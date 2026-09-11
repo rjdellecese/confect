@@ -447,6 +447,37 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect(
+    "rejects a non-interior split even when the end cursor is reformatted",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+
+        yield* c.run(
+          Effect.gen(function* () {
+            yield* insertNotes(["a", "b"]);
+            const reader = yield* DatabaseReader;
+            const source = reader.table("notes").stream("by_text");
+            const first = yield* QueryStream.paginate(source, {
+              cursor: null,
+              numItems: 1,
+            });
+            const result = yield* QueryStream.paginate(source, {
+              cursor: null,
+              endCursor: ` \n${first.continueCursor}\n `,
+              numItems: 1,
+              maximumRowsRead: 1,
+            }).pipe(Effect.result);
+
+            assert(Result.isFailure(result));
+            expect(result.failure).toBeInstanceOf(
+              QueryStream.ReadBudgetExceededError,
+            );
+          }),
+        );
+      }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("paginate reports SplitRequired when maximumBytesRead is hit", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -1566,6 +1597,67 @@ describe("QueryStream", () => {
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect(
+    "binds continuation and split cursors to the composed key layout",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+
+        yield* c.run(
+          Effect.gen(function* () {
+            yield* insertNotes(["a", "b", "c"]);
+            const reader = yield* DatabaseReader;
+            const source = reader.table("notes").stream("by_text");
+            const page = yield* QueryStream.paginate(source, {
+              cursor: null,
+              numItems: 10,
+              maximumRowsRead: 2,
+            });
+            assert(Predicate.isString(page.splitCursor));
+            const relabeled = source.pipe(
+              QueryStream.renameKey(["body", "_creationTime"]),
+            );
+
+            for (const cursor of [page.continueCursor, page.splitCursor]) {
+              const key = QueryStream.deserializeCursor(
+                cursor,
+                source.keyFields,
+              );
+              expect(key).toHaveLength(3);
+
+              for (const bound of ["cursor", "endCursor"] as const) {
+                const result = yield* QueryStream.paginate(relabeled, {
+                  cursor: null,
+                  numItems: 10,
+                  [bound]: cursor,
+                }).pipe(Effect.catchDefect(Effect.succeed));
+                expect(result).toMatchObject({
+                  data: { paginationError: "InvalidCursor" },
+                });
+              }
+            }
+
+            const rest = yield* QueryStream.paginate(
+              source.pipe(QueryStream.map((note) => note.text)),
+              {
+                cursor: page.continueCursor,
+                numItems: 10,
+              },
+            );
+            expect(rest.page).toEqual(["c"]);
+            const previous = yield* QueryStream.paginate(
+              QueryStream.reverse(source),
+              {
+                cursor: page.continueCursor,
+                numItems: 10,
+              },
+            );
+            expect(previous.page.map((note) => note.text)).toEqual(["a"]);
+          }),
+        );
+      }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("filter and map keep the stream paginable", () =>

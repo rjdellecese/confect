@@ -1,5 +1,6 @@
 import * as QueryStream from "@confect/server/QueryStream";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
@@ -92,6 +93,77 @@ describe("QueryStream.Element", () => {
   });
 });
 
+describe("QueryStream cursor serialization", () => {
+  it("round-trips Convex values and missing fields with their layout", () => {
+    const key: QueryStream.OrderKey = [
+      undefined,
+      null,
+      true,
+      "apple",
+      1,
+      2n,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      new Uint8Array([1, 2, 3]).buffer,
+      ["nested"],
+      { nested: "value" },
+    ];
+    const fields = key.map((_, index) => `field${index}`);
+    const cursor = QueryStream.serializeCursor(key, fields);
+
+    expect(JSON.parse(cursor)).toMatchObject({ version: 1, keyFields: fields });
+    expect(QueryStream.deserializeCursor(cursor)).toEqual(key);
+    expect(QueryStream.deserializeCursor(cursor, fields)).toEqual(key);
+  });
+
+  it("rejects serialization with mismatched key and field lengths", () => {
+    expect(() => QueryStream.serializeCursor([1], [])).toThrow(
+      "key and fields must have the same length",
+    );
+  });
+
+  it.each([
+    "not-json",
+    "null",
+    "[]",
+    '["apple",1,"id"]',
+    '{"keyFields":["text"],"key":["apple"]}',
+    '{"version":2,"keyFields":["text"],"key":["apple"]}',
+    '{"version":1,"keyFields":"text","key":["apple"]}',
+    '{"version":1,"keyFields":[1],"key":["apple"]}',
+    '{"version":1,"keyFields":["text"],"key":"apple"}',
+    '{"version":1,"keyFields":["text"],"key":[]}',
+    '{"version":1,"keyFields":["text"],"key":[{"$integer":"invalid"}]}',
+  ])("rejects malformed or unsupported cursor %s", (cursor) => {
+    expect(() => QueryStream.deserializeCursor(cursor)).toThrow(ConvexError);
+  });
+
+  it("validates field names and their order, not just their count", () => {
+    const cursor = QueryStream.serializeCursor(
+      ["apple", 1, "id"],
+      ["text", "_creationTime", "_id"],
+    );
+
+    for (const fields of [
+      ["body", "_creationTime", "_id"],
+      ["_creationTime", "text", "_id"],
+      ["text", "_creationTime"],
+    ]) {
+      expect(() => QueryStream.deserializeCursor(cursor, fields)).toThrow(
+        ConvexError,
+      );
+    }
+  });
+
+  it("distinguishes an empty order key from the end sentinel", () => {
+    const cursor = QueryStream.serializeCursor([], []);
+
+    expect(cursor).not.toBe(QueryStream.END_CURSOR);
+    expect(QueryStream.deserializeCursor(cursor, [])).toEqual([]);
+  });
+});
+
 describe.each(["asc", "desc"] as const)(
   "QueryStream.paginate (%s)",
   (order) => {
@@ -119,9 +191,16 @@ describe.each(["asc", "desc"] as const)(
             ),
           );
           const result = yield* QueryStream.paginate(source, {
-            cursor: start ? QueryStream.serializeCursor([values[1]]) : null,
+            cursor: start
+              ? QueryStream.serializeCursor([values[1]], source.keyFields)
+              : null,
             ...(end
-              ? { endCursor: QueryStream.serializeCursor([values[3]]) }
+              ? {
+                  endCursor: QueryStream.serializeCursor(
+                    [values[3]],
+                    source.keyFields,
+                  ),
+                }
               : {}),
             numItems: 10,
           });
@@ -130,10 +209,123 @@ describe.each(["asc", "desc"] as const)(
           expect(result.isDone).toBe(!end);
           expect(result.continueCursor).toBe(
             end
-              ? QueryStream.serializeCursor([values[3]])
+              ? QueryStream.serializeCursor([values[3]], source.keyFields)
               : QueryStream.END_CURSOR,
           );
         }),
+    );
+
+    it.effect.each(["cursor", "endCursor"] as const)(
+      "rejects an incompatible %s before reading documents",
+      (bound) =>
+        Effect.gen(function* () {
+          let reads = 0;
+          const source = new QueryStream.QueryStream(
+            order,
+            ["text", "_creationTime", "_id"],
+            Stream.fromEffect(
+              Effect.sync(() => {
+                reads++;
+                return new QueryStream.Element({
+                  doc: Option.some("apple"),
+                  key: ["apple", 1, "id"],
+                });
+              }),
+            ),
+          );
+
+          for (const cursor of [
+            '["apple",1,"id"]',
+            QueryStream.serializeCursor(
+              ["apple", 1, "id"],
+              ["body", "_creationTime", "_id"],
+            ),
+            QueryStream.serializeCursor(
+              ["apple", 1, "id"],
+              ["_creationTime", "text", "_id"],
+            ),
+          ]) {
+            for (const numItems of [0, 1]) {
+              const result = yield* QueryStream.paginate(source, {
+                cursor: QueryStream.serializeCursor(
+                  ["apple", 0, "before"],
+                  source.keyFields,
+                ),
+                numItems,
+                [bound]: cursor,
+              }).pipe(Effect.catchDefect(Effect.succeed));
+
+              expect(result).toBeInstanceOf(ConvexError);
+              expect(result).toMatchObject({
+                data: { paginationError: "InvalidCursor" },
+              });
+            }
+          }
+          expect(reads).toBe(0);
+        }),
+    );
+
+    it.effect("paginates tied values using the implicit ID", () =>
+      Effect.gen(function* () {
+        const ids = order === "asc" ? ["a", "b"] : ["b", "a"];
+        const source = new QueryStream.QueryStream(
+          order,
+          ["text", "_creationTime", "_id"],
+          Stream.fromIterable(
+            ids.map(
+              (id) =>
+                new QueryStream.Element({
+                  doc: Option.some(id),
+                  key: ["apple", 1, id],
+                }),
+            ),
+          ),
+        );
+        const first = yield* QueryStream.paginate(source, {
+          cursor: null,
+          numItems: 1,
+        });
+        const second = yield* QueryStream.paginate(source, {
+          cursor: first.continueCursor,
+          numItems: 1,
+        });
+        const end = yield* QueryStream.paginate(source, {
+          cursor: second.continueCursor,
+          numItems: 1,
+        });
+
+        expect([...first.page, ...second.page]).toEqual(ids);
+        expect(
+          QueryStream.deserializeCursor(first.continueCursor, source.keyFields),
+        ).toEqual(["apple", 1, ids[0]]);
+        expect(end).toMatchObject({
+          page: [],
+          isDone: true,
+          continueCursor: QueryStream.END_CURSOR,
+        });
+      }),
+    );
+
+    it.effect("pins a page to the end sentinel", () =>
+      Effect.gen(function* () {
+        const source = new QueryStream.QueryStream(
+          order,
+          ["_id"],
+          Stream.make(
+            new QueryStream.Element({ doc: Option.some(1), key: [1] }),
+          ),
+        );
+        const result = yield* QueryStream.paginate(source, {
+          cursor: null,
+          endCursor: QueryStream.END_CURSOR,
+          numItems: 1,
+        });
+        expect(result).toEqual({
+          page: [1],
+          isDone: true,
+          continueCursor: QueryStream.END_CURSOR,
+        });
+      }),
     );
   },
 );

@@ -9,65 +9,47 @@ description: "Compose, merge, join, and paginate index queries as Effect streams
   prerelease line, but its surface may still change between prereleases.
 </Warning>
 
-Query streams are an alternative querying API to the [`index`](/server/database/reading#standard-indexes) method, built around Effect's [`Stream`](https://effect.website/docs/stream/introduction). A **query stream** is a `Stream` of decoded documents in index order that also remembers how it is ordered. That extra knowledge is what lets streams be combined—merged, filtered, joined, deduplicated—and still be paginated with cursors afterwards, which a plain `Stream` cannot do.
-
-You can use Effect's `Stream` operations on a query stream, but transformations such as `Stream.take` return a plain `Stream`: the result loses the ordering metadata needed for further `QueryStream` composition and cursor pagination. This is useful when you only want a fixed number of results: `query.pipe(Stream.take(10), Stream.runCollect)` collects up to ten values without needing a cursor. Keep using `QueryStream` operations until you're ready to give up that metadata. Consumers such as `Stream.runCollect` instead return an `Effect` that produces the results when run.
-
-## The QueryStream type
-
-A `QueryStream` describes an ordered query, not its results. Creating or composing one does not read documents. Reads begin when you run a consuming effect, such as `Stream.runCollect(stream)` or `QueryStream.paginate(stream, paginationOpts)`. Each run executes the underlying queries again.
-
-The type has five parameters:
-
-```text
-QueryStream<Doc, Key, Direction, Error, Requirements>
-```
-
-| Parameter      | Meaning                                                                                                                                                                                      |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Doc`          | The type of each emitted value. Initially a decoded document; after `map` or a join, it can be any result type. `never` means the stream emits no values, as with an empty stream.           |
-| `Key`          | An ordered tuple of field names, such as `["text", "_creationTime"]`, describing the stream's sort order. It tracks the index fields left after `eq` pins values, not the values themselves. |
-| `Direction`    | Whether keys are visited in ascending (`"asc"`) or descending (`"desc"`) order. The union `"asc" \| "desc"` accepts either direction.                                                        |
-| `Error`        | Typed failures that can occur while reading or transforming values. `never` means no typed failures, but defects can still occur.                                                            |
-| `Requirements` | Effect services needed to run the stream. `never` means there are no outstanding service requirements.                                                                                       |
-
-The declaration abbreviates `Error` and `Requirements` as `E` and `R`. You normally let TypeScript infer all five parameters from `stream` and the operations you apply to it. Although the **type parameter** `Direction` defaults to the union, the **query method** `stream(...)` defaults to `"asc"`.
-
-For example, a notes query using the `by_text` index has this shape:
-
-```text
-QueryStream<Note, ["text", "_creationTime"], "asc", DocumentDecodeError, never>
-```
-
-Here, `Note` is the decoded note document type. The stream emits notes sorted by text and then creation time, can fail to decode a document, and needs no additional services. You create the query through Confect's `DatabaseReader` service, which provides access to your database, as shown in the [first query example](#a-first-query). The stream retains that database access, so you do not need to supply a reader again to consume it. Effectful operations such as `mapEffect` can add their own errors and service requirements.
-
-A `QueryStream<Doc, Key, Direction, Error, Requirements>` is also a `Stream<Doc, Error, Requirements>`: the emitted value, error, and requirement types carry over, but `Key` and `Direction` are specific to `QueryStream`.
+Query streams let you merge, filter, join, and deduplicate index queries while retaining cursor pagination. A **query stream** is an Effect [`Stream`](https://effect.website/docs/stream/introduction) of decoded documents with an order key and direction. Use `reader.table(...).stream(...)` for standard indexes; search indexes use [`search`](/server/database/reading#search-indexes).
 
 ## A first query
 
-Everything the `index` API does, a query stream does too: `collect`, `first`, and `take` are `Stream.runCollect`, `Stream.runHead`, and `Stream.take`, and `paginate` is `QueryStream.paginate`. What `index` can't do is combine queries, so once you're comfortable with streams you can use them for every standard-index query. (Search indexes stay with [`search`](/server/database/reading#search-indexes).)
+After [setting up Confect](/getting-started/quickstart), define a `feed` [paginated query spec](/server/functions#paginated-queries) with the notes document as its `item` schema. Its handler receives `paginationOpts` automatically. This handler merges notes from two roles, removes hidden notes, and returns a page:
 
-Create a stream with `stream` on a table, then compose it with the `QueryStream` module from `@confect/server`:
-
-```ts
-import { QueryStream } from "@confect/server";
+```ts confect/notes.impl.ts
+import { FunctionImpl, QueryStream } from "@confect/server";
 import * as Effect from "effect/Effect";
-import { DatabaseReader } from "./confect/_generated/services";
+import { DatabaseReader } from "./_generated/services";
+import databaseSchema from "./_generated/schema";
+import notes from "./notes.spec";
 
-Effect.gen(function* () {
-  const reader = yield* DatabaseReader;
+const feed = FunctionImpl.make(
+  databaseSchema,
+  notes,
+  "feed",
+  ({ paginationOpts }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
 
-  const byRole = (role: "admin" | "user") =>
-    reader
-      .table("notes")
-      .stream("by_role", (q) => q.eq("author.role", role), "desc");
+      const byRole = (role: "admin" | "user") =>
+        reader
+          .table("notes")
+          .stream("by_role", (q) => q.eq("author.role", role), "desc");
 
-  return yield* QueryStream.merge([byRole("admin"), byRole("user")]).pipe(
-    QueryStream.filter((note) => note.tag !== "hidden"),
-    QueryStream.paginate(paginationOpts),
-  );
-});
+      return yield* QueryStream.merge([byRole("admin"), byRole("user")]).pipe(
+        QueryStream.filter((note) => note.tag !== "hidden"),
+        QueryStream.paginate(paginationOpts),
+      );
+    }).pipe(Effect.orDie),
+);
 ```
+
+<Warning>
+  In React, use
+  [`useStreamPaginatedQuery`](/clients/react#usestreampaginatedquery), not
+  `usePaginatedQuery`, for stream-paginated queries. Stream pages aren't tracked
+  by Convex's query journal; the stream hook pins page ranges with `endCursor`
+  to keep loaded pages gap-free as data changes.
+</Warning>
 
 <Note>
   `reader.table("notes").stream(...)` is different from
@@ -76,27 +58,39 @@ Effect.gen(function* () {
   `Stream` over one query; the former is a composable query stream.
 </Note>
 
+## Operations at a glance
+
+The last column compares each operation with Effect's `Stream` operations.
+
+| Operation                                                                 | Order key                                      | In Effect                                                        |
+| ------------------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
+| [`stream`](#creating-a-stream)                                            | The index's fields, minus those pinned by `eq` | A `Stream` that remembers how it is sorted                       |
+| [`empty`](#empty-streams)                                                 | As given                                       | `Stream.empty` with a key                                        |
+| [`merge`](#merge)                                                         | Shared by every input; kept                    | Ordered, unlike `Stream.merge`                                   |
+| [`filter`/`filterEffect`](#filter-and-map)                                | Kept                                           | `Stream.filter`, `Stream.filterEffect`                           |
+| [`map`/`mapEffect`](#filter-and-map)                                      | Kept                                           | `Stream.map`, `Stream.mapEffect`                                 |
+| [`distinct`](#distinct)                                                   | Kept                                           | `Stream.changes` on a key prefix                                 |
+| [`narrow`](#narrow-to-a-key-range)                                        | Kept                                           | `dropWhile` and `takeUntil` on the key, pushed into the index    |
+| [`flatMap`](#flat-map)                                                    | Extended by the inner key                      | Sequential `Stream.flatMap`                                      |
+| [`flatMap` with `onEmpty`](#keep-outer-documents-without-inner-documents) | Extended by the inner key                      | `Stream.orElseIfEmpty` on each inner stream                      |
+| [`renameKey`](#rename-the-order-key)                                      | Field names relabeled                          | No equivalent                                                    |
+| [`reverse`](#reverse)                                                     | Kept; direction flipped                        | Reads the index backwards rather than reversing collected values |
+| [`Stream.runCollect`, `runHead`](#consuming-a-stream)                     | Consumed                                       | Effect's own consumers                                           |
+| [`Stream.take`](#consuming-a-stream)                                      | Not retained                                   | A transform returning a plain `Stream`                           |
+| [`unique`](#consuming-a-stream)                                           | Consumed                                       | `Stream.runHead` with a uniqueness check                         |
+| [`paginate`](#paginating-a-stream)                                        | Consumed                                       | `Stream.take(numItems)` after narrowing to the cursor            |
+
 ## The ordering contract
 
-Every query stream is sorted by its **order key** in its **direction**, and every operation on this page keeps it that way. That invariant is what a plain `Stream` lacks and what the rest of this page relies on: two streams sorted by the same key can be merged without collecting them, a cursor is a key, and a page of any composition resumes by restricting its output to the keys after that cursor.
+Every query stream visits its **order keys** in its **direction**. Keys are stored separately from emitted values, so mapping a document doesn't change its position. Compatible streams can be merged in key order, and pagination resumes after a saved key rather than an offset.
 
 The `Key` and `Direction` type parameters enforce this contract: `merge` refuses streams whose known keys or directions differ at compile time. Directions chosen at runtime are also checked at runtime.
 
-Only three operations change the key at all:
+`flatMap` appends the inner key to the outer key; `renameKey` relabels fields without reordering values. `reverse` changes the direction, not the key.
 
-- `flatMap` extends it, appending the inner stream's key to the outer stream's.
-- `renameKey` relabels its fields, without reordering anything.
-- `reverse` flips the direction.
+## Example data and diagram notation
 
-Everything else keeps the key exactly as it is, and the sinks consume it.
-
-## How this page is written
-
-Each operation is shown on one small dataset.
-
-### The example data
-
-Every example on this page runs over these two tables:
+The examples use these two tables. `n1` and `c1` are readable stand-ins for real Convex document IDs:
 
 | `notes` | `text`     | `author.role` | `tag`      | `_creationTime` |
 | ------- | ---------- | ------------- | ---------- | --------------- |
@@ -113,11 +107,13 @@ Every example on this page runs over these two tables:
 | `c2`       | `n1`     | `"meh"`   | 8               |
 | `c3`       | `n4`     | `"nice"`  | 9               |
 
-`notes` has the indexes `by_text` on `["text"]` and `by_role` on `["author.role"]`; `comments` has `by_note` on `["noteId"]` and `by_body` on `["body"]`. Convex appends `_creationTime` to every index, so `by_text` orders by `text` and then by creation time.
+`notes` has the indexes `by_text` on `["text"]` and `by_role` on `["author.role"]`; `comments` has `by_note` on `["noteId"]` and `by_body` on `["body"]`. Runtime order keys include `_creationTime` and `_id` tiebreakers, so `by_text` orders by text, creation time, then ID.
 
 ### Reading the diagrams
 
 A stream is drawn as a track, read left to right in **key order**—the way a marble diagram reads left to right in time, with the index's ordering as the axis:
+
+Diagram keys are **abbreviated**: `[apple,1]` means `["apple", 1, "n1"]`, with `_id` omitted for space. Joined keys omit both outer and inner IDs: `[1,7]` means `[1, "n1", 7, "c1"]`. Cursor labels such as `cursor: [apple,3]` stand for schematic **strings**, not arrays accepted by the API. See [Cursor format and validation](#cursor-format-and-validation) for the actual wire format.
 
 {/* stream-diagram: legend */}
 
@@ -134,32 +130,11 @@ by_text
 - `┤` is the end of the stream, `╎` a cursor: a position between two keys.
 - `╞═ … ═╡` is the operation between the input track (above) and its output (below). Tracks in one diagram share columns, so elements that line up vertically hold the same position in the output's order.
 
-## Operations at a glance
-
-Grouped by what each operation does to the order key. The last column names the nearest thing in Effect's `Stream` module for readers who know it.
-
-| Operation                                                                 | Order key                                      | In Effect                                                     |
-| ------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------- |
-| [`stream`](#creating-a-stream)                                            | The index's fields, minus those pinned by `eq` | A `Stream` that remembers how it is sorted                    |
-| [`empty`](#empty-streams)                                                 | As given                                       | `Stream.empty` with a key                                     |
-| [`merge`](#merge)                                                         | Shared by every input; kept                    | Ordered, unlike `Stream.merge`; ZIO's `mergeSorted`           |
-| [`filter`/`filterEffect`](#filter-and-map)                                | Kept                                           | `Stream.filter`, `Stream.filterEffect`                        |
-| [`map`/`mapEffect`](#filter-and-map)                                      | Kept                                           | `Stream.map`, `Stream.mapEffect`                              |
-| [`distinct`](#distinct)                                                   | Kept                                           | `Stream.changes` on a key prefix                              |
-| [`narrow`](#narrow-to-a-key-range)                                        | Kept                                           | `dropWhile` and `takeUntil` on the key, pushed into the index |
-| [`flatMap`](#flat-map)                                                    | Extended by the inner key                      | `Stream.flatMap`, sequential like RxJS's `concatMap`          |
-| [`flatMap` with `onEmpty`](#keep-outer-documents-without-inner-documents) | Extended by the inner key                      | `Stream.orElseIfEmpty` on each inner stream                   |
-| [`renameKey`](#rename-the-order-key)                                      | Relabeled                                      | Changes only the `Key` type parameter                         |
-| [`reverse`](#reverse)                                                     | Direction flipped                              | `Array.reverse`, read that way from the index                 |
-| [`Stream.runCollect`, `runHead`, `take`](#consuming-a-stream)             | Consumed                                       | Effect's own sinks                                            |
-| [`unique`](#consuming-a-stream)                                           | Consumed                                       | `Stream.runHead` with a uniqueness check                      |
-| [`paginate`](#paginating-a-stream)                                        | Consumed                                       | `Stream.take(numItems)` after narrowing to the cursor         |
-
 ## Creating a stream
 
 `stream` takes an index name, an optional range callback, and an optional order (`"asc"` by default). It returns a `QueryStream` whose elements are decoded documents, in index order.
 
-A stream value is a reusable description of a query rather than a result: every run re-runs the index query.
+Creating or composing a stream does not read documents. Reads begin when you run a consuming effect, such as `Stream.runCollect` or `QueryStream.paginate`; each run executes the queries again.
 
 ```ts Every note, sorted by text
 reader.table("notes").stream("by_text");
@@ -210,7 +185,9 @@ Fields must be used in the order the index declares them, and each method only o
 
 ### Order keys
 
-The fields that still vary after pinning, followed by the implicit `_creationTime` tiebreaker, form the stream's [order key](#the-ordering-contract). `reader.table("notes").stream("by_text")` has the key `["text", "_creationTime"]`, while pinning the text with `eq` leaves `["_creationTime"]`. The key is what decides which streams can be merged.
+The type-level `Key` tracks varying index fields, including `_creationTime`, but omits implicit `_id` fields. `reader.table("notes").stream("by_text")` has the type-level key `["text", "_creationTime"]`; its runtime `keyFields` are `["text", "_creationTime", "_id"]`, with values such as `["apple", 1, "n1"]`. Pinning text with `eq` removes it from both layouts.
+
+Use the type-level key for `empty`, `distinct`, `renameKey`, and `flatMap`'s `innerKey`. Use runtime keys for exact `narrow` boundaries and cursor serialization. Preserve every `_id` in a boundary: it distinguishes documents with otherwise equal keys. A [flat-map](#flat-map) keeps an ID for each level of the join, not just the final document.
 
 ### Empty streams
 
@@ -223,7 +200,7 @@ nothing
 ╰┤
 ```
 
-Nothing can infer a document type from no documents, so the type comes first as a type argument and the key second. The key is the type-level order key of the streams it will be merged with, tiebreaker included; the [generated document types](/server/database/schema#document-types) name the document:
+Pass the document type as a type argument, then the type-level key of the streams it will be merged with (`_creationTime` included, implicit `_id` omitted). The [generated document types](/server/database/schema#document-types) name the document:
 
 ```ts
 import * as Array from "effect/Array";
@@ -247,7 +224,7 @@ const notesByRoles = (roles: ReadonlyArray<"admin" | "user">) =>
 
 A query stream is a genuine `Stream`, so everything in Effect's `Stream` module applies (`QueryStream.isQueryStream` tells the two apart at runtime):
 
-`Stream.runCollect` collects all results, `Stream.runHead` returns the first result as an `Option`, and `Stream.take(n)` limits the stream to at most `n` results.
+`Stream.runCollect` returns an effect that collects all results; `Stream.runHead` returns an effect producing the first result as an `Option`. `Stream.take(n)` is a transform, not a consumer: it returns a plain stream of at most `n` results, which you can then collect.
 
 ```ts
 import * as Stream from "effect/Stream";
@@ -293,8 +270,6 @@ eq "fig"
 
 ## Composing streams
 
-Each operation below returns another query stream, so results stay mergeable and paginable. They are grouped by what they do to the [order key](#the-ordering-contract): `merge` combines streams that share one; `filter`, `map`, `distinct`, and `narrow` keep it; `flatMap` extends it; `renameKey` relabels it; `reverse` flips its direction.
-
 Keep callbacks deterministic and read-only: pagination, seeks, and reversal can reevaluate them for the same document. Effects should be safe to run again, not perform writes or other one-time side effects.
 
 ### Merge
@@ -333,13 +308,11 @@ merged
    [1]         [2]         [3]         [4]         [5]         [6]
 ```
 
-All inputs must have the same order key, document type, and order direction, which are all type errors otherwise. The direction is `"asc"` when omitted and the given literal when passed one; the first input fixes it and each later input must match. A direction chosen at runtime types as `"asc" | "desc"`: such a stream can lead a merge (a known direction is assignable to it) but can't follow a known one, and a mismatch the types can't see makes `merge` throw when the streams are combined. Overlapping inputs are not deduplicated: a document matched by two inputs appears twice.
+Inputs must have compatible document types and identical order-key layouts and directions. TypeScript rejects known mismatches; runtime direction mismatches throw when the streams are combined. For different document shapes or field names, [map and relabel](#rename-the-order-key) first. Overlapping inputs are not deduplicated: a document matched by two inputs appears twice.
 
 ### Filter and map
 
-`QueryStream.filter` and `QueryStream.map` are the `filter` and `map` that keep the result a query stream.
-
-The plain `Stream.filter` and `Stream.map` work on a query stream too, but like any plain combinator they return an ordinary `Stream` that can no longer be merged or paginated (see [Consuming a stream](#consuming-a-stream)). A document that `QueryStream.filter` rejects still counts as _read_, so cursors keep advancing past it and pagination stays correct.
+`QueryStream.filter` removes emitted values; `QueryStream.map` transforms them. Both preserve the original stored order keys. A rejected document still counts as _read_, so cursors can advance past it.
 
 ```ts
 reader
@@ -373,7 +346,7 @@ mapped
    [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
 ```
 
-A mapper must not change what the documents are ordered by—the mapped stream keeps the original order key.
+A mapper may replace any emitted fields, including fields named in the index, or emit a different shape entirely. It never recomputes the stored key or sorts by the new values. For example, mapping `note.text` to its length still orders by the original text, creation time, and ID—not by length.
 
 When the predicate or mapper needs to run an effect—read another table, use a service, or fail with a typed error—use `QueryStream.filterEffect` and `QueryStream.mapEffect` instead. They behave the same way, and the effect's error and requirement types flow into the stream's:
 
@@ -453,8 +426,8 @@ Endpoints follow **stream order**: on an ascending stream, `start` is the lower 
 
 ```ts
 const between = QueryStream.narrow(reader.table("notes").stream("by_text"), {
-  start: { key: ["banana", 2], inclusive: false },
-  end: { key: ["cherry", 4], inclusive: true },
+  start: { key: ["banana", 2, "n2"], inclusive: false },
+  end: { key: ["cherry", 4, "n4"], inclusive: true },
 });
 ```
 
@@ -500,7 +473,7 @@ When both endpoints use the same key, the range is empty unless both are inclusi
 
 On a `distinct` stream, full-key bounds filter the original representatives exactly; they do not select a replacement from within the narrowed range. Explicit prefix bounds still include or exclude whole groups. Bounds applied before `distinct` constrain its input and can change which document represents a group; bounds applied after it constrain only the output, preserving that original input range and its representatives.
 
-`paginate` uses an exclusive start and an inclusive end. To resume manually from a page's cursor, pass `{ start: { key: QueryStream.deserializeCursor(page.continueCursor), inclusive: false } }` to `narrow`.
+`paginate` uses an exclusive start and an inclusive end. For a nonterminal page, decode its `continueCursor` with `QueryStream.deserializeCursor(page.continueCursor, query.keyFields)` and pass that full runtime key as an exclusive `start` to `narrow`. Do not decode `QueryStream.END_CURSOR` as a boundary; it is an end-of-stream sentinel.
 
 ### Flat-map
 
@@ -544,7 +517,7 @@ joined
 
 Pass the inner streams' order key as `innerKey`; it is checked against the type of the stream the function returns. Inner streams must run in the outer stream's direction: with `QueryStream.flatMap(outer, f, options)` the outer stream fixes it and a differing inner stream is a type error, while with `outer.pipe(QueryStream.flatMap(f, options))` the inner streams fix it. A mismatch the types can't see fails when the join runs.
 
-The result's order key is the concatenation `["_creationTime", "_creationTime"]` here: the outer note's, then the comment's.
+Here the type-level key is `["_creationTime", "_creationTime"]`, but the runtime layout is `["_creationTime", "_id", "_creationTime", "_id"]`: the outer note's complete key, then the comment's. For `c1`, that is `[1, "n1", 7, "c1"]`. Keep both IDs when serializing or narrowing a joined stream; equal outer timestamps must not collapse distinct notes into one group.
 
 ### Keep outer documents without inner documents
 
@@ -610,13 +583,13 @@ interface Entry {
 const entries = QueryStream.merge([
   reader
     .table("notes")
-    .stream("by_text") // order key: ["text", "_creationTime"]
+    .stream("by_text") // type-level key: ["text", "_creationTime"]
     .pipe(
       QueryStream.map((note): Entry => ({ kind: "note", text: note.text })),
     ),
   reader
     .table("comments")
-    .stream("by_body") // order key: ["body", "_creationTime"]
+    .stream("by_body") // type-level key: ["body", "_creationTime"]
     .pipe(
       QueryStream.map((comment): Entry => ({
         kind: "comment",
@@ -693,11 +666,54 @@ Merges, filters and maps, flat-maps (their inner streams included), `distinct`, 
 
 ## Paginating a stream
 
-`QueryStream.paginate` consumes one page of any composed stream, using the same `paginationOpts` shape that Convex's built-in `paginate` does.
+`QueryStream.paginate` returns an effect producing one page of a composed stream. Pass the handler's `paginationOpts` as in the [first example](#a-first-query); the options follow Convex's pagination protocol with the semantics of [`convex-helpers`' stream pagination](https://stack.convex.dev/merging-streams-of-convex-data).
 
-It runs the stream narrowed to the keys after `cursor` (and up to `endCursor`, when given), collects `numItems` documents that pass the filters into a page, and reports a safe logical key as the next cursor. With `endCursor`, it reads through that cursor inclusively and ignores `numItems`. A cursor is a key rather than an offset, so resuming does not require scanning all earlier results, though a composition may need extra reads to produce each item.
+### Options
 
-Three pages of two over the filtered notes. Each page starts where the previous one's cursor points, so no page re-reads an earlier one; the hidden note is read on the last page, counted, and not returned:
+| Field              | Meaning                                                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cursor`           | Required exclusive start boundary. `null` starts at the beginning of the stream.                                                                                    |
+| `numItems`         | Requested number of emitted values, excluding filtered documents. Ignored as an item limit when `endCursor` is set.                                                 |
+| `endCursor`        | Optional inclusive end boundary. Pins the page to a key range regardless of how many values it contains. `QueryStream.END_CURSOR` pins it to the end of the stream. |
+| `maximumRowsRead`  | Optional budget for physical document reads from underlying `QueryStream` index queries, including filtered documents.                                              |
+| `maximumBytesRead` | Optional budget charging each document's estimated size on every read, not Convex's exact billed bytes.                                                             |
+
+### Result
+
+| Field            | Meaning and action                                                                                                                                                                                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page`           | Array of emitted values, possibly empty even when the stream made progress past filtered documents.                                                                                                                                                                     |
+| `continueCursor` | String identifying the next page's exclusive start. Save it unchanged; when the end is reached, the returned sentinel is `QueryStream.END_CURSOR` (`"[]"`). Never pass that sentinel as a normal `cursor`.                                                              |
+| `splitCursor`    | Optional interior boundary used to subdivide a page. Pin the left page with `endCursor: splitCursor`; start the right page with `cursor: splitCursor`, retaining the original end boundary.                                                                             |
+| `pageStatus`     | `"SplitRequired"` when a read budget stops the page at a safe boundary; `"SplitRecommended"` when a pinned page has grown too large or a page scans many rows. Both provide a `splitCursor`; otherwise this field may be absent. Stream-aware clients handle splitting. |
+| `isDone`         | `true` confirms the true end of the stream. Reaching a pinned key does not prove completion. A split recommendation can report `false` even at the end; handle splitting before requesting another page.                                                                |
+
+For a one-shot read inside a handler, consume the result's `page`. For sequential reads, preserve the returned cursor rather than reconstructing it from the last visible document:
+
+```ts
+const query = reader.table("notes").stream("by_text");
+const first =
+  yield *
+  QueryStream.paginate(query, {
+    cursor: null,
+    numItems: 2,
+  });
+
+const next =
+  first.isDone || first.continueCursor === QueryStream.END_CURSOR
+    ? undefined
+    : yield *
+      QueryStream.paginate(query, {
+        cursor: first.continueCursor,
+        numItems: 2,
+      });
+```
+
+For reactive clients, return the whole pagination result from the handler so the client can pin and split pages, rather than returning just `page`.
+
+### Page boundaries
+
+Three pages of two over the filtered notes follow each prior cursor. In this direct filtered scan, earlier documents aren't reread; the hidden note is read on the last page, counted, and not returned:
 
 {/* stream-diagram: paginate */}
 
@@ -734,66 +750,61 @@ filtered
                          ╎ n2 ──────── n5 ───────╎  exactly this range, however many documents it holds
 ```
 
-A [paginated query](/server/functions#paginated-queries) handler forwards its decoded `paginationOpts`:
+### Read budgets
 
-```ts confect/notes.impl.ts
-import { FunctionImpl, QueryStream } from "@confect/server";
-import * as Effect from "effect/Effect";
-import { DatabaseReader } from "./_generated/services";
-import databaseSchema from "./_generated/schema";
-import notes from "./notes.spec";
-
-const feed = FunctionImpl.make(
-  databaseSchema,
-  notes,
-  "feed",
-  ({ paginationOpts }) =>
-    Effect.gen(function* () {
-      const reader = yield* DatabaseReader;
-
-      const byRole = (role: "admin" | "user") =>
-        reader
-          .table("notes")
-          .stream("by_role", (q) => q.eq("author.role", role), "desc");
-
-      return yield* QueryStream.merge([byRole("admin"), byRole("user")]).pipe(
-        QueryStream.filter((note) => note.tag !== "hidden"),
-        QueryStream.paginate(paginationOpts),
-      );
-    }).pipe(Effect.orDie),
-);
-```
-
-Cursor bounds are pushed into underlying index queries where possible. Filters, distinct-group discovery, repeated seeks, merge prefetch, and joins can read more documents than the page returns, including documents read by an earlier page.
-
-### Pagination protocol
-
-`paginate` speaks Convex's pagination protocol, with the semantics of [`convex-helpers`' stream pagination](https://stack.convex.dev/merging-streams-of-convex-data):
-
-| Field                            | Meaning                                                                                                                                                                                                                        |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `cursor`                         | Where the page starts, exclusive. `null` starts at the beginning of the stream.                                                                                                                                                |
-| `numItems`                       | How many documents to return, counting only documents that pass filters.                                                                                                                                                       |
-| `endCursor`                      | When present, the page runs exactly to this cursor (inclusive) and `numItems` is ignored. Pinning pages this way keeps adjacent pages gap-free as data changes. `QueryStream.END_CURSOR` pins a page to the end of the stream. |
-| `maximumRowsRead`                | A budget counting physical document reads from underlying `QueryStream` index queries, filtered or not. On exhaustion, a page that made safe progress returns with `pageStatus: "SplitRequired"` and a `splitCursor`.          |
-| `maximumBytesRead`               | The same budget in bytes, charging each document's estimated size on every read. This is not an exact measure of Convex's billed bytes.                                                                                        |
-| `pageStatus: "SplitRecommended"` | Returned with a `splitCursor` when a pinned page has grown well past `numItems`, or any page had to scan a very large number of rows for its items, so reactive clients can subdivide it.                                      |
-| `isDone`                         | `true` only when the page reached the true end of the stream.                                                                                                                                                                  |
-
-Both budgets include group discovery, repeated reads during seeks, merge prefetch, and outer and inner `QueryStream` reads in joins. They do not track arbitrary I/O inside callbacks, such as a separate database lookup in `mapEffect`.
+Cursor bounds are pushed into underlying index queries where possible, but compositions may read more documents than they return, including documents read by an earlier page. Both budgets count filtered documents, distinct-group discovery, repeated seeks, merge prefetch, and outer and inner `QueryStream` reads in joins. They do not track arbitrary I/O inside callbacks, such as a separate database lookup in `mapEffect`.
 
 A budget-limited page stops at a safe logical key so resuming cannot skip an unfinished group or join. If the budget prevents safe progress or a strictly interior split of a pinned page, `paginate` fails with the typed `ReadBudgetExceededError` instead of returning a non-advancing cursor or repeating the same split. Increase the budget or change the query to reduce the reads needed for progress. Byte accounting happens after each document is read, so the last document can take the total over `maximumBytesRead`.
 
-A cursor that is malformed, or that was issued by a stream with a different order key (for example after an index change is deployed), fails the query with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }`—the signal `convex/react` and Confect's hooks treat as "restart pagination".
+### Cursor format and validation
+
+Boundary cursors are JSON strings containing a versioned envelope: `{ version: 1, keyFields: [...], key: [...] }`. `keyFields` contains the full runtime field layout in order, including implicit IDs; `key` contains the corresponding encoded values. For the example note `n3`, the serialized cursor string contains this JSON object (using the example's stand-in ID):
+
+```json
+{
+  "version": 1,
+  "keyFields": ["text", "_creationTime", "_id"],
+  "key": ["apple", 3, "n3"]
+}
+```
+
+| API                                     | Contract                                                                                                                                                             |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `serializeCursor(key, keyFields)`       | Serializes a full runtime `OrderKey` with its runtime field names. Both arguments are required; use the stream's `keyFields`, not its type-level `Key`.              |
+| `deserializeCursor(cursor, keyFields?)` | Validates the envelope and returns a decoded runtime `OrderKey`, preserving IDs. If expected `keyFields` are supplied, also validates the exact ordered field names. |
+| `END_CURSOR`                            | The string `"[]"`, returned when pagination reaches the end. Accepted as an `endCursor` sentinel only, not as a normal start or decoded key boundary.                |
+
+`paginate` validates boundary cursors against the stream's runtime layout. Malformed envelopes, unsupported versions, and mismatched ordered field names fail with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }`. Confect's pagination clients treat that signal as a request to restart. Old bare-array boundary cursors are rejected; `"[]"` retains only its sentinel role.
+
+The envelope does **not** identify the query, index, filters, pinned `eq` values, or direction. A change to any of those that preserves the runtime field layout is not automatically detected. Restart pagination when changing query semantics; do not rely on cursor validation to invalidate every cursor after a deployment.
 
 <Warning>
-  Stream cursors contain the order-key **values** of the page boundary,
-  serialized as JSON, rather than an opaque token. Anyone who receives a page
-  can read those values and craft cursors for chosen keys within the stream's
-  range. Don't paginate publicly over a sensitive indexed field without pinning
-  it with `eq`.
+  Stream cursors expose the boundary's field names and order-key **values**,
+  including document IDs. They are not opaque or signed: clients can read them
+  and craft cursors for chosen keys within the stream's range. Don't paginate
+  publicly over a sensitive indexed field without pinning it with `eq`.
 </Warning>
 
 ### On the client
 
-Pages of a stream-paginated query are not tracked by Convex's query journal, so [`usePaginatedQuery`](/clients/react#usepaginatedquery) can't keep them gap-free as data changes. Use [`useStreamPaginatedQuery`](/clients/react#usestreampaginatedquery) instead, which pins each loaded page with `endCursor` and splits pages that outgrow their size. Foldkit's [`PaginatedQuery`](/clients/foldkit#paginated-queries) machine works with stream-paginated queries as is: it pins each page it navigates away from, so going back reloads the same range.
+React's [`useStreamPaginatedQuery`](/clients/react#usestreampaginatedquery) handles page pinning, splitting, and invalid-cursor resets. Foldkit's [`PaginatedQuery`](/clients/foldkit#paginated-queries) machine also works with stream-paginated queries: it pins each page it navigates away from, so going back reloads the same range.
+
+## The QueryStream type
+
+TypeScript normally infers these parameters from `stream` and its composition:
+
+```text
+QueryStream<Doc, Key, Direction, Error, Requirements>
+```
+
+| Parameter            | Meaning                                                                                                                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Doc`                | Each emitted value: initially a decoded document, or a mapped/joined result. `never` means no values, as with an empty stream.                                                |
+| `Key`                | Ordered field-name tuple left after `eq` pins fields, such as `["text", "_creationTime"]`. Omits implicit `_id` fields; see [Order keys](#order-keys) for the runtime layout. |
+| `Direction`          | `"asc"` or `"desc"`. The type parameter defaults to their union; the `stream(...)` method defaults to `"asc"`.                                                                |
+| `Error` (`E`)        | Typed failures while reading or transforming values. `never` means no typed failures, not no defects.                                                                         |
+| `Requirements` (`R`) | Effect services needed to run the stream. `never` means no outstanding service requirements.                                                                                  |
+
+For example, the notes `by_text` query has type `QueryStream<Note, ["text", "_creationTime"], "asc", DocumentDecodeError, never>`. It retains the database access supplied when it was created, so consuming it doesn't require providing `DatabaseReader` again. `mapEffect` and other effectful operations can add errors and service requirements.
+
+A `QueryStream<Doc, Key, Direction, E, R>` is also a `Stream<Doc, E, R>`; only `QueryStream` carries the key and direction types.
