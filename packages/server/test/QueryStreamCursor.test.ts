@@ -13,6 +13,7 @@ describe("QueryStreamCursor schema", () => {
     });
     const serialized = Schema.encodeSync(QueryStreamCursor.Json)(cursor);
 
+    expect(cursor).toBeInstanceOf(QueryStreamCursor.QueryStreamCursor);
     expectTypeOf(cursor).toEqualTypeOf<QueryStreamCursor.QueryStreamCursor>();
     expectTypeOf<QueryStreamCursor.QueryStreamCursor>().toEqualTypeOf<{
       readonly version: 1;
@@ -22,6 +23,9 @@ describe("QueryStreamCursor schema", () => {
     expect(Schema.decodeSync(QueryStreamCursor.Json)(serialized)).toEqual(
       cursor,
     );
+    expect(
+      Schema.decodeSync(QueryStreamCursor.Json)(serialized),
+    ).toBeInstanceOf(QueryStreamCursor.QueryStreamCursor);
     expect(serialized).toBe(
       Schema.encodeSync(QueryStreamCursor.forKeyFields(cursor.keyFields))([
         "apple",
@@ -29,6 +33,17 @@ describe("QueryStreamCursor schema", () => {
         "id",
       ]),
     );
+  });
+
+  it("validates the key layout during class construction", () => {
+    expect(
+      () =>
+        new QueryStreamCursor.QueryStreamCursor({
+          version: 1,
+          keyFields: ["text"],
+          key: [],
+        }),
+    ).toThrow("Schema validation failed");
   });
 
   it.each([
@@ -134,11 +149,11 @@ describe("QueryStreamCursor serialization", () => {
     "round-trips native cursor values through the standard effectful schema APIs",
     () =>
       Effect.gen(function* () {
-        const value: QueryStreamCursor.QueryStreamCursor = {
+        const value = yield* QueryStreamCursor.QueryStreamCursor.makeEffect({
           version: 1,
           keyFields: ["optional", "integer", "bytes"],
           key: [undefined, 42n, new Uint8Array([1, 2]).buffer],
-        };
+        });
         const encoded = yield* Schema.encodeEffect(QueryStreamCursor.Json)(
           value,
         );
