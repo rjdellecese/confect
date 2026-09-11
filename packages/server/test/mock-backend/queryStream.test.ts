@@ -9,6 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import type * as Types from "effect/Types";
 import {
@@ -577,7 +578,9 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
-          const afterKey = QueryStreamCursor.deserialize(page1.continueCursor);
+          const afterKey = (yield* Schema.decodeEffect(QueryStreamCursor.Json)(
+            page1.continueCursor,
+          )).key;
 
           const narrowed = QueryStream.narrow(leaf, {
             start: { key: afterKey, inclusive: false },
@@ -623,7 +626,9 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
-          const afterKey = QueryStreamCursor.deserialize(page1.continueCursor);
+          const afterKey = (yield* Schema.decodeEffect(QueryStreamCursor.Json)(
+            page1.continueCursor,
+          )).key;
 
           // Pure transforms narrow by narrowing their input, so the bounds
           // still reach the leaf rather than falling back to in-memory
@@ -1622,10 +1627,9 @@ describe("QueryStream", () => {
             );
 
             for (const cursor of [page.continueCursor, page.splitCursor]) {
-              const key = QueryStreamCursor.deserialize(
-                cursor,
-                source.keyFields,
-              );
+              const key = yield* Schema.decodeEffect(
+                QueryStreamCursor.forKeyFields(source.keyFields),
+              )(cursor);
               expect(key).toHaveLength(3);
 
               for (const bound of ["cursor", "endCursor"] as const) {

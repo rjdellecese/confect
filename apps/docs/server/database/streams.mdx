@@ -473,7 +473,7 @@ When both endpoints use the same key, the range is empty unless both are inclusi
 
 On a `distinct` stream, full-key bounds filter the original representatives exactly; they do not select a replacement from within the narrowed range. Explicit prefix bounds still include or exclude whole groups. Bounds applied before `distinct` constrain its input and can change which document represents a group; bounds applied after it constrain only the output, preserving that original input range and its representatives.
 
-`paginate` uses an exclusive start and an inclusive end. For a nonterminal page, decode its `continueCursor` with `QueryStreamCursor.deserialize(page.continueCursor, query.keyFields)` and pass that full runtime key as an exclusive `start` to `narrow`. Do not decode `QueryStreamCursor.END_CURSOR` as a boundary; it is an end-of-stream sentinel.
+`paginate` uses an exclusive start and an inclusive end. For a nonterminal page, decode its `continueCursor` with the [stream's cursor schema](#cursor-format-and-validation) and pass that full runtime key as an exclusive `start` to `narrow`. Do not decode `QueryStreamCursor.END_CURSOR` as a boundary; it is an end-of-stream sentinel.
 
 ### Flat-map
 
@@ -770,13 +770,33 @@ Boundary cursors are JSON strings containing a versioned envelope: `{ version: 1
 }
 ```
 
-The `QueryStreamCursor` module, exported from `@confect/server`, owns the envelope schema and inferred `QueryStreamCursor` type. Its `Json` codec encodes that envelope as a string; its `OrderKey` type describes decoded Convex values, including missing fields as `undefined`.
+The `QueryStreamCursor` module, exported from `@confect/server`, models cursors with native Convex values: decoded keys can contain `bigint`, `ArrayBuffer`, or `undefined`. Its schemas handle the full JSON round trip through Effect's standard encoding and decoding APIs.
 
-| `QueryStreamCursor` export        | Contract                                                                                                                                                             |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `serialize(key, keyFields)`       | Serializes a full runtime `OrderKey` with its runtime field names. Both arguments are required; use the stream's `keyFields`, not its type-level `Key`.              |
-| `deserialize(cursor, keyFields?)` | Validates the envelope and returns a decoded runtime `OrderKey`, preserving IDs. If expected `keyFields` are supplied, also validates the exact ordered field names. |
-| `END_CURSOR`                      | The string `"[]"`, returned when pagination reaches the end. Accepted as an `endCursor` sentinel only, not as a normal start or decoded key boundary.                |
+| `QueryStreamCursor` export | Contract                                                                                                                                                                                                 |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QueryStreamCursor`        | Schema and inferred type for the full native cursor: version, runtime field names, and key values.                                                                                                       |
+| `Json`                     | String codec for the full native cursor, including Convex's special-value encodings.                                                                                                                     |
+| `OrderKey`                 | Schema and inferred type for decoded key values, including IDs and missing fields as `undefined`.                                                                                                        |
+| `forKeyFields(keyFields)`  | Returns a string codec for an `OrderKey`. Decoding checks the exact ordered field names; encoding supplies the version and field names automatically. Use runtime `keyFields`, not the type-level `Key`. |
+| `END_CURSOR`               | The string `"[]"`, returned when pagination reaches the end. Accepted as an `endCursor` sentinel only, not as a normal start or decoded key boundary.                                                    |
+
+For example, resume manually from a nonterminal page inside an effect:
+
+```ts
+import { QueryStreamCursor } from "@confect/server";
+import * as Schema from "effect/Schema";
+
+Effect.gen(function* () {
+  const Cursor = QueryStreamCursor.forKeyFields(query.keyFields);
+  const key = yield* Schema.decodeEffect(Cursor)(page.continueCursor);
+
+  return QueryStream.narrow(query, {
+    start: { key, inclusive: false },
+  });
+});
+```
+
+To encode a boundary key, use `Schema.encodeEffect(Cursor)(key)`. Both directions report schema failures through Effect's error channel.
 
 `paginate` validates boundary cursors against the stream's runtime layout. Malformed envelopes, unsupported versions, and mismatched ordered field names fail with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }`. Confect's pagination clients treat that signal as a request to restart. The string `"[]"` is accepted only as an `endCursor` sentinel.
 

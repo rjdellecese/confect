@@ -4,6 +4,7 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 describe("QueryStream type parameters", () => {
@@ -122,14 +123,15 @@ describe.each(["asc", "desc"] as const)(
           );
           const result = yield* QueryStream.paginate(source, {
             cursor: start
-              ? QueryStreamCursor.serialize([values[1]], source.keyFields)
+              ? yield* Schema.encodeEffect(
+                  QueryStreamCursor.forKeyFields(source.keyFields),
+                )([values[1]])
               : null,
             ...(end
               ? {
-                  endCursor: QueryStreamCursor.serialize(
-                    [values[3]],
-                    source.keyFields,
-                  ),
+                  endCursor: yield* Schema.encodeEffect(
+                    QueryStreamCursor.forKeyFields(source.keyFields),
+                  )([values[3]]),
                 }
               : {}),
             numItems: 10,
@@ -139,7 +141,9 @@ describe.each(["asc", "desc"] as const)(
           expect(result.isDone).toBe(!end);
           expect(result.continueCursor).toBe(
             end
-              ? QueryStreamCursor.serialize([values[3]], source.keyFields)
+              ? yield* Schema.encodeEffect(
+                  QueryStreamCursor.forKeyFields(source.keyFields),
+                )([values[3]])
               : QueryStreamCursor.END_CURSOR,
           );
         }),
@@ -166,21 +170,18 @@ describe.each(["asc", "desc"] as const)(
 
           for (const cursor of [
             '["apple",1,"id"]',
-            QueryStreamCursor.serialize(
-              ["apple", 1, "id"],
-              ["body", "_creationTime", "_id"],
-            ),
-            QueryStreamCursor.serialize(
-              ["apple", 1, "id"],
-              ["_creationTime", "text", "_id"],
-            ),
+            yield* Schema.encodeEffect(
+              QueryStreamCursor.forKeyFields(["body", "_creationTime", "_id"]),
+            )(["apple", 1, "id"]),
+            yield* Schema.encodeEffect(
+              QueryStreamCursor.forKeyFields(["_creationTime", "text", "_id"]),
+            )(["apple", 1, "id"]),
           ]) {
             for (const numItems of [0, 1]) {
               const result = yield* QueryStream.paginate(source, {
-                cursor: QueryStreamCursor.serialize(
-                  ["apple", 0, "before"],
-                  source.keyFields,
-                ),
+                cursor: yield* Schema.encodeEffect(
+                  QueryStreamCursor.forKeyFields(source.keyFields),
+                )(["apple", 0, "before"]),
                 numItems,
                 [bound]: cursor,
               }).pipe(Effect.catchDefect(Effect.succeed));
@@ -226,7 +227,9 @@ describe.each(["asc", "desc"] as const)(
 
         expect([...first.page, ...second.page]).toEqual(ids);
         expect(
-          QueryStreamCursor.deserialize(first.continueCursor, source.keyFields),
+          yield* Schema.decodeEffect(
+            QueryStreamCursor.forKeyFields(source.keyFields),
+          )(first.continueCursor),
         ).toEqual(["apple", 1, ids[0]]);
         expect(end).toMatchObject({
           page: [],

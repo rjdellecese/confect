@@ -1,37 +1,53 @@
-import {
-  ConvexError,
-  convexToJson,
-  jsonToConvex,
-  type Value,
-} from "convex/values";
+import { convexToJson, jsonToConvex, type Value } from "convex/values";
 import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
 import * as Equivalence from "effect/Equivalence";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
-
-export type OrderKey = ReadonlyArray<Value | undefined>;
+import * as SchemaGetter from "effect/SchemaGetter";
+import * as SchemaIssue from "effect/SchemaIssue";
 
 const UNDEFINED_SENTINEL = { $undefined: true } as const;
 const decodeUndefinedSentinel = Schema.decodeUnknownResult(
   Schema.Struct({ $undefined: Schema.Literal(true) }),
   { onExcessProperty: "error" },
 );
-const decodeKeyValue = (value: Schema.Json): Value | undefined =>
-  Result.isSuccess(decodeUndefinedSentinel(value))
-    ? undefined
-    : jsonToConvex(value as Parameters<typeof jsonToConvex>[0]);
-
-const KeyValue = Schema.Json.check(
-  Schema.makeFilter(
-    (value) => Result.isSuccess(Result.try(() => decodeKeyValue(value))),
-    { message: "Invalid Convex order-key value" },
-  ),
+const KeyValue = Schema.declare<Value | undefined>(
+  (value): value is Value | undefined =>
+    value === undefined ||
+    Result.isSuccess(Result.try(() => convexToJson(value as Value))),
+  {
+    toCodecJson: () =>
+      Schema.link<Value | undefined>()(Schema.Json, {
+        decode: SchemaGetter.transformEffect((value, options) =>
+          Effect.try({
+            try: () =>
+              Result.isSuccess(decodeUndefinedSentinel(value))
+                ? undefined
+                : jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
+            catch: () =>
+              new SchemaIssue.InvalidValue(
+                { message: "Invalid Convex order-key value" },
+                value,
+                options,
+              ),
+          }),
+        ),
+        encode: SchemaGetter.transform((value) =>
+          value === undefined ? UNDEFINED_SENTINEL : convexToJson(value),
+        ),
+      }),
+  },
 );
+
+export const OrderKey = Schema.Array(KeyValue);
+
+export type OrderKey = typeof OrderKey.Type;
 
 export const QueryStreamCursor = Schema.Struct({
   version: Schema.Literal(1),
   keyFields: Schema.Array(Schema.String),
-  key: Schema.Array(KeyValue),
+  key: OrderKey,
 }).check(
   Schema.makeFilter((cursor) => cursor.key.length === cursor.keyFields.length, {
     message: "key and fields must have the same length",
@@ -42,40 +58,23 @@ export interface QueryStreamCursor extends Schema.Schema.Type<
   typeof QueryStreamCursor
 > {}
 
-export const Json = Schema.fromJsonString(QueryStreamCursor);
+export const Json = Schema.fromJsonString(
+  Schema.toCodecJson(QueryStreamCursor),
+);
 
 export const END_CURSOR = "[]";
 
 const keyFieldsEquivalence = Array.makeEquivalence(Equivalence.String);
-const decode = Schema.decodeResult(Json);
-const encode = Schema.encodeSync(Json);
 
-const invalidCursorError = () =>
-  new ConvexError({ paginationError: "InvalidCursor" });
-
-export const serialize = (
-  key: OrderKey,
-  keyFields: ReadonlyArray<string>,
-): string =>
-  encode({
-    version: 1,
-    keyFields,
-    key: Array.map(key, (value) =>
-      value === undefined ? UNDEFINED_SENTINEL : convexToJson(value),
+export const forKeyFields = (keyFields: ReadonlyArray<string>) =>
+  Json.check(
+    Schema.makeFilter(
+      (cursor) => keyFieldsEquivalence(cursor.keyFields, keyFields),
+      { message: "Cursor order-key fields do not match the stream" },
     ),
-  });
-
-export const deserialize = (
-  cursor: string,
-  keyFields?: ReadonlyArray<string>,
-): OrderKey => {
-  const decoded = decode(cursor);
-  if (
-    Result.isFailure(decoded) ||
-    (keyFields !== undefined &&
-      !keyFieldsEquivalence(decoded.success.keyFields, keyFields))
-  ) {
-    throw invalidCursorError();
-  }
-  return Array.map(decoded.success.key, decodeKeyValue);
-};
+  ).pipe(
+    Schema.decodeTo(OrderKey, {
+      decode: SchemaGetter.transform((cursor) => cursor.key),
+      encode: SchemaGetter.transform((key) => ({ version: 1, keyFields, key })),
+    }),
+  );

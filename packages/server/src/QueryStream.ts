@@ -32,7 +32,12 @@ import type {
   PaginationOptions as ConvexPaginationOptions,
   PaginationResult as ConvexPaginationResult,
 } from "convex/server";
-import { compareValues, getDocumentSize, type Value } from "convex/values";
+import {
+  ConvexError,
+  compareValues,
+  getDocumentSize,
+  type Value,
+} from "convex/values";
 import { identity, dual, pipe } from "effect/Function";
 import { pipeArguments, type Pipeable } from "effect/Pipeable";
 import * as Array from "effect/Array";
@@ -2662,17 +2667,25 @@ export const paginate: {
     R,
     Direction extends OrderDirection,
   >(self: QueryStream<Doc, Key, Direction, E, R>, options: PaginateOptions) {
-    const after = Option.map(Option.fromNullOr(options.cursor), (cursor) =>
-      QueryStreamCursor.deserialize(cursor, self.keyFields),
-    );
+    const cursorSchema = QueryStreamCursor.forKeyFields(self.keyFields);
+    const encodeCursor = Schema.encodeEffect(cursorSchema);
+    const decodeCursor = Schema.decodeEffect(Schema.NullOr(cursorSchema));
     const endCursor = Option.fromNullishOr(options.endCursor);
     const pinnedEnd = Option.filter(
       endCursor,
       (cursor) => cursor !== QueryStreamCursor.END_CURSOR,
     );
-    const until = Option.map(pinnedEnd, (cursor) =>
-      QueryStreamCursor.deserialize(cursor, self.keyFields),
+    const decoded = yield* Effect.all({
+      after: decodeCursor(options.cursor),
+      until: decodeCursor(Option.getOrNull(pinnedEnd)),
+    }).pipe(
+      Effect.mapError(
+        () => new ConvexError({ paginationError: "InvalidCursor" }),
+      ),
+      Effect.orDie,
     );
+    const after = Option.fromNullOr(decoded.after);
+    const until = Option.fromNullOr(decoded.until);
     if (options.numItems === 0) {
       if (options.cursor === null) {
         return yield* Effect.die(
@@ -2784,83 +2797,68 @@ export const paginate: {
     const stoppedAt = state.stopped
       ? Chunk.last(state.readKeys)
       : Option.none<OrderKey>();
-    return Option.match(stoppedAt, {
+    return yield* Option.match(stoppedAt, {
       onSome: (lastKey) =>
-        state.hitLimit
-          ? {
-              page,
-              isDone: false,
-              continueCursor: QueryStreamCursor.serialize(
-                lastKey,
-                self.keyFields,
-              ),
-              pageStatus: "SplitRequired" as const,
-              splitCursor: QueryStreamCursor.serialize(
-                midpointKey(state.readKeys),
-                self.keyFields,
-              ),
-            }
-          : // A growing page that had to scan far past its item budget
-            // (a filter-heavy stream) recommends a split so reactive
-            // clients can subdivide it instead of re-scanning forever.
-            Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH
+        Effect.gen(function* () {
+          return state.hitLimit
             ? {
                 page,
                 isDone: false,
-                continueCursor: QueryStreamCursor.serialize(
-                  lastKey,
-                  self.keyFields,
-                ),
-                pageStatus: "SplitRecommended" as const,
-                splitCursor: QueryStreamCursor.serialize(
-                  midpointKey(state.readKeys),
-                  self.keyFields,
-                ),
+                continueCursor: yield* encodeCursor(lastKey),
+                pageStatus: "SplitRequired" as const,
+                splitCursor: yield* encodeCursor(midpointKey(state.readKeys)),
               }
-            : {
-                page,
-                isDone: false,
-                continueCursor: QueryStreamCursor.serialize(
-                  lastKey,
-                  self.keyFields,
-                ),
-              },
+            : // A growing page that had to scan far past its item budget
+              // (a filter-heavy stream) recommends a split so reactive
+              // clients can subdivide it instead of re-scanning forever.
+              Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH
+              ? {
+                  page,
+                  isDone: false,
+                  continueCursor: yield* encodeCursor(lastKey),
+                  pageStatus: "SplitRecommended" as const,
+                  splitCursor: yield* encodeCursor(midpointKey(state.readKeys)),
+                }
+              : {
+                  page,
+                  isDone: false,
+                  continueCursor: yield* encodeCursor(lastKey),
+                };
+        }),
       // The narrowed stream was exhausted: either we reached the
       // pinned end cursor (more may follow it) or the true end of
       // the stream. An endCursor-pinned page that has grown well
       // past its requested size recommends a split, so reactive
       // clients can subdivide it (as `convex-helpers` does).
-      onNone: () => {
-        // Any pinned page—including one pinned to the end of the
-        // stream—that has grown well past its requested size
-        // recommends a split.
-        const shouldRecommendSplit =
-          Option.isSome(endCursor) &&
-          (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
-            Chunk.size(state.page) > options.numItems + 1);
-        return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
-          ? {
-              page,
-              isDone: false,
-              continueCursor: Option.getOrElse(
-                pinnedEnd,
-                () => QueryStreamCursor.END_CURSOR,
-              ),
-              pageStatus: "SplitRecommended" as const,
-              splitCursor: QueryStreamCursor.serialize(
-                midpointKey(state.readKeys),
-                self.keyFields,
-              ),
-            }
-          : {
-              page,
-              isDone: Option.isNone(pinnedEnd),
-              continueCursor: Option.getOrElse(
-                pinnedEnd,
-                () => QueryStreamCursor.END_CURSOR,
-              ),
-            };
-      },
-    });
+      onNone: () =>
+        Effect.gen(function* () {
+          // Any pinned page—including one pinned to the end of the
+          // stream—that has grown well past its requested size
+          // recommends a split.
+          const shouldRecommendSplit =
+            Option.isSome(endCursor) &&
+            (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
+              Chunk.size(state.page) > options.numItems + 1);
+          return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
+            ? {
+                page,
+                isDone: false,
+                continueCursor: Option.getOrElse(
+                  pinnedEnd,
+                  () => QueryStreamCursor.END_CURSOR,
+                ),
+                pageStatus: "SplitRecommended" as const,
+                splitCursor: yield* encodeCursor(midpointKey(state.readKeys)),
+              }
+            : {
+                page,
+                isDone: Option.isNone(pinnedEnd),
+                continueCursor: Option.getOrElse(
+                  pinnedEnd,
+                  () => QueryStreamCursor.END_CURSOR,
+                ),
+              };
+        }),
+    }).pipe(Effect.orDie);
   }),
 );
