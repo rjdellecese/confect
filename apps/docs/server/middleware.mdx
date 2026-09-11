@@ -220,7 +220,7 @@ Both `MiddlewareImpl.make` and `MiddlewareImpl.makeByFunctionType` receive `(eff
 
 The same options mechanism also supports resource argument names, flags, and client-safe resolver functions. Use `MiddlewareImpl.make` rather than the `provides` shorthand when producing a service depends on the attachment options.
 
-Options belong to each attachment, so different functions can reuse the same middleware implementation with different values. They survive codegen and are carried by `refs`. To inspect attachments, use the ordered `middlewareAttachments` list of `{ spec, options }` entries; `middlewareSpecs` remains a specs-only view for compatibility, not a source of per-attachment options.
+Options belong to each attachment, so different functions can reuse the same middleware implementation with different values. They survive codegen and are carried by `refs`. To inspect attachments, use the ordered `middlewareAttachments` list of `{ spec, options }` entries; a ref's `middlewareSpecs` is a specs-only view derived from those attachments for compatibility, not a source of per-attachment options.
 
 The middleware's declared error still determines the client error union, independently of its options. `provides` and `requires` also remain fixed for a spec: an option does not change a handler's service types. For a `tolerateMissing` policy, declare a service containing an `Option` and let the implementation decide whether to provide `None` or fail.
 

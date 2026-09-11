@@ -345,14 +345,13 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
         _tag: "Confect" as const,
         convexFunctionName,
         kind: provenance.kind,
-        middlewareSpecs: [
-          ...groupMiddlewareSpecs,
-          ...functionSpec.middlewareSpecs,
-        ],
         middlewareAttachments: [
           ...groupMiddlewareAttachments,
           ...functionSpec.middlewareAttachments,
         ],
+        get middlewareSpecs() {
+          return this.middlewareAttachments.map(({ spec }) => spec);
+        },
       };
 
       Lazy.defineProperty(ref, "args", () => provenance.args);

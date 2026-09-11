@@ -777,6 +777,37 @@ describe("make with middleware options", () => {
     returns: () => Schema.String,
   });
 
+  it("derives middleware specs from ordered attachments without forcing schemas", () => {
+    const optionsBuilt = MutableRef.make(false);
+    const errorBuilt = MutableRef.make(false);
+    class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
+    class Policy extends MiddlewareSpec.MiddlewareSpec<Policy>()("Policy", {
+      options: () => {
+        MutableRef.set(optionsBuilt, true);
+        return Schema.Struct({ enabled: Schema.Boolean });
+      },
+      error: () => {
+        MutableRef.set(errorBuilt, true);
+        return Blocked;
+      },
+      functionTypes: { query: true, mutation: false, action: false },
+    }) {}
+    const ref = Ref.make(
+      "policies",
+      query.middleware(Policy, { enabled: false }),
+      [],
+      [{ spec: Policy, options: { enabled: true } }],
+    );
+
+    expect(ref.middlewareSpecs).toEqual([Policy, Policy]);
+    expect(ref.middlewareSpecs).toEqual(
+      ref.middlewareAttachments.map(({ spec }) => spec),
+    );
+    expect(Ref.hasErrorSchema(ref)).toBe(true);
+    expect(MutableRef.get(optionsBuilt)).toBe(false);
+    expect(MutableRef.get(errorBuilt)).toBe(false);
+  });
+
   it("retains client-safe resolver values without serializing them", () => {
     class Resource extends MiddlewareSpec.MiddlewareSpec<Resource>()(
       "Resource",
