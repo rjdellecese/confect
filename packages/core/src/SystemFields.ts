@@ -113,7 +113,7 @@ const makeExtendAst = (
     if (SchemaAST.isUnion(ast)) {
       return new SchemaAST.Union(
         Array.map(ast.types, extendAst),
-        ast.mode,
+        ast.options,
         ast.annotations,
         ast.checks,
         ast.encoding === undefined ? undefined : extendEncoding(ast.encoding),
