@@ -35,6 +35,8 @@ Repeat the same middleware with non-equivalent options within a group or functio
 
 Register each implementation using the same middleware spec that you attach. Server registration rejects implementations declared against a different spec, even when the keys match.
 
+Codegen distinguishes invalid attachment configuration from unexpected exceptions in your schema factories or equality functions, which remain defects rather than being reported as invalid options.
+
 ### Breaking Changes
 
 - Middleware callbacks receive `name`, `functionType`, `functionVisibility`, and decoded `args` inside `invocation`, rather than directly on their second argument.

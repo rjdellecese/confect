@@ -3,6 +3,7 @@ import * as GroupSpec from "@confect/core/GroupSpec";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
 
 describe("isGroupSpec", () => {
   it("checks whether a value is a function spec", () => {
@@ -138,20 +139,30 @@ describe("middleware options", () => {
     const group = GroupSpec.make().middleware(RequireRole, {
       roles: ["Buyer"],
     });
-    GroupSpec.validateMiddleware(
-      GroupSpec.make().addFunction(
-        internal.middleware(RequireRole, { roles: ["Buyer"] }),
+    expect(
+      GroupSpec.validateMiddleware(
+        GroupSpec.make().addFunction(
+          internal.middleware(RequireRole, { roles: ["Buyer"] }),
+        ),
       ),
+    ).toEqual(Result.succeed(undefined));
+    expect(
+      GroupSpec.validateMiddleware(
+        group
+          .middleware(RequireRole, { roles: ["Internal"] })
+          .addFunction(query),
+      ),
+    ).toEqual(Result.succeed(undefined));
+    expect(GroupSpec.validateMiddleware(group.addFunction(internal))).toEqual(
+      Result.succeed(undefined),
     );
-    GroupSpec.validateMiddleware(
-      group.middleware(RequireRole, { roles: ["Internal"] }).addFunction(query),
-    );
-    GroupSpec.validateMiddleware(group.addFunction(internal));
-    GroupSpec.validateMiddleware(
-      GroupSpec.make()
-        .addFunction(internal)
-        .middleware(RequireRole, { roles: ["Buyer"] }),
-    );
+    expect(
+      GroupSpec.validateMiddleware(
+        GroupSpec.make()
+          .addFunction(internal)
+          .middleware(RequireRole, { roles: ["Buyer"] }),
+      ),
+    ).toEqual(Result.succeed(undefined));
   });
 
   it("rejects equivalent instances only during validation, including group/function overlaps", () => {
@@ -168,9 +179,50 @@ describe("middleware options", () => {
         .addFunction(first)
         .middleware(RequireRole, { roles: ["Internal"] }),
     ]) {
-      expect(() => GroupSpec.validateMiddleware(candidate)).toThrowError(
-        /RequireRole.*equivalent options.*1 and 2/,
+      expect(GroupSpec.validateMiddleware(candidate)).toEqual(
+        Result.fail(
+          MiddlewareSpec.MiddlewareValidationError.EquivalentOptions({
+            middlewareKey: "RequireRole",
+            location:
+              candidate.middlewareAttachments.length === 2
+                ? 'group ""'
+                : 'function "get"',
+            previousIndex: 0,
+            attachmentIndex: 1,
+          }),
+        ),
       );
     }
+  });
+
+  it("propagates child failures and stops before evaluating later children", () => {
+    class Unreachable extends MiddlewareSpec.MiddlewareSpec<Unreachable>()(
+      "Unreachable",
+      {
+        options: (): Schema.Schema<string> => {
+          throw new Error("later child evaluated");
+        },
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
+    const invalid = GroupSpec.makeAt("invalid")
+      .middleware(RequireRole, { roles: ["Internal"] })
+      .middleware(RequireRole, { roles: ["Internal"] });
+    const later = GroupSpec.makeAt("later").middleware(Unreachable, "value");
+
+    expect(
+      GroupSpec.validateMiddleware(
+        GroupSpec.make().addGroup(invalid).addGroup(later),
+      ),
+    ).toEqual(
+      Result.fail(
+        MiddlewareSpec.MiddlewareValidationError.EquivalentOptions({
+          middlewareKey: "RequireRole",
+          location: 'group "invalid"',
+          previousIndex: 0,
+          attachmentIndex: 1,
+        }),
+      ),
+    );
   });
 });

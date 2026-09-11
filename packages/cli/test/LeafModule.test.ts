@@ -6,6 +6,8 @@ import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as String from "effect/String";
 import * as Layer from "effect/Layer";
@@ -221,6 +223,32 @@ export default GroupSpec.make().middleware(Policy, { roles: ["Internal"] }).addF
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/middlewareOptions.spec.ts");
       yield* validateSpec(leaf);
+    }),
+  );
+
+  it.effect("keeps schema and equivalence exceptions as defects", () =>
+    Effect.gen(function* () {
+      for (const options of [
+        '() => { throw new Error("schema bug"); }',
+        '() => Schema.String.pipe(Schema.overrideToEquivalence(() => () => { throw new Error("equivalence bug"); }))',
+      ]) {
+        const leaf = yield* toLeafModule("groups/_brokenOptions.spec.ts");
+        const exit = yield* Effect.exit(
+          withTempFile(
+            leaf.relativePath,
+            `import { GroupSpec, MiddlewareSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+class Policy extends MiddlewareSpec.MiddlewareSpec()("Policy", {
+  options: ${options},
+  functionTypes: { query: true, mutation: false, action: false },
+}) {}
+export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "second");`,
+            validateSpec(leaf),
+          ),
+        );
+        expect(Exit.hasDies(exit)).toBe(true);
+        expect(Exit.findErrorOption(exit)).toEqual(Option.none());
+      }
     }),
   );
 

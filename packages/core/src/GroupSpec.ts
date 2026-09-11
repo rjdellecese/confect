@@ -1,5 +1,6 @@
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
+import * as Result from "effect/Result";
 import type * as FunctionSpec from "./FunctionSpec";
 import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
@@ -358,16 +359,20 @@ export const withName = <const Name_ extends string>(
   });
 };
 
-export const validateMiddleware = (group: AnyWithProps): void => {
-  MiddlewareSpec.validateAttachments(
-    group.middlewareAttachments,
-    `group "${group.name}"`,
-  );
-  for (const function_ of Object.values(group.functions)) {
-    MiddlewareSpec.validateAttachments(
-      [...group.middlewareAttachments, ...function_.middlewareAttachments],
-      `function "${function_.name}"`,
+export const validateMiddleware = (
+  group: AnyWithProps,
+): Result.Result<void, MiddlewareSpec.MiddlewareValidationError> =>
+  Result.gen(function* () {
+    yield* MiddlewareSpec.validateAttachments(
+      group.middlewareAttachments,
+      `group "${group.name}"`,
     );
-  }
-  for (const child of Object.values(group.groups)) validateMiddleware(child);
-};
+    for (const function_ of Object.values(group.functions)) {
+      yield* MiddlewareSpec.validateAttachments(
+        [...group.middlewareAttachments, ...function_.middlewareAttachments],
+        `function "${function_.name}"`,
+      );
+    }
+    for (const child of Object.values(group.groups))
+      yield* validateMiddleware(child);
+  });

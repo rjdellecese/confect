@@ -7,6 +7,7 @@ import * as Ref from "@confect/core/Ref";
 import * as Context from "effect/Context";
 import * as MutableRef from "effect/MutableRef";
 import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 class CurrentUser extends Context.Service<
@@ -508,22 +509,39 @@ describe("validateAttachments", () => {
         ),
       functionTypes: { query: true, mutation: false, action: false },
     }) {}
-    expect(() =>
-      MiddlewareSpec.validateAttachments(
-        [
-          { spec: RoleSet, options: { roles: ["Internal", "Buyer"] } },
-          { spec: RoleSet, options: { roles: ["Buyer", "Internal", "Buyer"] } },
-        ],
-        "test chain",
-      ),
-    ).toThrowError(/equivalent options/);
-    MiddlewareSpec.validateAttachments(
+    const duplicate = MiddlewareSpec.validateAttachments(
       [
-        { spec: RequireRole, options: { roles: ["Internal", "Buyer"] } },
-        { spec: RequireRole, options: { roles: ["Buyer", "Internal"] } },
+        { spec: RoleSet, options: { roles: ["Internal", "Buyer"] } },
+        { spec: RoleSet, options: { roles: ["Buyer", "Internal", "Buyer"] } },
       ],
       "test chain",
     );
+    expect(duplicate).toEqual(
+      Result.fail(
+        MiddlewareSpec.MiddlewareValidationError.EquivalentOptions({
+          middlewareKey: "RoleSet",
+          location: "test chain",
+          attachmentIndex: 1,
+          previousIndex: 0,
+        }),
+      ),
+    );
+    expect(
+      Result.mapError(duplicate, MiddlewareSpec.formatValidationError),
+    ).toEqual(
+      Result.fail(
+        'Middleware "RoleSet" has equivalent options at attachments 1 and 2 on test chain',
+      ),
+    );
+    expect(
+      MiddlewareSpec.validateAttachments(
+        [
+          { spec: RequireRole, options: { roles: ["Internal", "Buyer"] } },
+          { spec: RequireRole, options: { roles: ["Buyer", "Internal"] } },
+        ],
+        "test chain",
+      ),
+    ).toEqual(Result.succeed(undefined));
   });
 
   it("validates option values on the schema's type side", () => {
@@ -535,15 +553,31 @@ describe("validateAttachments", () => {
       spec: Limit,
       options: { limit: 5 },
     };
-    MiddlewareSpec.validateAttachments([valid], "test chain");
+    expect(MiddlewareSpec.validateAttachments([valid], "test chain")).toEqual(
+      Result.succeed(undefined),
+    );
     const invalid: MiddlewareSpec.Attachment<typeof Limit> = {
       spec: Limit,
       // @ts-expect-error
       options: { limit: "5" },
     };
-    expect(() =>
-      MiddlewareSpec.validateAttachments([invalid], "test chain"),
-    ).toThrowError(/invalid options/);
+    const result = MiddlewareSpec.validateAttachments([invalid], "test chain");
+    expect(result).toEqual(
+      Result.fail(
+        MiddlewareSpec.MiddlewareValidationError.InvalidOptions({
+          middlewareKey: "Limit",
+          location: "test chain",
+          attachmentIndex: 0,
+        }),
+      ),
+    );
+    expect(
+      Result.mapError(result, MiddlewareSpec.formatValidationError),
+    ).toEqual(
+      Result.fail(
+        'Middleware "Limit" has invalid options at attachment 1 on test chain',
+      ),
+    );
   });
 
   it("rejects different spec declarations sharing an implementation key", () => {
@@ -554,14 +588,70 @@ describe("validateAttachments", () => {
         functionTypes: { query: true, mutation: true, action: true },
       },
     ) {}
+    const result = MiddlewareSpec.validateAttachments(
+      [
+        { spec: RequireRole, options: { roles: ["Internal"] } },
+        { spec: OtherRole, options: { roles: ["Buyer"] } },
+      ],
+      "test chain",
+    );
+    expect(result).toEqual(
+      Result.fail(
+        MiddlewareSpec.MiddlewareValidationError.ConflictingSpecs({
+          middlewareKey: "RequireRole",
+          location: "test chain",
+          attachmentIndex: 1,
+          previousIndex: 0,
+        }),
+      ),
+    );
+    expect(
+      Result.mapError(result, MiddlewareSpec.formatValidationError),
+    ).toEqual(
+      Result.fail(
+        'Different middleware specs share key "RequireRole" on test chain',
+      ),
+    );
+  });
+
+  it("does not turn schema factory or equivalence bugs into validation failures", () => {
+    const defect = new Error("schema bug");
+    class BrokenSchema extends MiddlewareSpec.MiddlewareSpec<BrokenSchema>()(
+      "BrokenSchema",
+      {
+        options: (): Schema.Schema<string> => {
+          throw defect;
+        },
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
+    class BrokenEquivalence extends MiddlewareSpec.MiddlewareSpec<BrokenEquivalence>()(
+      "BrokenEquivalence",
+      {
+        options: () =>
+          Schema.String.pipe(
+            Schema.overrideToEquivalence(() => () => {
+              throw defect;
+            }),
+          ),
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
+
+    expect(() =>
+      MiddlewareSpec.validateAttachments(
+        [{ spec: BrokenSchema, options: "value" }],
+        "test chain",
+      ),
+    ).toThrow(defect);
     expect(() =>
       MiddlewareSpec.validateAttachments(
         [
-          { spec: RequireRole, options: { roles: ["Internal"] } },
-          { spec: OtherRole, options: { roles: ["Buyer"] } },
+          { spec: BrokenEquivalence, options: "first" },
+          { spec: BrokenEquivalence, options: "second" },
         ],
         "test chain",
       ),
-    ).toThrowError(/Different middleware specs share key "RequireRole"/);
+    ).toThrow(defect);
   });
 });

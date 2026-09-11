@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { RegisteredMutation, RegisteredQuery } from "convex/server";
 import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as GroupSpec from "@confect/core/GroupSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
@@ -398,9 +399,9 @@ describe("make with middleware options", () => {
       refs.public.lazy.get.middlewareAttachments.map(({ options }) => options),
     ).toEqual([{ enabled: true }, { enabled: false }]);
     expect(evaluations).toBe(0);
-    GroupSpec.validateMiddleware(group);
+    expect(Result.isSuccess(GroupSpec.validateMiddleware(group))).toBe(true);
     expect(evaluations).toBe(1);
-    GroupSpec.validateMiddleware(group);
+    expect(Result.isSuccess(GroupSpec.validateMiddleware(group))).toBe(true);
     expect(evaluations).toBe(1);
   });
 });

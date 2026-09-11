@@ -1,6 +1,8 @@
 import type { FunctionType, FunctionVisibility } from "convex/server";
+import * as Data from "effect/Data";
 import type * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type { unhandled } from "effect/Types";
 import type * as FunctionProvenance from "./FunctionProvenance";
@@ -135,15 +137,56 @@ export type WithoutOptions<MiddlewareSpec_ extends AnyMiddlewareSpec> =
       : never
     : never;
 
+export type MiddlewareValidationError = Data.TaggedEnum<{
+  InvalidOptions: {
+    readonly middlewareKey: string;
+    readonly location: string;
+    readonly attachmentIndex: number;
+  };
+  ConflictingSpecs: {
+    readonly middlewareKey: string;
+    readonly location: string;
+    readonly attachmentIndex: number;
+    readonly previousIndex: number;
+  };
+  EquivalentOptions: {
+    readonly middlewareKey: string;
+    readonly location: string;
+    readonly attachmentIndex: number;
+    readonly previousIndex: number;
+  };
+}>;
+
+export const MiddlewareValidationError =
+  Data.taggedEnum<MiddlewareValidationError>();
+
+export const formatValidationError = MiddlewareValidationError.$match({
+  InvalidOptions: ({ middlewareKey, location, attachmentIndex }) =>
+    `Middleware "${middlewareKey}" has invalid options at attachment ${attachmentIndex + 1} on ${location}`,
+  ConflictingSpecs: ({ middlewareKey, location }) =>
+    `Different middleware specs share key "${middlewareKey}" on ${location}`,
+  EquivalentOptions: ({
+    middlewareKey,
+    location,
+    attachmentIndex,
+    previousIndex,
+  }) =>
+    `Middleware "${middlewareKey}" has equivalent options at attachments ${previousIndex + 1} and ${attachmentIndex + 1} on ${location}`,
+});
+
 export const validateAttachments = (
   attachments: ReadonlyArray<Attachment>,
   location: string,
-): void => {
+): Result.Result<void, MiddlewareValidationError> => {
   for (const [index, attachment] of attachments.entries()) {
     const schema = attachment.spec.options;
     if (schema !== undefined && !Schema.is(schema)(attachment.options)) {
-      throw new Error(
-        `Middleware "${attachment.spec.key}" has invalid options at attachment ${index + 1} on ${location}`,
+      return Result.fail(
+        MiddlewareValidationError.InvalidOptions({
+          middlewareKey: attachment.spec.key,
+          location,
+          attachmentIndex: index,
+        }),
       );
     }
     const equivalent =
@@ -152,20 +195,31 @@ export const validateAttachments = (
       if (previousIndex === index) break;
       if (previous.spec.key !== attachment.spec.key) continue;
       if (previous.spec !== attachment.spec) {
-        throw new Error(
-          `Different middleware specs share key "${attachment.spec.key}" on ${location}`,
+        return Result.fail(
+          MiddlewareValidationError.ConflictingSpecs({
+            middlewareKey: attachment.spec.key,
+            location,
+            attachmentIndex: index,
+            previousIndex,
+          }),
         );
       }
       if (
         equivalent === undefined ||
         equivalent(previous.options, attachment.options)
       ) {
-        throw new Error(
-          `Middleware "${attachment.spec.key}" has equivalent options at attachments ${previousIndex + 1} and ${index + 1} on ${location}`,
+        return Result.fail(
+          MiddlewareValidationError.EquivalentOptions({
+            middlewareKey: attachment.spec.key,
+            location,
+            attachmentIndex: index,
+            previousIndex,
+          }),
         );
       }
     }
   }
+  return Result.succeed(undefined);
 };
 
 export type AttachmentArgs<MiddlewareSpec_ extends AnyMiddlewareSpec> = [
