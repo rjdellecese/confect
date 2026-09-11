@@ -50,10 +50,10 @@ export class QueryStreamCursor extends Schema.Class<QueryStreamCursor>(
   Schema.Struct({
     version: Schema.Literal(1),
     keyFields: Schema.Array(Schema.String),
-    key: OrderKey,
+    orderKey: OrderKey,
   }).check(
     Schema.makeFilter(
-      (cursor) => cursor.key.length === cursor.keyFields.length,
+      (cursor) => cursor.orderKey.length === cursor.keyFields.length,
       {
         message: "key and fields must have the same length",
       },
@@ -77,9 +77,9 @@ export const forKeyFields = (keyFields: ReadonlyArray<string>) =>
     ),
   ).pipe(
     Schema.decodeTo(OrderKey, {
-      decode: SchemaGetter.transform((cursor) => cursor.key),
-      encode: SchemaGetter.transformEffect((key) =>
-        QueryStreamCursor.makeEffect({ version: 1, keyFields, key }),
+      decode: SchemaGetter.transform((cursor) => cursor.orderKey),
+      encode: SchemaGetter.transformEffect((orderKey) =>
+        QueryStreamCursor.makeEffect({ version: 1, keyFields, orderKey }),
       ),
     }),
   );

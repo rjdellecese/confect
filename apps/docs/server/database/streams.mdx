@@ -760,13 +760,13 @@ A budget-limited page stops at a safe logical key so resuming cannot skip an unf
 
 ### Cursor format and validation
 
-Boundary cursors are JSON strings containing a versioned envelope: `{ version: 1, keyFields: [...], key: [...] }`. `keyFields` contains the full runtime field layout in order, including implicit IDs; `key` contains the corresponding encoded values. For the example note `n3`, the serialized cursor string contains this JSON object (using the example's stand-in ID):
+Boundary cursors are JSON strings containing a versioned envelope: `{ version: 1, keyFields: [...], orderKey: [...] }`. `keyFields` contains the full runtime field layout in order, including implicit IDs; `orderKey` contains the corresponding encoded values. For the example note `n3`, the serialized cursor string contains this JSON object (using the example's stand-in ID):
 
 ```json
 {
   "version": 1,
   "keyFields": ["text", "_creationTime", "_id"],
-  "key": ["apple", 3, "n3"]
+  "orderKey": ["apple", 3, "n3"]
 }
 ```
 

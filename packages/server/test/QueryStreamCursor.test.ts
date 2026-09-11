@@ -9,7 +9,7 @@ describe("QueryStreamCursor schema", () => {
     const cursor = Schema.decodeSync(QueryStreamCursor.QueryStreamCursor)({
       version: 1,
       keyFields: ["text", "_creationTime", "_id"],
-      key: ["apple", 1, "id"],
+      orderKey: ["apple", 1, "id"],
     });
     const serialized = Schema.encodeSync(QueryStreamCursor.Json)(cursor);
 
@@ -18,7 +18,7 @@ describe("QueryStreamCursor schema", () => {
     expectTypeOf<QueryStreamCursor.QueryStreamCursor>().toEqualTypeOf<{
       readonly version: 1;
       readonly keyFields: ReadonlyArray<string>;
-      readonly key: QueryStreamCursor.OrderKey;
+      readonly orderKey: QueryStreamCursor.OrderKey;
     }>();
     expect(Schema.decodeSync(QueryStreamCursor.Json)(serialized)).toEqual(
       cursor,
@@ -41,7 +41,7 @@ describe("QueryStreamCursor schema", () => {
         new QueryStreamCursor.QueryStreamCursor({
           version: 1,
           keyFields: ["text"],
-          key: [],
+          orderKey: [],
         }),
     ).toThrow("Schema validation failed");
   });
@@ -49,13 +49,17 @@ describe("QueryStreamCursor schema", () => {
   it.each([
     null,
     [],
-    { version: 2, keyFields: ["text"], key: ["apple"] },
-    { version: 1, keyFields: [1], key: ["apple"] },
-    { version: 1, keyFields: ["text"], key: [] },
-    { version: 1, keyFields: ["text"], key: [undefined] },
-    { version: 1, keyFields: ["text"], key: [{ $integer: "invalid" }] },
-    { version: 1, keyFields: ["text"], key: [{ $undefined: false }] },
-    { version: 1, keyFields: ["text"], key: [{ $undefined: true, extra: 1 }] },
+    { version: 2, keyFields: ["text"], orderKey: ["apple"] },
+    { version: 1, keyFields: [1], orderKey: ["apple"] },
+    { version: 1, keyFields: ["text"], orderKey: [] },
+    { version: 1, keyFields: ["text"], orderKey: [undefined] },
+    { version: 1, keyFields: ["text"], orderKey: [{ $integer: "invalid" }] },
+    { version: 1, keyFields: ["text"], orderKey: [{ $undefined: false }] },
+    {
+      version: 1,
+      keyFields: ["text"],
+      orderKey: [{ $undefined: true, extra: 1 }],
+    },
   ])("rejects an invalid envelope through the schema: %j", (input) => {
     expect(
       Result.isFailure(
@@ -90,7 +94,9 @@ describe("QueryStreamCursor serialization", () => {
 
     expect(Schema.is(QueryStreamCursor.OrderKey)(key)).toBe(true);
     expect(JSON.parse(cursor)).toMatchObject({ version: 1, keyFields: fields });
-    expect(Schema.decodeSync(QueryStreamCursor.Json)(cursor).key).toEqual(key);
+    expect(Schema.decodeSync(QueryStreamCursor.Json)(cursor).orderKey).toEqual(
+      key,
+    );
     expect(
       Schema.decodeSync(QueryStreamCursor.forKeyFields(fields))(cursor),
     ).toEqual(key);
@@ -107,17 +113,17 @@ describe("QueryStreamCursor serialization", () => {
     "null",
     "[]",
     '["apple",1,"id"]',
-    '{"keyFields":["text"],"key":["apple"]}',
-    '{"version":2,"keyFields":["text"],"key":["apple"]}',
-    '{"version":1,"keyFields":"text","key":["apple"]}',
-    '{"version":1,"keyFields":[1],"key":["apple"]}',
-    '{"version":1,"keyFields":["text"],"key":"apple"}',
-    '{"version":1,"keyFields":["text"],"key":[]}',
-    '{"version":1,"keyFields":["text"],"key":[{"$integer":"invalid"}]}',
+    '{"keyFields":["text"],"orderKey":["apple"]}',
+    '{"version":2,"keyFields":["text"],"orderKey":["apple"]}',
+    '{"version":1,"keyFields":"text","orderKey":["apple"]}',
+    '{"version":1,"keyFields":[1],"orderKey":["apple"]}',
+    '{"version":1,"keyFields":["text"],"orderKey":"apple"}',
+    '{"version":1,"keyFields":["text"],"orderKey":[]}',
+    '{"version":1,"keyFields":["text"],"orderKey":[{"$integer":"invalid"}]}',
   ])("rejects malformed or unsupported cursor %s", (cursor) => {
-    expect(() => Schema.decodeSync(QueryStreamCursor.Json)(cursor).key).toThrow(
-      Schema.SchemaError,
-    );
+    expect(
+      () => Schema.decodeSync(QueryStreamCursor.Json)(cursor).orderKey,
+    ).toThrow(Schema.SchemaError);
   });
 
   it("validates field names and their order, not just their count", () => {
@@ -152,7 +158,7 @@ describe("QueryStreamCursor serialization", () => {
         const value = yield* QueryStreamCursor.QueryStreamCursor.makeEffect({
           version: 1,
           keyFields: ["optional", "integer", "bytes"],
-          key: [undefined, 42n, new Uint8Array([1, 2]).buffer],
+          orderKey: [undefined, 42n, new Uint8Array([1, 2]).buffer],
         });
         const encoded = yield* Schema.encodeEffect(QueryStreamCursor.Json)(
           value,
@@ -167,7 +173,7 @@ describe("QueryStreamCursor serialization", () => {
         expect(wire).toEqual({
           version: 1,
           keyFields: value.keyFields,
-          key: [
+          orderKey: [
             { $undefined: true },
             { $integer: "KgAAAAAAAAA=" },
             { $bytes: "AQI=" },
@@ -179,8 +185,10 @@ describe("QueryStreamCursor serialization", () => {
           typeof bound.Type
         >().toEqualTypeOf<QueryStreamCursor.OrderKey>();
         expectTypeOf<typeof bound.Encoded>().toEqualTypeOf<string>();
-        expect(yield* Schema.decodeEffect(bound)(encoded)).toEqual(value.key);
-        expect(yield* Schema.encodeEffect(bound)(value.key)).toBe(encoded);
+        expect(yield* Schema.decodeEffect(bound)(encoded)).toEqual(
+          value.orderKey,
+        );
+        expect(yield* Schema.encodeEffect(bound)(value.orderKey)).toBe(encoded);
       }),
   );
 });
