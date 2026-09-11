@@ -30,7 +30,7 @@ export const layerFromEnvironment = Layer.effect(
 - Use `Config.option(...)` for semantic absence.
 - Use `Config.withDefault(...)` for missing-data defaults only; malformed values still fail.
 - Use `Config.orElse(...)` only when intentionally catching any config parse failure.
-- Use `Config.unwrap(...)` / `Config.Wrap<T>` for `layerConfig(...)` helpers.
+- Use `Config.unwrap(...)`/`Config.Wrap<T>` for `layerConfig(...)` helpers.
 
 ## Providers
 

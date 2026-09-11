@@ -2,8 +2,8 @@
  * End-to-end test of Confect's query-cache contract, enforced by the
  * constant `Clock` that `RegisteredConvexFunction.queryFunction` provides.
  * Asserts at the cache layer that Effect's internal clock reads (log
- * timestamps, spans) don't trip `observed_time` — those queries stay cached
- * across `MAX_CACHE_AGE` — while explicit time reads (`Clock.currentTimeMillis`
+ * timestamps, spans) don't trip `observed_time`—those queries stay cached
+ * across `MAX_CACHE_AGE`—while explicit time reads (`Clock.currentTimeMillis`
  * or a raw `Date.now()` call) opt the query out and evict.
  */
 

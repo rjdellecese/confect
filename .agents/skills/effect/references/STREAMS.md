@@ -38,8 +38,8 @@ Do not use streams just to loop forever. For one repeated effect with no emitted
 - Drop ordering when order is irrelevant and latency matters: `Stream.mapEffect(fn, { concurrency, unordered: true })`.
 - One input to zero/many outputs: `Stream.flatMap(...)`.
 - Multiple inner streams concurrently: `Stream.flatMap(fn, { concurrency })`.
-- Keep only matching values: `Stream.filter(...)` / `Stream.filterEffect(...)`.
-- Stateful transformation: `Stream.mapAccum(...)` / `Stream.mapAccumEffect(...)`.
+- Keep only matching values: `Stream.filter(...)`/`Stream.filterEffect(...)`.
+- Stateful transformation: `Stream.mapAccum(...)`/`Stream.mapAccumEffect(...)`.
 - Paginated pull-to-pages: prefer `Stream.paginate(...)` over hand-rolled loops. There is no separate `Stream.paginateEffect`.
 
 ## Consumption Chooser
@@ -95,7 +95,7 @@ export interface Interface {
 }
 ```
 
-Implementation can use private `Queue` / `SubscriptionRef`; consumers see streams.
+Implementation can use private `Queue`/`SubscriptionRef`; consumers see streams.
 
 ## Backpressure And Buffers
 
@@ -108,7 +108,7 @@ Use `Stream.buffer(...)` only when producer and consumer should decouple.
 - `strategy: "sliding"`: keep the latest values by dropping old ones.
 - `capacity: "unbounded"`: rare; use only when growth is bounded elsewhere.
 
-Use `Stream.debounce(...)` for quiet-period behavior and `Stream.throttle(...)` / `Stream.throttleEffect(...)` for rate-shaped streams.
+Use `Stream.debounce(...)` for quiet-period behavior and `Stream.throttle(...)`/`Stream.throttleEffect(...)` for rate-shaped streams.
 
 ## Error Handling
 

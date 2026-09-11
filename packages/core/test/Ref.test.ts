@@ -270,7 +270,7 @@ describe("FunctionReference", () => {
       Ref.Ref<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
-        // @ts-expect-error — ref args must be struct-shaped
+        // @ts-expect-error—ref args must be struct-shaped
         string,
         number
       >
@@ -472,7 +472,7 @@ describe("decodeErrorOption", () => {
     expect(Option.getOrThrow(decoded)).toBeInstanceOf(NotFound);
   });
 
-  test("returns None — rather than throwing — for data that does not match", () => {
+  test("returns None—rather than throwing—for data that does not match", () => {
     // Convex raises its own `ConvexError`s (this is the shape of a pagination
     // `InvalidCursor`), which never match a user-declared error schema.
     // Throwing here would replace the real error with an opaque `ParseError`,

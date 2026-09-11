@@ -13,7 +13,7 @@ Add experimental stream querying with reactive pagination, configurable middlewa
 
 Create composable Effect streams with `reader.table(...).stream(index, range?, order?)` and `QueryStream` from `@confect/server`. Merge, filter, map, join, deduplicate, narrow, and reverse queries without losing cursor pagination. Order keys and directions are checked by the type system. Joins support left-join placeholders through `onEmpty`, and effectful filters and maps support ordered concurrency. Reversing a distinct stream preserves its chosen representatives.
 
-`QueryStream.paginate` resumes from indexed cursor bounds and supports pinned page ranges, automatic split recommendations, and `maximumRowsRead` / `maximumBytesRead` budgets that count underlying query-stream reads, including filtered documents. Byte counts are estimates. If a budget prevents safe progress or splitting, pagination fails with `ReadBudgetExceededError`; increase the budget or reduce the query's read requirements.
+`QueryStream.paginate` resumes from indexed cursor bounds and supports pinned page ranges, automatic split recommendations, and `maximumRowsRead`/`maximumBytesRead` budgets that count underlying query-stream reads, including filtered documents. Byte counts are estimates. If a budget prevents safe progress or splitting, pagination fails with `ReadBudgetExceededError`; increase the budget or reduce the query's read requirements.
 
 Use React's new `useStreamPaginatedQuery` for these queries:
 
@@ -58,4 +58,4 @@ Middleware with an options schema also receives `options` alongside `invocation`
 ### Fixes and tracing
 
 - Preserve `ConvexError.data` when a handler throws a `ConvexError` inside an Effect instead of returning it as a typed failure.
-- Add named tracing spans for JavaScript client calls, server function execution, database writes and pagination, `QueryStream.unique` / `QueryStream.paginate`, and `confect codegen` / `confect dev` code-generation passes.
+- Add named tracing spans for JavaScript client calls, server function execution, database writes and pagination, `QueryStream.unique`/`QueryStream.paginate`, and `confect codegen`/`confect dev` code-generation passes.

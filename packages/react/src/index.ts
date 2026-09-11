@@ -169,8 +169,8 @@ const useConvexPaginatedQueryInternal = (
 const MINIMUM_CONVEX_VERSION = "1.36.0";
 
 /**
- * The non-throwing mode of `usePaginatedQueryInternal` — its fourth,
- * `throwOnError` parameter — arrived in convex 1.36.0. Convex 1.32 through
+ * The non-throwing mode of `usePaginatedQueryInternal`—its fourth,
+ * `throwOnError` parameter—arrived in convex 1.36.0. Convex 1.32 through
  * 1.35 export the same symbol taking only three parameters, where a fourth
  * argument is silently ignored and errors are always thrown.
  *
@@ -229,7 +229,7 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
       `usePaginatedQuery requires convex >= ${MINIMUM_CONVEX_VERSION}, but found ` +
         `${convexVersion}. Earlier versions always throw paginated query errors ` +
         "instead of returning them, so a declared `error` schema cannot be " +
-        "surfaced as a `Failure` — upgrade the `convex` package.",
+        "surfaced as a `Failure`—upgrade the `convex` package.",
     );
   }
 
@@ -260,7 +260,7 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
   // failures included, so results are decoded unconditionally.
   //
   // Decoding allocates fresh items, so key on the referentially stable
-  // `results` the Convex hook provides — the same identity-preservation
+  // `results` the Convex hook provides—the same identity-preservation
   // rationale as in `useQuery` above.
   const { results: encodedResults } = convexResult;
   const decodedResults = useMemo(
@@ -299,8 +299,7 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
         Match.when("LoadingMore", () =>
           PaginatedQueryResult.loadingMore({ results: decodedResults }),
         ),
-        // `CanLoadMore` is the only status whose `loadMore` does anything —
-        // the Convex hook returns an intentional no-op for all the others, so
+        // `CanLoadMore` is the only status whose `loadMore` does anything—the Convex hook returns an intentional no-op for all the others, so
         // they carry no callback at all.
         Match.when("CanLoadMore", () =>
           PaginatedQueryResult.canLoadMore({
@@ -313,8 +312,7 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
         ),
         Match.exhaustive,
       ),
-    // The memo produces `Variants`, the conditional return type's superset —
-    // when `E` is `never` the `Failure` arm is unreachable at runtime, which
+    // The memo produces `Variants`, the conditional return type's superset—when `E` is `never` the `Failure` arm is unreachable at runtime, which
     // is exactly what the conditional encodes.
     [ref, skipped, decodedResults, status, loadMore, error],
   ) as PaginatedQueryResult.PaginatedQueryResult<
@@ -335,14 +333,14 @@ const isInvalidCursorError = (error: Error): boolean =>
     error.data !== null &&
     // Both Convex's built-in pagination (which also sets
     // `isConvexSystemError`) and `QueryStream.paginate` signal an invalid
-    // cursor with this data shape — the same check `convex/react` performs.
+    // cursor with this data shape—the same check `convex/react` performs.
     (error.data as { paginationError?: unknown }).paginationError ===
       "InvalidCursor");
 
 const NO_ITEMS: ReadonlyArray<unknown> = [];
 
 /**
- * EXPERIMENTAL — endCursor-pinned reactive pagination (see
+ * EXPERIMENTAL—endCursor-pinned reactive pagination (see
  * `notes/stream-based-querying.md`). Use it with paginated queries whose
  * handlers paginate via `QueryStream.paginate`: those don't write the query
  * journal that {@link usePaginatedQuery}'s built-in reactivity relies on,
@@ -351,7 +349,7 @@ const NO_ITEMS: ReadonlyArray<unknown> = [];
  * including the built-in `paginate`.)
  *
  * Each loaded page is pinned to a fixed index range by re-subscribing it
- * with its `continueCursor` echoed back as `endCursor` — pages then grow
+ * with its `continueCursor` echoed back as `endCursor`—pages then grow
  * and shrink reactively but always meet exactly, and a page that outgrows
  * `initialNumItems` is split in two. This is the mechanism of
  * `convex-helpers/react`'s `usePaginatedQuery`, re-expressed over the pure
@@ -382,7 +380,7 @@ export const useStreamPaginatedQuery = <
   // `useQueries` requires a *referentially stable* queries object while
   // nothing has changed: its subscription memo keys on identity, and its
   // `useSubscription` re-runs a render-phase state update whenever the
-  // subscription changes — an unstable input loops the render. Callers
+  // subscription changes—an unstable input loops the render. Callers
   // typically pass a fresh `args` literal each render, so everything that
   // feeds the queries object is stabilized by *value* here: the function
   // reference by `ref`, and the encoded args by their serialized form (as
@@ -436,7 +434,7 @@ export const useStreamPaginatedQuery = <
     resetKey,
     state: freshState(),
   }));
-  // Render-phase reset — the React-sanctioned derived-state-from-props
+  // Render-phase reset—the React-sanctioned derived-state-from-props
   // pattern, also how `convex/react`'s own paginated hook resets.
   let current = tracked;
   if (current.resetKey !== resetKey) {
@@ -484,8 +482,7 @@ export const useStreamPaginatedQuery = <
   );
 
   // Apply the transitions this render discovered (completed split swaps,
-  // new splits of overgrown pages) or restart after an invalid cursor —
-  // render-phase state updates, as in `convex-helpers`' hook. Both settle:
+  // new splits of overgrown pages) or restart after an invalid cursor—render-phase state updates, as in `convex-helpers`' hook. Both settle:
   // the updated state no longer produces the same discovery.
   if (interpretation._tag === "ResetRequired") {
     setTracked((previous) => ({

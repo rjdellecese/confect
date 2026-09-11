@@ -107,7 +107,7 @@ layer(BundlerLayer)("bundle", (it) => {
         yield* fs.makeDirectory(path.join(pkgDir, "dist", "Widget"), {
           recursive: true,
         });
-        // Conditional `exports` with only `import`/`types` — no
+        // Conditional `exports` with only `import`/`types`—no
         // `require`/`default`. CommonJS resolution (`createRequire`) throws
         // ERR_PACKAGE_PATH_NOT_EXPORTED for this shape, so it only bundles
         // once resolution honors the ESM `import` condition.
@@ -177,7 +177,7 @@ layer(BundlerLayer)("bundle", (it) => {
 
         const bundled = yield* Bundler.bundle(entry);
         // esbuild canonicalizes `import.meta.url` to the entry's real path, so
-        // resolve symlinks before comparing — otherwise this fails when the
+        // resolve symlinks before comparing—otherwise this fails when the
         // temp dir lives under a symlinked root (e.g. macOS `/tmp` ->
         // `/private/tmp`).
         const realEntry = yield* fs.realPath(entry);

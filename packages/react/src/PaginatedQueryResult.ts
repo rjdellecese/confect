@@ -12,7 +12,7 @@ type TypeId = typeof TypeId;
  * A `PaginatedQueryResult` represents the result of a Confect paginated query.
  * The non-`Failure` variants mirror the statuses of `usePaginatedQuery` from
  * `convex/react` and all carry `results` and `isLoading`, so the common UI
- * shape — render the list, show a spinner while loading — needs only an
+ * shape—render the list, show a spinner while loading—needs only an
  * {@link isFailure} early-out and plain field access.
  *
  * Every variant carries `results`, including `Failure`: when a later page
@@ -23,8 +23,8 @@ type TypeId = typeof TypeId;
  * `loadMore` appears only on `CanLoadMore`, the one state it can make
  * progress from. The underlying Convex hook exposes it on every status, but
  * calling it while a page is in flight, once the list is exhausted, or after
- * a failure is an intentional no-op there; narrowing to `CanLoadMore` — via
- * {@link isCanLoadMore} or {@link match} — makes that statically apparent
+ * a failure is an intentional no-op there; narrowing to `CanLoadMore`—via
+ * {@link isCanLoadMore} or {@link match}—makes that statically apparent
  * instead of silently dropping the call.
  *
  * When the query declares no `error` schema (`E` is `never`), the `Failure`
@@ -48,7 +48,7 @@ export type PaginatedQueryResult<Item, E = never> = [E] extends [never]
       | Failure<Item, E>;
 
 /**
- * Every variant regardless of `E` — the parameter type for guards and
+ * Every variant regardless of `E`—the parameter type for guards and
  * {@link match}, since `PaginatedQueryResult` itself excludes `Failure` when
  * `E` is `never`.
  */

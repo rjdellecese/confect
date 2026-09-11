@@ -9,7 +9,7 @@
  *
  * Deliberately a plain async vitest test rather than `it.effect`/TestConfect:
  * `@effect/vitest` runs the outer test fiber on Effect's default scheduler,
- * which resolves `globalThis.setImmediate` at dispatch time — stubbing the
+ * which resolves `globalThis.setImmediate` at dispatch time—stubbing the
  * globals would crash the harness fiber, not just the code under test. With
  * `convexTest` used directly, the only Effect fiber alive inside the stub
  * window is the handler fiber under test.

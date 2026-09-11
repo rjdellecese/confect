@@ -10,8 +10,7 @@ import * as Runtime from "effect/Runtime";
 /**
  * Generates the stream diagrams on the Streams docs page.
  *
- * A diagram is a set of tracks. A track is read left to right in key order
- * — the marble-diagram convention, with the index's ordering as the axis in
+ * A diagram is a set of tracks. A track is read left to right in key order—the marble-diagram convention, with the index's ordering as the axis in
  * place of time. Its name sits on the line above it, and the track curls up
  * into the name (`╰`) rather than sitting beside it, so the diagram is no
  * wider than its columns. Every track in one diagram shares the same
@@ -52,8 +51,7 @@ const keyCell = (key: string): string => `  ${key}`.padEnd(COLUMN_WIDTH);
 /**
  * A track: a named stream, one cell per column, ending in `end`. The name
  * is printed on the line above, and the track starts with the corner that
- * joins it to the name. `start` shifts both right by that many columns —
- * an inner stream of a join begins where its outer element is.
+ * joins it to the name. `start` shifts both right by that many columns—an inner stream of a join begins where its outer element is.
  */
 export const track = (
   name: string,

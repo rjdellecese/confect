@@ -6,7 +6,7 @@ only so that `@ark/attest` resolves against TypeScript 6 while the rest of the
 workspace runs on TypeScript 7.
 
 TypeScript 7 is the native compiler: `tsc` is a Go binary, and the `typescript`
-npm package no longer exports the JavaScript compiler API — `import ts from
+npm package no longer exports the JavaScript compiler API—`import ts from
 "typescript"` yields a version string and nothing else. `@ark/attest` drives
 that API (and `tsserver`) to count type instantiations, so it cannot run on
 TypeScript 7 at all; there is no released version of it that can.

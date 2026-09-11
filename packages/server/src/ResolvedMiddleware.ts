@@ -5,8 +5,7 @@ import type * as FunctionRegistryItem from "./FunctionRegistryItem";
 import type * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 
 /**
- * A middleware spec paired with its implementation for one function's type —
- * the resolved form `buildForGroup` hands to `makeRegisteredFunction`.
+ * A middleware spec paired with its implementation for one function's type—the resolved form `buildForGroup` hands to `makeRegisteredFunction`.
  */
 export interface ResolvedMiddleware {
   readonly middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec;
@@ -42,7 +41,7 @@ export const resolve = (
       const registered = middlewareRegistryItems.get(middlewareSpec.key);
       if (registered === undefined) {
         throw new Error(
-          `Middleware "${middlewareSpec.key}" is attached to this group's spec, but no implementation was provided — pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,
+          `Middleware "${middlewareSpec.key}" is attached to this group's spec, but no implementation was provided—pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,
         );
       }
       if (registered.middlewareSpec !== middlewareSpec) {

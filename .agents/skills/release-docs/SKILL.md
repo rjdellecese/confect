@@ -18,7 +18,7 @@ The normal source branches are:
 
 Follow these steps:
 
-1. Identify the version and source ref. Default to `v9` / `main` unless the
+1. Identify the version and source ref. Default to `v9`/`main` unless the
    request names v10 or another ref.
 2. Run `git fetch origin main release --tags` (and fetch `v10` while its
    prerelease branch exists), then read the version's currently deployed source

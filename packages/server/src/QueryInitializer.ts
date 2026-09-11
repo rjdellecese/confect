@@ -104,13 +104,13 @@ export interface QueryInitializer<
     ) => SearchFilter,
   ) => OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
   /**
-   * EXPERIMENTAL — stream-first querying (see `notes/stream-based-querying.md`).
+   * EXPERIMENTAL—stream-first querying (see `notes/stream-based-querying.md`).
    *
    * Like `index`, but returns a {@link QueryStream.QueryStream}: a genuine
    * Effect `Stream` of documents in index order that stays mergeable and
    * paginable.
    *
-   * In SQL terms: an index range scan — `SELECT * FROM table WHERE <range>
+   * In SQL terms: an index range scan—`SELECT * FROM table WHERE <range>
    * ORDER BY <index fields> [DESC]`; `eq` calls are the equality
    * predicates, the bound calls are the range predicates. The value is a
    * reusable description of a query: each run re-runs the index query.   *
@@ -120,7 +120,7 @@ export interface QueryInitializer<
    * the equality predicates). The order direction is part of the
    * type too: omitted, it is `"asc"`; a literal is tracked as that literal,
    * and a value known only at runtime as the union. The order parameter is
-   * either absent or a direction — never `undefined` — so the type can't
+   * either absent or a direction—never `undefined`—so the type can't
    * claim a literal the runtime default would contradict.
    */
   readonly stream: {
@@ -381,8 +381,7 @@ export const make = <
       : QueryStream.rangeBuilder();
 
     // The type-level field tuple appends the `_creationTime` tiebreaker, but
-    // the runtime `table.indexes` record stores only the declared fields —
-    // append it here.
+    // the runtime `table.indexes` record stores only the declared fields—append it here.
     const indexFields: ReadonlyArray<string> =
       indexName === "by_id"
         ? ["_id"]

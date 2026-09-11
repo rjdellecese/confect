@@ -44,7 +44,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 
 ## TypeScript
 
-The workspace is on TypeScript 7, so `tsc` is a native binary and the `typescript` package no longer exports a JavaScript compiler API — anything that needs to _drive_ the compiler rather than _run_ it has to either spawn `tsc` or use `typescript/unstable/*`. Effect's language service comes from `@effect/tsgo` (not `@effect/language-service`, which supports only TypeScript 5 and 6): the root `prepare` script patches both TypeScript and Oxlint. TypeScript provides Effect editor features with duplicate diagnostics disabled, while Oxlint reports Effect diagnostics through the `effecttsgo` plugin; configure their severities in `.oxlintrc.json`.
+The workspace is on TypeScript 7, so `tsc` is a native binary and the `typescript` package no longer exports a JavaScript compiler API—anything that needs to _drive_ the compiler rather than _run_ it has to either spawn `tsc` or use `typescript/unstable/*`. Effect's language service comes from `@effect/tsgo` (not `@effect/language-service`, which supports only TypeScript 5 and 6): the root `prepare` script patches both TypeScript and Oxlint. TypeScript provides Effect editor features with duplicate diagnostics disabled, while Oxlint reports Effect diagnostics through the `effecttsgo` plugin; configure their severities in `.oxlintrc.json`.
 
 ## Build System
 
@@ -58,11 +58,11 @@ Build, lint, and format run through Vite+ (`vp`), which orders packages by their
 
 - `pnpm build` - Build all @confect packages (cached, dependency-ordered)
 - `pnpm dev` - Watch-rebuild all packages (tsdown watchers + `tsc -b --watch` for declarations)
-- `pnpm dev:example` / `pnpm dev:docs` - Run the example app / docs site
+- `pnpm dev:example`/`pnpm dev:docs` - Run the example app/docs site
 - `pnpm test` - Run all package test suites via Vitest (`vitest run`)
 - `pnpm typecheck` - Typecheck the package graph and test suites via `tsc -b` (project references, incremental)
-- `pnpm lint` / `pnpm lint:fix` - Lint (Oxlint + Syncpack); `lint:fix` writes fixes
-- `pnpm format` / `pnpm format:check` - Format (Oxfmt + Syncpack); `format` writes, `format:check` only checks
+- `pnpm lint`/`pnpm lint:fix` - Lint (Oxlint + Syncpack); `lint:fix` writes fixes
+- `pnpm format`/`pnpm format:check` - Format (Oxfmt + Syncpack); `format` writes, `format:check` only checks
 - `pnpm check` - Format, lint, and type checks together (`vp check`)
 - `pnpm clean` - Remove dist, coverage, and node_modules everywhere
 
@@ -81,7 +81,7 @@ Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.s
 
 ### Running tests
 
-Run `pnpm test` to run all suites at once, or target a single package with `vitest run --project @confect/<pkg>` (e.g. `vitest run --project @confect/core`). Run tests with `vitest run`, not `vp test` — the Vite+ test runner mishandles type-only test files. The server's Convex integration suites have dedicated scripts: `pnpm test:server:mock-backend` and `pnpm test:server:local-backend`.
+Run `pnpm test` to run all suites at once, or target a single package with `vitest run --project @confect/<pkg>` (e.g. `vitest run --project @confect/core`). Run tests with `vitest run`, not `vp test`—the Vite+ test runner mishandles type-only test files. The server's Convex integration suites have dedicated scripts: `pnpm test:server:mock-backend` and `pnpm test:server:local-backend`.
 
 ## Versioning and Publishing
 

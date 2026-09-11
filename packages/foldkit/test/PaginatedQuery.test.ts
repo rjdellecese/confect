@@ -384,7 +384,7 @@ describe("PaginatedQuery", () => {
       ) as Active;
       const loadingOne = Option.getOrThrow(PaginatedQuery.prev(pageTwo));
       // Page one reloads its pinned range, which may hold more or fewer
-      // documents than it did — but never a different range.
+      // documents than it did—but never a different range.
       const pageOne = PaginatedQuery.settle(
         loadingOne,
         success(loadingOne, [{ text: "a" }, { text: "a2" }, { text: "b" }], {

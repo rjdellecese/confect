@@ -259,7 +259,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
     }),
   );
 
-  // A `makeNode()` spec validates regardless of its location — runtime is
+  // A `makeNode()` spec validates regardless of its location—runtime is
   // declared by the spec, not the directory (no `confect/node/` requirement).
   it.effect("accepts a valid node leaf spec at a non-`node/` path", () =>
     Effect.gen(function* () {
@@ -434,7 +434,7 @@ layer(LeafModuleLayer)("refs import graph", (it) => {
 });
 
 // Discovery returns paths joined with the host separator, so these compare by
-// path segment rather than against POSIX literals — a substring check for
+// path segment rather than against POSIX literals—a substring check for
 // "middleware/" is vacuously true on Windows and asserts nothing there.
 layer(LeafModuleLayer)("discovery", (it) => {
   it.effect("excludes `middleware/` from leaf spec discovery", () =>
@@ -442,7 +442,7 @@ layer(LeafModuleLayer)("discovery", (it) => {
       const path = yield* Path.Path;
       const specFiles = yield* discoverLeafSpecFiles;
 
-      // The fixtures do have middleware specs there — they must not be
+      // The fixtures do have middleware specs there—they must not be
       // discovered as groups.
       expect(
         Array.filter(specFiles, (file) =>

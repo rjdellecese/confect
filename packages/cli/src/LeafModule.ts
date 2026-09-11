@@ -31,7 +31,7 @@ export interface LeafModule {
   readonly groupPathDot: string;
   readonly exportName: string;
   /**
-   * The runtime declared by the group's spec — `"Node"` for
+   * The runtime declared by the group's spec—`"Node"` for
    * `GroupSpec.makeNode()`, `"Convex"` for `GroupSpec.make()`. `None` while the
    * runtime is unknown: discovery (`toLeafModule`) works from the file path alone,
    * which does not determine the runtime, so this is filled in once the spec has
@@ -197,19 +197,19 @@ const absoluteModulePath = Effect.fnUntraced(function* (relativePath: string) {
 
 /**
  * Every `*.spec.ts` is reachable from `_generated/spec.ts`, which the client
- * imports through `_generated/refs.ts` — so a spec's whole import graph is
+ * imports through `_generated/refs.ts`—so a spec's whole import graph is
  * bundled into the browser whether or not the client calls those functions.
  * Server logic co-located with a declaration therefore ships to users, silently.
  *
  * `@confect/server` is a sound proxy for "server logic lives here": an
- * implementation can't be written without `FunctionImpl` / `MiddlewareImpl`,
- * both of which live there. Table `Doc` / `Fields` schemas live in
+ * implementation can't be written without `FunctionImpl`/`MiddlewareImpl`,
+ * both of which live there. Table `Doc`/`Fields` schemas live in
  * `@confect/core`, so the documented `notes.Doc` pattern in a spec must not
  * reach `@confect/server` even through `tables/` or `_generated/`. The check
  * runs over the spec bundle's transitive inputs rather than the spec module
  * alone, so it also covers middleware declarations under
  * `confect/middleware/` (which codegen otherwise never visits) and any
- * shared helper a spec pulls in — while only ever flagging modules that
+ * shared helper a spec pulls in—while only ever flagging modules that
  * genuinely reach the client.
  */
 const validateClientSafety = Effect.fnUntraced(function* (
@@ -247,7 +247,7 @@ const validateClientSafety = Effect.fnUntraced(function* (
  * can read its runtime and avoid re-bundling for later inspection (e.g.
  * stamping `leaf.runtime` and parent/child name-collision checks at codegen
  * time). The group's runtime (`Convex` vs `Node`) is whatever the spec
- * declares — it is not constrained by the file's location.
+ * declares—it is not constrained by the file's location.
  */
 export const validateSpec = Effect.fn("LeafModule.validateSpec")(function* (
   leaf: LeafModule,
@@ -293,9 +293,9 @@ const findFinalizedGroupImpl = <S>(
 /**
  * Build the impl layer with a fresh `Registry` so each validation is
  * isolated from prior validations' `FunctionImpl.make` writes. The CLI no
- * longer reads the registry directly — `GroupImpl.finalize` snapshots the
+ * longer reads the registry directly—`GroupImpl.finalize` snapshots the
  * registered function names onto the produced `Finalized` `GroupImpl`
- * service value — but a fresh `Ref` is still required because the default
+ * service value—but a fresh `Ref` is still required because the default
  * `Context.Reference` is cached globally and would otherwise accumulate
  * items across impls.
  */

@@ -67,8 +67,7 @@ describe("FunctionImpl.make", () => {
     "registers a group's function without any api or assembled-spec context",
     () =>
       Effect.gen(function* () {
-        // Registration consults neither `api` nor the assembled spec tree —
-        // only the group's own spec and the function name — so independent
+        // Registration consults neither `api` nor the assembled spec tree—only the group's own spec and the function name—so independent
         // groups each register their own function flatly.
         const parent = GroupSpec.make().addFunction(fnSpec("parentFn"));
         const child = GroupSpec.make().addFunction(fnSpec("childFn"));

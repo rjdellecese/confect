@@ -32,7 +32,7 @@ export {
 //
 // The deploy-time Convex `TableDefinition` is the part of a table that
 // belongs on the server: it value-imports `defineTable` from `convex/server`.
-// Specs and generated refs reach `Fields` / `Doc` through `@confect/core`,
+// Specs and generated refs reach `Fields`/`Doc` through `@confect/core`,
 // so this helper is only called from `_generated/convexSchema.ts`.
 
 const tableDefinitionCache = new WeakMap<

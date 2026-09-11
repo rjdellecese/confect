@@ -1,7 +1,7 @@
 // Guards what actually ends up in the published tarballs.
 //
 // Every published package uses `files: ["dist", ...]`, which is an allowlist of
-// directories, not of files — so anything a build step happens to leave inside
+// directories, not of files—so anything a build step happens to leave inside
 // `dist` ships to npm. That is how `dist/tsconfig.src.tsbuildinfo` went out in
 // every release until it was noticed by hand. This asks npm for the exact file
 // list it would pack and fails on anything that has no business being there.
@@ -59,11 +59,11 @@ for (const dir of publishedPackages()) {
   const problems = [];
 
   // A package that packs no build output means the check ran before `pnpm
-  // build` — passing here would be vacuous, so treat it as a failure.
+  // build`—passing here would be vacuous, so treat it as a failure.
   if (!files.some((path) => path.startsWith("dist/"))) {
     problems.push([
       "dist/",
-      "no build output packed — did this run before `pnpm build`?",
+      "no build output packed—did this run before `pnpm build`?",
     ]);
   }
 
@@ -83,7 +83,7 @@ for (const dir of publishedPackages()) {
   console.error(`FAIL ${dir}`);
   for (const [path, reason] of problems) {
     // oxlint-disable-next-line effecttsgo/global-console -- This standalone verification script reports directly to its caller.
-    console.error(`       ${path} — ${reason}`);
+    console.error(`       ${path}—${reason}`);
   }
 }
 

@@ -66,7 +66,7 @@ FunctionSpec.publicQuery({
 
 ### Paginated queries
 
-Define a paginated query with `FunctionSpec.publicPaginatedQuery` (or `internalPaginatedQuery`). Instead of `returns`, pass an `item` schema — the type of one element in a page. The optional `args` field map declares only your own arguments; Confect composes the Convex-facing schemas for you, adding the `paginationOpts` argument (with all of Convex's [pagination protocol fields](https://docs.convex.dev/database/pagination)) and wrapping `item` in a `PaginationResult` returns schema.
+Define a paginated query with `FunctionSpec.publicPaginatedQuery` (or `internalPaginatedQuery`). Instead of `returns`, pass an `item` schema—the type of one element in a page. The optional `args` field map declares only your own arguments; Confect composes the Convex-facing schemas for you, adding the `paginationOpts` argument (with all of Convex's [pagination protocol fields](https://docs.convex.dev/database/pagination)) and wrapping `item` in a `PaginationResult` returns schema.
 
 ```ts confect/notes.spec.ts
 import { FunctionSpec } from "@confect/core";
@@ -81,7 +81,7 @@ FunctionSpec.publicPaginatedQuery({
 });
 ```
 
-Do not declare `paginationOpts` in `args` — it is added automatically, and declaring it yourself is a type (and runtime) error.
+Do not declare `paginationOpts` in `args`—it is added automatically, and declaring it yourself is a type (and runtime) error.
 
 The handler receives the decoded args including `paginationOpts`, which it typically forwards directly to [`paginate`](/server/database/reading#paginate):
 

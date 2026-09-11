@@ -64,11 +64,11 @@ If a task spans several branches, read all matching files before editing.
 - Runtime configuration: `Config` recipes read in layers; override with `ConfigProvider` in tests.
 - Event source: `Stream` consumed with `Stream.runForEach(...)` and forked with `Effect.forkScoped` in the owning layer.
 - Queue-backed event source: `Queue` for the producer boundary, `Stream.fromQueue(...)` for consumers.
-- Broadcast event source: `PubSub` / `Stream.fromPubSub(...)` or `SubscriptionRef` for latest-value state.
+- Broadcast event source: `PubSub`/`Stream.fromPubSub(...)` or `SubscriptionRef` for latest-value state.
 - Polling worker: `runPass().pipe(Effect.repeat(Schedule.spaced(...)))`, with typed pass failures handled before repeat.
-- Retry transient operation: `Effect.retry(...)` / `Effect.retryOrElse(...)` with a bounded `Schedule`.
-- Keyed lookup cache with TTL and concurrent-lookup dedupe: prefer `Cache.make(...)` / exit-aware `Cache.makeWith(...)` when their lifecycle and eviction model fit.
-- Memoize a single effect result: `Effect.cached(...)` / `Effect.cachedWithTTL(...)`.
+- Retry transient operation: `Effect.retry(...)`/`Effect.retryOrElse(...)` with a bounded `Schedule`.
+- Keyed lookup cache with TTL and concurrent-lookup dedupe: prefer `Cache.make(...)`/exit-aware `Cache.makeWith(...)` when their lifecycle and eviction model fit.
+- Memoize a single effect result: `Effect.cached(...)`/`Effect.cachedWithTTL(...)`.
 - Batch N keys into one backend call (only when a real batch endpoint exists): `Effect.request(...)` + `RequestResolver`.
 - HTTP request in an Effect application: prefer Effect `HttpClient` plus request/response schema decoding.
 - HTTP transient retry: `HttpClient.retryTransient(...)`.

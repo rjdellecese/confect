@@ -54,7 +54,7 @@ const CONVEX_CONFIG_SUFFIX = /[/\\]convex\.config(\.[cm]?[jt]s)?$/;
  * `convex.config.ts` in plain Node, this plugin intercepts every non-entry
  * import of a `convex.config` module (mirroring the Convex CLI's own
  * `componentPlugin`) and swaps in a virtual wrapper that re-exports the real
- * definition with `componentDefinitionPath` and `defaultName` filled in — the
+ * definition with `componentDefinitionPath` and `defaultName` filled in—the
  * exact shape of Convex's `ImportedComponentDefinition`.
  */
 export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
@@ -80,7 +80,7 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
 
       // Component definitions are conventionally imported extensionless
       // (`.../convex.config`), which npm `exports` maps resolve but plain
-      // file resolution may not — probe the same candidates Convex does.
+      // file resolution may not—probe the same candidates Convex does.
       const extension = path.extname(args.path);
       const candidates = [
         args.path,
@@ -112,7 +112,7 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
       (args) => {
         const specifier = (args.pluginData as { specifier: string }).specifier;
         // The injected path is the definition's *directory*, matching the
-        // Convex runtime's convention — so even if a future convex version
+        // Convex runtime's convention—so even if a future convex version
         // stops reading `defaultName`, `app.use`'s last-resort fallback
         // (`componentDefinitionPath.split("/").pop()`) still yields the
         // conventional component name rather than `convex.config`. Convex's
@@ -172,7 +172,7 @@ const byName = Order.mapInput(
  * `defineComponent`'s docs). Beyond rejecting genuinely invalid names, this
  * is a drift tripwire: if a future convex version stopped resolving names
  * the way we rely on (e.g. `defaultName` disappearing), the fallback name
- * would be a path segment like `convex.config` — caught here as a clear
+ * would be a path segment like `convex.config`—caught here as a clear
  * error instead of silently emitting a broken registry.
  */
 const VALID_COMPONENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;

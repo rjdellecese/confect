@@ -50,7 +50,7 @@ class DeclarationEmit extends Context.Service<
  * TypeScript 7 is a native binary: the `typescript` package no longer exports a
  * JavaScript compiler API to build a `Program` with, so this drives the real
  * `tsc` over a generated project and reads what it wrote. `lib/tsc.js` is the
- * package's own launcher, which finds the platform binary — going through it
+ * package's own launcher, which finds the platform binary—going through it
  * (rather than `node_modules/.bin/tsc`) keeps the spawn identical on Windows,
  * where the bin entry is a shell script.
  */
@@ -155,7 +155,7 @@ layer(TestLayer, { timeout: "120 seconds" })("declaration emit", (it) => {
 
         expect(
           diagnostics,
-          "docs.ts must typecheck cleanly — non-object doc types require `type` aliases, not `interface … extends`",
+          "docs.ts must typecheck cleanly—non-object doc types require `type` aliases, not `interface … extends`",
         ).toBe("");
       }),
     120_000,

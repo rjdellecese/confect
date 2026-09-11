@@ -519,7 +519,7 @@ const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
   );
 
 /**
- * Decode `encodedError` against the ref's error schema — the function's
+ * Decode `encodedError` against the ref's error schema—the function's
  * declared `error` schema unioned with its covering middlewares' error
  * schemas. Returns `None` if the ref declares no typed error at all (Confect
  * ref without an `error` schema and without failing middleware, or a
@@ -541,14 +541,14 @@ export const decodeError = <Ref_ extends Any>(
 
 /**
  * Synchronous counterpart to `decodeError`. Returns `None` when the value is
- * not this ref's typed error — either because the ref declares no `error`
+ * not this ref's typed error—either because the ref declares no `error`
  * schema, or because `encodedError` doesn't match the one it declares.
  *
  * The second case is reachable in normal operation: Convex raises its own
  * `ConvexError`s (an `InvalidCursor` pagination error, for instance), and
  * those never match a user-declared error schema. Callers pair this with a
  * fallback that surfaces the original error, so failing to decode must not
- * throw — a `ParseError` here would replace the real error with an opaque one
+ * throw—a `ParseError` here would replace the real error with an opaque one
  * and lose the only useful diagnostic. Hence the `Option` suffix rather than
  * `Sync`, matching `Schema.decodeUnknownOption`: the sibling `*Sync` helpers
  * in this module all throw on a parse failure, and this one deliberately
@@ -589,8 +589,7 @@ const paginatedKind = (ref: AnyConfect): FunctionProvenance.Paginated =>
   );
 
 /**
- * Encode the args of a paginated query ref via its user-args schema —
- * `paginationOpts` is excluded, since the pagination protocol fields are
+ * Encode the args of a paginated query ref via its user-args schema—`paginationOpts` is excluded, since the pagination protocol fields are
  * managed by the client (e.g. `usePaginatedQuery` from `convex/react`), not by
  * the caller. Requires a ref built with `FunctionSpec.publicPaginatedQuery`
  * (or `internalPaginatedQuery`).

@@ -1,7 +1,7 @@
 /**
  * End-to-end test of Confect's storage services inside Convex's real UDF
  * isolate. Convex returns storage URLs as plain strings, which the storage
- * services decode with Effect's `Schema.URLFromString` — so these only pass
+ * services decode with Effect's `Schema.URLFromString`—so these only pass
  * if that string→URL decode succeeds in the isolate.
  */
 

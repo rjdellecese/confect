@@ -436,7 +436,7 @@ const discoverEntryPoints = Effect.gen(function* () {
     tryEntry(generatedSpecPath, "specDirty"),
     // `confect/schema.ts` is no longer user-authored; the runtime
     // `DatabaseSchema` lives at `_generated/schema.ts` (codegen-written,
-    // so not an entry point — wiring it through esbuild would form a
+    // so not an entry point—wiring it through esbuild would form a
     // codegen→write→onEnd→codegen loop). Updates to `confect/tables/*.ts`
     // still reach this dev loop via the impl entry points' import graphs;
     // brand-new tables are caught by the Create-event safety net below.
@@ -452,8 +452,7 @@ const discoverEntryPoints = Effect.gen(function* () {
   );
 
   // `convex/convex.config.ts` feeds the generated components registry, so
-  // edits to it (or to a locally-defined component definition it imports —
-  // npm component definitions are externalized and not watched) must re-run
+  // edits to it (or to a locally-defined component definition it imports—npm component definitions are externalized and not watched) must re-run
   // codegen.
   const convexDirectory = yield* ConvexDirectory.get;
   const convexConfigEntryOption = yield* Effect.gen(function* () {
@@ -491,7 +490,7 @@ const esbuildOptions = (
   // added impl) it's an echo of the codegen run that triggered the
   // restart. Either way, the entry's contents were already accounted
   // for, so we record any errors but don't flip dirty or push a
-  // signal — only genuine subsequent rebuilds should do that.
+  // signal—only genuine subsequent rebuilds should do that.
   const initialBuildSeenRef = Ref.makeUnsafe(false);
   return {
     entryPoints: [entry.absolutePath],
@@ -831,7 +830,7 @@ const handleConfectChange = ({
 
   // Any other `.ts` under `confect/` (helpers like `tables/notes.ts`).
   // Updates to such files are handled by the esbuild watcher for whichever
-  // entry point imports them — its onEnd flips the right dirty flag.
+  // entry point imports them—its onEnd flips the right dirty flag.
   // Creates are our safety net: when a previously-missing import is added,
   // esbuild may not have its parent directory on a poll path, so we
   // re-run codegen on Create here.
