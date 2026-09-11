@@ -148,7 +148,7 @@ export const rebase = <
         (union) =>
           new SchemaAST.Union(
             Array.map(union.types, visit),
-            union.mode,
+            union.options,
             union.annotations,
             union.checks,
             undefined,

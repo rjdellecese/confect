@@ -11,7 +11,7 @@ import * as ConvexDirectory from "./ConvexDirectory";
 import * as ProjectRoot from "./ProjectRoot";
 
 export const flags = {
-  componentDir: Flag.string("component-dir").pipe(
+  componentDir: Flag.String("component-dir").pipe(
     Flag.withDescription(
       "Generate a component instead of the application; its sibling confect/ directory contains the source.",
     ),

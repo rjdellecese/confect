@@ -1,14 +1,17 @@
 import type { DefaultFunctionArgs, FunctionReference } from "convex/server";
 import { getFunctionAddress } from "convex/server";
 import * as Array from "effect/Array";
-import { pipe } from "effect/Function";
+import { memoize, pipe } from "effect/Function";
 import * as Match from "effect/Match";
 import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
+import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
 import * as GenericId from "./GenericId";
 import type * as GroupSpec from "./GroupSpec";
 import * as IdScope from "./IdScope";
+import * as Lazy from "./Lazy";
+import type * as MiddlewareSpec from "./MiddlewareSpec";
 import * as Ref from "./Ref";
 import type * as Refs from "./Refs";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
@@ -175,7 +178,7 @@ export const make = <
             );
           }),
           Record.map((functionSpec) =>
-            Ref.make(path, functionSpec, group.middlewareSpecs),
+            Ref.make(path, functionSpec, group.middlewareAttachments),
           ),
         );
         return { ...collect(group.groups, path), ...functions };
@@ -218,6 +221,19 @@ export const bind = <
   );
   const rebase = (schema: Schema.ConstraintCodec<any, any, never, never>) =>
     GenericId.rebase(schema, contract.scope, scope);
+  const rebaseMiddleware = memoize(
+    (middleware: MiddlewareSpec.AnyMiddlewareSpec) => {
+      if (!("error" in middleware)) return middleware;
+      const boundMiddleware = Object.create(
+        middleware,
+      ) as MiddlewareSpec.AnyMiddlewareSpec;
+      Lazy.defineProperty(boundMiddleware, "error", () => {
+        const error = middleware.error;
+        return error === undefined ? undefined : rebase(error);
+      });
+      return boundMiddleware;
+    },
+  );
   const visit = (tree: Tree, references: unknown): Tree =>
     Record.map(tree, (child, key) => {
       const reference = (references as Record<string, unknown>)[key];
@@ -228,32 +244,52 @@ export const bind = <
             ...ref,
             functionReference: nativeRef,
           })),
-          Match.tag("Confect", (ref) => ({
-            ...ref,
-            functionReference: nativeRef,
-            args: Schema.Struct(Record.map(ref.args.fields, rebase)),
-            returns: rebase(ref.returns),
-            kind: Match.value(ref.kind).pipe(
-              Match.tag("Standard", (kind) => kind),
-              Match.tag("Paginated", (kind) => ({
-                ...kind,
-                userArgs: Schema.Struct(
-                  Record.map(kind.userArgs.fields, rebase),
-                ),
-                item: rebase(kind.item),
-                page: rebase(kind.page),
-              })),
-              Match.exhaustive,
-            ),
-            middlewareSpecs: Array.map(ref.middlewareSpecs, (middleware) =>
-              "error" in middleware
-                ? { ...middleware, error: rebase(middleware.error) }
-                : middleware,
-            ),
-            ...("error" in ref && ref.error !== undefined
-              ? { error: rebase(ref.error) }
-              : {}),
-          })),
+          Match.tag("Confect", (ref) => {
+            const bound = {
+              [Ref.TypeId]: Ref.TypeId as Ref.TypeId,
+              _tag: "Confect" as const,
+              convexFunctionName: ref.convexFunctionName,
+              functionReference: nativeRef,
+              kind: Match.value(ref.kind).pipe(
+                Match.tag("Standard", (kind) => kind),
+                Match.tag("Paginated", (kind) => {
+                  const boundKind = { _tag: "Paginated" as const };
+                  Lazy.defineProperty(boundKind, "userArgs", () =>
+                    Schema.Struct(Record.map(kind.userArgs.fields, rebase)),
+                  );
+                  Lazy.defineProperty(boundKind, "item", () =>
+                    rebase(kind.item),
+                  );
+                  Lazy.defineProperty(boundKind, "page", () =>
+                    rebase(kind.page),
+                  );
+                  return boundKind as FunctionProvenance.Paginated;
+                }),
+                Match.exhaustive,
+              ),
+              middlewareAttachments: Array.map(
+                ref.middlewareAttachments,
+                (attachment) => ({
+                  ...attachment,
+                  spec: rebaseMiddleware(attachment.spec),
+                }),
+              ),
+              get middlewareSpecs() {
+                return this.middlewareAttachments.map(({ spec }) => spec);
+              },
+            };
+            Lazy.defineProperty(bound, "args", () =>
+              Schema.Struct(Record.map(ref.args.fields, rebase)),
+            );
+            Lazy.defineProperty(bound, "returns", () => rebase(ref.returns));
+            if ("error" in ref) {
+              Lazy.defineProperty(bound, "error", () => {
+                const error = ref.error;
+                return error === undefined ? undefined : rebase(error);
+              });
+            }
+            return bound as unknown as Ref.AnyConfect;
+          }),
           Match.exhaustive,
         );
       } else {
