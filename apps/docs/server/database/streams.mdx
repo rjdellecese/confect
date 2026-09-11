@@ -774,7 +774,7 @@ Boundary cursors are JSON strings containing a versioned envelope: `{ version: 1
 | `deserializeCursor(cursor, keyFields?)` | Validates the envelope and returns a decoded runtime `OrderKey`, preserving IDs. If expected `keyFields` are supplied, also validates the exact ordered field names. |
 | `END_CURSOR`                            | The string `"[]"`, returned when pagination reaches the end. Accepted as an `endCursor` sentinel only, not as a normal start or decoded key boundary.                |
 
-`paginate` validates boundary cursors against the stream's runtime layout. Malformed envelopes, unsupported versions, and mismatched ordered field names fail with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }`. Confect's pagination clients treat that signal as a request to restart. Old bare-array boundary cursors are rejected; `"[]"` retains only its sentinel role.
+`paginate` validates boundary cursors against the stream's runtime layout. Malformed envelopes, unsupported versions, and mismatched ordered field names fail with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }`. Confect's pagination clients treat that signal as a request to restart. The string `"[]"` is accepted only as an `endCursor` sentinel.
 
 The envelope does **not** identify the query, index, filters, pinned `eq` values, or direction. A change to any of those that preserves the runtime field layout is not automatically detected. Restart pagination when changing query semantics; do not rely on cursor validation to invalidate every cursor after a deployment.
 

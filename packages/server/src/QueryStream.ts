@@ -2571,7 +2571,7 @@ const invalidCursorError = () =>
 
 /**
  * Decode a versioned cursor, optionally checking its runtime order-key
- * fields against a stream's `keyFields`. Malformed, legacy, unsupported,
+ * fields against a stream's `keyFields`. Malformed, unsupported,
  * or incompatible cursors throw the `InvalidCursor` `ConvexError`.
  * Field compatibility does not identify a query's filters or pinned values.
  *
