@@ -12,7 +12,7 @@
     "convex": "1.45.0",
     "effect": "4.0.0-rc.113",
     "foldkit": "0.148.1",
-    "tsdown": "0.22.14",
+    "tsdown": "0.23.0",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
     "vitest": "5.0.0"

@@ -33,10 +33,10 @@ export const findProjectRoot = Effect.gen(function* () {
     fs.exists(path.join(dir, "package.json")),
   );
 
-  return yield* Option.match(projectRoot, {
-    onNone: () => Effect.fail(new ProjectRootNotFoundError()),
-    onSome: Effect.succeed,
-  });
+  return yield* Effect.fromOption(
+    projectRoot,
+    () => new ProjectRootNotFoundError(),
+  );
 });
 
 export const layer = Layer.effect(
