@@ -10,7 +10,7 @@
     "@effect/vitest": "0.30.0",
     "@types/node": "22.20.2",
     "confect-bench-harness": "workspace:*",
-    "effect": "3.22.1",
+    "effect": "3.22.2",
     "tsdown": "0.23.0",
     "tsx": "4.23.13",
     "typescript": "7.0.2",
