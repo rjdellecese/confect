@@ -68,7 +68,7 @@ export const Json = Schema.fromJsonString(
 
 export const END_CURSOR = "[]";
 
-const keyFieldsEquivalence = Array.makeEquivalence(Equivalence.String);
+export const keyFieldsEquivalence = Array.makeEquivalence(Equivalence.String);
 
 export const codecForKeyFields = (keyFields: ReadonlyArray<string>) =>
   Json.check(

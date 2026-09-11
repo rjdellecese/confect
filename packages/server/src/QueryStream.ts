@@ -47,7 +47,6 @@ import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
-import * as Equivalence from "effect/Equivalence";
 import * as Filter from "effect/Filter";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
@@ -1132,8 +1131,6 @@ const extractOrderKey = (
 // Combinators
 // -----------------------------------------------------------------------------
 
-const keyFieldsEquivalence = Array.makeEquivalence(Equivalence.String);
-
 type SourceStatus = Data.TaggedEnum<{
   Ready: {};
   Exhausted: {};
@@ -1310,7 +1307,7 @@ export const merge = <
     Array.tailNonEmpty(streams),
     (stream) =>
       stream.order !== head.order ||
-      !keyFieldsEquivalence(stream.keyFields, head.keyFields),
+      !QueryStreamCursor.keyFieldsEquivalence(stream.keyFields, head.keyFields),
   );
   if (Option.isSome(incompatible)) {
     throw new Error(
@@ -1836,7 +1833,9 @@ const makeFlatMap = <
         `QueryStream.flatMap: inner stream order (${inner.order}) differs from the outer stream's (${self.order})`,
       );
     }
-    if (!keyFieldsEquivalence(inner.keyFields, innerKeyFields)) {
+    if (
+      !QueryStreamCursor.keyFieldsEquivalence(inner.keyFields, innerKeyFields)
+    ) {
       throw new Error(
         `QueryStream.flatMap: inner stream order-key fields ([${Array.join(inner.keyFields, ", ")}]) differ from innerKey ([${Array.join(innerKeyFields, ", ")}])`,
       );
@@ -2044,7 +2043,12 @@ export const distinct = dual<
   ) => QueryStream<Doc, Key, Direction, E, R>
 >(2, (self, fields) => {
   const visible = visibleKeyFields(self);
-  if (!keyFieldsEquivalence(fields, Array.take(visible, fields.length))) {
+  if (
+    !QueryStreamCursor.keyFieldsEquivalence(
+      fields,
+      Array.take(visible, fields.length),
+    )
+  ) {
     throw new Error(
       `QueryStream.distinct: fields ([${Array.join(fields, ", ")}]) must be a prefix of the stream's order-key fields ([${Array.join(visible, ", ")}])`,
     );
