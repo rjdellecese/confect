@@ -8,10 +8,6 @@ import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
 
 const UNDEFINED_SENTINEL = { $undefined: true } as const;
-const decodeUndefinedSentinel = Schema.decodeUnknownResult(
-  Schema.Struct({ $undefined: Schema.Literal(true) }),
-  { onExcessProperty: "error" },
-);
 const KeyValue = Schema.declare<Value | undefined>(
   (value): value is Value | undefined =>
     value === undefined ||
@@ -22,7 +18,12 @@ const KeyValue = Schema.declare<Value | undefined>(
         decode: SchemaGetter.transformEffect((value, options) =>
           Effect.try({
             try: () =>
-              Result.isSuccess(decodeUndefinedSentinel(value))
+              Result.isSuccess(
+                Schema.decodeUnknownResult(
+                  Schema.Struct({ $undefined: Schema.Literal(true) }),
+                  { onExcessProperty: "error" },
+                )(value),
+              )
                 ? undefined
                 : jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
             catch: () =>
