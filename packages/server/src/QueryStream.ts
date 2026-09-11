@@ -671,9 +671,9 @@ const splitRange = (
 export class QueryStream<
   out Doc,
   Key extends ReadonlyArray<string> = ReadonlyArray<string>,
+  out Direction extends OrderDirection = OrderDirection,
   out E = never,
   out R = never,
-  out Direction extends OrderDirection = OrderDirection,
 > implements Stream.Stream<Doc, E, R> {
   declare readonly [TypeId]: TypeId;
   declare readonly "~key": Types.Invariant<Key>;
@@ -718,7 +718,7 @@ export class QueryStream<
      */
     readonly narrowWith?: (
       bounds: KeyBounds,
-    ) => QueryStream<Doc, Key, E, R, Direction>,
+    ) => QueryStream<Doc, Key, Direction, E, R>,
     /**
      * Positions in `keyFields` of the implicit `_id` tiebreakers the
      * type-level `Key` omits: normally the trailing one, plus—on a
@@ -737,7 +737,7 @@ export class QueryStream<
      * their representative-selection order. Absent on externally
      * constructed streams without a reversal recipe; `reverse` then throws.
      */
-    readonly reverseWith?: () => QueryStream<Doc, Key, E, R, Flip<Direction>>,
+    readonly reverseWith?: () => QueryStream<Doc, Key, Flip<Direction>, E, R>,
   ) {}
 
   toStream(): Stream.Stream<Doc, E, R> {
@@ -813,11 +813,11 @@ export const empty =
   <Doc>(): {
     <const Key extends ReadonlyArray<string>>(
       key: Key,
-    ): QueryStream<Doc, Types.Mutable<Key>, never, never, "asc">;
+    ): QueryStream<Doc, Types.Mutable<Key>, "asc", never, never>;
     <const Key extends ReadonlyArray<string>, Direction extends OrderDirection>(
       key: Key,
       order: Direction,
-    ): QueryStream<Doc, Types.Mutable<Key>, never, never, Direction>;
+    ): QueryStream<Doc, Types.Mutable<Key>, Direction, never, never>;
   } =>
   (key: ReadonlyArray<string>, order: OrderDirection = "asc") => {
     const keyFields = withIdTiebreaker(key);
@@ -826,7 +826,7 @@ export const empty =
     // literal types the caller supplied.
     const make = (
       direction: OrderDirection,
-    ): QueryStream<Doc, any, never, never, any> =>
+    ): QueryStream<Doc, any, any, never, never> =>
       new QueryStream(
         direction,
         keyFields,
@@ -961,9 +961,9 @@ export const fromReflection = <
 ): QueryStream<
   Doc,
   ReadonlyArray<string>,
+  Direction,
   Document.DocumentDecodeError,
-  never,
-  Direction
+  never
 > =>
   makeLeaf(
     reflection,
@@ -981,9 +981,9 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
 ): QueryStream<
   Doc,
   ReadonlyArray<string>,
+  Direction,
   Document.DocumentDecodeError,
-  never,
-  Direction
+  never
 > => {
   // Bounds and range splitting work in full index-key space: the index's
   // fields plus the implicit `_id` tiebreaker (already explicit for
@@ -1310,10 +1310,10 @@ export const merge = <
   Direction extends OrderDirection,
 >(
   streams: readonly [
-    QueryStream<Doc, Key, E, R, Direction>,
-    ...ReadonlyArray<QueryStream<Doc, Key, E, R, NoInfer<Direction>>>,
+    QueryStream<Doc, Key, Direction, E, R>,
+    ...ReadonlyArray<QueryStream<Doc, Key, NoInfer<Direction>, E, R>>,
   ],
-): QueryStream<Doc, Key, E, R, Direction> => {
+): QueryStream<Doc, Key, Direction, E, R> => {
   const head = Array.headNonEmpty(streams);
   const incompatible = Array.findFirst(
     Array.tailNonEmpty(streams),
@@ -1342,10 +1342,10 @@ const mergeUnchecked = <
   Direction extends OrderDirection,
 >(
   streams: readonly [
-    QueryStream<Doc, Key, E, R, Direction>,
-    ...ReadonlyArray<QueryStream<Doc, Key, E, R, Direction>>,
+    QueryStream<Doc, Key, Direction, E, R>,
+    ...ReadonlyArray<QueryStream<Doc, Key, Direction, E, R>>,
   ],
-): QueryStream<Doc, Key, E, R, Direction> => {
+): QueryStream<Doc, Key, Direction, E, R> => {
   const head = Array.headNonEmpty(streams);
   const annotated: Stream.Stream<Element<Doc>, E, R> = Stream.unwrap(
     Effect.map(
@@ -1406,9 +1406,9 @@ const transform = <
   Doc2,
   Direction extends OrderDirection,
 >(
-  self: QueryStream<Doc, Key, E, R, Direction>,
+  self: QueryStream<Doc, Key, Direction, E, R>,
   f: (doc: Doc) => Option.Option<Doc2>,
-): QueryStream<Doc2, Key, E, R, Direction> =>
+): QueryStream<Doc2, Key, Direction, E, R> =>
   new QueryStream(
     self.order,
     self.keyFields,
@@ -1433,10 +1433,10 @@ const transformEffect = <
   R2,
   Direction extends OrderDirection,
 >(
-  self: QueryStream<Doc, Key, E, R, Direction>,
+  self: QueryStream<Doc, Key, Direction, E, R>,
   f: (doc: Doc) => Effect.Effect<Option.Option<Doc2>, E2, R2>,
   options: EffectOptions | undefined,
-): QueryStream<Doc2, Key, E | E2, R | R2, Direction> =>
+): QueryStream<Doc2, Key, Direction, E | E2, R | R2> =>
   new QueryStream(
     self.order,
     self.keyFields,
@@ -1494,8 +1494,8 @@ export const filter = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-  ) => QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
+  ) => QueryStream<Doc, Key, Direction, E, R>,
   <
     Doc,
     Key extends ReadonlyArray<string>,
@@ -1503,9 +1503,9 @@ export const filter = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
     predicate: (doc: Doc) => boolean,
-  ) => QueryStream<Doc, Key, E, R, Direction>
+  ) => QueryStream<Doc, Key, Direction, E, R>
 >(2, (self, predicate) =>
   transform(self, (doc) => (predicate(doc) ? Option.some(doc) : Option.none())),
 );
@@ -1530,8 +1530,8 @@ export const filterEffect = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-  ) => QueryStream<Doc, Key, E | E2, R | R2, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
+  ) => QueryStream<Doc, Key, Direction, E | E2, R | R2>,
   <
     Doc,
     Key extends ReadonlyArray<string>,
@@ -1541,10 +1541,10 @@ export const filterEffect = dual<
     R2,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
     predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
     options?: EffectOptions,
-  ) => QueryStream<Doc, Key, E | E2, R | R2, Direction>
+  ) => QueryStream<Doc, Key, Direction, E | E2, R | R2>
 >(
   (args) => isQueryStream(args[0]),
   (self, predicate, options) =>
@@ -1579,8 +1579,8 @@ export const map = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-  ) => QueryStream<Doc2, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
+  ) => QueryStream<Doc2, Key, Direction, E, R>,
   <
     Doc,
     Key extends ReadonlyArray<string>,
@@ -1589,9 +1589,9 @@ export const map = dual<
     Doc2,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
     f: (doc: Doc) => Doc2,
-  ) => QueryStream<Doc2, Key, E, R, Direction>
+  ) => QueryStream<Doc2, Key, Direction, E, R>
 >(2, (self, f) => transform(self, (doc) => Option.some(f(doc))));
 
 /**
@@ -1616,8 +1616,8 @@ export const mapEffect = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-  ) => QueryStream<Doc2, Key, E | E2, R | R2, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
+  ) => QueryStream<Doc2, Key, Direction, E | E2, R | R2>,
   <
     Doc,
     Key extends ReadonlyArray<string>,
@@ -1628,10 +1628,10 @@ export const mapEffect = dual<
     R2,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
     f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
     options?: EffectOptions,
-  ) => QueryStream<Doc2, Key, E | E2, R | R2, Direction>
+  ) => QueryStream<Doc2, Key, Direction, E | E2, R | R2>
 >(
   (args) => isQueryStream(args[0]),
   (self, f, options) =>
@@ -1691,19 +1691,19 @@ export const flatMap = dual<
     Direction extends OrderDirection,
     Doc3 = never,
   >(
-    f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, Direction>,
+    f: (doc: Doc) => QueryStream<Doc2, InnerKey, Direction, E2, R2>,
     options: {
       readonly innerKey: NoInfer<InnerKey>;
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
   ) => <Key extends ReadonlyArray<string>, E, R>(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
   ) => QueryStream<
     Doc2 | Doc3,
     readonly [...Key, ...InnerKey],
+    Direction,
     E | E2,
-    R | R2,
-    Direction
+    R | R2
   >,
   <
     Doc,
@@ -1717,8 +1717,8 @@ export const flatMap = dual<
     Direction extends OrderDirection,
     Doc3 = never,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-    f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, NoInfer<Direction>>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
+    f: (doc: Doc) => QueryStream<Doc2, InnerKey, NoInfer<Direction>, E2, R2>,
     options: {
       readonly innerKey: NoInfer<InnerKey>;
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
@@ -1726,9 +1726,9 @@ export const flatMap = dual<
   ) => QueryStream<
     Doc2 | Doc3,
     readonly [...Key, ...InnerKey],
+    Direction,
     E | E2,
-    R | R2,
-    Direction
+    R | R2
   >
 >(3, (self, f, options) => {
   // Runtime inner key fields follow the same convention as leaves: the
@@ -1803,8 +1803,8 @@ const makeFlatMap = <
   Direction extends OrderDirection,
   Doc3 = never,
 >(
-  self: QueryStream<Doc, Key, E, R, Direction>,
-  f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, Direction>,
+  self: QueryStream<Doc, Key, Direction, E, R>,
+  f: (doc: Doc) => QueryStream<Doc2, InnerKey, Direction, E2, R2>,
   innerKeyFields: ReadonlyArray<string>,
   innerTiebreakers: ReadonlyArray<number>,
   /** What an outer document with no inner rows emits, if it is kept. */
@@ -1813,9 +1813,9 @@ const makeFlatMap = <
 ): QueryStream<
   Doc2 | Doc3,
   readonly [...Key, ...InnerKey],
+  Direction,
   E | E2,
-  R | R2,
-  Direction
+  R | R2
 > => {
   const outerLength = self.keyFields.length;
   const keyFields = Array.appendAll(self.keyFields, innerKeyFields);
@@ -1835,8 +1835,8 @@ const makeFlatMap = <
   // direction case and untyped callers) covers the rest.
   let validatedOnce = false;
   const validated = (
-    inner: QueryStream<Doc2, InnerKey, E2, R2, Direction>,
-  ): QueryStream<Doc2, InnerKey, E2, R2, Direction> => {
+    inner: QueryStream<Doc2, InnerKey, Direction, E2, R2>,
+  ): QueryStream<Doc2, InnerKey, Direction, E2, R2> => {
     if (validatedOnce) {
       return inner;
     }
@@ -2038,8 +2038,8 @@ export const distinct = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-  ) => QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
+  ) => QueryStream<Doc, Key, Direction, E, R>,
   <
     const Fields extends ReadonlyArray<string>,
     Doc,
@@ -2048,9 +2048,9 @@ export const distinct = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
     fields: Fields,
-  ) => QueryStream<Doc, Key, E, R, Direction>
+  ) => QueryStream<Doc, Key, Direction, E, R>
 >(2, (self, fields) => {
   const visible = visibleKeyFields(self);
   if (!keyFieldsEquivalence(fields, Array.take(visible, fields.length))) {
@@ -2111,8 +2111,8 @@ export const renameKey = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-  ) => QueryStream<Doc, Types.Mutable<NewKey>, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
+  ) => QueryStream<Doc, Types.Mutable<NewKey>, Direction, E, R>,
   <
     const NewKey extends ReadonlyArray<string>,
     Doc,
@@ -2123,9 +2123,9 @@ export const renameKey = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
     key: NewKey,
-  ) => QueryStream<Doc, Types.Mutable<NewKey>, E, R, Direction>
+  ) => QueryStream<Doc, Types.Mutable<NewKey>, Direction, E, R>
 >(2, (self, key) => renameKeyImpl(self, key));
 
 const renameKeyImpl = <
@@ -2136,9 +2136,9 @@ const renameKeyImpl = <
   NewKey extends ReadonlyArray<string>,
   Direction extends OrderDirection,
 >(
-  self: QueryStream<Doc, Key, E, R, Direction>,
+  self: QueryStream<Doc, Key, Direction, E, R>,
   key: NewKey,
-): QueryStream<Doc, Types.Mutable<NewKey>, E, R, Direction> => {
+): QueryStream<Doc, Types.Mutable<NewKey>, Direction, E, R> => {
   const visible = visibleKeyFields(self);
   if (key.length !== visible.length) {
     throw new Error(
@@ -2181,11 +2181,11 @@ const makeDistinct = <
   R,
   Direction extends OrderDirection,
 >(
-  self: QueryStream<Doc, Key, E, R>,
+  self: QueryStream<Doc, Key, OrderDirection, E, R>,
   distinctLength: number,
   order: Direction,
   bounds: KeyBounds,
-): QueryStream<Doc, Key, E, R, Direction> => {
+): QueryStream<Doc, Key, Direction, E, R> => {
   const afterKey = (key: OrderKey): KeyBounds => {
     const pastGroup: KeyBound = {
       key,
@@ -2212,7 +2212,7 @@ const makeDistinct = <
           upper: groupBound(bounds.upper),
         }),
         (
-          current: QueryStream<Doc, Key, E, R>,
+          current: QueryStream<Doc, Key, OrderDirection, E, R>,
         ): Effect.Effect<
           readonly [ReadonlyArray<Element<Doc>>, Option.Option<typeof current>],
           E,
@@ -2320,8 +2320,8 @@ export const reverse = <
   R,
   Direction extends OrderDirection,
 >(
-  self: QueryStream<Doc, Key, E, R, Direction>,
-): QueryStream<Doc, Key, E, R, Flip<Direction>> => {
+  self: QueryStream<Doc, Key, Direction, E, R>,
+): QueryStream<Doc, Key, Flip<Direction>, E, R> => {
   if (self.reverseWith === undefined) {
     throw new Error(
       "QueryStream.reverse: this stream cannot be reversed without a reversal recipe",
@@ -2376,8 +2376,8 @@ export const narrow = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-  ) => QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
+  ) => QueryStream<Doc, Key, Direction, E, R>,
   <
     Doc,
     Key extends ReadonlyArray<string>,
@@ -2385,9 +2385,9 @@ export const narrow = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
     bounds: NarrowBounds,
-  ) => QueryStream<Doc, Key, E, R, Direction>
+  ) => QueryStream<Doc, Key, Direction, E, R>
 >(
   2,
   <
@@ -2397,7 +2397,7 @@ export const narrow = dual<
     R,
     Direction extends OrderDirection,
   >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+    self: QueryStream<Doc, Key, Direction, E, R>,
     bounds: NarrowBounds,
   ) => {
     const start = Option.fromUndefinedOr(bounds.start);
@@ -2419,9 +2419,9 @@ const narrowByKeyBounds = <
   R,
   Direction extends OrderDirection,
 >(
-  self: QueryStream<Doc, Key, E, R, Direction>,
+  self: QueryStream<Doc, Key, Direction, E, R>,
   bounds: KeyBounds,
-): QueryStream<Doc, Key, E, R, Direction> =>
+): QueryStream<Doc, Key, Direction, E, R> =>
   Option.isNone(bounds.lower) && Option.isNone(bounds.upper)
     ? self
     : self.narrowWith !== undefined
@@ -2454,9 +2454,9 @@ const narrowInMemory = <
   R,
   Direction extends OrderDirection,
 >(
-  self: QueryStream<Doc, Key, E, R, Direction>,
+  self: QueryStream<Doc, Key, Direction, E, R>,
   bounds: KeyBounds,
-): QueryStream<Doc, Key, E, R, Direction> => {
+): QueryStream<Doc, Key, Direction, E, R> => {
   type Narrower = (
     annotated: Stream.Stream<Element<Doc>, E, R>,
   ) => Stream.Stream<Element<Doc>, E, R>;
@@ -2512,7 +2512,7 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
  */
 export const unique = Effect.fn("QueryStream.unique")(
   <Doc, Key extends ReadonlyArray<string>, E, R>(
-    self: QueryStream<Doc, Key, E, R>,
+    self: QueryStream<Doc, Key, OrderDirection, E, R>,
   ): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
     self.pipe(
       Stream.take(2),
@@ -2738,10 +2738,10 @@ export const paginate: {
   (
     options: PaginateOptions,
   ): <Doc, Key extends ReadonlyArray<string>, E, R>(
-    self: QueryStream<Doc, Key, E, R>,
+    self: QueryStream<Doc, Key, OrderDirection, E, R>,
   ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
   <Doc, Key extends ReadonlyArray<string>, E, R>(
-    self: QueryStream<Doc, Key, E, R>,
+    self: QueryStream<Doc, Key, OrderDirection, E, R>,
     options: PaginateOptions,
   ): Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
 } = dual(
@@ -2752,7 +2752,7 @@ export const paginate: {
     E,
     R,
     Direction extends OrderDirection,
-  >(self: QueryStream<Doc, Key, E, R, Direction>, options: PaginateOptions) {
+  >(self: QueryStream<Doc, Key, Direction, E, R>, options: PaginateOptions) {
     if (options.numItems === 0) {
       if (options.cursor === null) {
         return yield* Effect.die(

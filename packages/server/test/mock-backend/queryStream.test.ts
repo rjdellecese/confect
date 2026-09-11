@@ -25,7 +25,7 @@ const collectTexts = <E, R>(
 
 /** Walk a stream page by page until exhausted, returning the pages. */
 const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
-  stream: QueryStream.QueryStream<Doc, Key, E, R>,
+  stream: QueryStream.QueryStream<Doc, Key, QueryStream.OrderDirection, E, R>,
   numItems: number,
 ): Effect.Effect<
   ReadonlyArray<ReadonlyArray<Doc>>,
@@ -1766,9 +1766,9 @@ describe("QueryStream types", () => {
         QueryStream.QueryStream<
           string,
           ["_creationTime"],
+          "asc",
           Document.DocumentDecodeError,
-          never,
-          "asc"
+          never
         >
       >();
 
@@ -1885,12 +1885,11 @@ describe("QueryStream types", () => {
         DirectionOf<typeof dynamic>
       >().toEqualTypeOf<QueryStream.OrderDirection>();
 
-      // The direction is covariant: a known direction is also "either", so
-      // annotations that omit it (and helpers generic over four
-      // parameters) accept every stream.
+      // The direction is covariant: a known direction is also "either".
       const widened: QueryStream.QueryStream<
         unknown,
         ["text", "_creationTime"],
+        QueryStream.OrderDirection,
         unknown,
         unknown
       > = full;

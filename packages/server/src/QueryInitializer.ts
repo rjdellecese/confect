@@ -141,9 +141,9 @@ export interface QueryInitializer<
     ): QueryStream.QueryStream<
       Doc,
       QueryStream.Remaining<Spec>,
+      "asc",
       Document.DocumentDecodeError,
-      never,
-      "asc"
+      never
     >;
     <
       IndexName extends keyof Indexes<
@@ -164,9 +164,9 @@ export interface QueryInitializer<
     ): QueryStream.QueryStream<
       Doc,
       QueryStream.Remaining<Spec>,
+      Direction,
       Document.DocumentDecodeError,
-      never,
-      Direction
+      never
     >;
     <
       IndexName extends keyof Indexes<
@@ -178,9 +178,9 @@ export interface QueryInitializer<
     ): QueryStream.QueryStream<
       Doc,
       NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
+      "asc",
       Document.DocumentDecodeError,
-      never,
-      "asc"
+      never
     >;
     <
       IndexName extends keyof Indexes<
@@ -194,9 +194,9 @@ export interface QueryInitializer<
     ): QueryStream.QueryStream<
       Doc,
       NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
+      Direction,
       Document.DocumentDecodeError,
-      never,
-      Direction
+      never
     >;
   };
 }

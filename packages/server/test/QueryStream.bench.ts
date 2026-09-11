@@ -27,7 +27,7 @@ const leaf = <Doc, Key extends ReadonlyArray<string>>(
     undefined,
     undefined,
     [keyFields.length - 1],
-  ) as unknown as QueryStream.QueryStream<Doc, Key, never, never, "asc">;
+  ) as unknown as QueryStream.QueryStream<Doc, Key, "asc", never, never>;
 
 const notes = leaf<Note, ["text", "_creationTime"]>([
   "text",

@@ -20,28 +20,28 @@ A `QueryStream` describes an ordered query, not its results. Creating or composi
 The type has five parameters:
 
 ```text
-QueryStream<Doc, Key, Error, Requirements, Direction>
+QueryStream<Doc, Key, Direction, Error, Requirements>
 ```
 
 | Parameter      | Meaning                                                                                                                                                                                      |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Doc`          | The type of each emitted value. Initially a decoded document; after `map` or a join, it can be any result type. `never` means the stream emits no values, as with an empty stream.           |
 | `Key`          | An ordered tuple of field names, such as `["text", "_creationTime"]`, describing the stream's sort order. It tracks the index fields left after `eq` pins values, not the values themselves. |
+| `Direction`    | Whether keys are visited in ascending (`"asc"`) or descending (`"desc"`) order. The union `"asc" \| "desc"` accepts either direction.                                                        |
 | `Error`        | Typed failures that can occur while reading or transforming values. `never` means no typed failures, but defects can still occur.                                                            |
 | `Requirements` | Effect services needed to run the stream. `never` means there are no outstanding service requirements.                                                                                       |
-| `Direction`    | Whether keys are visited in ascending (`"asc"`) or descending (`"desc"`) order. The union `"asc" \| "desc"` accepts either direction.                                                        |
 
 The declaration abbreviates `Error` and `Requirements` as `E` and `R`. You normally let TypeScript infer all five parameters from `stream` and the operations you apply to it. Although the **type parameter** `Direction` defaults to the union, the **query method** `stream(...)` defaults to `"asc"`.
 
 For example, a notes query using the `by_text` index has this shape:
 
 ```text
-QueryStream<Note, ["text", "_creationTime"], DocumentDecodeError, never, "asc">
+QueryStream<Note, ["text", "_creationTime"], "asc", DocumentDecodeError, never>
 ```
 
 Here, `Note` is the decoded note document type. The stream emits notes sorted by text and then creation time, can fail to decode a document, and needs no additional services. You create the query through Confect's `DatabaseReader` service, which provides access to your database, as shown in the [first query example](#a-first-query). The stream retains that database access, so you do not need to supply a reader again to consume it. Effectful operations such as `mapEffect` can add their own errors and service requirements.
 
-A `QueryStream<Doc, Key, Error, Requirements, Direction>` is also a `Stream<Doc, Error, Requirements>`: the emitted value, error, and requirement types carry over, but `Key` and `Direction` are specific to `QueryStream`.
+A `QueryStream<Doc, Key, Direction, Error, Requirements>` is also a `Stream<Doc, Error, Requirements>`: the emitted value, error, and requirement types carry over, but `Key` and `Direction` are specific to `QueryStream`.
 
 ## A first query
 
