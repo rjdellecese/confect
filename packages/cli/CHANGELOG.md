@@ -1,5 +1,11 @@
 # @confect/cli
 
+## 9.4.3
+
+### Patch Changes
+
+- b71e56a: Upgrade `@effect/cli` to `^0.77.1` to fix escaping apostrophes in generated shell completion descriptions.
+
 ## 9.4.2
 
 ## 9.4.1

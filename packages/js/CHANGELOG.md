@@ -1,5 +1,9 @@
 # @confect/js
 
+## 9.4.3
+
+No changes in this release.
+
 ## 9.4.2
 
 ## 9.4.1
