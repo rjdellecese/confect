@@ -39,7 +39,7 @@ layer(ConvexConfigProvider.layer)("ConvexConfigProvider", (it) => {
       "CONFECT_TEST_PRESENT",
       "value",
       Effect.gen(function* () {
-        const value = yield* Config.string("CONFECT_TEST_PRESENT");
+        const value = yield* Config.String("CONFECT_TEST_PRESENT");
         expect(value).toBe("value");
       }),
     ),
@@ -50,7 +50,7 @@ layer(ConvexConfigProvider.layer)("ConvexConfigProvider", (it) => {
       "CONFECT_TEST_NESTED",
       "value",
       Effect.gen(function* () {
-        const value = yield* Config.string("NESTED").pipe(
+        const value = yield* Config.String("NESTED").pipe(
           Config.nested("CONFECT_TEST"),
         );
         expect(value).toBe("value");
@@ -66,11 +66,11 @@ layer(ConvexConfigProvider.layer)("ConvexConfigProvider", (it) => {
         "",
         Effect.gen(function* () {
           const option = yield* Config.option(
-            Config.string("CONFECT_TEST_EMPTY"),
+            Config.String("CONFECT_TEST_EMPTY"),
           );
           expect(Option.isNone(option)).toBe(true);
 
-          const value = yield* Config.string("CONFECT_TEST_EMPTY").pipe(
+          const value = yield* Config.String("CONFECT_TEST_EMPTY").pipe(
             Config.withDefault("fallback"),
           );
           expect(value).toBe("fallback");
@@ -84,7 +84,7 @@ layer(ConvexConfigProvider.layer)("ConvexConfigProvider", (it) => {
       undefined,
       Effect.gen(function* () {
         const option = yield* Config.option(
-          Config.string("CONFECT_TEST_UNSET"),
+          Config.String("CONFECT_TEST_UNSET"),
         );
         expect(Option.isNone(option)).toBe(true);
       }),
