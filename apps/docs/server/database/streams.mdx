@@ -187,6 +187,8 @@ Fields must be used in the order the index declares them, and each method only o
 
 The type-level `Key` tracks varying index fields, including `_creationTime`, but omits implicit `_id` fields. `reader.table("notes").stream("by_text")` has the type-level key `["text", "_creationTime"]`; its runtime `keyFields` are `["text", "_creationTime", "_id"]`, with values such as `["apple", 1, "n1"]`. Pinning text with `eq` removes it from both layouts.
 
+The `QueryStreamKeyFields` module, exported from `@confect/server`, owns the schema and type for ordered field names. Its `Equivalence` compares names and order; its tuple, tiebreaker, prefix, and renaming helpers keep type-visible fields aligned with runtime layouts. These describe field names, not the `OrderKey` values stored in a cursor.
+
 Use the type-level key for `empty`, `distinct`, `renameKey`, and `flatMap`'s `innerKey`. Use runtime keys for exact `narrow` boundaries and cursor serialization. Preserve every `_id` in a boundary: it distinguishes documents with otherwise equal keys. A [flat-map](#flat-map) keeps an ID for each level of the join, not just the final document.
 
 ### Empty streams

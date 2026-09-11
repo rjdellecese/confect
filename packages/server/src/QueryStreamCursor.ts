@@ -1,11 +1,10 @@
 import { convexToJson, jsonToConvex, type Value } from "convex/values";
-import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Equivalence from "effect/Equivalence";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
+import * as QueryStreamKeyFields from "./QueryStreamKeyFields";
 
 const UNDEFINED_SENTINEL = { $undefined: true } as const;
 const KeyValue = Schema.declare<Value | undefined>(
@@ -50,7 +49,7 @@ export class QueryStreamCursor extends Schema.Class<QueryStreamCursor>(
 )(
   Schema.Struct({
     version: Schema.Literal(1),
-    keyFields: Schema.Array(Schema.String),
+    keyFields: QueryStreamKeyFields.QueryStreamKeyFields,
     orderKey: OrderKey,
   }).check(
     Schema.makeFilter(
@@ -68,12 +67,12 @@ export const Json = Schema.fromJsonString(
 
 export const END_CURSOR = "[]";
 
-export const keyFieldsEquivalence = Array.makeEquivalence(Equivalence.String);
-
-export const codecForKeyFields = (keyFields: ReadonlyArray<string>) =>
+export const codecForKeyFields = (
+  keyFields: QueryStreamKeyFields.QueryStreamKeyFields,
+) =>
   Json.check(
     Schema.makeFilter(
-      (cursor) => keyFieldsEquivalence(cursor.keyFields, keyFields),
+      (cursor) => QueryStreamKeyFields.Equivalence(cursor.keyFields, keyFields),
       { message: "Cursor order-key fields do not match the stream" },
     ),
   ).pipe(

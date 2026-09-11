@@ -63,6 +63,8 @@ import * as Tuple from "effect/Tuple";
 import type * as Types from "effect/Types";
 import * as Document from "./Document";
 import * as QueryStreamCursor from "./QueryStreamCursor";
+import * as QueryStreamKeyFields from "./QueryStreamKeyFields";
+import type { QueryStreamKeyFields as KeyFields } from "./QueryStreamKeyFields";
 import type { OrderKey } from "./QueryStreamCursor";
 
 /**
@@ -153,7 +155,7 @@ export const RangeOp = Data.taggedEnum<RangeOp>();
  *
  * @experimental
  */
-export interface IndexRangeSpec<out Fields extends ReadonlyArray<string>> {
+export interface IndexRangeSpec<out Fields extends KeyFields> {
   readonly [RangeSpecTypeId]: {
     readonly _Remaining: Types.Covariant<Fields>;
   };
@@ -164,26 +166,12 @@ export interface IndexRangeSpec<out Fields extends ReadonlyArray<string>> {
 /**
  * @experimental
  */
-export type AnyIndexRangeSpec = IndexRangeSpec<ReadonlyArray<string>>;
+export type AnyIndexRangeSpec = IndexRangeSpec<KeyFields>;
 
 /**
  * @experimental
  */
 export type Remaining<Spec> = Spec extends IndexRangeSpec<infer R> ? R : never;
-
-type Head<Fields extends ReadonlyArray<string>> = Fields extends readonly [
-  infer H extends string,
-  ...ReadonlyArray<string>,
-]
-  ? H
-  : never;
-
-type Tail<Fields extends ReadonlyArray<string>> = Fields extends readonly [
-  string,
-  ...infer Rest extends ReadonlyArray<string>,
-]
-  ? Rest
-  : ReadonlyArray<string>;
 
 /**
  * A typed index-range builder. `eq` must target the next unpinned index
@@ -194,27 +182,27 @@ type Tail<Fields extends ReadonlyArray<string>> = Fields extends readonly [
  */
 export interface RangeBuilder<
   ConvexDoc extends GenericDocument,
-  Fields extends ReadonlyArray<string>,
+  Fields extends KeyFields,
 > extends IndexRangeSpec<Fields> {
   readonly eq: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
-  ) => RangeBuilder<ConvexDoc, Tail<Fields>>;
+    field: QueryStreamKeyFields.Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
+  ) => RangeBuilder<ConvexDoc, QueryStreamKeyFields.Tail<Fields>>;
   readonly gt: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
+    field: QueryStreamKeyFields.Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
   ) => LowerBoundedRange<ConvexDoc, Fields>;
   readonly gte: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
+    field: QueryStreamKeyFields.Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
   ) => LowerBoundedRange<ConvexDoc, Fields>;
   readonly lt: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
+    field: QueryStreamKeyFields.Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
   ) => IndexRangeSpec<Fields>;
   readonly lte: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
+    field: QueryStreamKeyFields.Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
   ) => IndexRangeSpec<Fields>;
 }
 
@@ -225,22 +213,22 @@ export interface RangeBuilder<
  */
 export interface LowerBoundedRange<
   ConvexDoc extends GenericDocument,
-  Fields extends ReadonlyArray<string>,
+  Fields extends KeyFields,
 > extends IndexRangeSpec<Fields> {
   readonly lt: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
+    field: QueryStreamKeyFields.Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
   ) => IndexRangeSpec<Fields>;
   readonly lte: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
+    field: QueryStreamKeyFields.Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
   ) => IndexRangeSpec<Fields>;
 }
 
 const makeRangeBuilder = (
   eqCount: number,
   ops: ReadonlyArray<RangeOp>,
-): RangeBuilder<GenericDocument, ReadonlyArray<string>> => {
+): RangeBuilder<GenericDocument, KeyFields> => {
   const push =
     (tag: RangeOp["_tag"], nextEqCount: number) =>
     (field: string, value: Value | undefined) =>
@@ -251,7 +239,7 @@ const makeRangeBuilder = (
 
   return {
     [RangeSpecTypeId]: {
-      _Remaining: identity as Types.Covariant<ReadonlyArray<string>>,
+      _Remaining: identity as Types.Covariant<KeyFields>,
     },
     eqCount,
     ops,
@@ -270,7 +258,7 @@ const makeRangeBuilder = (
  */
 export const rangeBuilder = <
   ConvexDoc extends GenericDocument,
-  Fields extends ReadonlyArray<string>,
+  Fields extends KeyFields,
 >(): RangeBuilder<ConvexDoc, Fields> =>
   makeRangeBuilder(0, []) as unknown as RangeBuilder<ConvexDoc, Fields>;
 
@@ -285,67 +273,6 @@ const applyOps = (ops: ReadonlyArray<RangeOp>, q: any): any =>
  */
 export const applyRange = (spec: AnyIndexRangeSpec, q: any): any =>
   applyOps(spec.ops, q);
-
-/**
- * Append the implicit `_id` tiebreaker unless the field list already ends
- * with it—the single runtime convention for order-key and index-key
- * field lists.
- */
-const withIdTiebreaker = (
-  fields: ReadonlyArray<string>,
-): ReadonlyArray<string> =>
-  Option.exists(Array.last(fields), (field) => field === "_id")
-    ? fields
-    : Array.append(fields, "_id");
-
-/**
- * The position of the `_id` tiebreaker that {@link withIdTiebreaker} added
- * to `fields` (none when the fields already ended with `_id`, as `by_id`'s
- * do—that `_id` is part of the type-level key).
- */
-const appendedTiebreaker = (
-  fields: ReadonlyArray<string>,
-  withTiebreaker: ReadonlyArray<string>,
-): ReadonlyArray<number> =>
-  withTiebreaker.length === fields.length ? [] : [withTiebreaker.length - 1];
-
-/** The order-key fields the type-level key names: all but the tiebreakers. */
-const visibleKeyFields = (self: {
-  readonly keyFields: ReadonlyArray<string>;
-  readonly tiebreakers: ReadonlyArray<number>;
-}): ReadonlyArray<string> =>
-  Array.filter(
-    self.keyFields,
-    (_field, index) => !Array.contains(self.tiebreakers, index),
-  );
-
-/**
- * The runtime length of the order-key prefix that covers the first
- * `visibleLength` type-visible fields—including any tiebreakers that
- * sit between them.
- */
-const runtimePrefixLength = (
-  self: {
-    readonly keyFields: ReadonlyArray<string>;
-    readonly tiebreakers: ReadonlyArray<number>;
-  },
-  visibleLength: number,
-): number =>
-  visibleLength === 0
-    ? 0
-    : Option.getOrThrowWith(
-        Array.get(
-          Array.filter(
-            Array.makeBy(self.keyFields.length, identity),
-            (index) => !Array.contains(self.tiebreakers, index),
-          ),
-          visibleLength - 1,
-        ),
-        () =>
-          new Error(
-            `QueryStream: prefix length ${visibleLength} exceeds the order key ([${Array.join(self.keyFields, ", ")}])`,
-          ),
-      ) + 1;
 
 // -----------------------------------------------------------------------------
 // Convex value ordering
@@ -541,7 +468,7 @@ const peelBound = (
 /** `eq` every component of `key` but the last, which gets the bound tag. */
 const rangeOpsFor = (
   prefixOps: ReadonlyArray<RangeOp>,
-  fields: ReadonlyArray<string>,
+  fields: KeyFields,
   key: OrderKey,
   tag: BoundTag,
 ): ReadonlyArray<RangeOp> =>
@@ -570,7 +497,7 @@ const rangeOpsFor = (
  * Convex-expressible ranges, ordered for the given direction.
  */
 const splitRange = (
-  fields: ReadonlyArray<string>,
+  fields: KeyFields,
   order: OrderDirection,
   bounds: IndexBounds,
 ): ReadonlyArray<ReadonlyArray<RangeOp>> => {
@@ -660,7 +587,7 @@ const splitRange = (
  */
 export class QueryStream<
   out Doc,
-  Key extends ReadonlyArray<string> = ReadonlyArray<string>,
+  Key extends KeyFields = KeyFields,
   out Direction extends OrderDirection = OrderDirection,
   out E = never,
   out R = never,
@@ -689,7 +616,7 @@ export class QueryStream<
   constructor(
     readonly order: Direction,
     /** Names of the order-key fields (runtime; ends with `_id`). */
-    readonly keyFields: ReadonlyArray<string>,
+    readonly keyFields: KeyFields,
     /** The annotated elements; `None` = read but filtered out. */
     readonly annotated: Stream.Stream<Element<Doc>, E, R>,
     /**
@@ -716,7 +643,7 @@ export class QueryStream<
      * relate the type-level key to the runtime key (`renameKey`, `distinct`)
      * skip over them. Defaults to the trailing `_id`, if any.
      */
-    readonly tiebreakers: ReadonlyArray<number> = appendedTiebreaker(
+    readonly tiebreakers: ReadonlyArray<number> = QueryStreamKeyFields.appendedTiebreaker(
       Array.dropRight(keyFields, 1),
       keyFields,
     ),
@@ -801,17 +728,17 @@ export const isQueryStream = (u: unknown): u is Any =>
  */
 export const empty =
   <Doc>(): {
-    <const Key extends ReadonlyArray<string>>(
+    <const Key extends KeyFields>(
       key: Key,
     ): QueryStream<Doc, Types.Mutable<Key>, "asc", never, never>;
-    <const Key extends ReadonlyArray<string>, Direction extends OrderDirection>(
+    <const Key extends KeyFields, Direction extends OrderDirection>(
       key: Key,
       order: Direction,
     ): QueryStream<Doc, Types.Mutable<Key>, Direction, never, never>;
   } =>
-  (key: ReadonlyArray<string>, order: OrderDirection = "asc") => {
-    const keyFields = withIdTiebreaker(key);
-    const tiebreakers = appendedTiebreaker(key, keyFields);
+  (key: KeyFields, order: OrderDirection = "asc") => {
+    const keyFields = QueryStreamKeyFields.withIdTiebreaker(key);
+    const tiebreakers = QueryStreamKeyFields.appendedTiebreaker(key, keyFields);
     // `any` in the key and direction slots: the overloads above assign the
     // literal types the caller supplied.
     const make = (
@@ -871,7 +798,7 @@ export interface Reflection<Direction extends OrderDirection = OrderDirection> {
    * All of the index's fields in order, including the `_creationTime`
    * tiebreaker (for `by_id`, just `["_id"]`).
    */
-  readonly indexFields: ReadonlyArray<string>;
+  readonly indexFields: KeyFields;
   /** The recorded range: `eq` pins the first `spec.eqCount` index fields. */
   readonly spec: AnyIndexRangeSpec;
   readonly order: Direction;
@@ -950,7 +877,7 @@ export const fromReflection = <
   reflection: Reflection<Direction>,
 ): QueryStream<
   Doc,
-  ReadonlyArray<string>,
+  KeyFields,
   Direction,
   Document.DocumentDecodeError,
   never
@@ -970,7 +897,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   bounds: IndexBounds,
 ): QueryStream<
   Doc,
-  ReadonlyArray<string>,
+  KeyFields,
   Direction,
   Document.DocumentDecodeError,
   never
@@ -979,7 +906,9 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   // fields plus the implicit `_id` tiebreaker (already explicit for
   // `by_id`). Convex accepts range constraints on `_creationTime` and
   // `_id` even though its index types don't advertise them.
-  const fullIndexFields = withIdTiebreaker(reflection.indexFields);
+  const fullIndexFields = QueryStreamKeyFields.withIdTiebreaker(
+    reflection.indexFields,
+  );
   // The order key is the index fields that still vary: everything after
   // the eq-pinned prefix. Deriving it from the full index key keeps the
   // invariant fullIndexFields = eq prefix ++ keyFields—in particular a
@@ -989,7 +918,10 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   // The appended `_id` (if any) is the key's one type-invisible position—unless pinning consumed the whole key.
   const tiebreakers = Array.map(
     Array.filter(
-      appendedTiebreaker(reflection.indexFields, fullIndexFields),
+      QueryStreamKeyFields.appendedTiebreaker(
+        reflection.indexFields,
+        fullIndexFields,
+      ),
       (position) => position >= reflection.spec.eqCount,
     ),
     (position) => position - reflection.spec.eqCount,
@@ -1292,7 +1224,7 @@ const mergeStep =
  */
 export const merge = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Key extends KeyFields,
   E,
   R,
   Direction extends OrderDirection,
@@ -1307,7 +1239,7 @@ export const merge = <
     Array.tailNonEmpty(streams),
     (stream) =>
       stream.order !== head.order ||
-      !QueryStreamCursor.keyFieldsEquivalence(stream.keyFields, head.keyFields),
+      !QueryStreamKeyFields.Equivalence(stream.keyFields, head.keyFields),
   );
   if (Option.isSome(incompatible)) {
     throw new Error(
@@ -1324,7 +1256,7 @@ export const merge = <
  */
 const mergeUnchecked = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Key extends KeyFields,
   E,
   R,
   Direction extends OrderDirection,
@@ -1388,7 +1320,7 @@ const mergeUnchecked = <
  */
 const transform = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Key extends KeyFields,
   E,
   R,
   Doc2,
@@ -1413,7 +1345,7 @@ const transform = <
 /** The effectful {@link transform}. */
 const transformEffect = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Key extends KeyFields,
   E,
   R,
   Doc2,
@@ -1476,21 +1408,10 @@ export interface EffectOptions {
 export const filter = dual<
   <Doc>(
     predicate: (doc: Doc) => boolean,
-  ) => <
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(
+  ) => <Key extends KeyFields, E, R, Direction extends OrderDirection>(
     self: QueryStream<Doc, Key, Direction, E, R>,
   ) => QueryStream<Doc, Key, Direction, E, R>,
-  <
-    Doc,
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(
+  <Doc, Key extends KeyFields, E, R, Direction extends OrderDirection>(
     self: QueryStream<Doc, Key, Direction, E, R>,
     predicate: (doc: Doc) => boolean,
   ) => QueryStream<Doc, Key, Direction, E, R>
@@ -1512,23 +1433,10 @@ export const filterEffect = dual<
   <Doc, E2, R2>(
     predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
     options?: EffectOptions,
-  ) => <
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(
+  ) => <Key extends KeyFields, E, R, Direction extends OrderDirection>(
     self: QueryStream<Doc, Key, Direction, E, R>,
   ) => QueryStream<Doc, Key, Direction, E | E2, R | R2>,
-  <
-    Doc,
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    E2,
-    R2,
-    Direction extends OrderDirection,
-  >(
+  <Doc, Key extends KeyFields, E, R, E2, R2, Direction extends OrderDirection>(
     self: QueryStream<Doc, Key, Direction, E, R>,
     predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
     options?: EffectOptions,
@@ -1561,22 +1469,10 @@ export const filterEffect = dual<
 export const map = dual<
   <Doc, Doc2>(
     f: (doc: Doc) => Doc2,
-  ) => <
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(
+  ) => <Key extends KeyFields, E, R, Direction extends OrderDirection>(
     self: QueryStream<Doc, Key, Direction, E, R>,
   ) => QueryStream<Doc2, Key, Direction, E, R>,
-  <
-    Doc,
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Doc2,
-    Direction extends OrderDirection,
-  >(
+  <Doc, Key extends KeyFields, E, R, Doc2, Direction extends OrderDirection>(
     self: QueryStream<Doc, Key, Direction, E, R>,
     f: (doc: Doc) => Doc2,
   ) => QueryStream<Doc2, Key, Direction, E, R>
@@ -1598,17 +1494,12 @@ export const mapEffect = dual<
   <Doc, Doc2, E2, R2>(
     f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
     options?: EffectOptions,
-  ) => <
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(
+  ) => <Key extends KeyFields, E, R, Direction extends OrderDirection>(
     self: QueryStream<Doc, Key, Direction, E, R>,
   ) => QueryStream<Doc2, Key, Direction, E | E2, R | R2>,
   <
     Doc,
-    Key extends ReadonlyArray<string>,
+    Key extends KeyFields,
     E,
     R,
     Doc2,
@@ -1673,7 +1564,7 @@ export const flatMap = dual<
   <
     Doc,
     Doc2,
-    InnerKey extends ReadonlyArray<string>,
+    InnerKey extends KeyFields,
     E2,
     R2,
     Direction extends OrderDirection,
@@ -1684,7 +1575,7 @@ export const flatMap = dual<
       readonly innerKey: NoInfer<InnerKey>;
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
-  ) => <Key extends ReadonlyArray<string>, E, R>(
+  ) => <Key extends KeyFields, E, R>(
     self: QueryStream<Doc, Key, Direction, E, R>,
   ) => QueryStream<
     Doc2 | Doc3,
@@ -1695,11 +1586,11 @@ export const flatMap = dual<
   >,
   <
     Doc,
-    Key extends ReadonlyArray<string>,
+    Key extends KeyFields,
     E,
     R,
     Doc2,
-    InnerKey extends ReadonlyArray<string>,
+    InnerKey extends KeyFields,
     E2,
     R2,
     Direction extends OrderDirection,
@@ -1721,12 +1612,14 @@ export const flatMap = dual<
 >(3, (self, f, options) => {
   // Runtime inner key fields follow the same convention as leaves: the
   // type-level key plus the implicit `_id` tiebreaker.
-  const innerKeyFields = withIdTiebreaker(options.innerKey);
+  const innerKeyFields = QueryStreamKeyFields.withIdTiebreaker(
+    options.innerKey,
+  );
   return makeFlatMap(
     self,
     f,
     innerKeyFields,
-    appendedTiebreaker(options.innerKey, innerKeyFields),
+    QueryStreamKeyFields.appendedTiebreaker(options.innerKey, innerKeyFields),
     options.onEmpty,
     {},
   );
@@ -1781,11 +1674,11 @@ const combineUpperRefinements = (
 
 const makeFlatMap = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Key extends KeyFields,
   E,
   R,
   Doc2,
-  InnerKey extends ReadonlyArray<string>,
+  InnerKey extends KeyFields,
   E2,
   R2,
   Direction extends OrderDirection,
@@ -1793,7 +1686,7 @@ const makeFlatMap = <
 >(
   self: QueryStream<Doc, Key, Direction, E, R>,
   f: (doc: Doc) => QueryStream<Doc2, InnerKey, Direction, E2, R2>,
-  innerKeyFields: ReadonlyArray<string>,
+  innerKeyFields: KeyFields,
   innerTiebreakers: ReadonlyArray<number>,
   /** What an outer document with no inner rows emits, if it is kept. */
   onEmpty: ((doc: Doc) => Doc3) | undefined,
@@ -1833,9 +1726,7 @@ const makeFlatMap = <
         `QueryStream.flatMap: inner stream order (${inner.order}) differs from the outer stream's (${self.order})`,
       );
     }
-    if (
-      !QueryStreamCursor.keyFieldsEquivalence(inner.keyFields, innerKeyFields)
-    ) {
+    if (!QueryStreamKeyFields.Equivalence(inner.keyFields, innerKeyFields)) {
       throw new Error(
         `QueryStream.flatMap: inner stream order-key fields ([${Array.join(inner.keyFields, ", ")}]) differ from innerKey ([${Array.join(innerKeyFields, ", ")}])`,
       );
@@ -2019,11 +1910,11 @@ const makeFlatMap = <
  * @experimental
  */
 export const distinct = dual<
-  <const Fields extends ReadonlyArray<string>>(
+  <const Fields extends KeyFields>(
     fields: Fields,
   ) => <
     Doc,
-    Key extends readonly [...Fields, ...ReadonlyArray<string>],
+    Key extends readonly [...Fields, ...KeyFields],
     E,
     R,
     Direction extends OrderDirection,
@@ -2031,9 +1922,9 @@ export const distinct = dual<
     self: QueryStream<Doc, Key, Direction, E, R>,
   ) => QueryStream<Doc, Key, Direction, E, R>,
   <
-    const Fields extends ReadonlyArray<string>,
+    const Fields extends KeyFields,
     Doc,
-    Key extends readonly [...Fields, ...ReadonlyArray<string>],
+    Key extends readonly [...Fields, ...KeyFields],
     E,
     R,
     Direction extends OrderDirection,
@@ -2042,9 +1933,9 @@ export const distinct = dual<
     fields: Fields,
   ) => QueryStream<Doc, Key, Direction, E, R>
 >(2, (self, fields) => {
-  const visible = visibleKeyFields(self);
+  const visible = QueryStreamKeyFields.visibleKeyFields(self);
   if (
-    !QueryStreamCursor.keyFieldsEquivalence(
+    !QueryStreamKeyFields.Equivalence(
       fields,
       Array.take(visible, fields.length),
     )
@@ -2057,7 +1948,7 @@ export const distinct = dual<
   // past a tiebreaker (into a `flatMap` result's inner key) includes it.
   return makeDistinct(
     self,
-    runtimePrefixLength(self, fields.length),
+    QueryStreamKeyFields.runtimePrefixLength(self, fields.length),
     self.order,
     {
       lower: Option.none(),
@@ -2095,11 +1986,11 @@ export const distinct = dual<
  * @experimental
  */
 export const renameKey = dual<
-  <const NewKey extends ReadonlyArray<string>>(
+  <const NewKey extends KeyFields>(
     key: NewKey,
   ) => <
     Doc,
-    Key extends ReadonlyArray<string> & {
+    Key extends KeyFields & {
       readonly length: NewKey["length"];
     },
     E,
@@ -2109,9 +2000,9 @@ export const renameKey = dual<
     self: QueryStream<Doc, Key, Direction, E, R>,
   ) => QueryStream<Doc, Types.Mutable<NewKey>, Direction, E, R>,
   <
-    const NewKey extends ReadonlyArray<string>,
+    const NewKey extends KeyFields,
     Doc,
-    Key extends ReadonlyArray<string> & {
+    Key extends KeyFields & {
       readonly length: NewKey["length"];
     },
     E,
@@ -2125,37 +2016,16 @@ export const renameKey = dual<
 
 const renameKeyImpl = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Key extends KeyFields,
   E,
   R,
-  NewKey extends ReadonlyArray<string>,
+  NewKey extends KeyFields,
   Direction extends OrderDirection,
 >(
   self: QueryStream<Doc, Key, Direction, E, R>,
   key: NewKey,
 ): QueryStream<Doc, Types.Mutable<NewKey>, Direction, E, R> => {
-  const visible = visibleKeyFields(self);
-  if (key.length !== visible.length) {
-    throw new Error(
-      `QueryStream.renameKey: key ([${Array.join(key, ", ")}]) must have as many fields as the stream's order key ([${Array.join(visible, ", ")}])`,
-    );
-  }
-  // Relabel the type-visible positions in order; tiebreakers keep their
-  // names.
-  const keyFields = Array.map(self.keyFields, (field, index) =>
-    Array.contains(self.tiebreakers, index)
-      ? field
-      : Option.getOrThrowWith(
-          Array.get(
-            key,
-            index -
-              Array.filter(self.tiebreakers, (position) => position < index)
-                .length,
-          ),
-          () =>
-            new Error("QueryStream.renameKey: key/order-key length mismatch"),
-        ),
-  );
+  const keyFields = QueryStreamKeyFields.rename(self, key);
   return new QueryStream(
     self.order,
     keyFields,
@@ -2171,7 +2041,7 @@ const renameKeyImpl = <
 
 const makeDistinct = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Key extends KeyFields,
   E,
   R,
   Direction extends OrderDirection,
@@ -2310,7 +2180,7 @@ const makeDistinct = <
  */
 export const reverse = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Key extends KeyFields,
   E,
   R,
   Direction extends OrderDirection,
@@ -2364,34 +2234,16 @@ export type NarrowBounds =
 export const narrow = dual<
   (
     bounds: NarrowBounds,
-  ) => <
-    Doc,
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(
+  ) => <Doc, Key extends KeyFields, E, R, Direction extends OrderDirection>(
     self: QueryStream<Doc, Key, Direction, E, R>,
   ) => QueryStream<Doc, Key, Direction, E, R>,
-  <
-    Doc,
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(
+  <Doc, Key extends KeyFields, E, R, Direction extends OrderDirection>(
     self: QueryStream<Doc, Key, Direction, E, R>,
     bounds: NarrowBounds,
   ) => QueryStream<Doc, Key, Direction, E, R>
 >(
   2,
-  <
-    Doc,
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(
+  <Doc, Key extends KeyFields, E, R, Direction extends OrderDirection>(
     self: QueryStream<Doc, Key, Direction, E, R>,
     bounds: NarrowBounds,
   ) => {
@@ -2409,7 +2261,7 @@ export const narrow = dual<
 
 const narrowByKeyBounds = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Key extends KeyFields,
   E,
   R,
   Direction extends OrderDirection,
@@ -2444,7 +2296,7 @@ const admittedByUpper =
 /** The fallback for streams that don't know how to rebuild themselves. */
 const narrowInMemory = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Key extends KeyFields,
   E,
   R,
   Direction extends OrderDirection,
@@ -2506,7 +2358,7 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
  * @experimental
  */
 export const unique = Effect.fn("QueryStream.unique")(
-  <Doc, Key extends ReadonlyArray<string>, E, R>(
+  <Doc, Key extends KeyFields, E, R>(
     self: QueryStream<Doc, Key, OrderDirection, E, R>,
   ): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
     self.pipe(
@@ -2655,10 +2507,10 @@ const midpointKey = (readKeys: Chunk.Chunk<OrderKey>): OrderKey =>
 export const paginate: {
   (
     options: PaginateOptions,
-  ): <Doc, Key extends ReadonlyArray<string>, E, R>(
+  ): <Doc, Key extends KeyFields, E, R>(
     self: QueryStream<Doc, Key, OrderDirection, E, R>,
   ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
-  <Doc, Key extends ReadonlyArray<string>, E, R>(
+  <Doc, Key extends KeyFields, E, R>(
     self: QueryStream<Doc, Key, OrderDirection, E, R>,
     options: PaginateOptions,
   ): Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
@@ -2666,7 +2518,7 @@ export const paginate: {
   2,
   Effect.fn("QueryStream.paginate")(function* <
     Doc,
-    Key extends ReadonlyArray<string>,
+    Key extends KeyFields,
     E,
     R,
     Direction extends OrderDirection,
