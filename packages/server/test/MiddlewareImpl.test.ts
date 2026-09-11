@@ -44,6 +44,144 @@ type EnvironmentOf<H> = H extends (
   ? R
   : never;
 
+describe("implementation options", () => {
+  class GroupPolicy extends MiddlewareSpec.MiddlewareSpec<GroupPolicy>()(
+    "GroupPolicy",
+    {
+      options: () => Schema.Struct({ label: Schema.String }),
+      functionTypes: { query: true, mutation: true, action: true },
+    },
+  ) {}
+
+  class FunctionPolicy extends MiddlewareSpec.MiddlewareSpec<FunctionPolicy>()(
+    "FunctionPolicy",
+    {
+      options: () => Schema.Struct({ tolerateMissing: Schema.Boolean }),
+      functionTypes: { query: true, mutation: true, action: true },
+    },
+  ) {}
+
+  class Observe extends MiddlewareSpec.MiddlewareSpec<Observe>()("Observe", {
+    functionTypes: { query: true, mutation: true, action: true },
+  }) {}
+
+  it("types options for the common implementation strategy", () => {
+    MiddlewareImpl.make(
+      databaseSchema,
+      GroupPolicy,
+      (effect, { options, invocation }) => {
+        expectTypeOf(options).toEqualTypeOf<{
+          readonly label: string;
+        }>();
+        expectTypeOf(invocation).toEqualTypeOf<{
+          readonly name: string;
+          readonly functionType: "query" | "mutation" | "action";
+          readonly functionVisibility: "public" | "internal";
+          readonly args: unknown;
+        }>();
+        return effect;
+      },
+    );
+  });
+
+  it("types options for each function-type implementation", () => {
+    MiddlewareImpl.makeByFunctionType(databaseSchema, FunctionPolicy, {
+      query: (effect, { options }) => {
+        expectTypeOf(options).toEqualTypeOf<{
+          readonly tolerateMissing: boolean;
+        }>();
+        return effect;
+      },
+      mutation: (effect, { options }) => {
+        expectTypeOf(options).toEqualTypeOf<{
+          readonly tolerateMissing: boolean;
+        }>();
+        return effect;
+      },
+      action: (effect, { options }) => {
+        expectTypeOf(options).toEqualTypeOf<{
+          readonly tolerateMissing: boolean;
+        }>();
+        return effect;
+      },
+    });
+  });
+
+  it("omits options from the context type for optionless middleware", () => {
+    MiddlewareImpl.make(databaseSchema, Observe, (effect, context) => {
+      expectTypeOf<keyof typeof context>().toEqualTypeOf<"invocation">();
+      expectTypeOf(context.invocation).toEqualTypeOf<
+        MiddlewareSpec.MiddlewareOptions["invocation"]
+      >();
+      return effect;
+    });
+  });
+
+  it("retains the options field when a declared schema accepts undefined", () => {
+    class UndefinedPolicy extends MiddlewareSpec.MiddlewareSpec<UndefinedPolicy>()(
+      "UndefinedPolicy",
+      {
+        options: () => Schema.Undefined,
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+
+    MiddlewareImpl.make(databaseSchema, UndefinedPolicy, (effect, context) => {
+      expectTypeOf<keyof typeof context>().toEqualTypeOf<
+        "options" | "invocation"
+      >();
+      expectTypeOf(context.options).toBeUndefined();
+      return effect;
+    });
+    MiddlewareImpl.makeByFunctionType(databaseSchema, UndefinedPolicy, {
+      query: (effect, { options }) => {
+        expectTypeOf(options).toBeUndefined();
+        return effect;
+      },
+      mutation: (effect, { options }) => {
+        expectTypeOf(options).toBeUndefined();
+        return effect;
+      },
+      action: (effect, { options }) => {
+        expectTypeOf(options).toBeUndefined();
+        return effect;
+      },
+    });
+  });
+
+  it("allows invocation-only callbacks with either implementation strategy", () => {
+    MiddlewareImpl.make(databaseSchema, Observe, (effect, { invocation }) => {
+      expectTypeOf(invocation).toEqualTypeOf<
+        MiddlewareSpec.MiddlewareOptions["invocation"]
+      >();
+      return effect;
+    });
+    MiddlewareImpl.makeByFunctionType(databaseSchema, Observe, {
+      query: (effect, context) => {
+        expectTypeOf<keyof typeof context>().toEqualTypeOf<"invocation">();
+        expectTypeOf(context.invocation).toEqualTypeOf<
+          MiddlewareSpec.MiddlewareOptions["invocation"]
+        >();
+        return effect;
+      },
+      mutation: (effect, context) => {
+        expectTypeOf<keyof typeof context>().toEqualTypeOf<"invocation">();
+        expectTypeOf(context.invocation).toEqualTypeOf<
+          MiddlewareSpec.MiddlewareOptions["invocation"]
+        >();
+        return effect;
+      },
+      action: (effect, context) => {
+        expectTypeOf<keyof typeof context>().toEqualTypeOf<"invocation">();
+        expectTypeOf(context.invocation).toEqualTypeOf<
+          MiddlewareSpec.MiddlewareOptions["invocation"]
+        >();
+        return effect;
+      },
+    });
+  });
+});
+
 describe("handler environment widening", () => {
   it("accepts handlers consuming a service provided by an attached middleware", () => {
     FunctionImpl.make(databaseSchema, coveredGroup, "viewerName", () =>

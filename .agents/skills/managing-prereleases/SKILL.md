@@ -1,12 +1,6 @@
 ---
 name: managing-prereleases
-description: >-
-  How to optionally ship a major version of `@confect/*` as iterative Changesets
-  prereleases on a dedicated `vN` release branch before graduating to stable —
-  one possible release path for a major, not the only one. Use whenever the user
-  wants to cut a beta/next/prerelease, set up a `vN` branch, run `pnpm changeset
-  pre enter`/`pre exit`, publish `X.0.0-next.N` versions under the npm `next`
-  dist-tag, or merge a prerelease line back into `main`.
+description: How to optionally ship a major version of `@confect/*` as iterative Changesets prereleases on a dedicated `vN` release branch before graduating to stable — one possible release path for a major, not the only one. Use whenever the user wants to cut a beta/next/prerelease, set up a `vN` branch, run `pnpm changeset pre enter`/`pre exit`, publish `X.0.0-next.N` versions under the npm `next` dist-tag, or merge a prerelease line back into `main`.
 ---
 
 # Managing prereleases
@@ -117,14 +111,13 @@ Before exiting, audit `.changeset/pre/` by ID against the prerelease changelogs 
    ```bash
    git switch v9 && git pull
    pnpm changeset pre exit
-   pnpm changeset version
-   pnpm format
+   pnpm version-packages
    git add .
    git commit -m "Exit prerelease mode and version packages"
    git push
    ```
 
-   `pre exit` deletes `.changeset/pre.json`. `changeset version` then consumes every changeset accumulated during the prerelease cycle and writes the final stable versions (e.g. `9.0.0`) into each `package.json`. Run `pnpm format` before committing — `changeset version` writes CHANGELOG entries in its own Markdown style, which fails the Format CI job otherwise. Pushing triggers `release.yml`; with no remaining changesets, `changesets/action` skips opening a Version Packages PR and goes straight to `pnpm release`, publishing the final stable to `latest`. The docs assembler recognizes that the published version no longer has a prerelease suffix, makes it the default `Stable` version, and repoints unversioned docs redirects to it.
+   `pre exit` deletes `.changeset/pre.json`. `pnpm version-packages` (`changeset version && pnpm format`, also used by `release.yml`) then consumes every changeset accumulated during the prerelease cycle and writes the final stable versions (e.g. `9.0.0`) into each `package.json`. The format pass matters because Changesets writes CHANGELOG entries in its own Markdown style, which fails the Format CI job otherwise. Pushing triggers `release.yml`; with no remaining changesets, `changesets/action` skips opening a Version Packages PR and goes straight to `pnpm release`, publishing the final stable to `latest`. The docs assembler recognizes that the published version no longer has a prerelease suffix, makes it the default `Stable` version, and repoints unversioned docs redirects to it.
 
 2. **Open a PR merging `vN` back into `main`** with the major as the title (e.g. `v9`). Use a merge commit so the prerelease history is preserved in `main` — merge commits are enabled repo-wide for exactly this case, even though squash is the norm for regular PRs. If the merge-commit option is missing from the UI (or the API returns `405 Merge commits are not allowed`), check that "Allow merge commits" is still enabled in the repository settings and that no "Require linear history" rule exists on `main` — the rule overrides the repo-level toggle and hides the option.
 
@@ -157,7 +150,7 @@ Before exiting, audit `.changeset/pre/` by ID against the prerelease changelogs 
 | ------------------------------------------------------ | ------------------------------- |
 | Enter pre mode                                         | `pnpm changeset pre enter next` |
 | Author a changeset                                     | `pnpm changeset`                |
-| Apply versions locally (the action normally does this) | `pnpm changeset version`        |
+| Apply versions locally (the action normally does this) | `pnpm version-packages`         |
 | Exit pre mode                                          | `pnpm changeset pre exit`       |
 | Publish manually (the action normally does this)       | `pnpm release`                  |
 | Install a prerelease                                   | `pnpm add @confect/server@next` |

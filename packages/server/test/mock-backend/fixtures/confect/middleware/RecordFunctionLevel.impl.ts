@@ -9,7 +9,7 @@ import RecordFunctionLevel, {
 export default MiddlewareImpl.make(
   databaseSchema,
   RecordFunctionLevel,
-  (effect, { args }) =>
+  (effect, { invocation: { args } }) =>
     typeof args === "object" &&
     args !== null &&
     (args as { blockedAtFunction?: boolean }).blockedAtFunction === true

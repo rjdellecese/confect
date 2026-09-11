@@ -1,3 +1,4 @@
+import type * as MiddlewareAttachment from "./MiddlewareAttachment";
 import type {
   DefaultFunctionArgs,
   FunctionType,
@@ -32,6 +33,9 @@ export interface FunctionSpec<
   readonly name: Name_;
   readonly functionProvenance: FunctionProvenance_;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
+  readonly middlewareAttachments: ReadonlyArray<
+    MiddlewareAttachment.MiddlewareAttachment<MiddlewareSpecs_>
+  >;
 }
 
 export interface Builder<
@@ -55,6 +59,7 @@ export interface Builder<
         FunctionProvenance_,
         MiddlewareSpecs_
       >,
+    ...options: MiddlewareAttachment.Args<NoInfer<MiddlewareSpec_>>
   ): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
@@ -282,9 +287,14 @@ export type WithoutName<
 const Proto = {
   [TypeId]: TypeId,
 
+  get middlewareSpecs() {
+    return this.middlewareAttachments.map(({ spec }) => spec);
+  },
+
   middleware(
     this: AnyWithProps,
     middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec,
+    ...options: ReadonlyArray<unknown>
   ) {
     if (this.functionProvenance._tag === "Convex") {
       throw new Error(
@@ -298,8 +308,9 @@ const Proto = {
       );
     }
     if (
-      this.middlewareSpecs.some(
-        (existing) => existing.key === middlewareSpec.key,
+      !("options" in middlewareSpec) &&
+      this.middlewareAttachments.some(
+        ({ spec }) => spec.key === middlewareSpec.key,
       )
     ) {
       throw new Error(
@@ -312,10 +323,13 @@ const Proto = {
       functionVisibility: this.functionVisibility,
       name: this.name,
       functionProvenance: this.functionProvenance,
-      middlewareSpecs: [...this.middlewareSpecs, middlewareSpec],
+      middlewareAttachments: [
+        ...this.middlewareAttachments,
+        { spec: middlewareSpec, options: options[0] },
+      ],
     });
   },
-};
+} satisfies ThisType<AnyWithProps>;
 
 interface Options {
   readonly name: string;
@@ -373,7 +387,7 @@ const make = <
         args === undefined
           ? FunctionProvenance.Confect(() => ({}), returns, error)
           : FunctionProvenance.Confect(args, returns, error),
-      middlewareSpecs: [],
+      middlewareAttachments: [],
     });
   }
 
@@ -448,7 +462,7 @@ const makePaginated = <
         args === undefined
           ? FunctionProvenance.ConfectPaginated(() => ({}), item, error)
           : FunctionProvenance.ConfectPaginated(args, item, error),
-      middlewareSpecs: [],
+      middlewareAttachments: [],
     });
   }
 
@@ -562,7 +576,7 @@ const makeConvex =
         ExtractArgs<F>,
         ExtractReturns<F>
       >(),
-      middlewareSpecs: [],
+      middlewareAttachments: [],
     }) as any;
   };
 

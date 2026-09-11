@@ -1,5 +1,7 @@
+import * as MiddlewareAttachment from "./MiddlewareAttachment";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
+import * as Result from "effect/Result";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
@@ -36,6 +38,9 @@ export interface GroupSpec<
     [GroupName in Name<Groups_>]: WithName<Groups_, GroupName>;
   };
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
+  readonly middlewareAttachments: ReadonlyArray<
+    MiddlewareAttachment.MiddlewareAttachment<MiddlewareSpecs_>
+  >;
   readonly "~Functions": Functions_;
   readonly "~Groups": Groups_;
 
@@ -72,6 +77,7 @@ export interface GroupSpec<
         Functions_,
         MiddlewareSpecs_
       >,
+    ...options: MiddlewareAttachment.Args<NoInfer<MiddlewareSpec_>>
   ): GroupSpec<
     Runtime,
     Name_,
@@ -154,22 +160,27 @@ export type AddGroups<
 const Proto = {
   [TypeId]: TypeId,
 
+  get middlewareSpecs() {
+    return this.middlewareAttachments.map(({ spec }) => spec);
+  },
+
   addFunction<Function extends FunctionSpec.AnyWithProps>(
     this: Any,
     function_: Function,
   ) {
     const this_ = this as AnyWithProps;
 
-    const overlapping = function_.middlewareSpecs.find(
-      (functionMiddlewareSpec) =>
-        this_.middlewareSpecs.some(
-          (groupMiddlewareSpec) =>
+    const overlapping = function_.middlewareAttachments.find(
+      ({ spec: functionMiddlewareSpec }) =>
+        !("options" in functionMiddlewareSpec) &&
+        this_.middlewareAttachments.some(
+          ({ spec: groupMiddlewareSpec }) =>
             groupMiddlewareSpec.key === functionMiddlewareSpec.key,
         ),
     );
     if (overlapping !== undefined) {
       throw new Error(
-        `Middleware "${overlapping.key}" is attached to both function "${function_.name}" and its group`,
+        `Middleware "${overlapping.spec.key}" is attached to both function "${function_.name}" and its group`,
       );
     }
 
@@ -178,7 +189,7 @@ const Proto = {
       name: this_.name,
       functions: Record.set(this_.functions, function_.name, function_),
       groups: this_.groups,
-      middlewareSpecs: this_.middlewareSpecs,
+      middlewareAttachments: this_.middlewareAttachments,
     });
   },
 
@@ -191,7 +202,7 @@ const Proto = {
       name: this_.name,
       functions: this_.functions,
       groups: Record.set(this_.groups, group_.name, group_),
-      middlewareSpecs: this_.middlewareSpecs,
+      middlewareAttachments: this_.middlewareAttachments,
     });
   },
 
@@ -204,19 +215,21 @@ const Proto = {
       name: this_.name,
       functions: this_.functions,
       groups: Record.set(this_.groups, name, withName(name, group_)),
-      middlewareSpecs: this_.middlewareSpecs,
+      middlewareAttachments: this_.middlewareAttachments,
     });
   },
 
   middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
     this: Any,
     middlewareSpec: MiddlewareSpec_,
+    ...options: ReadonlyArray<unknown>
   ) {
     const this_ = this as AnyWithProps;
 
     if (
-      this_.middlewareSpecs.some(
-        (existing) => existing.key === middlewareSpec.key,
+      !("options" in middlewareSpec) &&
+      this_.middlewareAttachments.some(
+        ({ spec }) => spec.key === middlewareSpec.key,
       )
     ) {
       throw new Error(
@@ -226,8 +239,9 @@ const Proto = {
 
     for (const function_ of Object.values(this_.functions)) {
       if (
-        function_.middlewareSpecs.some(
-          (existing) => existing.key === middlewareSpec.key,
+        !("options" in middlewareSpec) &&
+        function_.middlewareAttachments.some(
+          ({ spec }) => spec.key === middlewareSpec.key,
         )
       ) {
         throw new Error(
@@ -241,37 +255,53 @@ const Proto = {
       name: this_.name,
       functions: this_.functions,
       groups: this_.groups,
-      middlewareSpecs: [...this_.middlewareSpecs, middlewareSpec],
+      middlewareAttachments: [
+        ...this_.middlewareAttachments,
+        { spec: middlewareSpec, options: options[0] },
+      ],
     });
   },
-};
+} satisfies ThisType<AnyWithProps>;
 
 const makeProto = <
   Runtime extends RuntimeAndFunctionType.Runtime,
   Name_ extends string,
   Functions_ extends FunctionSpec.AnyWithPropsWithRuntime<Runtime>,
   Groups_ extends AnyWithPropsWithRuntime<Runtime>,
-  MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec,
+  MiddlewareAttachments_ extends
+    ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>,
 >({
   runtime,
   name,
   functions,
   groups,
-  middlewareSpecs,
+  middlewareAttachments,
 }: {
   runtime: Runtime;
   name: Name_;
   functions: Record.ReadonlyRecord<string, Functions_>;
   groups: Record.ReadonlyRecord<string, Groups_>;
-  middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
-}): GroupSpec<Runtime, Name_, Functions_, Groups_, MiddlewareSpecs_> =>
+  middlewareAttachments: MiddlewareAttachments_;
+}): GroupSpec<
+  Runtime,
+  Name_,
+  Functions_,
+  Groups_,
+  MiddlewareAttachments_[number]["spec"]
+> =>
   Object.assign(Object.create(Proto), {
     runtime,
     name,
     functions,
     groups,
-    middlewareSpecs,
-  }) as GroupSpec<Runtime, Name_, Functions_, Groups_, MiddlewareSpecs_>;
+    middlewareAttachments,
+  }) as GroupSpec<
+    Runtime,
+    Name_,
+    Functions_,
+    Groups_,
+    MiddlewareAttachments_[number]["spec"]
+  >;
 
 export const make = (): GroupSpec<"Convex", ""> =>
   makeProto({
@@ -279,7 +309,7 @@ export const make = (): GroupSpec<"Convex", ""> =>
     name: "",
     functions: Record.empty(),
     groups: Record.empty(),
-    middlewareSpecs: [],
+    middlewareAttachments: [],
   });
 
 export const makeAt = <const Name_ extends string>(
@@ -292,7 +322,7 @@ export const makeAt = <const Name_ extends string>(
     name,
     functions: Record.empty(),
     groups: Record.empty(),
-    middlewareSpecs: [],
+    middlewareAttachments: [],
   });
 };
 
@@ -302,7 +332,7 @@ export const makeNode = (): GroupSpec<"Node", ""> =>
     name: "",
     functions: Record.empty(),
     groups: Record.empty(),
-    middlewareSpecs: [],
+    middlewareAttachments: [],
   });
 
 export const makeNodeAt = <const Name_ extends string>(
@@ -315,7 +345,7 @@ export const makeNodeAt = <const Name_ extends string>(
     name,
     functions: Record.empty(),
     groups: Record.empty(),
-    middlewareSpecs: [],
+    middlewareAttachments: [],
   });
 };
 
@@ -335,6 +365,24 @@ export const withName = <const Name_ extends string>(
     name,
     functions: group_.functions,
     groups: group_.groups,
-    middlewareSpecs: group_.middlewareSpecs,
+    middlewareAttachments: group_.middlewareAttachments,
   });
 };
+
+export const validateMiddleware = (
+  group: AnyWithProps,
+): Result.Result<void, MiddlewareAttachment.ValidationError> =>
+  Result.gen(function* () {
+    yield* MiddlewareAttachment.validateAll(
+      group.middlewareAttachments,
+      `group "${group.name}"`,
+    );
+    for (const function_ of Object.values(group.functions)) {
+      yield* MiddlewareAttachment.validateAll(
+        [...group.middlewareAttachments, ...function_.middlewareAttachments],
+        `function "${function_.name}"`,
+      );
+    }
+    for (const child of Object.values(group.groups))
+      yield* validateMiddleware(child);
+  });

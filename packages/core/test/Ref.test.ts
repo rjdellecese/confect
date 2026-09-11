@@ -803,7 +803,7 @@ describe("error schema laziness at decode time", () => {
           return NotFound;
         },
       }),
-      [Gate],
+      [{ spec: Gate, options: undefined }],
     );
 
     Ref.encodeArgsSync(ref, {});
@@ -817,5 +817,64 @@ describe("error schema laziness at decode time", () => {
     expect(Option.isSome(decoded)).toBe(true);
     expect(MutableRef.get(specErrorBuilt)).toBe(true);
     expect(MutableRef.get(middlewareErrorBuilt)).toBe(true);
+  });
+});
+
+describe("make with middleware options", () => {
+  const query = FunctionSpec.publicQuery({
+    name: "get",
+    returns: () => Schema.String,
+  });
+
+  it("derives middleware specs from ordered attachments without forcing schemas", () => {
+    const optionsBuilt = MutableRef.make(false);
+    const errorBuilt = MutableRef.make(false);
+    class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
+    class Policy extends MiddlewareSpec.MiddlewareSpec<Policy>()("Policy", {
+      options: () => {
+        MutableRef.set(optionsBuilt, true);
+        return Schema.Struct({ enabled: Schema.Boolean });
+      },
+      error: () => {
+        MutableRef.set(errorBuilt, true);
+        return Blocked;
+      },
+      functionTypes: { query: true, mutation: false, action: false },
+    }) {}
+    const ref = Ref.make(
+      "policies",
+      query.middleware(Policy, { enabled: false }),
+      [{ spec: Policy, options: { enabled: true } }],
+    );
+
+    expect(ref.middlewareSpecs).toEqual([Policy, Policy]);
+    expect(ref.middlewareSpecs).toEqual(
+      ref.middlewareAttachments.map(({ spec }) => spec),
+    );
+    expect(Ref.hasErrorSchema(ref)).toBe(true);
+    expect(MutableRef.get(optionsBuilt)).toBe(false);
+    expect(MutableRef.get(errorBuilt)).toBe(false);
+  });
+
+  it("retains client-safe resolver values without serializing them", () => {
+    class Resource extends MiddlewareSpec.MiddlewareSpec<Resource>()(
+      "Resource",
+      {
+        options: () =>
+          Schema.Struct({
+            resolve: Schema.declare<(args: unknown) => string>(
+              (value): value is (args: unknown) => string =>
+                typeof value === "function",
+            ),
+            tolerateMissing: Schema.Boolean,
+          }),
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
+    const resolve = (_args: unknown) => "resource-id";
+    const options = { resolve, tolerateMissing: true };
+    const ref = Ref.make("resources", query.middleware(Resource, options));
+    expect(ref.middlewareAttachments[0]?.options).toBe(options);
+    expectTypeOf<Ref.Error<typeof ref>>().toBeNever();
   });
 });

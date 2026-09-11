@@ -38,7 +38,7 @@ export const make = ({
   model: modelId,
   config,
 }: Options): Effect.Effect<
-  LanguageModel.Service,
+  LanguageModel.LanguageModel,
   never,
   OpenAiClient.OpenAiClient
 > => OpenAiLanguageModel.make({ model: modelId, config });

@@ -137,18 +137,20 @@ export type RegisteredFunction<
 export const applyMiddleware = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-  options: MiddlewareSpec.MiddlewareOptions,
+  invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
 ): Effect.Effect<A, any, R> => {
-  let wrapped: Effect.Effect<any, any, any> = effect;
-  for (let index = resolvedMiddlewares.length - 1; index >= 0; index--) {
-    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
-    wrapped = resolvedMiddlewares[index]!.middlewareImpl(
-      wrapped as any,
-      options,
-    ) as any;
-  }
-  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The erased middleware error remains intact so runHandlerPromise can validate it against the combined error schema.
-  return wrapped as Effect.Effect<A, any, R>;
+  return resolvedMiddlewares.reduceRight<Effect.Effect<any, any, any>>(
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The erased middleware error remains intact so runHandlerPromise can validate it against the combined error schema.
+    (wrapped, middleware) => {
+      const context =
+        "options" in middleware.middlewareSpec
+          ? { options: middleware.options, invocation }
+          : { invocation };
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
+      return middleware.middlewareImpl(wrapped, context);
+    },
+    effect,
+  );
 };
 
 /**

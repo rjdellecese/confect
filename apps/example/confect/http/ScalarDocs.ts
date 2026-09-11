@@ -10,7 +10,7 @@ import { Api } from "./NotesApi";
  */
 export const layer = Layer.unwrap(
   Effect.gen(function* () {
-    const siteUrl = yield* Effect.orDie(Config.string("CONVEX_SITE_URL"));
+    const siteUrl = yield* Effect.orDie(Config.String("CONVEX_SITE_URL"));
 
     return HttpApiScalar.layer(Api, {
       path: "/path-prefix/docs",

@@ -7,6 +7,7 @@ import * as Document from "@confect/server/Document";
 import * as MutationRunner from "@confect/server/MutationRunner";
 import * as OrderedQuery from "@confect/server/OrderedQuery";
 import * as QueryRunner from "@confect/server/QueryRunner";
+import * as QueryStream from "@confect/server/QueryStream";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type {
   GenericActionCtx,
@@ -15,11 +16,13 @@ import type {
   OrderedQuery as ConvexOrderedQuery,
 } from "convex/server";
 import { ConvexError, type GenericId } from "convex/values";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 import * as Tracer from "effect/Tracer";
 import { vi } from "vitest";
 
@@ -79,6 +82,148 @@ type ConvexDataModel = DataModel.ToConvex<
 const noteId = "note-id" as GenericId<"notes">;
 
 describe("server operation tracing", () => {
+  it.effect(
+    "traces lazy, repeatable query stream consumers without per-element spans",
+    () =>
+      Effect.gen(function* () {
+        const recorder = yield* makeRecorder;
+        let reads = 0;
+        const source = new QueryStream.QueryStream(
+          "asc",
+          ["_id"],
+          Stream.suspend(() => {
+            reads++;
+            return Stream.make(
+              new QueryStream.Element({ doc: Option.some(7), key: ["note"] }),
+            );
+          }),
+        ).pipe(QueryStream.map((value) => value + 1));
+        const unique = QueryStream.unique(source);
+        const paginate = QueryStream.paginate(source, {
+          numItems: 2,
+          cursor: null,
+        });
+        const curried = source.pipe(
+          QueryStream.paginate({ numItems: 2, cursor: null }),
+        );
+
+        expectTypeOf(unique).toEqualTypeOf<
+          Effect.Effect<Option.Option<number>, QueryStream.NotUniqueError>
+        >();
+        expectTypeOf(paginate).toEqualTypeOf<
+          Effect.Effect<
+            QueryStream.PaginationResult<number>,
+            QueryStream.ReadBudgetExceededError
+          >
+        >();
+        expectTypeOf(curried).toEqualTypeOf<typeof paginate>();
+        expect(reads).toBe(0);
+        expect(recorder.spans).toEqual([]);
+
+        const results = yield* Effect.all([
+          unique,
+          paginate,
+          curried,
+          unique,
+          paginate,
+          curried,
+        ]).pipe(Effect.withSpan("caller"), Effect.withTracer(recorder.tracer));
+
+        const page = {
+          page: [8],
+          isDone: true,
+          continueCursor: QueryStream.END_CURSOR,
+        };
+        expect(results).toEqual([
+          Option.some(8),
+          page,
+          page,
+          Option.some(8),
+          page,
+          page,
+        ]);
+        expect(reads).toBe(6);
+        expect(recorder.spans.map((span) => span.name)).toEqual([
+          "caller",
+          "QueryStream.unique",
+          "QueryStream.paginate",
+          "QueryStream.paginate",
+          "QueryStream.unique",
+          "QueryStream.paginate",
+          "QueryStream.paginate",
+        ]);
+        const [parent, ...children] = recorder.spans;
+        for (const child of children) {
+          expect(Option.getOrThrow(child.parent)).toBe(parent);
+          assert(child.status._tag === "Ended");
+          expect(Exit.isSuccess(child.status.exit)).toBe(true);
+        }
+        expect(children[0]).not.toBe(children[3]);
+      }),
+  );
+
+  it.effect(
+    "ends the unique span with its original typed cardinality error",
+    () =>
+      Effect.gen(function* () {
+        const recorder = yield* makeRecorder;
+        const source = new QueryStream.QueryStream(
+          "asc",
+          ["_id"],
+          Stream.make(
+            new QueryStream.Element({ doc: Option.some(1), key: [1] }),
+            new QueryStream.Element({ doc: Option.some(2), key: [2] }),
+          ),
+        );
+        const error = yield* QueryStream.unique(source).pipe(
+          Effect.flip,
+          Effect.withTracer(recorder.tracer),
+        );
+
+        assert.instanceOf(error, QueryStream.NotUniqueError);
+        expect(recorder.spans).toHaveLength(1);
+        const span = recorder.spans[0]!;
+        expect(span.name).toBe("QueryStream.unique");
+        assert(span.status._tag === "Ended");
+        assert(Exit.isFailure(span.status.exit));
+        expect(
+          Option.getOrThrow(Cause.findErrorOption(span.status.exit.cause)),
+        ).toBe(error);
+        expect(Cause.pretty(span.status.exit.cause)).toContain(
+          "QueryStream.unique",
+        );
+      }),
+  );
+
+  it.effect("preserves typed stream failures inside the pagination span", () =>
+    Effect.gen(function* () {
+      const recorder = yield* makeRecorder;
+      const failure = new OperationFailure({ reason: "query failed" });
+      const source = new QueryStream.QueryStream(
+        "asc",
+        ["_id"],
+        Stream.fail(failure),
+      );
+      const error = yield* QueryStream.paginate(source, {
+        numItems: 1,
+        cursor: null,
+      }).pipe(Effect.flip, Effect.withTracer(recorder.tracer));
+
+      expect(error).toBe(failure);
+      expect(recorder.spans).toHaveLength(1);
+      const span = recorder.spans[0]!;
+      expect(span.name).toBe("QueryStream.paginate");
+      assert(span.status._tag === "Ended");
+      assert(Exit.isFailure(span.status.exit));
+      expect(
+        Option.getOrThrow(Cause.findErrorOption(span.status.exit.cause)),
+      ).toBe(failure);
+      expect(Cause.pretty(span.status.exit.cause)).toContain(
+        "QueryStream.paginate",
+      );
+    }),
+  );
+
   it.effect(
     "traces lazy, repeatable RPC calls without a codec child span",
     () =>

@@ -1,5 +1,18 @@
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
-import type { Ref } from "@confect/core";
+import { FunctionSpec, GroupSpec, MiddlewareSpec, Ref } from "@confect/core";
+import {
+  FunctionImpl,
+  GroupImpl,
+  MiddlewareImpl,
+  RegisteredConvexFunction,
+  RegisteredFunctions,
+} from "@confect/server";
+import { TestConfect as TestConfect_ } from "../../../test/src";
+import * as Context from "effect/Context";
+import * as Layer from "effect/Layer";
+import databaseSchema from "./fixtures/confect/_generated/schema";
+import convexSchema from "./fixtures/confect/_generated/convexSchema";
+import { NameRejected } from "./fixtures/confect/middleware/RequireName.spec";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
@@ -284,5 +297,267 @@ describe("middleware", () => {
         Ref.Error<typeof refs.public.groups.middlewareOrder.recordPlain>
       >().toEqualTypeOf<GateClosed>();
     });
+  });
+
+  describe("per-attachment options", () => {
+    class GroupPolicy extends MiddlewareSpec.MiddlewareSpec<GroupPolicy>()(
+      "GroupPolicy",
+      {
+        options: () => Schema.Struct({ label: Schema.String }),
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+
+    class FunctionPolicy extends MiddlewareSpec.MiddlewareSpec<FunctionPolicy>()(
+      "FunctionPolicy",
+      {
+        options: () => Schema.Struct({ tolerateMissing: Schema.Boolean }),
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+
+    class Observe extends MiddlewareSpec.MiddlewareSpec<Observe>()("Observe", {
+      functionTypes: { query: true, mutation: true, action: true },
+    }) {}
+
+    class UndefinedPolicy extends MiddlewareSpec.MiddlewareSpec<UndefinedPolicy>()(
+      "UndefinedPolicy",
+      {
+        options: () => Schema.Undefined,
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+
+    it.effect(
+      "passes typed options through both implementation strategies in attachment order",
+      () =>
+        Effect.gen(function* () {
+          const events: globalThis.Array<string> = [];
+          const query = FunctionSpec.publicQuery({
+            name: "get",
+            args: () => ({ id: Schema.String }),
+            returns: () => Schema.String,
+          })
+            .middleware(FunctionPolicy, { tolerateMissing: true })
+            .middleware(GroupPolicy, { label: "inner" })
+            .middleware(UndefinedPolicy, undefined)
+            .middleware(Observe);
+          const group = GroupSpec.make()
+            .middleware(GroupPolicy, { label: "group" })
+            .addFunction(query);
+
+          const groupLayer = GroupImpl.make(databaseSchema, group).pipe(
+            Layer.provide(
+              FunctionImpl.make(databaseSchema, group, "get", () =>
+                Effect.sync(() => {
+                  events.push("handler");
+                  return "ok";
+                }),
+              ),
+            ),
+            Layer.provide(
+              MiddlewareImpl.make(
+                databaseSchema,
+                GroupPolicy,
+                (effect, context) => {
+                  return Effect.gen(function* () {
+                    expect(context).toEqual({
+                      options: { label: context.options.label },
+                      invocation: {
+                        name: "get",
+                        functionType: "query",
+                        functionVisibility: "public",
+                        args: { id: "decoded" },
+                      },
+                    });
+                    events.push(context.options.label);
+                    const result = yield* effect;
+                    events.push(`${context.options.label}:after`);
+                    return result;
+                  });
+                },
+              ),
+            ),
+            Layer.provide(
+              MiddlewareImpl.makeByFunctionType(
+                databaseSchema,
+                FunctionPolicy,
+                {
+                  query: (effect, { options, invocation }) => {
+                    return Effect.gen(function* () {
+                      expect(options.tolerateMissing).toBe(true);
+                      expect(invocation).toEqual({
+                        name: "get",
+                        functionType: "query",
+                        functionVisibility: "public",
+                        args: { id: "decoded" },
+                      });
+                      events.push("function");
+                      return yield* effect;
+                    });
+                  },
+                  mutation: (effect) => effect,
+                  action: (effect) => effect,
+                },
+              ),
+            ),
+            Layer.provide(
+              MiddlewareImpl.make(
+                databaseSchema,
+                Observe,
+                (effect, context) => {
+                  expect(Object.hasOwn(context, "options")).toBe(false);
+                  expect(context).toStrictEqual({
+                    invocation: {
+                      name: "get",
+                      functionType: "query",
+                      functionVisibility: "public",
+                      args: { id: "decoded" },
+                    },
+                  });
+                  return effect;
+                },
+              ),
+            ),
+            Layer.provide(
+              MiddlewareImpl.makeByFunctionType(
+                databaseSchema,
+                UndefinedPolicy,
+                {
+                  query: (effect, context) => {
+                    expect(Object.hasOwn(context, "options")).toBe(true);
+                    expect(context).toStrictEqual({
+                      options: undefined,
+                      invocation: {
+                        name: "get",
+                        functionType: "query",
+                        functionVisibility: "public",
+                        args: { id: "decoded" },
+                      },
+                    });
+                    return effect;
+                  },
+                  mutation: (effect) => effect,
+                  action: (effect) => effect,
+                },
+              ),
+            ),
+            GroupImpl.finalize,
+          );
+
+          const registered = RegisteredFunctions.buildForGroup<typeof group>(
+            databaseSchema,
+            groupLayer,
+            RegisteredConvexFunction.make,
+          );
+          const c = yield* Effect.service(TestConfect.TestConfect).pipe(
+            Effect.provide(
+              TestConfect_.layer(databaseSchema, convexSchema, {
+                ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+                "./fixtures/convex/options.ts": () =>
+                  Promise.resolve(registered),
+              }),
+            ),
+          );
+          expect(
+            yield* c.query(Ref.make("options", query), { id: "decoded" }),
+          ).toBe("ok");
+          expect(events).toEqual([
+            "group",
+            "function",
+            "inner",
+            "handler",
+            "inner:after",
+            "group:after",
+          ]);
+        }),
+    );
+
+    it.effect("lets the inner instance shadow the same provided service", () =>
+      Effect.gen(function* () {
+        class Value extends Context.Service<Value, string>()(
+          "@confect/server/test/mock-backend/middleware.test/Value",
+        ) {}
+        class ProvideValue extends MiddlewareSpec.MiddlewareSpec<
+          ProvideValue,
+          { provides: Value }
+        >()("ProvideValue", {
+          options: () => Schema.Struct({ value: Schema.String }),
+          functionTypes: { query: true, mutation: false, action: false },
+        }) {}
+        const query = FunctionSpec.publicQuery({
+          name: "get",
+          returns: () => Schema.String,
+        }).middleware(ProvideValue, { value: "inner" });
+        const group = GroupSpec.make()
+          .middleware(ProvideValue, { value: "outer" })
+          .addFunction(query);
+        const groupLayer = GroupImpl.make(databaseSchema, group).pipe(
+          Layer.provide(
+            FunctionImpl.make(databaseSchema, group, "get", () =>
+              Effect.service(Value),
+            ),
+          ),
+          Layer.provide(
+            MiddlewareImpl.make(
+              databaseSchema,
+              ProvideValue,
+              (effect, { options }) =>
+                Effect.provideService(effect, Value, options.value),
+            ),
+          ),
+          GroupImpl.finalize,
+        );
+        const registered = RegisteredFunctions.buildForGroup<typeof group>(
+          databaseSchema,
+          groupLayer,
+          RegisteredConvexFunction.make,
+        );
+        const c = yield* Effect.service(TestConfect.TestConfect).pipe(
+          Effect.provide(
+            TestConfect_.layer(databaseSchema, convexSchema, {
+              ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+              "./fixtures/convex/options.ts": () => Promise.resolve(registered),
+            }),
+          ),
+        );
+        expect(yield* c.query(Ref.make("options", query))).toBe("inner");
+      }),
+    );
+
+    it.effect(
+      "carries per-attachment options through codegen, execution, and client error decoding",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              const writer = yield* DatabaseWriter;
+              yield* writer.table("users").insert({ username: "ada" });
+            }),
+          );
+          const group = refs.public.groups.middlewareOptions;
+          expectTypeOf<Ref.Error<typeof group.shortName>>().toEqualTypeOf<
+            NoViewer | NameRejected
+          >();
+          expect(group.shortName.middlewareAttachments[2]?.options).toEqual({
+            minLength: 2,
+          });
+          expect(group.longName.middlewareAttachments[2]?.options).toEqual({
+            minLength: 5,
+          });
+          expect(yield* c.query(group.shortName)).toBe("ada");
+          expect(yield* Effect.result(c.query(group.longName))).toEqual(
+            Result.fail(new NameRejected({ minLength: 5 })),
+          );
+          expect(yield* Effect.result(c.mutation(group.mutation))).toEqual(
+            Result.fail(new NameRejected({ minLength: 4 })),
+          );
+          expect(yield* Effect.result(c.action(group.action))).toEqual(
+            Result.fail(new NameRejected({ minLength: 6 })),
+          );
+          expect(yield* c.query(group.shortName)).toBe("ada");
+        }).pipe(Effect.provide(TestConfect.layer)),
+    );
   });
 });
