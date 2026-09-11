@@ -58,9 +58,9 @@ const observeUpstreamEnd = <
   R,
   Direction extends QueryStream.OrderDirection,
 >(
-  stream: QueryStream.QueryStream<Doc, Key, E, R, Direction>,
+  stream: QueryStream.QueryStream<Doc, Key, Direction, E, R>,
   onEnd: Effect.Effect<void>,
-): QueryStream.QueryStream<Doc, Key, E, R, Direction> =>
+): QueryStream.QueryStream<Doc, Key, Direction, E, R> =>
   new QueryStream.QueryStream(
     stream.order,
     stream.keyFields,
@@ -78,7 +78,10 @@ const pageTags = Effect.fnUntraced(function* <
   Key extends ReadonlyArray<string>,
   E,
   R,
->(stream: QueryStream.QueryStream<Doc, Key, E, R>, numItems = 1) {
+>(
+  stream: QueryStream.QueryStream<Doc, Key, QueryStream.OrderDirection, E, R>,
+  numItems = 1,
+) {
   const pages: Array<Array<string | undefined>> = [];
   let cursor: string | null = null;
   for (let index = 0; index < 20; index++) {

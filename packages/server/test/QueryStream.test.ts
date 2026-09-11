@@ -4,6 +4,42 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 
+describe("QueryStream type parameters", () => {
+  it("accepts direction third and defaults errors and requirements to never", () => {
+    const source = new QueryStream.QueryStream<number, ["_id"], "desc">(
+      "desc",
+      ["_id"],
+      Stream.empty,
+    );
+
+    expect(source.order).toBe("desc");
+    expectTypeOf(source.toStream()).toEqualTypeOf<Stream.Stream<number>>();
+    expectTypeOf<QueryStream.QueryStream<number, ["_id"]>>().toEqualTypeOf<
+      QueryStream.QueryStream<number, ["_id"], QueryStream.OrderDirection>
+    >();
+    expectTypeOf<
+      QueryStream.QueryStream<number, ["_id"], "desc", Error>
+    >().toEqualTypeOf<
+      QueryStream.QueryStream<number, ["_id"], "desc", Error, never>
+    >();
+  });
+
+  it("carries the fourth and fifth parameters into the Effect stream channels", () => {
+    type Source = QueryStream.QueryStream<
+      number,
+      ["_id"],
+      "asc",
+      Error,
+      { readonly service: "query" }
+    >;
+
+    expectTypeOf<Source["order"]>().toEqualTypeOf<"asc">();
+    expectTypeOf<ReturnType<Source["toStream"]>>().toEqualTypeOf<
+      Stream.Stream<number, Error, { readonly service: "query" }>
+    >();
+  });
+});
+
 describe("QueryStream.RangeOp", () => {
   it.each(["eq", "gt", "gte", "lt", "lte"] as const)(
     "constructs %s operations with the existing record shape",
