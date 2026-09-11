@@ -1,3 +1,6 @@
+import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
+import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
+import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import { describe, expect, it } from "@effect/vitest";
 import * as QueryStream from "@confect/server/QueryStream";
 import { compareValues } from "convex/values";
@@ -22,7 +25,7 @@ const documents = [
 type Document = (typeof documents)[number];
 
 interface ReaderRun {
-  readonly order: QueryStream.OrderDirection;
+  readonly order: QueryStreamOrderDirection.QueryStreamOrderDirection;
   next: number;
   returned: number;
   settled: number;
@@ -41,10 +44,10 @@ const makeReader = (pending?: PendingRead) => {
   const reader: QueryStream.ReflectionReader = {
     query: () => ({
       withIndex: (_indexName, indexRange) => {
-        const operations: Array<QueryStream.RangeOp> = [];
+        const operations: Array<QueryStreamIndexRange.RangeOp> = [];
         const record =
-          (_tag: QueryStream.RangeOp["_tag"]) =>
-          (field: string, value: QueryStream.RangeOp["value"]) => {
+          (_tag: QueryStreamIndexRange.RangeOp["_tag"]) =>
+          (field: string, value: QueryStreamIndexRange.RangeOp["value"]) => {
             operations.push({ _tag, field, value });
             return builder;
           };
@@ -138,7 +141,10 @@ const makeReader = (pending?: PendingRead) => {
     tableSchema,
     indexName: "by_group",
     indexFields: ["group", "_creationTime"],
-    spec: QueryStream.rangeBuilder<Document, ["group", "_creationTime"]>(),
+    spec: QueryStreamIndexRange.rangeBuilder<
+      Document,
+      ["group", "_creationTime"]
+    >(),
     order: "asc",
   });
   return { stream, runs, events };
@@ -353,7 +359,7 @@ describe("QueryStream iterator lifecycle", () => {
           Effect.flip,
         );
 
-        expect(error).toBeInstanceOf(QueryStream.ReadBudgetExceededError);
+        expect(error).toBeInstanceOf(QueryStreamReadBudget.ExceededError);
         expect(error).toMatchObject({ rowsRead: 1 });
         expect(reader.events).toEqual(["0:open:desc", "0:next", "0:return"]);
       }),
@@ -376,7 +382,7 @@ describe("QueryStream iterator lifecycle", () => {
           Effect.flip,
         );
 
-        expect(error).toBeInstanceOf(QueryStream.ReadBudgetExceededError);
+        expect(error).toBeInstanceOf(QueryStreamReadBudget.ExceededError);
         expect(error).toMatchObject({ rowsRead: 2 });
         expect(reader.events).toEqual([
           "0:open:desc",

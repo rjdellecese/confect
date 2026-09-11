@@ -1,3 +1,5 @@
+import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
+import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { type Document, QueryStream } from "@confect/server";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -27,11 +29,17 @@ const collectTexts = <E, R>(
 
 /** Walk a stream page by page until exhausted, returning the pages. */
 const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
-  stream: QueryStream.QueryStream<Doc, Key, QueryStream.OrderDirection, E, R>,
+  stream: QueryStream.QueryStream<
+    Doc,
+    Key,
+    QueryStreamOrderDirection.QueryStreamOrderDirection,
+    E,
+    R
+  >,
   numItems: number,
 ): Effect.Effect<
   ReadonlyArray<ReadonlyArray<Doc>>,
-  E | QueryStream.ReadBudgetExceededError,
+  E | QueryStreamReadBudget.ExceededError,
   R
 > => {
   const go = (
@@ -39,7 +47,7 @@ const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
     pages: ReadonlyArray<ReadonlyArray<Doc>>,
   ): Effect.Effect<
     ReadonlyArray<ReadonlyArray<Doc>>,
-    E | QueryStream.ReadBudgetExceededError,
+    E | QueryStreamReadBudget.ExceededError,
     R
   > =>
     QueryStream.paginate(stream, { numItems, cursor }).pipe(
@@ -238,8 +246,8 @@ describe("QueryStream", () => {
           // Directions the types can't see: both typed as the union, so
           // the runtime check is what catches the mismatch.
           const directions: readonly [
-            QueryStream.OrderDirection,
-            QueryStream.OrderDirection,
+            QueryStreamOrderDirection.QueryStreamOrderDirection,
+            QueryStreamOrderDirection.QueryStreamOrderDirection,
           ] = ["asc", "desc"];
           expect(() =>
             QueryStream.merge([
@@ -473,7 +481,7 @@ describe("QueryStream", () => {
 
             assert(Result.isFailure(result));
             expect(result.failure).toBeInstanceOf(
-              QueryStream.ReadBudgetExceededError,
+              QueryStreamReadBudget.ExceededError,
             );
           }),
         );
@@ -537,7 +545,7 @@ describe("QueryStream", () => {
             pages: ReadonlyArray<ReadonlyArray<string>>,
           ): Effect.Effect<
             ReadonlyArray<ReadonlyArray<string>>,
-            Document.DocumentDecodeError | QueryStream.ReadBudgetExceededError
+            Document.DocumentDecodeError | QueryStreamReadBudget.ExceededError
           > =>
             QueryStream.paginate(merged, {
               numItems: 10,
@@ -1976,17 +1984,18 @@ describe("QueryStream types", () => {
       expectTypeOf<
         DirectionOf<typeof descendingBounded>
       >().toEqualTypeOf<"desc">();
-      const runtimeOrder = "asc" as QueryStream.OrderDirection;
+      const runtimeOrder =
+        "asc" as QueryStreamOrderDirection.QueryStreamOrderDirection;
       const dynamic = reader.table("notes").stream("by_text", runtimeOrder);
       expectTypeOf<
         DirectionOf<typeof dynamic>
-      >().toEqualTypeOf<QueryStream.OrderDirection>();
+      >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
 
       // The direction is covariant: a known direction is also "either".
       const widened: QueryStream.QueryStream<
         unknown,
         ["text", "_creationTime"],
-        QueryStream.OrderDirection,
+        QueryStreamOrderDirection.QueryStreamOrderDirection,
         unknown,
         unknown
       > = full;
@@ -2011,7 +2020,7 @@ describe("QueryStream types", () => {
       const dynamicLed = QueryStream.merge([dynamic, full]);
       expectTypeOf<
         DirectionOf<typeof dynamicLed>
-      >().toEqualTypeOf<QueryStream.OrderDirection>();
+      >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
       const mixedJoin = QueryStream.flatMap(
         bounded,
         // @ts-expect-error—inner streams must run in the outer direction.
@@ -2028,7 +2037,7 @@ describe("QueryStream types", () => {
       );
       expectTypeOf<
         DirectionOf<typeof dynamicInnerJoin>
-      >().toEqualTypeOf<QueryStream.OrderDirection>();
+      >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
 
       // reverse flips a known direction and keeps a runtime one as the
       // union, leaving the key alone.
@@ -2040,7 +2049,7 @@ describe("QueryStream types", () => {
       const reversedDynamic = QueryStream.reverse(dynamic);
       expectTypeOf<
         DirectionOf<typeof reversedDynamic>
-      >().toEqualTypeOf<QueryStream.OrderDirection>();
+      >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
     });
     void _typeChecks;
   });

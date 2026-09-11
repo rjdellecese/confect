@@ -1,48 +1,7 @@
-import { convexToJson, jsonToConvex, type Value } from "convex/values";
-import * as Effect from "effect/Effect";
-import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
-import * as SchemaIssue from "effect/SchemaIssue";
 import * as QueryStreamKeyFields from "./QueryStreamKeyFields";
-
-const UNDEFINED_SENTINEL = { $undefined: true } as const;
-const KeyValue = Schema.declare<Value | undefined>(
-  (value): value is Value | undefined =>
-    value === undefined ||
-    Result.isSuccess(Result.try(() => convexToJson(value as Value))),
-  {
-    toCodecJson: () =>
-      Schema.link<Value | undefined>()(Schema.Json, {
-        decode: SchemaGetter.transformEffect((value, options) =>
-          Effect.try({
-            try: () =>
-              Result.isSuccess(
-                Schema.decodeUnknownResult(
-                  Schema.Struct({ $undefined: Schema.Literal(true) }),
-                  { onExcessProperty: "error" },
-                )(value),
-              )
-                ? undefined
-                : jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
-            catch: () =>
-              new SchemaIssue.InvalidValue(
-                { message: "Invalid Convex order-key value" },
-                value,
-                options,
-              ),
-          }),
-        ),
-        encode: SchemaGetter.transform((value) =>
-          value === undefined ? UNDEFINED_SENTINEL : convexToJson(value),
-        ),
-      }),
-  },
-);
-
-export const OrderKey = Schema.Array(KeyValue);
-
-export type OrderKey = typeof OrderKey.Type;
+import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 
 export class QueryStreamCursor extends Schema.Class<QueryStreamCursor>(
   "QueryStreamCursor",
@@ -50,7 +9,7 @@ export class QueryStreamCursor extends Schema.Class<QueryStreamCursor>(
   Schema.Struct({
     version: Schema.Literal(1),
     keyFields: QueryStreamKeyFields.QueryStreamKeyFields,
-    orderKey: OrderKey,
+    orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
   }).check(
     Schema.makeFilter(
       (cursor) => cursor.orderKey.length === cursor.keyFields.length,
@@ -76,7 +35,7 @@ export const codecForKeyFields = (
       { message: "Cursor order-key fields do not match the stream" },
     ),
   ).pipe(
-    Schema.decodeTo(OrderKey, {
+    Schema.decodeTo(QueryStreamOrderKey.QueryStreamOrderKey, {
       decode: SchemaGetter.transform((cursor) => cursor.orderKey),
       encode: SchemaGetter.transformEffect((orderKey) =>
         QueryStreamCursor.makeEffect({ version: 1, keyFields, orderKey }),

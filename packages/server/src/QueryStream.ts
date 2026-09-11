@@ -27,28 +27,18 @@
  *   index key—equality-pinned values never leak into cursors.
  */
 import type {
-  GenericDocument,
-  FieldTypeFromFieldPath,
   PaginationOptions as ConvexPaginationOptions,
   PaginationResult as ConvexPaginationResult,
 } from "convex/server";
-import {
-  ConvexError,
-  compareValues,
-  getDocumentSize,
-  type Value,
-} from "convex/values";
+import { ConvexError } from "convex/values";
 import { identity, dual, pipe } from "effect/Function";
 import { pipeArguments, type Pipeable } from "effect/Pipeable";
 import * as Array from "effect/Array";
 import type * as Channel from "effect/Channel";
 import * as Chunk from "effect/Chunk";
-import * as Cause from "effect/Cause";
-import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Filter from "effect/Filter";
-import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
@@ -65,7 +55,23 @@ import * as Document from "./Document";
 import * as QueryStreamCursor from "./QueryStreamCursor";
 import * as QueryStreamKeyFields from "./QueryStreamKeyFields";
 import type { QueryStreamKeyFields as KeyFields } from "./QueryStreamKeyFields";
-import type { OrderKey } from "./QueryStreamCursor";
+import * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
+import type {
+  QueryStreamOrderDirection as OrderDirection,
+  Flip,
+} from "./QueryStreamOrderDirection";
+import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import type { QueryStreamOrderKey as OrderKey } from "./QueryStreamOrderKey";
+import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
+import type {
+  KeyBound,
+  KeyBounds,
+  IndexBounds,
+  NarrowBounds,
+} from "./QueryStreamKeyBounds";
+import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
+import type { AnyIndexRangeSpec } from "./QueryStreamIndexRange";
+import * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 
 /**
  * @experimental
@@ -75,37 +81,6 @@ export const TypeId = "~@confect/server/QueryStream";
  * @experimental
  */
 export type TypeId = typeof TypeId;
-
-// -----------------------------------------------------------------------------
-// Order keys
-// -----------------------------------------------------------------------------
-
-/**
- * The direction a stream is ordered in. Tracked covariantly in the type: a
- * stream of a known direction is also a stream of `"asc" | "desc"`, the
- * class default, so annotations that omit the direction accept every
- * stream. Combining streams of different known directions—`merge`, or a
- * `flatMap` whose inner streams run the other way—is a type error; a
- * direction chosen at runtime types as the union, and the runtime check
- * catches what the types can't see (`merge` throws when the streams are
- * combined, `flatMap` fails when the join runs).
- *
- * @experimental
- */
-export type OrderDirection = "asc" | "desc";
-
-/**
- * The opposite of a direction; a runtime-chosen direction stays the union.
- *
- * @experimental
- */
-export type Flip<Direction extends OrderDirection> = Direction extends "asc"
-  ? "desc"
-  : "asc";
-
-const flipDirection = <Direction extends OrderDirection>(
-  direction: Direction,
-): Flip<Direction> => (direction === "asc" ? "desc" : "asc") as Flip<Direction>;
 
 /**
  * An element of the annotated stream: the decoded document (`None` when the
@@ -118,456 +93,6 @@ export class Element<Doc> extends Data.Class<{
   readonly doc: Option.Option<Doc>;
   readonly key: OrderKey;
 }> {}
-
-// -----------------------------------------------------------------------------
-// Typed index ranges
-// -----------------------------------------------------------------------------
-//
-// The range builder mirrors Convex's `IndexRangeBuilder`, but *consumes* the
-// index-field tuple at the type level as `eq` pins fields. The remaining
-// tuple becomes the resulting stream's order key, which is what `merge`
-// checks for compatibility.
-
-/**
- * @experimental
- */
-export const RangeSpecTypeId = "~@confect/server/QueryStream/IndexRangeSpec";
-/**
- * @experimental
- */
-export type RangeSpecTypeId = typeof RangeSpecTypeId;
-
-/**
- * @experimental
- */
-export type RangeOp = Data.TaggedEnum<{
-  [Tag in "eq" | "gt" | "gte" | "lt" | "lte"]: {
-    readonly field: string;
-    readonly value: Value | undefined;
-  };
-}>;
-
-export const RangeOp = Data.taggedEnum<RangeOp>();
-
-/**
- * The result of applying a range callback: the recorded operations, plus a
- * phantom `Remaining`—the index fields not consumed by `eq` pinning.
- *
- * @experimental
- */
-export interface IndexRangeSpec<out Fields extends KeyFields> {
-  readonly [RangeSpecTypeId]: {
-    readonly _Remaining: Types.Covariant<Fields>;
-  };
-  readonly eqCount: number;
-  readonly ops: ReadonlyArray<RangeOp>;
-}
-
-/**
- * @experimental
- */
-export type AnyIndexRangeSpec = IndexRangeSpec<KeyFields>;
-
-/**
- * @experimental
- */
-export type Remaining<Spec> = Spec extends IndexRangeSpec<infer R> ? R : never;
-
-/**
- * A typed index-range builder. `eq` must target the next unpinned index
- * field, and consumes it; `gt`/`gte`/`lt`/`lte` bound the next field without
- * consuming it (bounded fields still vary within the range).
- *
- * @experimental
- */
-export interface RangeBuilder<
-  ConvexDoc extends GenericDocument,
-  Fields extends KeyFields,
-> extends IndexRangeSpec<Fields> {
-  readonly eq: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
-  ) => RangeBuilder<ConvexDoc, QueryStreamKeyFields.Tail<Fields>>;
-  readonly gt: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
-  ) => LowerBoundedRange<ConvexDoc, Fields>;
-  readonly gte: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
-  ) => LowerBoundedRange<ConvexDoc, Fields>;
-  readonly lt: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
-  ) => IndexRangeSpec<Fields>;
-  readonly lte: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
-  ) => IndexRangeSpec<Fields>;
-}
-
-/**
- * After `gt`/`gte`, only an upper bound on the same field may follow.
- *
- * @experimental
- */
-export interface LowerBoundedRange<
-  ConvexDoc extends GenericDocument,
-  Fields extends KeyFields,
-> extends IndexRangeSpec<Fields> {
-  readonly lt: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
-  ) => IndexRangeSpec<Fields>;
-  readonly lte: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
-  ) => IndexRangeSpec<Fields>;
-}
-
-const makeRangeBuilder = (
-  eqCount: number,
-  ops: ReadonlyArray<RangeOp>,
-): RangeBuilder<GenericDocument, KeyFields> => {
-  const push =
-    (tag: RangeOp["_tag"], nextEqCount: number) =>
-    (field: string, value: Value | undefined) =>
-      makeRangeBuilder(
-        nextEqCount,
-        Array.append(ops, RangeOp[tag]({ field, value })),
-      );
-
-  return {
-    [RangeSpecTypeId]: {
-      _Remaining: identity as Types.Covariant<KeyFields>,
-    },
-    eqCount,
-    ops,
-    eq: push("eq", eqCount + 1),
-    gt: push("gt", eqCount),
-    gte: push("gte", eqCount),
-    lt: push("lt", eqCount),
-    lte: push("lte", eqCount),
-  };
-};
-
-/**
- * The initial builder handed to a range callback.
- *
- * @experimental
- */
-export const rangeBuilder = <
-  ConvexDoc extends GenericDocument,
-  Fields extends KeyFields,
->(): RangeBuilder<ConvexDoc, Fields> =>
-  makeRangeBuilder(0, []) as unknown as RangeBuilder<ConvexDoc, Fields>;
-
-/** Replay recorded range ops onto Convex's real `IndexRangeBuilder`. */
-const applyOps = (ops: ReadonlyArray<RangeOp>, q: any): any =>
-  Array.reduce(ops, q, (builder, op) => builder[op._tag](op.field, op.value));
-
-/**
- * Replay a recorded range spec onto Convex's real `IndexRangeBuilder`.
- *
- * @experimental
- */
-export const applyRange = (spec: AnyIndexRangeSpec, q: any): any =>
-  applyOps(spec.ops, q);
-
-// -----------------------------------------------------------------------------
-// Convex value ordering
-// -----------------------------------------------------------------------------
-
-/**
- * `Order` over Convex values, matching Convex's index ordering—a wrapper
- * around the canonical `compareValues` from `convex/values` (type rank
- * first, then within the type, including UTF-8 string order and NaN
- * bit-level ordering).
- *
- * @experimental
- */
-export const ValueOrder: Order.Order<Value | undefined> = Order.make(
-  (self, that) => Math.sign(compareValues(self, that)) as -1 | 0 | 1,
-);
-
-/**
- * `Order` over order keys: lexicographic by `ValueOrder`, then by length—also the ordering of Convex array values.
- *
- * @experimental
- */
-export const OrderKeyOrder: Order.Order<OrderKey> = Order.Array(ValueOrder);
-
-// -----------------------------------------------------------------------------
-// Key bounds and cuts
-// -----------------------------------------------------------------------------
-//
-// A bound's key may be a *prefix* of the full key: bounding by `["a"]` means
-// bounding by the whole family of keys that start with `"a"`. To compare
-// bounds and keys uniformly, each is modelled as a "cut"—a position
-// *between* keys: the `predecessor` cut of a prefix sits just before every
-// key extending it, the `successor` cut just after, and an `exact` cut is a
-// full key itself. (This is `convex-helpers`' `compareKeys` model.)
-
-/**
- * One side of a range: a (possibly prefix) key and whether it's included.
- *
- * @experimental
- */
-export interface KeyBound {
-  readonly key: OrderKey;
-  readonly inclusive: boolean;
-}
-
-/**
- * Bounds over a stream's order key, in *ascending key space* (`narrow`
- * converts from stream space, where `desc` reverses which end is which).
- *
- * @experimental
- */
-export interface KeyBounds {
-  readonly lower: Option.Option<KeyBound>;
-  readonly upper: Option.Option<KeyBound>;
-}
-
-/**
- * Bounds in *full index-key space*: `eq`-pinned values appear as a shared
- * prefix of both keys (`splitRange` re-derives them as `eq` constraints).
- * An empty key bounds nothing.
- *
- * @experimental
- */
-export interface IndexBounds {
-  readonly lower: KeyBound;
-  readonly upper: KeyBound;
-}
-
-type CutKind = "predecessor" | "exact" | "successor";
-
-interface KeyCut {
-  readonly key: OrderKey;
-  readonly kind: CutKind;
-}
-
-const cutKindRank: Record.ReadonlyRecord<CutKind, number> = {
-  predecessor: 0,
-  exact: 1,
-  successor: 2,
-};
-
-const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
-  const minLength = Math.min(self.key.length, that.key.length);
-  const prefixOrdering = OrderKeyOrder(
-    Array.take(self.key, minLength),
-    Array.take(that.key, minLength),
-  );
-  if (prefixOrdering !== 0) {
-    return prefixOrdering;
-  }
-  if (self.key.length === that.key.length) {
-    return Order.Number(cutKindRank[self.kind], cutKindRank[that.kind]);
-  }
-  // One key is a proper prefix of the other. The shorter cut sits just
-  // before (`predecessor`) or just after (`successor`) *every* key
-  // extending its prefix—the longer one included. (`exact` cuts are
-  // always full keys, so an `exact` cut is never the shorter one here.)
-  const selfIsShorter = self.key.length < that.key.length;
-  const shorter = selfIsShorter ? self : that;
-  const shorterOrdering = shorter.kind === "predecessor" ? -1 : 1;
-  return selfIsShorter ? shorterOrdering : (-shorterOrdering as -1 | 1);
-});
-
-const exactCut = (key: OrderKey): KeyCut => ({ key, kind: "exact" });
-
-const lowerCut = (bound: KeyBound): KeyCut => ({
-  key: bound.key,
-  kind: bound.inclusive ? "predecessor" : "successor",
-});
-
-const upperCut = (bound: KeyBound): KeyCut => ({
-  key: bound.key,
-  kind: bound.inclusive ? "successor" : "predecessor",
-});
-
-/** The stricter (later) of two lower bounds. */
-const tightestLower = (self: KeyBound, that: KeyBound): KeyBound =>
-  Order.isGreaterThan(KeyCutOrder)(lowerCut(that), lowerCut(self))
-    ? that
-    : self;
-
-/** The stricter (earlier) of two upper bounds. */
-const tightestUpper = (self: KeyBound, that: KeyBound): KeyBound =>
-  Order.isLessThan(KeyCutOrder)(upperCut(that), upperCut(self)) ? that : self;
-
-const combineKeyBound = (
-  self: Option.Option<KeyBound>,
-  that: Option.Option<KeyBound>,
-  combine: (self: KeyBound, that: KeyBound) => KeyBound,
-): Option.Option<KeyBound> =>
-  Option.match(self, {
-    onNone: () => that,
-    onSome: (first) =>
-      Option.some(
-        Option.match(that, {
-          onNone: () => first,
-          onSome: (second) => combine(first, second),
-        }),
-      ),
-  });
-
-/** Order of positions in stream order: for `desc`, later keys are smaller. */
-const PositionOrder = (order: OrderDirection): Order.Order<OrderKey> =>
-  order === "asc" ? OrderKeyOrder : Order.flip(OrderKeyOrder);
-
-// -----------------------------------------------------------------------------
-// Range splitting
-// -----------------------------------------------------------------------------
-//
-// Convex index ranges have the shape `eq(f1) … eq(fn), gt/gte(fm)?,
-// lt/lte(fm)?`—every field pinned except the last, which may carry two
-// inequalities. An arbitrary range between two index keys therefore
-// decomposes into a *sequence* of Convex-expressible ranges (the port of
-// `convex-helpers`' `splitRange`): e.g. `(1, 2, 3) < key <= (1, 3, 2)` over
-// fields `(f1, f2, f3)` becomes
-//
-//   1. eq(f1, 1), eq(f2, 2), gt(f3, 3)
-//   2. eq(f1, 1), gt(f2, 2), lt(f2, 3)
-//   3. eq(f1, 1), eq(f2, 3), lte(f3, 2)
-
-type BoundTag = "gt" | "gte" | "lt" | "lte";
-
-class TaggedBound extends Data.Class<{
-  readonly key: OrderKey;
-  readonly tag: BoundTag;
-}> {}
-
-/** Dropping a bound key's last component bounds by the remaining prefix—exclusively. */
-const excludePrefix = (tag: BoundTag): BoundTag =>
-  tag === "gt" || tag === "gte" ? "gt" : "lt";
-
-/**
- * Peel a bound key down to a single component: each peeled entry becomes an
- * exact-prefix segment, the final (shortest) entry feeds the middle range.
- */
-const peelBound = (
-  key: OrderKey,
-  tag: BoundTag,
-): {
-  readonly peeled: ReadonlyArray<TaggedBound>;
-  readonly final: TaggedBound;
-} =>
-  key.length <= 1
-    ? { peeled: [], final: new TaggedBound({ key, tag }) }
-    : pipe(
-        peelBound(Array.dropRight(key, 1), excludePrefix(tag)),
-        ({ final, peeled }) => ({
-          peeled: Array.prepend(peeled, new TaggedBound({ key, tag })),
-          final,
-        }),
-      );
-
-/** `eq` every component of `key` but the last, which gets the bound tag. */
-const rangeOpsFor = (
-  prefixOps: ReadonlyArray<RangeOp>,
-  fields: KeyFields,
-  key: OrderKey,
-  tag: BoundTag,
-): ReadonlyArray<RangeOp> =>
-  Option.match(Array.last(key), {
-    onNone: () => prefixOps,
-    onSome: (lastValue) =>
-      pipe(
-        Array.zip(fields, Array.dropRight(key, 1)),
-        Array.map(([field, value]) => RangeOp.eq({ field, value })),
-        (eqOps) =>
-          Array.appendAll(
-            Array.appendAll(prefixOps, eqOps),
-            Array.of(
-              RangeOp[tag]({
-                field: fields[key.length - 1]!,
-                value: lastValue,
-              }),
-            ),
-          ),
-      ),
-  });
-
-/**
- * Decompose the range between `bounds.lower` and `bounds.upper` (over the
- * full index-key `fields`, `_id` tiebreaker included) into a sequence of
- * Convex-expressible ranges, ordered for the given direction.
- */
-const splitRange = (
-  fields: KeyFields,
-  order: OrderDirection,
-  bounds: IndexBounds,
-): ReadonlyArray<ReadonlyArray<RangeOp>> => {
-  // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
-  // upper inclusive at `k`—the half-open (k, k]—both cut at
-  // successor(k).
-  if (
-    Order.isGreaterThanOrEqualTo(KeyCutOrder)(
-      lowerCut(bounds.lower),
-      upperCut(bounds.upper),
-    )
-  ) {
-    return [];
-  }
-
-  const commonLength = pipe(
-    Array.zip(bounds.lower.key, bounds.upper.key),
-    Array.takeWhile(
-      ([lowerValue, upperValue]) => ValueOrder(lowerValue, upperValue) === 0,
-    ),
-  ).length;
-  const prefixOps = pipe(
-    Array.zip(Array.take(fields, commonLength), bounds.lower.key),
-    Array.map(([field, value]) => RangeOp.eq({ field, value })),
-  );
-  const restFields = Array.drop(fields, commonLength);
-
-  const lower = peelBound(
-    Array.drop(bounds.lower.key, commonLength),
-    bounds.lower.inclusive ? "gte" : "gt",
-  );
-  const upper = peelBound(
-    Array.drop(bounds.upper.key, commonLength),
-    bounds.upper.inclusive ? "lte" : "lt",
-  );
-
-  const startRanges = Array.map(lower.peeled, ({ key, tag }) =>
-    rangeOpsFor(prefixOps, restFields, key, tag),
-  );
-  const endRanges = Array.reverse(
-    Array.map(upper.peeled, ({ key, tag }) =>
-      rangeOpsFor(prefixOps, restFields, key, tag),
-    ),
-  );
-
-  const { key: lowerFinalKey, tag: lowerFinalTag } = lower.final;
-  const { key: upperFinalKey, tag: upperFinalTag } = upper.final;
-  const middleRange =
-    Array.isReadonlyArrayNonEmpty(lowerFinalKey) &&
-    Array.isReadonlyArrayNonEmpty(upperFinalKey)
-      ? Array.appendAll(prefixOps, [
-          RangeOp[lowerFinalTag]({
-            field: restFields[0]!,
-            value: Array.headNonEmpty(lowerFinalKey),
-          }),
-          RangeOp[upperFinalTag]({
-            field: restFields[0]!,
-            value: Array.headNonEmpty(upperFinalKey),
-          }),
-        ])
-      : Array.isReadonlyArrayNonEmpty(lowerFinalKey)
-        ? rangeOpsFor(prefixOps, restFields, lowerFinalKey, lowerFinalTag)
-        : rangeOpsFor(prefixOps, restFields, upperFinalKey, upperFinalTag);
-
-  const ranges = Array.appendAll(
-    Array.appendAll(startRanges, Array.of(middleRange)),
-    endRanges,
-  );
-  return order === "desc" ? Array.reverse(ranges) : ranges;
-};
 
 // -----------------------------------------------------------------------------
 // QueryStream
@@ -752,7 +277,7 @@ export const empty =
         // Narrowing nothing is nothing, and so is reversing it.
         () => make(direction),
         tiebreakers,
-        () => make(flipDirection(direction)),
+        () => make(QueryStreamOrderDirection.flip(direction)),
       );
     return make(order);
   };
@@ -784,7 +309,7 @@ export interface ReflectionReader {
  * needed to rebuild `db.query(table).withIndex(index, range).order(order)`.
  * A Convex query object is one-shot (its first iteration consumes it), so a
  * leaf holds this *recipe* and re-executes it on every run of the stream—the Effect formulation of `convex-helpers`' `reflect()`. It is also the
- * data a future `splitRange`-style `narrow` needs in order to rebuild the
+ * data a future `QueryStreamIndexRange.splitRange`-style `narrow` needs in order to rebuild the
  * leaf with tighter index bounds instead of filtering in memory.
  *
  * @experimental
@@ -810,52 +335,6 @@ export interface Reflection<Direction extends OrderDirection = OrderDirection> {
   readonly bounds?: IndexBounds;
 }
 
-/** Fold a range spec's recorded ops into full-index-key bounds. */
-const boundsFromSpec = (spec: AnyIndexRangeSpec): IndexBounds =>
-  Array.reduce(
-    spec.ops,
-    {
-      lower: { key: Array.empty<Value | undefined>(), inclusive: true },
-      upper: { key: Array.empty<Value | undefined>(), inclusive: true },
-    } as IndexBounds,
-    (bounds, op) =>
-      Match.value(op._tag).pipe(
-        Match.when("eq", (): IndexBounds => ({
-          lower: {
-            key: Array.append(bounds.lower.key, op.value),
-            inclusive: bounds.lower.inclusive,
-          },
-          upper: {
-            key: Array.append(bounds.upper.key, op.value),
-            inclusive: bounds.upper.inclusive,
-          },
-        })),
-        Match.whenOr("gt", "gte", (tag): IndexBounds => ({
-          lower: {
-            key: Array.append(bounds.lower.key, op.value),
-            inclusive: tag === "gte",
-          },
-          upper: bounds.upper,
-        })),
-        Match.whenOr("lt", "lte", (tag): IndexBounds => ({
-          lower: bounds.lower,
-          upper: {
-            key: Array.append(bounds.upper.key, op.value),
-            inclusive: tag === "lte",
-          },
-        })),
-        Match.exhaustive,
-      ),
-  );
-
-const intersectIndexBounds = (
-  self: IndexBounds,
-  that: IndexBounds,
-): IndexBounds => ({
-  lower: tightestLower(self.lower, that.lower),
-  upper: tightestUpper(self.upper, that.upper),
-});
-
 /**
  * Build a leaf `QueryStream` from reflection data.
  *
@@ -865,7 +344,7 @@ const intersectIndexBounds = (
  * of a query rather than a result.
  *
  * Each run rebuilds the Convex queries from the reflection—the leaf's
- * bounds decomposed into Convex-expressible index ranges via `splitRange`—and order keys are extracted from the *encoded* document before schema
+ * bounds decomposed into Convex-expressible index ranges via `QueryStreamIndexRange.splitRange`—and order keys are extracted from the *encoded* document before schema
  * decoding.
  *
  * @experimental
@@ -885,9 +364,9 @@ export const fromReflection = <
   makeLeaf(
     reflection,
     reflection.bounds === undefined
-      ? boundsFromSpec(reflection.spec)
-      : intersectIndexBounds(
-          boundsFromSpec(reflection.spec),
+      ? QueryStreamIndexRange.boundsFromSpec(reflection.spec)
+      : QueryStreamKeyBounds.intersectIndexBounds(
+          QueryStreamIndexRange.boundsFromSpec(reflection.spec),
           reflection.bounds,
         ),
   );
@@ -929,7 +408,11 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   const keyPaths = Array.map(keyFields, (field) => String.split(field, "."));
   // `eq`-pinned values form a shared prefix of both bound keys.
   const eqValues = Array.take(bounds.lower.key, reflection.spec.eqCount);
-  const segments = splitRange(fullIndexFields, reflection.order, bounds);
+  const segments = QueryStreamIndexRange.splitRange(
+    fullIndexFields,
+    reflection.order,
+    bounds,
+  );
 
   const encodedDocuments = Stream.fromIterable(segments).pipe(
     Stream.flatMap((segment) =>
@@ -937,7 +420,9 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
         Stream.fromAsyncIterable(
           reflection.reader
             .query(reflection.tableName)
-            .withIndex(reflection.indexName, (q) => applyOps(segment, q))
+            .withIndex(reflection.indexName, (q) =>
+              QueryStreamIndexRange.applyOps(segment, q),
+            )
             .order(reflection.order),
           identity,
         ),
@@ -946,56 +431,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
     Stream.orDie,
   );
 
-  const charged = Stream.fromPull(
-    Effect.gen(function* () {
-      const budgetStatus = yield* ReadBudgetStatus;
-      const limits = yield* ReadBudgetLimits;
-      const pull = yield* Stream.toPull(encodedDocuments);
-      return Option.match(budgetStatus, {
-        onNone: () => pull,
-        onSome: (stateRef) =>
-          SynchronizedRef.modifyEffect(stateRef, (state) =>
-            Effect.gen(function* () {
-              if (isBudgetExhausted(limits, state)) {
-                return Tuple.make(
-                  Option.none(),
-                  new ReadBudgetState({
-                    rows: state.rows,
-                    bytes: state.bytes,
-                    status: BudgetStatus.Stopped(),
-                  }),
-                );
-              }
-              const documents = yield* pull;
-              return Tuple.make(
-                Option.some(documents),
-                new ReadBudgetState({
-                  status: state.status,
-                  rows: state.rows + documents.length,
-                  bytes: Option.match(limits.maximumBytesRead, {
-                    onNone: () => state.bytes,
-                    onSome: () =>
-                      Array.reduce(
-                        documents,
-                        state.bytes,
-                        (bytes, document) =>
-                          bytes + getDocumentSize(document as GenericDocument),
-                      ),
-                  }),
-                }),
-              );
-            }),
-          ).pipe(
-            Effect.flatMap(
-              Option.match({
-                onNone: () => Cause.done(),
-                onSome: Effect.succeed,
-              }),
-            ),
-          ),
-      });
-    }),
-  ).pipe(Stream.scoped);
+  const charged = QueryStreamReadBudget.charge(encodedDocuments);
 
   const annotated = charged.pipe(
     Stream.mapEffect((encoded) =>
@@ -1004,7 +440,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
         (doc) =>
           new Element({
             doc: Option.some(doc as Doc),
-            key: extractOrderKey(
+            key: QueryStreamOrderKey.extract(
               encoded as Record.ReadonlyRecord<string, unknown>,
               keyPaths,
             ),
@@ -1027,37 +463,33 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
       makeLeaf(reflection, {
         lower: Option.match(keyBounds.lower, {
           onNone: () => bounds.lower,
-          onSome: (bound) => tightestLower(bounds.lower, toFullKeySpace(bound)),
+          onSome: (bound) =>
+            QueryStreamKeyBounds.tightestLower(
+              bounds.lower,
+              toFullKeySpace(bound),
+            ),
         }),
         upper: Option.match(keyBounds.upper, {
           onNone: () => bounds.upper,
-          onSome: (bound) => tightestUpper(bounds.upper, toFullKeySpace(bound)),
+          onSome: (bound) =>
+            QueryStreamKeyBounds.tightestUpper(
+              bounds.upper,
+              toFullKeySpace(bound),
+            ),
         }),
       }),
     tiebreakers,
     // Bounds live in ascending key space, so the reversed leaf keeps them.
     () =>
       makeLeaf(
-        { ...reflection, order: flipDirection(reflection.order) },
+        {
+          ...reflection,
+          order: QueryStreamOrderDirection.flip(reflection.order),
+        },
         bounds,
       ),
   );
 };
-
-const extractOrderKey = (
-  encoded: Record.ReadonlyRecord<string, unknown>,
-  keyPaths: ReadonlyArray<ReadonlyArray<string>>,
-): OrderKey =>
-  Array.map(keyPaths, (path) =>
-    Array.reduce(
-      path,
-      encoded as unknown,
-      (value, segment) =>
-        (value as Record.ReadonlyRecord<string, unknown> | undefined)?.[
-          segment
-        ],
-    ),
-  ) as OrderKey;
 
 // -----------------------------------------------------------------------------
 // Combinators
@@ -1115,12 +547,12 @@ const fillMergeSource = <Doc, E>(
             ),
             Pull.catchDone(() =>
               Effect.gen(function* () {
-                const budgetStatus = yield* ReadBudgetStatus;
+                const budgetStatus = yield* QueryStreamReadBudget.Status;
                 const status = yield* Option.match(budgetStatus, {
                   onNone: () => Effect.succeed(SourceStatus.Exhausted()),
                   onSome: (stateRef) =>
                     Effect.map(SynchronizedRef.get(stateRef), (state) =>
-                      BudgetStatus.$match(state.status, {
+                      QueryStreamReadBudget.Phase.$match(state.status, {
                         Active: () => SourceStatus.Exhausted(),
                         Stopped: () => SourceStatus.BudgetLimited(),
                       }),
@@ -1154,7 +586,7 @@ const mergeStep =
     E
   > =>
     Effect.gen(function* () {
-      const budgetStatus = yield* ReadBudgetStatus;
+      const budgetStatus = yield* QueryStreamReadBudget.Status;
       const filled = yield* Effect.forEach(sources, fillMergeSource, {
         concurrency: Option.match(budgetStatus, {
           onNone: () => "unbounded" as const,
@@ -1282,7 +714,7 @@ const mergeUnchecked = <
                 status: SourceStatus.Ready(),
               }),
           ),
-          mergeStep<Doc, E>(PositionOrder(head.order)),
+          mergeStep<Doc, E>(QueryStreamOrderKey.positionOrder(head.order)),
         ),
     ),
   );
@@ -1645,13 +1077,22 @@ const combineLowerRefinements = (
     ? incoming
     : incoming === undefined
       ? existing
-      : Order.isGreaterThan(OrderKeyOrder)(existing.outer, incoming.outer)
+      : Order.isGreaterThan(QueryStreamOrderKey.Order)(
+            existing.outer,
+            incoming.outer,
+          )
         ? existing
-        : Order.isLessThan(OrderKeyOrder)(existing.outer, incoming.outer)
+        : Order.isLessThan(QueryStreamOrderKey.Order)(
+              existing.outer,
+              incoming.outer,
+            )
           ? incoming
           : {
               outer: existing.outer,
-              inner: tightestLower(existing.inner, incoming.inner),
+              inner: QueryStreamKeyBounds.tightestLower(
+                existing.inner,
+                incoming.inner,
+              ),
             };
 
 /** Of two upper refinements, the one at the earlier boundary row wins. */
@@ -1663,13 +1104,22 @@ const combineUpperRefinements = (
     ? incoming
     : incoming === undefined
       ? existing
-      : Order.isLessThan(OrderKeyOrder)(existing.outer, incoming.outer)
+      : Order.isLessThan(QueryStreamOrderKey.Order)(
+            existing.outer,
+            incoming.outer,
+          )
         ? existing
-        : Order.isGreaterThan(OrderKeyOrder)(existing.outer, incoming.outer)
+        : Order.isGreaterThan(QueryStreamOrderKey.Order)(
+              existing.outer,
+              incoming.outer,
+            )
           ? incoming
           : {
               outer: existing.outer,
-              inner: tightestUpper(existing.inner, incoming.inner),
+              inner: QueryStreamKeyBounds.tightestUpper(
+                existing.inner,
+                incoming.inner,
+              ),
             };
 
 const makeFlatMap = <
@@ -1738,12 +1188,12 @@ const makeFlatMap = <
   const innerBoundsFor = (outerKey: OrderKey): KeyBounds => ({
     lower:
       refinements.lower !== undefined &&
-      OrderKeyOrder(outerKey, refinements.lower.outer) === 0
+      QueryStreamOrderKey.Order(outerKey, refinements.lower.outer) === 0
         ? Option.some(refinements.lower.inner)
         : Option.none(),
     upper:
       refinements.upper !== undefined &&
-      OrderKeyOrder(outerKey, refinements.upper.outer) === 0
+      QueryStreamOrderKey.Order(outerKey, refinements.upper.outer) === 0
         ? Option.some(refinements.upper.inner)
         : Option.none(),
   });
@@ -1757,8 +1207,8 @@ const makeFlatMap = <
     innerBounds: KeyBounds,
     doc: Option.Option<Doc2 | Doc3>,
   ): Stream.Stream<Element<Doc2 | Doc3>> =>
-    admittedByLower(innerBounds.lower)(nullPadding) &&
-    admittedByUpper(innerBounds.upper)(nullPadding)
+    QueryStreamKeyBounds.admittedByLower(innerBounds.lower)(nullPadding) &&
+    QueryStreamKeyBounds.admittedByUpper(innerBounds.upper)(nullPadding)
       ? Stream.succeed(
           new Element({ doc, key: Array.appendAll(outerKey, nullPadding) }),
         )
@@ -1786,8 +1236,9 @@ const makeFlatMap = <
             Stream.orElseIfEmpty(() =>
               Stream.unwrap(
                 Effect.gen(function* () {
-                  const budgetStatus = yield* ReadBudgetStatus;
-                  if (yield* isBudgetStopped(budgetStatus)) return Stream.empty;
+                  const budgetStatus = yield* QueryStreamReadBudget.Status;
+                  if (yield* QueryStreamReadBudget.isStopped(budgetStatus))
+                    return Stream.empty;
                   const original = yield* Option.match(
                     Option.gen(function* () {
                       yield* Option.fromUndefinedOr(onEmpty);
@@ -1802,7 +1253,8 @@ const makeFlatMap = <
                       onSome: () => Stream.runHead(inner.annotated),
                     },
                   );
-                  const isStopped = yield* isBudgetStopped(budgetStatus);
+                  const isStopped =
+                    yield* QueryStreamReadBudget.isStopped(budgetStatus);
                   return Option.match(original, {
                     onSome: () => Stream.empty,
                     onNone: () =>
@@ -2068,9 +1520,10 @@ const makeDistinct = <
       inclusive: key.length > distinctLength || inclusive,
     }));
   const isAdmitted = (key: OrderKey) =>
-    admittedByLower(bounds.lower)(key) && admittedByUpper(bounds.upper)(key);
+    QueryStreamKeyBounds.admittedByLower(bounds.lower)(key) &&
+    QueryStreamKeyBounds.admittedByUpper(bounds.upper)(key);
   const annotated = Stream.unwrap(
-    Effect.map(ReadBudgetStatus, (budgetStatus) =>
+    Effect.map(QueryStreamReadBudget.Status, (budgetStatus) =>
       Stream.paginate(
         narrowByKeyBounds(order === self.order ? self : reverse(self), {
           lower: groupBound(bounds.lower),
@@ -2084,7 +1537,7 @@ const makeDistinct = <
           R
         > =>
           Effect.gen(function* () {
-            if (yield* isBudgetStopped(budgetStatus))
+            if (yield* QueryStreamReadBudget.isStopped(budgetStatus))
               return Tuple.make([], Option.none());
             const discovered = yield* Stream.runHead(current.annotated);
             if (Option.isNone(discovered)) return Tuple.make([], Option.none());
@@ -2132,7 +1585,7 @@ const makeDistinct = <
                 next,
               );
             }
-            if (yield* isBudgetStopped(budgetStatus))
+            if (yield* QueryStreamReadBudget.isStopped(budgetStatus))
               return Tuple.make([], Option.none());
             const checkpoint = Option.getOrElse(firstKey, () => key);
             return Tuple.make(
@@ -2153,11 +1606,25 @@ const makeDistinct = <
     undefined,
     (keyBounds) =>
       makeDistinct(self, distinctLength, order, {
-        lower: combineKeyBound(bounds.lower, keyBounds.lower, tightestLower),
-        upper: combineKeyBound(bounds.upper, keyBounds.upper, tightestUpper),
+        lower: QueryStreamKeyBounds.combineKeyBound(
+          bounds.lower,
+          keyBounds.lower,
+          QueryStreamKeyBounds.tightestLower,
+        ),
+        upper: QueryStreamKeyBounds.combineKeyBound(
+          bounds.upper,
+          keyBounds.upper,
+          QueryStreamKeyBounds.tightestUpper,
+        ),
       }),
     self.tiebreakers,
-    () => makeDistinct(self, distinctLength, flipDirection(order), bounds),
+    () =>
+      makeDistinct(
+        self,
+        distinctLength,
+        QueryStreamOrderDirection.flip(order),
+        bounds,
+      ),
   );
 };
 
@@ -2194,22 +1661,6 @@ export const reverse = <
   }
   return self.reverseWith();
 };
-
-/**
- * At least one endpoint in stream order. Omit the other to leave that side
- * unbounded.
- *
- * @experimental
- */
-export type NarrowBounds =
-  | {
-      readonly start: KeyBound;
-      readonly end?: KeyBound | undefined;
-    }
-  | {
-      readonly start?: KeyBound | undefined;
-      readonly end: KeyBound;
-    };
 
 /**
  * Restrict a stream to the order keys between `start` and `end` (in stream
@@ -2275,24 +1726,6 @@ const narrowByKeyBounds = <
       ? self.narrowWith(bounds)
       : narrowInMemory(self, bounds);
 
-/** Whether a key sits after the lower bound (always, when unbounded). */
-const admittedByLower =
-  (lower: Option.Option<KeyBound>) =>
-  (key: OrderKey): boolean =>
-    Option.match(lower, {
-      onNone: () => true,
-      onSome: (bound) => KeyCutOrder(exactCut(key), lowerCut(bound)) > 0,
-    });
-
-/** Whether a key sits before the upper bound (always, when unbounded). */
-const admittedByUpper =
-  (upper: Option.Option<KeyBound>) =>
-  (key: OrderKey): boolean =>
-    Option.match(upper, {
-      onNone: () => true,
-      onSome: (bound) => KeyCutOrder(exactCut(key), upperCut(bound)) < 0,
-    });
-
 /** The fallback for streams that don't know how to rebuild themselves. */
 const narrowInMemory = <
   Doc,
@@ -2308,8 +1741,8 @@ const narrowInMemory = <
     annotated: Stream.Stream<Element<Doc>, E, R>,
   ) => Stream.Stream<Element<Doc>, E, R>;
 
-  const aboveLower = admittedByLower(bounds.lower);
-  const belowUpper = admittedByUpper(bounds.upper);
+  const aboveLower = QueryStreamKeyBounds.admittedByLower(bounds.lower);
+  const belowUpper = QueryStreamKeyBounds.admittedByUpper(bounds.upper);
 
   const dropOutOfRange: Narrower =
     self.order === "asc"
@@ -2401,73 +1834,6 @@ export type PaginateOptions = ConvexPaginationOptions;
  */
 export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
 
-/**
- * A page exhausted its read budget without a safe logical continuation.
- *
- * @experimental
- */
-export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceededError>()(
-  "ReadBudgetExceededError",
-  { rowsRead: Schema.Finite, bytesRead: Schema.optionalKey(Schema.Finite) },
-) {
-  override get message() {
-    return "QueryStream.paginate: the read budget was exhausted before a safe page boundary; increase the budget or simplify the query";
-  }
-}
-
-type BudgetStatus = Data.TaggedEnum<{
-  Active: {};
-  Stopped: {};
-}>;
-
-const BudgetStatus = Data.taggedEnum<BudgetStatus>();
-
-class ReadBudgetState extends Data.Class<{
-  readonly rows: number;
-  readonly bytes: number;
-  readonly status: BudgetStatus;
-}> {}
-
-interface ReadBudgetLimits {
-  readonly maximumRowsRead: Option.Option<number>;
-  readonly maximumBytesRead: Option.Option<number>;
-}
-
-const ReadBudgetLimits = Context.Reference<ReadBudgetLimits>(
-  "@confect/server/QueryStream/ReadBudgetLimits",
-  {
-    defaultValue: () => ({
-      maximumRowsRead: Option.none(),
-      maximumBytesRead: Option.none(),
-    }),
-  },
-);
-
-type ReadBudgetStatus = Option.Option<
-  SynchronizedRef.SynchronizedRef<ReadBudgetState>
->;
-
-const ReadBudgetStatus = Context.Reference<ReadBudgetStatus>(
-  "@confect/server/QueryStream/ReadBudgetStatus",
-  { defaultValue: Option.none },
-);
-
-const isBudgetExhausted = (
-  limits: ReadBudgetLimits,
-  state: ReadBudgetState,
-): boolean =>
-  Option.exists(limits.maximumRowsRead, (limit) => state.rows >= limit) ||
-  Option.exists(limits.maximumBytesRead, (limit) => state.bytes >= limit);
-
-const isBudgetStopped = (status: ReadBudgetStatus): Effect.Effect<boolean> =>
-  Option.match(status, {
-    onNone: () => Effect.succeed(false),
-    onSome: (stateRef) =>
-      Effect.map(SynchronizedRef.get(stateRef), (state) =>
-        BudgetStatus.$is("Stopped")(state.status),
-      ),
-  });
-
 class PaginateState<Doc> extends Data.Class<{
   readonly page: Chunk.Chunk<Doc>;
   readonly readKeys: Chunk.Chunk<OrderKey>;
@@ -2499,7 +1865,7 @@ const midpointKey = (readKeys: Chunk.Chunk<OrderKey>): OrderKey =>
  *   Bytes use estimated document sizes, not backend-billed bytes; a
  *   document's size is known only after it is read.
  * - Budget stops return `SplitRequired` at a safe output boundary. If no
- *   safe progress is possible, the effect fails with `ReadBudgetExceededError`.
+ *   safe progress is possible, the effect fails with `QueryStreamReadBudget.ExceededError`.
  *   A resource stop never proves an input or a distinct group empty.
  *
  * @experimental
@@ -2509,11 +1875,19 @@ export const paginate: {
     options: PaginateOptions,
   ): <Doc, Key extends KeyFields, E, R>(
     self: QueryStream<Doc, Key, OrderDirection, E, R>,
-  ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
+  ) => Effect.Effect<
+    PaginationResult<Doc>,
+    E | QueryStreamReadBudget.ExceededError,
+    R
+  >;
   <Doc, Key extends KeyFields, E, R>(
     self: QueryStream<Doc, Key, OrderDirection, E, R>,
     options: PaginateOptions,
-  ): Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
+  ): Effect.Effect<
+    PaginationResult<Doc>,
+    E | QueryStreamReadBudget.ExceededError,
+    R
+  >;
 } = dual(
   2,
   Effect.fn("QueryStream.paginate")(function* <
@@ -2572,12 +1946,15 @@ export const paginate: {
     });
     const maximumRowsRead = Option.fromUndefinedOr(options.maximumRowsRead);
     const maximumBytesRead = Option.fromUndefinedOr(options.maximumBytesRead);
-    const limits: ReadBudgetLimits = { maximumRowsRead, maximumBytesRead };
+    const limits: QueryStreamReadBudget.Limits = {
+      maximumRowsRead,
+      maximumBytesRead,
+    };
     const stateRef = yield* SynchronizedRef.make(
-      new ReadBudgetState({
+      new QueryStreamReadBudget.State({
         rows: 0,
         bytes: 0,
-        status: BudgetStatus.Active(),
+        status: QueryStreamReadBudget.Phase.Active(),
       }),
     );
     const budgetStatus = Option.as(
@@ -2603,7 +1980,7 @@ export const paginate: {
               onSome: (value) => Chunk.append(state.page, value),
             });
             return Effect.map(SynchronizedRef.get(stateRef), (usage) => {
-              const hitLimit = isBudgetExhausted(limits, usage);
+              const hitLimit = QueryStreamReadBudget.isExhausted(limits, usage);
               return new PaginateState({
                 page,
                 readKeys,
@@ -2616,11 +1993,11 @@ export const paginate: {
           },
         ),
       ),
-      Effect.provideService(ReadBudgetLimits, limits),
-      Effect.provideService(ReadBudgetStatus, budgetStatus),
+      Effect.provideService(QueryStreamReadBudget.Limits, limits),
+      Effect.provideService(QueryStreamReadBudget.Status, budgetStatus),
     );
     const usage = yield* SynchronizedRef.get(stateRef);
-    const stopped = BudgetStatus.$is("Stopped")(usage.status);
+    const stopped = QueryStreamReadBudget.Phase.$is("Stopped")(usage.status);
     const limited = stopped || collected.hitLimit;
     if (
       limited &&
@@ -2628,10 +2005,13 @@ export const paginate: {
         Option.exists(
           until,
           (endpoint) =>
-            OrderKeyOrder(midpointKey(collected.readKeys), endpoint) === 0,
+            QueryStreamOrderKey.Order(
+              midpointKey(collected.readKeys),
+              endpoint,
+            ) === 0,
         ))
     ) {
-      return yield* new ReadBudgetExceededError({
+      return yield* new QueryStreamReadBudget.ExceededError({
         rowsRead: usage.rows,
         ...Option.match(maximumBytesRead, {
           onNone: () => ({}),

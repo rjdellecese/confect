@@ -1,3 +1,5 @@
+import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
+import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import * as QueryStream from "@confect/server/QueryStream";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -18,7 +20,11 @@ describe("QueryStream type parameters", () => {
     expect(source.order).toBe("desc");
     expectTypeOf(source.toStream()).toEqualTypeOf<Stream.Stream<number>>();
     expectTypeOf<QueryStream.QueryStream<number, ["_id"]>>().toEqualTypeOf<
-      QueryStream.QueryStream<number, ["_id"], QueryStream.OrderDirection>
+      QueryStream.QueryStream<
+        number,
+        ["_id"],
+        QueryStreamOrderDirection.QueryStreamOrderDirection
+      >
     >();
     expectTypeOf<
       QueryStream.QueryStream<number, ["_id"], "desc", Error>
@@ -43,34 +49,10 @@ describe("QueryStream type parameters", () => {
   });
 });
 
-describe("QueryStream.RangeOp", () => {
-  it.each(["eq", "gt", "gte", "lt", "lte"] as const)(
-    "constructs %s operations with the existing record shape",
-    (tag) => {
-      expect(
-        QueryStream.RangeOp[tag]({ field: "text", value: "hello" }),
-      ).toEqual({
-        _tag: tag,
-        field: "text",
-        value: "hello",
-      });
-      expect(
-        QueryStream.RangeOp[tag]({ field: "text", value: undefined }).value,
-      ).toBeUndefined();
-    },
-  );
-
-  it("constructs precisely tagged operations", () => {
-    const op = QueryStream.RangeOp.eq({ field: "text", value: "hello" });
-    expectTypeOf(op._tag).toEqualTypeOf<"eq">();
-    expect(QueryStream.RangeOp.$is("eq")(op)).toBe(true);
-  });
-});
-
 describe("QueryStream.Element", () => {
   it("constructs an element with an inferred document type and readonly fields", () => {
     const doc = Option.some({ text: "hello" });
-    const key: QueryStreamCursor.OrderKey = ["hello", 1, "id"];
+    const key: QueryStreamOrderKey.QueryStreamOrderKey = ["hello", 1, "id"];
     const element = new QueryStream.Element({ doc, key });
 
     expectTypeOf(element).toEqualTypeOf<
@@ -78,7 +60,7 @@ describe("QueryStream.Element", () => {
     >();
     expectTypeOf(element).toExtend<{
       readonly doc: Option.Option<{ text: string }>;
-      readonly key: QueryStreamCursor.OrderKey;
+      readonly key: QueryStreamOrderKey.QueryStreamOrderKey;
     }>();
     expect(element.doc).toBe(doc);
     expect(element.key).toBe(key);
@@ -86,7 +68,7 @@ describe("QueryStream.Element", () => {
   });
 
   it("constructs a filtered-out element without losing its order key", () => {
-    const key: QueryStreamCursor.OrderKey = [undefined, "id"];
+    const key: QueryStreamOrderKey.QueryStreamOrderKey = [undefined, "id"];
     const element = new QueryStream.Element({ doc: Option.none(), key });
 
     expectTypeOf(element).toEqualTypeOf<QueryStream.Element<never>>();

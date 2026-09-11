@@ -1,3 +1,4 @@
+import type * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { FunctionSpec, Ref, Table } from "@confect/core";
 import * as ActionRunner from "@confect/server/ActionRunner";
@@ -114,7 +115,7 @@ describe("server operation tracing", () => {
         expectTypeOf(paginate).toEqualTypeOf<
           Effect.Effect<
             QueryStream.PaginationResult<number>,
-            QueryStream.ReadBudgetExceededError
+            QueryStreamReadBudget.ExceededError
           >
         >();
         expectTypeOf(curried).toEqualTypeOf<typeof paginate>();

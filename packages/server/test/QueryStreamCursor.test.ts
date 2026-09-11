@@ -1,3 +1,4 @@
+import * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -18,7 +19,7 @@ describe("QueryStreamCursor schema", () => {
     expectTypeOf<QueryStreamCursor.QueryStreamCursor>().toEqualTypeOf<{
       readonly version: 1;
       readonly keyFields: ReadonlyArray<string>;
-      readonly orderKey: QueryStreamCursor.OrderKey;
+      readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey;
     }>();
     expect(Schema.decodeSync(QueryStreamCursor.Json)(serialized)).toEqual(
       cursor,
@@ -73,7 +74,7 @@ describe("QueryStreamCursor schema", () => {
 
 describe("QueryStreamCursor serialization", () => {
   it("round-trips Convex values and missing fields with their layout", () => {
-    const key: QueryStreamCursor.OrderKey = [
+    const key: QueryStreamOrderKey.QueryStreamOrderKey = [
       undefined,
       null,
       true,
@@ -92,7 +93,7 @@ describe("QueryStreamCursor serialization", () => {
       QueryStreamCursor.codecForKeyFields(fields),
     )(key);
 
-    expect(Schema.is(QueryStreamCursor.OrderKey)(key)).toBe(true);
+    expect(Schema.is(QueryStreamOrderKey.QueryStreamOrderKey)(key)).toBe(true);
     expect(JSON.parse(cursor)).toMatchObject({ version: 1, keyFields: fields });
     expect(Schema.decodeSync(QueryStreamCursor.Json)(cursor).orderKey).toEqual(
       key,
@@ -185,7 +186,7 @@ describe("QueryStreamCursor serialization", () => {
         const bound = QueryStreamCursor.codecForKeyFields(value.keyFields);
         expectTypeOf<
           typeof bound.Type
-        >().toEqualTypeOf<QueryStreamCursor.OrderKey>();
+        >().toEqualTypeOf<QueryStreamOrderKey.QueryStreamOrderKey>();
         expectTypeOf<typeof bound.Encoded>().toEqualTypeOf<string>();
         expect(yield* Schema.decodeEffect(bound)(encoded)).toEqual(
           value.orderKey,

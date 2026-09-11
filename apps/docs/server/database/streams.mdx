@@ -758,7 +758,7 @@ filtered
 
 Cursor bounds are pushed into underlying index queries where possible, but compositions may read more documents than they return, including documents read by an earlier page. Both budgets count filtered documents, distinct-group discovery, repeated seeks, merge prefetch, and outer and inner `QueryStream` reads in joins. They do not track arbitrary I/O inside callbacks, such as a separate database lookup in `mapEffect`.
 
-A budget-limited page stops at a safe logical key so resuming cannot skip an unfinished group or join. If the budget prevents safe progress or a strictly interior split of a pinned page, `paginate` fails with the typed `ReadBudgetExceededError` instead of returning a non-advancing cursor or repeating the same split. Increase the budget or change the query to reduce the reads needed for progress. Byte accounting happens after each document is read, so the last document can take the total over `maximumBytesRead`.
+A budget-limited page stops at a safe logical key so resuming cannot skip an unfinished group or join. If the budget prevents safe progress or a strictly interior split of a pinned page, `paginate` fails with the typed `QueryStreamReadBudget.ExceededError` instead of returning a non-advancing cursor or repeating the same split. Increase the budget or change the query to reduce the reads needed for progress. Byte accounting happens after each document is read, so the last document can take the total over `maximumBytesRead`.
 
 ### Cursor format and validation
 
@@ -774,13 +774,12 @@ Boundary cursors are JSON strings containing a versioned envelope: `{ version: 1
 
 The `QueryStreamCursor` module, exported from `@confect/server`, models cursors with native Convex values: decoded keys can contain `bigint`, `ArrayBuffer`, or `undefined`. Its schemas handle the full JSON round trip through Effect's standard encoding and decoding APIs.
 
-| `QueryStreamCursor` export     | Contract                                                                                                                                                                                                 |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `QueryStreamCursor`            | Schema and inferred type for the full native cursor: version, runtime field names, and key values.                                                                                                       |
-| `Json`                         | String codec for the full native cursor, including Convex's special-value encodings.                                                                                                                     |
-| `OrderKey`                     | Schema and inferred type for decoded key values, including IDs and missing fields as `undefined`.                                                                                                        |
-| `codecForKeyFields(keyFields)` | Returns a string codec for an `OrderKey`. Decoding checks the exact ordered field names; encoding supplies the version and field names automatically. Use runtime `keyFields`, not the type-level `Key`. |
-| `END_CURSOR`                   | The string `"[]"`, returned when pagination reaches the end. Accepted as an `endCursor` sentinel only, not as a normal start or decoded key boundary.                                                    |
+| `QueryStreamCursor` export     | Contract                                                                                                                                                                                                           |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `QueryStreamCursor`            | Schema and inferred type for the full native cursor: version, runtime field names, and key values.                                                                                                                 |
+| `Json`                         | String codec for the full native cursor, including Convex's special-value encodings.                                                                                                                               |
+| `codecForKeyFields(keyFields)` | Returns a string codec for a `QueryStreamOrderKey`. Decoding checks the exact ordered field names; encoding supplies the version and field names automatically. Use runtime `keyFields`, not the type-level `Key`. |
+| `END_CURSOR`                   | The string `"[]"`, returned when pagination reaches the end. Accepted as an `endCursor` sentinel only, not as a normal start or decoded key boundary.                                                              |
 
 For example, resume manually from a nonterminal page inside an effect:
 
@@ -834,3 +833,16 @@ QueryStream<Doc, Key, Direction, Error, Requirements>
 For example, the notes `by_text` query has type `QueryStream<Note, ["text", "_creationTime"], "asc", DocumentDecodeError, never>`. It retains the database access supplied when it was created, so consuming it doesn't require providing `DatabaseReader` again. `mapEffect` and other effectful operations can add errors and service requirements.
 
 A `QueryStream<Doc, Key, Direction, E, R>` is also a `Stream<Doc, E, R>`; only `QueryStream` carries the key and direction types.
+
+## Supporting modules
+
+Most queries need only `QueryStream`. For code that works directly with ordering, ranges, or budgets, the following modules are also exported from `@confect/server`:
+
+| Module                      | Owns                                                                                                                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `QueryStreamKeyFields`      | Field-name schema and type, field equivalence, tuple types, and tiebreaker-aware field operations.                                 |
+| `QueryStreamOrderDirection` | The direction type, its `Flip` type, and `flip` operation.                                                                         |
+| `QueryStreamOrderKey`       | The native order-key and `KeyValue` schemas and types, Convex value ordering, and extraction of key values from encoded documents. |
+| `QueryStreamKeyBounds`      | Bound and cut types, prefix-aware comparison, bound intersection, and key admission checks.                                        |
+| `QueryStreamIndexRange`     | Typed range builders, recorded operations, replay, and splitting key bounds into Convex index ranges.                              |
+| `QueryStreamReadBudget`     | Shared read counters and limits, leaf-read accounting, and `ExceededError`.                                                        |
