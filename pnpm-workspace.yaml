@@ -34,8 +34,8 @@ minimumReleaseAgeExclude:
 overrides:
   convex: 1.45.0
   effect: 4.0.0-rc.113
-  react: 19.2.8
-  react-dom: 19.2.8
+  react: 19.3.0
+  react-dom: 19.3.0
 
 packageExtensions:
   "@mintlify/mdx":

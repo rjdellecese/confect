@@ -534,9 +534,8 @@ export const decodeError = <Ref_ extends Any>(
   Option.match(errorSchemaOf(ref), {
     onNone: () => Effect.succeed(Option.none<Error<Ref_>>()),
     onSome: (schema) =>
-      Effect.map(
+      Effect.asSome(
         Schema.decodeUnknownEffect(schema)(encodedError),
-        Option.some,
       ) as Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError>,
   });
 

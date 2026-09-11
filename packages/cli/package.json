@@ -17,14 +17,14 @@
     "exsolve": "^1.1.1"
   },
   "devDependencies": {
-    "@convex-dev/workpool": "0.4.10",
-    "@effect/tsgo": "0.38.0",
+    "@convex-dev/workpool": "0.4.11",
+    "@effect/tsgo": "0.44.0",
     "@effect/vitest": "4.0.0-rc.113",
     "@types/node": "24.13.3",
     "@vitest/coverage-v8": "5.0.0",
     "convex": "1.45.0",
     "effect": "4.0.0-rc.113",
-    "tsdown": "0.22.14",
+    "tsdown": "0.23.0",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
     "vite": "8.2.2",
