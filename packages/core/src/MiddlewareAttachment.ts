@@ -102,5 +102,5 @@ export const validateAll = (
       }
     }
   }
-  return Result.succeed(undefined);
+  return Result.void;
 };
