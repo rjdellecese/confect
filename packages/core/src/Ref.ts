@@ -1,3 +1,4 @@
+import type * as MiddlewareAttachment from "./MiddlewareAttachment";
 import type {
   DefaultFunctionArgs,
   FunctionReference as ConvexFunctionReference,
@@ -102,6 +103,7 @@ interface ConfectRefWithTypes<
   readonly returns: Schema.Codec<any, any>;
   readonly kind: FunctionProvenance.ConfectKind;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
+  readonly middlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
   readonly error?: Schema.Codec<any, any>;
 }
 
@@ -322,7 +324,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
    */
   convexFunctionNamespace: string,
   functionSpec: FunctionSpec_,
-  groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec> = [],
+  groupMiddlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment> = [],
 ): FromFunctionSpec<FunctionSpec_> => {
   const convexFunctionName = `${convexFunctionNamespace}:${functionSpec.name}`;
 
@@ -340,10 +342,13 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
         _tag: "Confect" as const,
         convexFunctionName,
         kind: provenance.kind,
-        middlewareSpecs: [
-          ...groupMiddlewareSpecs,
-          ...functionSpec.middlewareSpecs,
+        middlewareAttachments: [
+          ...groupMiddlewareAttachments,
+          ...functionSpec.middlewareAttachments,
         ],
+        get middlewareSpecs() {
+          return this.middlewareAttachments.map(({ spec }) => spec);
+        },
       };
 
       Lazy.defineProperty(ref, "args", () => provenance.args);

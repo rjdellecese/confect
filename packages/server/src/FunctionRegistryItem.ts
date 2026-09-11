@@ -1,6 +1,6 @@
+import type * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as Lazy from "@confect/core/Lazy";
-import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import type { FunctionType, FunctionVisibility } from "convex/server";
 import * as Match from "effect/Match";
 import * as Predicate from "effect/Predicate";
@@ -34,7 +34,7 @@ export interface ConfectFunctionRegistryItem {
   readonly args: Schema.Codec<any, any>;
   readonly returns: Schema.Codec<any, any>;
   readonly error?: Schema.Codec<any, any>;
-  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
+  readonly middlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
   readonly handler: Handler.AnyConfectProvenance;
 }
 
@@ -46,11 +46,11 @@ export interface ConvexFunctionRegistryItem {
 
 export const make = ({
   functionSpec,
-  groupMiddlewareSpecs,
+  groupMiddlewareAttachments,
   handler,
 }: {
   functionSpec: FunctionSpec.AnyWithProps;
-  groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
+  groupMiddlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
   handler: Handler.Any;
 }): AnyWithProps =>
   Match.value(functionSpec.functionProvenance).pipe(
@@ -66,9 +66,9 @@ export const make = ({
         name: functionSpec.name,
         functionVisibility: functionSpec.functionVisibility,
         functionType: functionSpec.runtimeAndFunctionType.functionType,
-        middlewareSpecs: [
-          ...groupMiddlewareSpecs,
-          ...functionSpec.middlewareSpecs,
+        middlewareAttachments: [
+          ...groupMiddlewareAttachments,
+          ...functionSpec.middlewareAttachments,
         ],
         handler: handler as Handler.AnyConfectProvenance,
       });

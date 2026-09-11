@@ -153,6 +153,12 @@ export declare const api: {
       viewerNameAction: FunctionReference<"action", "public", {}, string>;
       viewerNameMutation: FunctionReference<"mutation", "public", {}, string>;
     };
+    middlewareOptions: {
+      action: FunctionReference<"action", "public", {}, string>;
+      longName: FunctionReference<"query", "public", {}, string>;
+      mutation: FunctionReference<"mutation", "public", {}, string>;
+      shortName: FunctionReference<"query", "public", {}, string>;
+    };
     middlewareOrder: {
       record: FunctionReference<
         "mutation",

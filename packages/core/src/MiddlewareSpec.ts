@@ -44,21 +44,28 @@ export interface SuccessValue {
  *
  * Mirrors `RpcMiddleware.RpcMiddleware` in Effect.
  */
-export interface MiddlewareImpl<Provides_, E, R> {
+export interface MiddlewareImpl<Provides_, E, R, Options_ = never> {
   (
     effect: Effect.Effect<SuccessValue, E | unhandled, Provides_>,
-    options: MiddlewareOptions,
+    context: MiddlewareOptions<Options_>,
   ): Effect.Effect<SuccessValue, E | unhandled, R>;
 }
 
-export interface MiddlewareOptions {
-  readonly name: string;
-  readonly functionType: FunctionType;
-  readonly functionVisibility: FunctionVisibility;
-  readonly args: unknown;
-}
+export type MiddlewareOptions<Options_ = never> = {
+  readonly invocation: {
+    readonly name: string;
+    readonly functionType: FunctionType;
+    readonly functionVisibility: FunctionVisibility;
+    readonly args: unknown;
+  };
+} & ([Options_] extends [never] ? unknown : { readonly options: Options_ });
 
-export interface AnyMiddlewareImpl extends MiddlewareImpl<any, any, any> {}
+export interface AnyMiddlewareImpl {
+  (
+    effect: Effect.Effect<SuccessValue, any, any>,
+    context: MiddlewareOptions | MiddlewareOptions<unknown>,
+  ): Effect.Effect<SuccessValue, any, any>;
+}
 
 /**
  * The class shape produced by {@link MiddlewareSpec}. Only the static side is ever
@@ -75,6 +82,7 @@ export interface MiddlewareSpec<
   Requires_,
   ErrorSchema_ extends Schema.Codec<any, any>,
   FunctionTypes_ extends FunctionType,
+  OptionsSchema_ extends Schema.Schema<any> = never,
 > {
   new (_: never): {
     readonly [TypeId]: TypeId;
@@ -84,11 +92,13 @@ export interface MiddlewareSpec<
   readonly key: Key_;
   readonly functionTypes: SupportedFunctionTypes;
   readonly error?: ErrorSchema_;
+  readonly options?: OptionsSchema_;
   readonly "~Provides": Provides_;
   readonly "~Requires": Requires_;
   readonly "~Error": ErrorSchema_;
   readonly "~FunctionTypes": FunctionTypes_;
   readonly "~Self": Self;
+  readonly "~Options": OptionsSchema_;
 }
 
 export interface AnyMiddlewareSpec {
@@ -96,11 +106,23 @@ export interface AnyMiddlewareSpec {
   readonly key: string;
   readonly functionTypes: SupportedFunctionTypes;
   readonly error?: Schema.Codec<any, any>;
+  readonly options?: Schema.Schema<any>;
   readonly "~Provides": any;
   readonly "~Requires": any;
   readonly "~Error": any;
   readonly "~FunctionTypes": FunctionType;
+  readonly "~Options": any;
 }
+
+export type Options<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_["~Options"]["Type"];
+
+export type WithoutOptions<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_ extends AnyMiddlewareSpec
+    ? [MiddlewareSpec_["~Options"]] extends [never]
+      ? MiddlewareSpec_
+      : never
+    : never;
 
 export type Key<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_["key"];
@@ -160,10 +182,12 @@ export const MiddlewareSpec =
     const Key_ extends string,
     const FunctionTypesConfig_ extends SupportedFunctionTypes,
     ErrorSchema_ extends Schema.Codec<any, any> = never,
+    OptionsSchema_ extends Schema.Schema<any> = never,
   >(
     key: Key_,
     options: {
       readonly error?: () => ErrorSchema_;
+      readonly options?: () => OptionsSchema_;
       readonly functionTypes: FunctionTypesConfig_ &
         ValidateFunctionTypesConfig<FunctionTypesConfig_>;
     },
@@ -173,7 +197,8 @@ export const MiddlewareSpec =
     "provides" extends keyof Config ? Config["provides"] : never,
     "requires" extends keyof Config ? Config["requires"] : never,
     ErrorSchema_,
-    FunctionTypesFromConfig<FunctionTypesConfig_>
+    FunctionTypesFromConfig<FunctionTypesConfig_>,
+    OptionsSchema_
   > => {
     const { query, mutation, action } = options.functionTypes;
     if (!query && !mutation && !action) {
@@ -193,6 +218,9 @@ export const MiddlewareSpec =
     } satisfies SupportedFunctionTypes;
     if (options.error !== undefined) {
       Lazy.defineProperty(class_, "error", options.error);
+    }
+    if (options.options !== undefined) {
+      Lazy.defineProperty(class_, "options", options.options);
     }
     return class_;
   };
@@ -256,7 +284,7 @@ export type ValidateFunction<
       : [
             Extract<
               FunctionSpec.MiddlewareSpecs<FunctionSpec_>,
-              { readonly key: Key<MiddlewareSpec_> }
+              { readonly key: Key<WithoutOptions<MiddlewareSpec_>> }
             >,
           ] extends [never]
         ? FunctionTypeOf<FunctionSpec_> extends FunctionTypes<MiddlewareSpec_>
@@ -276,7 +304,10 @@ export type ValidateAttach<
   Functions_ extends FunctionSpec.AnyWithProps,
   MiddlewareSpecs_ extends AnyMiddlewareSpec,
 > = [
-  Extract<MiddlewareSpecs_, { readonly key: Key<MiddlewareSpec_> }>,
+  Extract<
+    MiddlewareSpecs_,
+    { readonly key: Key<WithoutOptions<MiddlewareSpec_>> }
+  >,
 ] extends [never]
   ? [Exclude<Requires<MiddlewareSpec_>, Provides<MiddlewareSpecs_>>] extends [
       never,
@@ -304,7 +335,7 @@ type GroupOverlap<
       ? [
           Extract<
             MiddlewareSpecs_,
-            { readonly key: Key<FunctionMiddlewareSpec> }
+            { readonly key: Key<WithoutOptions<FunctionMiddlewareSpec>> }
           >,
         ] extends [never]
         ? never
@@ -348,7 +379,10 @@ export type ValidateFunctionAttach<
 > = FunctionProvenance_ extends { readonly _tag: "Convex" }
   ? AttachmentError<`Plain Convex functions cannot have middleware — their raw handlers are passed through untouched`>
   : [
-        Extract<MiddlewareSpecs_, { readonly key: Key<MiddlewareSpec_> }>,
+        Extract<
+          MiddlewareSpecs_,
+          { readonly key: Key<WithoutOptions<MiddlewareSpec_>> }
+        >,
       ] extends [never]
     ? RuntimeAndFunctionType_["functionType"] extends FunctionTypes<MiddlewareSpec_>
       ? unknown

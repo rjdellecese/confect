@@ -1,4 +1,4 @@
-import { GroupSpec } from "@confect/core";
+import { GroupSpec, MiddlewareAttachment } from "@confect/core";
 import { Registry, type RegistryItems } from "@confect/server";
 import * as GroupImpl from "@confect/server/GroupImpl";
 import * as FileSystem from "effect/FileSystem";
@@ -18,6 +18,7 @@ import {
   ImplMissingMiddlewareError,
   ImplMissingSpecImportError,
   ImplNotFinalizedError,
+  InvalidMiddlewareAttachmentError,
   SpecImportsServerError,
   SpecMissingDefaultGroupSpecError,
 } from "./CodegenError";
@@ -265,6 +266,16 @@ export const validateSpec = Effect.fn("LeafModule.validateSpec")(function* (
   }
 
   yield* validateClientSafety(leaf, bundled);
+
+  yield* Effect.fromResult(GroupSpec.validateMiddleware(groupSpec)).pipe(
+    Effect.mapError(
+      (error) =>
+        new InvalidMiddlewareAttachmentError({
+          specPath: leaf.relativePath,
+          message: MiddlewareAttachment.formatValidationError(error),
+        }),
+    ),
+  );
 
   return groupSpec;
 });
