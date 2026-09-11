@@ -287,6 +287,10 @@ export type WithoutName<
 const Proto = {
   [TypeId]: TypeId,
 
+  get middlewareSpecs() {
+    return this.middlewareAttachments.map(({ spec }) => spec);
+  },
+
   middleware(
     this: AnyWithProps,
     middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec,
@@ -305,8 +309,8 @@ const Proto = {
     }
     if (
       !("options" in middlewareSpec) &&
-      this.middlewareSpecs.some(
-        (existing) => existing.key === middlewareSpec.key,
+      this.middlewareAttachments.some(
+        ({ spec }) => spec.key === middlewareSpec.key,
       )
     ) {
       throw new Error(
@@ -319,14 +323,13 @@ const Proto = {
       functionVisibility: this.functionVisibility,
       name: this.name,
       functionProvenance: this.functionProvenance,
-      middlewareSpecs: [...this.middlewareSpecs, middlewareSpec],
       middlewareAttachments: [
         ...this.middlewareAttachments,
         { spec: middlewareSpec, options: options[0] },
       ],
     });
   },
-};
+} satisfies ThisType<AnyWithProps>;
 
 interface Options {
   readonly name: string;
@@ -384,7 +387,6 @@ const make = <
         args === undefined
           ? FunctionProvenance.Confect(() => ({}), returns, error)
           : FunctionProvenance.Confect(args, returns, error),
-      middlewareSpecs: [],
       middlewareAttachments: [],
     });
   }
@@ -460,7 +462,6 @@ const makePaginated = <
         args === undefined
           ? FunctionProvenance.ConfectPaginated(() => ({}), item, error)
           : FunctionProvenance.ConfectPaginated(args, item, error),
-      middlewareSpecs: [],
       middlewareAttachments: [],
     });
   }
@@ -575,7 +576,6 @@ const makeConvex =
         ExtractArgs<F>,
         ExtractReturns<F>
       >(),
-      middlewareSpecs: [],
       middlewareAttachments: [],
     }) as any;
   };

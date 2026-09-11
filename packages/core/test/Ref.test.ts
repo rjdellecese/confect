@@ -754,7 +754,7 @@ describe("error schema laziness at decode time", () => {
           return NotFound;
         },
       }),
-      [Gate],
+      [{ spec: Gate, options: undefined }],
     );
 
     Ref.encodeArgsSync(ref, {});
@@ -795,7 +795,6 @@ describe("make with middleware options", () => {
     const ref = Ref.make(
       "policies",
       query.middleware(Policy, { enabled: false }),
-      [],
       [{ spec: Policy, options: { enabled: true } }],
     );
 

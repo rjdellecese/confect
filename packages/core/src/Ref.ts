@@ -324,10 +324,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
    */
   convexFunctionNamespace: string,
   functionSpec: FunctionSpec_,
-  groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec> = [],
-  groupMiddlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment> = groupMiddlewareSpecs.map(
-    (spec) => ({ spec, options: undefined }),
-  ),
+  groupMiddlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment> = [],
 ): FromFunctionSpec<FunctionSpec_> => {
   const convexFunctionName = `${convexFunctionNamespace}:${functionSpec.name}`;
 

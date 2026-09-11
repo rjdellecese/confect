@@ -395,6 +395,8 @@ describe("make with middleware options", () => {
       .middleware(LazyPolicy, { enabled: true })
       .addFunction(query.middleware(LazyPolicy, { enabled: false }));
     const refs = Refs.make(Spec.make().addAt("lazy", group));
+    expect(group.middlewareSpecs).toEqual([LazyPolicy]);
+    expect(group.functions.get.middlewareSpecs).toEqual([LazyPolicy]);
     expect(
       refs.public.lazy.get.middlewareAttachments.map(({ options }) => options),
     ).toEqual([{ enabled: true }, { enabled: false }]);

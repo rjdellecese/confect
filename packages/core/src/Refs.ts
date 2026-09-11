@@ -126,7 +126,6 @@ const makeHelper = (
           Ref.make(
             currentConvexFunctionNamespace,
             function_,
-            group.middlewareSpecs,
             group.middlewareAttachments,
           ),
         ),

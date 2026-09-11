@@ -482,4 +482,19 @@ describe("middleware options", () => {
       { roles: ["Internal"] },
     ]);
   });
+
+  it("derives middleware specs without storing a parallel array", () => {
+    const covered = query
+      .middleware(RequireRole, { roles: ["Internal"] })
+      .middleware(Observe);
+
+    expect(covered.middlewareSpecs).toEqual([RequireRole, Observe]);
+    expect(covered.middlewareSpecs).toEqual(
+      covered.middlewareAttachments.map(({ spec }) => spec),
+    );
+    expect(Object.hasOwn(covered, "middlewareSpecs")).toBe(false);
+    expect(Object.hasOwn(query, "middlewareSpecs")).toBe(false);
+    expect(query.middlewareSpecs).toEqual([]);
+    expect(query.middlewareAttachments).toEqual([]);
+  });
 });

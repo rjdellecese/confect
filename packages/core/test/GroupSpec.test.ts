@@ -135,6 +135,27 @@ describe("middleware options", () => {
     ]);
   });
 
+  it("preserves attachments and derived specs through every group copy", () => {
+    const group = GroupSpec.make()
+      .middleware(RequireRole, { roles: ["Internal"] })
+      .middleware(Observe);
+
+    for (const copy of [
+      group,
+      group.addFunction(query),
+      group.addGroup(GroupSpec.makeAt("child")),
+      group.addGroupAt("alias", GroupSpec.make()),
+      GroupSpec.withName("renamed", group),
+    ]) {
+      expect(copy.middlewareAttachments).toBe(group.middlewareAttachments);
+      expect(copy.middlewareSpecs).toEqual([RequireRole, Observe]);
+      expect(Object.hasOwn(copy, "middlewareSpecs")).toBe(false);
+    }
+    expect(group.functions).toEqual({});
+    expect(group.groups).toEqual({});
+    expect(group.name).toBe("");
+  });
+
   it("allows different options at both attachment levels and across their boundary", () => {
     const internal = query.middleware(RequireRole, { roles: ["Internal"] });
     const group = GroupSpec.make().middleware(RequireRole, {

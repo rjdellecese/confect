@@ -411,7 +411,9 @@ describe("FunctionSpec.middleware", () => {
 
 describe("Ref error union", () => {
   it("decodes both the function's error and its middleware's error", () => {
-    const ref = Ref.make("ns", queryWithError, [RequireUser]);
+    const ref = Ref.make("ns", queryWithError, [
+      { spec: RequireUser, options: undefined },
+    ]);
 
     const notFound = Ref.decodeErrorOption(ref, {
       _tag: "NotFound",
@@ -427,7 +429,9 @@ describe("Ref error union", () => {
   });
 
   it("decodes a middleware error on a function with no error schema of its own", () => {
-    const ref = Ref.make("ns", query, [RequireUser]);
+    const ref = Ref.make("ns", query, [
+      { spec: RequireUser, options: undefined },
+    ]);
 
     expect(Ref.hasErrorSchema(ref)).toBe(true);
     const notSignedIn = Ref.decodeErrorOption(ref, { _tag: "NotSignedIn" });
@@ -435,7 +439,9 @@ describe("Ref error union", () => {
   });
 
   it("reports no error schema when neither function nor middleware declares one", () => {
-    const ref = Ref.make("ns", query, [MutationOnly]);
+    const ref = Ref.make("ns", query, [
+      { spec: MutationOnly, options: undefined },
+    ]);
 
     expect(Ref.hasErrorSchema(ref)).toBe(false);
   });
@@ -451,7 +457,7 @@ describe("Ref error union", () => {
       },
     }) {}
 
-    const ref = Ref.make("ns", query, [Lazy]);
+    const ref = Ref.make("ns", query, [{ spec: Lazy, options: undefined }]);
 
     expect(Ref.hasErrorSchema(ref)).toBe(true);
     expect(MutableRef.get(errorBuilt)).toBe(false);

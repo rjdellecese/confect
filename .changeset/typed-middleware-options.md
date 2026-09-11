@@ -42,6 +42,7 @@ Use `@confect/core/MiddlewareAttachment` for attachment types and `Result`-based
 ### Breaking Changes
 
 - Middleware callbacks receive `name`, `functionType`, `functionVisibility`, and decoded `args` inside `invocation`, rather than directly on their second argument.
+- `Ref.make` accepts group attachments as its third argument, rather than a specs-only list. Pass `[{ spec: MyMiddleware, options: undefined }]` for middleware without options, or provide the declared options value.
 
 To migrate, nest metadata destructuring under `invocation` in callbacks passed to `MiddlewareImpl.make` or `MiddlewareImpl.makeByFunctionType`.
 
