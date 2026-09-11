@@ -1641,7 +1641,7 @@ export const mapEffect = dual<
 >(
   (args) => isQueryStream(args[0]),
   (self, f, options) =>
-    transformEffect(self, (doc) => Effect.map(f(doc), Option.some), options),
+    transformEffect(self, (doc) => Effect.asSome(f(doc)), options),
 );
 
 /**
