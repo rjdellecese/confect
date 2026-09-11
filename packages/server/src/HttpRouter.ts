@@ -40,7 +40,7 @@ export type Services =
   | StorageActionWriter;
 
 /**
- * A layer that registers routes on the HTTP router — the input to
+ * A layer that registers routes on the HTTP router—the input to
  * {@link make}.
  *
  * Compose it from Effect's `effect/unstable/http` and
@@ -53,8 +53,7 @@ export type Services =
  *
  * Route handlers and middleware may require any of the Confect
  * {@link Services}, which surface as request-level `Requires` markers and are
- * supplied per request. Anything else the layer requires is a type error —
- * notably, an `HttpApiBuilder.layer(api)` whose group handler layers are not
+ * supplied per request. Anything else the layer requires is a type error—notably, an `HttpApiBuilder.layer(api)` whose group handler layers are not
  * provided leaves an `HttpApiGroup.ToService` requirement behind, so a missing
  * handler group is caught at compile time.
  *
@@ -85,17 +84,17 @@ export type Routes = Layer.Layer<
  * paths. Requests that match no route receive the Effect router's 404
  * response.
  *
- * Plain Convex routes can still be added to the returned router — Convex
+ * Plain Convex routes can still be added to the returned router—Convex
  * matches exact paths first and longer path prefixes before the catch-all, so
  * they take precedence.
  */
 export const make = (routes: Routes): ConvexHttpRouter => {
   applyMonkeyPatches();
 
-  // Provided (not just merged) so that route layers' own construction — e.g.
-  // a `Layer.unwrap` reading `Config` — resolves configuration through the
-  // Convex-aware provider; merged so that request fibers — endpoint handlers
-  // and middleware — do too.
+  // Provided (not just merged) so that route layers' own construction—e.g.
+  // a `Layer.unwrap` reading `Config`—resolves configuration through the
+  // Convex-aware provider; merged so that request fibers—endpoint handlers
+  // and middleware—do too.
   const AppLayer = routes.pipe(
     Layer.provideMerge(ConvexConfigProvider.layer),
     Layer.provide(HttpServer.layerServices),
@@ -134,8 +133,8 @@ export const make = (routes: Routes): ConvexHttpRouter => {
 // These are necessary until the Convex runtime supports these APIs. See
 // https://discord.com/channels/1019350475847499849/1281364098419785760
 // Each patch is applied only where the API is actually broken, so runtimes
-// with working implementations — Node under convex-test, notably, where
-// `new AbortSignal()` is an illegal constructor — keep their native behavior.
+// with working implementations—Node under convex-test, notably, where
+// `new AbortSignal()` is an illegal constructor—keep their native behavior.
 const applyMonkeyPatches = () => {
   const urlCredentialsBroken = (() => {
     try {
@@ -163,8 +162,8 @@ const applyMonkeyPatches = () => {
     }
   })();
   if (requestSignalBroken) {
-    // `configurable` so repeated definition — e.g. module re-evaluation in a
-    // long-lived environment — does not throw.
+    // `configurable` so repeated definition—e.g. module re-evaluation in a
+    // long-lived environment—does not throw.
     Object.defineProperty(Request.prototype, "signal", {
       get: () => new AbortSignal(),
       configurable: true,

@@ -51,7 +51,7 @@ describe("withName", () => {
 
     expect(renamed).not.toBe(group);
     expect(renamed.name).toBe("renamed");
-    // Input is untouched — no in-place rename, no shared state.
+    // Input is untouched—no in-place rename, no shared state.
     expect(group.name).toBe(originalName);
   });
 

@@ -69,7 +69,7 @@ export interface AnyMiddlewareImpl {
 
 /**
  * The class shape produced by {@link MiddlewareSpec}. Only the static side is ever
- * used — the class is a value-level carrier for the middleware's key, its
+ * used—the class is a value-level carrier for the middleware's key, its
  * declared functionTypes, and its (lazily-evaluated) error schema, plus the
  * type-level `Provides`/`Error` metadata. It is deliberately not a
  * `Context.Tag`: implementations are registered through the group `Registry`
@@ -253,7 +253,7 @@ export const errorSchemas = (
 /**
  * A branded, unconstructible type carrying a spec-authoring error message.
  * Surfaced as (part of) a parameter type so the diagnostic names the exact
- * problem at the `.middleware()` / `.addFunction()` call site.
+ * problem at the `.middleware()`/`.addFunction()` call site.
  */
 export interface AttachmentError<Message extends string> {
   readonly "~@confect/core/MiddlewareSpec/AttachmentError": Message;
@@ -279,7 +279,7 @@ export type ValidateFunction<
         readonly functionProvenance: { readonly _tag: "Convex" };
       }
       ? FunctionTypeOf<FunctionSpec_> extends FunctionTypes<MiddlewareSpec_>
-        ? AttachmentError<`Convex-provenance function "${FunctionSpec_["name"]}" cannot be covered by middleware "${Key<MiddlewareSpec_>}" — attach middleware only to groups whose matching-type functions are all Confect-provenance`>
+        ? AttachmentError<`Convex-provenance function "${FunctionSpec_["name"]}" cannot be covered by middleware "${Key<MiddlewareSpec_>}"—attach middleware only to groups whose matching-type functions are all Confect-provenance`>
         : never
       : [
             Extract<
@@ -313,7 +313,7 @@ export type ValidateAttach<
       never,
     ]
     ? ValidationResult<ValidateFunction<Functions_, MiddlewareSpec_>>
-    : AttachmentError<`Middleware "${Key<MiddlewareSpec_>}" requires services that no middleware attached earlier to this group provides — attach the providing middleware first`>
+    : AttachmentError<`Middleware "${Key<MiddlewareSpec_>}" requires services that no middleware attached earlier to this group provides—attach the providing middleware first`>
   : AttachmentError<`Middleware "${Key<MiddlewareSpec_>}" is already attached to this group`>;
 
 export type ValidateAddedFunction<
@@ -347,8 +347,8 @@ type GroupOverlap<
  * The parameter-type validation applied to the group spec at
  * `GroupImpl.make`: every function's attached middleware must have its
  * `requires` services provided by some middleware covering that function
- * (the group's or the function's own). Checked here — with the group fully
- * assembled — rather than at the spec builders, because a function-level
+ * (the group's or the function's own). Checked here—with the group fully
+ * assembled—rather than at the spec builders, because a function-level
  * middleware's `requires` may legitimately be satisfied by a group
  * middleware the function spec never sees, and group attachment is
  * declaratively order-independent with respect to `addFunction`.
@@ -377,7 +377,7 @@ export type ValidateFunctionAttach<
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
   MiddlewareSpecs_ extends AnyMiddlewareSpec,
 > = FunctionProvenance_ extends { readonly _tag: "Convex" }
-  ? AttachmentError<`Plain Convex functions cannot have middleware — their raw handlers are passed through untouched`>
+  ? AttachmentError<`Plain Convex functions cannot have middleware—their raw handlers are passed through untouched`>
   : [
         Extract<
           MiddlewareSpecs_,

@@ -11,7 +11,7 @@ describe("Table", () => {
       expect(Table.isUnnamedTable(unnamed)).toBe(true);
       expect(Table.isTable(unnamed)).toBe(false);
       // No `tableName` property on the unnamed callable, so the discriminator
-      // is `tableName` presence — not `name`, which every JS function has
+      // is `tableName` presence—not `name`, which every JS function has
       // (Function.prototype.name) and which would silently mislead any
       // hasProperty-style predicate.
       expect("tableName" in unnamed).toBe(false);

@@ -61,9 +61,8 @@ export const isUnfinalizedGroupImpl = (u: unknown): u is AnyUnfinalized =>
  * `RegisteredFunctions.buildForGroup` and the CLI's `validateImpl`) retrieve
  * the typed `Finalized` service directly rather than scanning the context.
  *
- * The tag is keyed only by finalization status — no group path — because each
- * group's impl layer is built in its own isolated scope (`buildForGroup` /
- * `validateImpl` each provide a fresh `Registry`), so at most one `GroupImpl`
+ * The tag is keyed only by finalization status—no group path—because each
+ * group's impl layer is built in its own isolated scope (`buildForGroup`/`validateImpl` each provide a fresh `Registry`), so at most one `GroupImpl`
  * service of each status exists per build.
  */
 export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({

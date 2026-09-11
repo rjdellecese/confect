@@ -86,7 +86,7 @@ export type AnyWithProps = Table<
 // (`.index`, `.searchIndex`, `.vectorIndex`) live here and return new
 // `UnnamedTable`s, accumulating plain index metadata records. The
 // user-supplied `lazyFields` callback is just carried through until first
-// access of `Fields` / `Doc` on a bound table. The codegen pipeline emits a
+// access of `Fields`/`Doc` on a bound table. The codegen pipeline emits a
 // wrapper file per user-authored table that simply invokes the unnamed
 // callable with the filename basename.
 
@@ -241,7 +241,7 @@ export type TablesRecord<Tables extends AnyWithProps> = {
 // spread of the metadata records) and never invokes the callback. Binding
 // via `unnamed(tableName)` installs lazy memoised getters for `Fields` and
 // `Doc` via `Lazy.defineProperty`, so the first access materialises the
-// value and replaces the getter with a plain data property — second-and-
+// value and replaces the getter with a plain data property—second-and-
 // subsequent accesses are observably indistinguishable from a plain
 // property and avoid all function-call overhead.
 

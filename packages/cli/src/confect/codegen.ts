@@ -134,7 +134,7 @@ const runCodegen = Effect.gen(function* () {
   // migration message surfaces before any bundler error from impl
   // validation (each impl imports `_generated/schema.ts`).
   yield* rejectLegacySchemaFile;
-  // List `confect/tables/*.ts` (filename-only — no bundling yet) so the
+  // List `confect/tables/*.ts` (filename-only—no bundling yet) so the
   // `_generated/id.ts` constructor can be emitted *before* we bundle any
   // user-authored table module. Tables import from `_generated/id.ts` for
   // cross-table id refs, so it must exist on disk first.
@@ -157,7 +157,7 @@ const runCodegen = Effect.gen(function* () {
     groupSpecsByPosixRelativePath,
   );
   yield* generateAssembledSpecs(leaves);
-  // `_generated/api.ts` / `nodeApi.ts` are no longer imported by generated or
+  // `_generated/api.ts`/`nodeApi.ts` are no longer imported by generated or
   // impl code (impls take the database schema from `_generated/schema`
   // directly), so remove any copies left over from earlier versions before
   // impl validation runs.
@@ -407,7 +407,7 @@ const generateAssembledSpecs = Effect.fnUntraced(function* (
   const confectDirectory = yield* ConfectDirectory.get;
   const generatedSpecPath = yield* GENERATED_SPEC_PATH;
 
-  // A single assembled spec holds every group regardless of runtime — a Node
+  // A single assembled spec holds every group regardless of runtime—a Node
   // group's `makeNode()` lives in its imported leaf spec, so the assembled
   // file is runtime-agnostic. Always emit it (even empty) so downstream
   // readers (`loadGeneratedSpec`, `generateRefs`) always find a spec module.
@@ -467,7 +467,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
 
       // Every leaf reaching this point came through
       // `loadAndValidateLeafModules`, which stamps the runtime from the
-      // validated spec — so `None` here means that invariant was broken.
+      // validated spec—so `None` here means that invariant was broken.
       const runtime = yield* Option.match(leaf.runtime, {
         onNone: () =>
           Effect.die(
@@ -606,9 +606,8 @@ const generateFunctionModules = Effect.gen(function* () {
  * The user-authored `confect/schema.ts` is no longer supported: codegen now
  * owns both `_generated/schema.ts` (runtime) and `_generated/convexSchema.ts`
  * (deploy), derived from a single scan of `confect/tables/*.ts`. Detect a
- * stray file and fail with a clear migration message — leaving it in place
- * would silently shadow the codegen-owned `_generated/schema.ts` /
- * `_generated/convexSchema.ts`.
+ * stray file and fail with a clear migration message—leaving it in place
+ * would silently shadow the codegen-owned `_generated/schema.ts`/`_generated/convexSchema.ts`.
  */
 const rejectLegacySchemaFile = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -622,11 +621,11 @@ const rejectLegacySchemaFile = Effect.gen(function* () {
 });
 
 /**
- * Surface a yellow `⚠` warning when codegen sees no tables — either the
+ * Surface a yellow `⚠` warning when codegen sees no tables—either the
  * `confect/tables/` directory is missing or it contains no `.ts` files.
  * Generation still succeeds (emitting an empty `DatabaseSchema` and
- * `defineSchema({})`), since action-only / table-free Confect backends
- * are legal — but the warning catches the much more common case of a
+ * `defineSchema({})`), since action-only/table-free Confect backends
+ * are legal—but the warning catches the much more common case of a
  * typoed directory or files placed under the wrong root.
  */
 const warnIfNoTables = (
@@ -913,7 +912,7 @@ const generateRefs = Effect.gen(function* () {
 });
 
 /**
- * Generate `confect/_generated/components.ts` — the typed registry of Convex
+ * Generate `confect/_generated/components.ts`—the typed registry of Convex
  * components installed in `convex/convex.config.ts` (see
  * {@link templates.components}). The file is emitted even when there is no
  * `convex.config.ts` (as an empty registry) so the import surface stays

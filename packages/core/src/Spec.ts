@@ -10,7 +10,7 @@ export const isSpec = (u: unknown): u is AnyWithProps =>
 
 /**
  * A Confect spec: a flat container of function groups. Groups may be of any
- * runtime — a group built with `GroupSpec.makeNode()` (a Node action group) sits
+ * runtime—a group built with `GroupSpec.makeNode()` (a Node action group) sits
  * alongside `GroupSpec.make()` groups in the same namespace. The runtime of a
  * group lives on the group itself (`GroupSpec.runtime`) and on each function's
  * `RuntimeAndFunctionType`; the spec does not carry a runtime of its own.

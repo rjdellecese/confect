@@ -200,12 +200,12 @@ describe("Command", () => {
     );
 
     it("requires messages to be declared", () => {
-      // @ts-expect-error — messages is required
+      // @ts-expect-error—messages is required
       Command.mutation("SaveNote", insertMutationRef, saveNoteHandlers);
     });
 
     it("rejects an explicitly undefined interrupt option", () => {
-      // @ts-expect-error — absence and `interrupt: undefined` are distinct
+      // @ts-expect-error—absence and `interrupt: undefined` are distinct
       Command.mutation("SaveNote", insertMutationRef, {
         ...saveNoteConfig,
         interrupt: undefined,
@@ -215,7 +215,7 @@ describe("Command", () => {
     it("rejects a handler Message not declared in messages", () => {
       Command.mutation("SaveNote", insertMutationRef, {
         messages: [FailedSaveNote],
-        // @ts-expect-error — onSuccess must produce a declared Message
+        // @ts-expect-error—onSuccess must produce a declared Message
         onSuccess: (note: unknown) => SucceededSaveNote({ note }),
         onError: (error: unknown) => FailedSaveNote({ error }),
       });
@@ -232,7 +232,7 @@ describe("Command", () => {
         Effect.Effect<Message, never, Client.Client>
       >();
 
-      // @ts-expect-error — a mutation with args is not callable without them
+      // @ts-expect-error—a mutation with args is not callable without them
       SaveNote();
     });
   });
@@ -300,7 +300,7 @@ describe("Command", () => {
         messages: [SucceededSaveNote, FailedSaveNote],
         onSuccess: () => SucceededSaveNote({ note: null }),
         onError: (error) => FailedSaveNote({ error }),
-        // @ts-expect-error — keyFields must name fields of the ref's args
+        // @ts-expect-error—keyFields must name fields of the ref's args
         interrupt: { keyFields: ["nope"], toKey: () => "" },
       });
     });
@@ -368,7 +368,7 @@ describe("Command", () => {
   });
 });
 
-// Mirrors foldkit/test's internal `ResolvableCommandDefinition` — the
+// Mirrors foldkit/test's internal `ResolvableCommandDefinition`—the
 // constraint Story/Scene `Command.resolve` and `expectExact` place on the
 // definitions they accept. Factory-built definitions must stay assignable to
 // it, or user test suites can't match Confect-built Commands.
@@ -438,7 +438,7 @@ describe("Foldkit test-tooling compatibility", () => {
     const resolved = resolve(SaveNote, SucceededSaveNote({ note: null }));
     expectTypeOf(resolved).toEqualTypeOf<Message>();
 
-    // @ts-expect-error — a Message outside the definition's union is rejected
+    // @ts-expect-error—a Message outside the definition's union is rejected
     resolve(SaveNote, { _tag: "Unrelated" as const });
   });
 });

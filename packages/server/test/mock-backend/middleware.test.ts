@@ -271,8 +271,7 @@ describe("middleware", () => {
           expect(expectFailure(result)).toBeInstanceOf(FunctionGateClosed);
 
           // The group middleware ran first (the ordering test above observes
-          // that), but a failed mutation rolls back its whole transaction —
-          // the markers they inserted are rolled back along with it.
+          // that), but a failed mutation rolls back its whole transaction—the markers they inserted are rolled back along with it.
           const texts = yield* listNoteTexts;
           expect(texts).toStrictEqual([]);
         }).pipe(Effect.provide(TestConfect.layer)),

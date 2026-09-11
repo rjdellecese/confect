@@ -149,7 +149,7 @@ describe("Subscription", () => {
 
     it("rejects Convex-provenance refs at the type level", () => {
       const makeConvexEntry = () =>
-        // @ts-expect-error — only Confect-provenance refs are supported
+        // @ts-expect-error—only Confect-provenance refs are supported
         Subscription.reactiveQuery<Model>()(convexGetQueryRef, noteHandlers);
 
       expect(typeof makeConvexEntry).toBe("function");
@@ -157,7 +157,7 @@ describe("Subscription", () => {
 
     it("requires args and is accepted by Foldkit Subscription.make", () => {
       const requiresArgs = () =>
-        // @ts-expect-error — declared args require an extractor
+        // @ts-expect-error—declared args require an extractor
         Subscription.reactiveQuery<Model>()(getQueryRef, noteHandlers);
       const subscriptions = FoldkitSubscription.make<
         Model,
@@ -198,7 +198,7 @@ describe("Subscription", () => {
 
     it("rejects Convex-provenance refs at the type level", () => {
       const makeConvexStream = () =>
-        // @ts-expect-error — only Confect-provenance refs are supported
+        // @ts-expect-error—only Confect-provenance refs are supported
         Subscription.reactiveQueryStream(convexGetQueryRef, noteHandlers);
 
       expect(typeof makeConvexStream).toBe("function");
@@ -671,7 +671,7 @@ describe("Subscription.paginatedQuery", () => {
 
     it("requires a bundle and is accepted by Foldkit Subscription.make", () => {
       const invalid = () =>
-        // @ts-expect-error — the bundle owns state and settlement schemas
+        // @ts-expect-error—the bundle owns state and settlement schemas
         Subscription.paginatedQuery<PaginatedModel>()(paginateRef, {
           state: (model: PaginatedModel) => model.notes,
           onSettled: SettledGetNotesPage,

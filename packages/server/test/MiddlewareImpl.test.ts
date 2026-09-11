@@ -248,7 +248,7 @@ describe("cross-middleware requires", () => {
       viewerName.middleware(NeedsViewer),
     );
 
-    // @ts-expect-error — nothing covering viewerName provides Viewer
+    // @ts-expect-error—nothing covering viewerName provides Viewer
     GroupImpl.make(databaseSchema, unsatisfied);
   });
 
@@ -314,7 +314,7 @@ describe("implementation service bounds", () => {
 
   it("puts the Provides obligation in the downstream effect's environment", () => {
     // The incoming effect requires `Viewer`, so an implementation that never
-    // provides it cannot eliminate the requirement — its output environment
+    // provides it cannot eliminate the requirement—its output environment
     // would keep `Viewer`, which `CommonServices` excludes.
     type Impl = MiddlewareSpec.MiddlewareImpl<Viewer, NoViewer, never>;
     type IncomingEnvironment =

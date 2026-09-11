@@ -93,8 +93,8 @@ const wrapTransformation = (
 
 /**
  * Builds an AST walker that adds the given system-field property signatures to
- * every object node of a schema's AST — including each step of its encoding
- * chain — wrapping transformations so the fields survive them.
+ * every object node of a schema's AST—including each step of its encoding
+ * chain—wrapping transformations so the fields survive them.
  */
 const makeExtendAst = (
   systemPropertySignatures: ReadonlyArray<SchemaAST.PropertySignature>,
@@ -156,9 +156,8 @@ const makeExtendAst = (
  *
  * A plain `Struct` gains the fields via `Schema.fieldsAssign` and a `Union`
  * has them distributed across its members, preserving the schema's
- * `Struct`/`Union` structure. Any other object-shaped schema — one built with
- * `Schema.decodeTo`/`Schema.encodeKeys`, a branded struct, a suspended schema
- * — is extended at the AST level: every object node in its encoding chain
+ * `Struct`/`Union` structure. Any other object-shaped schema—one built with
+ * `Schema.decodeTo`/`Schema.encodeKeys`, a branded struct, a suspended schema—is extended at the AST level: every object node in its encoding chain
  * gains the system fields, and each transformation is wrapped so the fields
  * bypass the user-defined getters. Schemas that do not resolve to an object
  * shape at every step (such as `Schema.Class`, whose decoded values are class
@@ -264,7 +263,7 @@ export type ExtendWithSystemFields<
 
 /**
  * The decoded/encoded document shape: a table's fields plus Convex's system
- * fields. Deliberately a bare intersection (no `Expand`/`Simplify`) — flattening
+ * fields. Deliberately a bare intersection (no `Expand`/`Simplify`)—flattening
  * it with a homomorphic mapped type collapses to `{ [x: string]: any }` when
  * `Document` is still an unresolved generic, which breaks structural
  * comparability in the database reader/writer plumbing.

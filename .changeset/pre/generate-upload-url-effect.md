@@ -20,4 +20,4 @@ Effect.gen(function* () {
 });
 ```
 
-`StorageWriter.delete` is unchanged — it takes a storage ID, so it remains a function.
+`StorageWriter.delete` is unchanged—it takes a storage ID, so it remains a function.

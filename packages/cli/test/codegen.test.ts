@@ -98,9 +98,9 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
   );
 
   // Names are derived from the basename alone, but the directory is scanned
-  // recursively — so two files in different subdirectories can resolve to the
+  // recursively—so two files in different subdirectories can resolve to the
   // same table name. That must fail loudly rather than racing on a shared
-  // generated wrapper path / emitting duplicate schema bindings. Two distinct
+  // generated wrapper path/emitting duplicate schema bindings. Two distinct
   // colliding names are seeded so we can assert that *all* collisions are
   // captured in a single pass, not just the first.
   it.effect("rejects every set of files that resolve to the same name", () =>

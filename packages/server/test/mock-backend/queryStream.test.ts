@@ -405,8 +405,7 @@ describe("QueryStream", () => {
           expect(page1.page.map((doc) => doc.text)).toEqual(["a", "b"]);
 
           // Re-request the same page pinned to its end cursor: `numItems`
-          // is ignored and the page runs exactly to the pinned endpoint —
-          // the range-defined page the reactive pagination articles call
+          // is ignored and the page runs exactly to the pinned endpoint—the range-defined page the reactive pagination articles call
           // for.
           const pinned = yield* QueryStream.paginate(stream, {
             numItems: 1,
@@ -552,8 +551,8 @@ describe("QueryStream", () => {
             start: { key: afterKey, inclusive: false },
           });
 
-          // The narrowed stream is a rebuilt *leaf* — not an in-memory
-          // fallback — whose lower bound is the pinned prefix plus the
+          // The narrowed stream is a rebuilt *leaf*—not an in-memory
+          // fallback—whose lower bound is the pinned prefix plus the
           // cursor key, exclusive.
           expect(narrowed.reflection?.bounds?.lower).toEqual({
             key: ["b", ...afterKey],
@@ -1196,7 +1195,7 @@ describe("QueryStream", () => {
             "a",
           ]);
 
-          // Through a join — the inner streams reverse with the outer — and
+          // Through a join—the inner streams reverse with the outer—and
           // on to pagination, with cursors still pushed down.
           const joined = reader
             .table("notes")
@@ -1525,7 +1524,7 @@ describe("QueryStream", () => {
               numItems: 2,
               cursor: null,
             });
-            // A page pinned as (cursor, cursor] is the empty range — the
+            // A page pinned as (cursor, cursor] is the empty range—the
             // boundary row must not be re-emitted by the pushed-down ranges.
             const emptyPinned = yield* QueryStream.paginate(stream, {
               numItems: 5,
@@ -1705,20 +1704,20 @@ describe("QueryStream types", () => {
       expectTypeOf<typeof endOnly>().toEqualTypeOf<typeof full>();
       expectTypeOf<typeof between>().toEqualTypeOf<typeof full>();
 
-      // @ts-expect-error — empty bounds do not narrow a stream.
+      // @ts-expect-error—empty bounds do not narrow a stream.
       const emptyBounds = QueryStream.narrow(full, {});
       void emptyBounds;
-      // @ts-expect-error — the data-last form also requires an endpoint.
+      // @ts-expect-error—the data-last form also requires an endpoint.
       QueryStream.narrow({});
-      // @ts-expect-error — explicitly undefined endpoints are still absent.
+      // @ts-expect-error—explicitly undefined endpoints are still absent.
       const absentBounds = QueryStream.narrow(full, {
         start: undefined,
         end: undefined,
       });
       void absentBounds;
-      // @ts-expect-error — an undefined start alone is not a bound.
+      // @ts-expect-error—an undefined start alone is not a bound.
       QueryStream.narrow({ start: undefined });
-      // @ts-expect-error — an undefined end alone is not a bound.
+      // @ts-expect-error—an undefined end alone is not a bound.
       QueryStream.narrow({ end: undefined });
 
       // Streams pinned the same way merge; the pinned values may differ.
@@ -1730,25 +1729,25 @@ describe("QueryStream types", () => {
       const mergedAcrossIndexes = QueryStream.merge([pinned, byCreationTime]);
       void mergedAcrossIndexes;
 
-      // @ts-expect-error — order keys differ: ["text", "_creationTime"]
+      // @ts-expect-error—order keys differ: ["text", "_creationTime"]
       const mergedMismatched = QueryStream.merge([pinned, full]);
       void mergedMismatched;
 
       const wrongField = reader
         .table("notes")
-        // @ts-expect-error — `eq` must target the next index field.
+        // @ts-expect-error—`eq` must target the next index field.
         .stream("by_text", (q) => q.eq("tag", "x"));
       void wrongField;
 
       const wrongValue = reader
         .table("notes")
-        // @ts-expect-error — the value must match the field's type.
+        // @ts-expect-error—the value must match the field's type.
         .stream("by_text", (q) => q.eq("text", 42));
       void wrongValue;
 
       const afterBound = reader.table("notes").stream("by_text", (q) => {
         const lowerBounded = q.gte("text", "a");
-        // @ts-expect-error — after a lower bound, `eq` is gone.
+        // @ts-expect-error—after a lower bound, `eq` is gone.
         void lowerBounded.eq;
         return lowerBounded;
       });
@@ -1797,7 +1796,7 @@ describe("QueryStream types", () => {
       >();
 
       const joinedMismatched = QueryStream.flatMap(bounded, (_note) => pinned, {
-        // @ts-expect-error — innerKey must match the inner stream's order key.
+        // @ts-expect-error—innerKey must match the inner stream's order key.
         innerKey: ["text", "_creationTime"],
       });
       void joinedMismatched;
@@ -1808,11 +1807,11 @@ describe("QueryStream types", () => {
         ["text", "_creationTime"]
       >();
 
-      // @ts-expect-error — fields must be a prefix of the order key.
+      // @ts-expect-error—fields must be a prefix of the order key.
       const distinctNonPrefix = QueryStream.distinct(full, ["_creationTime"]);
       void distinctNonPrefix;
 
-      // @ts-expect-error — "text" is pinned away on this stream's key.
+      // @ts-expect-error—"text" is pinned away on this stream's key.
       const distinctPinnedAway = QueryStream.distinct(pinned, ["text"]);
       void distinctPinnedAway;
 
@@ -1825,7 +1824,7 @@ describe("QueryStream types", () => {
         ["renamed", "_creationTime"]
       >();
 
-      // @ts-expect-error — the new key must have as many fields as the old.
+      // @ts-expect-error—the new key must have as many fields as the old.
       const relabeledTooShort = QueryStream.renameKey(full, ["_creationTime"]);
       void relabeledTooShort;
 
@@ -1908,7 +1907,7 @@ describe("QueryStream types", () => {
       expectTypeOf<DirectionOf<typeof sameDirection>>().toEqualTypeOf<"desc">();
       // The first input fixes the direction, and the argument is checked
       // against it (the message names the direction the rest must have).
-      // @ts-expect-error — inputs must share an order direction.
+      // @ts-expect-error—inputs must share an order direction.
       const mixedDirections = QueryStream.merge([full, descending]);
       void mixedDirections;
       // A runtime-chosen direction can lead a merge (a known direction is
@@ -1919,7 +1918,7 @@ describe("QueryStream types", () => {
       >().toEqualTypeOf<QueryStream.OrderDirection>();
       const mixedJoin = QueryStream.flatMap(
         bounded,
-        // @ts-expect-error — inner streams must run in the outer direction.
+        // @ts-expect-error—inner streams must run in the outer direction.
         (_note) => descending,
         { innerKey: ["text", "_creationTime"] },
       );

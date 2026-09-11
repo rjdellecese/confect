@@ -547,7 +547,7 @@ export const reset = <Item_, UserArgs_, Error_>(
  * Navigate to the next page, retaining the current page while it loads.
  *
  * The page being left is pushed onto the stack *pinned* to the range it
- * displayed — its cursor to its continuation cursor — so `prev` reloads
+ * displayed—its cursor to its continuation cursor—so `prev` reloads
  * exactly that range rather than the first `initialNumItems` documents
  * after its cursor, however the data has moved meanwhile. Convex's own
  * pagination keeps that range in its query journal; stream-paginated

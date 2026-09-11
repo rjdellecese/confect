@@ -70,13 +70,13 @@ describe("make", () => {
   it("only accepts context-free struct fields as args", () => {
     const nonStruct = FunctionSpec.publicQuery({
       name: "nonStruct",
-      // @ts-expect-error — function args must be a struct field map
+      // @ts-expect-error—function args must be a struct field map
       args: () => Schema.String,
       returns: () => Schema.String,
     });
     const serviceful = FunctionSpec.publicQuery({
       name: "serviceful",
-      // @ts-expect-error — function args must be synchronously encodable and decodable
+      // @ts-expect-error—function args must be synchronously encodable and decodable
       args: () => ({ value: ServicefulString }),
       returns: () => Schema.String,
     });
@@ -119,7 +119,7 @@ describe("make", () => {
   });
 });
 
-// LAZINESS INVARIANT — DO NOT REGRESS.
+// LAZINESS INVARIANT—DO NOT REGRESS.
 //
 // `args` fields and `returns`/`error` schemas are passed as thunks and exposed
 // as lazy memoised schema getters so that importing the assembled
@@ -133,7 +133,7 @@ describe("make", () => {
 //      `.error`, which would force-build the schema. See `Ref.hasErrorSchema`.
 //
 // If you are changing `FunctionProvenance`, `FunctionSpec`, or `Ref` and these
-// tests fail, do not "fix" them by eagerly reading the schemas — preserve the
+// tests fail, do not "fix" them by eagerly reading the schemas—preserve the
 // laziness instead.
 describe("laziness invariant", () => {
   const makeSpec = (track: {
@@ -366,7 +366,7 @@ describe("paginated queries", () => {
     it("throws when the user args schema declares paginationOpts", () => {
       const spec = FunctionSpec.publicPaginatedQuery({
         name: "listPaginated",
-        // @ts-expect-error — paginationOpts must not be declared in user args
+        // @ts-expect-error—paginationOpts must not be declared in user args
         args: () => ({
           paginationOpts: Schema.Struct({ numItems: Schema.Finite }),
         }),
@@ -376,7 +376,7 @@ describe("paginated queries", () => {
       expect(
         () => spec.functionProvenance.args,
       ).toThrowErrorMatchingInlineSnapshot(
-        `[Error: A paginated query's args schema must not declare \`paginationOpts\` — it is added automatically from the \`PaginationOptions\` schema]`,
+        `[Error: A paginated query's args schema must not declare \`paginationOpts\`—it is added automatically from the \`PaginationOptions\` schema]`,
       );
     });
   });

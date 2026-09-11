@@ -31,7 +31,7 @@ export interface Bundled {
  * cwd was used during bundling.
  *
  * `original` (the specifier as written, before resolution) is filled in from
- * `path` when esbuild omits it — esbuild only sets it when it differs from the
+ * `path` when esbuild omits it—esbuild only sets it when it differs from the
  * resolved path, which is exactly the externalized-bare-specifier case that
  * absolutizing `path` would otherwise mangle into `<cwd>/@confect/server`.
  * {@link importersOfPackage} relies on `original` always being the raw
@@ -86,7 +86,7 @@ export const resolveModule = (
  * Bundles first-party workspace dependencies that `bundle-require` would
  * otherwise externalize and hand to Node's native ESM resolver. Resolves each
  * bare specifier and, following symlinks, bundles it when its real path lives
- * outside `node_modules` — mirroring Vite's "linked dependencies are not
+ * outside `node_modules`—mirroring Vite's "linked dependencies are not
  * externalized" heuristic. Registered ahead of `externalPlugin`, so deferring
  * (returning `undefined`) leaves third-party externalization untouched.
  * `skipPatterns` are the tsconfig `paths` regexes, which keep deferring to
@@ -156,7 +156,7 @@ const captureBuildResultPlugin = (
 /**
  * Bundle a TypeScript entry point with esbuild via {@link bundleRequire} and
  * import the result. `bundle-require` writes a temp `.mjs` next to the source,
- * `import()`s it, and deletes it — so third-party `node_modules` externals
+ * `import()`s it, and deletes it—so third-party `node_modules` externals
  * resolve through the user's normal `node_modules` walk, while first-party
  * workspace deps are bundled by {@link bundleWorkspacePlugin} and tsconfig
  * `paths` aliases stay inside the bundle.
@@ -171,8 +171,8 @@ const captureBuildResultPlugin = (
  * metafile is captured via a small `onEnd` plugin because `bundle-require`
  * itself only exposes a flat `dependencies: string[]`.
  *
- * `options.plugins` are registered ahead of every other plugin — including
- * `bundle-require`'s own `externalPlugin` — so a caller-supplied plugin can
+ * `options.plugins` are registered ahead of every other plugin—including
+ * `bundle-require`'s own `externalPlugin`—so a caller-supplied plugin can
  * claim resolutions (e.g. `convex.config` imports) before the workspace and
  * externalization heuristics see them.
  */
@@ -280,7 +280,7 @@ export const directlyImports = Effect.fnUntraced(function* (
  * Returns the absolute paths of every module in the bundle that declares a
  * direct import of `packageName` (the package itself or one of its subpaths)
  * and satisfies `where`. Use `where` to restrict the search to the modules you
- * care about — the bundle's inputs include every transitive dependency.
+ * care about—the bundle's inputs include every transitive dependency.
  *
  * Matching is on the specifier as written rather than the resolved path,
  * because {@link bundleWorkspacePlugin} bundles first-party workspace

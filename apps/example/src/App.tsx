@@ -133,7 +133,7 @@ const ViewerDemo = () => {
 
   // `whoAmI` is covered by the `RequireViewer` middleware: it provides the
   // current viewer to the handler, or fails with the typed `NotSignedIn`
-  // error — which surfaces here, decoded, in `onFailure`.
+  // error—which surfaces here, decoded, in `onFailure`.
   const whoAmI = useQuery(refs.public.viewer.whoAmI, {});
   const createUser = useMutation(refs.public.users.create);
   const clearUsers = useMutation(refs.public.users.clearAll);
@@ -144,7 +144,7 @@ const ViewerDemo = () => {
       setPostStatus(
         Result.match(result, {
           onSuccess: () => "Posted!",
-          onFailure: () => "Not signed in — create a user first.",
+          onFailure: () => "Not signed in—create a user first.",
         }),
       );
       setViewerNote("");
@@ -159,7 +159,7 @@ const ViewerDemo = () => {
         {QueryResult.match(whoAmI, {
           onLoading: () => "Loading…",
           onSuccess: (name) => `Signed in as ${name}`,
-          onFailure: () => "Not signed in — create a user below.",
+          onFailure: () => "Not signed in—create a user below.",
         })}
       </div>
       <input

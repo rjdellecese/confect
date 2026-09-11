@@ -227,7 +227,7 @@ describe("GroupSpec.middleware", () => {
     expect(() =>
       GroupSpec.make()
         .middleware(RequireUser)
-        // @ts-expect-error — duplicate attachment is also a type error
+        // @ts-expect-error—duplicate attachment is also a type error
         .middleware(RequireUser),
     ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Middleware "RequireUser" is already attached to this group]`,
@@ -246,12 +246,12 @@ describe("GroupSpec.middleware", () => {
   });
 
   it("rejects attaching middleware whose functionTypes don't cover a declared function", () => {
-    // @ts-expect-error — MutationOnly does not declare function type "query"
+    // @ts-expect-error—MutationOnly does not declare function type "query"
     GroupSpec.make().addFunction(query).middleware(MutationOnly);
   });
 
   it("rejects adding a function whose type an attached middleware doesn't declare", () => {
-    // @ts-expect-error — MutationOnly does not declare function type "query"
+    // @ts-expect-error—MutationOnly does not declare function type "query"
     GroupSpec.make().middleware(MutationOnly).addFunction(query);
   });
 
@@ -298,7 +298,7 @@ describe("requires", () => {
 
   it("rejects a requiring middleware attached before its provider", () => {
     GroupSpec.make()
-      // @ts-expect-error — nothing attached earlier provides CurrentUser
+      // @ts-expect-error—nothing attached earlier provides CurrentUser
       .middleware(NeedsUser)
       .middleware(ProvideUser);
   });
@@ -345,7 +345,7 @@ describe("FunctionSpec.middleware", () => {
     expect(() =>
       mutation
         .middleware(MutationOnly)
-        // @ts-expect-error — duplicate attachment is also a type error
+        // @ts-expect-error—duplicate attachment is also a type error
         .middleware(MutationOnly),
     ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Middleware "MutationOnly" is already attached to function "setThing"]`,
@@ -354,7 +354,7 @@ describe("FunctionSpec.middleware", () => {
 
   it("rejects middleware whose functionTypes don't include the function's type", () => {
     expect(() =>
-      // @ts-expect-error — MutationOnly does not declare function type "query"
+      // @ts-expect-error—MutationOnly does not declare function type "query"
       query.middleware(MutationOnly),
     ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Middleware "MutationOnly" does not declare function type "query" of function "getThing"]`,
@@ -365,7 +365,7 @@ describe("FunctionSpec.middleware", () => {
     const convexQuery = FunctionSpec.convexPublicQuery<any>()("plainQuery");
 
     expect(() =>
-      // @ts-expect-error — plain Convex functions cannot have middleware
+      // @ts-expect-error—plain Convex functions cannot have middleware
       convexQuery.middleware(RequireUser),
     ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Plain Convex function "plainQuery" cannot have middleware]`,
@@ -378,7 +378,7 @@ describe("FunctionSpec.middleware", () => {
     expect(() =>
       GroupSpec.make()
         .addFunction(covered)
-        // @ts-expect-error — MutationOnly is already attached to setThing
+        // @ts-expect-error—MutationOnly is already attached to setThing
         .middleware(MutationOnly),
     ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Middleware "MutationOnly" is attached to both function "setThing" and its group]`,
@@ -391,7 +391,7 @@ describe("FunctionSpec.middleware", () => {
     expect(() =>
       GroupSpec.make()
         .middleware(MutationOnly)
-        // @ts-expect-error — MutationOnly is already attached to the group
+        // @ts-expect-error—MutationOnly is already attached to the group
         .addFunction(covered),
     ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Middleware "MutationOnly" is attached to both function "setThing" and its group]`,

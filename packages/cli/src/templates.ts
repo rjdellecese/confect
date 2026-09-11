@@ -71,7 +71,7 @@ interface TableModuleBinding {
 }
 
 /**
- * Emit `confect/_generated/schema.ts` — the runtime `DatabaseSchema` used
+ * Emit `confect/_generated/schema.ts`—the runtime `DatabaseSchema` used
  * by impls and the per-group registries (and downstream by per-function
  * bundles for codec lookup). Every table wrapper at
  * `confect/_generated/tables/<name>.ts` is imported statically and
@@ -151,12 +151,12 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
 });
 
 /**
- * Emit `confect/_generated/convexSchema.ts` — the Convex deploy-time
+ * Emit `confect/_generated/convexSchema.ts`—the Convex deploy-time
  * `SchemaDefinition`. Imports every table from its generated wrapper at
  * `_generated/tables/<name>` and calls `defineSchema({...})` exactly once.
  * `Table.tableDefinition` lives in `@confect/server` because it is the
  * `defineTable` binding; the generated table wrappers themselves stay
- * client-safe (`Fields` / `Doc` from `@confect/core`).
+ * client-safe (`Fields`/`Doc` from `@confect/core`).
  *
  * The `defineSchema` and `Table` imports are aliased with a leading `$`
  * because each table is imported under its own (filename-derived) name; a
@@ -212,7 +212,7 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
 });
 
 /**
- * Emit `confect/_generated/id.ts` — a type-constrained `Id` constructor and
+ * Emit `confect/_generated/id.ts`—a type-constrained `Id` constructor and
  * a `TableNames` union derived from the user's `confect/tables/*.ts`
  * filenames. User-authored table modules import `Id` from this file to
  * declare cross-table id references without typing the destination name as
@@ -251,7 +251,7 @@ const idEffect = Effect.fnUntraced(function* ({
 });
 
 /**
- * Emit `confect/_generated/tables/<tableName>.ts` — a two-line wrapper that
+ * Emit `confect/_generated/tables/<tableName>.ts`—a two-line wrapper that
  * imports the user-authored `UnnamedTable` and binds the file basename to
  * it, producing the fully-named `Table` value that downstream consumers
  * (schema, specs, impls) read.
@@ -332,14 +332,14 @@ const authConfigEffect = Effect.fnUntraced(function* ({
 });
 
 /**
- * Emit `confect/_generated/components.ts` — a typed registry of the Convex
+ * Emit `confect/_generated/components.ts`—a typed registry of the Convex
  * components installed via `app.use(...)` in `convex/convex.config.ts`.
  * Mirrors the `components` export of Convex's generated
  * `convex/_generated/api`: the runtime value is `componentsGeneric()` (a
  * name-preserving proxy), and each entry is typed with the `ComponentApi`
  * that component packages export from `_generated/component.js`. Unlike
  * `convex/_generated/api`, this file exists before `convex codegen` ever
- * runs, so impl modules can import it safely — `confect codegen` bundles and
+ * runs, so impl modules can import it safely—`confect codegen` bundles and
  * evaluates each impl's import graph, and `convex/_generated/api` doesn't
  * exist yet at that point.
  *
@@ -414,7 +414,7 @@ const refsEffect = Effect.fnUntraced(function* ({
  * Emit `_generated/docs.ts`: one named `type <table>` alias per table plus a
  * `Docs` registry. Each alias is `Document.Document<typeof schemaDefinition,
  * "<table>">`, so it stays structurally exact while giving the document a
- * *name* — declaration emit then prints e.g. `NotesDoc` instead of expanding
+ * *name*—declaration emit then prints e.g. `NotesDoc` instead of expanding
  * the row structure. A `type` alias (rather than an extending `interface`) is
  * used so it works for every document shape: object tables, but also union
  * schemas (`Schema.Union`) and other non-object documents, which an `interface
@@ -437,7 +437,7 @@ const docsEffect = Effect.fnUntraced(function* ({
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-  // With no tables there is nothing to import — emitting the (unused) imports
+  // With no tables there is nothing to import—emitting the (unused) imports
   // would trip `noUnusedLocals`.
   if (tables.length === 0) {
     yield* cbw.writeLine(`export interface Docs {}`);

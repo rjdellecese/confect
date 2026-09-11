@@ -52,8 +52,7 @@ export interface Dependencies<Query extends Ref.AnyConfectPublicQuery> {
 }
 
 /**
- * Maps a reactive query's emissions into the app's Messages. Every failure —
- * the ref's typed error, a transport error, or a codec error — arrives via
+ * Maps a reactive query's emissions into the app's Messages. Every failure—the ref's typed error, a transport error, or a codec error—arrives via
  * `onError`, so the resulting stream's error channel is `never`, as Foldkit
  * requires.
  */

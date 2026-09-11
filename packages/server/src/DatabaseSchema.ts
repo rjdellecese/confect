@@ -59,7 +59,7 @@ export type TableWithName<
  * record is stored verbatim and later read by key (`databaseSchema.tables[
  * tableName]` in `DatabaseReader`/`DatabaseWriter`), so a key that diverges
  * from the bound table's name would make those lookups silently miss. The
- * type signature does not enforce this — codegen upholds it by deriving both
+ * type signature does not enforce this—codegen upholds it by deriving both
  * the key and the table name from the same filename (and the shorthand
  * `{ notes, tags, users }` form it emits makes them identical by
  * construction). Hand-written calls must preserve it.

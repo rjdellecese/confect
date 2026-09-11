@@ -7,7 +7,7 @@ import * as Schema from "effect/Schema";
  * Use this as the `paginationOpts` field of a paginated query's args schema.
  * Beyond `numItems` and `cursor`, Convex's pagination protocol sends the
  * optional fields (`endCursor`, `id`, `maximumRowsRead`, `maximumBytesRead`)
- * with real requests — most notably `usePaginatedQuery` from `convex/react`
+ * with real requests—most notably `usePaginatedQuery` from `convex/react`
  * always includes `id`, and includes `endCursor` when splitting pages.
  * Declaring them is required for the generated Convex argument validator to
  * accept those requests and for the fields to survive decoding and reach

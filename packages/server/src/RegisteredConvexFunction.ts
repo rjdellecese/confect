@@ -116,7 +116,7 @@ export const make = (
  * time (every `Date.now()` read is tracked). Effect's logging, span, and
  * elapsed-time machinery reads timestamps through the ambient `Clock`'s unsafe
  * accessors, which would silently opt any logging or timing query out of the
- * cache — and there is no untracked time source in the isolate to serve them
+ * cache—and there is no untracked time source in the isolate to serve them
  * from, since Effect's own live clock falls back to `Date.now()` for monotonic
  * time when neither `process.hrtime` nor `performance.now` exists. Queries
  * therefore run with a `Clock` whose unsafe accessors all return constants, so
@@ -136,7 +136,7 @@ const queryClock: Clock.Clock = {
   currentTimeNanos: Effect.sync(() => BigInt(Date.now()) * 1_000_000n),
   // oxlint-disable-next-line effecttsgo/global-date-in-effect -- This access intentionally notifies Convex's query-cache tracker.
   monotonicTimeNanos: Effect.sync(() => BigInt(Date.now()) * 1_000_000n),
-  // `Effect.sleep` resolves the ambient clock, so it cannot be used here — it
+  // `Effect.sleep` resolves the ambient clock, so it cannot be used here—it
   // would recurse straight back into this `sleep`.
   sleep: (duration) =>
     Effect.callback<void>((resume) => {

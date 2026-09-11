@@ -21,8 +21,8 @@ export const TABLES_DIRNAME = "tables";
  * Discovered metadata for a single user-authored table module under
  * `confect/tables/`.
  *
- * - `relativePath` — path from `confect/` to the file (e.g. `tables/notes.ts`).
- * - `tableName` — the file basename (e.g. `notes`). This is also the import
+ * - `relativePath`—path from `confect/` to the file (e.g. `tables/notes.ts`).
+ * - `tableName`—the file basename (e.g. `notes`). This is also the import
  *   binding used in generated files, and the table name surfaced to Convex.
  */
 export interface TableModule {
@@ -66,7 +66,7 @@ const byTableName = Order.mapInput(
 
 /**
  * Discover every `confect/tables/**\/*.ts` module by listing the directory.
- * Validates that each filename is a legal table identifier — the table name is
+ * Validates that each filename is a legal table identifier—the table name is
  * derived from the file basename, so the filename must be a valid JavaScript
  * identifier with no leading underscore (Convex reserves `_<name>` for system
  * tables).

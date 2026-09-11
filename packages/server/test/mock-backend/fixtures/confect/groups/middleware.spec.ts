@@ -26,7 +26,7 @@ export default GroupSpec.make()
     }),
   )
   // Declares its own `error` schema *and* is covered by a failing
-  // middleware — the client-visible error union is `NoNotes | NoViewer`.
+  // middleware—the client-visible error union is `NoNotes | NoViewer`.
   .addFunction(
     FunctionSpec.publicQuery({
       name: "firstNoteForViewer",

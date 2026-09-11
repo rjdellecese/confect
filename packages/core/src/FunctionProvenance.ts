@@ -44,7 +44,7 @@ export type FunctionProvenance = Data.TaggedEnum<{
 }>;
 
 /**
- * The declaration shape of a Confect function — orthogonal to both the
+ * The declaration shape of a Confect function—orthogonal to both the
  * provenance origin (Confect vs Convex) and the function type
  * (query/mutation/action). A `Standard` function declares its args fields and
  * returns schema directly; a `Paginated` function declares user-args fields
@@ -62,11 +62,11 @@ export interface Paginated<
   Item extends Schema.Codec<any, any> = Schema.Codec<any, any>,
 > {
   readonly _tag: "Paginated";
-  /** User-declared args — no `paginationOpts`. */
+  /** User-declared args—no `paginationOpts`. */
   readonly userArgs: ArgsSchema<UserArgsFields_>;
   /** Page element schema. */
   readonly item: Item;
-  /** Mutable array of items — the page decode target. */
+  /** Mutable array of items—the page decode target. */
   readonly page: Schema.Codec<any, any>;
 }
 
@@ -109,8 +109,7 @@ const Standard: Standard = { _tag: "Standard" };
  * `args`, `returns`, and `error` are exposed as sync lazy memoised getters
  * (via {@link Lazy.defineProperty}) that only evaluate their thunk on first
  * access, mirroring how `Table` defers `Fields`/`Doc`. This keeps importing the
- * assembled `_generated/spec.ts` cheap — no `Schema.Struct(...)` /
- * `Schema.Array(...)` work runs at module load; it is deferred to the first
+ * assembled `_generated/spec.ts` cheap—no `Schema.Struct(...)`/`Schema.Array(...)` work runs at module load; it is deferred to the first
  * invocation that actually compiles validators or runs a codec.
  *
  * The object is built by hand rather than through `FunctionProvenance.Confect`
@@ -184,7 +183,7 @@ export interface AnyConfectPaginated extends AnyConfect {
 /**
  * Build the provenance of a paginated query from lazy schema thunks, with the
  * same laziness contract as {@link Confect}. The user-facing schemas live on
- * the `Paginated` kind (`kind.userArgs`, `kind.item`, `kind.page`) — the kind
+ * the `Paginated` kind (`kind.userArgs`, `kind.item`, `kind.page`)—the kind
  * container is built eagerly (it is cheap) while the schemas inside it stay
  * lazy. The composed Convex-facing `args`/`returns` are derived lazily from
  * them: `args` spreads the user fields plus `paginationOpts`, and `returns`
@@ -216,7 +215,7 @@ export const ConfectPaginated = <
     const fields = paginatedKind.userArgs.fields;
     if ("paginationOpts" in fields) {
       throw new globalThis.Error(
-        "A paginated query's args schema must not declare `paginationOpts` — " +
+        "A paginated query's args schema must not declare `paginationOpts`—" +
           "it is added automatically from the `PaginationOptions` schema",
       );
     }

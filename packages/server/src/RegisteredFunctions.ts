@@ -42,7 +42,7 @@ type RegisteredFunctionsOf<Group extends GroupSpec.AnyWithProps> = {
 /**
  * The registered-functions record for a single group, derived from the group's
  * own `GroupSpec`: its declared functions, plus any nested subgroups it carries
- * directly. This is the node that `buildForGroup` returns — computed from the
+ * directly. This is the node that `buildForGroup` returns—computed from the
  * leaf `GroupSpec` itself rather than by navigating the project-wide assembled
  * `Spec` to a dot-path, so the per-group registry's type depends only on its
  * own leaf. For the filesystem layout a leaf `GroupSpec` carries no subgroups
@@ -74,7 +74,7 @@ export interface AnyWithProps {
  * The group layer is built with a fresh, isolated `Registry` (rather than the
  * globally-cached default `Context.Reference`), so each `FunctionImpl.make`
  * registers under its flat, single-segment function-name key without colliding
- * with any other group built in the same process — the built registry holds
+ * with any other group built in the same process—the built registry holds
  * exactly this group's functions at the top level.
  *
  * Only the runtime `databaseSchema` value is needed at runtime (it is forwarded

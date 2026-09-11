@@ -71,7 +71,7 @@ const nodeGroup = () =>
 
 /**
  * Run `generateFunctions(spec)` against a clean convex tree (no pre-existing
- * `convex/` modules — every group takes the `writeGroups` "new group" branch),
+ * `convex/` modules—every group takes the `writeGroups` "new group" branch),
  * with a registry file pre-seeded at `registryRelativePath` so the generated
  * module's import can be resolved on disk. Returns the generated module's
  * contents plus whether its registry import resolves to a real file.

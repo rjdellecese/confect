@@ -9,7 +9,7 @@ description: "Compose, merge, join, and paginate index queries as Effect streams
   prerelease line, but its surface may still change between prereleases.
 </Warning>
 
-Query streams are an alternative querying API to the [`index`](/server/database/reading#standard-indexes) method, built around Effect's [`Stream`](https://effect.website/docs/stream/introduction). A **query stream** is a `Stream` of decoded documents in index order that also remembers how it is ordered. That extra knowledge is what lets streams be combined — merged, filtered, joined, deduplicated — and still be paginated with cursors afterwards, which a plain `Stream` cannot do.
+Query streams are an alternative querying API to the [`index`](/server/database/reading#standard-indexes) method, built around Effect's [`Stream`](https://effect.website/docs/stream/introduction). A **query stream** is a `Stream` of decoded documents in index order that also remembers how it is ordered. That extra knowledge is what lets streams be combined—merged, filtered, joined, deduplicated—and still be paginated with cursors afterwards, which a plain `Stream` cannot do.
 
 You can use Effect's `Stream` operations on a query stream, but transformations such as `Stream.take` return a plain `Stream`: the result loses the ordering metadata needed for further `QueryStream` composition and cursor pagination. This is useful when you only want a fixed number of results: `query.pipe(Stream.take(10), Stream.runCollect)` collects up to ten values without needing a cursor. Keep using `QueryStream` operations until you're ready to give up that metadata. Consumers such as `Stream.runCollect` instead return an `Effect` that produces the results when run.
 
@@ -117,7 +117,7 @@ Every example on this page runs over these two tables:
 
 ### Reading the diagrams
 
-A stream is drawn as a track, read left to right in **key order** — the way a marble diagram reads left to right in time, with the index's ordering as the axis:
+A stream is drawn as a track, read left to right in **key order**—the way a marble diagram reads left to right in time, with the index's ordering as the axis:
 
 {/* stream-diagram: legend */}
 
@@ -143,8 +143,8 @@ Grouped by what each operation does to the order key. The last column names the 
 | [`stream`](#creating-a-stream)                                            | The index's fields, minus those pinned by `eq` | A `Stream` that remembers how it is sorted                    |
 | [`empty`](#empty-streams)                                                 | As given                                       | `Stream.empty` with a key                                     |
 | [`merge`](#merge)                                                         | Shared by every input; kept                    | Ordered, unlike `Stream.merge`; ZIO's `mergeSorted`           |
-| [`filter` / `filterEffect`](#filter-and-map)                              | Kept                                           | `Stream.filter`, `Stream.filterEffect`                        |
-| [`map` / `mapEffect`](#filter-and-map)                                    | Kept                                           | `Stream.map`, `Stream.mapEffect`                              |
+| [`filter`/`filterEffect`](#filter-and-map)                                | Kept                                           | `Stream.filter`, `Stream.filterEffect`                        |
+| [`map`/`mapEffect`](#filter-and-map)                                      | Kept                                           | `Stream.map`, `Stream.mapEffect`                              |
 | [`distinct`](#distinct)                                                   | Kept                                           | `Stream.changes` on a key prefix                              |
 | [`narrow`](#narrow-to-a-key-range)                                        | Kept                                           | `dropWhile` and `takeUntil` on the key, pushed into the index |
 | [`flatMap`](#flat-map)                                                    | Extended by the inner key                      | `Stream.flatMap`, sequential like RxJS's `concatMap`          |
@@ -203,7 +203,7 @@ eq "apple"
 
 The range callback mirrors Convex's index range builder with one addition: it tracks which fields are still _varying_ after the range is applied.
 
-- `eq` pins the next index field to a value and consumes it — it no longer varies within the stream.
+- `eq` pins the next index field to a value and consumes it—it no longer varies within the stream.
 - `gt`, `gte`, `lt`, and `lte` bound the next field without consuming it, and must come last (a lower bound may be followed by an upper bound on the same field).
 
 Fields must be used in the order the index declares them, and each method only offers the next unused field, so misuse is a type error.
@@ -373,9 +373,9 @@ mapped
    [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
 ```
 
-A mapper must not change what the documents are ordered by — the mapped stream keeps the original order key.
+A mapper must not change what the documents are ordered by—the mapped stream keeps the original order key.
 
-When the predicate or mapper needs to run an effect — read another table, use a service, or fail with a typed error — use `QueryStream.filterEffect` and `QueryStream.mapEffect` instead. They behave the same way, and the effect's error and requirement types flow into the stream's:
+When the predicate or mapper needs to run an effect—read another table, use a service, or fail with a typed error—use `QueryStream.filterEffect` and `QueryStream.mapEffect` instead. They behave the same way, and the effect's error and requirement types flow into the stream's:
 
 ```ts
 // Comments on notes that aren't hidden.
@@ -643,7 +643,7 @@ relabeled
    [great,7]   [meh,8]     [nice,9]     key: [text, _creationTime]
 ```
 
-With matching key names, the two streams merge by their key values — here, alphabetically:
+With matching key names, the two streams merge by their key values—here, alphabetically:
 
 {/* stream-diagram: rename-key-merge */}
 
@@ -660,7 +660,7 @@ merged
    [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]    [great,7]   [meh,8]     [nice,9]
 ```
 
-The new key must have exactly as many fields as the old one, and the values under each position must be comparable — relabeling doesn't reorder anything. A `flatMap` result relabels by its combined key, outer fields first.
+The new key must have exactly as many fields as the old one, and the values under each position must be comparable—relabeling doesn't reorder anything. A `flatMap` result relabels by its combined key, outer fields first.
 
 ### Reverse
 
@@ -784,7 +784,7 @@ Both budgets include group discovery, repeated reads during seeks, merge prefetc
 
 A budget-limited page stops at a safe logical key so resuming cannot skip an unfinished group or join. If the budget prevents safe progress or a strictly interior split of a pinned page, `paginate` fails with the typed `ReadBudgetExceededError` instead of returning a non-advancing cursor or repeating the same split. Increase the budget or change the query to reduce the reads needed for progress. Byte accounting happens after each document is read, so the last document can take the total over `maximumBytesRead`.
 
-A cursor that is malformed, or that was issued by a stream with a different order key (for example after an index change is deployed), fails the query with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }` — the signal `convex/react` and Confect's hooks treat as "restart pagination".
+A cursor that is malformed, or that was issued by a stream with a different order key (for example after an index change is deployed), fails the query with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }`—the signal `convex/react` and Confect's hooks treat as "restart pagination".
 
 <Warning>
   Stream cursors contain the order-key **values** of the page boundary,

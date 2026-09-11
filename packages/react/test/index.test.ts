@@ -785,7 +785,7 @@ describe("usePaginatedQuery", () => {
           paginatedQuery,
           {
             count: 42,
-            // @ts-expect-error — paginationOpts is managed by the hook, not the caller
+            // @ts-expect-error—paginationOpts is managed by the hook, not the caller
             paginationOpts: { numItems: 10, cursor: null },
           },
           { initialNumItems: 10 },

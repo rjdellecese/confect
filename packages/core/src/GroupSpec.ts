@@ -20,7 +20,7 @@ export interface GroupSpec<
   // Subgroups may be of any runtime, independent of this group's own runtime: a
   // group is only a namespace for its children, which are otherwise-independent
   // modules. Functions, by contrast, stay homogeneous (a Node group only accepts
-  // Node actions) — `addFunction` keeps the `<Runtime>` bound below.
+  // Node actions)—`addFunction` keeps the `<Runtime>` bound below.
   Groups_ extends AnyWithProps = never,
   MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec = never,
 > {

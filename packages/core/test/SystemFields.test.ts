@@ -30,7 +30,7 @@ describe("extendWithSystemFields", () => {
       ).not.toThrow();
     });
 
-    test("has the same type as the Schema.fieldsAssign combinator builds — a Struct, not a collapsed Codec — so the declared type cannot drift from the runtime", () => {
+    test("has the same type as the Schema.fieldsAssign combinator builds—a Struct, not a collapsed Codec—so the declared type cannot drift from the runtime", () => {
       const ViaFieldsAssign = Schema.fieldsAssign(
         SystemFields.SystemFields("notes").fields,
       )(NoteSchema);
@@ -90,7 +90,7 @@ describe("extendWithSystemFields", () => {
       ).not.toThrow();
     });
 
-    test("has the same type as the mapMembers + Tuple.map(fieldsAssign) combinator builds — a Union with every member extended — so the declared type cannot drift from the runtime", () => {
+    test("has the same type as the mapMembers + Tuple.map(fieldsAssign) combinator builds—a Union with every member extended—so the declared type cannot drift from the runtime", () => {
       const ViaMapMembers = ItemSchema.mapMembers(
         Tuple.map(
           Schema.fieldsAssign(SystemFields.SystemFields("items").fields),

@@ -128,7 +128,7 @@ export type RegisteredFunction<
  * invocation, after args decode. Iterated innermost-first so that the
  * first-attached (group-level, in attachment order) middleware ends up
  * outermost and runs first. Erased types: the public safety story lives at
- * the `MiddlewareSpec.MiddlewareImpl` / `MiddlewareImpl.make` signatures, and
+ * the `MiddlewareSpec.MiddlewareImpl`/`MiddlewareImpl.make` signatures, and
  * the composed effect's error channel is re-accounted by
  * {@link combineErrorSchemas}.
  */
@@ -155,7 +155,7 @@ export const applyMiddleware = <A, E, R>(
  * The error-schema allowlist for a function with middleware: the function's
  * own declared `error` schema unioned with every covering middleware's
  * error schema. `undefined` (⇒ every failure dies) only when neither
- * declares one — mirroring the ref-side union clients decode against.
+ * declares one—mirroring the ref-side union clients decode against.
  */
 export const combineErrorSchemas = (
   error: Schema.Codec<any, any> | undefined,
@@ -189,9 +189,9 @@ export const combineErrorSchemas = (
  * error channel—reaches the client as a `ConvexError`. The fiber dies and
  * `runPromise` rejects with a generic failure.
  *
- * Either way, a `ConvexError` *defect* — thrown imperatively rather than
+ * Either way, a `ConvexError` *defect*—thrown imperatively rather than
  * placed in the error channel, e.g. the pagination protocol's
- * `InvalidCursor` signal from `QueryStream.paginate` — is rethrown bare so
+ * `InvalidCursor` signal from `QueryStream.paginate`—is rethrown bare so
  * it retains its identity and Convex serializes its `data` to the client,
  * matching how a thrown `ConvexError` behaves in a plain Convex handler.
  *
@@ -200,7 +200,7 @@ export const combineErrorSchemas = (
  * lands in the fiber's root context, while a service provided within `effect`
  * pops before the `orDie`/`catch`/`result` wrappers this function adds. The
  * fiber's op counter survives context pops, so a cooperative yield can fire
- * inside those wrappers — only a root-context scheduler covers them.
+ * inside those wrappers—only a root-context scheduler covers them.
  */
 export const runHandlerPromise =
   (

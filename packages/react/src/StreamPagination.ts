@@ -1,13 +1,11 @@
 /**
- * EXPERIMENTAL — the pure state machine behind {@link useStreamPaginatedQuery}
+ * EXPERIMENTAL—the pure state machine behind {@link useStreamPaginatedQuery}
  * (see `notes/stream-based-querying.md` in the repo root).
  *
- * Reactive pagination without the query journal: every loaded page —
- * including the first — is pinned to a fixed index range by echoing its
+ * Reactive pagination without the query journal: every loaded page—including the first—is pinned to a fixed index range by echoing its
  * `continueCursor` back as the next subscription's `endCursor` (the last
  * page pins to the end-of-stream sentinel once exhausted), so adjacent
- * pages stay exactly contiguous and pages never shed items as data changes
- * — the "range-defined pages" the Fully Reactive Pagination article calls
+ * pages stay exactly contiguous and pages never shed items as data changes—the "range-defined pages" the Fully Reactive Pagination article calls
  * for, and the mechanism of `convex-helpers/react`'s `usePaginatedQuery`.
  *
  * Pinning a freshly loaded page, loading more, and splitting an overgrown
@@ -17,7 +15,7 @@
  *
  * This module is framework-free (it imports only `effect/*` and a type
  * from `convex/server`); it lives here for now because the React hook is
- * its only consumer — a second client (e.g. `@confect/foldkit`) should
+ * its only consumer—a second client (e.g. `@confect/foldkit`) should
  * prompt a move down to `@confect/js`.
  */
 import type { PaginationResult } from "convex/server";
@@ -184,8 +182,7 @@ export const loadMore =
 
 /**
  * Split the page at `key` in two at `splitCursor`. The first replacement
- * pins at the split point; the second keeps the page's own `endCursor` —
- * for a pinned page its original end (so a truncated `SplitRequired` page
+ * pins at the split point; the second keeps the page's own `endCursor`—for a pinned page its original end (so a truncated `SplitRequired` page
  * loses none of its range), and for a growing page no end at all (it keeps
  * growing).
  */
@@ -252,7 +249,7 @@ export type Results = Record.ReadonlyRecord<
 // -----------------------------------------------------------------------------
 
 /**
- * The wire shape of one loaded page — `PaginationResult` from
+ * The wire shape of one loaded page—`PaginationResult` from
  * `convex/server`, so the protocol has a single source of truth.
  */
 export type PageResult = PaginationResult<unknown>;

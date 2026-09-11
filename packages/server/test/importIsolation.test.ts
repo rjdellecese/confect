@@ -37,8 +37,7 @@ layer(TestLayer)("import isolation", (it) => {
         const contents = yield* fs.readFileString(registry);
         // The DatabaseSchema value is imported (cheap: table schemas only).
         expect(contents).toContain('import databaseSchema from "../../schema"');
-        // The project-wide api/spec modules must NOT be runtime-imported —
-        // importing them is what drags every sibling spec into this one
+        // The project-wide api/spec modules must NOT be runtime-imported—importing them is what drags every sibling spec into this one
         // function's bundle.
         expect(contents).not.toMatch(
           /^import .* from "[^"]*\/(api|nodeApi)";$/m,

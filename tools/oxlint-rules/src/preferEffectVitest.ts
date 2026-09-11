@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
 const message =
-  'Import from "@effect/vitest" instead of "vitest": it re-exports everything "vitest" does, alongside the Effect-aware test APIs (it.effect, layer, flakyTest, …). Only `vi` must come from "vitest" — the mocks API breaks when imported through a re-export.';
+  'Import from "@effect/vitest" instead of "vitest": it re-exports everything "vitest" does, alongside the Effect-aware test APIs (it.effect, layer, flakyTest, …). Only `vi` must come from "vitest"—the mocks API breaks when imported through a re-export.';
 
 /**
  * Names that must be imported from `vitest` itself: Vitest resolves the
@@ -32,7 +32,7 @@ const importedName = (
  *
  * `@effect/vitest` does `export * from "vitest"`, so every named export of
  * `vitest` (including `beforeEach`, `expectTypeOf`, …) is available from
- * it — which also makes rewriting the module specifier a safe autofix. The
+ * it—which also makes rewriting the module specifier a safe autofix. The
  * exception is `vi` (see `vitestOnlyNames`): an import that pulls only
  * exempt names is allowed, and one that mixes exempt names with others is
  * reported without a fix, since it has to be split by hand. Subpath imports

@@ -7,4 +7,4 @@
 "@confect/test": patch
 ---
 
-Sync with `main`: this prerelease line now includes all changes released in `@confect/*` 9.3.0 — see that version's changelog entries.
+Sync with `main`: this prerelease line now includes all changes released in `@confect/*` 9.3.0—see that version's changelog entries.

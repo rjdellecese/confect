@@ -99,7 +99,7 @@ export const validateConfectFunctionIdentifier = (identifier: string) => {
  * as a `confect/tables/<identifier>.ts` filename).
  *
  * Rules:
- * - Must match `/^[A-Za-z][A-Za-z0-9_]*$/` — letter-leading, alphanumeric plus
+ * - Must match `/^[A-Za-z][A-Za-z0-9_]*$/`—letter-leading, alphanumeric plus
  *   underscore. No `$` (not a valid Convex table name character); no leading
  *   `_` (Convex reserves `_<name>` for its system tables).
  * - Must not be a reserved JavaScript identifier, so the name can also be used

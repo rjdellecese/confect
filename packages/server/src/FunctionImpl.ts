@@ -23,15 +23,15 @@ export const FunctionImpl = <Name_ extends string>({ name }: { name: Name_ }) =>
  *
  * The function is registered under a flat, single-segment key (its own
  * `name`), not a project-wide dot-path. Each group's impl layer is
- * built in isolation — `RegisteredFunctions.buildForGroup` (and the CLI's
- * `validateImpl`) provide a fresh `Registry` per group — so function names
+ * built in isolation—`RegisteredFunctions.buildForGroup` (and the CLI's
+ * `validateImpl`) provide a fresh `Registry` per group—so function names
  * only need to be unique within their own group.
  *
  * `databaseSchema` is retained purely as a type-level carrier: the handler's
  * ctx-service requirements (`DatabaseReader`, `QueryCtx<DataModel>`, …) are
- * derived from it via `Handler.WithName`. It is not read at runtime — the
+ * derived from it via `Handler.WithName`. It is not read at runtime—the
  * generated per-group registry forwards the schema value to the function
- * builders — so impls depend on `_generated/schema` (table schemas) rather than
+ * builders—so impls depend on `_generated/schema` (table schemas) rather than
  * `_generated/api` (which transitively imports every function spec).
  */
 export const make = <

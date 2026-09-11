@@ -54,7 +54,7 @@ const listOrFail = Ref.make(
 
 /**
  * The mock serves each subscribed page from `responses`, keyed by the
- * page's `paginationOpts` — so tests observe exactly which page ranges the
+ * page's `paginationOpts`—so tests observe exactly which page ranges the
  * hook subscribes, and control when each loads.
  */
 const responses = MutableRef.make(new Map<string, unknown>());
