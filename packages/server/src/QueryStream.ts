@@ -2667,7 +2667,7 @@ export const paginate: {
     R,
     Direction extends OrderDirection,
   >(self: QueryStream<Doc, Key, Direction, E, R>, options: PaginateOptions) {
-    const cursorSchema = QueryStreamCursor.forKeyFields(self.keyFields);
+    const cursorSchema = QueryStreamCursor.codecForKeyFields(self.keyFields);
     const encodeCursor = Schema.encodeEffect(cursorSchema);
     const decodeCursor = Schema.decodeEffect(Schema.NullOr(cursorSchema));
     const endCursor = Option.fromNullishOr(options.endCursor);

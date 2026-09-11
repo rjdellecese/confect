@@ -124,13 +124,13 @@ describe.each(["asc", "desc"] as const)(
           const result = yield* QueryStream.paginate(source, {
             cursor: start
               ? yield* Schema.encodeEffect(
-                  QueryStreamCursor.forKeyFields(source.keyFields),
+                  QueryStreamCursor.codecForKeyFields(source.keyFields),
                 )([values[1]])
               : null,
             ...(end
               ? {
                   endCursor: yield* Schema.encodeEffect(
-                    QueryStreamCursor.forKeyFields(source.keyFields),
+                    QueryStreamCursor.codecForKeyFields(source.keyFields),
                   )([values[3]]),
                 }
               : {}),
@@ -142,7 +142,7 @@ describe.each(["asc", "desc"] as const)(
           expect(result.continueCursor).toBe(
             end
               ? yield* Schema.encodeEffect(
-                  QueryStreamCursor.forKeyFields(source.keyFields),
+                  QueryStreamCursor.codecForKeyFields(source.keyFields),
                 )([values[3]])
               : QueryStreamCursor.END_CURSOR,
           );
@@ -171,16 +171,24 @@ describe.each(["asc", "desc"] as const)(
           for (const cursor of [
             '["apple",1,"id"]',
             yield* Schema.encodeEffect(
-              QueryStreamCursor.forKeyFields(["body", "_creationTime", "_id"]),
+              QueryStreamCursor.codecForKeyFields([
+                "body",
+                "_creationTime",
+                "_id",
+              ]),
             )(["apple", 1, "id"]),
             yield* Schema.encodeEffect(
-              QueryStreamCursor.forKeyFields(["_creationTime", "text", "_id"]),
+              QueryStreamCursor.codecForKeyFields([
+                "_creationTime",
+                "text",
+                "_id",
+              ]),
             )(["apple", 1, "id"]),
           ]) {
             for (const numItems of [0, 1]) {
               const result = yield* QueryStream.paginate(source, {
                 cursor: yield* Schema.encodeEffect(
-                  QueryStreamCursor.forKeyFields(source.keyFields),
+                  QueryStreamCursor.codecForKeyFields(source.keyFields),
                 )(["apple", 0, "before"]),
                 numItems,
                 [bound]: cursor,
@@ -228,7 +236,7 @@ describe.each(["asc", "desc"] as const)(
         expect([...first.page, ...second.page]).toEqual(ids);
         expect(
           yield* Schema.decodeEffect(
-            QueryStreamCursor.forKeyFields(source.keyFields),
+            QueryStreamCursor.codecForKeyFields(source.keyFields),
           )(first.continueCursor),
         ).toEqual(["apple", 1, ids[0]]);
         expect(end).toMatchObject({

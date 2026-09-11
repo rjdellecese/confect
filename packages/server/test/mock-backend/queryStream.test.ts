@@ -1628,7 +1628,7 @@ describe("QueryStream", () => {
 
             for (const cursor of [page.continueCursor, page.splitCursor]) {
               const key = yield* Schema.decodeEffect(
-                QueryStreamCursor.forKeyFields(source.keyFields),
+                QueryStreamCursor.codecForKeyFields(source.keyFields),
               )(cursor);
               expect(key).toHaveLength(3);
 

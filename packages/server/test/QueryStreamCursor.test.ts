@@ -27,7 +27,7 @@ describe("QueryStreamCursor schema", () => {
       Schema.decodeSync(QueryStreamCursor.Json)(serialized),
     ).toBeInstanceOf(QueryStreamCursor.QueryStreamCursor);
     expect(serialized).toBe(
-      Schema.encodeSync(QueryStreamCursor.forKeyFields(cursor.keyFields))([
+      Schema.encodeSync(QueryStreamCursor.codecForKeyFields(cursor.keyFields))([
         "apple",
         1,
         "id",
@@ -88,9 +88,9 @@ describe("QueryStreamCursor serialization", () => {
       { nested: "value" },
     ];
     const fields = key.map((_, index) => `field${index}`);
-    const cursor = Schema.encodeSync(QueryStreamCursor.forKeyFields(fields))(
-      key,
-    );
+    const cursor = Schema.encodeSync(
+      QueryStreamCursor.codecForKeyFields(fields),
+    )(key);
 
     expect(Schema.is(QueryStreamCursor.OrderKey)(key)).toBe(true);
     expect(JSON.parse(cursor)).toMatchObject({ version: 1, keyFields: fields });
@@ -98,13 +98,13 @@ describe("QueryStreamCursor serialization", () => {
       key,
     );
     expect(
-      Schema.decodeSync(QueryStreamCursor.forKeyFields(fields))(cursor),
+      Schema.decodeSync(QueryStreamCursor.codecForKeyFields(fields))(cursor),
     ).toEqual(key);
   });
 
   it("rejects serialization with mismatched key and field lengths", () => {
     expect(() =>
-      Schema.encodeSync(QueryStreamCursor.forKeyFields([]))([1]),
+      Schema.encodeSync(QueryStreamCursor.codecForKeyFields([]))([1]),
     ).toThrow("key and fields must have the same length");
   });
 
@@ -128,7 +128,7 @@ describe("QueryStreamCursor serialization", () => {
 
   it("validates field names and their order, not just their count", () => {
     const cursor = Schema.encodeSync(
-      QueryStreamCursor.forKeyFields(["text", "_creationTime", "_id"]),
+      QueryStreamCursor.codecForKeyFields(["text", "_creationTime", "_id"]),
     )(["apple", 1, "id"]);
 
     for (const fields of [
@@ -137,17 +137,19 @@ describe("QueryStreamCursor serialization", () => {
       ["text", "_creationTime"],
     ]) {
       expect(() =>
-        Schema.decodeSync(QueryStreamCursor.forKeyFields(fields))(cursor),
+        Schema.decodeSync(QueryStreamCursor.codecForKeyFields(fields))(cursor),
       ).toThrow(Schema.SchemaError);
     }
   });
 
   it("distinguishes an empty order key from the end sentinel", () => {
-    const cursor = Schema.encodeSync(QueryStreamCursor.forKeyFields([]))([]);
+    const cursor = Schema.encodeSync(QueryStreamCursor.codecForKeyFields([]))(
+      [],
+    );
 
     expect(cursor).not.toBe(QueryStreamCursor.END_CURSOR);
     expect(
-      Schema.decodeSync(QueryStreamCursor.forKeyFields([]))(cursor),
+      Schema.decodeSync(QueryStreamCursor.codecForKeyFields([]))(cursor),
     ).toEqual([]);
   });
 
@@ -180,7 +182,7 @@ describe("QueryStreamCursor serialization", () => {
           ],
         });
 
-        const bound = QueryStreamCursor.forKeyFields(value.keyFields);
+        const bound = QueryStreamCursor.codecForKeyFields(value.keyFields);
         expectTypeOf<
           typeof bound.Type
         >().toEqualTypeOf<QueryStreamCursor.OrderKey>();

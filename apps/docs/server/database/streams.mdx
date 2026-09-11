@@ -772,13 +772,13 @@ Boundary cursors are JSON strings containing a versioned envelope: `{ version: 1
 
 The `QueryStreamCursor` module, exported from `@confect/server`, models cursors with native Convex values: decoded keys can contain `bigint`, `ArrayBuffer`, or `undefined`. Its schemas handle the full JSON round trip through Effect's standard encoding and decoding APIs.
 
-| `QueryStreamCursor` export | Contract                                                                                                                                                                                                 |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `QueryStreamCursor`        | Schema and inferred type for the full native cursor: version, runtime field names, and key values.                                                                                                       |
-| `Json`                     | String codec for the full native cursor, including Convex's special-value encodings.                                                                                                                     |
-| `OrderKey`                 | Schema and inferred type for decoded key values, including IDs and missing fields as `undefined`.                                                                                                        |
-| `forKeyFields(keyFields)`  | Returns a string codec for an `OrderKey`. Decoding checks the exact ordered field names; encoding supplies the version and field names automatically. Use runtime `keyFields`, not the type-level `Key`. |
-| `END_CURSOR`               | The string `"[]"`, returned when pagination reaches the end. Accepted as an `endCursor` sentinel only, not as a normal start or decoded key boundary.                                                    |
+| `QueryStreamCursor` export     | Contract                                                                                                                                                                                                 |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QueryStreamCursor`            | Schema and inferred type for the full native cursor: version, runtime field names, and key values.                                                                                                       |
+| `Json`                         | String codec for the full native cursor, including Convex's special-value encodings.                                                                                                                     |
+| `OrderKey`                     | Schema and inferred type for decoded key values, including IDs and missing fields as `undefined`.                                                                                                        |
+| `codecForKeyFields(keyFields)` | Returns a string codec for an `OrderKey`. Decoding checks the exact ordered field names; encoding supplies the version and field names automatically. Use runtime `keyFields`, not the type-level `Key`. |
+| `END_CURSOR`                   | The string `"[]"`, returned when pagination reaches the end. Accepted as an `endCursor` sentinel only, not as a normal start or decoded key boundary.                                                    |
 
 For example, resume manually from a nonterminal page inside an effect:
 
@@ -787,7 +787,7 @@ import { QueryStreamCursor } from "@confect/server";
 import * as Schema from "effect/Schema";
 
 Effect.gen(function* () {
-  const Cursor = QueryStreamCursor.forKeyFields(query.keyFields);
+  const Cursor = QueryStreamCursor.codecForKeyFields(query.keyFields);
   const key = yield* Schema.decodeEffect(Cursor)(page.continueCursor);
 
   return QueryStream.narrow(query, {

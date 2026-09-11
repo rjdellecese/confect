@@ -69,7 +69,7 @@ export const END_CURSOR = "[]";
 
 const keyFieldsEquivalence = Array.makeEquivalence(Equivalence.String);
 
-export const forKeyFields = (keyFields: ReadonlyArray<string>) =>
+export const codecForKeyFields = (keyFields: ReadonlyArray<string>) =>
   Json.check(
     Schema.makeFilter(
       (cursor) => keyFieldsEquivalence(cursor.keyFields, keyFields),
