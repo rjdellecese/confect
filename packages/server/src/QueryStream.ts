@@ -32,14 +32,7 @@ import type {
   PaginationOptions as ConvexPaginationOptions,
   PaginationResult as ConvexPaginationResult,
 } from "convex/server";
-import {
-  compareValues,
-  ConvexError,
-  convexToJson,
-  getDocumentSize,
-  jsonToConvex,
-  type Value,
-} from "convex/values";
+import { compareValues, getDocumentSize, type Value } from "convex/values";
 import { identity, dual, pipe } from "effect/Function";
 import { pipeArguments, type Pipeable } from "effect/Pipeable";
 import * as Array from "effect/Array";
@@ -65,6 +58,8 @@ import * as SynchronizedRef from "effect/SynchronizedRef";
 import * as Tuple from "effect/Tuple";
 import type * as Types from "effect/Types";
 import * as Document from "./Document";
+import * as QueryStreamCursor from "./QueryStreamCursor";
+import type { OrderKey } from "./QueryStreamCursor";
 
 /**
  * @experimental
@@ -78,15 +73,6 @@ export type TypeId = typeof TypeId;
 // -----------------------------------------------------------------------------
 // Order keys
 // -----------------------------------------------------------------------------
-
-/**
- * The values of a document's order-key fields: the index fields that still
- * vary after equality pinning, plus the trailing `_id` tiebreaker. `undefined`
- * appears for optional fields that are absent.
- *
- * @experimental
- */
-export type OrderKey = ReadonlyArray<Value | undefined>;
 
 /**
  * The direction a stream is ordered in. Tracked covariantly in the type: a
@@ -2529,94 +2515,6 @@ export const unique = Effect.fn("QueryStream.unique")(
 // Pagination
 // -----------------------------------------------------------------------------
 
-const UNDEFINED_SENTINEL = { $undefined: true } as const;
-
-/**
- * Serialize an order key and its runtime field names as a versioned cursor.
- * Unlike the built-in Convex pagination
- * cursors (opaque tokens), these carry the raw order-key *values*—they are
- * delivered to clients in `continueCursor`/`splitCursor`, so a stream whose
- * remaining order key includes a sensitive indexed field exposes that
- * field's values at page boundaries. Pin such fields with `eq`, or don't
- * paginate over them publicly, until cursors are made opaque.
- *
- * @experimental
- */
-export const serializeCursor = (
-  key: OrderKey,
-  keyFields: ReadonlyArray<string>,
-): string => {
-  if (key.length !== keyFields.length) {
-    throw new Error(
-      "QueryStream.serializeCursor: key and fields must have the same length",
-    );
-  }
-  return JSON.stringify({
-    version: 1,
-    keyFields,
-    key: Array.map(key, (value) =>
-      value === undefined ? UNDEFINED_SENTINEL : convexToJson(value),
-    ),
-  });
-};
-
-/**
- * The error a stream-paginated query fails with when a client-supplied
- * cursor is malformed or no longer matches the stream's order-key shape—the `paginationError: "InvalidCursor"` form `convex/react` (and
- * `useStreamPaginatedQuery`) recognize as "reset pagination" rather than an
- * application failure.
- */
-const invalidCursorError = () =>
-  new ConvexError({ paginationError: "InvalidCursor" });
-
-/**
- * Decode a versioned cursor, optionally checking its runtime order-key
- * fields against a stream's `keyFields`. Malformed, unsupported,
- * or incompatible cursors throw the `InvalidCursor` `ConvexError`.
- * Field compatibility does not identify a query's filters or pinned values.
- *
- * @experimental
- */
-export const deserializeCursor = (
-  cursor: string,
-  keyFields?: ReadonlyArray<string>,
-): OrderKey => {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(cursor);
-  } catch {
-    throw invalidCursorError();
-  }
-  if (
-    !Predicate.isObject(parsed) ||
-    parsed.version !== 1 ||
-    !globalThis.Array.isArray(parsed.keyFields) ||
-    !parsed.keyFields.every(Predicate.isString) ||
-    !globalThis.Array.isArray(parsed.key) ||
-    parsed.key.length !== parsed.keyFields.length ||
-    (keyFields !== undefined &&
-      !keyFieldsEquivalence(parsed.keyFields, keyFields))
-  ) {
-    throw invalidCursorError();
-  }
-  try {
-    return Array.map(parsed.key as ReadonlyArray<unknown>, (value) =>
-      Predicate.hasProperty(value, "$undefined")
-        ? undefined
-        : jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
-    );
-  } catch {
-    throw invalidCursorError();
-  }
-};
-
-/**
- * The cursor denoting the end of the stream.
- *
- * @experimental
- */
-export const END_CURSOR = "[]";
-
 /**
  * Reading this many rows into one page earns a `SplitRecommended`—half of
  * `convex-helpers`' `MAX_DOCUMENT_SCAN_LEN` (32000), as there.
@@ -2765,15 +2663,15 @@ export const paginate: {
     Direction extends OrderDirection,
   >(self: QueryStream<Doc, Key, Direction, E, R>, options: PaginateOptions) {
     const after = Option.map(Option.fromNullOr(options.cursor), (cursor) =>
-      deserializeCursor(cursor, self.keyFields),
+      QueryStreamCursor.deserialize(cursor, self.keyFields),
     );
     const endCursor = Option.fromNullishOr(options.endCursor);
     const pinnedEnd = Option.filter(
       endCursor,
-      (cursor) => cursor !== END_CURSOR,
+      (cursor) => cursor !== QueryStreamCursor.END_CURSOR,
     );
     const until = Option.map(pinnedEnd, (cursor) =>
-      deserializeCursor(cursor, self.keyFields),
+      QueryStreamCursor.deserialize(cursor, self.keyFields),
     );
     if (options.numItems === 0) {
       if (options.cursor === null) {
@@ -2892,9 +2790,12 @@ export const paginate: {
           ? {
               page,
               isDone: false,
-              continueCursor: serializeCursor(lastKey, self.keyFields),
+              continueCursor: QueryStreamCursor.serialize(
+                lastKey,
+                self.keyFields,
+              ),
               pageStatus: "SplitRequired" as const,
-              splitCursor: serializeCursor(
+              splitCursor: QueryStreamCursor.serialize(
                 midpointKey(state.readKeys),
                 self.keyFields,
               ),
@@ -2906,9 +2807,12 @@ export const paginate: {
             ? {
                 page,
                 isDone: false,
-                continueCursor: serializeCursor(lastKey, self.keyFields),
+                continueCursor: QueryStreamCursor.serialize(
+                  lastKey,
+                  self.keyFields,
+                ),
                 pageStatus: "SplitRecommended" as const,
-                splitCursor: serializeCursor(
+                splitCursor: QueryStreamCursor.serialize(
                   midpointKey(state.readKeys),
                   self.keyFields,
                 ),
@@ -2916,7 +2820,10 @@ export const paginate: {
             : {
                 page,
                 isDone: false,
-                continueCursor: serializeCursor(lastKey, self.keyFields),
+                continueCursor: QueryStreamCursor.serialize(
+                  lastKey,
+                  self.keyFields,
+                ),
               },
       // The narrowed stream was exhausted: either we reached the
       // pinned end cursor (more may follow it) or the true end of
@@ -2935,9 +2842,12 @@ export const paginate: {
           ? {
               page,
               isDone: false,
-              continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
+              continueCursor: Option.getOrElse(
+                pinnedEnd,
+                () => QueryStreamCursor.END_CURSOR,
+              ),
               pageStatus: "SplitRecommended" as const,
-              splitCursor: serializeCursor(
+              splitCursor: QueryStreamCursor.serialize(
                 midpointKey(state.readKeys),
                 self.keyFields,
               ),
@@ -2945,7 +2855,10 @@ export const paginate: {
           : {
               page,
               isDone: Option.isNone(pinnedEnd),
-              continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
+              continueCursor: Option.getOrElse(
+                pinnedEnd,
+                () => QueryStreamCursor.END_CURSOR,
+              ),
             };
       },
     });

@@ -1,3 +1,4 @@
+import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { FunctionSpec, Ref, Table } from "@confect/core";
 import * as ActionRunner from "@confect/server/ActionRunner";
 import type * as DataModel from "@confect/server/DataModel";
@@ -132,7 +133,7 @@ describe("server operation tracing", () => {
         const page = {
           page: [8],
           isDone: true,
-          continueCursor: QueryStream.END_CURSOR,
+          continueCursor: QueryStreamCursor.END_CURSOR,
         };
         expect(results).toEqual([
           Option.some(8),

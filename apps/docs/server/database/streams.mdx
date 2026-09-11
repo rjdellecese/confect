@@ -473,7 +473,7 @@ When both endpoints use the same key, the range is empty unless both are inclusi
 
 On a `distinct` stream, full-key bounds filter the original representatives exactly; they do not select a replacement from within the narrowed range. Explicit prefix bounds still include or exclude whole groups. Bounds applied before `distinct` constrain its input and can change which document represents a group; bounds applied after it constrain only the output, preserving that original input range and its representatives.
 
-`paginate` uses an exclusive start and an inclusive end. For a nonterminal page, decode its `continueCursor` with `QueryStream.deserializeCursor(page.continueCursor, query.keyFields)` and pass that full runtime key as an exclusive `start` to `narrow`. Do not decode `QueryStream.END_CURSOR` as a boundary; it is an end-of-stream sentinel.
+`paginate` uses an exclusive start and an inclusive end. For a nonterminal page, decode its `continueCursor` with `QueryStreamCursor.deserialize(page.continueCursor, query.keyFields)` and pass that full runtime key as an exclusive `start` to `narrow`. Do not decode `QueryStreamCursor.END_CURSOR` as a boundary; it is an end-of-stream sentinel.
 
 ### Flat-map
 
@@ -670,20 +670,20 @@ Merges, filters and maps, flat-maps (their inner streams included), `distinct`, 
 
 ### Options
 
-| Field              | Meaning                                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cursor`           | Required exclusive start boundary. `null` starts at the beginning of the stream.                                                                                    |
-| `numItems`         | Requested number of emitted values, excluding filtered documents. Ignored as an item limit when `endCursor` is set.                                                 |
-| `endCursor`        | Optional inclusive end boundary. Pins the page to a key range regardless of how many values it contains. `QueryStream.END_CURSOR` pins it to the end of the stream. |
-| `maximumRowsRead`  | Optional budget for physical document reads from underlying `QueryStream` index queries, including filtered documents.                                              |
-| `maximumBytesRead` | Optional budget charging each document's estimated size on every read, not Convex's exact billed bytes.                                                             |
+| Field              | Meaning                                                                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cursor`           | Required exclusive start boundary. `null` starts at the beginning of the stream.                                                                                          |
+| `numItems`         | Requested number of emitted values, excluding filtered documents. Ignored as an item limit when `endCursor` is set.                                                       |
+| `endCursor`        | Optional inclusive end boundary. Pins the page to a key range regardless of how many values it contains. `QueryStreamCursor.END_CURSOR` pins it to the end of the stream. |
+| `maximumRowsRead`  | Optional budget for physical document reads from underlying `QueryStream` index queries, including filtered documents.                                                    |
+| `maximumBytesRead` | Optional budget charging each document's estimated size on every read, not Convex's exact billed bytes.                                                                   |
 
 ### Result
 
 | Field            | Meaning and action                                                                                                                                                                                                                                                      |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `page`           | Array of emitted values, possibly empty even when the stream made progress past filtered documents.                                                                                                                                                                     |
-| `continueCursor` | String identifying the next page's exclusive start. Save it unchanged; when the end is reached, the returned sentinel is `QueryStream.END_CURSOR` (`"[]"`). Never pass that sentinel as a normal `cursor`.                                                              |
+| `continueCursor` | String identifying the next page's exclusive start. Save it unchanged; when the end is reached, the returned sentinel is `QueryStreamCursor.END_CURSOR` (`"[]"`). Never pass that sentinel as a normal `cursor`.                                                        |
 | `splitCursor`    | Optional interior boundary used to subdivide a page. Pin the left page with `endCursor: splitCursor`; start the right page with `cursor: splitCursor`, retaining the original end boundary.                                                                             |
 | `pageStatus`     | `"SplitRequired"` when a read budget stops the page at a safe boundary; `"SplitRecommended"` when a pinned page has grown too large or a page scans many rows. Both provide a `splitCursor`; otherwise this field may be absent. Stream-aware clients handle splitting. |
 | `isDone`         | `true` confirms the true end of the stream. Reaching a pinned key does not prove completion. A split recommendation can report `false` even at the end; handle splitting before requesting another page.                                                                |
@@ -691,6 +691,8 @@ Merges, filters and maps, flat-maps (their inner streams included), `distinct`, 
 For a one-shot read inside a handler, consume the result's `page`. For sequential reads, preserve the returned cursor rather than reconstructing it from the last visible document:
 
 ```ts
+import { QueryStreamCursor } from "@confect/server";
+
 const query = reader.table("notes").stream("by_text");
 const first =
   yield *
@@ -700,7 +702,7 @@ const first =
   });
 
 const next =
-  first.isDone || first.continueCursor === QueryStream.END_CURSOR
+  first.isDone || first.continueCursor === QueryStreamCursor.END_CURSOR
     ? undefined
     : yield *
       QueryStream.paginate(query, {
@@ -768,11 +770,13 @@ Boundary cursors are JSON strings containing a versioned envelope: `{ version: 1
 }
 ```
 
-| API                                     | Contract                                                                                                                                                             |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `serializeCursor(key, keyFields)`       | Serializes a full runtime `OrderKey` with its runtime field names. Both arguments are required; use the stream's `keyFields`, not its type-level `Key`.              |
-| `deserializeCursor(cursor, keyFields?)` | Validates the envelope and returns a decoded runtime `OrderKey`, preserving IDs. If expected `keyFields` are supplied, also validates the exact ordered field names. |
-| `END_CURSOR`                            | The string `"[]"`, returned when pagination reaches the end. Accepted as an `endCursor` sentinel only, not as a normal start or decoded key boundary.                |
+The `QueryStreamCursor` module, exported from `@confect/server`, owns the envelope schema and inferred `QueryStreamCursor` type. Its `Json` codec encodes that envelope as a string; its `OrderKey` type describes decoded Convex values, including missing fields as `undefined`.
+
+| `QueryStreamCursor` export        | Contract                                                                                                                                                             |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `serialize(key, keyFields)`       | Serializes a full runtime `OrderKey` with its runtime field names. Both arguments are required; use the stream's `keyFields`, not its type-level `Key`.              |
+| `deserialize(cursor, keyFields?)` | Validates the envelope and returns a decoded runtime `OrderKey`, preserving IDs. If expected `keyFields` are supplied, also validates the exact ordered field names. |
+| `END_CURSOR`                      | The string `"[]"`, returned when pagination reaches the end. Accepted as an `endCursor` sentinel only, not as a normal start or decoded key boundary.                |
 
 `paginate` validates boundary cursors against the stream's runtime layout. Malformed envelopes, unsupported versions, and mismatched ordered field names fail with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }`. Confect's pagination clients treat that signal as a request to restart. The string `"[]"` is accepted only as an `endCursor` sentinel.
 

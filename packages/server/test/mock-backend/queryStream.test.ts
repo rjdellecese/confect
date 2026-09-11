@@ -1,3 +1,4 @@
+import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { type Document, QueryStream } from "@confect/server";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
@@ -381,7 +382,7 @@ describe("QueryStream", () => {
           });
           expect(tagsOf(page3.page)).toEqual(["6"]);
           assertEquals(page3.isDone, true);
-          assertEquals(page3.continueCursor, QueryStream.END_CURSOR);
+          assertEquals(page3.continueCursor, QueryStreamCursor.END_CURSOR);
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
@@ -576,7 +577,7 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
-          const afterKey = QueryStream.deserializeCursor(page1.continueCursor);
+          const afterKey = QueryStreamCursor.deserialize(page1.continueCursor);
 
           const narrowed = QueryStream.narrow(leaf, {
             start: { key: afterKey, inclusive: false },
@@ -622,7 +623,7 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
-          const afterKey = QueryStream.deserializeCursor(page1.continueCursor);
+          const afterKey = QueryStreamCursor.deserialize(page1.continueCursor);
 
           // Pure transforms narrow by narrowing their input, so the bounds
           // still reach the leaf rather than falling back to in-memory
@@ -1621,7 +1622,7 @@ describe("QueryStream", () => {
             );
 
             for (const cursor of [page.continueCursor, page.splitCursor]) {
-              const key = QueryStream.deserializeCursor(
+              const key = QueryStreamCursor.deserialize(
                 cursor,
                 source.keyFields,
               );
