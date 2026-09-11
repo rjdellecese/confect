@@ -214,13 +214,11 @@ Provide this implementation once in the group's impl layer, alongside the `Requi
 
 The second argument is required and typed from the schema's `Type`. Middleware without an `options` schema still uses `.middleware(Spec)` with no second argument. Options are validated against the schema's **type side**, not its encoded input, during codegen and server registration. Confect does not decode or coerce them: if a schema transforms strings into numbers, pass a number, not a string.
 
-Keep the schema inside its thunk. Constructing middleware specs and assembling groups, specs, and refs does not evaluate options schemas; validation happens later.
+Pass `options` as a schema factory (`() => schema`), not as a schema value.
 
 Both `MiddlewareImpl.make` and `MiddlewareImpl.makeByFunctionType` receive `(effect, { options, invocation })` when the middleware declares an options schema. The typed `options` field contains the attachment value; `invocation` contains `name`, `functionType`, `functionVisibility`, and decoded `args`. Middleware without an options schema receives only `{ invocation }`: `options` is absent from both the context type and the runtime object. A declared schema that accepts `undefined` still receives an `options` field, even when its value is `undefined`. Destructure only what you need: `(effect, { options })` reads the role flags without binding invocation metadata.
 
 The same options mechanism also supports resource argument names, flags, and client-safe resolver functions. Use `MiddlewareImpl.make` rather than the `provides` shorthand when producing a service depends on the attachment options.
-
-Options belong to each attachment, so different functions can reuse the same middleware implementation with different values. They survive codegen and are carried by `refs`. To inspect attachments, use the ordered `middlewareAttachments` list of `{ spec, options }` entries. Function specs, group specs, and refs expose `middlewareSpecs` as a specs-only view derived from those attachments, not a separately stored list or a source of per-attachment options.
 
 The middleware's declared error still determines the client error union, independently of its options. `provides` and `requires` also remain fixed for a spec: an option does not change a handler's service types. For a `tolerateMissing` policy, declare a service containing an `Option` and let the implementation decide whether to provide `None` or fail.
 
@@ -249,7 +247,7 @@ GroupSpec.make()
 
 Both role checks must pass before the handler runs, so only an `admin` user can call `deleteAll` in this example. Repeated guards form a conjunction, not a union of allowed policies: two role guards mean the caller must satisfy both, not either. An earlier short-circuit still prevents the remaining attachments and handler from running.
 
-Confect uses `Schema.toEquivalence` to compare options for attachments with the same middleware key. Equivalent options are rejected by `confect codegen` and by server registration, including across the group/function boundary. TypeScript does not check this equivalence. Middleware without an options schema still rejects duplicate keys immediately, both at the type level and at runtime.
+Attachments with the same middleware key must have non-equivalent options according to the options schema. Equivalent options are rejected by `confect codegen` and by server registration, including across the group/function boundary. TypeScript does not check this equivalence. Middleware without an options schema still rejects duplicate keys immediately, both at the type level and at runtime.
 
 Equality follows the options schema rather than evaluating the policy's behavior. In this example, object key order does not matter, but an omitted flag differs from an explicit `false`, even though both deny that role. Use `Schema.overrideToEquivalence` on the options schema if your policy needs custom equality semantics.
 
