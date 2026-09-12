@@ -32,7 +32,7 @@ export type Phase = Data.TaggedEnum<{
 
 export const Phase = Data.taggedEnum<Phase>();
 
-export class State extends Data.Class<{
+export class QueryStreamReadBudget extends Data.Class<{
   readonly rows: number;
   readonly bytes: number;
   readonly status: Phase;
@@ -53,14 +53,19 @@ export const Limits = Context.Reference<Limits>(
   },
 );
 
-export type Status = Option.Option<SynchronizedRef.SynchronizedRef<State>>;
+export type Status = Option.Option<
+  SynchronizedRef.SynchronizedRef<QueryStreamReadBudget>
+>;
 
 export const Status = Context.Reference<Status>(
   "@confect/server/QueryStream/ReadBudgetStatus",
   { defaultValue: Option.none },
 );
 
-export const isExhausted = (limits: Limits, state: State): boolean =>
+export const isExhausted = (
+  limits: Limits,
+  state: QueryStreamReadBudget,
+): boolean =>
   Option.exists(limits.maximumRowsRead, (limit) => state.rows >= limit) ||
   Option.exists(limits.maximumBytesRead, (limit) => state.bytes >= limit);
 
@@ -87,7 +92,7 @@ export const charge = (encodedDocuments: Stream.Stream<unknown>) =>
               if (isExhausted(limits, state)) {
                 return Tuple.make(
                   Option.none(),
-                  new State({
+                  new QueryStreamReadBudget({
                     rows: state.rows,
                     bytes: state.bytes,
                     status: Phase.Stopped(),
@@ -97,7 +102,7 @@ export const charge = (encodedDocuments: Stream.Stream<unknown>) =>
               const documents = yield* pull;
               return Tuple.make(
                 Option.some(documents),
-                new State({
+                new QueryStreamReadBudget({
                   status: state.status,
                   rows: state.rows + documents.length,
                   bytes: Option.match(limits.maximumBytesRead, {

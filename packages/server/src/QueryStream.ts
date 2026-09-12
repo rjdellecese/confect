@@ -1951,7 +1951,7 @@ export const paginate: {
       maximumBytesRead,
     };
     const stateRef = yield* SynchronizedRef.make(
-      new QueryStreamReadBudget.State({
+      new QueryStreamReadBudget.QueryStreamReadBudget({
         rows: 0,
         bytes: 0,
         status: QueryStreamReadBudget.Phase.Active(),

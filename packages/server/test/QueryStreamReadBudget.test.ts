@@ -57,7 +57,7 @@ describe("QueryStreamReadBudget", () => {
   );
 
   it("recognizes both row and byte exhaustion", () => {
-    const state = new QueryStreamReadBudget.State({
+    const state = new QueryStreamReadBudget.QueryStreamReadBudget({
       rows: 2,
       bytes: 20,
       status: QueryStreamReadBudget.Phase.Active(),
@@ -106,7 +106,7 @@ describe("QueryStreamReadBudget", () => {
           ),
         );
         const ref = yield* SynchronizedRef.make(
-          new QueryStreamReadBudget.State({
+          new QueryStreamReadBudget.QueryStreamReadBudget({
             rows: 0,
             bytes: 0,
             status: QueryStreamReadBudget.Phase.Active(),
