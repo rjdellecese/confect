@@ -115,7 +115,7 @@ describe("server operation tracing", () => {
         expectTypeOf(paginate).toEqualTypeOf<
           Effect.Effect<
             QueryStream.PaginationResult<number>,
-            QueryStreamReadBudget.ExceededError
+            QueryStreamReadBudget.ReadBudgetExceededError
           >
         >();
         expectTypeOf(curried).toEqualTypeOf<typeof paginate>();

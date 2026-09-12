@@ -7,6 +7,40 @@ import * as Stream from "effect/Stream";
 import * as SynchronizedRef from "effect/SynchronizedRef";
 
 describe("QueryStreamReadBudget", () => {
+  it.each(["rowsRead", "bytesRead"] as const)(
+    "rejects invalid %s counts",
+    (field) => {
+      for (const value of [
+        -1,
+        0.5,
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+        Number.NEGATIVE_INFINITY,
+      ]) {
+        expect(
+          Option.isNone(
+            QueryStreamReadBudget.ReadBudgetExceededError.makeOption({
+              rowsRead: 0,
+              [field]: value,
+            }),
+          ),
+        ).toBe(true);
+      }
+    },
+  );
+
+  it("accepts zero counts and optional byte accounting", () => {
+    expect(
+      new QueryStreamReadBudget.ReadBudgetExceededError({ rowsRead: 0 }),
+    ).toMatchObject({ rowsRead: 0 });
+    expect(
+      new QueryStreamReadBudget.ReadBudgetExceededError({
+        rowsRead: 0,
+        bytesRead: 0,
+      }),
+    ).toMatchObject({ rowsRead: 0, bytesRead: 0 });
+  });
+
   it.effect("defaults to unrestricted reads without a shared budget", () =>
     Effect.gen(function* () {
       const limits = yield* QueryStreamReadBudget.Limits;
@@ -99,7 +133,7 @@ describe("QueryStreamReadBudget", () => {
   );
 
   it("preserves the pagination error tag and details", () => {
-    const error = new QueryStreamReadBudget.ExceededError({
+    const error = new QueryStreamReadBudget.ReadBudgetExceededError({
       rowsRead: 2,
       bytesRead: 20,
     });

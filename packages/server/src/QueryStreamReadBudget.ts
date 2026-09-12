@@ -16,9 +16,9 @@ import * as Tuple from "effect/Tuple";
  *
  * @experimental
  */
-export class ExceededError extends Schema.TaggedError<ExceededError>()(
+export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceededError>()(
   "ReadBudgetExceededError",
-  { rowsRead: Schema.Finite, bytesRead: Schema.optionalKey(Schema.Finite) },
+  { rowsRead: Schema.Natural, bytesRead: Schema.optionalKey(Schema.Natural) },
 ) {
   override get message() {
     return "QueryStream.paginate: the read budget was exhausted before a safe page boundary; increase the budget or simplify the query";

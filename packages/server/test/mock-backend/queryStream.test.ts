@@ -39,7 +39,7 @@ const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
   numItems: number,
 ): Effect.Effect<
   ReadonlyArray<ReadonlyArray<Doc>>,
-  E | QueryStreamReadBudget.ExceededError,
+  E | QueryStreamReadBudget.ReadBudgetExceededError,
   R
 > => {
   const go = (
@@ -47,7 +47,7 @@ const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
     pages: ReadonlyArray<ReadonlyArray<Doc>>,
   ): Effect.Effect<
     ReadonlyArray<ReadonlyArray<Doc>>,
-    E | QueryStreamReadBudget.ExceededError,
+    E | QueryStreamReadBudget.ReadBudgetExceededError,
     R
   > =>
     QueryStream.paginate(stream, { numItems, cursor }).pipe(
@@ -481,7 +481,7 @@ describe("QueryStream", () => {
 
             assert(Result.isFailure(result));
             expect(result.failure).toBeInstanceOf(
-              QueryStreamReadBudget.ExceededError,
+              QueryStreamReadBudget.ReadBudgetExceededError,
             );
           }),
         );
@@ -545,7 +545,8 @@ describe("QueryStream", () => {
             pages: ReadonlyArray<ReadonlyArray<string>>,
           ): Effect.Effect<
             ReadonlyArray<ReadonlyArray<string>>,
-            Document.DocumentDecodeError | QueryStreamReadBudget.ExceededError
+            | Document.DocumentDecodeError
+            | QueryStreamReadBudget.ReadBudgetExceededError
           > =>
             QueryStream.paginate(merged, {
               numItems: 10,

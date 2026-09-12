@@ -642,7 +642,9 @@ describe("QueryStream distinct read budgets", () => {
           }).pipe(Effect.result);
           assert(Result.isFailure(exhausted));
           assert(
-            Schema.is(QueryStreamReadBudget.ExceededError)(exhausted.failure),
+            Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
+              exhausted.failure,
+            ),
           );
           expect(exhausted.failure.rowsRead).toBe(2);
 
@@ -812,10 +814,12 @@ describe("QueryStream distinct read budgets", () => {
           }).pipe(Effect.result);
           assert(Result.isFailure(result));
           expect(result.failure).toBeInstanceOf(
-            QueryStreamReadBudget.ExceededError,
+            QueryStreamReadBudget.ReadBudgetExceededError,
           );
           assert(
-            Schema.is(QueryStreamReadBudget.ExceededError)(result.failure),
+            Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
+              result.failure,
+            ),
           );
           expect(result.failure.rowsRead).toBe(1);
         }),
@@ -836,7 +840,9 @@ describe("QueryStream distinct read budgets", () => {
           ).pipe(Effect.result);
           assert(Result.isFailure(result));
           assert(
-            Schema.is(QueryStreamReadBudget.ExceededError)(result.failure),
+            Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
+              result.failure,
+            ),
           );
           expect(result.failure.rowsRead).toBe(1);
           expect(result.failure.bytesRead).toBe(
@@ -872,7 +878,9 @@ describe("QueryStream distinct read budgets", () => {
           }).pipe(Effect.result);
           assert(Result.isFailure(result));
           assert(
-            Schema.is(QueryStreamReadBudget.ExceededError)(result.failure),
+            Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
+              result.failure,
+            ),
           );
           expect(result.failure.rowsRead).toBe(3);
 
@@ -936,7 +944,11 @@ describe("QueryStream distinct read budgets", () => {
           },
         ).pipe(Effect.result);
         assert(Result.isFailure(result));
-        assert(Schema.is(QueryStreamReadBudget.ExceededError)(result.failure));
+        assert(
+          Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
+            result.failure,
+          ),
+        );
         expect(result.failure.rowsRead).toBe(1);
       }),
     ),
@@ -975,7 +987,9 @@ describe("QueryStream distinct read budgets", () => {
           }).pipe(Effect.result);
           assert(Result.isFailure(result));
           assert(
-            Schema.is(QueryStreamReadBudget.ExceededError)(result.failure),
+            Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
+              result.failure,
+            ),
           );
           expect(result.failure.rowsRead).toBe(1);
 

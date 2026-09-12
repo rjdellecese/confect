@@ -1865,7 +1865,7 @@ const midpointKey = (readKeys: Chunk.Chunk<OrderKey>): OrderKey =>
  *   Bytes use estimated document sizes, not backend-billed bytes; a
  *   document's size is known only after it is read.
  * - Budget stops return `SplitRequired` at a safe output boundary. If no
- *   safe progress is possible, the effect fails with `QueryStreamReadBudget.ExceededError`.
+ *   safe progress is possible, the effect fails with `QueryStreamReadBudget.ReadBudgetExceededError`.
  *   A resource stop never proves an input or a distinct group empty.
  *
  * @experimental
@@ -1877,7 +1877,7 @@ export const paginate: {
     self: QueryStream<Doc, Key, OrderDirection, E, R>,
   ) => Effect.Effect<
     PaginationResult<Doc>,
-    E | QueryStreamReadBudget.ExceededError,
+    E | QueryStreamReadBudget.ReadBudgetExceededError,
     R
   >;
   <Doc, Key extends KeyFields, E, R>(
@@ -1885,7 +1885,7 @@ export const paginate: {
     options: PaginateOptions,
   ): Effect.Effect<
     PaginationResult<Doc>,
-    E | QueryStreamReadBudget.ExceededError,
+    E | QueryStreamReadBudget.ReadBudgetExceededError,
     R
   >;
 } = dual(
@@ -2011,7 +2011,7 @@ export const paginate: {
             ) === 0,
         ))
     ) {
-      return yield* new QueryStreamReadBudget.ExceededError({
+      return yield* new QueryStreamReadBudget.ReadBudgetExceededError({
         rowsRead: usage.rows,
         ...Option.match(maximumBytesRead, {
           onNone: () => ({}),

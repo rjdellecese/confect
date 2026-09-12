@@ -151,6 +151,27 @@ const makeReader = (pending?: PendingRead) => {
 };
 
 describe("QueryStream iterator lifecycle", () => {
+  it.effect.each(["maximumRowsRead", "maximumBytesRead"] as const)(
+    "reports zero reads when %s is zero",
+    (limit) =>
+      Effect.gen(function* () {
+        const reader = makeReader();
+        const error = yield* QueryStream.paginate(reader.stream, {
+          cursor: null,
+          numItems: 10,
+          [limit]: 0,
+        }).pipe(Effect.flip);
+        expect(error).toBeInstanceOf(
+          QueryStreamReadBudget.ReadBudgetExceededError,
+        );
+        expect(error).toMatchObject({ rowsRead: 0 });
+        if (limit === "maximumBytesRead") {
+          expect(error).toMatchObject({ bytesRead: 0 });
+        }
+        expect(reader.runs.every((run) => run.next === 0)).toBe(true);
+      }),
+  );
+
   it.effect("isolates budget limits and status across page executions", () =>
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>();
@@ -359,7 +380,9 @@ describe("QueryStream iterator lifecycle", () => {
           Effect.flip,
         );
 
-        expect(error).toBeInstanceOf(QueryStreamReadBudget.ExceededError);
+        expect(error).toBeInstanceOf(
+          QueryStreamReadBudget.ReadBudgetExceededError,
+        );
         expect(error).toMatchObject({ rowsRead: 1 });
         expect(reader.events).toEqual(["0:open:desc", "0:next", "0:return"]);
       }),
@@ -382,7 +405,9 @@ describe("QueryStream iterator lifecycle", () => {
           Effect.flip,
         );
 
-        expect(error).toBeInstanceOf(QueryStreamReadBudget.ExceededError);
+        expect(error).toBeInstanceOf(
+          QueryStreamReadBudget.ReadBudgetExceededError,
+        );
         expect(error).toMatchObject({ rowsRead: 2 });
         expect(reader.events).toEqual([
           "0:open:desc",
