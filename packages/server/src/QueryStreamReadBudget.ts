@@ -21,7 +21,7 @@ export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceed
   { rowsRead: Schema.Natural, bytesRead: Schema.optionalKey(Schema.Natural) },
 ) {
   override get message() {
-    return "QueryStream.paginate: the read budget was exhausted before a safe page boundary; increase the budget or simplify the query";
+    return "The read budget was exhausted before a safe page boundary; increase the budget or simplify the query";
   }
 }
 

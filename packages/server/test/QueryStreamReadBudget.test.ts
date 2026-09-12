@@ -141,5 +141,6 @@ describe("QueryStreamReadBudget", () => {
     expect(error.rowsRead).toBe(2);
     expect(error.bytesRead).toBe(20);
     expect(error.message).toContain("before a safe page boundary");
+    expect(error.message).not.toContain("QueryStream.paginate");
   });
 });
