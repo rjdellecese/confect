@@ -59,7 +59,12 @@ const confectCliEntryUrl = new URL(
  * up-to-date.
  */
 export const setupForFixture =
-  (baseDir: string, fixtureSubpath: string) => () =>
+  (
+    baseDir: string,
+    fixtureSubpath: string,
+    componentDirs: ReadonlyArray<string> = [],
+  ) =>
+  () =>
     pipe(
       Effect.gen(function* () {
         const path = yield* Path.Path;
@@ -69,6 +74,14 @@ export const setupForFixture =
 
         yield* Effect.gen(function* () {
           process.chdir(fixtureDir);
+          for (const componentDir of componentDirs) {
+            yield* runCommand(process.execPath, [
+              cliEntry,
+              "codegen",
+              "--component-dir",
+              componentDir,
+            ]);
+          }
           yield* runCommand(process.execPath, [cliEntry, "codegen"]);
         }).pipe(Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))));
       }),

@@ -5,7 +5,6 @@ import type {
   VectorIndexNames,
   VectorSearchQuery,
 } from "convex/server";
-import type { GenericId } from "convex/values";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -35,7 +34,9 @@ export interface VectorSearchService<
         IndexName
       >
     >,
-  ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
+  ): Effect.Effect<
+    Array<{ _id: DataModel.Id<DataModel_, TableName>; _score: number }>
+  >;
 }
 
 export type VectorSearchTag<DataModel_ extends DataModel.AnyWithProps> =
@@ -49,7 +50,15 @@ export const make =
     vectorSearch: ConvexVectorSearch<DataModel_>,
   ): VectorSearchService<DataModel_> =>
   (tableName, indexName, query) =>
-    Effect.promise(() => vectorSearch(tableName, indexName, query));
+    Effect.promise(() => vectorSearch(tableName, indexName, query)).pipe(
+      Effect.map(
+        (rows) =>
+          rows as unknown as Array<{
+            _id: DataModel.Id<DataModel_, typeof tableName>;
+            _score: number;
+          }>,
+      ),
+    );
 
 export const VectorSearch = <
   DataModel_ extends DataModel.AnyWithProps,

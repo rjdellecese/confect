@@ -73,6 +73,7 @@ const nodeActionFunction = <
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
+    scope: databaseSchema.target.scope,
     name,
     functionVisibility,
     args,

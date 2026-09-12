@@ -1,3 +1,4 @@
+import type * as IdScope from "@confect/core/IdScope";
 import { compileTableSchema } from "@confect/core/SchemaToValidator";
 import * as Table_ from "@confect/core/Table";
 import * as Schema from "effect/Schema";
@@ -22,6 +23,7 @@ export {
   type VectorIndexes,
   type Doc,
   type Fields,
+  type Scope,
   type WithName,
   type TablesRecord,
 } from "@confect/core/Table";
@@ -59,7 +61,7 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
   }
 
   let definition: TableDefinition<any, any, any, any> = defineTable(
-    compileTableSchema(table.Fields),
+    compileTableSchema(table.Fields, table.scope),
   );
   for (const [name, indexFields] of Object.entries(
     table.indexes as Record<string, any>,
@@ -122,4 +124,15 @@ export const systemTables = {
   _storage: storageTable,
 } as const;
 
-export type SystemTables = typeof scheduledFunctionsTable | typeof storageTable;
+export const systemTablesForScope = <const Scope_ extends IdScope.IdScope>(
+  scope: Scope_,
+) => ({
+  _scheduled_functions: Table_.make(() => scheduledFunctionsTable.Fields)(
+    "_scheduled_functions",
+    scope,
+  ),
+  _storage: Table_.make(() => storageTable.Fields)("_storage", scope),
+});
+
+export type SystemTables<Scope_ extends IdScope.IdScope = IdScope.App> =
+  ReturnType<typeof systemTablesForScope<Scope_>>[keyof typeof systemTables];

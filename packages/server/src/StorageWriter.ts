@@ -1,3 +1,4 @@
+import type * as IdScope from "@confect/core/IdScope";
 import type { StorageWriter as ConvexStorageWriter } from "convex/server";
 import type { GenericId } from "convex/values";
 import * as Context from "effect/Context";
@@ -6,6 +7,17 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { BlobNotFoundError } from "./BlobNotFoundError";
+import type * as ScopedId from "@confect/core/GenericId";
+
+export type Service<Scope extends IdScope.IdScope = IdScope.App> = {
+  generateUploadUrl: ReturnType<typeof make>["generateUploadUrl"];
+  delete: (
+    id: ScopedId.GenericId<"_storage", Scope>,
+  ) => ReturnType<ReturnType<typeof make>["delete"]>;
+};
+export type ForScope<Scope extends IdScope.IdScope> = Scope extends IdScope.App
+  ? StorageWriter
+  : { readonly "~ScopedStorageWriter": Scope };
 
 const make = (storageWriter: ConvexStorageWriter) => ({
   generateUploadUrl: Effect.promise(() =>
@@ -26,6 +38,17 @@ export class StorageWriter extends Context.Service<
   StorageWriter,
   ReturnType<typeof make>
 >()("@confect/server/StorageWriter") {
-  static readonly layer = (storageWriter: ConvexStorageWriter) =>
-    Layer.succeed(this, make(storageWriter));
+  static readonly forScope = <
+    Scope extends IdScope.IdScope = IdScope.App,
+  >(): Context.Service<ForScope<Scope>, Service<Scope>> =>
+    Context.Service("@confect/server/StorageWriter");
+
+  static readonly layer = <Scope extends IdScope.IdScope = IdScope.App>(
+    storageWriter: ConvexStorageWriter,
+    _scope?: Scope,
+  ) =>
+    Layer.succeed(
+      this.forScope<Scope>(),
+      make(storageWriter) as unknown as Service<Scope>,
+    );
 }

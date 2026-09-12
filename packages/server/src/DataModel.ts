@@ -1,6 +1,7 @@
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
+import type * as GenericId from "@confect/core/GenericId";
 
 export declare const TypeId: "~@confect/server/DataModel";
 export type TypeId = typeof TypeId;
@@ -68,3 +69,11 @@ export type DocumentByName<
   DataModel_ extends AnyWithProps,
   TableName extends TableNames<DataModel_>,
 > = DocumentWithName<DataModel_, TableName>;
+
+export type Id<
+  DataModel_ extends AnyWithProps,
+  TableName extends TableNames<DataModel_>,
+> = GenericId.GenericId<
+  TableName,
+  Table.Scope<TableWithName<DataModel_, TableName>>
+>;

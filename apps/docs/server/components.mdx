@@ -1,7 +1,7 @@
 ---
 icon: "component"
 title: "Components"
-description: "Use Convex components in your Confect app."
+description: "Install Convex components, bind published Confect contracts, and author components with scoped IDs and Effect handlers."
 ---
 
 Convex [components](https://docs.convex.dev/components) are configured in `convex/convex.config.ts`, which is one of the files in the `convex/` directory that Confect does not manage. Configure components using the vanilla Convex API.
@@ -50,3 +50,174 @@ const pool = new Workpool(components.workpool, {
 Some components (such as [Workflow](https://www.convex.dev/components/workflow), [Migrations](https://www.convex.dev/components/migrations), and [Workpool](https://www.convex.dev/components/workpool)) expect you to define Convex functions in your project that they can reference. You can integrate these into your Confect spec and impl using [plain Convex functions](/server/plain-convex-functions).
 
 See the [Convex components documentation](https://docs.convex.dev/components) for details on installing and using components.
+
+## Use a published Confect component
+
+A Confect component is a normal Convex component with an additional contract containing its public function codecs. Install its Convex definition with `app.use`, then bind the contract to the generated registry entry:
+
+```ts confect/counter.ts
+import { Component } from "@confect/core";
+import contract from "@example/counter/confect";
+import { components } from "./_generated/components";
+
+export const counter = Component.bind(contract, components.counter);
+```
+
+Call bound references with `QueryRunner`, `MutationRunner`, `ActionRunner`, or `Scheduler`, just like your application's references. Arguments and returns use the component's decoded Effect types; declared errors enter the Effect error channel. Bound references are backend-only: expose your own application functions for frontend access.
+
+```ts
+import * as Effect from "effect/Effect";
+import { MutationRunner } from "./_generated/services";
+import { counter } from "./counter";
+
+const create = Effect.gen(function* () {
+  const runMutation = yield* MutationRunner;
+  return yield* runMutation(counter.counter.create, { count: 3 });
+});
+```
+
+The extra `counter` segment in this example is the component's `counter.spec.ts` function group. Binding preserves the component's exported group structure.
+
+### Store component IDs in application tables
+
+Each installation has its own ID type. An application ID, a component ID, and an ID from a second installation are different types even when their table names match.
+
+```ts confect/tables/links.ts
+import { Component, Table } from "@confect/core";
+import * as Schema from "effect/Schema";
+import { counter } from "../counter";
+
+export default Table.make(() =>
+  Schema.Struct({ counterId: Component.id(counter, "counters") }),
+);
+```
+
+`Component.id` also supports `_storage` and `_scheduled_functions` for generated contracts. Use `Component.schema(counter, exportedCodec)` to rebind IDs inside a codec exported by the component, including nested objects and arrays.
+
+Scopes change TypeScript identity and validator selection, not ID strings. IDs owned by the current database compile to `v.id(tableName)`; IDs from another database compile to `v.string()`. A foreign ID field therefore does not validate ownership at runtime. Validate untrusted references through the owning component and perform authorization in your application.
+
+<Warning>
+  Keep the generated registry's literal mount names. Widening a component API to
+  `any` or an unspecified mount name loses compile-time instance separation.
+  Scopes are not an authorization mechanism.
+</Warning>
+
+### Wrap a vanilla component reference
+
+For a component without a Confect contract, `Ref.fromFunctionReference` adapts a native function reference for Confect's runners and scheduler. Its types and values remain the native wire types; it does not add codecs, scoped IDs, or declared Effect errors.
+
+```ts
+import { Ref } from "@confect/core";
+import { components } from "./_generated/components";
+
+const create = Ref.fromFunctionReference(components.counter.counter.create);
+```
+
+## Author a component
+
+Use the same table, spec, and implementation APIs as an application. Put `confect/` next to the component's Convex directory, inside a package with a `name` in `package.json`:
+
+```text
+package.json
+src/
+  confect/
+    tables/counters.ts
+    counter.spec.ts
+    counter.impl.ts
+  convex/
+    convex.config.ts
+```
+
+```ts src/convex/convex.config.ts
+import { defineComponent } from "convex/server";
+
+export default defineComponent("counter");
+```
+
+Run Confect codegen before Convex's component codegen:
+
+```sh
+confect codegen --component-dir src/convex
+convex codegen --component-dir src/convex
+```
+
+For watch mode, use `confect dev --component-dir src/convex` alongside your Convex development workflow. These commands target one component; run application codegen separately.
+
+Confect generates the usual IDs, tables, schema, services, references, and registered functions, plus `confect/_generated/component.ts`. That file exports the publishable contract. Only public functions appear in the contract's bound reference tree; internal functions remain callable inside the component through its own generated references.
+
+The generated definition scope derives from the nearest package's name and the component directory's package-relative path. Keep that identity stable and import `Id` from `_generated/id` when declaring the component's own IDs. Existing application IDs remain compatible with Convex's `GenericId` type.
+
+Scope parameters accept the branded `IdScope.IdScope` type, not raw strings. Prefer the generated `scope` from `_generated/id`. For hand-authored schemas, import `IdScope` from `@confect/core` and use `IdScope.app`, `IdScope.component(name)`, or `IdScope.instance(parentScope, name)`. These helpers preserve scope identity in the types without changing the runtime strings or checking ownership.
+
+### Handler capabilities
+
+Keep using `FunctionImpl.make(databaseSchema, group, name, handler)` with the generated schema. The schema determines the available services:
+
+- Database operations address the component's database, with scoped document IDs.
+- Storage and scheduling services return IDs in that same component scope.
+- Generated raw contexts preserve scoped ID types and omit `auth`.
+- Application `Auth` is unavailable. Pass the identity information your component needs explicitly in function arguments.
+
+Component codegen rejects `confect/auth.ts`. Configuration reads still use Convex's environment provider; declare component environment variables through the native component configuration API.
+
+For Effect HTTP routes, use `HttpRouter.forSchema(databaseSchema)(routes)` so route capabilities follow the component schema too. Mount the component's routes using Convex's component HTTP routing API. The schema-free `HttpRouter.make(routes)` remains the application API.
+
+Convex's built-in database pagination is not supported inside components. Use [stream queries](/server/database/streams) for component pagination instead of the native `.paginate()` path. Plain Convex functions retain their native contexts and runtime restrictions; Confect does not rewrite their handlers.
+
+### Install a child component
+
+Use `defineComponent(...).use(...)` in the component configuration. Bind the child's contract with the enclosing component's generated scope:
+
+```ts src/confect/child.ts
+import { Component } from "@confect/core";
+import childContract from "@example/child/confect";
+import { components } from "./_generated/components";
+import { scope } from "./_generated/id";
+
+export const child = Component.bind(childContract, components.child, {
+  parentScope: scope,
+});
+```
+
+The `parentScope` keeps child IDs associated with the enclosing installation when a parent contract returns them. Omit it when binding in the root application.
+
+## Publish the package
+
+Build the Convex and Confect trees to JavaScript and emit their TypeScript declarations. Preserve relative imports and the generated files they reference, or bundle the corresponding entry points. A package whose output mirrors `src/` under `dist/` can expose:
+
+```json package.json
+{
+  "exports": {
+    "./convex.config.js": {
+      "types": "./dist/convex/convex.config.d.ts",
+      "default": "./dist/convex/convex.config.js"
+    },
+    "./_generated/component.js": {
+      "types": "./dist/convex/_generated/component.d.ts"
+    },
+    "./confect": {
+      "types": "./dist/confect/_generated/component.d.ts",
+      "default": "./dist/confect/_generated/component.js"
+    }
+  },
+  "files": ["dist"]
+}
+```
+
+Include the runtime dependencies used by your component (`effect` and the relevant `@confect/*` packages), and declare compatible Convex requirements. The Confect contract's dependency graph must contain specs and codecs, not implementation modules. Include all transitive contract declarations as well as the deployable functions and schema in the package.
+
+Vanilla Convex consumers install `@example/counter/convex.config.js` and call its generated component API without importing the Confect contract. They supply encoded arguments and receive encoded results; for example, `Schema.FiniteFromString` is a string on the wire. They observe declared failures as Convex errors rather than Effect failures. Confect consumers bind the additional `/confect` export to get decoding and typed errors.
+
+Confect does not run Convex's component codegen, build your npm package, or publish it for you. Before publishing, inspect `npm pack --dry-run` and test the packed artifact from a separate consumer project using both interfaces.
+
+## Test a component
+
+Register the component's generated Convex schema and module loaders with `TestConfect` before calling bound references:
+
+```ts
+const t = yield * TestConfect.TestConfect<typeof applicationSchema>();
+yield * t.registerComponent("counter", componentConvexSchema, componentModules);
+yield * t.mutation(counter.counter.create, { count: 3 });
+```
+
+The registration path must match the installed component path. The module map follows `convex-test` conventions and includes the component's Convex `_generated` files. Register the same definition at two paths to test instance isolation. A published package can provide its own `/test` helper that supplies this schema and module map.
