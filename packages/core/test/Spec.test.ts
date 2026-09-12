@@ -14,6 +14,62 @@ describe("isSpec", () => {
   });
 });
 
+it("derives group types from the payload and replaces an existing group immutably", () => {
+  const original = GroupSpec.makeAt("notes").addFunction(
+    FunctionSpec.publicQuery({ name: "old", returns: () => Schema.String }),
+  );
+  const replacement = GroupSpec.makeAt("notes").addFunction(
+    FunctionSpec.publicQuery({ name: "current", returns: () => Schema.Number }),
+  );
+  const empty = Spec.make();
+  const before = empty.add(original);
+  const after = before.add(replacement);
+  expect(Spec.groups(empty)).toEqual({});
+  expect(Spec.groups(before).notes).toBe(original);
+  expect(Spec.groups(after).notes).toBe(replacement);
+  expectTypeOf<Spec.Groups<typeof empty>>().toBeNever();
+  expectTypeOf<Spec.Groups<typeof after>>().toEqualTypeOf<typeof replacement>();
+  expectTypeOf(Spec.groups(after).notes).toEqualTypeOf<typeof replacement>();
+  expectTypeOf<
+    keyof Refs.Refs<typeof after>["notes"]
+  >().toEqualTypeOf<"current">();
+});
+
+it("replaces an addAt binding without changing the source group or forcing its schemas", () => {
+  let evaluated = 0;
+  const original = GroupSpec.make().addFunction(
+    FunctionSpec.publicQuery({
+      name: "old",
+      returns: () => {
+        evaluated++;
+        return Schema.String;
+      },
+    }),
+  );
+  const replacement = GroupSpec.makeNode().addFunction(
+    FunctionSpec.publicNodeAction({
+      name: "current",
+      returns: () => {
+        evaluated++;
+        return Schema.Number;
+      },
+    }),
+  );
+  const before = Spec.make().addAt("service", original);
+  const after = before.addAt("service", replacement);
+  expect(evaluated).toBe(0);
+  expect(original.name).toBe("");
+  expect(replacement.name).toBe("");
+  expect(Spec.groups(before).service.runtime).toBe("Convex");
+  expect(Spec.groups(after).service.runtime).toBe("Node");
+  expectTypeOf<Spec.Groups<typeof after>>().toEqualTypeOf<
+    GroupSpec.NamedAt<typeof replacement, "service">
+  >();
+  expectTypeOf<
+    keyof Refs.Refs<typeof after>["service"]
+  >().toEqualTypeOf<"current">();
+});
+
 it("infers refs from addAt-assembled spec", () => {
   const FnReturns = Schema.Array(Schema.String);
 
@@ -65,7 +121,7 @@ it("places a Node group alongside Convex groups, with no `node` namespace", () =
 
   const spec = Spec.make().addAt("notes", notes).addAt("email", email);
 
-  expect(Object.keys(spec.groups).sort()).toEqual(["email", "notes"]);
+  expect(Object.keys(Spec.groups(spec)).sort()).toEqual(["email", "notes"]);
 
   const refs = Refs.make(spec);
 

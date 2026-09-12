@@ -5,7 +5,7 @@ export const TypeId = "~@confect/server/DatabaseSchema";
 export type TypeId = typeof TypeId;
 
 export interface Any {
-  readonly [TypeId]: TypeId;
+  readonly [TypeId]: unknown;
 }
 
 export const isDatabaseSchema = (u: unknown): u is Any =>
@@ -18,25 +18,23 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
  * memoised getters), so this layer is a plain
  * record indirection with no module-loading or async machinery.
  */
-export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
-  readonly [TypeId]: TypeId;
-  readonly tables: {
-    readonly [TableName in Table.Name<Tables_>]: Table.WithName<
-      Tables_,
-      TableName
-    >;
-  };
-  readonly "~Tables": Tables_;
+export interface DatabaseSchema<
+  Tables_ extends Readonly<Record<string, Table.AnyWithProps>> = {},
+> {
+  readonly [TypeId]: Readonly<Tables_>;
 }
 
-export interface AnyWithProps {
-  readonly [TypeId]: TypeId;
-  readonly tables: Record<string, Table.AnyWithProps>;
-  readonly "~Tables": Table.AnyWithProps;
-}
+export interface AnyWithProps extends DatabaseSchema<
+  Readonly<Record<string, Table.AnyWithProps>>
+> {}
 
 export type Tables<DatabaseSchema_ extends AnyWithProps> =
-  DatabaseSchema_["~Tables"];
+  DatabaseSchema_[TypeId][keyof DatabaseSchema_[TypeId]];
+
+/** The bound table record, without evaluating any table schemas. */
+export const tables = <Schema extends AnyWithProps>(
+  self: Schema,
+): Schema[TypeId] => self[TypeId];
 
 export type TableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
   Tables<DatabaseSchema_>
@@ -49,29 +47,12 @@ export type TableWithName<
 > = Extract<Tables<DatabaseSchema_>, { readonly tableName: TableName }>;
 
 /**
- * Construct a `DatabaseSchema` from a record of bound `Table`s. The empty
- * case is `DatabaseSchema.make({})`. The `Tables_` union is inferred from
- * the value record's values, so codegen-emitted calls of the form
- * `DatabaseSchema.make({ notes, tags, users })` do not need an explicit
- * type argument.
- *
- * Invariant: each record **key must equal its value's `tableName`**. The
- * record is stored verbatim and later read by key (`databaseSchema.tables[
- * tableName]` in `DatabaseReader`/`DatabaseWriter`), so a key that diverges
- * from the bound table's name would make those lookups silently miss. The
- * type signature does not enforce this—codegen upholds it by deriving both
- * the key and the table name from the same filename (and the shorthand
- * `{ notes, tags, users }` form it emits makes them identical by
- * construction). Hand-written calls must preserve it.
+ * Construct a database schema from its bound table record. The record's keys
+ * must match their tables' names. Table schemas remain lazy; construction
+ * only stores the record. The empty case is `make({})`.
  */
 export const make = <
-  const TablesRecord extends Record<string, Table.AnyWithProps>,
+  const TablesRecord extends Readonly<Record<string, Table.AnyWithProps>>,
 >(
   tables: TablesRecord,
-): DatabaseSchema<TablesRecord[keyof TablesRecord]> =>
-  ({
-    [TypeId]: TypeId,
-    tables: tables as unknown as DatabaseSchema<
-      TablesRecord[keyof TablesRecord]
-    >["tables"],
-  }) as DatabaseSchema<TablesRecord[keyof TablesRecord]>;
+): DatabaseSchema<TablesRecord> => ({ [TypeId]: tables });

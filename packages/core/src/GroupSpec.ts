@@ -349,10 +349,11 @@ export const makeNodeAt = <const Name_ extends string>(
   });
 };
 
-export const withName = <const Name_ extends string>(
+export function withName<const Name_ extends string, Group extends Any>(
   name: Name_,
-  group: Any,
-): AnyWithProps => {
+  group: Group,
+): NamedAt<Group, Name_>;
+export function withName(name: string, group: Any): AnyWithProps {
   validateConfectFunctionIdentifier(name);
   const group_ = group as AnyWithProps;
 
@@ -367,7 +368,7 @@ export const withName = <const Name_ extends string>(
     groups: group_.groups,
     middlewareAttachments: group_.middlewareAttachments,
   });
-};
+}
 
 export const validateMiddleware = (
   group: AnyWithProps,

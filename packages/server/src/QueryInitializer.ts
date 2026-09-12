@@ -212,8 +212,8 @@ export const make = <
     DataModel.ToConvex<DataModel.FromTables<Tables>>
   >,
   table: Table.WithName<Tables, TableName>,
-): QueryInitializer<DataModel.DataModel<Tables>, TableName> => {
-  type DataModel_ = DataModel.DataModel<Tables>;
+): QueryInitializer<DataModel.FromTables<Tables>, TableName> => {
+  type DataModel_ = DataModel.FromTables<Tables>;
   type ConvexDataModel_ = DataModel.ToConvex<DataModel_>;
   type ThisQueryInitializer = QueryInitializer<DataModel_, TableName>;
   type QueryInitializerFunction<
