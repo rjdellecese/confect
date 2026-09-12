@@ -1,3 +1,4 @@
+import * as QueryStreamKeyFields from "@confect/server/QueryStreamKeyFields";
 import { bench } from "confect-bench-harness";
 import * as QueryStream from "@confect/server/QueryStream";
 import * as Stream from "effect/Stream";
@@ -22,11 +23,8 @@ const leaf = <Doc, Key extends ReadonlyArray<string>>(
 ) =>
   new QueryStream.QueryStream(
     "asc",
-    keyFields,
+    QueryStreamKeyFields.fromIndex(keyFields.slice(0, -1)),
     Stream.empty,
-    undefined,
-    undefined,
-    [keyFields.length - 1],
   ) as unknown as QueryStream.QueryStream<Doc, Key, "asc", never, never>;
 
 const notes = leaf<Note, ["text", "_creationTime"]>([
