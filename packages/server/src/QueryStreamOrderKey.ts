@@ -78,7 +78,7 @@ export const Order: Order_.Order<QueryStreamOrderKey> =
   Order_.Array(ValueOrder);
 
 /** Order of positions in stream order: for `desc`, later keys are smaller. */
-export const positionOrder = (
+export const PositionOrder = (
   order: OrderDirection,
 ): Order_.Order<QueryStreamOrderKey> =>
   order === "asc" ? Order : Order_.flip(Order);

@@ -75,8 +75,8 @@ describe("QueryStreamOrderKey", () => {
     expect(QueryStreamOrderKey.Order(["a"], ["a", 1])).toBe(-1);
     expect(QueryStreamOrderKey.Order(["b"], ["a", 2])).toBe(1);
     expect(QueryStreamOrderKey.Order([], [])).toBe(0);
-    expect(QueryStreamOrderKey.positionOrder("asc")(["a"], ["b"])).toBe(-1);
-    expect(QueryStreamOrderKey.positionOrder("desc")(["a"], ["b"])).toBe(1);
+    expect(QueryStreamOrderKey.PositionOrder("asc")(["a"], ["b"])).toBe(-1);
+    expect(QueryStreamOrderKey.PositionOrder("desc")(["a"], ["b"])).toBe(1);
   });
 
   it("extracts nested values and retains missing fields", () => {

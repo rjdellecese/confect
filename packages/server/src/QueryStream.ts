@@ -578,7 +578,7 @@ const fillMergeSource = <Doc, E>(
  * source is exhausted or an input stopped before its next key was known.
  */
 const mergeStep =
-  <Doc, E>(position: Order.Order<OrderKey>) =>
+  <Doc, E>(PositionOrder: Order.Order<OrderKey>) =>
   (
     sources: ReadonlyArray<MergeSource<Doc, E>>,
   ): Effect.Effect<
@@ -599,7 +599,7 @@ const mergeStep =
         )
       )
         return undefined;
-      const isEarlier = Order.isLessThan(position);
+      const isEarlier = Order.isLessThan(PositionOrder);
 
       const earliest = Array.reduce(
         filled,
@@ -714,7 +714,7 @@ const mergeUnchecked = <
                 status: SourceStatus.Ready(),
               }),
           ),
-          mergeStep<Doc, E>(QueryStreamOrderKey.positionOrder(head.order)),
+          mergeStep<Doc, E>(QueryStreamOrderKey.PositionOrder(head.order)),
         ),
     ),
   );
