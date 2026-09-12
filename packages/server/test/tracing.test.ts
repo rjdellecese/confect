@@ -1,4 +1,4 @@
-import * as QueryStreamKeyFields from "@confect/server/QueryStreamKeyFields";
+import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { FunctionSpec, Ref, Table } from "@confect/core";
@@ -93,7 +93,7 @@ describe("server operation tracing", () => {
         let reads = 0;
         const source = new QueryStream.QueryStream(
           "asc",
-          QueryStreamKeyFields.fromIndex([]),
+          QueryStreamKeyLayout.fromIndex([]),
           Stream.suspend(() => {
             reads++;
             return Stream.make(
@@ -172,7 +172,7 @@ describe("server operation tracing", () => {
         const recorder = yield* makeRecorder;
         const source = new QueryStream.QueryStream(
           "asc",
-          QueryStreamKeyFields.fromIndex([]),
+          QueryStreamKeyLayout.fromIndex([]),
           Stream.make(
             new QueryStream.Element({ doc: Option.some(1), key: [1] }),
             new QueryStream.Element({ doc: Option.some(2), key: [2] }),
@@ -204,7 +204,7 @@ describe("server operation tracing", () => {
       const failure = new OperationFailure({ reason: "query failed" });
       const source = new QueryStream.QueryStream(
         "asc",
-        QueryStreamKeyFields.fromIndex([]),
+        QueryStreamKeyLayout.fromIndex([]),
         Stream.fail(failure),
       );
       const error = yield* QueryStream.paginate(source, {

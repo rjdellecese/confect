@@ -5,31 +5,40 @@ import { identity, pipe } from "effect/Function";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import type * as Types from "effect/Types";
-import type { Names as KeyFields } from "./QueryStreamKeyFields";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
 import type { IndexBounds } from "./QueryStreamKeyBounds";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 import type { QueryStreamOrderKey as OrderKey } from "./QueryStreamOrderKey";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 
-type Head<Fields extends KeyFields> = Fields extends readonly [
-  infer H extends string,
-  ...KeyFields,
-]
-  ? H
-  : never;
+type Head<FieldPaths extends ReadonlyArray<string>> =
+  FieldPaths extends readonly [infer H extends string, ...ReadonlyArray<string>]
+    ? H
+    : never;
 
-type Tail<Fields extends KeyFields> = Fields extends readonly [
-  string,
-  ...infer Rest extends KeyFields,
-]
-  ? Rest
-  : KeyFields;
+type Tail<FieldPaths extends ReadonlyArray<string>> =
+  FieldPaths extends readonly [
+    string,
+    ...infer Rest extends ReadonlyArray<string>,
+  ]
+    ? Rest
+    : ReadonlyArray<string>;
+
+/**
+ * Complete the source index paths with Convex's implicit ID tiebreaker.
+ * These paths address the encoded document and are never ordering aliases.
+ * @experimental
+ */
+export const completeFieldPaths = (
+  fieldPaths: ReadonlyArray<string>,
+): ReadonlyArray<string> =>
+  Option.exists(Array.last(fieldPaths), (fieldPath) => fieldPath === "_id")
+    ? fieldPaths
+    : Array.append(fieldPaths, "_id");
 
 // The range builder mirrors Convex's `IndexRangeBuilder`, but *consumes* the
-// index-field tuple at the type level as `eq` pins fields. The remaining
-// tuple becomes the resulting stream's order key, which is what `merge`
-// checks for compatibility.
+// index-field tuple at the type level as `eq` pins field paths. The remaining
+// tuple supplies the initial visible ordering labels of the resulting stream.
 
 const RangeSpecTypeId = "~@confect/server/QueryStream/IndexRangeSpec";
 
@@ -47,13 +56,13 @@ const RangeOp = Data.taggedEnum<RangeOp>();
 
 /**
  * The result of applying a range callback: the recorded operations, plus a
- * phantom `Remaining`—the index fields not consumed by `eq` pinning.
+ * phantom `Remaining`—the index field paths not consumed by `eq` pinning.
  *
  * @experimental
  */
-export interface IndexRangeSpec<out Fields extends KeyFields> {
+export interface IndexRangeSpec<out FieldPaths extends ReadonlyArray<string>> {
   readonly [RangeSpecTypeId]: {
-    readonly _Remaining: Types.Covariant<Fields>;
+    readonly _Remaining: Types.Covariant<FieldPaths>;
   };
   readonly eqCount: number;
   readonly ops: ReadonlyArray<RangeOp>;
@@ -62,7 +71,7 @@ export interface IndexRangeSpec<out Fields extends KeyFields> {
 /**
  * @experimental
  */
-export type AnyIndexRangeSpec = IndexRangeSpec<KeyFields>;
+export type AnyIndexRangeSpec = IndexRangeSpec<ReadonlyArray<string>>;
 
 /**
  * @experimental
@@ -72,34 +81,34 @@ export type Remaining<Spec> = Spec extends IndexRangeSpec<infer R> ? R : never;
 /**
  * A typed index-range builder. `eq` must target the next unpinned index
  * field, and consumes it; `gt`/`gte`/`lt`/`lte` bound the next field without
- * consuming it (bounded fields still vary within the range).
+ * consuming it (bounded field paths still vary within the range).
  *
  * @experimental
  */
 export interface RangeBuilder<
   ConvexDoc extends GenericDocument,
-  Fields extends KeyFields,
-> extends IndexRangeSpec<Fields> {
+  FieldPaths extends ReadonlyArray<string>,
+> extends IndexRangeSpec<FieldPaths> {
   readonly eq: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
-  ) => RangeBuilder<ConvexDoc, Tail<Fields>>;
+    fieldPath: Head<FieldPaths>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<FieldPaths>>,
+  ) => RangeBuilder<ConvexDoc, Tail<FieldPaths>>;
   readonly gt: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
-  ) => LowerBoundedRange<ConvexDoc, Fields>;
+    fieldPath: Head<FieldPaths>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<FieldPaths>>,
+  ) => LowerBoundedRange<ConvexDoc, FieldPaths>;
   readonly gte: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
-  ) => LowerBoundedRange<ConvexDoc, Fields>;
+    fieldPath: Head<FieldPaths>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<FieldPaths>>,
+  ) => LowerBoundedRange<ConvexDoc, FieldPaths>;
   readonly lt: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
-  ) => IndexRangeSpec<Fields>;
+    fieldPath: Head<FieldPaths>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<FieldPaths>>,
+  ) => IndexRangeSpec<FieldPaths>;
   readonly lte: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
-  ) => IndexRangeSpec<Fields>;
+    fieldPath: Head<FieldPaths>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<FieldPaths>>,
+  ) => IndexRangeSpec<FieldPaths>;
 }
 
 /**
@@ -109,29 +118,31 @@ export interface RangeBuilder<
  */
 export interface LowerBoundedRange<
   ConvexDoc extends GenericDocument,
-  Fields extends KeyFields,
-> extends IndexRangeSpec<Fields> {
+  FieldPaths extends ReadonlyArray<string>,
+> extends IndexRangeSpec<FieldPaths> {
   readonly lt: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
-  ) => IndexRangeSpec<Fields>;
+    fieldPath: Head<FieldPaths>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<FieldPaths>>,
+  ) => IndexRangeSpec<FieldPaths>;
   readonly lte: (
-    field: Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
-  ) => IndexRangeSpec<Fields>;
+    fieldPath: Head<FieldPaths>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<FieldPaths>>,
+  ) => IndexRangeSpec<FieldPaths>;
 }
 
 const makeRangeBuilder = (
   ops: ReadonlyArray<RangeOp>,
-): RangeBuilder<GenericDocument, KeyFields> => {
+): RangeBuilder<GenericDocument, ReadonlyArray<string>> => {
   const push =
     (tag: RangeOp["_tag"]) =>
-    (field: string, value: QueryStreamOrderKey.KeyValue) =>
-      makeRangeBuilder(Array.append(ops, RangeOp[tag]({ field, value })));
+    (fieldPath: string, value: QueryStreamOrderKey.KeyValue) =>
+      makeRangeBuilder(
+        Array.append(ops, RangeOp[tag]({ field: fieldPath, value })),
+      );
 
   return {
     [RangeSpecTypeId]: {
-      _Remaining: identity as Types.Covariant<KeyFields>,
+      _Remaining: identity as Types.Covariant<ReadonlyArray<string>>,
     },
     get eqCount() {
       return Array.takeWhile(ops, (op) => op._tag === "eq").length;
@@ -152,9 +163,9 @@ const makeRangeBuilder = (
  */
 export const rangeBuilder = <
   ConvexDoc extends GenericDocument,
-  Fields extends KeyFields,
->(): RangeBuilder<ConvexDoc, Fields> =>
-  makeRangeBuilder([]) as unknown as RangeBuilder<ConvexDoc, Fields>;
+  FieldPaths extends ReadonlyArray<string>,
+>(): RangeBuilder<ConvexDoc, FieldPaths> =>
+  makeRangeBuilder([]) as unknown as RangeBuilder<ConvexDoc, FieldPaths>;
 
 /**
  * Replay recorded range ops onto Convex's real `IndexRangeBuilder`.
@@ -173,11 +184,11 @@ export const applyRange = (spec: AnyIndexRangeSpec, q: any): any =>
   applyOps(spec.ops, q);
 
 // Convex index ranges have the shape `eq(f1) … eq(fn), gt/gte(fm)?,
-// lt/lte(fm)?`—every field pinned except the last, which may carry two
+// lt/lte(fm)?`—every field path pinned except the last, which may carry two
 // inequalities. An arbitrary range between two index keys therefore
 // decomposes into a *sequence* of Convex-expressible ranges (the port of
 // `convex-helpers`' `splitRange`): e.g. `(1, 2, 3) < key <= (1, 3, 2)` over
-// fields `(f1, f2, f3)` becomes
+// field paths `(f1, f2, f3)` becomes
 //
 //   1. eq(f1, 1), eq(f2, 2), gt(f3, 3)
 //   2. eq(f1, 1), gt(f2, 2), lt(f2, 3)
@@ -218,7 +229,7 @@ const peelBound = (
 /** `eq` every component of `key` but the last, which gets the bound tag. */
 const rangeOpsFor = (
   prefixOps: ReadonlyArray<RangeOp>,
-  fields: KeyFields,
+  fieldPaths: ReadonlyArray<string>,
   key: OrderKey,
   tag: BoundTag,
 ): ReadonlyArray<RangeOp> =>
@@ -226,14 +237,16 @@ const rangeOpsFor = (
     onNone: () => prefixOps,
     onSome: (lastValue) =>
       pipe(
-        Array.zip(fields, Array.dropRight(key, 1)),
-        Array.map(([field, value]) => RangeOp.eq({ field, value })),
+        Array.zip(fieldPaths, Array.dropRight(key, 1)),
+        Array.map(([fieldPath, value]) =>
+          RangeOp.eq({ field: fieldPath, value }),
+        ),
         (eqOps) =>
           Array.appendAll(
             Array.appendAll(prefixOps, eqOps),
             Array.of(
               RangeOp[tag]({
-                field: fields[key.length - 1]!,
+                field: fieldPaths[key.length - 1]!,
                 value: lastValue,
               }),
             ),
@@ -243,13 +256,13 @@ const rangeOpsFor = (
 
 /**
  * Decompose the range between `bounds.lower` and `bounds.upper` (over the
- * full index-key `fields`, `_id` tiebreaker included) into a sequence of
+ * complete index `fieldPaths`, `_id` tiebreaker included) into a sequence of
  * Convex-expressible ranges, ordered for the given direction.
  *
  * @experimental
  */
 export const splitRange = (
-  fields: KeyFields,
+  fieldPaths: ReadonlyArray<string>,
   order: OrderDirection,
   bounds: IndexBounds,
 ): ReadonlyArray<ReadonlyArray<RangeOp>> => {
@@ -268,10 +281,10 @@ export const splitRange = (
     ),
   ).length;
   const prefixOps = pipe(
-    Array.zip(Array.take(fields, commonLength), bounds.lower.key),
-    Array.map(([field, value]) => RangeOp.eq({ field, value })),
+    Array.zip(Array.take(fieldPaths, commonLength), bounds.lower.key),
+    Array.map(([fieldPath, value]) => RangeOp.eq({ field: fieldPath, value })),
   );
-  const restFields = Array.drop(fields, commonLength);
+  const restFieldPaths = Array.drop(fieldPaths, commonLength);
 
   const lower = peelBound(
     Array.drop(bounds.lower.key, commonLength),
@@ -283,11 +296,11 @@ export const splitRange = (
   );
 
   const startRanges = Array.map(lower.peeled, ({ key, tag }) =>
-    rangeOpsFor(prefixOps, restFields, key, tag),
+    rangeOpsFor(prefixOps, restFieldPaths, key, tag),
   );
   const endRanges = Array.reverse(
     Array.map(upper.peeled, ({ key, tag }) =>
-      rangeOpsFor(prefixOps, restFields, key, tag),
+      rangeOpsFor(prefixOps, restFieldPaths, key, tag),
     ),
   );
 
@@ -298,17 +311,17 @@ export const splitRange = (
     Array.isReadonlyArrayNonEmpty(upperFinalKey)
       ? Array.appendAll(prefixOps, [
           RangeOp[lowerFinalTag]({
-            field: restFields[0]!,
+            field: restFieldPaths[0]!,
             value: Array.headNonEmpty(lowerFinalKey),
           }),
           RangeOp[upperFinalTag]({
-            field: restFields[0]!,
+            field: restFieldPaths[0]!,
             value: Array.headNonEmpty(upperFinalKey),
           }),
         ])
       : Array.isReadonlyArrayNonEmpty(lowerFinalKey)
-        ? rangeOpsFor(prefixOps, restFields, lowerFinalKey, lowerFinalTag)
-        : rangeOpsFor(prefixOps, restFields, upperFinalKey, upperFinalTag);
+        ? rangeOpsFor(prefixOps, restFieldPaths, lowerFinalKey, lowerFinalTag)
+        : rangeOpsFor(prefixOps, restFieldPaths, upperFinalKey, upperFinalTag);
 
   const ranges = Array.appendAll(
     Array.appendAll(startRanges, Array.of(middleRange)),

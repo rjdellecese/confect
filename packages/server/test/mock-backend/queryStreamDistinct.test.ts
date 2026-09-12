@@ -1,3 +1,4 @@
+import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import { QueryStream } from "@confect/server";
@@ -437,7 +438,10 @@ describe("QueryStream distinct representatives", () => {
                     )
                     .pipe(QueryStream.distinct(["text"])),
                 {
-                  innerKey: ["text", "_creationTime"],
+                  innerLayout: QueryStreamKeyLayout.fromIndex([
+                    "text",
+                    "_creationTime",
+                  ]),
                   onEmpty: (row) => ({ tag: `none for ${row.text}` }),
                 },
               ),
@@ -476,7 +480,9 @@ describe("QueryStream distinct representatives", () => {
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", row.tag ?? "")),
                 {
-                  innerKey: ["_creationTime"],
+                  innerLayout: QueryStreamKeyLayout.fromIndex([
+                    "_creationTime",
+                  ]),
                   onEmpty: (row) => ({ tag: `none for ${row.text}` }),
                 },
               ),
@@ -974,7 +980,10 @@ describe("QueryStream distinct read budgets", () => {
                     )
                     .pipe(QueryStream.distinct(["text"])),
                 {
-                  innerKey: ["text", "_creationTime"],
+                  innerLayout: QueryStreamKeyLayout.fromIndex([
+                    "text",
+                    "_creationTime",
+                  ]),
                   onEmpty: () => ({ tag: "missing" }),
                 },
               ),

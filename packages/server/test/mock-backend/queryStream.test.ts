@@ -1,3 +1,5 @@
+import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
+import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
@@ -113,7 +115,7 @@ describe("QueryStream", () => {
           // query object…
           expect(stream.reflection?.tableName).toBe("notes");
           expect(stream.reflection?.indexName).toBe("by_text");
-          expect(stream.reflection?.indexFields).toEqual([
+          expect(stream.reflection?.indexFieldPaths).toEqual([
             "text",
             "_creationTime",
           ]);
@@ -201,7 +203,9 @@ describe("QueryStream", () => {
           const notes = reader.table("notes").stream("by_text");
           type Note =
             typeof notes extends Stream.Stream<infer A, any, any> ? A : never;
-          const nothing = QueryStream.empty<Note>()(["text", "_creationTime"]);
+          const nothing = QueryStream.empty<Note>()(
+            QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+          );
 
           expect(
             yield* collectTexts(QueryStream.merge([nothing, notes])),
@@ -867,7 +871,11 @@ describe("QueryStream", () => {
                           (q) => q.eq("text", note.tag ?? ""),
                           order,
                         ),
-                    { innerKey: ["_creationTime"] },
+                    {
+                      innerLayout: QueryStreamKeyLayout.fromIndex([
+                        "_creationTime",
+                      ]),
+                    },
                   ),
                 );
               const elements = yield* Stream.runCollect(joined.annotated);
@@ -999,7 +1007,9 @@ describe("QueryStream", () => {
                 reader
                   .table("notes")
                   .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
-              { innerKey: ["_creationTime"] },
+              {
+                innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+              },
             ),
           );
 
@@ -1020,7 +1030,9 @@ describe("QueryStream", () => {
                 reader
                   .table("notes")
                   .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
-              { innerKey: ["_creationTime"] },
+              {
+                innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+              },
             ),
           );
           const filteredTags = yield* Stream.runCollect(filteredJoin).pipe(
@@ -1065,7 +1077,11 @@ describe("QueryStream", () => {
                   reader
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
-                { innerKey: ["_creationTime"] },
+                {
+                  innerLayout: QueryStreamKeyLayout.fromIndex([
+                    "_creationTime",
+                  ]),
+                },
               ),
             );
 
@@ -1117,7 +1133,7 @@ describe("QueryStream", () => {
             // steps past it like any element.
             const joined = outer.pipe(
               QueryStream.flatMap(inner, {
-                innerKey: ["_creationTime"],
+                innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                 onEmpty: (note) => ({ tag: `none for ${note.text}` }),
               }),
             );
@@ -1134,7 +1150,7 @@ describe("QueryStream", () => {
             const withoutX0 = outer.pipe(
               QueryStream.filter((note) => note.text !== "x0"),
               QueryStream.flatMap(inner, {
-                innerKey: ["_creationTime"],
+                innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                 onEmpty: (note) => ({ tag: `none for ${note.text}` }),
               }),
             );
@@ -1252,7 +1268,11 @@ describe("QueryStream", () => {
                   reader
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
-                { innerKey: ["_creationTime"] },
+                {
+                  innerLayout: QueryStreamKeyLayout.fromIndex([
+                    "_creationTime",
+                  ]),
+                },
               ),
             );
           const pages = yield* paginateAll(QueryStream.reverse(joined), 1);
@@ -1462,15 +1482,22 @@ describe("QueryStream", () => {
                   reader
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
-                { innerKey: ["_creationTime"] },
+                {
+                  innerLayout: QueryStreamKeyLayout.fromIndex([
+                    "_creationTime",
+                  ]),
+                },
               ),
             );
-          expect(joined.keyFields).toEqual([
-            "text",
-            "_creationTime",
-            "_id",
-            "_creationTime",
-            "_id",
+          expect(QueryStreamKeyLayout.segments(joined.keyLayout)).toEqual([
+            {
+              _tag: "WithImplicitId",
+              labels: QueryStreamKeyLabels.make(["text", "_creationTime"]),
+            },
+            {
+              _tag: "WithImplicitId",
+              labels: QueryStreamKeyLabels.make(["_creationTime"]),
+            },
           ]);
 
           // Relabeling names only the type-visible positions.
@@ -1481,12 +1508,15 @@ describe("QueryStream", () => {
               "innerCreated",
             ]),
           );
-          expect(relabeled.keyFields).toEqual([
-            "outerText",
-            "outerCreated",
-            "_id",
-            "innerCreated",
-            "_id",
+          expect(QueryStreamKeyLayout.segments(relabeled.keyLayout)).toEqual([
+            {
+              _tag: "WithImplicitId",
+              labels: QueryStreamKeyLabels.make(["outerText", "outerCreated"]),
+            },
+            {
+              _tag: "WithImplicitId",
+              labels: QueryStreamKeyLabels.make(["innerCreated"]),
+            },
           ]);
           const pages = yield* paginateAll(relabeled, 1);
           expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
@@ -1516,6 +1546,125 @@ describe("QueryStream", () => {
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("paginates nested inner joins with their complete layouts", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+          for (const text of ["outer", "outer", "middle", "middle"]) {
+            yield* writer.table("notes").insert({ text });
+          }
+          for (const tag of ["l1", "l2"]) {
+            yield* writer.table("notes").insert({ text: "leaf", tag });
+          }
+          const scan = (text: string) =>
+            reader.table("notes").stream("by_text", (q) => q.eq("text", text));
+          const leaf = scan("leaf");
+          const inner = QueryStream.flatMap(scan("middle"), () => leaf, {
+            innerLayout: leaf.keyLayout,
+          });
+          const joined = QueryStream.flatMap(scan("outer"), () => inner, {
+            innerLayout: inner.keyLayout,
+          });
+          expect(QueryStreamKeyLayout.segments(joined.keyLayout)).toEqual([
+            {
+              _tag: "WithImplicitId",
+              labels: QueryStreamKeyLabels.make(["_creationTime"]),
+            },
+            {
+              _tag: "WithImplicitId",
+              labels: QueryStreamKeyLabels.make(["_creationTime"]),
+            },
+            {
+              _tag: "WithImplicitId",
+              labels: QueryStreamKeyLabels.make(["_creationTime"]),
+            },
+          ]);
+          const renamed = QueryStream.renameKey(joined, [
+            "outer",
+            "middle",
+            "leaf",
+          ]);
+          const merged = QueryStream.merge([
+            renamed,
+            QueryStream.empty<Stream.Success<typeof renamed>>()(
+              renamed.keyLayout,
+            ),
+          ]);
+          const expected = ["l1", "l2", "l1", "l2", "l1", "l2", "l1", "l2"];
+          const tags = (
+            pages: ReadonlyArray<ReadonlyArray<{ tag?: string }>>,
+          ) => pages.flatMap((page) => page.map((doc) => doc.tag));
+          expect(tags(yield* paginateAll(merged, 1))).toEqual(expected);
+          expect(
+            tags(yield* paginateAll(QueryStream.reverse(merged), 2)),
+          ).toEqual(expected.toReversed());
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect(
+    "joins zero-width by_id keys and pads composite empty layouts",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+        yield* c.run(
+          Effect.gen(function* () {
+            const writer = yield* DatabaseWriter;
+            const reader = yield* DatabaseReader;
+            const id = yield* writer.table("notes").insert({ text: "only" });
+            const pinned = reader
+              .table("notes")
+              .stream("by_id", (q) => q.eq("_id", id));
+            const outer = reader.table("notes").stream("by_creation_time");
+            const joined = QueryStream.flatMap(outer, () => pinned, {
+              innerLayout: pinned.keyLayout,
+            });
+            expect(QueryStreamKeyLayout.segments(joined.keyLayout)).toEqual(
+              QueryStreamKeyLayout.segments(outer.keyLayout),
+            );
+            expect(
+              (yield* paginateAll(joined, 1)).flat().map((doc) => doc.text),
+            ).toEqual(["only"]);
+            const zeroEmpty = QueryStream.empty<
+              Stream.Success<typeof pinned>
+            >()(pinned.keyLayout);
+            expect(
+              QueryStreamKeyLayout.segments(
+                QueryStream.merge([pinned, zeroEmpty]).keyLayout,
+              ),
+            ).toEqual([]);
+            const innerLayout = QueryStreamKeyLayout.concat(
+              outer.keyLayout,
+              outer.keyLayout,
+            );
+            const compositeEmpty =
+              QueryStream.empty<Stream.Success<typeof outer>>()(innerLayout);
+            const placeholders = QueryStream.flatMap(
+              outer,
+              () => compositeEmpty,
+              { innerLayout, onEmpty: (doc) => doc },
+            );
+            const annotated = yield* Stream.runCollect(placeholders.annotated);
+            expect(annotated[0].key.slice(-4)).toEqual([
+              null,
+              null,
+              null,
+              null,
+            ]);
+            expect(
+              (yield* paginateAll(placeholders, 1))
+                .flat()
+                .map((doc) => doc.text),
+            ).toEqual(["only"]);
+          }),
+        );
+      }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("resumes a fully eq-pinned by_id stream from its cursor", () =>
@@ -1637,7 +1786,7 @@ describe("QueryStream", () => {
 
             for (const cursor of [page.continueCursor, page.splitCursor]) {
               const key = yield* Schema.decodeEffect(
-                QueryStreamCursor.codecForKeyFields(source.keyFields),
+                QueryStreamCursor.codecForLayout(source.keyLayout),
               )(cursor);
               expect(key).toHaveLength(3);
 
@@ -1750,7 +1899,7 @@ describe("QueryStream", () => {
 describe("QueryStream types", () => {
   // Read off the stream's phantom markers, so these need no updating when
   // the class gains a parameter.
-  type KeyOf<S extends QueryStream.Any> = Types.Invariant.Type<S["~key"]>;
+  type LabelsOf<S extends QueryStream.Any> = Types.Invariant.Type<S["~labels"]>;
   type DirectionOf<S extends QueryStream.Any> = Types.Covariant.Type<
     S["~direction"]
   >;
@@ -1765,25 +1914,27 @@ describe("QueryStream types", () => {
       const reader = yield* DatabaseReader;
 
       const full = reader.table("notes").stream("by_text");
-      expectTypeOf<KeyOf<typeof full>>().toEqualTypeOf<
+      expectTypeOf<LabelsOf<typeof full>>().toEqualTypeOf<
         ["text", "_creationTime"]
       >();
 
       const pinned = reader
         .table("notes")
         .stream("by_text", (q) => q.eq("text", "x"));
-      expectTypeOf<KeyOf<typeof pinned>>().toEqualTypeOf<["_creationTime"]>();
+      expectTypeOf<LabelsOf<typeof pinned>>().toEqualTypeOf<
+        ["_creationTime"]
+      >();
 
       // Bounded fields still vary, so they are not consumed.
       const bounded = reader
         .table("notes")
         .stream("by_text", (q) => q.gte("text", "a"));
-      expectTypeOf<KeyOf<typeof bounded>>().toEqualTypeOf<
+      expectTypeOf<LabelsOf<typeof bounded>>().toEqualTypeOf<
         ["text", "_creationTime"]
       >();
 
       const byCreationTime = reader.table("notes").stream("by_creation_time");
-      expectTypeOf<KeyOf<typeof byCreationTime>>().toEqualTypeOf<
+      expectTypeOf<LabelsOf<typeof byCreationTime>>().toEqualTypeOf<
         ["_creationTime"]
       >();
 
@@ -1864,7 +2015,7 @@ describe("QueryStream types", () => {
         pinned,
         (note) => note.text !== "",
       );
-      expectTypeOf<KeyOf<typeof pureFiltered>>().toEqualTypeOf<
+      expectTypeOf<LabelsOf<typeof pureFiltered>>().toEqualTypeOf<
         ["_creationTime"]
       >();
       const pureMapped = QueryStream.map(pinned, (note) => note.text);
@@ -1889,9 +2040,9 @@ describe("QueryStream types", () => {
 
       // flatMap concatenates order keys at the type level.
       const joined = QueryStream.flatMap(bounded, (_note) => pinned, {
-        innerKey: ["_creationTime"],
+        innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
       });
-      expectTypeOf<KeyOf<typeof joined>>().toEqualTypeOf<
+      expectTypeOf<LabelsOf<typeof joined>>().toEqualTypeOf<
         readonly ["text", "_creationTime", "_creationTime"]
       >();
       // Without onEmpty, the elements are exactly the inner documents.
@@ -1902,14 +2053,14 @@ describe("QueryStream types", () => {
       >();
 
       const joinedMismatched = QueryStream.flatMap(bounded, (_note) => pinned, {
-        // @ts-expect-error—innerKey must match the inner stream's order key.
-        innerKey: ["text", "_creationTime"],
+        // @ts-expect-error—innerLayout must match the inner stream's order key.
+        innerLayout: QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
       });
       void joinedMismatched;
 
       // distinct preserves the order key and requires a prefix of it.
       const distinctTexts = QueryStream.distinct(full, ["text"]);
-      expectTypeOf<KeyOf<typeof distinctTexts>>().toEqualTypeOf<
+      expectTypeOf<LabelsOf<typeof distinctTexts>>().toEqualTypeOf<
         ["text", "_creationTime"]
       >();
 
@@ -1926,7 +2077,7 @@ describe("QueryStream types", () => {
         "renamed",
         "_creationTime",
       ]);
-      expectTypeOf<KeyOf<typeof relabeled>>().toEqualTypeOf<
+      expectTypeOf<LabelsOf<typeof relabeled>>().toEqualTypeOf<
         ["renamed", "_creationTime"]
       >();
 
@@ -1935,16 +2086,15 @@ describe("QueryStream types", () => {
       void relabeledTooShort;
 
       // empty takes its document type explicitly and its key literally.
-      const nothing = QueryStream.empty<{ readonly text: string }>()([
-        "text",
-        "_creationTime",
-      ]);
-      expectTypeOf<KeyOf<typeof nothing>>().toEqualTypeOf<
+      const nothing = QueryStream.empty<{ readonly text: string }>()(
+        QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+      );
+      expectTypeOf<LabelsOf<typeof nothing>>().toEqualTypeOf<
         ["text", "_creationTime"]
       >();
       expectTypeOf<DirectionOf<typeof nothing>>().toEqualTypeOf<"asc">();
       const nothingDescending = QueryStream.empty<{ readonly text: string }>()(
-        ["text", "_creationTime"],
+        QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
         "desc",
       );
       expectTypeOf<
@@ -1953,10 +2103,10 @@ describe("QueryStream types", () => {
 
       // With onEmpty, the elements are the inner documents or the placeholder.
       const withPlaceholder = QueryStream.flatMap(bounded, (_note) => pinned, {
-        innerKey: ["_creationTime"],
+        innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
         onEmpty: (note) => ({ missingFor: note.text }),
       });
-      expectTypeOf<KeyOf<typeof withPlaceholder>>().toEqualTypeOf<
+      expectTypeOf<LabelsOf<typeof withPlaceholder>>().toEqualTypeOf<
         readonly ["text", "_creationTime", "_creationTime"]
       >();
       expectTypeOf<
@@ -1970,7 +2120,7 @@ describe("QueryStream types", () => {
 
       // A flatMap result relabels by its type-level (tiebreaker-free) key.
       const relabeledJoin = QueryStream.renameKey(joined, ["a", "b", "c"]);
-      expectTypeOf<KeyOf<typeof relabeledJoin>>().toEqualTypeOf<
+      expectTypeOf<LabelsOf<typeof relabeledJoin>>().toEqualTypeOf<
         ["a", "b", "c"]
       >();
 
@@ -2026,14 +2176,22 @@ describe("QueryStream types", () => {
         bounded,
         // @ts-expect-error—inner streams must run in the outer direction.
         (_note) => descending,
-        { innerKey: ["text", "_creationTime"] },
+        {
+          innerLayout: QueryStreamKeyLayout.fromIndex([
+            "text",
+            "_creationTime",
+          ]),
+        },
       );
       void mixedJoin;
       // In the data-last form the inner streams fix the direction, so a
       // runtime-chosen inner direction widens the join's.
       const dynamicInnerJoin = bounded.pipe(
         QueryStream.flatMap((_note) => dynamic, {
-          innerKey: ["text", "_creationTime"],
+          innerLayout: QueryStreamKeyLayout.fromIndex([
+            "text",
+            "_creationTime",
+          ]),
         }),
       );
       expectTypeOf<
@@ -2044,7 +2202,7 @@ describe("QueryStream types", () => {
       // union, leaving the key alone.
       const reversed = QueryStream.reverse(full);
       expectTypeOf<DirectionOf<typeof reversed>>().toEqualTypeOf<"desc">();
-      expectTypeOf<KeyOf<typeof reversed>>().toEqualTypeOf<
+      expectTypeOf<LabelsOf<typeof reversed>>().toEqualTypeOf<
         ["text", "_creationTime"]
       >();
       const reversedDynamic = QueryStream.reverse(dynamic);
