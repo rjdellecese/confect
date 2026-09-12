@@ -1,3 +1,6 @@
+import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
+import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
+import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { type Document, QueryStream } from "@confect/server";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
@@ -8,6 +11,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import type * as Types from "effect/Types";
 import {
@@ -25,11 +29,17 @@ const collectTexts = <E, R>(
 
 /** Walk a stream page by page until exhausted, returning the pages. */
 const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
-  stream: QueryStream.QueryStream<Doc, Key, E, R>,
+  stream: QueryStream.QueryStream<
+    Doc,
+    Key,
+    QueryStreamOrderDirection.QueryStreamOrderDirection,
+    E,
+    R
+  >,
   numItems: number,
 ): Effect.Effect<
   ReadonlyArray<ReadonlyArray<Doc>>,
-  E | QueryStream.ReadBudgetExceededError,
+  E | QueryStreamReadBudget.ReadBudgetExceededError,
   R
 > => {
   const go = (
@@ -37,7 +47,7 @@ const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
     pages: ReadonlyArray<ReadonlyArray<Doc>>,
   ): Effect.Effect<
     ReadonlyArray<ReadonlyArray<Doc>>,
-    E | QueryStream.ReadBudgetExceededError,
+    E | QueryStreamReadBudget.ReadBudgetExceededError,
     R
   > =>
     QueryStream.paginate(stream, { numItems, cursor }).pipe(
@@ -236,8 +246,8 @@ describe("QueryStream", () => {
           // Directions the types can't see: both typed as the union, so
           // the runtime check is what catches the mismatch.
           const directions: readonly [
-            QueryStream.OrderDirection,
-            QueryStream.OrderDirection,
+            QueryStreamOrderDirection.QueryStreamOrderDirection,
+            QueryStreamOrderDirection.QueryStreamOrderDirection,
           ] = ["asc", "desc"];
           expect(() =>
             QueryStream.merge([
@@ -381,7 +391,7 @@ describe("QueryStream", () => {
           });
           expect(tagsOf(page3.page)).toEqual(["6"]);
           assertEquals(page3.isDone, true);
-          assertEquals(page3.continueCursor, QueryStream.END_CURSOR);
+          assertEquals(page3.continueCursor, QueryStreamCursor.END_CURSOR);
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
@@ -447,6 +457,37 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect(
+    "rejects a non-interior split even when the end cursor is reformatted",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+
+        yield* c.run(
+          Effect.gen(function* () {
+            yield* insertNotes(["a", "b"]);
+            const reader = yield* DatabaseReader;
+            const source = reader.table("notes").stream("by_text");
+            const first = yield* QueryStream.paginate(source, {
+              cursor: null,
+              numItems: 1,
+            });
+            const result = yield* QueryStream.paginate(source, {
+              cursor: null,
+              endCursor: ` \n${first.continueCursor}\n `,
+              numItems: 1,
+              maximumRowsRead: 1,
+            }).pipe(Effect.result);
+
+            assert(Result.isFailure(result));
+            expect(result.failure).toBeInstanceOf(
+              QueryStreamReadBudget.ReadBudgetExceededError,
+            );
+          }),
+        );
+      }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("paginate reports SplitRequired when maximumBytesRead is hit", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -504,7 +545,8 @@ describe("QueryStream", () => {
             pages: ReadonlyArray<ReadonlyArray<string>>,
           ): Effect.Effect<
             ReadonlyArray<ReadonlyArray<string>>,
-            Document.DocumentDecodeError | QueryStream.ReadBudgetExceededError
+            | Document.DocumentDecodeError
+            | QueryStreamReadBudget.ReadBudgetExceededError
           > =>
             QueryStream.paginate(merged, {
               numItems: 10,
@@ -545,7 +587,9 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
-          const afterKey = QueryStream.deserializeCursor(page1.continueCursor);
+          const afterKey = (yield* Schema.decodeEffect(QueryStreamCursor.Json)(
+            page1.continueCursor,
+          )).orderKey;
 
           const narrowed = QueryStream.narrow(leaf, {
             start: { key: afterKey, inclusive: false },
@@ -591,7 +635,9 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
-          const afterKey = QueryStream.deserializeCursor(page1.continueCursor);
+          const afterKey = (yield* Schema.decodeEffect(QueryStreamCursor.Json)(
+            page1.continueCursor,
+          )).orderKey;
 
           // Pure transforms narrow by narrowing their input, so the bounds
           // still reach the leaf rather than falling back to in-memory
@@ -656,7 +702,7 @@ describe("QueryStream", () => {
 
               const fallback: typeof leaf = new QueryStream.QueryStream(
                 leaf.order,
-                leaf.keyFields,
+                leaf.keyLayout,
                 leaf.annotated,
               );
               const composed = QueryStream.merge([
@@ -1568,6 +1614,66 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect(
+    "binds continuation and split cursors to the composed key layout",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+
+        yield* c.run(
+          Effect.gen(function* () {
+            yield* insertNotes(["a", "b", "c"]);
+            const reader = yield* DatabaseReader;
+            const source = reader.table("notes").stream("by_text");
+            const page = yield* QueryStream.paginate(source, {
+              cursor: null,
+              numItems: 10,
+              maximumRowsRead: 2,
+            });
+            assert(Predicate.isString(page.splitCursor));
+            const relabeled = source.pipe(
+              QueryStream.renameKey(["body", "_creationTime"]),
+            );
+
+            for (const cursor of [page.continueCursor, page.splitCursor]) {
+              const key = yield* Schema.decodeEffect(
+                QueryStreamCursor.codecForKeyFields(source.keyFields),
+              )(cursor);
+              expect(key).toHaveLength(3);
+
+              for (const bound of ["cursor", "endCursor"] as const) {
+                const result = yield* QueryStream.paginate(relabeled, {
+                  cursor: null,
+                  numItems: 10,
+                  [bound]: cursor,
+                }).pipe(Effect.catchDefect(Effect.succeed));
+                expect(result).toMatchObject({
+                  data: { paginationError: "InvalidCursor" },
+                });
+              }
+            }
+
+            const rest = yield* QueryStream.paginate(
+              source.pipe(QueryStream.map((note) => note.text)),
+              {
+                cursor: page.continueCursor,
+                numItems: 10,
+              },
+            );
+            expect(rest.page).toEqual(["c"]);
+            const previous = yield* QueryStream.paginate(
+              QueryStream.reverse(source),
+              {
+                cursor: page.continueCursor,
+                numItems: 10,
+              },
+            );
+            expect(previous.page.map((note) => note.text)).toEqual(["a"]);
+          }),
+        );
+      }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("filter and map keep the stream paginable", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -1766,9 +1872,9 @@ describe("QueryStream types", () => {
         QueryStream.QueryStream<
           string,
           ["_creationTime"],
+          "asc",
           Document.DocumentDecodeError,
-          never,
-          "asc"
+          never
         >
       >();
 
@@ -1879,18 +1985,18 @@ describe("QueryStream types", () => {
       expectTypeOf<
         DirectionOf<typeof descendingBounded>
       >().toEqualTypeOf<"desc">();
-      const runtimeOrder = "asc" as QueryStream.OrderDirection;
+      const runtimeOrder =
+        "asc" as QueryStreamOrderDirection.QueryStreamOrderDirection;
       const dynamic = reader.table("notes").stream("by_text", runtimeOrder);
       expectTypeOf<
         DirectionOf<typeof dynamic>
-      >().toEqualTypeOf<QueryStream.OrderDirection>();
+      >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
 
-      // The direction is covariant: a known direction is also "either", so
-      // annotations that omit it (and helpers generic over four
-      // parameters) accept every stream.
+      // The direction is covariant: a known direction is also "either".
       const widened: QueryStream.QueryStream<
         unknown,
         ["text", "_creationTime"],
+        QueryStreamOrderDirection.QueryStreamOrderDirection,
         unknown,
         unknown
       > = full;
@@ -1915,7 +2021,7 @@ describe("QueryStream types", () => {
       const dynamicLed = QueryStream.merge([dynamic, full]);
       expectTypeOf<
         DirectionOf<typeof dynamicLed>
-      >().toEqualTypeOf<QueryStream.OrderDirection>();
+      >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
       const mixedJoin = QueryStream.flatMap(
         bounded,
         // @ts-expect-error—inner streams must run in the outer direction.
@@ -1932,7 +2038,7 @@ describe("QueryStream types", () => {
       );
       expectTypeOf<
         DirectionOf<typeof dynamicInnerJoin>
-      >().toEqualTypeOf<QueryStream.OrderDirection>();
+      >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
 
       // reverse flips a known direction and keeps a runtime one as the
       // union, leaving the key alone.
@@ -1944,7 +2050,7 @@ describe("QueryStream types", () => {
       const reversedDynamic = QueryStream.reverse(dynamic);
       expectTypeOf<
         DirectionOf<typeof reversedDynamic>
-      >().toEqualTypeOf<QueryStream.OrderDirection>();
+      >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
     });
     void _typeChecks;
   });

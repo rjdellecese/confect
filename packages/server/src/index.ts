@@ -29,6 +29,13 @@ export * as QueryRunner from "./QueryRunner";
  * @experimental
  */
 export * as QueryStream from "./QueryStream";
+export * as QueryStreamCursor from "./QueryStreamCursor";
+export * as QueryStreamKeyFields from "./QueryStreamKeyFields";
+export * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
+export * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+export * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
+export * as QueryStreamIndexRange from "./QueryStreamIndexRange";
+export * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 export * as RegisteredConvexFunction from "./RegisteredConvexFunction";
 export * as RegisteredFunction from "./RegisteredFunction";
 export * as RegisteredFunctions from "./RegisteredFunctions";

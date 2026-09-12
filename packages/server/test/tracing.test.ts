@@ -1,3 +1,6 @@
+import * as QueryStreamKeyFields from "@confect/server/QueryStreamKeyFields";
+import type * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
+import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { FunctionSpec, Ref, Table } from "@confect/core";
 import * as ActionRunner from "@confect/server/ActionRunner";
 import type * as DataModel from "@confect/server/DataModel";
@@ -90,7 +93,7 @@ describe("server operation tracing", () => {
         let reads = 0;
         const source = new QueryStream.QueryStream(
           "asc",
-          ["_id"],
+          QueryStreamKeyFields.fromIndex([]),
           Stream.suspend(() => {
             reads++;
             return Stream.make(
@@ -113,7 +116,7 @@ describe("server operation tracing", () => {
         expectTypeOf(paginate).toEqualTypeOf<
           Effect.Effect<
             QueryStream.PaginationResult<number>,
-            QueryStream.ReadBudgetExceededError
+            QueryStreamReadBudget.ReadBudgetExceededError
           >
         >();
         expectTypeOf(curried).toEqualTypeOf<typeof paginate>();
@@ -132,7 +135,7 @@ describe("server operation tracing", () => {
         const page = {
           page: [8],
           isDone: true,
-          continueCursor: QueryStream.END_CURSOR,
+          continueCursor: QueryStreamCursor.END_CURSOR,
         };
         expect(results).toEqual([
           Option.some(8),
@@ -169,7 +172,7 @@ describe("server operation tracing", () => {
         const recorder = yield* makeRecorder;
         const source = new QueryStream.QueryStream(
           "asc",
-          ["_id"],
+          QueryStreamKeyFields.fromIndex([]),
           Stream.make(
             new QueryStream.Element({ doc: Option.some(1), key: [1] }),
             new QueryStream.Element({ doc: Option.some(2), key: [2] }),
@@ -201,7 +204,7 @@ describe("server operation tracing", () => {
       const failure = new OperationFailure({ reason: "query failed" });
       const source = new QueryStream.QueryStream(
         "asc",
-        ["_id"],
+        QueryStreamKeyFields.fromIndex([]),
         Stream.fail(failure),
       );
       const error = yield* QueryStream.paginate(source, {
