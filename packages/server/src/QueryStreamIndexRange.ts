@@ -156,7 +156,11 @@ export const rangeBuilder = <
 >(): RangeBuilder<ConvexDoc, Fields> =>
   makeRangeBuilder([]) as unknown as RangeBuilder<ConvexDoc, Fields>;
 
-/** Replay recorded range ops onto Convex's real `IndexRangeBuilder`. */
+/**
+ * Replay recorded range ops onto Convex's real `IndexRangeBuilder`.
+ *
+ * @experimental
+ */
 export const applyOps = (ops: ReadonlyArray<RangeOp>, q: any): any =>
   Array.reduce(ops, q, (builder, op) => builder[op._tag](op.field, op.value));
 
@@ -241,6 +245,8 @@ const rangeOpsFor = (
  * Decompose the range between `bounds.lower` and `bounds.upper` (over the
  * full index-key `fields`, `_id` tiebreaker included) into a sequence of
  * Convex-expressible ranges, ordered for the given direction.
+ *
+ * @experimental
  */
 export const splitRange = (
   fields: KeyFields,
@@ -311,7 +317,11 @@ export const splitRange = (
   return order === "desc" ? Array.reverse(ranges) : ranges;
 };
 
-/** Fold a range spec's recorded ops into full-index-key bounds. */
+/**
+ * Fold a range spec's recorded ops into full-index-key bounds.
+ *
+ * @experimental
+ */
 export const boundsFromSpec = (spec: AnyIndexRangeSpec): IndexBounds =>
   Array.reduce(
     spec.ops,

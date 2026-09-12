@@ -92,13 +92,21 @@ const upperCut = (bound: KeyBound): KeyCut => ({
   kind: bound.inclusive ? "successor" : "predecessor",
 });
 
-/** The stricter (later) of two lower bounds. */
+/**
+ * The stricter (later) of two lower bounds.
+ *
+ * @experimental
+ */
 export const tightestLower = (self: KeyBound, that: KeyBound): KeyBound =>
   Order.isGreaterThan(KeyCutOrder)(lowerCut(that), lowerCut(self))
     ? that
     : self;
 
-/** The stricter (earlier) of two upper bounds. */
+/**
+ * The stricter (earlier) of two upper bounds.
+ *
+ * @experimental
+ */
 export const tightestUpper = (self: KeyBound, that: KeyBound): KeyBound =>
   Order.isLessThan(KeyCutOrder)(upperCut(that), upperCut(self)) ? that : self;
 
@@ -118,14 +126,23 @@ const combineKeyBound = (
       ),
   });
 
+/**
+ * @experimental
+ */
 export const intersect = (self: KeyBounds, that: KeyBounds): KeyBounds => ({
   lower: combineKeyBound(self.lower, that.lower, tightestLower),
   upper: combineKeyBound(self.upper, that.upper, tightestUpper),
 });
 
+/**
+ * @experimental
+ */
 export const isEmpty = (bounds: IndexBounds): boolean =>
   KeyCutOrder(lowerCut(bounds.lower), upperCut(bounds.upper)) >= 0;
 
+/**
+ * @experimental
+ */
 export const intersectIndexBounds = (
   self: IndexBounds,
   that: IndexBounds,
@@ -134,7 +151,11 @@ export const intersectIndexBounds = (
   upper: tightestUpper(self.upper, that.upper),
 });
 
-/** Whether a key sits after the lower bound (always, when unbounded). */
+/**
+ * Whether a key sits after the lower bound (always, when unbounded).
+ *
+ * @experimental
+ */
 export const admittedByLower =
   (lower: Option.Option<KeyBound>) =>
   (key: OrderKey): boolean =>
@@ -143,7 +164,11 @@ export const admittedByLower =
       onSome: (bound) => KeyCutOrder(exactCut(key), lowerCut(bound)) > 0,
     });
 
-/** Whether a key sits before the upper bound (always, when unbounded). */
+/**
+ * Whether a key sits before the upper bound (always, when unbounded).
+ *
+ * @experimental
+ */
 export const admittedByUpper =
   (upper: Option.Option<KeyBound>) =>
   (key: OrderKey): boolean =>

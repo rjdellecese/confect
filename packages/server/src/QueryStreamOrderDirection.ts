@@ -20,6 +20,9 @@ export type QueryStreamOrderDirection = "asc" | "desc";
 export type Flip<Direction extends QueryStreamOrderDirection> =
   Direction extends "asc" ? "desc" : "asc";
 
+/**
+ * @experimental
+ */
 export const flip = <Direction extends QueryStreamOrderDirection>(
   direction: Direction,
 ): Flip<Direction> => (direction === "asc" ? "desc" : "asc") as Flip<Direction>;

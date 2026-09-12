@@ -27,10 +27,16 @@ export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceed
 
 const TypeId = Symbol("@confect/server/QueryStreamReadBudget");
 
+/**
+ * @experimental
+ */
 export interface QueryStreamReadBudget {
   readonly [TypeId]: typeof TypeId;
 }
 
+/**
+ * @experimental
+ */
 export interface Limits {
   readonly maximumRowsRead: Option.Option<number>;
   readonly maximumBytesRead: Option.Option<number>;
@@ -154,6 +160,9 @@ class Budget implements QueryStreamReadBudget {
   }
 }
 
+/**
+ * @experimental
+ */
 export const make = (limits: Limits): Effect.Effect<QueryStreamReadBudget> =>
   SynchronizedRef.make<State>(
     Option.isNone(limits.maximumRowsRead) &&
@@ -169,20 +178,35 @@ export const make = (limits: Limits): Effect.Effect<QueryStreamReadBudget> =>
         }),
   ).pipe(Effect.map((state) => new Budget(state)));
 
+/**
+ * @experimental
+ */
 export const current: Effect.Effect<Option.Option<QueryStreamReadBudget>> =
   Effect.map(Status, (budget) => budget);
 
+/**
+ * @experimental
+ */
 export const provide = (budget: QueryStreamReadBudget) =>
   (budget as Budget).provide();
 
+/**
+ * @experimental
+ */
 export const isExhausted = (
   budget: QueryStreamReadBudget,
 ): Effect.Effect<boolean> => (budget as Budget).isExhausted();
 
+/**
+ * @experimental
+ */
 export const exceeded = (
   budget: QueryStreamReadBudget,
 ): Effect.Effect<ReadBudgetExceededError> => (budget as Budget).exceeded();
 
+/**
+ * @experimental
+ */
 export const isStopped = (
   status: Option.Option<QueryStreamReadBudget>,
 ): Effect.Effect<boolean> =>
@@ -191,6 +215,9 @@ export const isStopped = (
     onSome: (budget) => (budget as Budget).isStopped(),
   });
 
+/**
+ * @experimental
+ */
 export const charge = (encodedDocuments: Stream.Stream<unknown>) =>
   Stream.fromPull(
     Effect.gen(function* () {

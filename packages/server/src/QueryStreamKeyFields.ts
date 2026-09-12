@@ -4,10 +4,19 @@ import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
+/**
+ * @experimental
+ */
 export const Names = Schema.Array(Schema.String);
 
+/**
+ * @experimental
+ */
 export type Names = typeof Names.Type;
 
+/**
+ * @experimental
+ */
 export const Equivalence = Schema.toEquivalence(Names);
 
 type Field = Data.TaggedEnum<{
@@ -17,10 +26,16 @@ type Field = Data.TaggedEnum<{
 
 const Field = Data.taggedEnum<Field>();
 
+/**
+ * @experimental
+ */
 export class QueryStreamKeyFields extends Data.Class<{
   readonly fields: ReadonlyArray<Field>;
 }> {}
 
+/**
+ * @experimental
+ */
 export const fromIndex = (names: Names): QueryStreamKeyFields => {
   const fields = Array.map(names, (name) => Field.Named({ name }));
   return new QueryStreamKeyFields({
@@ -30,6 +45,9 @@ export const fromIndex = (names: Names): QueryStreamKeyFields => {
   });
 };
 
+/**
+ * @experimental
+ */
 export const names = (self: QueryStreamKeyFields): Names =>
   Array.map(
     self.fields,
@@ -39,12 +57,18 @@ export const names = (self: QueryStreamKeyFields): Names =>
     }),
   );
 
+/**
+ * @experimental
+ */
 export const drop = (
   self: QueryStreamKeyFields,
   count: number,
 ): QueryStreamKeyFields =>
   new QueryStreamKeyFields({ fields: Array.drop(self.fields, count) });
 
+/**
+ * @experimental
+ */
 export const concat = (
   self: QueryStreamKeyFields,
   that: QueryStreamKeyFields,
@@ -53,9 +77,15 @@ export const concat = (
     fields: Array.appendAll(self.fields, that.fields),
   });
 
+/**
+ * @experimental
+ */
 export const visibleKeyFields = (self: QueryStreamKeyFields): Names =>
   Array.map(Array.filter(self.fields, Field.$is("Named")), ({ name }) => name);
 
+/**
+ * @experimental
+ */
 export const runtimePrefixLength = (
   self: QueryStreamKeyFields,
   visibleLength: number,
@@ -74,6 +104,9 @@ export const runtimePrefixLength = (
   );
 };
 
+/**
+ * @experimental
+ */
 export const rename = (
   self: QueryStreamKeyFields,
   key: Names,

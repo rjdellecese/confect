@@ -51,10 +51,19 @@ const KeyValue = Schema.declare<Value | undefined>(
   },
 );
 
+/**
+ * @experimental
+ */
 export type KeyValue = typeof KeyValue.Type;
 
+/**
+ * @experimental
+ */
 export const QueryStreamOrderKey = Schema.Array(KeyValue);
 
+/**
+ * @experimental
+ */
 export type QueryStreamOrderKey = typeof QueryStreamOrderKey.Type;
 
 /**
@@ -77,12 +86,19 @@ export const ValueOrder: Order_.Order<KeyValue> = Order_.make(
 export const Order: Order_.Order<QueryStreamOrderKey> =
   Order_.Array(ValueOrder);
 
-/** Order of positions in stream order: for `desc`, later keys are smaller. */
+/**
+ * Order of positions in stream order: for `desc`, later keys are smaller.
+ *
+ * @experimental
+ */
 export const PositionOrder = (
   order: OrderDirection,
 ): Order_.Order<QueryStreamOrderKey> =>
   order === "asc" ? Order : Order_.flip(Order);
 
+/**
+ * @experimental
+ */
 export const extract = (
   encoded: Record.ReadonlyRecord<string, unknown>,
   keyPaths: ReadonlyArray<ReadonlyArray<string>>,

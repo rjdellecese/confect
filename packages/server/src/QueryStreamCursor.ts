@@ -3,6 +3,9 @@ import * as SchemaGetter from "effect/SchemaGetter";
 import * as QueryStreamKeyFields from "./QueryStreamKeyFields";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 
+/**
+ * @experimental
+ */
 export class QueryStreamCursor extends Schema.Class<QueryStreamCursor>(
   "QueryStreamCursor",
 )(
@@ -20,12 +23,21 @@ export class QueryStreamCursor extends Schema.Class<QueryStreamCursor>(
   ),
 ) {}
 
+/**
+ * @experimental
+ */
 export const Json = Schema.fromJsonString(
   Schema.toCodecJson(QueryStreamCursor),
 );
 
+/**
+ * @experimental
+ */
 export const END_CURSOR = "[]";
 
+/**
+ * @experimental
+ */
 export const codecForKeyFields = (keyFields: QueryStreamKeyFields.Names) =>
   Json.check(
     Schema.makeFilter(
