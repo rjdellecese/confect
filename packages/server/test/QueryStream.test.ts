@@ -1,3 +1,4 @@
+import * as QueryStreamKeyFields from "@confect/server/QueryStreamKeyFields";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
@@ -13,7 +14,7 @@ describe("QueryStream type parameters", () => {
   it("accepts direction third and defaults errors and requirements to never", () => {
     const source = new QueryStream.QueryStream<number, ["_id"], "desc">(
       "desc",
-      ["_id"],
+      QueryStreamKeyFields.fromIndex([]),
       Stream.empty,
     );
 
@@ -47,6 +48,62 @@ describe("QueryStream type parameters", () => {
       Stream.Stream<number, Error, { readonly service: "query" }>
     >();
   });
+});
+
+describe("QueryStream.merge", () => {
+  for (const direction of ["asc", "desc"] as const) {
+    it.effect(`drains buffered chunks stably in ${direction} order`, () =>
+      Effect.gen(function* () {
+        const source = (label: string, ranks: ReadonlyArray<number>) =>
+          new QueryStream.QueryStream<string, [], typeof direction>(
+            direction,
+            QueryStreamKeyFields.fromIndex([]),
+            Stream.fromIterable(
+              ranks.map(
+                (rank) =>
+                  new QueryStream.Element({
+                    doc: Option.some(`${label}:${rank}`),
+                    key: [rank],
+                  }),
+              ),
+            ),
+          );
+        const ascending = direction === "asc";
+        const result = yield* Stream.runCollect(
+          QueryStream.merge([
+            source("left", ascending ? [1, 2, 2, 5] : [5, 2, 2, 1]),
+            source("right", ascending ? [0, 2, 3, 4, 6] : [6, 4, 3, 2, 0]),
+            QueryStream.empty<string>()([], direction),
+          ]),
+        );
+        expect(result).toEqual(
+          ascending
+            ? [
+                "right:0",
+                "left:1",
+                "left:2",
+                "left:2",
+                "right:2",
+                "right:3",
+                "right:4",
+                "left:5",
+                "right:6",
+              ]
+            : [
+                "right:6",
+                "left:5",
+                "right:4",
+                "right:3",
+                "left:2",
+                "left:2",
+                "right:2",
+                "left:1",
+                "right:0",
+              ],
+        );
+      }),
+    );
+  }
 });
 
 describe("QueryStream.Element", () => {
@@ -92,7 +149,7 @@ describe.each(["asc", "desc"] as const)(
           const values = order === "asc" ? [1, 2, 3, 4, 5] : [5, 4, 3, 2, 1];
           const source = new QueryStream.QueryStream(
             order,
-            ["_id"],
+            QueryStreamKeyFields.fromIndex([]),
             Stream.fromIterable(
               values.map(
                 (value) =>
@@ -138,7 +195,7 @@ describe.each(["asc", "desc"] as const)(
           let reads = 0;
           const source = new QueryStream.QueryStream(
             order,
-            ["text", "_creationTime", "_id"],
+            QueryStreamKeyFields.fromIndex(["text", "_creationTime"]),
             Stream.fromEffect(
               Effect.sync(() => {
                 reads++;
@@ -191,7 +248,7 @@ describe.each(["asc", "desc"] as const)(
         const ids = order === "asc" ? ["a", "b"] : ["b", "a"];
         const source = new QueryStream.QueryStream(
           order,
-          ["text", "_creationTime", "_id"],
+          QueryStreamKeyFields.fromIndex(["text", "_creationTime"]),
           Stream.fromIterable(
             ids.map(
               (id) =>
@@ -233,7 +290,7 @@ describe.each(["asc", "desc"] as const)(
       Effect.gen(function* () {
         const source = new QueryStream.QueryStream(
           order,
-          ["_id"],
+          QueryStreamKeyFields.fromIndex([]),
           Stream.make(
             new QueryStream.Element({ doc: Option.some(1), key: [1] }),
           ),
@@ -261,7 +318,7 @@ describe("QueryStream", () => {
   ];
   const source = new QueryStream.QueryStream(
     "asc",
-    ["_id"],
+    QueryStreamKeyFields.fromIndex([]),
     Stream.fromIterable(elements),
   );
 

@@ -14,35 +14,58 @@ type Doc = {
 const builder = () =>
   QueryStreamIndexRange.rangeBuilder<Doc, ["category", "score", "_id"]>();
 
-describe("QueryStreamIndexRange.RangeOp", () => {
+describe("QueryStreamIndexRange operations", () => {
   it.each(["eq", "gt", "gte", "lt", "lte"] as const)(
     "constructs %s operations with the existing record shape",
     (tag) => {
-      expect(
-        QueryStreamIndexRange.RangeOp[tag]({ field: "text", value: "hello" }),
-      ).toEqual({
-        _tag: tag,
-        field: "text",
-        value: "hello",
-      });
-      expect(
-        QueryStreamIndexRange.RangeOp[tag]({ field: "text", value: undefined })
-          .value,
-      ).toBeUndefined();
+      const root = QueryStreamIndexRange.rangeBuilder<
+        Doc & { text?: string },
+        ["text"]
+      >();
+      for (const value of ["hello", undefined]) {
+        expect(root[tag]("text", value).ops).toStrictEqual([
+          { _tag: tag, field: "text", value },
+        ]);
+      }
     },
   );
 
   it("constructs precisely tagged operations", () => {
-    const op = QueryStreamIndexRange.RangeOp.eq({
-      field: "text",
+    const op = {
+      _tag: "eq",
+      field: "category",
       value: "hello",
-    });
+    } satisfies QueryStreamIndexRange.RangeOp;
     expectTypeOf(op._tag).toEqualTypeOf<"eq">();
-    expect(QueryStreamIndexRange.RangeOp.$is("eq")(op)).toBe(true);
+    expect(builder().eq("category", "hello").ops).toEqual([op]);
   });
 });
 
 describe("QueryStreamIndexRange.rangeBuilder", () => {
+  it("preserves field tuple inference", () => {
+    type Fields = readonly ["category", "_id"];
+    type Builder<F extends ReadonlyArray<string>> =
+      QueryStreamIndexRange.RangeBuilder<Doc, F>;
+    expectTypeOf<
+      Parameters<Builder<Fields>["eq"]>[0]
+    >().toEqualTypeOf<"category">();
+    expectTypeOf<
+      QueryStreamIndexRange.Remaining<ReturnType<Builder<Fields>["eq"]>>
+    >().toEqualTypeOf<["_id"]>();
+    expectTypeOf<Parameters<Builder<[]>["eq"]>[0]>().toEqualTypeOf<never>();
+    expectTypeOf<
+      QueryStreamIndexRange.Remaining<ReturnType<Builder<["_id"]>["eq"]>>
+    >().toEqualTypeOf<[]>();
+    expectTypeOf<
+      Parameters<Builder<ReadonlyArray<string>>["eq"]>[0]
+    >().toEqualTypeOf<never>();
+    expectTypeOf<
+      QueryStreamIndexRange.Remaining<
+        ReturnType<Builder<ReadonlyArray<string>>["eq"]>
+      >
+    >().toEqualTypeOf<ReadonlyArray<string>>();
+  });
+
   it("returns independent branches without mutating a reused builder", () => {
     const root = Object.freeze(builder());
     Object.freeze(root.ops);
@@ -70,6 +93,46 @@ describe("QueryStreamIndexRange.rangeBuilder", () => {
     expect(lower).not.toBe(pinned);
     expect(upper).not.toBe(lower);
     expect(pinned.eq("score", 2).eqCount).toBe(2);
+  });
+
+  it("derives an enumerable equality count from the leading operations", () => {
+    const root = builder();
+    const pinned = root.eq("category", "a").eq("score", 2);
+    const id = "item" as GenericId<"items">;
+    const lower = pinned.gt("_id", id);
+    const bounded = lower.lte("_id", id);
+    const expectedOps = [
+      { _tag: "eq", field: "category", value: "a" },
+      { _tag: "eq", field: "score", value: 2 },
+    ];
+
+    for (const [spec, expectedCount] of [
+      [root, 0],
+      [pinned, 2],
+      [lower, 2],
+      [bounded, 2],
+      [pinned.eq("_id", id), 3],
+    ] as const) {
+      expect(spec.eqCount).toBe(expectedCount);
+      expect({ ...spec }.eqCount).toBe(expectedCount);
+      const descriptor = Object.getOwnPropertyDescriptor(spec, "eqCount");
+      expect(descriptor).toMatchObject({
+        enumerable: true,
+        get: expect.any(Function),
+      });
+      expect(descriptor).not.toHaveProperty("value");
+    }
+    expect(root.ops).toEqual([]);
+    expect(pinned.ops).toEqual(expectedOps);
+    expect(lower.ops).toEqual([
+      ...expectedOps,
+      { _tag: "gt", field: "_id", value: id },
+    ]);
+    expect(bounded.ops).toEqual([
+      ...expectedOps,
+      { _tag: "gt", field: "_id", value: id },
+      { _tag: "lte", field: "_id", value: id },
+    ]);
   });
 
   it("consumes equality fields while preserving bounded fields and their value types", () => {
@@ -132,10 +195,11 @@ describe("QueryStreamIndexRange replay", () => {
           return final;
         },
       };
-      const op = QueryStreamIndexRange.RangeOp[tag]({
+      const op: QueryStreamIndexRange.RangeOp = {
+        _tag: tag,
         field: "score",
         value: undefined,
-      });
+      };
       expect(QueryStreamIndexRange.applyOps([op], receiver)).toBe(final);
       expect(calls).toEqual([receiver, "score", undefined]);
     },
@@ -205,22 +269,23 @@ describe("QueryStreamIndexRange.splitRange", () => {
         lower: { key: [1, 2, 3], inclusive: false },
         upper: { key: [1, 3, 2], inclusive: true },
       };
-      const eq = QueryStreamIndexRange.RangeOp.eq;
-      const expected = [
+      const expected: ReadonlyArray<
+        ReadonlyArray<QueryStreamIndexRange.RangeOp>
+      > = [
         [
-          eq({ field: "f1", value: 1 }),
-          eq({ field: "f2", value: 2 }),
-          QueryStreamIndexRange.RangeOp.gt({ field: "f3", value: 3 }),
+          { _tag: "eq", field: "f1", value: 1 },
+          { _tag: "eq", field: "f2", value: 2 },
+          { _tag: "gt", field: "f3", value: 3 },
         ],
         [
-          eq({ field: "f1", value: 1 }),
-          QueryStreamIndexRange.RangeOp.gt({ field: "f2", value: 2 }),
-          QueryStreamIndexRange.RangeOp.lt({ field: "f2", value: 3 }),
+          { _tag: "eq", field: "f1", value: 1 },
+          { _tag: "gt", field: "f2", value: 2 },
+          { _tag: "lt", field: "f2", value: 3 },
         ],
         [
-          eq({ field: "f1", value: 1 }),
-          eq({ field: "f2", value: 3 }),
-          QueryStreamIndexRange.RangeOp.lte({ field: "f3", value: 2 }),
+          { _tag: "eq", field: "f1", value: 1 },
+          { _tag: "eq", field: "f2", value: 3 },
+          { _tag: "lte", field: "f3", value: 2 },
         ],
       ];
       expect(
@@ -243,9 +308,7 @@ describe("QueryStreamIndexRange.splitRange", () => {
         "asc",
         QueryStreamIndexRange.boundsFromSpec(builder().eq("category", "a")),
       ),
-    ).toEqual([
-      [QueryStreamIndexRange.RangeOp.eq({ field: "category", value: "a" })],
-    ]);
+    ).toEqual([[{ _tag: "eq", field: "category", value: "a" }]]);
   });
 
   it.each(["gt", "gte", "lt", "lte"] as const)(

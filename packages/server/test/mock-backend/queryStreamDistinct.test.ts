@@ -65,13 +65,12 @@ const observeUpstreamEnd = <
 ): QueryStream.QueryStream<Doc, Key, Direction, E, R> =>
   new QueryStream.QueryStream(
     stream.order,
-    stream.keyFields,
+    stream.keyLayout,
     stream.annotated.pipe(
       Stream.concat(Stream.fromEffect(onEnd).pipe(Stream.drain)),
     ),
     stream.reflection,
     stream.narrowWith,
-    stream.tiebreakers,
     stream.reverseWith,
   );
 

@@ -38,9 +38,9 @@ describe("QueryStreamOrderKey", () => {
   ])("rejects malformed JSON key values: %j", (value) => {
     expect(
       Result.isFailure(
-        Schema.decodeResult(Schema.toCodecJson(QueryStreamOrderKey.KeyValue))(
-          value,
-        ),
+        Schema.decodeResult(
+          Schema.toCodecJson(QueryStreamOrderKey.QueryStreamOrderKey),
+        )([value]),
       ),
     ).toBe(true);
   });

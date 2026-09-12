@@ -1,106 +1,101 @@
 import * as Array from "effect/Array";
-import { identity } from "effect/Function";
+import * as Data from "effect/Data";
 import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-export const QueryStreamKeyFields = Schema.Array(Schema.String);
+export const Names = Schema.Array(Schema.String);
 
-export type QueryStreamKeyFields = typeof QueryStreamKeyFields.Type;
+export type Names = typeof Names.Type;
 
-export const Equivalence = Schema.toEquivalence(QueryStreamKeyFields);
+export const Equivalence = Schema.toEquivalence(Names);
 
-export type Head<Fields extends QueryStreamKeyFields> =
-  Fields extends readonly [infer H extends string, ...QueryStreamKeyFields]
-    ? H
-    : never;
+type Field = Data.TaggedEnum<{
+  Named: { readonly name: string };
+  ImplicitId: {};
+}>;
 
-export type Tail<Fields extends QueryStreamKeyFields> =
-  Fields extends readonly [string, ...infer Rest extends QueryStreamKeyFields]
-    ? Rest
-    : QueryStreamKeyFields;
+const Field = Data.taggedEnum<Field>();
 
-export interface WithTiebreakers {
-  readonly keyFields: QueryStreamKeyFields;
-  readonly tiebreakers: ReadonlyArray<number>;
-}
+export class QueryStreamKeyFields extends Data.Class<{
+  readonly fields: ReadonlyArray<Field>;
+}> {}
 
-/**
- * Append the implicit `_id` tiebreaker unless the field list already ends
- * with it—the single runtime convention for order-key and index-key
- * field lists.
- */
-export const withIdTiebreaker = (
-  fields: QueryStreamKeyFields,
-): QueryStreamKeyFields =>
-  Option.exists(Array.last(fields), (field) => field === "_id")
-    ? fields
-    : Array.append(fields, "_id");
+export const fromIndex = (names: Names): QueryStreamKeyFields => {
+  const fields = Array.map(names, (name) => Field.Named({ name }));
+  return new QueryStreamKeyFields({
+    fields: Option.exists(Array.last(names), (name) => name === "_id")
+      ? fields
+      : Array.append(fields, Field.ImplicitId()),
+  });
+};
 
-/**
- * The position of the `_id` tiebreaker that {@link withIdTiebreaker} added
- * to `fields` (none when the fields already ended with `_id`, as `by_id`'s
- * do—that `_id` is part of the type-level key).
- */
-export const appendedTiebreaker = (
-  fields: QueryStreamKeyFields,
-  withTiebreaker: QueryStreamKeyFields,
-): ReadonlyArray<number> =>
-  withTiebreaker.length === fields.length ? [] : [withTiebreaker.length - 1];
-
-/** The order-key fields the type-level key names: all but the tiebreakers. */
-export const visibleKeyFields = (self: WithTiebreakers): QueryStreamKeyFields =>
-  Array.filter(
-    self.keyFields,
-    (_field, index) => !Array.contains(self.tiebreakers, index),
+export const names = (self: QueryStreamKeyFields): Names =>
+  Array.map(
+    self.fields,
+    Field.$match({
+      Named: ({ name }) => name,
+      ImplicitId: () => "_id",
+    }),
   );
 
-/**
- * The runtime length of the order-key prefix that covers the first
- * `visibleLength` type-visible fields—including any tiebreakers that
- * sit between them.
- */
+export const drop = (
+  self: QueryStreamKeyFields,
+  count: number,
+): QueryStreamKeyFields =>
+  new QueryStreamKeyFields({ fields: Array.drop(self.fields, count) });
+
+export const concat = (
+  self: QueryStreamKeyFields,
+  that: QueryStreamKeyFields,
+): QueryStreamKeyFields =>
+  new QueryStreamKeyFields({
+    fields: Array.appendAll(self.fields, that.fields),
+  });
+
+export const visibleKeyFields = (self: QueryStreamKeyFields): Names =>
+  Array.map(Array.filter(self.fields, Field.$is("Named")), ({ name }) => name);
+
 export const runtimePrefixLength = (
-  self: WithTiebreakers,
+  self: QueryStreamKeyFields,
   visibleLength: number,
-): number =>
-  visibleLength === 0
-    ? 0
-    : Option.getOrThrowWith(
-        Array.get(
-          Array.filter(
-            Array.makeBy(self.keyFields.length, identity),
-            (index) => !Array.contains(self.tiebreakers, index),
-          ),
-          visibleLength - 1,
-        ),
-        () =>
-          new Error(
-            `QueryStream: prefix length ${visibleLength} exceeds the order key ([${Array.join(self.keyFields, ", ")}])`,
-          ),
-      ) + 1;
+): Result.Result<number, Error> => {
+  if (visibleLength === 0) return Result.succeed(0);
+  let remaining = visibleLength;
+  for (const [index, field] of self.fields.entries()) {
+    if (Field.$is("Named")(field) && --remaining === 0) {
+      return Result.succeed(index + 1);
+    }
+  }
+  return Result.fail(
+    new Error(
+      `QueryStream: prefix length ${visibleLength} exceeds the order key ([${Array.join(names(self), ", ")}])`,
+    ),
+  );
+};
 
 export const rename = (
-  self: WithTiebreakers,
-  key: QueryStreamKeyFields,
-): QueryStreamKeyFields => {
+  self: QueryStreamKeyFields,
+  key: Names,
+): Result.Result<QueryStreamKeyFields, Error> => {
   const visible = visibleKeyFields(self);
   if (key.length !== visible.length) {
-    throw new Error(
-      `QueryStream.renameKey: key ([${Array.join(key, ", ")}]) must have as many fields as the stream's order key ([${Array.join(visible, ", ")}])`,
+    return Result.fail(
+      new Error(
+        `QueryStream.renameKey: key ([${Array.join(key, ", ")}]) must have as many fields as the stream's order key ([${Array.join(visible, ", ")}])`,
+      ),
     );
   }
-  return Array.map(self.keyFields, (field, index) =>
-    Array.contains(self.tiebreakers, index)
-      ? field
-      : Option.getOrThrowWith(
-          Array.get(
-            key,
-            index -
-              Array.filter(self.tiebreakers, (position) => position < index)
-                .length,
-          ),
-          () =>
-            new Error("QueryStream.renameKey: key/order-key length mismatch"),
-        ),
+  let index = 0;
+  return Result.succeed(
+    new QueryStreamKeyFields({
+      fields: Array.map(
+        self.fields,
+        Field.$match({
+          Named: () => Field.Named({ name: Array.getUnsafe(key, index++) }),
+          ImplicitId: () => Field.ImplicitId(),
+        }),
+      ),
+    }),
   );
 };

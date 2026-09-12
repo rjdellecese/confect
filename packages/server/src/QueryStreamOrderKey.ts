@@ -15,7 +15,7 @@ import * as SchemaIssue from "effect/SchemaIssue";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 
 const UNDEFINED_SENTINEL = { $undefined: true } as const;
-export const KeyValue = Schema.declare<Value | undefined>(
+const KeyValue = Schema.declare<Value | undefined>(
   (value): value is Value | undefined =>
     value === undefined ||
     Result.isSuccess(Result.try(() => convexToJson(value as Value))),

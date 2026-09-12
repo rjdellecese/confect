@@ -702,7 +702,7 @@ describe("QueryStream", () => {
 
               const fallback: typeof leaf = new QueryStream.QueryStream(
                 leaf.order,
-                leaf.keyFields,
+                leaf.keyLayout,
                 leaf.annotated,
               );
               const composed = QueryStream.merge([

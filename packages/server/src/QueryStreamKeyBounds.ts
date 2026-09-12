@@ -45,9 +45,9 @@ export interface IndexBounds {
   readonly upper: KeyBound;
 }
 
-export type CutKind = "predecessor" | "exact" | "successor";
+type CutKind = "predecessor" | "exact" | "successor";
 
-export interface KeyCut {
+interface KeyCut {
   readonly key: OrderKey;
   readonly kind: CutKind;
 }
@@ -58,7 +58,7 @@ const cutKindRank: Record.ReadonlyRecord<CutKind, number> = {
   successor: 2,
 };
 
-export const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
+const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
   const minLength = Math.min(self.key.length, that.key.length);
   const prefixOrdering = QueryStreamOrderKey.Order(
     Array.take(self.key, minLength),
@@ -80,14 +80,14 @@ export const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
   return selfIsShorter ? shorterOrdering : (-shorterOrdering as -1 | 1);
 });
 
-export const exactCut = (key: OrderKey): KeyCut => ({ key, kind: "exact" });
+const exactCut = (key: OrderKey): KeyCut => ({ key, kind: "exact" });
 
-export const lowerCut = (bound: KeyBound): KeyCut => ({
+const lowerCut = (bound: KeyBound): KeyCut => ({
   key: bound.key,
   kind: bound.inclusive ? "predecessor" : "successor",
 });
 
-export const upperCut = (bound: KeyBound): KeyCut => ({
+const upperCut = (bound: KeyBound): KeyCut => ({
   key: bound.key,
   kind: bound.inclusive ? "successor" : "predecessor",
 });
@@ -102,7 +102,7 @@ export const tightestLower = (self: KeyBound, that: KeyBound): KeyBound =>
 export const tightestUpper = (self: KeyBound, that: KeyBound): KeyBound =>
   Order.isLessThan(KeyCutOrder)(upperCut(that), upperCut(self)) ? that : self;
 
-export const combineKeyBound = (
+const combineKeyBound = (
   self: Option.Option<KeyBound>,
   that: Option.Option<KeyBound>,
   combine: (self: KeyBound, that: KeyBound) => KeyBound,
@@ -117,6 +117,14 @@ export const combineKeyBound = (
         }),
       ),
   });
+
+export const intersect = (self: KeyBounds, that: KeyBounds): KeyBounds => ({
+  lower: combineKeyBound(self.lower, that.lower, tightestLower),
+  upper: combineKeyBound(self.upper, that.upper, tightestUpper),
+});
+
+export const isEmpty = (bounds: IndexBounds): boolean =>
+  KeyCutOrder(lowerCut(bounds.lower), upperCut(bounds.upper)) >= 0;
 
 export const intersectIndexBounds = (
   self: IndexBounds,

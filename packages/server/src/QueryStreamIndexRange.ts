@@ -4,29 +4,34 @@ import * as Data from "effect/Data";
 import { identity, pipe } from "effect/Function";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
-import * as Order from "effect/Order";
 import type * as Types from "effect/Types";
-import type * as QueryStreamKeyFields from "./QueryStreamKeyFields";
-import type { QueryStreamKeyFields as KeyFields } from "./QueryStreamKeyFields";
+import type { Names as KeyFields } from "./QueryStreamKeyFields";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
 import type { IndexBounds } from "./QueryStreamKeyBounds";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 import type { QueryStreamOrderKey as OrderKey } from "./QueryStreamOrderKey";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 
+type Head<Fields extends KeyFields> = Fields extends readonly [
+  infer H extends string,
+  ...KeyFields,
+]
+  ? H
+  : never;
+
+type Tail<Fields extends KeyFields> = Fields extends readonly [
+  string,
+  ...infer Rest extends KeyFields,
+]
+  ? Rest
+  : KeyFields;
+
 // The range builder mirrors Convex's `IndexRangeBuilder`, but *consumes* the
 // index-field tuple at the type level as `eq` pins fields. The remaining
 // tuple becomes the resulting stream's order key, which is what `merge`
 // checks for compatibility.
 
-/**
- * @experimental
- */
-export const RangeSpecTypeId = "~@confect/server/QueryStream/IndexRangeSpec";
-/**
- * @experimental
- */
-export type RangeSpecTypeId = typeof RangeSpecTypeId;
+const RangeSpecTypeId = "~@confect/server/QueryStream/IndexRangeSpec";
 
 /**
  * @experimental
@@ -38,7 +43,7 @@ export type RangeOp = Data.TaggedEnum<{
   };
 }>;
 
-export const RangeOp = Data.taggedEnum<RangeOp>();
+const RangeOp = Data.taggedEnum<RangeOp>();
 
 /**
  * The result of applying a range callback: the recorded operations, plus a
@@ -76,24 +81,24 @@ export interface RangeBuilder<
   Fields extends KeyFields,
 > extends IndexRangeSpec<Fields> {
   readonly eq: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
-  ) => RangeBuilder<ConvexDoc, QueryStreamKeyFields.Tail<Fields>>;
+    field: Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
+  ) => RangeBuilder<ConvexDoc, Tail<Fields>>;
   readonly gt: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
+    field: Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
   ) => LowerBoundedRange<ConvexDoc, Fields>;
   readonly gte: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
+    field: Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
   ) => LowerBoundedRange<ConvexDoc, Fields>;
   readonly lt: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
+    field: Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
   ) => IndexRangeSpec<Fields>;
   readonly lte: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
+    field: Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
   ) => IndexRangeSpec<Fields>;
 }
 
@@ -107,38 +112,36 @@ export interface LowerBoundedRange<
   Fields extends KeyFields,
 > extends IndexRangeSpec<Fields> {
   readonly lt: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
+    field: Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
   ) => IndexRangeSpec<Fields>;
   readonly lte: (
-    field: QueryStreamKeyFields.Head<Fields>,
-    value: FieldTypeFromFieldPath<ConvexDoc, QueryStreamKeyFields.Head<Fields>>,
+    field: Head<Fields>,
+    value: FieldTypeFromFieldPath<ConvexDoc, Head<Fields>>,
   ) => IndexRangeSpec<Fields>;
 }
 
 const makeRangeBuilder = (
-  eqCount: number,
   ops: ReadonlyArray<RangeOp>,
 ): RangeBuilder<GenericDocument, KeyFields> => {
   const push =
-    (tag: RangeOp["_tag"], nextEqCount: number) =>
+    (tag: RangeOp["_tag"]) =>
     (field: string, value: QueryStreamOrderKey.KeyValue) =>
-      makeRangeBuilder(
-        nextEqCount,
-        Array.append(ops, RangeOp[tag]({ field, value })),
-      );
+      makeRangeBuilder(Array.append(ops, RangeOp[tag]({ field, value })));
 
   return {
     [RangeSpecTypeId]: {
       _Remaining: identity as Types.Covariant<KeyFields>,
     },
-    eqCount,
+    get eqCount() {
+      return Array.takeWhile(ops, (op) => op._tag === "eq").length;
+    },
     ops,
-    eq: push("eq", eqCount + 1),
-    gt: push("gt", eqCount),
-    gte: push("gte", eqCount),
-    lt: push("lt", eqCount),
-    lte: push("lte", eqCount),
+    eq: push("eq"),
+    gt: push("gt"),
+    gte: push("gte"),
+    lt: push("lt"),
+    lte: push("lte"),
   };
 };
 
@@ -151,7 +154,7 @@ export const rangeBuilder = <
   ConvexDoc extends GenericDocument,
   Fields extends KeyFields,
 >(): RangeBuilder<ConvexDoc, Fields> =>
-  makeRangeBuilder(0, []) as unknown as RangeBuilder<ConvexDoc, Fields>;
+  makeRangeBuilder([]) as unknown as RangeBuilder<ConvexDoc, Fields>;
 
 /** Replay recorded range ops onto Convex's real `IndexRangeBuilder`. */
 export const applyOps = (ops: ReadonlyArray<RangeOp>, q: any): any =>
@@ -247,12 +250,7 @@ export const splitRange = (
   // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
   // upper inclusive at `k`—the half-open (k, k]—both cut at
   // successor(k).
-  if (
-    Order.isGreaterThanOrEqualTo(QueryStreamKeyBounds.KeyCutOrder)(
-      QueryStreamKeyBounds.lowerCut(bounds.lower),
-      QueryStreamKeyBounds.upperCut(bounds.upper),
-    )
-  ) {
+  if (QueryStreamKeyBounds.isEmpty(bounds)) {
     return [];
   }
 

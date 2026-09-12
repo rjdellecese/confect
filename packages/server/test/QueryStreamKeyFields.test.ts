@@ -1,6 +1,7 @@
 import { QueryStreamKeyFields as PublicKeyFields } from "@confect/server";
 import * as QueryStreamKeyFields from "@confect/server/QueryStreamKeyFields";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 describe("QueryStreamKeyFields", () => {
@@ -8,19 +9,18 @@ describe("QueryStreamKeyFields", () => {
     expect(PublicKeyFields.QueryStreamKeyFields).toBe(
       QueryStreamKeyFields.QueryStreamKeyFields,
     );
+    expect(PublicKeyFields.Names).toBe(QueryStreamKeyFields.Names);
     expect(PublicKeyFields.Equivalence).toBe(QueryStreamKeyFields.Equivalence);
-    const fields = Schema.decodeSync(QueryStreamKeyFields.QueryStreamKeyFields)(
-      ["text", "_creationTime", "_id"],
-    );
-    expectTypeOf(
-      fields,
-    ).toEqualTypeOf<QueryStreamKeyFields.QueryStreamKeyFields>();
+    const fields = Schema.decodeSync(QueryStreamKeyFields.Names)([
+      "text",
+      "_creationTime",
+      "_id",
+    ]);
+    expectTypeOf(fields).toEqualTypeOf<QueryStreamKeyFields.Names>();
     expectTypeOf(fields).toEqualTypeOf<ReadonlyArray<string>>();
     expect(fields).toEqual(["text", "_creationTime", "_id"]);
-    expect(Schema.is(QueryStreamKeyFields.QueryStreamKeyFields)([])).toBe(true);
-    expect(Schema.is(QueryStreamKeyFields.QueryStreamKeyFields)([1])).toBe(
-      false,
-    );
+    expect(Schema.is(QueryStreamKeyFields.Names)([])).toBe(true);
+    expect(Schema.is(QueryStreamKeyFields.Names)([1])).toBe(false);
   });
 
   it.each([
@@ -35,23 +35,6 @@ describe("QueryStreamKeyFields", () => {
       expect(QueryStreamKeyFields.Equivalence(left, right)).toBe(equal);
     },
   );
-
-  it("preserves field tuple inference", () => {
-    expectTypeOf<
-      QueryStreamKeyFields.Head<readonly ["text", "_id"]>
-    >().toEqualTypeOf<"text">();
-    expectTypeOf<
-      QueryStreamKeyFields.Tail<readonly ["text", "_id"]>
-    >().toEqualTypeOf<["_id"]>();
-    expectTypeOf<QueryStreamKeyFields.Head<[]>>().toEqualTypeOf<never>();
-    expectTypeOf<QueryStreamKeyFields.Tail<["_id"]>>().toEqualTypeOf<[]>();
-    expectTypeOf<
-      QueryStreamKeyFields.Head<ReadonlyArray<string>>
-    >().toEqualTypeOf<never>();
-    expectTypeOf<
-      QueryStreamKeyFields.Tail<ReadonlyArray<string>>
-    >().toEqualTypeOf<ReadonlyArray<string>>();
-  });
 
   it.each([
     { fields: [], expected: ["_id"], tiebreakers: [0] },
@@ -70,79 +53,142 @@ describe("QueryStreamKeyFields", () => {
     "tracks only an appended ID for $fields",
     ({ fields, expected, tiebreakers }) => {
       const original = Object.freeze(fields);
-      const actual = QueryStreamKeyFields.withIdTiebreaker(original);
-      expect(actual).toEqual(expected);
-      expect(QueryStreamKeyFields.appendedTiebreaker(original, actual)).toEqual(
-        tiebreakers,
-      );
-      if (tiebreakers.length === 0) {
-        expect(actual).toBe(original);
-      }
+      const actual = QueryStreamKeyFields.fromIndex(original);
+      expect(QueryStreamKeyFields.names(actual)).toEqual(expected);
+      expect(
+        actual.fields.flatMap((field, index) =>
+          field._tag === "ImplicitId" ? [index] : [],
+        ),
+      ).toEqual(tiebreakers);
+      expect(QueryStreamKeyFields.visibleKeyFields(actual)).toEqual(original);
     },
   );
 
   it("excludes implicit IDs while retaining explicit ID fields", () => {
+    const joined = QueryStreamKeyFields.concat(
+      QueryStreamKeyFields.fromIndex(["text"]),
+      QueryStreamKeyFields.fromIndex(["_creationTime"]),
+    );
+    expect(QueryStreamKeyFields.names(joined)).toEqual([
+      "text",
+      "_id",
+      "_creationTime",
+      "_id",
+    ]);
+    expect(QueryStreamKeyFields.visibleKeyFields(joined)).toEqual([
+      "text",
+      "_creationTime",
+    ]);
     expect(
-      QueryStreamKeyFields.visibleKeyFields({
-        keyFields: ["text", "_id", "_creationTime", "_id"],
-        tiebreakers: [1, 3],
-      }),
-    ).toEqual(["text", "_creationTime"]);
-    expect(
-      QueryStreamKeyFields.visibleKeyFields({
-        keyFields: ["_id"],
-        tiebreakers: [],
-      }),
+      QueryStreamKeyFields.visibleKeyFields(
+        QueryStreamKeyFields.fromIndex(["_id"]),
+      ),
     ).toEqual(["_id"]);
     expect(
-      QueryStreamKeyFields.visibleKeyFields({
-        keyFields: [],
-        tiebreakers: [],
-      }),
+      QueryStreamKeyFields.visibleKeyFields(
+        new QueryStreamKeyFields.QueryStreamKeyFields({ fields: [] }),
+      ),
     ).toEqual([]);
   });
 
   it("includes interior tiebreakers in a runtime prefix", () => {
-    const layout = {
-      keyFields: ["text", "_id", "_creationTime", "_id"],
-      tiebreakers: [1, 3],
-    };
-    expect(QueryStreamKeyFields.runtimePrefixLength(layout, 0)).toBe(0);
-    expect(QueryStreamKeyFields.runtimePrefixLength(layout, 1)).toBe(1);
-    expect(QueryStreamKeyFields.runtimePrefixLength(layout, 2)).toBe(3);
-    expect(() => QueryStreamKeyFields.runtimePrefixLength(layout, 3)).toThrow(
-      "prefix length 3 exceeds the order key",
+    const layout = QueryStreamKeyFields.concat(
+      QueryStreamKeyFields.fromIndex(["text"]),
+      QueryStreamKeyFields.fromIndex(["_creationTime"]),
     );
     expect(
-      QueryStreamKeyFields.runtimePrefixLength(
-        { keyFields: [], tiebreakers: [] },
-        0,
+      Result.getOrThrow(QueryStreamKeyFields.runtimePrefixLength(layout, 0)),
+    ).toBe(0);
+    expect(
+      Result.getOrThrow(QueryStreamKeyFields.runtimePrefixLength(layout, 1)),
+    ).toBe(1);
+    expect(
+      Result.getOrThrow(QueryStreamKeyFields.runtimePrefixLength(layout, 2)),
+    ).toBe(3);
+    const invalid = QueryStreamKeyFields.runtimePrefixLength(layout, 3);
+    expect(Result.isFailure(invalid)).toBe(true);
+    if (Result.isFailure(invalid))
+      expect(invalid.failure.message).toContain(
+        "prefix length 3 exceeds the order key",
+      );
+    expect(
+      Result.getOrThrow(
+        QueryStreamKeyFields.runtimePrefixLength(
+          new QueryStreamKeyFields.QueryStreamKeyFields({ fields: [] }),
+          0,
+        ),
       ),
     ).toBe(0);
   });
 
   it("renames only visible fields without mutating the layout", () => {
-    const layout = Object.freeze({
-      keyFields: Object.freeze(["text", "_id", "_creationTime", "_id"]),
-      tiebreakers: Object.freeze([1, 3]),
-    });
-    expect(QueryStreamKeyFields.rename(layout, ["body", "created"])).toEqual([
+    const layout = Object.freeze(
+      QueryStreamKeyFields.concat(
+        QueryStreamKeyFields.fromIndex(["text"]),
+        QueryStreamKeyFields.fromIndex(["_creationTime"]),
+      ),
+    );
+    Object.freeze(layout.fields);
+    const renamed = Result.getOrThrow(
+      QueryStreamKeyFields.rename(layout, ["body", "created"]),
+    );
+    expect(QueryStreamKeyFields.names(renamed)).toEqual([
       "body",
       "_id",
       "created",
       "_id",
     ]);
-    expect(layout.keyFields).toEqual(["text", "_id", "_creationTime", "_id"]);
-    expect(() => QueryStreamKeyFields.rename(layout, ["body"])).toThrow(
-      "must have as many fields",
-    );
+    expect(QueryStreamKeyFields.visibleKeyFields(renamed)).toEqual([
+      "body",
+      "created",
+    ]);
+    expect(QueryStreamKeyFields.names(layout)).toEqual([
+      "text",
+      "_id",
+      "_creationTime",
+      "_id",
+    ]);
+    const invalid = QueryStreamKeyFields.rename(layout, ["body"]);
+    expect(Result.isFailure(invalid)).toBe(true);
+    if (Result.isFailure(invalid))
+      expect(invalid.failure.message).toContain("must have as many fields");
     expect(
-      QueryStreamKeyFields.rename({ keyFields: ["_id"], tiebreakers: [] }, [
-        "id",
-      ]),
+      QueryStreamKeyFields.names(
+        Result.getOrThrow(
+          QueryStreamKeyFields.rename(QueryStreamKeyFields.fromIndex(["_id"]), [
+            "id",
+          ]),
+        ),
+      ),
     ).toEqual(["id"]);
     expect(
-      QueryStreamKeyFields.rename({ keyFields: [], tiebreakers: [] }, []),
+      QueryStreamKeyFields.names(
+        Result.getOrThrow(
+          QueryStreamKeyFields.rename(
+            new QueryStreamKeyFields.QueryStreamKeyFields({ fields: [] }),
+            [],
+          ),
+        ),
+      ),
     ).toEqual([]);
+  });
+
+  it("keeps implicit IDs attached to their positions when equality pins fields", () => {
+    const layout = QueryStreamKeyFields.fromIndex(["text", "_creationTime"]);
+    const pinned = QueryStreamKeyFields.drop(layout, 2);
+    expect(pinned.fields).toEqual([{ _tag: "ImplicitId" }]);
+    expect(QueryStreamKeyFields.visibleKeyFields(pinned)).toEqual([]);
+    expect(
+      QueryStreamKeyFields.names(QueryStreamKeyFields.drop(pinned, 1)),
+    ).toEqual([]);
+    expect(
+      QueryStreamKeyFields.drop(QueryStreamKeyFields.fromIndex(["_id"]), 1)
+        .fields,
+    ).toEqual([]);
+    expect(QueryStreamKeyFields.names(layout)).toEqual([
+      "text",
+      "_creationTime",
+      "_id",
+    ]);
   });
 });

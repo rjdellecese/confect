@@ -3,39 +3,62 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Option from "effect/Option";
 
 describe("QueryStreamKeyBounds", () => {
-  it.each([true, false])("maps inclusive=%s bounds to cuts", (inclusive) => {
-    const key = ["a"];
-    expect(QueryStreamKeyBounds.exactCut(key)).toEqual({ key, kind: "exact" });
-    expect(QueryStreamKeyBounds.lowerCut({ key, inclusive })).toEqual({
-      key,
-      kind: inclusive ? "predecessor" : "successor",
-    });
-    expect(QueryStreamKeyBounds.upperCut({ key, inclusive })).toEqual({
-      key,
-      kind: inclusive ? "successor" : "predecessor",
-    });
-  });
+  it.each([true, false])(
+    "admits the endpoint only for inclusive=%s bounds",
+    (inclusive) => {
+      const key = ["a"];
+      const bound = Option.some({ key, inclusive });
+      expect(QueryStreamKeyBounds.admittedByLower(bound)(key)).toBe(inclusive);
+      expect(QueryStreamKeyBounds.admittedByUpper(bound)(key)).toBe(inclusive);
+    },
+  );
 
-  it("orders cuts around every extension of a prefix in both directions", () => {
-    const cuts: ReadonlyArray<QueryStreamKeyBounds.KeyCut> = [
-      { key: [], kind: "predecessor" },
-      { key: ["a"], kind: "predecessor" },
-      { key: ["a", 1], kind: "predecessor" },
-      { key: ["a", 1], kind: "exact" },
-      { key: ["a", 1], kind: "successor" },
-      { key: ["a", 2], kind: "exact" },
-      { key: ["a"], kind: "successor" },
-      { key: ["b"], kind: "predecessor" },
-      { key: [], kind: "successor" },
+  it("orders bounds around every extension of a prefix in both directions", () => {
+    const lowerBounds: ReadonlyArray<QueryStreamKeyBounds.KeyBound> = [
+      { key: [], inclusive: true },
+      { key: ["a"], inclusive: true },
+      { key: ["a", 1], inclusive: true },
+      { key: ["a", 1], inclusive: false },
+      { key: ["a", 2], inclusive: true },
+      { key: ["a", 2], inclusive: false },
+      { key: ["a"], inclusive: false },
+      { key: ["b"], inclusive: true },
+      { key: [], inclusive: false },
     ];
-    for (const [leftIndex, left] of cuts.entries()) {
-      for (const [rightIndex, right] of cuts.entries()) {
-        expect(QueryStreamKeyBounds.KeyCutOrder(left, right)).toBe(
-          leftIndex === rightIndex ? 0 : leftIndex < rightIndex ? -1 : 1,
+    for (const [leftIndex, lower] of lowerBounds.entries()) {
+      for (const [rightIndex, right] of lowerBounds.entries()) {
+        const upper = { key: right.key, inclusive: !right.inclusive };
+        expect(QueryStreamKeyBounds.isEmpty({ lower, upper })).toBe(
+          leftIndex >= rightIndex,
         );
+      }
+      const upper = { key: lower.key, inclusive: !lower.inclusive };
+      for (const [key, position] of [
+        [["a", 1], 2.5],
+        [["a", 2], 4.5],
+      ] as const) {
+        expect(
+          QueryStreamKeyBounds.admittedByLower(Option.some(lower))(key),
+        ).toBe(position > leftIndex);
+        expect(
+          QueryStreamKeyBounds.admittedByUpper(Option.some(upper))(key),
+        ).toBe(position < leftIndex);
       }
     }
   });
+
+  it.each([true, false])(
+    "detects empty equal-key ranges with inclusive=%s lower bounds",
+    (inclusive) => {
+      const lower = { key: ["a"], inclusive };
+      for (const upperInclusive of [true, false]) {
+        const upper = { key: ["a"], inclusive: upperInclusive };
+        expect(QueryStreamKeyBounds.isEmpty({ lower, upper })).toBe(
+          !inclusive || !upperInclusive,
+        );
+      }
+    },
+  );
 
   it.each([true, false])(
     "admits the entire prefix family only for inclusive=%s endpoints",
@@ -94,45 +117,60 @@ describe("QueryStreamKeyBounds", () => {
     );
   });
 
-  it("combines absent bounds and intersects present bounds with the supplied operation", () => {
+  it("combines absent bounds and intersects present bounds with the tightest endpoints", () => {
     const first = Option.some({ key: [1], inclusive: true });
     const second = Option.some({ key: [2], inclusive: false });
     const none = Option.none<QueryStreamKeyBounds.KeyBound>();
     expect(
-      QueryStreamKeyBounds.combineKeyBound(
-        none,
-        none,
-        QueryStreamKeyBounds.tightestLower,
+      QueryStreamKeyBounds.intersect(
+        { lower: none, upper: none },
+        { lower: none, upper: none },
       ),
-    ).toEqual(none);
+    ).toEqual({ lower: none, upper: none });
+    for (const [left, right] of [
+      [none, first],
+      [first, none],
+    ]) {
+      const result = QueryStreamKeyBounds.intersect(
+        { lower: left, upper: left },
+        { lower: right, upper: right },
+      );
+      expect(result).toEqual({ lower: first, upper: first });
+      if (Option.isNone(left)) {
+        expect(result.lower).toBe(first);
+        expect(result.upper).toBe(first);
+      }
+    }
+    for (const [left, right] of [
+      [first, second],
+      [second, first],
+    ]) {
+      expect(
+        QueryStreamKeyBounds.intersect(
+          { lower: left, upper: left },
+          { lower: right, upper: right },
+        ),
+      ).toEqual({ lower: second, upper: first });
+    }
     expect(
-      QueryStreamKeyBounds.combineKeyBound(
-        none,
-        first,
-        QueryStreamKeyBounds.tightestLower,
+      QueryStreamKeyBounds.intersect(
+        { lower: first, upper: none },
+        { lower: none, upper: second },
       ),
-    ).toBe(first);
-    expect(
-      QueryStreamKeyBounds.combineKeyBound(
-        first,
-        none,
-        QueryStreamKeyBounds.tightestLower,
-      ),
-    ).toEqual(first);
-    expect(
-      QueryStreamKeyBounds.combineKeyBound(
-        first,
-        second,
-        QueryStreamKeyBounds.tightestLower,
-      ),
-    ).toEqual(second);
-    expect(
-      QueryStreamKeyBounds.combineKeyBound(
-        first,
-        second,
-        QueryStreamKeyBounds.tightestUpper,
-      ),
-    ).toEqual(first);
+    ).toEqual({ lower: first, upper: second });
+  });
+
+  it("intersects optional endpoints without mutating either range", () => {
+    const first = Object.freeze({
+      lower: Option.some({ key: [1], inclusive: true }),
+      upper: Option.some({ key: [5], inclusive: true }),
+    });
+    const second = Object.freeze({
+      lower: Option.some({ key: [2], inclusive: false }),
+      upper: Option.some({ key: [4], inclusive: false }),
+    });
+    expect(QueryStreamKeyBounds.intersect(first, second)).toEqual(second);
+    expect(QueryStreamKeyBounds.intersect(second, first)).toEqual(second);
   });
 
   it("intersects both endpoints without mutating either range", () => {
@@ -158,6 +196,13 @@ describe("QueryStreamKeyBounds", () => {
       lower: disjoint.lower,
       upper: first.upper,
     });
+    expect(QueryStreamKeyBounds.isEmpty(first)).toBe(false);
+    expect(QueryStreamKeyBounds.isEmpty(second)).toBe(false);
+    expect(
+      QueryStreamKeyBounds.isEmpty(
+        QueryStreamKeyBounds.intersectIndexBounds(first, disjoint),
+      ),
+    ).toBe(true);
   });
 
   it("requires at least one NarrowBounds endpoint", () => {

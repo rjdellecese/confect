@@ -8,7 +8,7 @@ export class QueryStreamCursor extends Schema.Class<QueryStreamCursor>(
 )(
   Schema.Struct({
     version: Schema.Literal(1),
-    keyFields: QueryStreamKeyFields.QueryStreamKeyFields,
+    keyFields: QueryStreamKeyFields.Names,
     orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
   }).check(
     Schema.makeFilter(
@@ -26,9 +26,7 @@ export const Json = Schema.fromJsonString(
 
 export const END_CURSOR = "[]";
 
-export const codecForKeyFields = (
-  keyFields: QueryStreamKeyFields.QueryStreamKeyFields,
-) =>
+export const codecForKeyFields = (keyFields: QueryStreamKeyFields.Names) =>
   Json.check(
     Schema.makeFilter(
       (cursor) => QueryStreamKeyFields.Equivalence(cursor.keyFields, keyFields),
