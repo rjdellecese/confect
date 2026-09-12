@@ -7,10 +7,10 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-rc.113",
+    "@effect/vitest": "4.0.0-rc.115",
     "@types/node": "24.13.3",
     "confect-bench-harness": "workspace:*",
-    "effect": "4.0.0-rc.113",
+    "effect": "4.0.0-rc.115",
     "tsdown": "0.23.0",
     "tsx": "4.23.13",
     "typescript": "7.0.2",
@@ -51,7 +51,7 @@
   "module": "./dist/index.js",
   "peerDependencies": {
     "convex": "^1.32.0",
-    "effect": "^4.0.0-rc.113"
+    "effect": "^4.0.0-rc.115"
   },
   "repository": {
     "type": "git",

@@ -3,8 +3,8 @@
   "description": "Internal oxlint JS plugin carrying Confect's repo-specific lint rules, authored with effect-oxlint.",
   "version": "0.0.0",
   "devDependencies": {
-    "@effect/vitest": "4.0.0-rc.113",
-    "effect": "4.0.0-rc.113",
+    "@effect/vitest": "4.0.0-rc.115",
+    "effect": "4.0.0-rc.115",
     "effect-oxlint": "0.3.4",
     "shx": "0.4.0",
     "vitest": "5.0.0"
