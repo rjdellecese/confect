@@ -989,7 +989,7 @@ export const flatMap = dual<
     E | E2,
     R | R2
   >
->(3, (self, f, options) => {
+>(3, (self, f, options): Any => {
   return makeFlatMap(
     self,
     f,
