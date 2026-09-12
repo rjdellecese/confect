@@ -25,14 +25,17 @@ export const KeyValue = Schema.declare<Value | undefined>(
         decode: SchemaGetter.transformEffect((value, options) =>
           Effect.try({
             try: () =>
-              Result.isSuccess(
+              Result.match(
                 Schema.decodeUnknownResult(
                   Schema.Struct({ $undefined: Schema.Literal(true) }),
                   { onExcessProperty: "error" },
                 )(value),
-              )
-                ? undefined
-                : jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
+                {
+                  onSuccess: () => undefined,
+                  onFailure: () =>
+                    jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
+                },
+              ),
             catch: () =>
               new SchemaIssue.InvalidValue(
                 { message: "Invalid Convex order-key value" },
