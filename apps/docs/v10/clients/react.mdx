@@ -122,11 +122,11 @@ const NoteDetail = ({ selectedId }: { selectedId: string | undefined }) => {
 
 ## `usePaginatedQuery`
 
-Loads data reactively from a [paginated query](/v10/server/functions#paginated-queries), mirroring the ergonomics of `usePaginatedQuery` from `convex/react`. The ref must come from a spec defined with `FunctionSpec.publicPaginatedQuery` — passing any other ref fails at runtime with an error pointing at the constructor.
+Loads data reactively from a [paginated query](/v10/server/functions#paginated-queries), mirroring the ergonomics of `usePaginatedQuery` from `convex/react`. The ref must come from a spec defined with `FunctionSpec.publicPaginatedQuery`—passing any other ref fails at runtime with an error pointing at the constructor.
 
 Args are encoded using the spec's user-args schema (`paginationOpts` is managed by the hook, not the caller), and each loaded page is decoded using the spec's `item` schema. Pass `"skip"` instead of args to disable the query, like `useQuery`.
 
-Returns a `PaginatedQueryResult<Item, E>`. The loaded variants — `LoadingFirstPage`, `LoadingMore`, `CanLoadMore`, and `Exhausted` — all carry `results` and `isLoading`, and `CanLoadMore` additionally carries `loadMore`, so the common UI needs only field access and a couple of predicates:
+Returns a `PaginatedQueryResult<Item, E>`. The loaded variants—`LoadingFirstPage`, `LoadingMore`, `CanLoadMore`, and `Exhausted`—all carry `results` and `isLoading`, and `CanLoadMore` additionally carries `loadMore`, so the common UI needs only field access and a couple of predicates:
 
 ```tsx
 import { PaginatedQueryResult, usePaginatedQuery } from "@confect/react";
@@ -157,13 +157,13 @@ const PaginatedNoteList = () => {
 };
 ```
 
-`loadMore` lives only on `CanLoadMore`, the one state it can make progress from — the underlying Convex hook exposes it on every status, but calling it while a page is in flight, once the list is exhausted, or after a failure is an intentional no-op there. Narrowing with `isCanLoadMore` (or `match`'s `onCanLoadMore`) makes that statically apparent instead of silently dropping the call.
+`loadMore` lives only on `CanLoadMore`, the one state it can make progress from—the underlying Convex hook exposes it on every status, but calling it while a page is in flight, once the list is exhausted, or after a failure is an intentional no-op there. Narrowing with `isCanLoadMore` (or `match`'s `onCanLoadMore`) makes that statically apparent instead of silently dropping the call.
 
 `PaginatedQueryResult` also provides `match` for exhaustive pattern matching, and the predicates `isLoadingFirstPage`, `isLoadingMore`, `isExhausted`, `isLoading`, and `isFailure`.
 
 ### Typed errors
 
-When the spec declares an `error` schema, the result type gains a `Failure` variant carrying the decoded typed error — errors are values, consistent with `useQuery`. Narrow with `PaginatedQueryResult.isFailure` (or handle `onFailure` in `match`) to reach it:
+When the spec declares an `error` schema, the result type gains a `Failure` variant carrying the decoded typed error—errors are values, consistent with `useQuery`. Narrow with `PaginatedQueryResult.isFailure` (or handle `onFailure` in `match`) to reach it:
 
 ```tsx
 const notes = usePaginatedQuery(
@@ -182,7 +182,7 @@ if (PaginatedQueryResult.isFailure(notes)) {
     </div>
   );
 }
-// notes: narrowed to the non-`Failure` variants — isLoading is available too.
+// notes: narrowed to the non-`Failure` variants—isLoading is available too.
 ```
 
 Every variant carries `results`, `Failure` included: when a later page fails, the pages already loaded are not discarded.
@@ -190,6 +190,51 @@ Every variant carries `results`, `Failure` included: when a later page fails, th
 Without an `error` schema, the `Failure` variant is excluded from the type entirely, so no narrowing is needed. Failures not declared in the `error` schema are thrown during render and propagate to the nearest [error boundary](https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary).
 
 <Note>`usePaginatedQuery` requires `convex` 1.36.0 or newer.</Note>
+
+## `useStreamPaginatedQuery`
+
+Loads data reactively from a paginated query whose handler paginates a [query stream](/v10/server/database/streams#paginating-a-stream) with `QueryStream.paginate`. Those pages are not tracked by Convex's query journal, which `usePaginatedQuery` relies on to keep pages consistent as data changes, so this hook maintains that guarantee itself: every loaded page is pinned to a fixed index range by echoing its `continueCursor` back as the next subscription's `endCursor`. Adjacent pages always meet exactly, a document is never shown twice or lost between pages, and a page that outgrows `initialNumItems` is split in two.
+
+The call shape and the result are the same as `usePaginatedQuery`: args are encoded with the spec's user-args schema, pages are decoded with its `item` schema, `"skip"` disables the query, and the result is a `PaginatedQueryResult<Item, E>` with a `Failure` variant when the spec declares an `error` schema.
+
+```tsx
+import { PaginatedQueryResult, useStreamPaginatedQuery } from "@confect/react";
+import refs from "../confect/_generated/refs";
+
+const Feed = () => {
+  const feed = useStreamPaginatedQuery(
+    refs.public.notes.feed,
+    {},
+    { initialNumItems: 10 },
+  );
+
+  return (
+    <div>
+      <ul>
+        {feed.results.map((note) => (
+          <li key={note._id}>{note.text}</li>
+        ))}
+      </ul>
+      {feed.isLoading && <p>Loading…</p>}
+      {PaginatedQueryResult.isCanLoadMore(feed) && (
+        <button type="button" onClick={() => feed.loadMore(10)}>
+          Load more
+        </button>
+      )}
+    </div>
+  );
+};
+```
+
+The options also accept `maximumRowsRead` and `maximumBytesRead`, per-page read budgets forwarded to the server. On a stream that filters out most of what it reads, a page that would otherwise scan past Convex's query limits returns truncated with `SplitRequired` instead, and the hook splits it.
+
+When the server fails a page with `paginationError: "InvalidCursor"`, the hook restarts pagination from the first page rather than failing. Stream queries emit this signal for malformed cursors, unsupported cursor versions, or mismatched runtime key-field layouts—not every change to query semantics. See [Cursor format and validation](/v10/server/database/streams#cursor-format-and-validation).
+
+<Note>
+  `useStreamPaginatedQuery` also works with paginated queries that use the
+  built-in `paginate`, since it only relies on the `endCursor` protocol field.
+  It subscribes to one query per loaded page.
+</Note>
 
 ## `useMutation`
 

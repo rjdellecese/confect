@@ -143,6 +143,7 @@
                 "pages": [
                   "v10/server/database/schema",
                   "v10/server/database/reading",
+                  "v10/server/database/streams",
                   "v10/server/database/writing",
                   "v10/server/database/system-tables",
                   "v10/server/database/determinism"
