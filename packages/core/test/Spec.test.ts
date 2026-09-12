@@ -19,7 +19,7 @@ it("derives group types from the payload and replaces an existing group immutabl
     FunctionSpec.publicQuery({ name: "old", returns: () => Schema.String }),
   );
   const replacement = GroupSpec.makeAt("notes").addFunction(
-    FunctionSpec.publicQuery({ name: "current", returns: () => Schema.Number }),
+    FunctionSpec.publicQuery({ name: "current", returns: () => Schema.Finite }),
   );
   const empty = Spec.make();
   const before = empty.add(original);
@@ -51,7 +51,7 @@ it("replaces an addAt binding without changing the source group or forcing its s
       name: "current",
       returns: () => {
         evaluated++;
-        return Schema.Number;
+        return Schema.Finite;
       },
     }),
   );

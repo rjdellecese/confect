@@ -54,5 +54,5 @@ export type TableWithName<
 export const make = <
   const TablesRecord extends Readonly<Record<string, Table.AnyWithProps>>,
 >(
-  tables: TablesRecord,
-): DatabaseSchema<TablesRecord> => ({ [TypeId]: tables });
+  tableRecord: TablesRecord,
+): DatabaseSchema<TablesRecord> => ({ [TypeId]: tableRecord });

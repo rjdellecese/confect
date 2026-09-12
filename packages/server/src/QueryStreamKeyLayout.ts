@@ -276,17 +276,17 @@ export const rename = <ReplacementLabels extends ReadonlyArray<string>>(
       readonly segments: ReadonlyArray<Segment>;
     }>({ rest: replacementLabels, segments: [] }),
     (state, segment) =>
-      Option.flatMap(state, ({ rest, segments }) =>
+      Option.flatMap(state, ({ rest, segments: componentSegments }) =>
         Option.map(consumeSegment(rest, segment), (parsed) => ({
           rest: parsed.rest,
-          segments: Array.append(segments, parsed.segment),
+          segments: Array.append(componentSegments, parsed.segment),
         })),
       ),
   );
   const parsed = consumed.pipe(
     Option.filter(({ rest }) => QueryStreamKeyLabels.size(rest) === 0),
-    Option.map(({ segments }) =>
-      make<Types.Mutable<ReplacementLabels>>(segments),
+    Option.map(({ segments: componentSegments }) =>
+      make<Types.Mutable<ReplacementLabels>>(componentSegments),
     ),
   );
   return Result.fromOption(
