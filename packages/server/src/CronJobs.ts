@@ -14,6 +14,7 @@ import * as Record from "effect/Record";
 import type * as CronJob from "./CronJob";
 
 export const TypeId = "~@confect/server/CronJobs";
+
 export type TypeId = typeof TypeId;
 
 export interface CronJobs {
@@ -98,6 +99,7 @@ export const cronToConvexCronString = (cron: Cron.Cron): string => {
   );
 
   const hasNonDefaultSeconds = cron.seconds.size !== 1 || !cron.seconds.has(0);
+
   if (hasNonDefaultSeconds) {
     throw new Error(
       "Convex cron expressions do not support a seconds field. " +
@@ -120,6 +122,7 @@ export const cronToConvexCronString = (cron: Cron.Cron): string => {
 
 const setToField = (set: ReadonlySet<number>): string => {
   if (set.size === 0) return "*";
+
   return pipe(
     set,
     Array.sort(Order.Number),
@@ -132,24 +135,28 @@ export const durationToConvexIntervalSchedule = (
   duration: Duration.Duration,
 ): IntervalSchedule => {
   const millis = Duration.toMillis(duration);
+
   if (millis <= 0) {
     throw new Error("Interval must be a positive duration.");
   }
 
   const oneHourInMillis = Duration.hours(1).pipe(Duration.toMillis);
   const hours = millis / oneHourInMillis;
+
   if (Number.isInteger(hours)) {
     return { type: "interval", hours };
   }
 
   const oneMinuteInMillis = Duration.minutes(1).pipe(Duration.toMillis);
   const minutes = millis / oneMinuteInMillis;
+
   if (Number.isInteger(minutes)) {
     return { type: "interval", minutes };
   }
 
   const oneSecondInMillis = Duration.seconds(1).pipe(Duration.toMillis);
   const seconds = millis / oneSecondInMillis;
+
   if (Number.isInteger(seconds)) {
     return { type: "interval", seconds };
   }

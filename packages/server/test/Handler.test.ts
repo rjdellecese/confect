@@ -34,6 +34,7 @@ describe("Handler", () => {
       const vQueryReturns = v.array(v.string());
 
       type QueryArgs = Infer<typeof _vQueryArgsObject>;
+
       type QueryReturns = Infer<typeof vQueryReturns>;
 
       const _myQuery = query({
@@ -52,6 +53,7 @@ describe("Handler", () => {
       >();
 
       type ResultReturns = ExtractQueryReturns<Result>;
+
       expectTypeOf<ResultReturns>().toEqualTypeOf<Promise<QueryReturns>>();
     });
 
@@ -62,6 +64,7 @@ describe("Handler", () => {
       const vMutationReturns = v.null();
 
       type MutationArgs = Infer<typeof _vMutationArgsObject>;
+
       type MutationReturns = Infer<typeof vMutationReturns>;
 
       const _myMutation = mutation({
@@ -80,6 +83,7 @@ describe("Handler", () => {
       >();
 
       type ResultReturns = ExtractMutationReturns<Result>;
+
       expectTypeOf<ResultReturns>().toEqualTypeOf<Promise<MutationReturns>>();
     });
 
@@ -91,6 +95,7 @@ describe("Handler", () => {
       const _vActionReturnsObject = v.object(vActionReturns);
 
       type ActionArgs = Infer<typeof _vActionArgsObject>;
+
       type ActionReturns = Infer<typeof _vActionReturnsObject>;
 
       const _myAction = internalAction({
@@ -109,6 +114,7 @@ describe("Handler", () => {
       >();
 
       type ResultReturns = ExtractActionReturns<Result>;
+
       expectTypeOf<ResultReturns>().toEqualTypeOf<Promise<ActionReturns>>();
     });
   });

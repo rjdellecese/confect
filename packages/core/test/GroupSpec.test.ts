@@ -111,6 +111,7 @@ describe("middleware options", () => {
       options: () => Schema.Struct({ limit: Schema.FiniteFromString }),
       functionTypes: { query: true, mutation: false, action: false },
     }) {}
+
     const group = GroupSpec.make().middleware(Limit, { limit: 5 });
     expect(group.middlewareAttachments[0]?.options).toEqual({ limit: 5 });
     // @ts-expect-error
@@ -151,6 +152,7 @@ describe("middleware options", () => {
       expect(copy.middlewareSpecs).toEqual([RequireRole, Observe]);
       expect(Object.hasOwn(copy, "middlewareSpecs")).toBe(false);
     }
+
     expect(group.functions).toEqual({});
     expect(group.groups).toEqual({});
     expect(group.name).toBe("");
@@ -158,9 +160,11 @@ describe("middleware options", () => {
 
   it("allows different options at both attachment levels and across their boundary", () => {
     const internal = query.middleware(RequireRole, { roles: ["Internal"] });
+
     const group = GroupSpec.make().middleware(RequireRole, {
       roles: ["Buyer"],
     });
+
     expect(
       GroupSpec.validateMiddleware(
         GroupSpec.make().addFunction(
@@ -190,9 +194,11 @@ describe("middleware options", () => {
   it("rejects equivalent instances only during validation, including group/function overlaps", () => {
     const first = query.middleware(RequireRole, { roles: ["Internal"] });
     const second = first.middleware(RequireRole, { roles: ["Internal"] });
+
     const group = GroupSpec.make().middleware(RequireRole, {
       roles: ["Internal"],
     });
+
     for (const candidate of [
       GroupSpec.make().addFunction(second),
       group.middleware(RequireRole, { roles: ["Internal"] }),
@@ -227,9 +233,11 @@ describe("middleware options", () => {
         functionTypes: { query: true, mutation: false, action: false },
       },
     ) {}
+
     const invalid = GroupSpec.makeAt("invalid")
       .middleware(RequireRole, { roles: ["Internal"] })
       .middleware(RequireRole, { roles: ["Internal"] });
+
     const later = GroupSpec.makeAt("later").middleware(Unreachable, "value");
 
     expect(

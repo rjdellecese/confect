@@ -43,7 +43,9 @@ export const fromGroupModulePath = Effect.fnUntraced(function* (
       String.split(dir, path.sep),
       String.isNonEmpty,
     );
+
     yield* Effect.logDebug(Array.append(dirSegments, name));
+
     return make(Array.append(dirSegments, name));
   } else {
     return yield* new GroupModulePathIsNotATypeScriptFileError({

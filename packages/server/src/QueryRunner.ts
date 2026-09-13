@@ -18,6 +18,7 @@ const make =
     run(
       Ref.runWithCodec(
         query,
+        // SAFETY: OptionalArgs permits omission only when Args has no keys; otherwise args[0] is the required Args value.
         (args[0] ?? {}) as Ref.Args<Query>,
         (functionReference, encodedArgs) =>
           runQuery(functionReference, encodedArgs),
@@ -27,6 +28,7 @@ const make =
 export const QueryRunner = Context.Service<ReturnType<typeof make>>(
   "@confect/server/QueryRunner",
 );
+
 export type QueryRunner = typeof QueryRunner.Identifier;
 
 export const layer = (runQuery: GenericActionCtx<any>["runQuery"]) =>

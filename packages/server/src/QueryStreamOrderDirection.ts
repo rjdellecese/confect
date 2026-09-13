@@ -25,4 +25,7 @@ export type Flip<Direction extends QueryStreamOrderDirection> =
  */
 export const flip = <Direction extends QueryStreamOrderDirection>(
   direction: Direction,
-): Flip<Direction> => (direction === "asc" ? "desc" : "asc") as Flip<Direction>;
+): Flip<Direction> => {
+  // SAFETY: The conditional swaps each direction exactly as Flip specifies; TypeScript cannot narrow the generic conditional return type from this branch.
+  return (direction === "asc" ? "desc" : "asc") as Flip<Direction>;
+};

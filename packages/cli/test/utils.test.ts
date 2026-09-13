@@ -22,6 +22,7 @@ import {
 } from "@confect/cli/utils";
 
 const fixtureRoot = `${import.meta.dirname}/../../server/test/mock-backend/fixtures`;
+
 const fixtureConvex = `${fixtureRoot}/convex`;
 
 const RemoveGroupsLayer = Layer.mergeAll(
@@ -42,9 +43,11 @@ layer(RemoveGroupsLayer)("removeGroups", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
+
       const missingGroup = GroupPaths.GroupPaths.make(
         HashSet.make(GroupPath.make(["does", "not", "exist"])),
       );
+
       const modulePath = path.join(fixtureConvex, "does/not/exist.ts");
 
       expect(yield* fs.exists(modulePath)).toBe(false);
@@ -110,6 +113,7 @@ const runGenerateForNodeGroupEffect = Effect.fnUntraced(function* ({
     "registeredFunctions",
     registryRelativePath,
   );
+
   yield* fs.makeDirectory(path.dirname(registryPath), { recursive: true });
   yield* fs.writeFileString(registryPath, "export default {};\n");
 
@@ -132,8 +136,10 @@ const runGenerateForNodeGroupEffect = Effect.fnUntraced(function* ({
 
   const importMatch = contents.match(/from "([^"]+)"/);
   assert(importMatch !== null, "expected a registry import in the module");
+
   const resolved =
     path.resolve(path.dirname(modulePath), importMatch[1]!) + ".ts";
+
   const resolves = yield* fs.exists(resolved);
 
   return { contents, resolves };

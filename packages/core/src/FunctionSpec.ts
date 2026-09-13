@@ -15,6 +15,7 @@ import type * as MiddlewareSpec from "./MiddlewareSpec";
 import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "~@confect/core/FunctionSpec";
+
 export type TypeId = typeof TypeId;
 
 export const isFunctionSpec = (u: unknown): u is AnyWithProps =>
@@ -300,17 +301,24 @@ const Proto = {
     middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec,
     ...options: ReadonlyArray<unknown>
   ) {
-    if (this.functionProvenance._tag === "Convex") {
+    if (
+      FunctionProvenance.FunctionProvenance.$is("Convex")(
+        this.functionProvenance,
+      )
+    ) {
       throw new Error(
         `Plain Convex function "${this.name}" cannot have middleware`,
       );
     }
+
     const functionType = this.runtimeAndFunctionType.functionType;
+
     if (!middlewareSpec.functionTypes[functionType]) {
       throw new Error(
         `Middleware "${middlewareSpec.key}" does not declare function type "${functionType}" of function "${this.name}"`,
       );
     }
+
     if (
       !("options" in middlewareSpec) &&
       this.middlewareAttachments.some(
@@ -474,27 +482,34 @@ const makePaginated = <
 };
 
 export const publicQuery = make(RuntimeAndFunctionType.ConvexQuery, "public");
+
 export const internalQuery = make(
   RuntimeAndFunctionType.ConvexQuery,
   "internal",
 );
+
 export const publicPaginatedQuery = makePaginated(
   RuntimeAndFunctionType.ConvexQuery,
   "public",
 );
+
 export const internalPaginatedQuery = makePaginated(
   RuntimeAndFunctionType.ConvexQuery,
   "internal",
 );
+
 export const publicMutation = make(
   RuntimeAndFunctionType.ConvexMutation,
   "public",
 );
+
 export const internalMutation = make(
   RuntimeAndFunctionType.ConvexMutation,
   "internal",
 );
+
 export const publicAction = make(RuntimeAndFunctionType.ConvexAction, "public");
+
 export const internalAction = make(
   RuntimeAndFunctionType.ConvexAction,
   "internal",
@@ -504,6 +519,7 @@ export const publicNodeAction = make(
   RuntimeAndFunctionType.NodeAction,
   "public",
 );
+
 export const internalNodeAction = make(
   RuntimeAndFunctionType.NodeAction,
   "internal",
@@ -581,37 +597,44 @@ const makeConvex =
         ExtractReturns<F>
       >(),
       middlewareAttachments: [],
-    }) as any;
+    });
   };
 
 export const convexPublicQuery = makeConvex(
   RuntimeAndFunctionType.ConvexQuery,
   "public",
 );
+
 export const convexInternalQuery = makeConvex(
   RuntimeAndFunctionType.ConvexQuery,
   "internal",
 );
+
 export const convexPublicMutation = makeConvex(
   RuntimeAndFunctionType.ConvexMutation,
   "public",
 );
+
 export const convexInternalMutation = makeConvex(
   RuntimeAndFunctionType.ConvexMutation,
   "internal",
 );
+
 export const convexPublicAction = makeConvex(
   RuntimeAndFunctionType.ConvexAction,
   "public",
 );
+
 export const convexInternalAction = makeConvex(
   RuntimeAndFunctionType.ConvexAction,
   "internal",
 );
+
 export const convexPublicNodeAction = makeConvex(
   RuntimeAndFunctionType.NodeAction,
   "public",
 );
+
 export const convexInternalNodeAction = makeConvex(
   RuntimeAndFunctionType.NodeAction,
   "internal",

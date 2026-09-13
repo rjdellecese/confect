@@ -21,6 +21,7 @@ const make =
     run(
       Ref.runWithCodec(
         mutation,
+        // SAFETY: OptionalArgs permits omission only when Args has no keys; otherwise args[0] is the required Args value.
         (args[0] ?? {}) as Ref.Args<Mutation>,
         (functionReference, encodedArgs) =>
           runMutation(functionReference, encodedArgs),
@@ -30,6 +31,7 @@ const make =
 export const MutationRunner = Context.Service<ReturnType<typeof make>>(
   "@confect/server/MutationRunner",
 );
+
 export type MutationRunner = typeof MutationRunner.Identifier;
 
 export const layer = (runMutation: GenericActionCtx<any>["runMutation"]) =>

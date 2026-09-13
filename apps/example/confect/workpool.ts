@@ -28,6 +28,7 @@ export const backgroundWork = internalAction({
     Effect.gen(function* () {
       const delay = yield* Random.nextBetween(2_000, 5_000);
       yield* Effect.sleep(Duration.millis(delay));
+
       return null;
     }).pipe(Effect.runPromise),
 });
@@ -43,6 +44,7 @@ export const onComplete = internalMutation({
       // oxlint-disable-next-line effecttsgo/global-console -- This is a raw Convex handler, so console output is captured by Convex's function logs.
       console.error("Background work failed:", result.error);
     }
+
     return null;
   },
 });

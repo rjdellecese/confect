@@ -17,8 +17,10 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
+import { Id } from "../confect/_generated/id";
 import { Api } from "../confect/http/NotesApi";
 
 const App = () => {
@@ -148,6 +150,7 @@ const ViewerDemo = () => {
         }),
       );
       setViewerNote("");
+
       return null;
     });
   };
@@ -213,7 +216,7 @@ const NoteLookup = () => {
       />
       <button
         type="button"
-        onClick={() => setNoteId(input as GenericId<"notes">)}
+        onClick={() => setNoteId(Schema.decodeUnknownSync(Id("notes"))(input))}
       >
         Look up
       </button>
@@ -319,6 +322,7 @@ const NoteList = () => {
       refs.public.notes_and_random.notes.list,
       {},
     );
+
     if (Option.isSome(current)) {
       localStore.setQuery(
         refs.public.notes_and_random.notes.list,
@@ -387,6 +391,7 @@ const PaginatedNoteList = () => {
 
 const StreamFeed = () => {
   const [text, setText] = useState("");
+
   const insertAuthored = useMutation(
     refs.public.notes_and_random.notes.insertAuthored,
   );
@@ -397,12 +402,16 @@ const StreamFeed = () => {
     { initialNumItems: 3 },
   );
 
-  const post = (role: "admin" | "user", hidden?: boolean) =>
-    void insertAuthored({
+  const post = (role: "admin" | "user", hidden?: boolean) => {
+    const args = {
       text: text === "" ? `Hello from ${role}` : text,
       role,
-      ...(hidden === true ? { hidden } : {}),
-    }).then(() => setText(""));
+    };
+
+    void insertAuthored(hidden === true ? { ...args, hidden } : args).then(() =>
+      setText(""),
+    );
+  };
 
   return (
     <div>

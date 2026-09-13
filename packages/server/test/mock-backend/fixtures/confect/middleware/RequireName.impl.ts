@@ -10,9 +10,11 @@ export default MiddlewareImpl.make(
   (effect, { options }) =>
     Effect.gen(function* () {
       const { username } = yield* Viewer;
+
       if (username.length < options.minLength) {
         return yield* new NameRejected({ minLength: options.minLength });
       }
+
       return yield* effect;
     }),
 );

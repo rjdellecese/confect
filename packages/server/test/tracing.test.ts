@@ -3,6 +3,7 @@ import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { FunctionSpec, Ref, Table } from "@confect/core";
+import { GenericId } from "@confect/core/GenericId";
 import * as ActionRunner from "@confect/server/ActionRunner";
 import type * as DataModel from "@confect/server/DataModel";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
@@ -17,14 +18,16 @@ import type {
   GenericActionCtx,
   GenericDatabaseWriter,
   GenericDataModel,
+  FunctionReference,
   OrderedQuery as ConvexOrderedQuery,
 } from "convex/server";
-import { ConvexError, type GenericId } from "convex/values";
+import { CommitTsPlaceholder, ConvexError } from "convex/values";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as Tracer from "effect/Tracer";
@@ -44,6 +47,7 @@ const queryRef = Ref.make(
     error: () => OperationFailure,
   }),
 );
+
 const mutationRef = Ref.make(
   "operations",
   FunctionSpec.internalMutation({
@@ -53,6 +57,7 @@ const mutationRef = Ref.make(
     error: () => OperationFailure,
   }),
 );
+
 const actionRef = Ref.make(
   "operations",
   FunctionSpec.internalAction({
@@ -66,24 +71,45 @@ const actionRef = Ref.make(
 const makeRecorder = Effect.gen(function* () {
   const baseTracer = yield* Effect.service(Tracer.Tracer);
   const spans: Array<Tracer.Span> = [];
+
   const tracer = Tracer.make({
     span(options) {
       const span = baseTracer.span(options);
       spans.push(span);
+
       return span;
     },
   });
+
   return { spans, tracer };
 });
 
 const notes = Table.make(() =>
   Schema.Struct({ value: Schema.FiniteFromString }),
 )("notes");
+
 const databaseSchema = DatabaseSchema.make({ notes });
+
 type ConvexDataModel = DataModel.ToConvex<
   DataModel.FromSchema<typeof databaseSchema>
 >;
-const noteId = "note-id" as GenericId<"notes">;
+
+const noteId = Schema.decodeUnknownSync(GenericId("notes"))("note-id");
+
+const databaseWriter = (
+  overrides: Partial<GenericDatabaseWriter<ConvexDataModel>>,
+): GenericDatabaseWriter<ConvexDataModel> => ({
+  insert: vi.fn(),
+  patch: vi.fn(),
+  replace: vi.fn(),
+  delete: vi.fn(),
+  get: vi.fn(),
+  query: vi.fn(),
+  normalizeId: vi.fn(),
+  system: { get: vi.fn(), query: vi.fn(), normalizeId: vi.fn() },
+  vars: { commitTs: new CommitTsPlaceholder() },
+  ...overrides,
+});
 
 describe("server operation tracing", () => {
   it.effect(
@@ -92,11 +118,13 @@ describe("server operation tracing", () => {
       Effect.gen(function* () {
         const recorder = yield* makeRecorder;
         let reads = 0;
+
         const source = new QueryStream.QueryStream(
           "asc",
           Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
           Stream.suspend(() => {
             reads++;
+
             return Stream.make(
               new QueryStream.Element({
                 doc: Option.some(7),
@@ -105,11 +133,14 @@ describe("server operation tracing", () => {
             );
           }),
         ).pipe(QueryStream.map((value) => value + 1));
+
         const unique = QueryStream.unique(source);
+
         const paginate = QueryStream.paginate(source, {
           numItems: 2,
           cursor: null,
         });
+
         const curried = source.pipe(
           QueryStream.paginate({ numItems: 2, cursor: null }),
         );
@@ -141,6 +172,7 @@ describe("server operation tracing", () => {
           isDone: true,
           continueCursor: QueryStreamCursor.END_CURSOR,
         };
+
         expect(results).toEqual([
           Option.some(8),
           page,
@@ -160,11 +192,13 @@ describe("server operation tracing", () => {
           "QueryStream.paginate",
         ]);
         const [parent, ...children] = recorder.spans;
+
         for (const child of children) {
           expect(Option.getOrThrow(child.parent)).toBe(parent);
-          assert(child.status._tag === "Ended");
+          assert(Predicate.isTagged(child.status, "Ended"));
           expect(Exit.isSuccess(child.status.exit)).toBe(true);
         }
+
         expect(children[0]).not.toBe(children[3]);
       }),
   );
@@ -174,6 +208,7 @@ describe("server operation tracing", () => {
     () =>
       Effect.gen(function* () {
         const recorder = yield* makeRecorder;
+
         const source = new QueryStream.QueryStream(
           "asc",
           Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
@@ -182,6 +217,7 @@ describe("server operation tracing", () => {
             new QueryStream.Element({ doc: Option.some(2), orderKey: [2] }),
           ),
         );
+
         const error = yield* QueryStream.unique(source).pipe(
           Effect.flip,
           Effect.withTracer(recorder.tracer),
@@ -191,7 +227,7 @@ describe("server operation tracing", () => {
         expect(recorder.spans).toHaveLength(1);
         const span = recorder.spans[0]!;
         expect(span.name).toBe("QueryStream.unique");
-        assert(span.status._tag === "Ended");
+        assert(Predicate.isTagged(span.status, "Ended"));
         assert(Exit.isFailure(span.status.exit));
         expect(
           Option.getOrThrow(Cause.findErrorOption(span.status.exit.cause)),
@@ -206,11 +242,13 @@ describe("server operation tracing", () => {
     Effect.gen(function* () {
       const recorder = yield* makeRecorder;
       const failure = new OperationFailure({ reason: "query failed" });
+
       const source = new QueryStream.QueryStream(
         "asc",
         Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
         Stream.fail(failure),
       );
+
       const error = yield* QueryStream.paginate(source, {
         numItems: 1,
         cursor: null,
@@ -220,7 +258,7 @@ describe("server operation tracing", () => {
       expect(recorder.spans).toHaveLength(1);
       const span = recorder.spans[0]!;
       expect(span.name).toBe("QueryStream.paginate");
-      assert(span.status._tag === "Ended");
+      assert(Predicate.isTagged(span.status, "Ended"));
       assert(Exit.isFailure(span.status.exit));
       expect(
         Option.getOrThrow(Cause.findErrorOption(span.status.exit.cause)),
@@ -236,8 +274,14 @@ describe("server operation tracing", () => {
     () =>
       Effect.gen(function* () {
         const recorder = yield* makeRecorder;
+
         const invoke = vi
-          .fn<(ref: unknown, args: unknown) => Promise<unknown>>()
+          .fn<
+            (
+              ref: FunctionReference<"query" | "mutation" | "action">,
+              args: { value: string },
+            ) => Promise<string>
+          >()
           .mockResolvedValue("7");
 
         yield* Effect.gen(function* () {
@@ -265,17 +309,21 @@ describe("server operation tracing", () => {
             Effect.withSpan("caller"),
             Effect.withTracer(recorder.tracer),
           );
+
           expect(result).toEqual([7, 7, 7, 7]);
         }).pipe(
           Effect.provide(
             Layer.mergeAll(
               QueryRunner.layer(
+                // SAFETY: This mock is used only by queryRef, whose codec sends { value: string } and accepts the mock's encoded string result.
                 invoke as GenericActionCtx<GenericDataModel>["runQuery"],
               ),
               MutationRunner.layer(
+                // SAFETY: This mock is used only by mutationRef, whose codec sends { value: string } and accepts the mock's encoded string result.
                 invoke as GenericActionCtx<GenericDataModel>["runMutation"],
               ),
               ActionRunner.layer(
+                // SAFETY: This mock is used only by actionRef, whose codec sends { value: string } and accepts the mock's encoded string result.
                 invoke as GenericActionCtx<GenericDataModel>["runAction"],
               ),
             ),
@@ -295,9 +343,10 @@ describe("server operation tracing", () => {
           "ActionRunner.run",
           "QueryRunner.run",
         ]);
+
         for (const span of recorder.spans.slice(1)) {
           expect(Option.getOrThrow(span.parent)).toBe(recorder.spans[0]);
-          assert(span.status._tag === "Ended");
+          assert(Predicate.isTagged(span.status, "Ended"));
           assert.isTrue(Exit.isSuccess(span.status.exit));
         }
       }),
@@ -308,17 +357,25 @@ describe("server operation tracing", () => {
     () =>
       Effect.gen(function* () {
         const recorder = yield* makeRecorder;
+
         const invoke = vi
-          .fn<(ref: unknown, args: unknown) => Promise<unknown>>()
+          .fn<GenericActionCtx<GenericDataModel>["runQuery"]>()
           .mockRejectedValue(
-            new ConvexError({ _tag: "OperationFailure", reason: "rejected" }),
+            new ConvexError(
+              yield* Schema.encodeEffect(OperationFailure)(
+                new OperationFailure({ reason: "rejected" }),
+              ),
+            ),
           );
+
         const error = yield* Effect.gen(function* () {
           const runQuery = yield* QueryRunner.QueryRunner;
+
           return yield* Effect.flip(runQuery(queryRef, { value: 2 }));
         }).pipe(
           Effect.provide(
             QueryRunner.layer(
+              // SAFETY: vi.fn erases the generic rest-argument correlation from runQuery; the mock rejects every invocation with the encoded OperationFailure consumed by queryRef.
               invoke as GenericActionCtx<GenericDataModel>["runQuery"],
             ),
           ),
@@ -330,7 +387,7 @@ describe("server operation tracing", () => {
         expect(recorder.spans).toHaveLength(1);
         const span = recorder.spans[0]!;
         expect(span.name).toBe("QueryRunner.run");
-        assert(span.status._tag === "Ended");
+        assert(Predicate.isTagged(span.status, "Ended"));
         assert.isTrue(Exit.isFailure(span.status.exit));
       }),
   );
@@ -340,20 +397,42 @@ describe("server operation tracing", () => {
     () =>
       Effect.gen(function* () {
         const recorder = yield* makeRecorder;
+
         const insert = vi
           .fn<GenericDatabaseWriter<ConvexDataModel>["insert"]>()
           .mockResolvedValue(noteId);
+
         const replace = vi
-          .fn<GenericDatabaseWriter<ConvexDataModel>["replace"]>()
+          .fn<
+            (
+              ...args:
+                | Parameters<GenericDatabaseWriter<ConvexDataModel>["replace"]>
+                | [
+                    table: "notes",
+                    ...Parameters<
+                      GenericDatabaseWriter<ConvexDataModel>["replace"]
+                    >,
+                  ]
+            ) => Promise<void>
+          >()
           .mockResolvedValue(undefined);
+
         const get = vi
           .fn<GenericDatabaseWriter<ConvexDataModel>["get"]>()
           .mockResolvedValue({ _id: noteId, _creationTime: 1, value: "1" });
-        const writer = DatabaseWriter.make(databaseSchema, {
-          insert,
-          replace,
-          get,
-        } as unknown as GenericDatabaseWriter<ConvexDataModel>).table("notes");
+
+        const writer = DatabaseWriter.make(
+          databaseSchema,
+          databaseWriter({
+            // SAFETY: vi.fn erases the generic table parameter; this data model has only notes, and the mock returns the notes ID for that table's insert.
+            insert: insert as GenericDatabaseWriter<ConvexDataModel>["insert"],
+            // SAFETY: This mock accepts both replace argument lists for the sole notes table; vi.fn cannot preserve the SDK overloads' generic table correlation.
+            replace:
+              replace as GenericDatabaseWriter<ConvexDataModel>["replace"],
+            get,
+          }),
+        ).table("notes");
+
         const insertEffect = writer.insert({ value: 2 });
         const patchEffect = writer.patch(noteId, { value: 3 });
         const replaceEffect = writer.replace(noteId, { value: 4 });
@@ -391,17 +470,37 @@ describe("server operation tracing", () => {
   it.effect("keeps document encoding failures inside the write span", () =>
     Effect.gen(function* () {
       const recorder = yield* makeRecorder;
+
       const replace =
-        vi.fn<GenericDatabaseWriter<ConvexDataModel>["replace"]>();
+        vi.fn<
+          (
+            ...args:
+              | Parameters<GenericDatabaseWriter<ConvexDataModel>["replace"]>
+              | [
+                  table: "notes",
+                  ...Parameters<
+                    GenericDatabaseWriter<ConvexDataModel>["replace"]
+                  >,
+                ]
+          ) => Promise<void>
+        >();
+
       const get = vi
         .fn<GenericDatabaseWriter<ConvexDataModel>["get"]>()
         .mockResolvedValue({ _id: noteId, _creationTime: 1, value: "1" });
-      const writer = DatabaseWriter.make(databaseSchema, {
-        replace,
-        get,
-      } as unknown as GenericDatabaseWriter<ConvexDataModel>).table("notes");
+
+      const writer = DatabaseWriter.make(
+        databaseSchema,
+        databaseWriter({
+          // SAFETY: This mock accepts both replace argument lists for the sole notes table; vi.fn cannot preserve the SDK overloads' generic table correlation.
+          replace: replace as GenericDatabaseWriter<ConvexDataModel>["replace"],
+          get,
+        }),
+      ).table("notes");
+
       const error = yield* writer
-        .patch(noteId, { value: "invalid" as never })
+        // @ts-expect-error Deliberately pass invalid decoded data to exercise the encoder's runtime failure.
+        .patch(noteId, { value: "invalid" })
         .pipe(Effect.flip, Effect.withTracer(recorder.tracer));
 
       assert.instanceOf(error, Document.DocumentEncodeError);
@@ -409,7 +508,7 @@ describe("server operation tracing", () => {
       expect(recorder.spans).toHaveLength(1);
       const span = recorder.spans[0]!;
       expect(span.name).toBe("DatabaseWriter.patch");
-      assert(span.status._tag === "Ended");
+      assert(Predicate.isTagged(span.status, "Ended"));
       assert.isTrue(Exit.isFailure(span.status.exit));
     }),
   );
@@ -419,6 +518,7 @@ describe("server operation tracing", () => {
     () =>
       Effect.gen(function* () {
         const recorder = yield* makeRecorder;
+
         const paginate = vi
           .fn<ConvexOrderedQuery<ConvexDataModel["notes"]>["paginate"]>()
           .mockResolvedValue({
@@ -426,22 +526,35 @@ describe("server operation tracing", () => {
             isDone: true,
             continueCursor: "done",
           });
+
         const filter = vi.fn();
-        const query = { paginate, filter } as unknown as ConvexOrderedQuery<
-          ConvexDataModel["notes"]
-        >;
+
+        const query: ConvexOrderedQuery<ConvexDataModel["notes"]> = {
+          paginate,
+          filter,
+          collect: vi.fn(),
+          take: vi.fn(),
+          first: vi.fn(),
+          unique: vi.fn(),
+          [Symbol.asyncIterator]: vi.fn(),
+        };
+
         filter.mockReturnValue(query);
         const operation = OrderedQuery.make(query, "notes", notes.Fields);
+
         const predicate: Parameters<typeof operation.paginate>[1] = (q) =>
           q.eq(q.field("value"), "7");
+
         const options = { numItems: 1, cursor: null };
         const page = operation.paginate(options, predicate);
 
         expect(filter).not.toHaveBeenCalled();
         expect(paginate).not.toHaveBeenCalled();
+
         const results = yield* Effect.all([page, page]).pipe(
           Effect.withTracer(recorder.tracer),
         );
+
         expect(results[0]?.page).toEqual([
           { _id: noteId, _creationTime: 1, value: 7 },
         ]);

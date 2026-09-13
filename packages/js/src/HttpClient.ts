@@ -10,6 +10,7 @@ const make = (
   options?: ConstructorParameters<typeof ConvexHttpClient>[1],
 ) => {
   const client = new ConvexHttpClient(address, options);
+
   return InternalHttpClient.make({
     url: client.url,
     setAuth: (token) => client.setAuth(token),

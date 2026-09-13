@@ -2,6 +2,7 @@ import { ConvexError } from "convex/values";
 import type { Value } from "convex/values";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 
 /**
@@ -23,13 +24,10 @@ const ConvexErrorIdentifier = Symbol.for("ConvexError");
 
 const isConvexError = (error: unknown): error is ConvexError<Value> =>
   error instanceof ConvexError ||
-  (typeof error === "object" &&
-    error !== null &&
-    ConvexErrorIdentifier in error);
+  (Predicate.isObjectOrArray(error) && ConvexErrorIdentifier in error);
 
 const isInvalidCursorData = (value: unknown): value is InvalidCursorData =>
-  typeof value === "object" &&
-  value !== null &&
+  Predicate.isObjectOrArray(value) &&
   "isConvexSystemError" in value &&
   value.isConvexSystemError === true &&
   "paginationError" in value &&
@@ -46,6 +44,7 @@ const fromErrorMessage = (
  * Recognizes an invalid-cursor error emitted by a Convex query.
  */
 export const fromConvexQueryError = (
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Query failures are untrusted; the matcher recognizes supported cursor errors and leaves all other values unclassified.
   error: unknown,
 ): Option.Option<InvalidCursor> =>
   Match.value(error).pipe(
@@ -67,6 +66,7 @@ export const fromConvexQueryError = (
  * Recognizes the error data attached to Convex's invalid-cursor error.
  */
 export const fromConvexErrorData = (
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Convex error data is untrusted until the cursor-error schema recognizes it.
   errorData: unknown,
 ): Option.Option<InvalidCursor> =>
   Match.value(errorData).pipe(

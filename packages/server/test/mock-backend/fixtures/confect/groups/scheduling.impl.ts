@@ -14,12 +14,14 @@ import scheduling from "./scheduling.spec";
 
 const sumToN = Effect.fnUntraced(function* (n: number) {
   const sum = MutableRef.make(0);
+
   for (let i = 1; i <= n; i++) {
     // `Effect.sync` (unlike `Effect.succeed`, which the generator runtime
     // unwraps without touching the op counter) charges the fiber's op
     // budget on every iteration.
     MutableRef.set(sum, MutableRef.get(sum) + (yield* Effect.sync(() => i)));
   }
+
   return MutableRef.get(sum);
 });
 

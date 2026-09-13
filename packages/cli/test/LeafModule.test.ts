@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
@@ -63,6 +64,7 @@ const withTempFiles = Effect.fnUntraced(
     yield* Effect.forEach(files, ({ relativePath, contents }) =>
       fs.writeFileString(path.join(fixtureConfect, relativePath), contents),
     );
+
     return yield* use;
   },
   (effect, files) =>
@@ -74,6 +76,7 @@ const withTempFiles = Effect.fnUntraced(
           yield* Effect.forEach(files, ({ relativePath }) =>
             Effect.gen(function* () {
               const absolutePath = path.join(fixtureConfect, relativePath);
+
               if (yield* fs.exists(absolutePath)) {
                 yield* fs.remove(absolutePath);
               }
@@ -195,6 +198,7 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
     () =>
       Effect.gen(function* () {
         const leaf = yield* toLeafModule("groups/_duplicateOptions.spec.ts");
+
         const result = yield* Effect.result(
           withTempFile(
             leaf.relativePath,
@@ -210,8 +214,14 @@ export default GroupSpec.make().middleware(Policy, { roles: ["Internal"] }).addF
             validateSpec(leaf),
           ),
         );
+
         assert(Result.isFailure(result));
-        assert(result.failure._tag === "InvalidMiddlewareAttachmentError");
+        assert(
+          Predicate.isTagged(
+            result.failure,
+            "InvalidMiddlewareAttachmentError",
+          ),
+        );
         expect(result.failure.specPath).toBe(leaf.relativePath);
         expect(result.failure.message).toMatch(
           /Policy.*equivalent options.*function "get"/,
@@ -233,6 +243,7 @@ export default GroupSpec.make().middleware(Policy, { roles: ["Internal"] }).addF
         '() => Schema.String.pipe(Schema.overrideToEquivalence(() => () => { throw new Error("equivalence bug"); }))',
       ]) {
         const leaf = yield* toLeafModule("groups/_brokenOptions.spec.ts");
+
         const exit = yield* Effect.exit(
           withTempFile(
             leaf.relativePath,
@@ -246,6 +257,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
             validateSpec(leaf),
           ),
         );
+
         expect(Exit.hasDies(exit)).toBe(true);
         expect(Exit.findErrorOption(exit)).toEqual(Option.none());
       }
@@ -272,6 +284,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
   it.effect("rejects a spec without a GroupSpec default export", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/_invalid.spec.ts");
+
       const result = yield* Effect.result(
         withTempFile(
           "groups/_invalid.spec.ts",
@@ -288,6 +301,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
   it.effect("rejects a spec with a syntax error", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/_brokenSyntax.spec.ts");
+
       const result = yield* Effect.result(
         withTempFile(
           "groups/_brokenSyntax.spec.ts",
@@ -297,7 +311,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
       );
 
       assert(Result.isFailure(result));
-      assert(result.failure._tag === "BundleFailedError");
+      assert(Predicate.isTagged(result.failure, "BundleFailedError"));
       expect(result.failure.errors.length).toBeGreaterThan(0);
     }),
   );
@@ -320,6 +334,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
     () =>
       Effect.gen(function* () {
         const leaf = yield* toLeafModule("groups/_leakyTable.spec.ts");
+
         const result = yield* Effect.result(
           withTempFiles(
             [
@@ -341,7 +356,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
         );
 
         assert(Result.isFailure(result));
-        assert(result.failure._tag === "SpecImportsServerError");
+        assert(Predicate.isTagged(result.failure, "SpecImportsServerError"));
         expect(result.failure.specPath).toBe("groups/_leakyTable.spec.ts");
         expect(result.failure.importerPaths).toStrictEqual([
           "tables/_leaky.ts",
@@ -352,6 +367,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
   it.effect("rejects a spec that value-imports `@confect/server`", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/_leaky.spec.ts");
+
       const result = yield* Effect.result(
         withTempFile(
           "groups/_leaky.spec.ts",
@@ -361,7 +377,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
       );
 
       assert(Result.isFailure(result));
-      assert(result.failure._tag === "SpecImportsServerError");
+      assert(Predicate.isTagged(result.failure, "SpecImportsServerError"));
       expect(result.failure.importerPaths).toStrictEqual([
         "groups/_leaky.spec.ts",
       ]);
@@ -377,6 +393,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
     () =>
       Effect.gen(function* () {
         const leaf = yield* toLeafModule("groups/_leakyViaMiddleware.spec.ts");
+
         const result = yield* Effect.result(
           withTempFiles(
             [
@@ -394,7 +411,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
         );
 
         assert(Result.isFailure(result));
-        assert(result.failure._tag === "SpecImportsServerError");
+        assert(Predicate.isTagged(result.failure, "SpecImportsServerError"));
         expect(result.failure.specPath).toBe(
           "groups/_leakyViaMiddleware.spec.ts",
         );
@@ -538,7 +555,7 @@ export default GroupImpl.make(
       );
 
       assert(Result.isFailure(result));
-      assert(result.failure._tag === "BundleFailedError");
+      assert(Predicate.isTagged(result.failure, "BundleFailedError"));
       expect(result.failure.errors.length).toBeGreaterThan(0);
     }),
   );
@@ -650,7 +667,7 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
         );
 
         assert(Result.isFailure(result));
-        assert(result.failure._tag === "ImplMissingFunctionsError");
+        assert(Predicate.isTagged(result.failure, "ImplMissingFunctionsError"));
         // The reported group path is the impl/spec leaf's own filesystem
         // location, which points at the file that is missing functions.
         expect(result.failure.groupPath).toBe("groups._incomplete");

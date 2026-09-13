@@ -49,6 +49,7 @@ test("rejects malformed, unsupported, and colliding lock entries", () =>
       const unsupported = yield* vendoredSkillDirectories(
         '{"version":2,"skills":{}}',
       ).pipe(Effect.flip);
+
       expect(unsupported.message).toMatch(
         /Unsupported skills-lock\.json version/u,
       );
@@ -59,6 +60,7 @@ test("rejects malformed, unsupported, and colliding lock entries", () =>
           skills: { "same skill": {}, "same-skill": {} },
         }),
       ).pipe(Effect.flip);
+
       expect(collision.message).toMatch(/same installed directory/u);
     }),
   ));
@@ -74,6 +76,7 @@ test("replaces only the managed ignore block", () =>
         "coverage/",
         "",
       ].join("\n");
+
       const block = [
         "# skills-lock:start",
         "# Generated",
@@ -93,9 +96,11 @@ test("writes generated output and detects later drift", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
+
         const cwd = yield* fs.makeTempDirectoryScoped({
           prefix: "confect-skill-ignore-",
         });
+
         const lockPath = path.join(cwd, "skills-lock.json");
         const ignorePath = path.join(cwd, ".ignore");
         yield* fs.writeFileString(
@@ -117,9 +122,11 @@ test("writes generated output and detects later drift", () =>
             skills: { effect: {}, vitest: {} },
           }),
         );
+
         const drift = yield* syncSkillIgnore({ check: true, cwd }).pipe(
           Effect.flip,
         );
+
         expect(drift.message).toMatch(/pnpm skills:sync-ignore/u);
       }),
     ),
@@ -141,6 +148,7 @@ test("recognizes every mutating skills command alias", () => {
   ]) {
     expect(shouldSyncSkillIgnore(command)).toBeTrue();
   }
+
   expect(shouldSyncSkillIgnore("list")).toBeFalse();
   expect(shouldSyncSkillIgnore(undefined)).toBeFalse();
 });

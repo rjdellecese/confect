@@ -47,11 +47,14 @@ const insertAuthored = FunctionImpl.make(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      return yield* writer.table("notes").insert({
+      const note = {
         text,
         author: { role, name: role === "admin" ? "Ada" : "Uma" },
-        ...(hidden === true ? { tag: "hidden" } : {}),
-      });
+      };
+
+      return yield* writer
+        .table("notes")
+        .insert(hidden === true ? { ...note, tag: "hidden" } : note);
     }).pipe(Effect.orDie),
 );
 
@@ -137,6 +140,7 @@ const clearAll = FunctionImpl.make(databaseSchema, notes, "clearAll", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     const writer = yield* DatabaseWriter;
+
     const allNotes = yield* reader
       .table("notes")
       .index("by_creation_time")

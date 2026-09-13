@@ -1,5 +1,6 @@
 import { MiddlewareImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
 import databaseSchema from "../_generated/schema";
 import { insertMarker } from "./insertMarker";
 import RecordFunctionLevel, {
@@ -10,9 +11,9 @@ export default MiddlewareImpl.make(
   databaseSchema,
   RecordFunctionLevel,
   (effect, { invocation: { args } }) =>
-    typeof args === "object" &&
-    args !== null &&
-    (args as { blockedAtFunction?: boolean }).blockedAtFunction === true
+    Predicate.isObjectOrArray(args) &&
+    Predicate.hasProperty(args, "blockedAtFunction") &&
+    args.blockedAtFunction === true
       ? Effect.fail(new FunctionGateClosed())
       : insertMarker("function").pipe(Effect.andThen(effect)),
 );

@@ -3,6 +3,7 @@ import type { Cron, Duration } from "effect";
 import * as Predicate from "effect/Predicate";
 
 export const TypeId = "~@confect/server/CronJob";
+
 export type TypeId = typeof TypeId;
 
 export interface CronJob {
@@ -11,6 +12,7 @@ export interface CronJob {
   readonly identifier: string;
   readonly schedule: Cron.Cron | Duration.Duration;
   readonly ref: Ref.AnyMutation | Ref.AnyAction;
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Cron jobs retain arbitrary decoded args alongside their ref; the ref codec supplies the wire contract when scheduled.
   readonly args: Record<string, unknown>;
 }
 
@@ -25,6 +27,7 @@ const makeProto = (
   identifier: string,
   schedule: Cron.Cron | Duration.Duration,
   ref: Ref.AnyMutation | Ref.AnyAction,
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- This constructor stores decoded args for heterogeneous refs without imposing a shared value type.
   args: Record<string, unknown>,
 ): CronJob =>
   Object.assign(Object.create(Proto), {

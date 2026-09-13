@@ -28,6 +28,7 @@ describe("validateAll", () => {
         ),
       functionTypes: { query: true, mutation: false, action: false },
     }) {}
+
     const duplicate = MiddlewareAttachment.validateAll(
       [
         { spec: RoleSet, options: { roles: ["Internal", "Buyer"] } },
@@ -35,6 +36,7 @@ describe("validateAll", () => {
       ],
       "test chain",
     );
+
     expect(duplicate).toEqual(
       Result.fail(
         MiddlewareAttachment.ValidationError.EquivalentOptions({
@@ -68,18 +70,22 @@ describe("validateAll", () => {
       options: () => Schema.Struct({ limit: Schema.FiniteFromString }),
       functionTypes: { query: true, mutation: false, action: false },
     }) {}
+
     const valid: MiddlewareAttachment.MiddlewareAttachment<typeof Limit> = {
       spec: Limit,
       options: { limit: 5 },
     };
+
     expect(MiddlewareAttachment.validateAll([valid], "test chain")).toEqual(
       Result.succeed(undefined),
     );
+
     const invalid: MiddlewareAttachment.MiddlewareAttachment<typeof Limit> = {
       spec: Limit,
       // @ts-expect-error
       options: { limit: "5" },
     };
+
     const result = MiddlewareAttachment.validateAll([invalid], "test chain");
     expect(result).toEqual(
       Result.fail(
@@ -107,6 +113,7 @@ describe("validateAll", () => {
         functionTypes: { query: true, mutation: true, action: true },
       },
     ) {}
+
     const result = MiddlewareAttachment.validateAll(
       [
         { spec: RequireRole, options: { roles: ["Internal"] } },
@@ -114,6 +121,7 @@ describe("validateAll", () => {
       ],
       "test chain",
     );
+
     expect(result).toEqual(
       Result.fail(
         MiddlewareAttachment.ValidationError.ConflictingSpecs({
@@ -135,6 +143,7 @@ describe("validateAll", () => {
 
   it("does not turn schema factory or equivalence bugs into validation failures", () => {
     const defect = new Error("schema bug");
+
     class BrokenSchema extends MiddlewareSpec.MiddlewareSpec<BrokenSchema>()(
       "BrokenSchema",
       {
@@ -144,6 +153,7 @@ describe("validateAll", () => {
         functionTypes: { query: true, mutation: false, action: false },
       },
     ) {}
+
     class BrokenEquivalence extends MiddlewareSpec.MiddlewareSpec<BrokenEquivalence>()(
       "BrokenEquivalence",
       {

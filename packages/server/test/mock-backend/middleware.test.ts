@@ -31,6 +31,7 @@ import * as TestConfect from "./TestConfect";
 
 const expectFailure = <A, E>(result: Result.Result<A, E>): E => {
   assert(Result.isFailure(result));
+
   return result.failure;
 };
 
@@ -46,13 +47,16 @@ const insertUser = Effect.fnUntraced(function* (username: string) {
 
 const listNoteTexts = Effect.gen(function* () {
   const c = yield* TestConfect.TestConfect;
+
   return yield* c.run(
     Effect.gen(function* () {
       const reader = yield* DatabaseReader;
+
       const notes = yield* reader
         .table("notes")
         .index("by_creation_time", "asc")
         .collect();
+
       return Array.map(notes, (note) => note.text);
     }),
     Schema.mutable(Schema.Array(Schema.String)),
@@ -140,13 +144,16 @@ describe("middleware", () => {
           const noViewer = yield* Effect.result(
             c.query(refs.public.groups.middleware.firstNoteForViewer),
           );
+
           expect(expectFailure(noViewer)).toBeInstanceOf(NoViewer);
 
           // A user but no notes: the handler's own error.
           yield* insertUser("ada");
+
           const noNotes = yield* Effect.result(
             c.query(refs.public.groups.middleware.firstNoteForViewer),
           );
+
           expect(expectFailure(noNotes)).toBeInstanceOf(NoNotes);
         }).pipe(Effect.provide(TestConfect.layer)),
     );
@@ -332,6 +339,7 @@ describe("middleware", () => {
       () =>
         Effect.gen(function* () {
           const events: globalThis.Array<string> = [];
+
           const query = FunctionSpec.publicQuery({
             name: "get",
             args: () => ({ id: Schema.String }),
@@ -341,6 +349,7 @@ describe("middleware", () => {
             .middleware(GroupPolicy, { label: "inner" })
             .middleware(UndefinedPolicy, undefined)
             .middleware(Observe);
+
           const group = GroupSpec.make()
             .middleware(GroupPolicy, { label: "group" })
             .addFunction(query);
@@ -350,6 +359,7 @@ describe("middleware", () => {
               FunctionImpl.make(databaseSchema, group, "get", () =>
                 Effect.sync(() => {
                   events.push("handler");
+
                   return "ok";
                 }),
               ),
@@ -372,6 +382,7 @@ describe("middleware", () => {
                     events.push(context.options.label);
                     const result = yield* effect;
                     events.push(`${context.options.label}:after`);
+
                     return result;
                   });
                 },
@@ -392,6 +403,7 @@ describe("middleware", () => {
                         args: { id: "decoded" },
                       });
                       events.push("function");
+
                       return yield* effect;
                     });
                   },
@@ -414,6 +426,7 @@ describe("middleware", () => {
                       args: { id: "decoded" },
                     },
                   });
+
                   return effect;
                 },
               ),
@@ -434,6 +447,7 @@ describe("middleware", () => {
                         args: { id: "decoded" },
                       },
                     });
+
                     return effect;
                   },
                   mutation: (effect) => effect,
@@ -449,6 +463,7 @@ describe("middleware", () => {
             groupLayer,
             RegisteredConvexFunction.make,
           );
+
           const c = yield* Effect.service(TestConfect.TestConfect).pipe(
             Effect.provide(
               TestConfect_.layer(databaseSchema, convexSchema, {
@@ -458,6 +473,7 @@ describe("middleware", () => {
               }),
             ),
           );
+
           expect(
             yield* c.query(Ref.make("options", query), { id: "decoded" }),
           ).toBe("ok");
@@ -477,6 +493,7 @@ describe("middleware", () => {
         class Value extends Context.Service<Value, string>()(
           "@confect/server/test/mock-backend/middleware.test/Value",
         ) {}
+
         class ProvideValue extends MiddlewareSpec.MiddlewareSpec<
           ProvideValue,
           { provides: Value }
@@ -484,13 +501,16 @@ describe("middleware", () => {
           options: () => Schema.Struct({ value: Schema.String }),
           functionTypes: { query: true, mutation: false, action: false },
         }) {}
+
         const query = FunctionSpec.publicQuery({
           name: "get",
           returns: () => Schema.String,
         }).middleware(ProvideValue, { value: "inner" });
+
         const group = GroupSpec.make()
           .middleware(ProvideValue, { value: "outer" })
           .addFunction(query);
+
         const groupLayer = GroupImpl.make(databaseSchema, group).pipe(
           Layer.provide(
             FunctionImpl.make(databaseSchema, group, "get", () =>
@@ -507,11 +527,13 @@ describe("middleware", () => {
           ),
           GroupImpl.finalize,
         );
+
         const registered = RegisteredFunctions.buildForGroup<typeof group>(
           databaseSchema,
           groupLayer,
           RegisteredConvexFunction.make,
         );
+
         const c = yield* Effect.service(TestConfect.TestConfect).pipe(
           Effect.provide(
             TestConfect_.layer(databaseSchema, convexSchema, {
@@ -520,6 +542,7 @@ describe("middleware", () => {
             }),
           ),
         );
+
         expect(yield* c.query(Ref.make("options", query))).toBe("inner");
       }),
     );

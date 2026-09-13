@@ -14,5 +14,20 @@
     "separateTagGroups": true
   },
   "sortPackageJson": false,
-  "ignorePatterns": ["**/_generated/**", "**/fixtures/convex/**/*.ts"]
+  "ignorePatterns": [
+    "**/_generated/**",
+    "**/fixtures/convex/**/*.ts",
+    ".agent/**",
+    ".agents/**",
+    ".claude/**",
+    ".codex/**",
+    ".continue/**",
+    ".cursor/**",
+    ".gemini/**",
+    ".opencode/**",
+    ".pi/**",
+    ".roo/**",
+    ".windsurf/**",
+    "tools/oxlint/anti-slop/**"
+  ]
 }

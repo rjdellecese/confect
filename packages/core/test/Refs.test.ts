@@ -13,6 +13,7 @@ import * as Spec from "@confect/core/Spec";
 describe("make", () => {
   it("turns a spec into refs", () => {
     const FnReturns = Schema.Array(Schema.String);
+
     const list = FunctionSpec.publicQuery({
       name: "list",
       returns: () => FnReturns,
@@ -42,6 +43,7 @@ describe("make", () => {
           }),
         ),
     );
+
     expect(() => Refs.make(spec)).toThrowErrorMatchingInlineSnapshot(
       `[Error: Group and function at same level have same name ('notes:list')]`,
     );
@@ -65,6 +67,7 @@ describe("make", () => {
           }),
         ),
     );
+
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.internal.notes.internalList).toEqualTypeOf<
@@ -134,6 +137,7 @@ describe("make", () => {
           }),
         ),
     );
+
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.publicList).toEqualTypeOf<
@@ -151,6 +155,7 @@ describe("make", () => {
 
   it("turns a plain Convex spec into refs", () => {
     type ListQueryArgs = { tag: string };
+
     type ListQueryReturns = string[];
 
     const listSpec =
@@ -161,6 +166,7 @@ describe("make", () => {
     const spec = Spec.make().add(
       GroupSpec.makeAt("notes").addFunction(listSpec),
     );
+
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
@@ -184,9 +190,11 @@ describe("make", () => {
 
   it("filters plain Convex refs by visibility", () => {
     type GetQueryArgs = { id: string };
+
     type GetQueryReturns = string;
 
     type RemoveMutationArgs = { id: string };
+
     type RemoveMutationReturns = void;
 
     const spec = Spec.make().add(
@@ -206,6 +214,7 @@ describe("make", () => {
           >()("remove"),
         ),
     );
+
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.get).toEqualTypeOf<
@@ -235,12 +244,15 @@ describe("make", () => {
 
   it("mixes Confect and plain Convex specs", () => {
     type ConvexQueryArgs = { cursor: string };
+
     type ConvexQueryReturns = string[];
 
     const ConfectQueryArgs = { limit: Schema.Finite };
+
     type ConfectQueryArgs = Schema.Struct.Type<typeof ConfectQueryArgs>;
 
     const ConfectQueryReturns = Schema.Array(Schema.String);
+
     type ConfectQueryReturns = typeof ConfectQueryReturns.Type;
 
     const ConfectQuery = FunctionSpec.publicQuery({
@@ -262,6 +274,7 @@ describe("make", () => {
           >()("search"),
         ),
     );
+
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.list).toEqualTypeOf<
@@ -311,6 +324,7 @@ describe("middleware error unions", () => {
           >()("search"),
         ),
     );
+
     const refs = Refs.make(spec);
 
     expectTypeOf<
@@ -349,11 +363,13 @@ describe("make with middleware options", () => {
 
   it("preserves options through group builders and refs without inheriting into children", () => {
     const options = { roles: ["Internal"] as const };
+
     const group = GroupSpec.make()
       .middleware(RequireRole, options)
       .addFunction(query.middleware(Observe))
       .addGroup(GroupSpec.makeAt("child").addFunction(query))
       .addGroupAt("alias", GroupSpec.make().addFunction(query));
+
     const refs = Refs.make(Spec.make().addAt("roles", group));
     expect(refs.public.roles.get.middlewareAttachments[0]?.options).toBe(
       options,
@@ -371,6 +387,7 @@ describe("make with middleware options", () => {
         GroupSpec.make().addFunction(query.middleware(RequireRole, options)),
       ),
     );
+
     expect(
       functionRefs.public.roles.get.middlewareAttachments[0]?.options,
     ).toBe(options);
@@ -381,19 +398,23 @@ describe("make with middleware options", () => {
 
   it("keeps options schemas lazy through construction, assembly, and refs", () => {
     let evaluations = 0;
+
     class LazyPolicy extends MiddlewareSpec.MiddlewareSpec<LazyPolicy>()(
       "LazyPolicy",
       {
         options: () => {
           evaluations++;
+
           return Schema.Struct({ enabled: Schema.Boolean });
         },
         functionTypes: { query: true, mutation: false, action: false },
       },
     ) {}
+
     const group = GroupSpec.make()
       .middleware(LazyPolicy, { enabled: true })
       .addFunction(query.middleware(LazyPolicy, { enabled: false }));
+
     const refs = Refs.make(Spec.make().addAt("lazy", group));
     expect(group.middlewareSpecs).toEqual([LazyPolicy]);
     expect(group.functions.get.middlewareSpecs).toEqual([LazyPolicy]);

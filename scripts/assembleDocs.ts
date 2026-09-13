@@ -6,6 +6,7 @@ import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
@@ -13,6 +14,7 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import { parseArgs } from "node:util";
 
 const VERSIONS = ["v9", "v10"] as const;
+
 type Version = (typeof VERSIONS)[number];
 
 interface VersionDetails {
@@ -35,9 +37,13 @@ const VERSION_DETAILS = {
 } satisfies Record<Version, VersionDetails>;
 
 const INITIAL_DEFAULT_VERSION: Version = "v9";
+
 const MANIFEST_SCHEMA_VERSION = 1;
+
 const DOCS_ROOT = "apps/docs";
+
 const CORE_PACKAGE_PATH = "packages/core/package.json";
+
 const EXCLUDED_VERSION_ROOT_FILES = new Set([
   ".prettierignore",
   ".prettierrc.json",
@@ -58,18 +64,43 @@ interface Manifest {
   readonly versions: Readonly<Record<Version, VersionSource>>;
 }
 
-interface Redirect {
-  readonly source: string;
-  readonly destination: string;
-}
+const Redirect = Schema.StructWithRest(
+  Schema.Struct({ source: Schema.String, destination: Schema.String }),
+  [Schema.JsonObject],
+);
 
-interface DocsConfig extends Record<string, unknown> {
-  readonly navigation: Record<string, unknown>;
-  readonly redirects?: ReadonlyArray<Redirect> | undefined;
-}
+type Redirect = typeof Redirect.Type;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+const DocsConfigNavigation = Schema.StructWithRest(
+  Schema.Struct({ navigation: Schema.JsonObject }),
+  [Schema.JsonObject],
+);
+
+const DocsConfig = Schema.StructWithRest(
+  Schema.Struct({
+    navigation: Schema.JsonObject,
+    redirects: Schema.optionalKey(Schema.Array(Redirect)),
+  }),
+  [Schema.JsonObject],
+);
+
+type DocsConfig = typeof DocsConfig.Type;
+
+const ManifestHeader = Schema.Struct({
+  schemaVersion: Schema.Literal(MANIFEST_SCHEMA_VERSION),
+  defaultVersion: Schema.Literals(VERSIONS),
+  versions: Schema.JsonObject,
+});
+
+const VersionSource = Schema.Struct({ source: Schema.String });
+
+const PackageVersion = Schema.Struct({ version: Schema.String });
+
+const isJsonObject = (value: Schema.Json): value is Schema.JsonObject =>
+  Predicate.isObject(value) && !Array.isArray(value);
+
+const isJsonArray = (value: Schema.Json): value is Schema.JsonArray =>
+  Array.isArray(value);
 
 const isVersion = (value: string): value is Version =>
   VERSIONS.some((version) => version === value);
@@ -117,8 +148,9 @@ export class DocsRedirectError extends Schema.TaggedError<DocsRedirectError>()(
 }
 
 const quoteJson = Schema.encodeSync(Schema.fromJsonString(Schema.String));
+
 const encodeJson = Schema.encodeEffect(
-  Schema.fromJsonString(Schema.Unknown, { space: 2 }),
+  Schema.fromJsonString(Schema.Json, { space: 2 }),
 );
 
 const parseVersion = Effect.fn("Docs.parseVersion")(function* (value: string) {
@@ -127,6 +159,7 @@ const parseVersion = Effect.fn("Docs.parseVersion")(function* (value: string) {
       message: `Unknown documentation version ${quoteJson(value)}`,
     });
   }
+
   return value;
 });
 
@@ -155,6 +188,7 @@ export const parseDocsArguments = Effect.fn("Docs.parseArguments")(function* (
   const allowUnpublishedSource = values["allow-unpublished-source"] ?? false;
   const updateRef = values["update-ref"];
   const updateVersionValue = values["update-version"];
+
   const updateVersion =
     updateVersionValue === undefined
       ? undefined
@@ -186,6 +220,7 @@ const runGit = Effect.fn("Docs.runGit")(function* (
   args: ReadonlyArray<string>,
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+
   return yield* Effect.scoped(
     Effect.gen(function* () {
       const handle = yield* spawner.spawn(
@@ -195,6 +230,7 @@ const runGit = Effect.fn("Docs.runGit")(function* (
           stderr: "pipe",
         }),
       );
+
       const [chunks, stderr, exitCode] = yield* Effect.all(
         [
           Stream.runCollect(handle.stdout),
@@ -203,14 +239,18 @@ const runGit = Effect.fn("Docs.runGit")(function* (
         ],
         { concurrency: "unbounded" },
       );
+
       const stdout = new Uint8Array(
         chunks.reduce((length, chunk) => length + chunk.length, 0),
       );
+
       let offset = 0;
+
       for (const chunk of chunks) {
         stdout.set(chunk, offset);
         offset += chunk.length;
       }
+
       return { stdout, stderr, exitCode };
     }),
   );
@@ -220,6 +260,7 @@ const gitBuffer = Effect.fn("Docs.gitBuffer")(function* (
   args: ReadonlyArray<string>,
 ) {
   const result = yield* runGit(args);
+
   if (result.exitCode !== 0) {
     return yield* new DocsGitError({
       args,
@@ -227,6 +268,7 @@ const gitBuffer = Effect.fn("Docs.gitBuffer")(function* (
       stderr: result.stderr,
     });
   }
+
   return result.stdout;
 });
 
@@ -238,15 +280,18 @@ const gitText = Effect.fn("Docs.gitText")(function* (
 
 const resolveCommit = Effect.fn("Docs.resolveCommit")(function* (ref: string) {
   const candidates = ref.startsWith("origin/") ? [ref] : [ref, `origin/${ref}`];
+
   for (const candidate of candidates) {
     const result = yield* runGit([
       "rev-parse",
       "--verify",
       `${candidate}^{commit}`,
     ]);
+
     if (result.exitCode === 0)
       return new TextDecoder().decode(result.stdout).trim();
   }
+
   return yield* new DocsSourceError({
     source: ref,
     message: `Could not resolve Git ref ${quoteJson(ref)}`,
@@ -261,13 +306,16 @@ const latestV10PrereleaseRef = Effect.fn("Docs.latestV10PrereleaseRef")(
       "@confect/core@10.0.0-next.*",
       "--sort=-version:refname",
     ]);
+
     const latestTag = tags.split("\n").find(Boolean);
+
     if (latestTag === undefined) {
       return yield* new DocsSourceError({
         source: "@confect/core@10.0.0-next.*",
         message: "Could not find a published v10 prerelease tag",
       });
     }
+
     return latestTag;
   },
 );
@@ -276,7 +324,7 @@ const readGitFile = (source: string, filePath: string) =>
   gitBuffer(["show", `${source}:${filePath}`]);
 
 const decodeJson = (contents: string, source: string, filePath: string) =>
-  Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(contents).pipe(
+  Schema.decodeEffect(Schema.fromJsonString(Schema.Json))(contents).pipe(
     Effect.mapError(
       () =>
         new DocsDataError({
@@ -301,51 +349,48 @@ const readGitJson = Effect.fn("Docs.readGitJson")(function* (
 const readPackageVersion = Effect.fn("Docs.readPackageVersion")(function* (
   source: string,
 ) {
-  const packageJson = yield* readGitJson(source, CORE_PACKAGE_PATH);
-  if (!isRecord(packageJson) || typeof packageJson.version !== "string") {
-    return yield* new DocsDataError({
-      source,
-      filePath: CORE_PACKAGE_PATH,
-      message: `Invalid ${CORE_PACKAGE_PATH} at source ${source}`,
-    });
-  }
+  const packageJson = yield* Schema.decodeUnknownEffect(PackageVersion)(
+    yield* readGitJson(source, CORE_PACKAGE_PATH),
+  ).pipe(
+    Effect.mapError(
+      () =>
+        new DocsDataError({
+          source,
+          filePath: CORE_PACKAGE_PATH,
+          message: `Invalid ${CORE_PACKAGE_PATH} at source ${source}`,
+        }),
+    ),
+  );
+
   return packageJson.version;
 });
 
-const isRedirectList = (value: unknown): value is ReadonlyArray<Redirect> =>
-  Array.isArray(value) &&
-  value.every(
-    (redirect) =>
-      isRecord(redirect) &&
-      typeof redirect.source === "string" &&
-      typeof redirect.destination === "string",
-  );
-
 const readDocsConfig = Effect.fn("Docs.readConfig")(function* (source: string) {
   const configPath = `${DOCS_ROOT}/docs.json`;
-  const config = yield* readGitJson(source, configPath);
-  if (!isRecord(config) || !isRecord(config.navigation)) {
-    return yield* new DocsDataError({
-      source,
-      filePath: configPath,
-      message: `Invalid ${configPath} at source ${source}`,
-    });
-  }
 
-  const redirects = config.redirects;
-  if (redirects !== undefined && !isRedirectList(redirects)) {
-    return yield* new DocsDataError({
-      source,
-      filePath: configPath,
-      message: `Invalid ${configPath} redirects at source ${source}`,
-    });
-  }
+  const config = yield* Schema.decodeUnknownEffect(DocsConfigNavigation)(
+    yield* readGitJson(source, configPath),
+  ).pipe(
+    Effect.mapError(
+      () =>
+        new DocsDataError({
+          source,
+          filePath: configPath,
+          message: `Invalid ${configPath} at source ${source}`,
+        }),
+    ),
+  );
 
-  return {
-    ...config,
-    navigation: config.navigation,
-    ...(redirects === undefined ? {} : { redirects }),
-  } satisfies DocsConfig;
+  return yield* Schema.decodeEffect(DocsConfig)(config).pipe(
+    Effect.mapError(
+      () =>
+        new DocsDataError({
+          source,
+          filePath: configPath,
+          message: `Invalid ${configPath} redirects at source ${source}`,
+        }),
+    ),
+  );
 });
 
 const initialManifest = Effect.fn("Docs.initialManifest")(function* () {
@@ -363,42 +408,45 @@ const loadManifest = Effect.fn("Docs.loadManifest")(function* (
   manifestPath: string | undefined,
 ) {
   const fs = yield* FileSystem.FileSystem;
+
   if (manifestPath === undefined || !(yield* fs.exists(manifestPath))) {
     return yield* initialManifest();
   }
 
-  const manifest = yield* decodeJson(
-    yield* fs.readFileString(manifestPath),
-    manifestPath,
-    manifestPath,
+  const manifest = yield* Schema.decodeUnknownEffect(ManifestHeader)(
+    yield* decodeJson(
+      yield* fs.readFileString(manifestPath),
+      manifestPath,
+      manifestPath,
+    ),
+  ).pipe(
+    Effect.mapError(
+      () =>
+        new DocsDataError({
+          source: manifestPath,
+          filePath: manifestPath,
+          message: `Invalid documentation release manifest at ${manifestPath}`,
+        }),
+    ),
   );
-  if (
-    !isRecord(manifest) ||
-    manifest.schemaVersion !== MANIFEST_SCHEMA_VERSION ||
-    typeof manifest.defaultVersion !== "string" ||
-    !isVersion(manifest.defaultVersion) ||
-    !isRecord(manifest.versions)
-  ) {
-    return yield* new DocsDataError({
-      source: manifestPath,
-      filePath: manifestPath,
-      message: `Invalid documentation release manifest at ${manifestPath}`,
-    });
-  }
 
   const versions = manifest.versions;
+
   const readSource = Effect.fn("Docs.readManifestSource")(function* (
     version: Version,
   ) {
-    const entry = versions[version];
-    if (!isRecord(entry) || typeof entry.source !== "string") {
-      return yield* new DocsDataError({
-        source: manifestPath,
-        filePath: manifestPath,
-        message: `Invalid ${version} source in documentation release manifest`,
-      });
-    }
-    return { source: entry.source };
+    return yield* Schema.decodeUnknownEffect(VersionSource)(
+      versions[version],
+    ).pipe(
+      Effect.mapError(
+        () =>
+          new DocsDataError({
+            source: manifestPath,
+            filePath: manifestPath,
+            message: `Invalid ${version} source in documentation release manifest`,
+          }),
+      ),
+    );
   });
 
   return {
@@ -420,13 +468,16 @@ const validateSource = Effect.fn("Docs.validateSource")(function* (
   const source = yield* resolveCommit(ref);
   const packageVersion = yield* readPackageVersion(source);
   const packageMajor = Number.parseInt(packageVersion.split(".")[0], 10);
+
   if (packageMajor !== details.major) {
     return yield* new DocsSourceError({
       source,
       message: `${version} requires @confect/core major ${details.major}, but source ${source} contains ${packageVersion}; refusing to deploy it`,
     });
   }
+
   let belongsToSourceBranch = false;
+
   for (const branch of details.branches) {
     const ancestry = yield* runGit([
       "merge-base",
@@ -434,22 +485,26 @@ const validateSource = Effect.fn("Docs.validateSource")(function* (
       source,
       `origin/${branch}`,
     ]);
+
     if (ancestry.exitCode === 0) {
       belongsToSourceBranch = true;
       break;
     }
   }
+
   if (!allowUnpublishedSource && !belongsToSourceBranch) {
     return yield* new DocsSourceError({
       source,
       message: `${version} source ${source} is not part of ${details.branches.join(" or ")}; refusing to deploy it`,
     });
   }
+
   return source;
 });
 
 const versionPath = (filePath: string, version: Version): string => {
   if (/^v\d+(?:\/|$)/u.test(filePath)) return filePath;
+
   return `${version}/${filePath}`;
 };
 
@@ -458,16 +513,19 @@ export const rewriteDocumentationLinks = (
   version: Version,
 ): string => {
   let fenceMarker: string | undefined;
+
   return contents
     .split("\n")
     .map((line) => {
       const fence = line.match(/^\s*(`{3,}|~{3,})/u)?.[1];
+
       if (fence !== undefined) {
         if (fenceMarker === undefined) {
           fenceMarker = fence[0];
         } else if (fence[0] === fenceMarker) {
           fenceMarker = undefined;
         }
+
         return line;
       }
 
@@ -504,7 +562,7 @@ const writeOutputFile = Effect.fn("Docs.writeOutputFile")(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   yield* fs.makeDirectory(path.dirname(filePath), { recursive: true });
-  yield* typeof contents === "string"
+  yield* Predicate.isString(contents)
     ? fs.writeFileString(filePath, contents)
     : fs.writeFile(filePath, contents);
 });
@@ -515,6 +573,7 @@ const copyVersion = Effect.fn("Docs.copyVersion")(function* (
   output: string,
 ) {
   const path = yield* Path.Path;
+
   const files = new TextDecoder()
     .decode(
       yield* gitBuffer([
@@ -532,6 +591,7 @@ const copyVersion = Effect.fn("Docs.copyVersion")(function* (
 
   for (const sourcePath of files) {
     const relativePath = sourcePath.slice(`${DOCS_ROOT}/`.length);
+
     if (
       !relativePath.includes("/") &&
       EXCLUDED_VERSION_ROOT_FILES.has(relativePath)
@@ -541,6 +601,7 @@ const copyVersion = Effect.fn("Docs.copyVersion")(function* (
 
     const sourceContents = yield* readGitFile(source, sourcePath);
     const extension = path.extname(relativePath);
+
     const outputContents =
       extension === ".md" || extension === ".mdx"
         ? rewriteDocumentationLinks(
@@ -548,6 +609,7 @@ const copyVersion = Effect.fn("Docs.copyVersion")(function* (
             version,
           )
         : sourceContents;
+
     yield* writeOutputFile(
       path.join(output, version, relativePath),
       outputContents,
@@ -558,23 +620,24 @@ const copyVersion = Effect.fn("Docs.copyVersion")(function* (
 const prefixPageReference = (page: string, version: Version): string => {
   if (/^(?:https?:\/\/|[A-Z]+ \/)/u.test(page)) return page;
   const filePath = page.startsWith("/") ? page.slice(1) : page;
+
   return versionPath(filePath, version);
 };
 
 const rewritePageLists = (
-  value: unknown,
+  value: Schema.Json,
   version: Version,
   insidePages = false,
-): unknown => {
-  if (Array.isArray(value)) {
+): Schema.Json => {
+  if (isJsonArray(value)) {
     return value.map((entry) =>
-      insidePages && typeof entry === "string"
+      insidePages && Predicate.isString(entry)
         ? prefixPageReference(entry, version)
         : rewritePageLists(entry, version),
     );
   }
 
-  if (!isRecord(value)) return value;
+  if (!isJsonObject(value)) return value;
 
   return Object.fromEntries(
     Object.entries(value).map(([key, entry]) => [
@@ -585,23 +648,24 @@ const rewritePageLists = (
 };
 
 const collectPageReferences = (
-  value: unknown,
+  value: Schema.Json,
   insidePages = false,
   pages: Array<string> = [],
 ): Array<string> => {
-  if (Array.isArray(value)) {
+  if (isJsonArray(value)) {
     for (const entry of value) {
-      if (insidePages && typeof entry === "string") {
+      if (insidePages && Predicate.isString(entry)) {
         pages.push(entry);
       } else {
         collectPageReferences(entry, false, pages);
       }
     }
-  } else if (isRecord(value)) {
+  } else if (isJsonObject(value)) {
     for (const [key, entry] of Object.entries(value)) {
       collectPageReferences(entry, key === "pages", pages);
     }
   }
+
   return pages;
 };
 
@@ -613,18 +677,20 @@ const versionNavigation = Effect.fn("Docs.versionNavigation")(function* (
   const navigation = { ...config.navigation };
   delete navigation.global;
 
-  const rewrittenNavigation = rewritePageLists(navigation, version);
-  if (!isRecord(rewrittenNavigation)) {
-    return yield* new DocsDataError({
-      source: version,
-      filePath: `${DOCS_ROOT}/docs.json`,
-      message: `Invalid ${version} navigation`,
-    });
-  }
+  const rewrittenNavigation = yield* Schema.decodeUnknownEffect(
+    Schema.JsonObject,
+  )(rewritePageLists(navigation, version)).pipe(
+    Effect.mapError(
+      () =>
+        new DocsDataError({
+          source: version,
+          filePath: `${DOCS_ROOT}/docs.json`,
+          message: `Invalid ${version} navigation`,
+        }),
+    ),
+  );
 
-  return {
-    version,
-    ...(version === defaultVersion ? { default: true } : {}),
+  const fields = {
     tag:
       version === defaultVersion
         ? "Stable"
@@ -633,6 +699,12 @@ const versionNavigation = Effect.fn("Docs.versionNavigation")(function* (
           : "Previous",
     ...rewrittenNavigation,
   };
+
+  if (version === defaultVersion) {
+    return { version, default: true, ...fields };
+  }
+
+  return { version, ...fields };
 });
 
 export const assembleDocsMain = Effect.fn("Docs.main")(function* (
@@ -644,6 +716,7 @@ export const assembleDocsMain = Effect.fn("Docs.main")(function* (
   const repositoryRoot = yield* gitText(["rev-parse", "--show-toplevel"]);
   const output = path.resolve(options.outputArgument);
   const manifestOutput = path.resolve(options.manifestOutputArgument);
+
   for (const prohibitedOutput of [
     path.parse(output).root,
     repositoryRoot,
@@ -656,11 +729,14 @@ export const assembleDocsMain = Effect.fn("Docs.main")(function* (
       });
     }
   }
+
   const previousManifest = yield* loadManifest(options.manifestPath);
+
   const sourceFor = (version: Version) =>
     options.updateVersion === version && options.updateRef !== undefined
       ? options.updateRef
       : previousManifest.versions[version].source;
+
   const sources: Record<Version, string> = {
     v9: yield* validateSource(
       "v9",
@@ -673,55 +749,67 @@ export const assembleDocsMain = Effect.fn("Docs.main")(function* (
       options.allowUnpublishedSource,
     ),
   };
+
   const configs: Record<Version, DocsConfig> = {
     v9: yield* readDocsConfig(sources.v9),
     v10: yield* readDocsConfig(sources.v10),
   };
+
   const v10PackageVersion = yield* readPackageVersion(sources.v10);
+
   const defaultVersion: Version = v10PackageVersion.includes("-")
     ? "v9"
     : "v10";
-  const manifest: Manifest = {
+
+  const manifest = {
     schemaVersion: MANIFEST_SCHEMA_VERSION,
     defaultVersion,
     versions: { v9: { source: sources.v9 }, v10: { source: sources.v10 } },
-  };
+  } satisfies Manifest;
+
   const defaultSource = sources[defaultVersion];
   const defaultConfig = configs[defaultVersion];
 
   const generatedRedirects: Array<Redirect> = [
     ...new Set(collectPageReferences(defaultConfig.navigation)),
   ]
+    .values()
     .filter((page) => !/^(?:https?:\/\/|[A-Z]+ \/)/u.test(page))
     .map((page) => {
       const filePath = page.startsWith("/") ? page.slice(1) : page;
+
       return {
         source: `/${filePath}`,
         destination: `/${prefixPageReference(filePath, defaultVersion)}`,
       };
-    });
+    })
+    .toArray();
 
   const existingRedirects = defaultConfig.redirects ?? [];
+
   const existingRedirectSources = new Set(
     existingRedirects.map((redirect) => redirect.source),
   );
+
   for (const redirect of generatedRedirects) {
     if (existingRedirectSources.has(redirect.source)) {
       return yield* new DocsRedirectError({ source: redirect.source });
     }
   }
 
+  const versions = [
+    yield* versionNavigation(configs.v9, "v9", defaultVersion),
+    yield* versionNavigation(configs.v10, "v10", defaultVersion),
+  ];
+
+  const navigation =
+    defaultConfig.navigation.global === undefined
+      ? { versions }
+      : { global: defaultConfig.navigation.global, versions };
+
   const combinedConfig = {
     ...defaultConfig,
-    navigation: {
-      ...(defaultConfig.navigation.global === undefined
-        ? {}
-        : { global: defaultConfig.navigation.global }),
-      versions: [
-        yield* versionNavigation(configs.v9, "v9", defaultVersion),
-        yield* versionNavigation(configs.v10, "v10", defaultVersion),
-      ],
-    },
+    navigation,
     redirects: [...existingRedirects, ...generatedRedirects],
   };
 

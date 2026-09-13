@@ -1,6 +1,7 @@
 import { PaginationError } from "@confect/core";
 import { describe, expect, it } from "@effect/vitest";
 import { ConvexError } from "convex/values";
+import * as Data from "effect/Data";
 import * as Option from "effect/Option";
 
 describe("PaginationError", () => {
@@ -9,6 +10,7 @@ describe("PaginationError", () => {
       isConvexSystemError: true,
       paginationError: "InvalidCursor",
     });
+
     const error = Option.getOrThrow(
       PaginationError.fromConvexQueryError(cause),
     );
@@ -19,6 +21,7 @@ describe("PaginationError", () => {
 
   it("recognizes Convex's message-only fallback", () => {
     const cause = new Error("InvalidCursor: cursor has expired");
+
     const error = Option.getOrThrow(
       PaginationError.fromConvexQueryError(cause),
     );
@@ -31,6 +34,7 @@ describe("PaginationError", () => {
       isConvexSystemError: true,
       paginationError: "InvalidCursor",
     } as const;
+
     const error = Option.getOrThrow(PaginationError.fromConvexErrorData(cause));
 
     expect(error.cause).toBe(cause);
@@ -43,7 +47,9 @@ describe("PaginationError", () => {
     expect(
       Option.isNone(
         PaginationError.fromConvexQueryError(
-          new ConvexError({ _tag: "NotFound" }),
+          new ConvexError(
+            Data.taggedEnum<{ readonly _tag: "NotFound" }>().NotFound(),
+          ),
         ),
       ),
     ).toBe(true);

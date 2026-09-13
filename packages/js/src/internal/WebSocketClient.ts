@@ -22,19 +22,27 @@ export interface Transport {
   readonly close: () => Promise<void>;
   readonly query: (
     functionReference: Ref.FunctionReference<Ref.AnyPublicQuery>,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This raw transport receives args encoded by Ref.runWithCodec; their representation depends on the ref.
     encodedArgs: unknown,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Ref.runWithCodec owns return decoding after this raw transport promise resolves.
   ) => PromiseLike<unknown>;
   readonly mutation: (
     functionReference: Ref.FunctionReference<Ref.AnyPublicMutation>,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This raw transport receives args encoded by Ref.runWithCodec; their representation depends on the ref.
     encodedArgs: unknown,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Ref.runWithCodec owns return decoding after this raw transport promise resolves.
   ) => PromiseLike<unknown>;
   readonly action: (
     functionReference: Ref.FunctionReference<Ref.AnyPublicAction>,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This raw transport receives args encoded by Ref.runWithCodec; their representation depends on the ref.
     encodedArgs: unknown,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Ref.runWithCodec owns return decoding after this raw transport promise resolves.
   ) => PromiseLike<unknown>;
   readonly onUpdate: (
     functionReference: Ref.FunctionReference<Ref.AnyPublicQuery>,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Subscription args have already passed through the ref encoder; their wire representation is ref-specific.
     encodedArgs: unknown,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Subscription emissions remain untrusted until reactiveQuery applies Ref.decodeReturns.
     onUpdate: (result: unknown) => void,
     onError: (error: Error) => void,
   ) => () => void;
@@ -81,7 +89,9 @@ export const make = (address: string, convexClient: Transport) => {
     Ref.Returns<Query>,
     Ref.Error<Query> | WebSocketClientError | Schema.SchemaError
   > => {
+    // SAFETY: OptionalArgs permits omission only for an empty argument record; supplied args already have this ref's Args type.
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
+
     return runQuery(
       Ref.runWithCodec(
         ref,
@@ -100,7 +110,9 @@ export const make = (address: string, convexClient: Transport) => {
     Ref.Returns<Mutation>,
     Ref.Error<Mutation> | WebSocketClientError | Schema.SchemaError
   > => {
+    // SAFETY: OptionalArgs permits omission only for an empty argument record; supplied args already have this ref's Args type.
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
+
     return runMutation(
       Ref.runWithCodec(
         ref,
@@ -119,7 +131,9 @@ export const make = (address: string, convexClient: Transport) => {
     Ref.Returns<Action>,
     Ref.Error<Action> | WebSocketClientError | Schema.SchemaError
   > => {
+    // SAFETY: OptionalArgs permits omission only for an empty argument record; supplied args already have this ref's Args type.
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
+
     return runAction(
       Ref.runWithCodec(
         ref,
@@ -146,6 +160,8 @@ export const make = (address: string, convexClient: Transport) => {
       Ref.Returns<Query>,
       ReactiveQueryError<Query>
     >;
+
+    // SAFETY: OptionalArgs permits omission only for an empty argument record; supplied args already have this ref's Args type.
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
     const functionReference = Ref.getFunctionReference(ref);
     const onError = Ref.decodeErrorOrElse(ref, mapUnknownError);
@@ -167,6 +183,7 @@ export const make = (address: string, convexClient: Transport) => {
                     Queue.offerUnsafe(queue, Result.fail(onError(error)));
                   },
                 );
+
                 yield* Effect.addFinalizer(() =>
                   Effect.sync(() => unsubscribe()),
                 );

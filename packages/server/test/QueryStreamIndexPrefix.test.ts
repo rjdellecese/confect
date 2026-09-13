@@ -6,6 +6,7 @@ import * as Array from "effect/Array";
 import * as Result from "effect/Result";
 
 const fieldPaths = ["category", "score", "_id"] as const;
+
 const layout = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["score"]));
 
 describe("QueryStreamIndexPrefix", () => {
@@ -38,9 +39,11 @@ describe("QueryStreamIndexPrefix", () => {
       const prefix = Result.getOrThrow(
         QueryStreamIndexPrefix.make(fieldPaths, orderKey),
       );
+
       expect(QueryStreamIndexPrefix.entries(prefix)).toEqual(indexEntries);
       expect(QueryStreamIndexPrefix.values(prefix)).toEqual(orderKey);
     }
+
     expect(
       QueryStreamIndexPrefix.entries(
         Result.getOrThrow(QueryStreamIndexPrefix.make([], [])),
@@ -72,11 +75,13 @@ describe("QueryStreamIndexPrefix", () => {
       Result.getOrThrow(QueryStreamKey.complete(layout, [3, "id"])),
       Result.getOrThrow(QueryStreamKey.prefix(layout, [3])),
     ];
+
     const prefixes = Array.map(keys, (key) =>
       Result.getOrThrow(
         QueryStreamIndexPrefix.fromStreamKey(fieldPaths, ["a"], key),
       ),
     );
+
     expect(Array.map(prefixes, QueryStreamIndexPrefix.entries)).toEqual([
       [
         ["category", "a"],

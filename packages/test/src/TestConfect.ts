@@ -7,6 +7,8 @@ import type {
 } from "convex-test";
 import { convexTest } from "convex-test";
 import type {
+  DefaultFunctionArgs,
+  FunctionReference,
   GenericMutationCtx,
   GenericSchema,
   SchemaDefinition,
@@ -98,9 +100,15 @@ class TestConfectImplWithoutIdentity<
   > =>
     Ref.runWithCodec(
       queryRef,
+      // SAFETY: OptionalArgs permits omission only when Args has no keys; otherwise args[0] is the required Args value.
       (args[0] ?? {}) as Ref.Args<QueryRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.query(functionReference as any, encodedArgs),
+        this.testConvex.query(
+          // SAFETY: QueryRef is constrained to AnyQuery, so its Convex reference has function type "query".
+          functionReference as FunctionReference<"query", any>,
+          // SAFETY: runWithCodec encoded these arguments using this reference's args codec before invoking this callback.
+          encodedArgs as DefaultFunctionArgs,
+        ),
     );
 
   readonly mutation = <MutationRef extends Ref.AnyMutation>(
@@ -112,9 +120,15 @@ class TestConfectImplWithoutIdentity<
   > =>
     Ref.runWithCodec(
       mutationRef,
+      // SAFETY: OptionalArgs permits omission only when Args has no keys; otherwise args[0] is the required Args value.
       (args[0] ?? {}) as Ref.Args<MutationRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.mutation(functionReference as any, encodedArgs),
+        this.testConvex.mutation(
+          // SAFETY: MutationRef is constrained to AnyMutation, so its Convex reference has function type "mutation".
+          functionReference as FunctionReference<"mutation", any>,
+          // SAFETY: runWithCodec encoded these arguments using this reference's args codec before invoking this callback.
+          encodedArgs as DefaultFunctionArgs,
+        ),
     );
 
   readonly action = <ActionRef extends Ref.AnyAction>(
@@ -126,11 +140,18 @@ class TestConfectImplWithoutIdentity<
   > =>
     Ref.runWithCodec(
       actionRef,
+      // SAFETY: OptionalArgs permits omission only when Args has no keys; otherwise args[0] is the required Args value.
       (args[0] ?? {}) as Ref.Args<ActionRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.action(functionReference as any, encodedArgs),
+        this.testConvex.action(
+          // SAFETY: ActionRef is constrained to AnyAction, so its Convex reference has function type "action".
+          functionReference as FunctionReference<"action", any>,
+          // SAFETY: runWithCodec encoded these arguments using this reference's args codec before invoking this callback.
+          encodedArgs as DefaultFunctionArgs,
+        ),
     );
 
+  // SAFETY: Without a returns codec the branch discards the result; with a codec it encodes and decodes A. The overloads express this correlation, which the implementation's union return type cannot retain.
   readonly run: TestConfectWithoutIdentity<ConfectSchema>["run"] = (<
     A,
     B extends Value,
@@ -148,12 +169,7 @@ class TestConfectImplWithoutIdentity<
         DataModel.ToConvex<DataModel.FromSchema<ConfectSchema>>
       >,
     ): Layer.Layer<RegisteredConvexFunction.MutationServices<ConfectSchema>> =>
-      RegisteredConvexFunction.mutationLayer(
-        this.confectSchema,
-        mutationCtx,
-      ) as Layer.Layer<
-        RegisteredConvexFunction.MutationServices<ConfectSchema>
-      >;
+      RegisteredConvexFunction.mutationLayer(this.confectSchema, mutationCtx);
 
     return returns === undefined
       ? Effect.promise(() =>
@@ -207,6 +223,7 @@ class TestConfectImpl<
       confectSchema,
       testConvex,
     );
+    this.run = this.testConfectImplWithoutIdentity.run;
   }
 
   readonly withIdentity = (userIdentity: Partial<UserIdentity>) =>
@@ -230,14 +247,7 @@ class TestConfectImpl<
     ...args: Ref.OptionalArgs<ActionRef>
   ) => this.testConfectImplWithoutIdentity.action(actionRef, ...args);
 
-  readonly run: TestConfect<ConfectSchema>["run"] = ((
-    handler: any,
-    returns?: any,
-  ) =>
-    this.testConfectImplWithoutIdentity.run(
-      handler,
-      returns,
-    )) as TestConfect<ConfectSchema>["run"];
+  readonly run: TestConfect<ConfectSchema>["run"];
 
   readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
@@ -263,6 +273,6 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     () =>
       new TestConfectImpl(
         databaseSchema,
-        convexTest(convexSchemaDefinition, modules) as any,
+        convexTest(convexSchemaDefinition, modules),
       ),
   );

@@ -1,4 +1,4 @@
-import type { Predicate } from "effect";
+import * as Predicate from "effect/Predicate";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Ref from "effect/Ref";
@@ -128,8 +128,7 @@ describe("setNestedProperty", () => {
 });
 
 describe("forEachBranchLeaves", () => {
-  const isString = (value: unknown): value is string =>
-    typeof value === "string";
+  const isString = Predicate.isString;
 
   describe("basic functionality", () => {
     it.effect("processes leaves at a single branch", () =>
@@ -206,8 +205,7 @@ describe("forEachBranchLeaves", () => {
   describe("filtering with refinement", () => {
     it.effect("only processes values matching the refinement", () =>
       Effect.gen(function* () {
-        const isNumber = (value: unknown): value is number =>
-          typeof value === "number";
+        const isNumber = Predicate.isNumber;
 
         const results = yield* collectLeaves(
           {

@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
@@ -55,6 +56,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
     () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
+
         const components = yield* discoverInstalledComponents(
           path.join(fixturesRoot, "bare", "convex", "convex.config.ts"),
           "convex/convex.config.ts",
@@ -78,6 +80,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
     () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
+
         const components = yield* discoverInstalledComponents(
           path.join(fixturesRoot, "local", "convex", "convex.config.ts"),
           "convex/convex.config.ts",
@@ -96,6 +99,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
           waitlist.componentDefinitionPath,
           path.join(fixturesRoot, "local", "confect", "_generated"),
         );
+
         expect(importPath).toBe("../../convex/waitlist");
       }),
   );
@@ -105,6 +109,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
     () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
+
         const components = yield* discoverInstalledComponents(
           path.join(fixturesRoot, "nested", "convex", "convex.config.ts"),
           "convex/convex.config.ts",
@@ -121,6 +126,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
   it.effect("fails with a BuildError when the config throws on import", () =>
     Effect.gen(function* () {
       const path = yield* Path.Path;
+
       const result = yield* Effect.result(
         discoverInstalledComponents(
           path.join(fixturesRoot, "throwing", "convex", "convex.config.ts"),
@@ -138,6 +144,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
     () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
+
         const result = yield* Effect.result(
           discoverInstalledComponents(
             path.join(fixturesRoot, "badName", "convex", "convex.config.ts"),
@@ -146,7 +153,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
         );
 
         assert(Result.isFailure(result));
-        assert(result.failure._tag === "InvalidConvexConfigError");
+        assert(Predicate.isTagged(result.failure, "InvalidConvexConfigError"));
         expect(result.failure.reason).toContain('"not a valid name"');
       }),
   );
@@ -156,6 +163,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
     () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
+
         const result = yield* Effect.result(
           discoverInstalledComponents(
             path.join(fixturesRoot, "invalid", "convex", "convex.config.ts"),
@@ -190,6 +198,7 @@ layer(TestLayer)("generateComponents", (it) => {
       const contents = yield* fs.readFileString(
         path.join(confectDirectory, "_generated", "components.ts"),
       );
+
       expect(contents).toBe(
         `import { componentsGeneric } from "convex/server";
 
@@ -225,6 +234,7 @@ export const components: Components = componentsGeneric() as any;
       const contents = yield* fs.readFileString(
         path.join(confectDirectory, "_generated", "components.ts"),
       );
+
       expect(contents).toBe(
         `import { componentsGeneric } from "convex/server";
 

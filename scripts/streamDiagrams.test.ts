@@ -22,6 +22,7 @@ test("tracks and their keys share columns", () => {
   const [name, elements] = track("by_text", ["n1", undefined, "n2"]).split(
     "\n",
   );
+
   const beneath = keys(["[apple,1]", undefined, "[banana,2]"]);
   expect(name).toBe("by_text");
   expect(elements?.startsWith("╰")).toBe(true);
@@ -45,6 +46,7 @@ test("renders every marked block and leaves the rest of the page alone", () =>
       const full = yield* renderedOrMessage(
         `intro\n${Object.keys(diagrams).map(block).join("\n\n")}\noutro`,
       );
+
       expect(full.startsWith("intro\n")).toBe(true);
       expect(full.endsWith("\noutro")).toBe(true);
       expect(full).not.toContain("stale");
@@ -58,6 +60,7 @@ test("reports a page that is missing a diagram's block", () =>
       const message = yield* renderedOrMessage(
         `intro\n${block("legend")}\noutro`,
       );
+
       expect(message).toContain("has no block for");
     }),
   ));

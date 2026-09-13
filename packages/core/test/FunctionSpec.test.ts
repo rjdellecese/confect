@@ -74,6 +74,7 @@ describe("make", () => {
       args: () => Schema.String,
       returns: () => Schema.String,
     });
+
     const serviceful = FunctionSpec.publicQuery({
       name: "serviceful",
       // @ts-expect-error—function args must be synchronously encodable and decodable
@@ -145,14 +146,17 @@ describe("laziness invariant", () => {
       name: "tracked",
       args: () => {
         track.args?.();
+
         return { tracked: Schema.Boolean };
       },
       returns: () => {
         track.returns?.();
+
         return Schema.Null;
       },
       error: () => {
         track.error?.();
+
         return Schema.String;
       },
     });
@@ -175,9 +179,11 @@ describe("laziness invariant", () => {
 
   it("Ref.hasErrorSchema checks presence without forcing the error thunk", () => {
     const errorBuilt = MutableRef.make(false);
+
     const spec = makeSpec({
       error: () => MutableRef.set(errorBuilt, true),
     });
+
     const ref = Ref.make("ns", spec);
 
     expect(Ref.hasErrorSchema(ref)).toBe(true);
@@ -194,6 +200,7 @@ describe("laziness invariant", () => {
       returns: () => MutableRef.set(returnsBuilt, true),
       error: () => MutableRef.set(errorBuilt, true),
     });
+
     const ref = Ref.make("ns", spec);
 
     expect(MutableRef.get(argsBuilt)).toBe(false);
@@ -217,6 +224,7 @@ describe("laziness invariant", () => {
       name: "noError",
       returns: () => Schema.Null,
     });
+
     const ref = Ref.make("ns", spec);
 
     expect(Ref.hasErrorSchema(ref)).toBe(false);
@@ -225,6 +233,7 @@ describe("laziness invariant", () => {
 
   it("accessing a schema getter forces the thunk exactly once and memoises", () => {
     const argsCalls = MutableRef.make(0);
+
     const spec = makeSpec({
       args: () => MutableRef.increment(argsCalls),
     });
@@ -250,14 +259,17 @@ describe("paginated queries", () => {
         name: "tracked",
         args: () => {
           track.args?.();
+
           return { tracked: Schema.Boolean };
         },
         item: () => {
           track.item?.();
+
           return item;
         },
         error: () => {
           track.error?.();
+
           return Schema.String;
         },
       });
@@ -281,6 +293,7 @@ describe("paginated queries", () => {
     it("the kind tag is observable without forcing the schema thunks", () => {
       const argsBuilt = MutableRef.make(false);
       const itemBuilt = MutableRef.make(false);
+
       const spec = makePaginatedSpec({
         args: () => MutableRef.set(argsBuilt, true),
         item: () => MutableRef.set(itemBuilt, true),
@@ -302,9 +315,11 @@ describe("paginated queries", () => {
 
     it("Ref.hasErrorSchema checks presence without forcing the error thunk", () => {
       const errorBuilt = MutableRef.make(false);
+
       const spec = makePaginatedSpec({
         error: () => MutableRef.set(errorBuilt, true),
       });
+
       const ref = Ref.make("ns", spec);
 
       expect(Ref.hasErrorSchema(ref)).toBe(true);
@@ -313,6 +328,7 @@ describe("paginated queries", () => {
 
     it("accessing `args` forces the user-args thunk exactly once and memoises", () => {
       const argsCalls = MutableRef.make(0);
+
       const spec = makePaginatedSpec({
         args: () => MutableRef.increment(argsCalls),
       });
@@ -389,6 +405,7 @@ describe("paginated queries", () => {
         item: () => item,
         error: () => Schema.String,
       });
+
       type Spec = typeof _spec;
 
       expectTypeOf<

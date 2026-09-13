@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as Command from "effect/unstable/cli/Command";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -115,6 +116,7 @@ const logFileChangeIndented = Effect.fnUntraced(function* (
   const path = yield* Path.Path;
 
   const prefix = projectRoot + path.sep;
+
   const suffix = pipe(fullPath, String.startsWith(prefix))
     ? pipe(fullPath, String.slice(prefix.length))
     : fullPath;
@@ -181,6 +183,7 @@ export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
     const previousFunctionPaths = yield* loadPreviousFunctionPaths;
+
     const initialResult = yield* codegenHandler.pipe(
       Effect.tap(({ functionPaths }) =>
         logFunctionPathDiff(previousFunctionPaths, functionPaths),
@@ -188,6 +191,7 @@ export const dev = Command.make("dev", {}, () =>
       Effect.tap(() => logSuccess("Generated files are up-to-date")),
       CodegenError.catchAndLog,
     );
+
     const initialFunctionPaths = Option.match(initialResult, {
       onNone: () => emptyFunctionPaths,
       onSome: ({ functionPaths }) => functionPaths,
@@ -196,8 +200,10 @@ export const dev = Command.make("dev", {}, () =>
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
     const restartQueue = yield* Queue.sliding<void>(1);
+
     const watcherErrorsRef =
       yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
+
     const watcherWarningsRef =
       yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
 
@@ -269,8 +275,10 @@ const logChangedWatcherMessages = Effect.fnUntraced(function* (
   const messages = yield* Ref.get(messagesRef);
   const signature = watcherMessagesSignature(messages);
   const previous = yield* Ref.get(lastLoggedSignatureRef);
+
   if (signature === previous) return;
   yield* Ref.set(lastLoggedSignatureRef, signature);
+
   if (messages.size === 0) return;
   yield* log(dedupeWatcherMessages(messages));
 });
@@ -288,15 +296,19 @@ const drainUntilQuiescent = Effect.fnUntraced(function* (
 ) {
   const start = yield* Clock.currentTimeMillis;
   const maxMillis = Duration.toMillis(maxWait);
+
   const loop: Effect.Effect<void> = Effect.gen(function* () {
     yield* Effect.sleep(quiescence);
     const drained = yield* Queue.clear(signal);
+
     if (drained.length === 0) return;
     const now = yield* Clock.currentTimeMillis;
+
     if (now - start < maxMillis) {
       yield* loop;
     }
   });
+
   yield* loop;
 });
 
@@ -356,9 +368,11 @@ const syncLoop = Effect.fnUntraced(function* (
           ),
           CodegenError.catchAndLog,
         );
+
         if (Option.isNone(current)) {
           return;
         }
+
         // Drain any stragglers from this cycle's burst (slow watchers
         // whose onEnd fired after the first quiescence) plus, when
         // codegen wrote, the echo signals esbuild emits in response
@@ -367,6 +381,7 @@ const syncLoop = Effect.fnUntraced(function* (
         if (current.value.anyWritesHappened) {
           yield* Effect.sleep(ECHO_COOLDOWN);
         }
+
         yield* drainUntilQuiescent(
           signal,
           COALESCE_QUIESCENCE,
@@ -419,9 +434,11 @@ const discoverEntryPoints = Effect.gen(function* () {
     pendingKey: PendingKey,
   ) {
     const absolutePath = path.join(confectDirectory, relativePath);
+
     if (!(yield* fs.exists(absolutePath))) {
       return Option.none<EntryPoint>();
     }
+
     return Option.some<EntryPoint>({
       absolutePath,
       displayPath: path.relative(projectRoot, absolutePath),
@@ -445,6 +462,7 @@ const discoverEntryPoints = Effect.gen(function* () {
   ]);
 
   const implRelativePaths = yield* discoverLeafImplFiles;
+
   const implEntryOptions = yield* Effect.forEach(
     implRelativePaths,
     (relativePath) => tryEntry(relativePath, "specDirty"),
@@ -454,11 +472,14 @@ const discoverEntryPoints = Effect.gen(function* () {
   // edits to it (or to a locally-defined component definition it imports—npm component definitions are externalized and not watched) must re-run
   // codegen.
   const convexDirectory = yield* ConvexDirectory.get;
+
   const convexConfigEntryOption = yield* Effect.gen(function* () {
     const absolutePath = path.join(convexDirectory, CONVEX_CONFIG_FILENAME);
+
     if (!(yield* fs.exists(absolutePath))) {
       return Option.none<EntryPoint>();
     }
+
     return Option.some<EntryPoint>({
       absolutePath,
       displayPath: path.relative(projectRoot, absolutePath),
@@ -491,6 +512,7 @@ const esbuildOptions = (
   // for, so we record any errors but don't flip dirty or push a
   // signal—only genuine subsequent rebuilds should do that.
   const initialBuildSeenRef = Ref.makeUnsafe(false);
+
   return {
     entryPoints: [entry.absolutePath],
     bundle: true,
@@ -512,25 +534,31 @@ const esbuildOptions = (
                   initialBuildSeenRef,
                   true,
                 );
+
                 const isInitial = !wasInitial;
                 yield* Ref.update(watcherErrorsRef, (current) => {
                   const next = new Map(current);
+
                   if (result.errors.length > 0) {
                     next.set(entry.absolutePath, result.errors);
                   } else {
                     next.delete(entry.absolutePath);
                   }
+
                   return next;
                 });
                 yield* Ref.update(watcherWarningsRef, (current) => {
                   const next = new Map(current);
+
                   if (result.warnings.length > 0) {
                     next.set(entry.absolutePath, result.warnings);
                   } else {
                     next.delete(entry.absolutePath);
                   }
+
                   return next;
                 });
+
                 if (isInitial && result.errors.length === 0) return;
                 yield* Ref.update(pendingRef, (p) => ({
                   ...p,
@@ -572,20 +600,25 @@ const createEntryPointWatcher = (
           ),
         ),
       );
+
       yield* Effect.promise(() => ctx.watch());
+
       return ctx;
     }),
     (ctx) =>
       Effect.gen(function* () {
         yield* Effect.promise(() => ctx.dispose());
+
         // Clear any errors and warnings recorded by this watcher so a
         // disposed watcher can't leave stale messages visible to the sync loop.
         const clearEntry = (current: WatcherMessages) => {
           if (!current.has(entry.absolutePath)) return current;
           const next = new Map(current);
           next.delete(entry.absolutePath);
+
           return next;
         };
+
         yield* Ref.update(watcherErrorsRef, clearEntry);
         yield* Ref.update(watcherWarningsRef, clearEntry);
         yield* Effect.logDebug(
@@ -620,15 +653,18 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
   // `tsconfig.json`; if none exists, `paths` is empty and `notExternal` is
   // `[]`, leaving the externalization rule unchanged.
   const tsconfig = loadTsConfig(projectRoot);
+
   const notExternal = tsconfigPathsToRegExp(
     tsconfig?.data.compilerOptions?.paths ?? {},
   );
 
   const sync = Effect.gen(function* () {
     const desired = yield* discoverEntryPoints;
+
     const desiredByPath = new Map(
       desired.map((entryPoint) => [entryPoint.absolutePath, entryPoint]),
     );
+
     const current = yield* Ref.get(scopesRef);
 
     yield* Effect.forEach(
@@ -641,6 +677,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
                 Ref.update(scopesRef, (scopes) => {
                   const updated = new Map(scopes);
                   updated.delete(absolutePath);
+
                   return updated;
                 }),
               ),
@@ -651,6 +688,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
       desired,
       Effect.fnUntraced(function* (entry: EntryPoint) {
         const existing = yield* Ref.get(scopesRef);
+
         if (existing.has(entry.absolutePath)) return;
 
         const childScope = yield* Scope.fork(parentScope, "sequential");
@@ -667,6 +705,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
         yield* Ref.update(scopesRef, (scopes) => {
           const updated = new Map(scopes);
           updated.set(entry.absolutePath, childScope);
+
           return updated;
         });
       }),
@@ -737,7 +776,7 @@ const convexConfigStructureWatcher = Effect.fnUntraced(function* (
             signal,
             "specDirty",
             restartQueue,
-            event._tag !== "Update",
+            !Predicate.isTagged(event, "Update"),
           )
         : Effect.void,
     ),
@@ -792,6 +831,7 @@ const handleConfectChange = ({
   const isLifecycleChange = eventTag !== "Update";
 
   const topLevelKey = TOP_LEVEL_OPTIONAL_KEYS.get(relativePath);
+
   if (topLevelKey !== undefined) {
     return flipDirtyAndSignal(
       pendingRef,

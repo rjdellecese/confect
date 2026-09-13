@@ -33,6 +33,7 @@ describe("constructors", () => {
 
   test("canLoadMore carries results and loadMore", () => {
     const loadMore = (_numItems: number) => {};
+
     const r = PaginatedQueryResult.canLoadMore({ results: [1], loadMore });
 
     expect(r._tag).toBe("CanLoadMore");
@@ -78,10 +79,12 @@ describe("Equal", () => {
   test("loaded variants compare by tag and results, ignoring loadMore identity", () => {
     const results = [1, 2];
     const a = PaginatedQueryResult.canLoadMore({ results, loadMore: noop });
+
     const b = PaginatedQueryResult.canLoadMore({
       results,
       loadMore: (_n) => {},
     });
+
     const c = PaginatedQueryResult.exhausted({ results });
 
     expect(Equal.equals(a, b)).toBe(true);

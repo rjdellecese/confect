@@ -35,6 +35,7 @@ test("parses deployment arguments without changing the input", () =>
         "HEAD",
         "--allow-unpublished-source",
       ];
+
       const before = [...args];
       expect(yield* parseDocsArguments(args)).toEqual({
         outputArgument: "site",
@@ -57,6 +58,7 @@ test("rejects missing, unknown, and unpaired arguments with named errors", () =>
         "--manifest-output",
         "manifest.json",
       ];
+
       for (const args of [
         [],
         ["--output", "site"],
@@ -87,6 +89,7 @@ test("rewrites documentation links while preserving fenced and versioned links",
     "~~~",
     "[After](/guide)",
   ].join("\n");
+
   expect(rewriteDocumentationLinks(contents, "v10")).toBe(
     [
       "[Page](/v10/guide?q=x#anchor) [External](//example.com/page)",
@@ -109,9 +112,11 @@ test("rejects all protected output directories before loading sources", () =>
     Effect.gen(function* () {
       const path = yield* Path.Path;
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+
       const root = (yield* spawner.string(
         ChildProcess.make("git", ["rev-parse", "--show-toplevel"]),
       )).trim();
+
       for (const output of [
         path.parse(root).root,
         root,
@@ -123,7 +128,9 @@ test("rejects all protected output directories before loading sources", () =>
           "--manifest-output",
           path.join(root, "unused.json"),
         ]).pipe(Effect.flip);
-        expect(error).toMatchObject({ _tag: "DocsOutputError", output });
+
+        expect(error._tag).toBe("DocsOutputError");
+        expect(error).toMatchObject({ output });
       }
     }),
   ));
@@ -140,6 +147,7 @@ test("rejects malformed manifests and missing refs before replacing output", () 
         const manifestOutput = path.join(root, "output.json");
         yield* fs.makeDirectory(output);
         yield* fs.writeFileString(path.join(output, "sentinel"), "untouched");
+
         for (const [contents, tag] of [
           ["{", "DocsDataError"],
           [encodeJson({ schemaVersion: 2 }), "DocsDataError"],
@@ -164,6 +172,7 @@ test("rejects malformed manifests and missing refs before replacing output", () 
           ],
         ] as const) {
           yield* fs.writeFileString(manifest, contents);
+
           const error = yield* assembleDocsMain([
             "--output",
             output,
@@ -172,6 +181,7 @@ test("rejects malformed manifests and missing refs before replacing output", () 
             "--manifest",
             manifest,
           ]).pipe(Effect.flip);
+
           expect(error._tag).toBe(tag);
           expect(yield* fs.readFileString(path.join(output, "sentinel"))).toBe(
             "untouched",

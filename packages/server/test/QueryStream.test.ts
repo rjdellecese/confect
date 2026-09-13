@@ -79,7 +79,9 @@ describe("QueryStream.merge", () => {
               ),
             ),
           );
+
         const ascending = direction === "asc";
+
         const result = yield* Stream.runCollect(
           QueryStream.merge([
             source("left", ascending ? [1, 2, 2, 5] : [5, 2, 2, 1]),
@@ -93,6 +95,7 @@ describe("QueryStream.merge", () => {
             ),
           ]),
         );
+
         expect(result).toEqual(
           ascending
             ? [
@@ -128,6 +131,7 @@ describe("QueryStream key layouts", () => {
     Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["_id"]), identity),
     Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
   );
+
   const implicitFirst = QueryStreamKeyLayout.concat(
     Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
     Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["_id"]), identity),
@@ -139,6 +143,7 @@ describe("QueryStream key layouts", () => {
     expect(QueryStreamKeyLayout.visibleLabels(left.keyLayout)).toEqual(
       QueryStreamKeyLayout.visibleLabels(right.keyLayout),
     );
+
     for (const streams of [
       [left, right],
       [right, left],
@@ -161,6 +166,7 @@ describe("QueryStream key layouts", () => {
             new QueryStream.Element({ doc: Option.some(2), orderKey: [2] }),
           ),
         );
+
         const joined = QueryStream.flatMap(
           outer,
           (row) =>
@@ -169,17 +175,21 @@ describe("QueryStream key layouts", () => {
             ),
           { innerLayout: explicitFirst },
         );
+
         const defect = yield* Stream.runCollect(joined).pipe(
           Effect.catchDefect(Effect.succeed),
         );
+
         expect(defect).toBeInstanceOf(
           QueryStream.InnerStreamLayoutMismatchError,
         );
-        expect(defect).toMatchObject({
-          _tag: "InnerStreamLayoutMismatchError",
-          expected: explicitFirst,
-          actual: implicitFirst,
-        });
+        expect(defect).toHaveProperty("_tag", "InnerStreamLayoutMismatchError");
+        expect(defect).toMatchObject(
+          new QueryStream.InnerStreamLayoutMismatchError({
+            expected: explicitFirst,
+            actual: implicitFirst,
+          }),
+        );
       }),
   );
 
@@ -192,22 +202,29 @@ describe("QueryStream key layouts", () => {
           new QueryStream.Element({ doc: Option.some(1), orderKey: [1] }),
         ),
       );
+
       let layout = explicitFirst;
+
       const joined = QueryStream.flatMap(
         outer,
         () => QueryStream.empty<string>()(layout),
         { innerLayout: explicitFirst },
       );
+
       expect(yield* Stream.runCollect(joined)).toEqual([]);
       layout = implicitFirst;
+
       const defect = yield* Stream.runCollect(joined).pipe(
         Effect.catchDefect(Effect.succeed),
       );
-      expect(defect).toMatchObject({
-        _tag: "InnerStreamLayoutMismatchError",
-        expected: explicitFirst,
-        actual: implicitFirst,
-      });
+
+      expect(defect).toHaveProperty("_tag", "InnerStreamLayoutMismatchError");
+      expect(defect).toMatchObject(
+        new QueryStream.InnerStreamLayoutMismatchError({
+          expected: explicitFirst,
+          actual: implicitFirst,
+        }),
+      );
     }),
   );
 
@@ -230,24 +247,30 @@ describe("QueryStream key layouts", () => {
             }),
           ),
         );
+
         const layout = Result.getOrThrowWith(
           QueryStreamKeyLayout.fromIndex(["_id"]),
           identity,
         );
+
         const joined = QueryStream.flatMap(
           outer,
           (row) =>
             QueryStream.empty<string>()(layout, row === "asc" ? "asc" : "desc"),
           { innerLayout: layout },
         );
+
         const defect = yield* Stream.runCollect(joined).pipe(
           Effect.catchDefect(Effect.succeed),
         );
-        expect(defect).toMatchObject({
-          _tag: "InnerStreamOrderMismatchError",
-          expected: "asc",
-          actual: "desc",
-        });
+
+        expect(defect).toHaveProperty("_tag", "InnerStreamOrderMismatchError");
+        expect(defect).toMatchObject(
+          new QueryStream.InnerStreamOrderMismatchError({
+            expected: "asc",
+            actual: "desc",
+          }),
+        );
       }),
   );
 
@@ -258,6 +281,7 @@ describe("QueryStream key layouts", () => {
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
       Stream.empty,
     );
+
     void invalid;
   });
 });
@@ -265,11 +289,13 @@ describe("QueryStream key layouts", () => {
 describe("QueryStream.Element", () => {
   it("constructs an element with an inferred document type and readonly fields", () => {
     const doc = Option.some({ text: "hello" });
+
     const orderKey: QueryStreamOrderKey.QueryStreamOrderKey = [
       "hello",
       1,
       "id",
     ];
+
     const element = new QueryStream.Element({ doc, orderKey });
 
     expectTypeOf(element).toEqualTypeOf<
@@ -307,6 +333,7 @@ describe.each(["asc", "desc"] as const)(
       ({ start, end }) =>
         Effect.gen(function* () {
           const values = order === "asc" ? [1, 2, 3, 4, 5] : [5, 4, 3, 2, 1];
+
           const source = new QueryStream.QueryStream(
             order,
             Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
@@ -320,19 +347,22 @@ describe.each(["asc", "desc"] as const)(
               ),
             ),
           );
+
+          const endOptions = end
+            ? {
+                endCursor: yield* Schema.encodeEffect(
+                  QueryStreamCursor.codecForLayout(source.keyLayout),
+                )([values[3]]),
+              }
+            : undefined;
+
           const result = yield* QueryStream.paginate(source, {
             cursor: start
               ? yield* Schema.encodeEffect(
                   QueryStreamCursor.codecForLayout(source.keyLayout),
                 )([values[1]])
               : null,
-            ...(end
-              ? {
-                  endCursor: yield* Schema.encodeEffect(
-                    QueryStreamCursor.codecForLayout(source.keyLayout),
-                  )([values[3]]),
-                }
-              : {}),
+            ...endOptions,
             numItems: 10,
           });
 
@@ -353,6 +383,7 @@ describe.each(["asc", "desc"] as const)(
       (bound) =>
         Effect.gen(function* () {
           let reads = 0;
+
           const source = new QueryStream.QueryStream(
             order,
             Result.getOrThrowWith(
@@ -362,6 +393,7 @@ describe.each(["asc", "desc"] as const)(
             Stream.fromEffect(
               Effect.sync(() => {
                 reads++;
+
                 return new QueryStream.Element({
                   doc: Option.some("apple"),
                   orderKey: ["apple", 1, "id"],
@@ -412,6 +444,7 @@ describe.each(["asc", "desc"] as const)(
               });
             }
           }
+
           expect(reads).toBe(0);
         }),
     );
@@ -419,6 +452,7 @@ describe.each(["asc", "desc"] as const)(
     it.effect("paginates tied values using the implicit ID", () =>
       Effect.gen(function* () {
         const ids = order === "asc" ? ["a", "b"] : ["b", "a"];
+
         const source = new QueryStream.QueryStream(
           order,
           Result.getOrThrowWith(
@@ -435,14 +469,17 @@ describe.each(["asc", "desc"] as const)(
             ),
           ),
         );
+
         const first = yield* QueryStream.paginate(source, {
           cursor: null,
           numItems: 1,
         });
+
         const second = yield* QueryStream.paginate(source, {
           cursor: first.continueCursor,
           numItems: 1,
         });
+
         const end = yield* QueryStream.paginate(source, {
           cursor: second.continueCursor,
           numItems: 1,
@@ -471,11 +508,13 @@ describe.each(["asc", "desc"] as const)(
             new QueryStream.Element({ doc: Option.some(1), orderKey: [1] }),
           ),
         );
+
         const result = yield* QueryStream.paginate(source, {
           cursor: null,
           endCursor: QueryStreamCursor.END_CURSOR,
           numItems: 1,
         });
+
         expect(result).toEqual({
           page: [1],
           isDone: true,
@@ -492,6 +531,7 @@ describe("QueryStream", () => {
     new QueryStream.Element({ doc: Option.none<number>(), orderKey: [2] }),
     new QueryStream.Element({ doc: Option.some(3), orderKey: [3] }),
   ];
+
   const source = new QueryStream.QueryStream(
     "asc",
     Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
@@ -512,6 +552,7 @@ describe("QueryStream", () => {
           QueryStream.filter((doc) => doc > 1),
           QueryStream.map((doc) => doc.toString()),
         );
+
         const result = yield* Stream.runCollect(transformed.annotated).pipe(
           Effect.provideServiceEffect(
             QueryStreamReadBudget.QueryStreamReadBudget,
@@ -527,6 +568,7 @@ describe("QueryStream", () => {
           new QueryStream.Element({ doc: Option.none(), orderKey: [2] }),
           new QueryStream.Element({ doc: Option.some("3"), orderKey: [3] }),
         ]);
+
         for (const element of result) {
           expect(element).toBeInstanceOf(QueryStream.Element);
         }
@@ -538,14 +580,17 @@ describe("QueryStream", () => {
     () =>
       Effect.gen(function* () {
         const visited: Array<number> = [];
+
         const transformed = source.pipe(
           QueryStream.mapEffect((doc) =>
             Effect.sync(() => {
               visited.push(doc);
+
               return doc.toString();
             }),
           ),
         );
+
         const result = yield* Stream.runCollect(transformed.annotated).pipe(
           Effect.provideServiceEffect(
             QueryStreamReadBudget.QueryStreamReadBudget,
@@ -562,6 +607,7 @@ describe("QueryStream", () => {
           new QueryStream.Element({ doc: Option.none(), orderKey: [2] }),
           new QueryStream.Element({ doc: Option.some("3"), orderKey: [3] }),
         ]);
+
         for (const element of result) {
           expect(element).toBeInstanceOf(QueryStream.Element);
         }
@@ -587,12 +633,14 @@ describe("QueryStream boundary errors", () => {
 
   it("preserves the layout errors when stream arguments are invalid", () => {
     const fieldPaths: ReadonlyArray<string> = ["text"];
+
     const source = QueryStream.empty<string>()(
       Result.getOrThrowWith(
         QueryStreamKeyLayout.fromIndex(fieldPaths),
         identity,
       ),
     );
+
     const prefix: ReadonlyArray<string> = ["missing"];
     const replacement: ReadonlyArray<string> = [];
     expect(() => QueryStream.distinct(source, prefix)).toThrow(
@@ -613,10 +661,12 @@ describe("QueryStream boundary errors", () => {
   it.effect("preserves the named defect for a zero-sized initial page", () =>
     Effect.gen(function* () {
       const source = QueryStream.empty<string>()(layout);
+
       const defect = yield* QueryStream.paginate(source, {
         numItems: 0,
         cursor: null,
       }).pipe(Effect.catchDefect(Effect.succeed));
+
       expect(defect).toBeInstanceOf(QueryStream.EmptyInitialPageError);
     }),
   );
@@ -660,6 +710,7 @@ describe("QueryStream.ReadBudgetExceededError", () => {
       rowsRead: 2,
       bytesRead: 20,
     });
+
     expect(error._tag).toBe("ReadBudgetExceededError");
     expect(error.rowsRead).toBe(2);
     expect(error.bytesRead).toBe(20);

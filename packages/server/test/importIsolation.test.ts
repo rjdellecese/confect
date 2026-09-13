@@ -13,10 +13,12 @@ layer(TestLayer)("import isolation", (it) => {
     Effect.gen(function* () {
       const path = yield* Path.Path;
       const fs = yield* FileSystem.FileSystem;
+
       const fixtureRoot = path.join(
         import.meta.dirname,
         "mock-backend/fixtures/confect/_generated/registeredFunctions/groups/notes.ts",
       );
+
       const contents = yield* fs.readFileString(fixtureRoot);
       expect(contents).toContain("groups/notes.impl");
       expect(contents).not.toContain("groups/random.impl");
@@ -30,10 +32,12 @@ layer(TestLayer)("import isolation", (it) => {
       Effect.gen(function* () {
         const path = yield* Path.Path;
         const fs = yield* FileSystem.FileSystem;
+
         const registry = path.join(
           import.meta.dirname,
           "mock-backend/fixtures/confect/_generated/registeredFunctions/groups/notes.ts",
         );
+
         const contents = yield* fs.readFileString(registry);
         // The DatabaseSchema value is imported (cheap: table schemas only).
         expect(contents).toContain('import databaseSchema from "../../schema"');

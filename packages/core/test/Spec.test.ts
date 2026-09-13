@@ -18,9 +18,11 @@ it("derives group types from the payload and replaces an existing group immutabl
   const original = GroupSpec.makeAt("notes").addFunction(
     FunctionSpec.publicQuery({ name: "old", returns: () => Schema.String }),
   );
+
   const replacement = GroupSpec.makeAt("notes").addFunction(
     FunctionSpec.publicQuery({ name: "current", returns: () => Schema.Finite }),
   );
+
   const empty = Spec.make();
   const before = empty.add(original);
   const after = before.add(replacement);
@@ -37,24 +39,29 @@ it("derives group types from the payload and replaces an existing group immutabl
 
 it("replaces an addAt binding without changing the source group or forcing its schemas", () => {
   let evaluated = 0;
+
   const original = GroupSpec.make().addFunction(
     FunctionSpec.publicQuery({
       name: "old",
       returns: () => {
         evaluated++;
+
         return Schema.String;
       },
     }),
   );
+
   const replacement = GroupSpec.makeNode().addFunction(
     FunctionSpec.publicNodeAction({
       name: "current",
       returns: () => {
         evaluated++;
+
         return Schema.Finite;
       },
     }),
   );
+
   const before = Spec.make().addAt("service", original);
   const after = before.addAt("service", replacement);
   expect(evaluated).toBe(0);
@@ -92,7 +99,9 @@ it("infers refs from addAt-assembled spec", () => {
     .addAt("groups", GroupSpec.makeAt("groups").addGroupAt("notes", notes));
 
   type SpecGroups = Spec.Groups<typeof _spec>;
+
   type TopLevelNames = GroupSpec.Name<SpecGroups>;
+
   type PublicRefs = Refs.Refs<typeof _spec>;
 
   expectTypeOf<TopLevelNames>().toEqualTypeOf<"databaseReader" | "groups">();
@@ -130,6 +139,7 @@ it("places a Node group alongside Convex groups, with no `node` namespace", () =
   expect("node" in refs.public).toBe(false);
 
   type PublicRefs = Refs.Refs<typeof spec, RefMod.AnyPublic>;
+
   expectTypeOf<keyof PublicRefs>().toEqualTypeOf<"notes" | "email">();
   expectTypeOf<PublicRefs["email"]["send"]>().toExtend<RefMod.AnyAction>();
 });

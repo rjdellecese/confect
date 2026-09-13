@@ -6,6 +6,7 @@ import * as Pipeable from "effect/Pipeable";
 import * as Predicate from "effect/Predicate";
 
 const TypeId = "~@confect/react/PaginatedQueryResult";
+
 type TypeId = typeof TypeId;
 
 /**
@@ -131,11 +132,8 @@ export const isPaginatedQueryResult = (
 
 const PaginatedQueryResultProto = {
   [TypeId]: TypeId,
-  pipe(this: Variants<any, any>, ...args: ReadonlyArray<unknown>) {
-    return Pipeable.pipeArguments(
-      this,
-      args as unknown as Parameters<typeof Pipeable.pipeArguments>[1],
-    );
+  pipe() {
+    return Pipeable.pipeArguments(this, arguments);
   },
   /**
    * `CanLoadMore`'s `loadMore` is excluded from equality and hashing, like
@@ -146,10 +144,11 @@ const PaginatedQueryResultProto = {
     if (this._tag !== that._tag) {
       return false;
     }
+
     return Match.value(this).pipe(
       Match.tag(
         "LoadingFirstPage",
-        (self) => self.skipped === (that as LoadingFirstPage<any, any>).skipped,
+        (self) => isLoadingFirstPage(that) && self.skipped === that.skipped,
       ),
       Match.tag("LoadingMore", "CanLoadMore", "Exhausted", (self) =>
         Equal.equals(self.results, that.results),
@@ -157,14 +156,16 @@ const PaginatedQueryResultProto = {
       Match.tag(
         "Failure",
         (self) =>
-          Equal.equals(self.error, (that as Failure<any, any>).error) &&
-          Equal.equals(self.results, (that as Failure<any, any>).results),
+          isFailure(that) &&
+          Equal.equals(self.error, that.error) &&
+          Equal.equals(self.results, that.results),
       ),
       Match.exhaustive,
     );
   },
   [Hash.symbol](this: Variants<any, any>): number {
     const tagHash = Hash.string(this._tag);
+
     return Match.value(this).pipe(
       Match.tag("LoadingFirstPage", (self) =>
         Hash.combine(tagHash)(Hash.hash(self.skipped)),
@@ -235,28 +236,29 @@ export const failure = <E, Item = never>(options: {
 
 export const isLoadingFirstPage = <Item, E>(
   result: Variants<Item, E>,
-): result is LoadingFirstPage<Item, E> => result._tag === "LoadingFirstPage";
+): result is LoadingFirstPage<Item, E> =>
+  Predicate.isTagged(result, "LoadingFirstPage");
 
 export const isLoadingMore = <Item, E>(
   result: Variants<Item, E>,
-): result is LoadingMore<Item, E> => result._tag === "LoadingMore";
+): result is LoadingMore<Item, E> => Predicate.isTagged(result, "LoadingMore");
 
 export const isCanLoadMore = <Item, E>(
   result: Variants<Item, E>,
-): result is CanLoadMore<Item, E> => result._tag === "CanLoadMore";
+): result is CanLoadMore<Item, E> => Predicate.isTagged(result, "CanLoadMore");
 
 export const isExhausted = <Item, E>(
   result: Variants<Item, E>,
-): result is Exhausted<Item, E> => result._tag === "Exhausted";
+): result is Exhausted<Item, E> => Predicate.isTagged(result, "Exhausted");
 
 export const isFailure = <Item, E>(
   result: Variants<Item, E>,
-): result is Failure<Item, E> => result._tag === "Failure";
+): result is Failure<Item, E> => Predicate.isTagged(result, "Failure");
 
 export const isLoading = <Item, E>(
   result: Variants<Item, E>,
 ): result is LoadingFirstPage<Item, E> | LoadingMore<Item, E> =>
-  result._tag === "LoadingFirstPage" || result._tag === "LoadingMore";
+  isLoadingFirstPage(result) || isLoadingMore(result);
 
 type MatchOptions<Item, E, V, W, X, Y, Z> = {
   readonly onLoadingFirstPage: (skipped: boolean) => V;
@@ -295,6 +297,7 @@ export const match: {
     self: Variants<Item, E>,
     options: MatchOptions<Item, E, V, W, X, Y, Z>,
   ): MatchReturns<E, V, W, X, Y, Z> =>
+    // SAFETY: Z is returned only by onFailure, which is absent when E is never; TypeScript cannot reduce the generic conditional return type.
     Match.value(self).pipe(
       Match.tag("LoadingFirstPage", (loadingFirstPage_) =>
         options.onLoadingFirstPage(loadingFirstPage_.skipped),
@@ -312,6 +315,7 @@ export const match: {
         if (Predicate.hasProperty(options, "onFailure")) {
           return options.onFailure(failure_.error, failure_.results);
         }
+
         throw new Error(
           "`onFailure` is required when error schema is provided",
         );
