@@ -670,7 +670,7 @@ Merges, filters and maps, flat-maps (their inner streams included), `distinct`, 
 
 ## Paginating a stream
 
-`QueryStream.paginate` returns an effect producing one page of a composed stream. Pass the handler's `paginationOpts` as in the [first example](#a-first-query); the options follow Convex's pagination protocol with the semantics of [`convex-helpers`' stream pagination](https://stack.convex.dev/merging-streams-of-convex-data).
+`QueryStream.paginate` returns an effect producing one page of a composed stream. Pass the handler's `paginationOpts` as in the [first example](#a-first-query); the options follow Convex's pagination protocol, with key-based page boundaries and read budgets as described below.
 
 ### Options
 
