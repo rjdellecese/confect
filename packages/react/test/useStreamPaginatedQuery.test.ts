@@ -53,9 +53,9 @@ const listOrFail = Ref.make(
 );
 
 /**
- * The mock serves each subscribed page from `responses`, keyed by the
- * page's `paginationOpts`—so tests observe exactly which page ranges the
- * hook subscribes, and control when each loads.
+ * The mock serves each subscribed page from `responses`, keyed by the page's
+ * `paginationOpts`—so tests observe exactly which page ranges the hook
+ * subscribes, and control when each loads.
  */
 const responses = MutableRef.make(new Map<string, unknown>());
 
@@ -73,8 +73,8 @@ const subscribedOpts = () =>
 
 /**
  * Snapshot `result.current` without TypeScript carrying narrowing from an
- * earlier `assert` across an `act`/`rerender` (the property access itself
- * stays narrowed otherwise).
+ * earlier `assert` across an `act`/`rerender` (the property access itself stays
+ * narrowed otherwise).
  */
 const current = <A>(result: { readonly current: A }): A => result.current;
 
@@ -95,8 +95,8 @@ beforeEach(() => {
 });
 
 /**
- * Respond to the initial growing page and its pinned twin so the hook
- * settles at one pinned first page (the state every loaded page reaches).
+ * Respond to the initial growing page and its pinned twin so the hook settles
+ * at one pinned first page (the state every loaded page reaches).
  */
 const respondFirstPage = (result: object) => {
   respond({ numItems: 2, cursor: null }, result);

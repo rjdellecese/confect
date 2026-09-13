@@ -6,10 +6,10 @@ import * as FoldkitCommand from "foldkit/command";
 import * as Client from "./Client";
 
 /**
- * Everything a Command against `Ref_` can fail with before it is folded into
- * an `onError` Message: the ref's typed error (if it declares an `error`
- * schema), a transport-level `WebSocketClientError`, or a `SchemaError` from
- * encoding args or decoding returns.
+ * Everything a Command against `Ref_` can fail with before it is folded into an
+ * `onError` Message: the ref's typed error (if it declares an `error` schema),
+ * a transport-level `WebSocketClientError`, or a `SchemaError` from encoding
+ * args or decoding returns.
  */
 export type Error<Ref_ extends Ref.AnyConfect> =
   | Ref.Error<Ref_>
@@ -17,9 +17,10 @@ export type Error<Ref_ extends Ref.AnyConfect> =
   | Schema.SchemaError;
 
 /**
- * Maps a Confect function's outcome into the app's Messages. Every failure—the ref's typed error, a transport error, or a codec error—arrives via
- * `onError`, so the resulting Command's error channel is `never`, as Foldkit
- * requires. Follow Foldkit's naming convention: past-tense facts like
+ * Maps a Confect function's outcome into the app's Messages. Every failure—the
+ * ref's typed error, a transport error, or a codec error—arrives via `onError`,
+ * so the resulting Command's error channel is `never`, as Foldkit requires.
+ * Follow Foldkit's naming convention: past-tense facts like
  * `SucceededSaveNote`/`FailedSaveNote`.
  */
 export interface Handlers<
@@ -49,13 +50,13 @@ type SchemaArgs<Ref_ extends Ref.AnyConfect> = Schema.Schema.Type<
 >;
 
 /**
- * A Foldkit Command definition whose args are the ref's args: our
- * ref-derived call signature (args optional when the ref declares none)
- * intersected with Foldkit's own `CommandDefinitionWithArgs`, which supplies
- * the `CommandDefinitionTypeId` brand and makes the definition assignable
- * wherever Foldkit accepts one—including Story/Scene `Command.resolve`
- * and `expectExact` matchers. Call it from `update` to construct a Command
- * instance; nothing runs until the Foldkit runtime executes it.
+ * A Foldkit Command definition whose args are the ref's args: our ref-derived
+ * call signature (args optional when the ref declares none) intersected with
+ * Foldkit's own `CommandDefinitionWithArgs`, which supplies the
+ * `CommandDefinitionTypeId` brand and makes the definition assignable wherever
+ * Foldkit accepts one—including Story/Scene `Command.resolve` and `expectExact`
+ * matchers. Call it from `update` to construct a Command instance; nothing runs
+ * until the Foldkit runtime executes it.
  */
 export type Definition<
   Name extends string,
@@ -76,8 +77,8 @@ export type Definition<
  * invocations can be targeted independently.
  *
  * Interrupting stops the client-side Effect and guarantees the invocation's
- * result Messages never dispatch—it does not cancel the Convex function on
- * the server, which runs to completion once the call is on the wire.
+ * result Messages never dispatch—it does not cancel the Convex function on the
+ * server, which runs to completion once the call is on the wire.
  */
 export type InterruptOption<
   Ref_ extends Ref.AnyConfect,
@@ -97,8 +98,8 @@ export type KeyedInterrupt<
 /**
  * An interruptible Command definition whose key is the Command name—the
  * ref-derived call signature intersected with Foldkit's
- * `Interruptible.DefinitionWithArgsNameKeyed`, which supplies the brand and
- * the `Interrupt` constructor.
+ * `Interruptible.DefinitionWithArgsNameKeyed`, which supplies the brand and the
+ * `Interrupt` constructor.
  */
 export type InterruptibleDefinition<
   Name extends string,
@@ -149,8 +150,8 @@ const run = <Ref_ extends Ref.AnyConfect, SuccessMessage, ErrorMessage>(
 
 /**
  * An execute body for a hand-written `Command.define`—every failure already
- * folded into a Message. Reach for these when the factory below doesn't fit:
- * a custom args schema, `interrupt`, or a Command that makes several calls.
+ * folded into a Message. Reach for these when the factory below doesn't fit: a
+ * custom args schema, `interrupt`, or a Command that makes several calls.
  */
 export const queryEffect =
   <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
@@ -411,22 +412,26 @@ const makeFactory = <BoundRef extends Ref.AnyConfect>(
  *   messages: [SucceededGetNote, FailedGetNote],
  *   onSuccess: (note) => SucceededGetNote({ note }),
  *   onError: (error) => FailedGetNote({ message: String(error) }),
- * })
+ * });
  * // In update:
  * // [model, [FetchNote({ noteId })]]
  * ```
  *
  * Pass `interrupt` to make invocations interruptible via the returned
- * definition's `Interrupt` constructor—`true` keys them by the Command
- * name, `{ keyFields, toKey }` by a part derived from the ref's args:
+ * definition's `Interrupt` constructor—`true` keys them by the Command name, `{
+ * keyFields, toKey }` by a part derived from the ref's args:
  *
  * ```ts
- * const SaveDraft = Command.mutation("SaveDraft", refs.public.notes.insert, {
- *   messages: [SucceededSaveDraft, FailedSaveDraft],
- *   onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
- *   onError: (error) => FailedSaveDraft({ message: String(error) }),
- *   interrupt: true,
- * })
+ * const SaveDraft = Command.mutation(
+ *   "SaveDraft",
+ *   refs.public.notes.insert,
+ *   {
+ *     messages: [SucceededSaveDraft, FailedSaveDraft],
+ *     onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
+ *     onError: (error) => FailedSaveDraft({ message: String(error) }),
+ *     interrupt: true,
+ *   },
+ * );
  * // In update:
  * // [model, [SaveDraft.Interrupt((outcome) => CompletedCancelSaveDraft({ outcome }))]]
  * ```
@@ -443,8 +448,8 @@ export const mutation: ReturnType<
 > = makeFactory(mutationEffect);
 
 /**
- * A Foldkit Command definition for a Confect action whose Command args are
- * the ref's args. See `query`.
+ * A Foldkit Command definition for a Confect action whose Command args are the
+ * ref's args. See `query`.
  */
 export const action: ReturnType<
   typeof makeFactory<Ref.AnyConfectPublicAction>

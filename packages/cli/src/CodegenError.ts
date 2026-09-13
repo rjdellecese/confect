@@ -365,8 +365,8 @@ const renderParentChildNameCollisionError = (
 /**
  * Render any {@link CodegenError} into a styled, ready-to-print string.
  * Single-error variants render to a one-line `✘`-prefixed message;
- * `BundleFailedError` (the only multi-error variant) renders to a header
- * plus an esbuild diagnostic block.
+ * `BundleFailedError` (the only multi-error variant) renders to a header plus
+ * an esbuild diagnostic block.
  */
 export const renderCodegenError = (error: CodegenError): string => {
   if (isBuildError(error)) return renderBuildError(error);

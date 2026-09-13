@@ -40,22 +40,22 @@ export type Services =
   | StorageActionWriter;
 
 /**
- * A layer that registers routes on the HTTP router—the input to
- * {@link make}.
+ * A layer that registers routes on the HTTP router—the input to {@link make}.
  *
- * Compose it from Effect's `effect/unstable/http` and
- * `effect/unstable/httpapi` modules: `HttpApiBuilder.layer(api)` registers an
- * `HttpApi`'s endpoints (provide its group handler layers with
- * `Layer.provide`), `HttpApiScalar.layer(api, ...)` serves interactive API
- * docs, `HttpRouter.add` registers a plain route, and
- * `HttpRouter.middleware(fn, { global: true })` applies middleware to every
- * route. Merge any number of these with `Layer.mergeAll`.
+ * Compose it from Effect's `effect/unstable/http` and `effect/unstable/httpapi`
+ * modules: `HttpApiBuilder.layer(api)` registers an `HttpApi`'s endpoints
+ * (provide its group handler layers with `Layer.provide`),
+ * `HttpApiScalar.layer(api, ...)` serves interactive API docs, `HttpRouter.add`
+ * registers a plain route, and `HttpRouter.middleware(fn, { global: true })`
+ * applies middleware to every route. Merge any number of these with
+ * `Layer.mergeAll`.
  *
- * Route handlers and middleware may require any of the Confect
- * {@link Services}, which surface as request-level `Requires` markers and are
- * supplied per request. Anything else the layer requires is a type error—notably, an `HttpApiBuilder.layer(api)` whose group handler layers are not
- * provided leaves an `HttpApiGroup.ToService` requirement behind, so a missing
- * handler group is caught at compile time.
+ * Route handlers and middleware may require any of the Confect {@link Services},
+ * which surface as request-level `Requires` markers and are supplied per
+ * request. Anything else the layer requires is a type error—notably, an
+ * `HttpApiBuilder.layer(api)` whose group handler layers are not provided
+ * leaves an `HttpApiGroup.ToService` requirement behind, so a missing handler
+ * group is caught at compile time.
  *
  * Layers are built with Confect's Convex-aware `ConfigProvider` in context, so
  * `Config` reads (e.g. in `Layer.unwrap`) resolve against Convex environment
@@ -78,15 +78,14 @@ export type Routes = Layer.Layer<
 /**
  * Create a Convex HTTP router serving the given routes.
  *
- * A single catch-all `httpAction` is registered for every routable method
- * under the path prefix `"/"`, making the Effect router the single source of
- * truth for paths: place an API with `HttpApi.prefix` or absolute route
- * paths. Requests that match no route receive the Effect router's 404
- * response.
+ * A single catch-all `httpAction` is registered for every routable method under
+ * the path prefix `"/"`, making the Effect router the single source of truth
+ * for paths: place an API with `HttpApi.prefix` or absolute route paths.
+ * Requests that match no route receive the Effect router's 404 response.
  *
- * Plain Convex routes can still be added to the returned router—Convex
- * matches exact paths first and longer path prefixes before the catch-all, so
- * they take precedence.
+ * Plain Convex routes can still be added to the returned router—Convex matches
+ * exact paths first and longer path prefixes before the catch-all, so they take
+ * precedence.
  */
 export const make = (routes: Routes): ConvexHttpRouter => {
   applyMonkeyPatches();

@@ -21,11 +21,10 @@ import { setNestedProperty } from "./internal/utils";
 
 /**
  * Marker service produced by providing a middleware's implementation to a
- * group's impl layer. `GroupImpl.make` requires one per middleware attached
- * to the group's spec (via {@link FromGroupSpec}), so `GroupImpl.finalize`'s
- * `RIn = never` bound rejects a group that attaches a middleware but never
- * provides its implementation—the exact mechanism used for
- * `FunctionImpl`s.
+ * group's impl layer. `GroupImpl.make` requires one per middleware attached to
+ * the group's spec (via {@link FromGroupSpec}), so `GroupImpl.finalize`'s `RIn =
+ * never` bound rejects a group that attaches a middleware but never provides
+ * its implementation—the exact mechanism used for `FunctionImpl`s.
  */
 export interface MiddlewareImpl<MiddlewareKey extends string> {
   readonly middlewareKey: MiddlewareKey;
@@ -64,8 +63,9 @@ export type FunctionTypeServices<
 /**
  * The services a single middleware implementation may use: the set-theoretic
  * intersection of the ctx-service unions of the middleware's declared
- * `functionTypes`, so one implementation is valid in every runtime it can be invoked
- * in. Enumerated by hand rather than derived with `Exclude`/`Extract`—several ctx services are structurally typed (e.g. the raw
+ * `functionTypes`, so one implementation is valid in every runtime it can be
+ * invoked in. Enumerated by hand rather than derived with
+ * `Exclude`/`Extract`—several ctx services are structurally typed (e.g. the raw
  * `GenericQueryCtx`/`GenericMutationCtx` tags), so conditional-type set
  * arithmetic over them is not reliable.
  */
@@ -135,13 +135,14 @@ const layerFromImpls = <
   );
 
 /**
- * Provide a middleware's implementation with a single strategy shared by
- * every function type the middleware declares. The implementation's environment is
+ * Provide a middleware's implementation with a single strategy shared by every
+ * function type the middleware declares. The implementation's environment is
  * bounded by {@link CommonServices}—the intersection of the declared
  * functionTypes' ctx services—plus the middleware's declared `requires`, which
  * middleware running earlier in the chain provide. Reach for
- * {@link makeByFunctionType} when one strategy can't fit all declared functionTypes (the
- * usual case for database-touching middleware attached to actions).
+ * {@link makeByFunctionType} when one strategy can't fit all declared
+ * functionTypes (the usual case for database-touching middleware attached to
+ * actions).
  *
  * Like `FunctionImpl.make`, `databaseSchema` is a type-level carrier only.
  */
@@ -175,11 +176,11 @@ export const make = <
   );
 
 /**
- * Provide a middleware's implementation with one strategy per declared function type.
- * Each entry may use that function type's full ctx-service union—the recommended
- * shape for database-touching middleware that also covers actions: use
- * `DatabaseReader`/`DatabaseWriter` in queries and mutations, and `runQuery`
- * of an internal query in actions.
+ * Provide a middleware's implementation with one strategy per declared function
+ * type. Each entry may use that function type's full ctx-service union—the
+ * recommended shape for database-touching middleware that also covers actions:
+ * use `DatabaseReader`/`DatabaseWriter` in queries and mutations, and
+ * `runQuery` of an internal query in actions.
  */
 export const makeByFunctionType = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -205,11 +206,10 @@ export const makeByFunctionType = <
   );
 
 /**
- * Sugar over {@link make} for the flagship "run something, provide a
- * service" shape: run `effect` before the rest of the chain and provide its
- * result under `tag` (the runtime tag for the middleware's type-level
- * `provides` service, passed explicitly since the spec class only knows it
- * at the type level).
+ * Sugar over {@link make} for the flagship "run something, provide a service"
+ * shape: run `effect` before the rest of the chain and provide its result under
+ * `tag` (the runtime tag for the middleware's type-level `provides` service,
+ * passed explicitly since the spec class only knows it at the type level).
  */
 export const provides = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

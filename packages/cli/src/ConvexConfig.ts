@@ -30,9 +30,9 @@ export interface InstalledComponent {
    * The directory the component's definition lives in, mirroring the Convex
    * runtime's convention (a `componentDefinitionPath` identifies the
    * definition's directory): the import specifier minus its trailing
-   * `convex.config` segment when it was bare (e.g. `@convex-dev/workpool`),
-   * or the resolved absolute directory when it was relative (a
-   * locally-defined component).
+   * `convex.config` segment when it was bare (e.g. `@convex-dev/workpool`), or
+   * the resolved absolute directory when it was relative (a locally-defined
+   * component).
    */
   readonly componentDefinitionPath: string;
 }
@@ -40,9 +40,9 @@ export interface InstalledComponent {
 const COMPONENT_CONFIG_NAMESPACE = "confect-component-config";
 
 /**
- * Matches the trailing `convex.config` segment of a component-definition
- * import (with or without an extension), e.g.
- * `@convex-dev/workpool/convex.config` or `./waitlist/convex.config.ts`.
+ * Matches the trailing `convex.config` segment of a component-definition import
+ * (with or without an extension), e.g. `@convex-dev/workpool/convex.config` or
+ * `./waitlist/convex.config.ts`.
  */
 const CONVEX_CONFIG_SUFFIX = /[/\\]convex\.config(\.[cm]?[jt]s)?$/;
 
@@ -169,11 +169,11 @@ const byName = Order.mapInput(
 
 /**
  * Convex component names must be alphanumeric plus underscores (see
- * `defineComponent`'s docs). Beyond rejecting genuinely invalid names, this
- * is a drift tripwire: if a future convex version stopped resolving names
- * the way we rely on (e.g. `defaultName` disappearing), the fallback name
- * would be a path segment like `convex.config`—caught here as a clear
- * error instead of silently emitting a broken registry.
+ * `defineComponent`'s docs). Beyond rejecting genuinely invalid names, this is
+ * a drift tripwire: if a future convex version stopped resolving names the way
+ * we rely on (e.g. `defaultName` disappearing), the fallback name would be a
+ * path segment like `convex.config`—caught here as a clear error instead of
+ * silently emitting a broken registry.
  */
 const VALID_COMPONENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 

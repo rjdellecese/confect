@@ -22,12 +22,11 @@ import { ConvexDirectory } from "./ConvexDirectory";
 import * as templates from "./templates";
 
 /**
- * Tracks whether the current codegen run wrote anything to disk. Set to
- * `true` by every helper that actually overwrites a file (skipping the
- * content-unchanged case). `codegenHandler` provides a fresh `Ref` per
- * run and reads it back to report `anyWritesHappened`; callers outside a
- * codegen pass hit the cached default `Ref` and need not interact with
- * the tracker.
+ * Tracks whether the current codegen run wrote anything to disk. Set to `true`
+ * by every helper that actually overwrites a file (skipping the
+ * content-unchanged case). `codegenHandler` provides a fresh `Ref` per run and
+ * reads it back to report `anyWritesHappened`; callers outside a codegen pass
+ * hit the cached default `Ref` and need not interact with the tracker.
  */
 export const WriteTracker = Context.Reference<Ref.Ref<boolean>>(
   "@confect/cli/WriteTracker",
@@ -50,7 +49,10 @@ export const removePathExtension = Effect.fnUntraced(function* (
 export const toPosixPath = (path: Path.Path, pathStr: string): string =>
   pipe(String.split(pathStr, path.sep), Array.join("/"));
 
-/** Ensures a relative path is a valid ESM/TS module specifier (e.g. `spec` → `./spec`). */
+/**
+ * Ensures a relative path is a valid ESM/TS module specifier (e.g. `spec` →
+ * `./spec`).
+ */
 export const toModuleImportPath = Effect.fnUntraced(function* (
   relativePath: string,
 ) {
@@ -144,9 +146,9 @@ export const removePathIfExists = Effect.fnUntraced(function* (
 /**
  * Bump the mtime of `convex/schema.ts` so the Convex CLI's chokidar watcher
  * emits a `change` event after every successful Confect codegen run. Without
- * this, a codegen that doesn't change any file content (for example,
- * recovering from a transient broken state in `confect/`) leaves Convex
- * stuck on its previous error because nothing it observes has changed.
+ * this, a codegen that doesn't change any file content (for example, recovering
+ * from a transient broken state in `confect/`) leaves Convex stuck on its
+ * previous error because nothing it observes has changed.
  */
 export const touchConvexSchema = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -221,10 +223,10 @@ const generateGroupModuleEffect = Effect.fnUntraced(function* ({
 /**
  * Compute the module import specifier (relative to `modulePath`) for a group's
  * registry file under `confect/_generated/registeredFunctions/`. The registry
- * path mirrors the group's path one-to-one (see `registeredFunctionsRelativePath`
- * in `LeafModule.ts`) for both Convex and Node groups. Centralizing this here
- * keeps the "overlapping" and "new" group branches of `generateFunctions` from
- * drifting apart.
+ * path mirrors the group's path one-to-one (see
+ * `registeredFunctionsRelativePath` in `LeafModule.ts`) for both Convex and
+ * Node groups. Centralizing this here keeps the "overlapping" and "new" group
+ * branches of `generateFunctions` from drifting apart.
  */
 const registeredFunctionsImportPathForGroup = Effect.fnUntraced(function* (
   groupPath: GroupPath.GroupPath,

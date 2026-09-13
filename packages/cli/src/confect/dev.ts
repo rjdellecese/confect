@@ -277,10 +277,9 @@ const logChangedWatcherMessages = Effect.fnUntraced(function* (
 
 /**
  * Block until the signal queue has been quiet for `quiescence`. esbuild
- * watchers' `onEnd` events for a single user edit can be spread across
- * hundreds of milliseconds, so a fixed window misses late arrivals.
- * Bounded by `maxWait` so pathological signal floods can't pin the
- * loop forever.
+ * watchers' `onEnd` events for a single user edit can be spread across hundreds
+ * of milliseconds, so a fixed window misses late arrivals. Bounded by `maxWait`
+ * so pathological signal floods can't pin the loop forever.
  */
 const drainUntilQuiescent = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
@@ -404,10 +403,10 @@ interface EntryPoint {
 }
 
 /**
- * Every file whose import graph codegen should react to. Each one becomes
- * its own scoped esbuild watcher; the union of their watches gives us
- * dependency-aware tracking of anything reachable from `confect/`,
- * including files outside `confect/`.
+ * Every file whose import graph codegen should react to. Each one becomes its
+ * own scoped esbuild watcher; the union of their watches gives us
+ * dependency-aware tracking of anything reachable from `confect/`, including
+ * files outside `confect/`.
  */
 const discoverEntryPoints = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -598,9 +597,9 @@ const createEntryPointWatcher = (
 /**
  * Holds one scoped esbuild watcher per entry point and reconciles the set
  * whenever something offers to `restartQueue`. Adding or removing an entry
- * point only spawns/disposes the affected watcher; unchanged entries keep
- * their existing context, so a structural change doesn't churn watchers
- * for unrelated files.
+ * point only spawns/disposes the affected watcher; unchanged entries keep their
+ * existing context, so a structural change doesn't churn watchers for unrelated
+ * files.
  */
 const entryPointsWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
@@ -682,11 +681,10 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
 });
 
 /**
- * Single recursive `fs.watch` on `confect/`. Flips the matching dirty flag
- * for any change to an entry-point-shaped file (so codegen runs without
- * waiting on a newly spawned esbuild watcher), and offers to
- * `restartQueue` when an entry point is created or removed so the watcher
- * manager picks up the new set.
+ * Single recursive `fs.watch` on `confect/`. Flips the matching dirty flag for
+ * any change to an entry-point-shaped file (so codegen runs without waiting on
+ * a newly spawned esbuild watcher), and offers to `restartQueue` when an entry
+ * point is created or removed so the watcher manager picks up the new set.
  */
 const confectStructureWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
@@ -714,11 +712,11 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
 
 /**
  * Non-recursive `fs.watch` on the convex directory, reacting only to
- * `convex.config.ts`. Recursion is deliberately avoided: codegen (Confect's
- * and Convex's) writes into `convex/` and `convex/_generated/` constantly,
- * and reacting to those writes would loop. Create/Remove offers to
- * `restartQueue` so the entry-point watcher set picks up (or drops) the
- * config's esbuild watcher.
+ * `convex.config.ts`. Recursion is deliberately avoided: codegen (Confect's and
+ * Convex's) writes into `convex/` and `convex/_generated/` constantly, and
+ * reacting to those writes would loop. Create/Remove offers to `restartQueue`
+ * so the entry-point watcher set picks up (or drops) the config's esbuild
+ * watcher.
  */
 const convexConfigStructureWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,

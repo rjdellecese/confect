@@ -31,11 +31,11 @@ export interface GroupImpl<
    */
   readonly registeredFunctionNames: ReadonlyArray<string>;
   /**
-   * Keys of every middleware whose implementation registered into this
-   * group's layer scope via `MiddlewareImpl.make` (and friends). Same
-   * authoritativeness caveat as `registeredFunctionNames`. Lets consumers
-   * (the CLI's `validateImpl`) verify middleware-impl completeness against a
-   * `GroupSpec`'s attached middleware without inspecting the `Registry`.
+   * Keys of every middleware whose implementation registered into this group's
+   * layer scope via `MiddlewareImpl.make` (and friends). Same authoritativeness
+   * caveat as `registeredFunctionNames`. Lets consumers (the CLI's
+   * `validateImpl`) verify middleware-impl completeness against a `GroupSpec`'s
+   * attached middleware without inspecting the `Registry`.
    */
   readonly registeredMiddlewareKeys: ReadonlyArray<string>;
 }
@@ -62,8 +62,9 @@ export const isUnfinalizedGroupImpl = (u: unknown): u is AnyUnfinalized =>
  * the typed `Finalized` service directly rather than scanning the context.
  *
  * The tag is keyed only by finalization status—no group path—because each
- * group's impl layer is built in its own isolated scope (`buildForGroup`/`validateImpl` each provide a fresh `Registry`), so at most one `GroupImpl`
- * service of each status exists per build.
+ * group's impl layer is built in its own isolated scope
+ * (`buildForGroup`/`validateImpl` each provide a fresh `Registry`), so at most
+ * one `GroupImpl` service of each status exists per build.
  */
 export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({
   finalizationStatus,
@@ -118,15 +119,15 @@ const findUnfinalizedGroupImpl = <S>(
 /**
  * Mark a `GroupImpl` layer as fully implemented. The parameter type defaults
  * `RIn = never`, so passing a layer that still requires any `FunctionImpl`
- * service produces a type error at the impl author's site. The codegen
- * boundary requires the resulting `"Finalized"` brand, so omitting this call
- * is also rejected downstream.
+ * service produces a type error at the impl author's site. The codegen boundary
+ * requires the resulting `"Finalized"` brand, so omitting this call is also
+ * rejected downstream.
  *
  * As a side effect of finalization, the names of every `FunctionImpl` that
- * registered into this group's scope are snapshotted onto the produced
- * service value's `registeredFunctionNames` field, so consumers can verify
- * impl completeness against a `GroupSpec`'s expected functions without
- * having to inspect the `Registry` themselves.
+ * registered into this group's scope are snapshotted onto the produced service
+ * value's `registeredFunctionNames` field, so consumers can verify impl
+ * completeness against a `GroupSpec`'s expected functions without having to
+ * inspect the `Registry` themselves.
  */
 export const finalize = (
   group: Layer.Layer<GroupImpl<"Unfinalized">>,

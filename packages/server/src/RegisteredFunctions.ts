@@ -27,7 +27,9 @@ type RegisteredFunctionsHelper<Groups extends GroupSpec.AnyWithProps> = {
     : never;
 };
 
-/** The `RegisteredFunction` record for a group's own declared functions. */
+/**
+ * The `RegisteredFunction` record for a group's own declared functions.
+ */
 type RegisteredFunctionsOf<Group extends GroupSpec.AnyWithProps> = {
   [
     FunctionName in FunctionSpec.Name<GroupSpec.Functions<Group>>

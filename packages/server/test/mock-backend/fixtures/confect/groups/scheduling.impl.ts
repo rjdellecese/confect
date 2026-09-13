@@ -1,9 +1,8 @@
 /**
- * Handlers run one effect per element so the fiber burns several multiples
- * of `MaxOpsBeforeYield` (2048) and is forced through cooperative scheduler
- * yields mid-handler. Convex bans `setTimeout` in queries and mutations, so
- * these functions only succeed if the scheduler never dispatches through
- * timer APIs.
+ * Handlers run one effect per element so the fiber burns several multiples of
+ * `MaxOpsBeforeYield` (2048) and is forced through cooperative scheduler yields
+ * mid-handler. Convex bans `setTimeout` in queries and mutations, so these
+ * functions only succeed if the scheduler never dispatches through timer APIs.
  */
 
 import { FunctionImpl, GroupImpl } from "@confect/server";

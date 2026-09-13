@@ -253,8 +253,8 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
  * when a parent leaf declares a function or subgroup whose name matches a
  * sibling subdirectory spec's segment. Without this check the colliding
  * descendant would overwrite the parent's entry in the assembled
- * `GroupSpec.groups` map at runtime, surfacing as a confusing
- * `Refs.make` error rather than a codegen-time diagnostic.
+ * `GroupSpec.groups` map at runtime, surfacing as a confusing `Refs.make` error
+ * rather than a codegen-time diagnostic.
  */
 export const validateNoParentChildNameCollisions = Effect.fnUntraced(function* (
   leaves: ReadonlyArray<LeafModule>,
@@ -325,11 +325,10 @@ const checkAssemblyNodeForCollisions = Effect.fnUntraced(function* (
 });
 
 /**
- * `LeafModule.specImportPath` is the import path used from inside the
- * generated `_generated/spec.ts` (e.g. `"../notes.spec"`). Strip the
- * `../` prefix and re-add the `.ts` extension to recover the leaf's
- * confect-relative spec path used as the key in
- * `groupSpecsByPosixRelativePath`.
+ * `LeafModule.specImportPath` is the import path used from inside the generated
+ * `_generated/spec.ts` (e.g. `"../notes.spec"`). Strip the `../` prefix and
+ * re-add the `.ts` extension to recover the leaf's confect-relative spec path
+ * used as the key in `groupSpecsByPosixRelativePath`.
  */
 const bindingToRelativeSpecPath = (importPath: string): string => {
   const withoutDotDot = importPath.startsWith("../")
@@ -339,10 +338,10 @@ const bindingToRelativeSpecPath = (importPath: string): string => {
 };
 
 /**
- * A child assembly node may itself be a parent without a leaf (when the
- * actual leaves live only in deeper subdirectories). In that case we
- * surface the first descendant leaf as a representative path so the
- * error message points at something the user actually wrote.
+ * A child assembly node may itself be a parent without a leaf (when the actual
+ * leaves live only in deeper subdirectories). In that case we surface the first
+ * descendant leaf as a representative path so the error message points at
+ * something the user actually wrote.
  */
 const childRepresentativeSpecPath = (node: SpecAssemblyNode): string => {
   if (Option.isSome(node.importBinding)) {
@@ -605,9 +604,10 @@ const generateFunctionModules = Effect.gen(function* () {
 /**
  * The user-authored `confect/schema.ts` is no longer supported: codegen now
  * owns both `_generated/schema.ts` (runtime) and `_generated/convexSchema.ts`
- * (deploy), derived from a single scan of `confect/tables/*.ts`. Detect a
- * stray file and fail with a clear migration message—leaving it in place
- * would silently shadow the codegen-owned `_generated/schema.ts`/`_generated/convexSchema.ts`.
+ * (deploy), derived from a single scan of `confect/tables/*.ts`. Detect a stray
+ * file and fail with a clear migration message—leaving it in place would
+ * silently shadow the codegen-owned
+ * `_generated/schema.ts`/`_generated/convexSchema.ts`.
  */
 const rejectLegacySchemaFile = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -624,9 +624,9 @@ const rejectLegacySchemaFile = Effect.gen(function* () {
  * Surface a yellow `⚠` warning when codegen sees no tables—either the
  * `confect/tables/` directory is missing or it contains no `.ts` files.
  * Generation still succeeds (emitting an empty `DatabaseSchema` and
- * `defineSchema({})`), since action-only/table-free Confect backends
- * are legal—but the warning catches the much more common case of a
- * typoed directory or files placed under the wrong root.
+ * `defineSchema({})`), since action-only/table-free Confect backends are
+ * legal—but the warning catches the much more common case of a typoed directory
+ * or files placed under the wrong root.
  */
 const warnIfNoTables = (
   tableModules: ReadonlyArray<TableModule.TableModule>,
@@ -724,9 +724,9 @@ const generateTableWrappers = Effect.fnUntraced(function* (
 });
 
 /**
- * Remove any stale `_generated/tables/*.ts` wrapper whose source table
- * has been deleted or renamed. Mirrors `removeObsoleteRegisteredFunctions`
- * for the wrapper directory.
+ * Remove any stale `_generated/tables/*.ts` wrapper whose source table has been
+ * deleted or renamed. Mirrors `removeObsoleteRegisteredFunctions` for the
+ * wrapper directory.
  */
 const removeObsoleteTableWrappers = Effect.fnUntraced(function* (
   tableModules: ReadonlyArray<TableModule.TableModule>,
@@ -915,9 +915,8 @@ const generateRefs = Effect.gen(function* () {
  * Generate `confect/_generated/components.ts`—the typed registry of Convex
  * components installed in `convex/convex.config.ts` (see
  * {@link templates.components}). The file is emitted even when there is no
- * `convex.config.ts` (as an empty registry) so the import surface stays
- * stable. It must exist before impl validation because impl modules may
- * import it.
+ * `convex.config.ts` (as an empty registry) so the import surface stays stable.
+ * It must exist before impl validation because impl modules may import it.
  */
 export const generateComponents = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;

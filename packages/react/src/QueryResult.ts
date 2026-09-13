@@ -11,7 +11,8 @@ type TypeId = typeof TypeId;
 /**
  * A `QueryResult` represents the result of a Confect query.
  *
- * @typeParam A - The type of the decoded `returns` value in the `Success` variant.
+ * @typeParam A - The type of the decoded `returns` value in the `Success`
+ *   variant.
  * @typeParam E - The type of the decoded typed error in the `Failure` variant.
  */
 export type QueryResult<A, E = never> =
@@ -140,12 +141,11 @@ type MatchReturns<E, X, Y, Z> = [E] extends [never] ? X | Y : X | Y | Z;
  * not required.
  *
  * @example
- * ```tsx
- * const result = QueryResult.match(queryResult, {
- *   onLoading: (skipped) => skipped ? null : <p>Loading…</p>,
- *   onSuccess: (value) => <p>{value.text}</p>,
- *   onFailure: (error) => <p>Error: {error.message}</p>,
- * });
+ *   const result = QueryResult.match(queryResult, {
+ *     onLoading: (skipped) => (skipped ? null : <p>Loading…</p>),
+ *     onSuccess: (value) => <p>{value.text}</p>,
+ *     onFailure: (error) => <p>Error: {error.message}</p>,
+ *   });
  */
 export const match: {
   <A, E, X, Y, Z = never>(

@@ -67,10 +67,9 @@ export const QueryStreamOrderKey = Schema.Array(KeyValue);
 export type QueryStreamOrderKey = typeof QueryStreamOrderKey.Type;
 
 /**
- * `Order` over Convex values, matching Convex's index ordering—a wrapper
- * around the canonical `compareValues` from `convex/values` (type rank
- * first, then within the type, including UTF-8 string order and NaN
- * bit-level ordering).
+ * `Order` over Convex values, matching Convex's index ordering—a wrapper around
+ * the canonical `compareValues` from `convex/values` (type rank first, then
+ * within the type, including UTF-8 string order and NaN bit-level ordering).
  *
  * @experimental
  */
@@ -79,7 +78,8 @@ export const ValueOrder: Order_.Order<KeyValue> = Order_.make(
 );
 
 /**
- * `Order` over order keys: lexicographic by `ValueOrder`, then by length—also the ordering of Convex array values.
+ * `Order` over order keys: lexicographic by `ValueOrder`, then by length—also
+ * the ordering of Convex array values.
  *
  * @experimental
  */

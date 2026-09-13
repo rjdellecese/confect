@@ -30,6 +30,7 @@ minimumReleaseAgeExclude:
   - effect@4.0.0-rc.115
   - foldkit@0.148.1
   - effect-oxlint@0.3.4
+  - eslint-plugin-jsdoc@64.3.10
 
 overrides:
   convex: 1.45.0

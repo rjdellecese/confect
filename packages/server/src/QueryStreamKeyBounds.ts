@@ -23,8 +23,8 @@ export interface KeyBound {
 }
 
 /**
- * Bounds over a stream's order key, in *ascending key space* (`narrow`
- * converts from stream space, where `desc` reverses which end is which).
+ * Bounds over a stream's order key, in _ascending key space_ (`narrow` converts
+ * from stream space, where `desc` reverses which end is which).
  *
  * @experimental
  */
@@ -34,9 +34,9 @@ export interface KeyBounds {
 }
 
 /**
- * Bounds in *full index-key space*: `eq`-pinned values appear as a shared
- * prefix of both keys (`splitRange` re-derives them as `eq` constraints).
- * An empty key bounds nothing.
+ * Bounds in _full index-key space_: `eq`-pinned values appear as a shared
+ * prefix of both keys (`splitRange` re-derives them as `eq` constraints). An
+ * empty key bounds nothing.
  *
  * @experimental
  */

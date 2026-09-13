@@ -29,8 +29,8 @@ export const isBuildError = (error: unknown): error is BuildError =>
 
 /**
  * Internal failure produced by the esbuild bundle/import pipeline. Always
- * remapped to a {@link BuildError} (which carries enough context for the CLI
- * to render it) before reaching a user-surface boundary.
+ * remapped to a {@link BuildError} (which carries enough context for the CLI to
+ * render it) before reaching a user-surface boundary.
  */
 export class BundlerError extends Schema.TaggedError<BundlerError>()(
   "BundlerError",

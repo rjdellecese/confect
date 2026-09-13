@@ -18,8 +18,8 @@ const FunctionRegistryItemProto = {
 };
 
 /**
- * A function registered by `FunctionImpl.make`, one of two shapes keyed by
- * the spec's provenance.
+ * A function registered by `FunctionImpl.make`, one of two shapes keyed by the
+ * spec's provenance.
  */
 export type AnyWithProps =
   | ConfectFunctionRegistryItem
