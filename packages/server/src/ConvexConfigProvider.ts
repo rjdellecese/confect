@@ -15,9 +15,9 @@ declare const process: { env: Record<string, string | undefined> };
  * trie over the environment to resolve and enumerate config paths) cannot be
  * used. This provider resolves each requested path to a single environment
  * variable, joining the path segments with `"_"` to match the key convention
- * `fromEnv` uses. As with the built-in providers, an empty string is treated
- * as a missing value, so `Config.withDefault` and `Config.option` recover
- * from it.
+ * `fromEnv` uses. As with the built-in providers, an empty string is treated as
+ * a missing value, so `Config.withDefault` and `Config.option` recover from
+ * it.
  */
 export const make = (): ConfigProvider.ConfigProvider =>
   ConfigProvider.make((path) => {

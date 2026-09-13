@@ -141,7 +141,9 @@ export type Name<FunctionSpec_ extends AnyWithProps> = FunctionSpec_["name"];
 export type MiddlewareSpecs<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_["middlewareSpecs"][number];
 
-/** The field map declared by a Confect-provenance spec. */
+/**
+ * The field map declared by a Confect-provenance spec.
+ */
 export type ArgsFields<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     readonly functionProvenance: {
@@ -157,7 +159,9 @@ export type ArgsFields<FunctionSpec_ extends AnyWithProps> =
       ? FunctionProvenance.ArgsFields
       : never;
 
-/** The args schema assembled from a Confect-provenance spec's field map. */
+/**
+ * The args schema assembled from a Confect-provenance spec's field map.
+ */
 export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     readonly functionProvenance: {
@@ -395,10 +399,10 @@ const make = <
 };
 
 /**
- * `Schema.Struct` fields that must not declare `paginationOpts`. Used to
- * reject a user args schema that redeclares the field the paginated
- * constructors add themselves; the check reports at the `args` thunk with an
- * unsatisfiable type when violated.
+ * `Schema.Struct` fields that must not declare `paginationOpts`. Used to reject
+ * a user args schema that redeclares the field the paginated constructors add
+ * themselves; the check reports at the `args` thunk with an unsatisfiable type
+ * when violated.
  */
 type ForbidPaginationOpts<
   UserArgsFields extends FunctionProvenance.ArgsFields,

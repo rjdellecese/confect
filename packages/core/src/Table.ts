@@ -417,6 +417,7 @@ export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
  * Extract all of the index field paths within a Convex `Validator`.
  *
  * This is used when declaring table indexes.
+ *
  * @public
  */
 type ExtractFieldPaths<T extends Validator<any, any, any>> =

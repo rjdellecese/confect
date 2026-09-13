@@ -27,8 +27,8 @@ export interface Bundled {
  * so the metafile's input keys (and each input's `imports[].path`) are stored
  * relative to that cwd. Callers reach for the metafile with absolute paths
  * (e.g. {@link directlyImports}), so we normalize every key/import path to
- * absolute up front. That way the lookup logic stays oblivious to whatever
- * cwd was used during bundling.
+ * absolute up front. That way the lookup logic stays oblivious to whatever cwd
+ * was used during bundling.
  *
  * `original` (the specifier as written, before resolution) is filled in from
  * `path` when esbuild omits it—esbuild only sets it when it differs from the
@@ -172,8 +172,8 @@ const captureBuildResultPlugin = (
  * itself only exposes a flat `dependencies: string[]`.
  *
  * `options.plugins` are registered ahead of every other plugin—including
- * `bundle-require`'s own `externalPlugin`—so a caller-supplied plugin can
- * claim resolutions (e.g. `convex.config` imports) before the workspace and
+ * `bundle-require`'s own `externalPlugin`—so a caller-supplied plugin can claim
+ * resolutions (e.g. `convex.config` imports) before the workspace and
  * externalization heuristics see them.
  */
 export const bundle = Effect.fn("Bundler.bundle")(function* (

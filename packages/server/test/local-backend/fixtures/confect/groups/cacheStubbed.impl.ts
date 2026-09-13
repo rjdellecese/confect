@@ -1,10 +1,10 @@
 /**
- * Handlers return `Random.next` as a per-execution witness: the test
- * compares two consecutive query results to detect whether the cache evicted
- * (different values) or held (same value). The live Random service delegates
- * to `Math.random`, which flips
- * `observed_rng_during_execution` but that flag is not checked by
- * `MAX_CACHE_AGE` eviction, so it does not perturb the behavior under test.
+ * Handlers return `Random.next` as a per-execution witness: the test compares
+ * two consecutive query results to detect whether the cache evicted (different
+ * values) or held (same value). The live Random service delegates to
+ * `Math.random`, which flips `observed_rng_during_execution` but that flag is
+ * not checked by `MAX_CACHE_AGE` eviction, so it does not perturb the behavior
+ * under test.
  */
 
 import { FunctionImpl, GroupImpl } from "@confect/server";

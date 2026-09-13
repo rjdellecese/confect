@@ -115,8 +115,8 @@ export type PaginatedQueryArgs<Query extends Ref.AnyPublicPaginatedQuery> =
     : never;
 
 /**
- * The item type for a paginated query: the element type of the `page` field
- * of the ref's returns.
+ * The item type for a paginated query: the element type of the `page` field of
+ * the ref's returns.
  */
 export type PaginatedQueryItem<Query extends Ref.AnyPublicPaginatedQuery> =
   Ref.Returns<Query>["page"][number];
@@ -170,12 +170,12 @@ const MINIMUM_CONVEX_VERSION = "1.36.0";
 
 /**
  * The non-throwing mode of `usePaginatedQueryInternal`—its fourth,
- * `throwOnError` parameter—arrived in convex 1.36.0. Convex 1.32 through
- * 1.35 export the same symbol taking only three parameters, where a fourth
- * argument is silently ignored and errors are always thrown.
+ * `throwOnError` parameter—arrived in convex 1.36.0. Convex 1.32 through 1.35
+ * export the same symbol taking only three parameters, where a fourth argument
+ * is silently ignored and errors are always thrown.
  *
- * The function itself cannot be interrogated for this: `Function.length`
- * counts parameters up to the first one with a default, and 1.36.0 declares
+ * The function itself cannot be interrogated for this: `Function.length` counts
+ * parameters up to the first one with a default, and 1.36.0 declares
  * `throwOnError = true`, so both shapes report an arity of 3. The package
  * version is the only reliable signal.
  */
@@ -322,9 +322,9 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
 };
 
 /**
- * Whether a paginated query error means the stored cursors no longer match
- * the query (a data-dependent query changed underneath us), calling for a
- * full pagination reset rather than a failure.
+ * Whether a paginated query error means the stored cursors no longer match the
+ * query (a data-dependent query changed underneath us), calling for a full
+ * pagination reset rather than a failure.
  */
 const isInvalidCursorError = (error: Error): boolean =>
   error.message.includes("InvalidCursor") ||
@@ -343,18 +343,18 @@ const NO_ITEMS: ReadonlyArray<unknown> = [];
  * EXPERIMENTAL—endCursor-pinned reactive pagination (see
  * `notes/stream-based-querying.md`). Use it with paginated queries whose
  * handlers paginate via `QueryStream.paginate`: those don't write the query
- * journal that {@link usePaginatedQuery}'s built-in reactivity relies on,
- * so gap-free pages must be maintained by the client instead. (It works
- * with any paginated query honoring the `endCursor` protocol field,
- * including the built-in `paginate`.)
+ * journal that {@link usePaginatedQuery}'s built-in reactivity relies on, so
+ * gap-free pages must be maintained by the client instead. (It works with any
+ * paginated query honoring the `endCursor` protocol field, including the
+ * built-in `paginate`.)
  *
- * Each loaded page is pinned to a fixed index range by re-subscribing it
- * with its `continueCursor` echoed back as `endCursor`—pages then grow
- * and shrink reactively but always meet exactly, and a page that outgrows
+ * Each loaded page is pinned to a fixed index range by re-subscribing it with
+ * its `continueCursor` echoed back as `endCursor`—pages then grow and shrink
+ * reactively but always meet exactly, and a page that outgrows
  * `initialNumItems` is split in two. This is the mechanism of
  * `convex-helpers/react`'s `usePaginatedQuery`, re-expressed over the pure
- * {@link StreamPagination} state machine, with args/items/errors codec'd
- * through the ref's schemas exactly like {@link usePaginatedQuery}.
+ * {@link StreamPagination} state machine, with args/items/errors codec'd through
+ * the ref's schemas exactly like {@link usePaginatedQuery}.
  */
 export const useStreamPaginatedQuery = <
   Query extends Ref.AnyPublicPaginatedQuery,
@@ -364,11 +364,11 @@ export const useStreamPaginatedQuery = <
   options: {
     readonly initialNumItems: number;
     /**
-     * Per-page read budgets forwarded as `paginationOpts.maximumRowsRead`
-     * and `paginationOpts.maximumBytesRead`: a page that would scan more
-     * rows, or read more bytes, than these returns truncated with
-     * `SplitRequired` (and the hook splits it) instead of exceeding
-     * Convex's query limits on a filter-heavy stream.
+     * Per-page read budgets forwarded as `paginationOpts.maximumRowsRead` and
+     * `paginationOpts.maximumBytesRead`: a page that would scan more rows, or
+     * read more bytes, than these returns truncated with `SplitRequired` (and
+     * the hook splits it) instead of exceeding Convex's query limits on a
+     * filter-heavy stream.
      */
     readonly maximumRowsRead?: number;
     readonly maximumBytesRead?: number;

@@ -70,9 +70,9 @@ export type AnyIndexRangeSpec = IndexRangeSpec<KeyFields>;
 export type Remaining<Spec> = Spec extends IndexRangeSpec<infer R> ? R : never;
 
 /**
- * A typed index-range builder. `eq` must target the next unpinned index
- * field, and consumes it; `gt`/`gte`/`lt`/`lte` bound the next field without
- * consuming it (bounded fields still vary within the range).
+ * A typed index-range builder. `eq` must target the next unpinned index field,
+ * and consumes it; `gt`/`gte`/`lt`/`lte` bound the next field without consuming
+ * it (bounded fields still vary within the range).
  *
  * @experimental
  */
@@ -190,7 +190,10 @@ class TaggedBound extends Data.Class<{
   readonly tag: BoundTag;
 }> {}
 
-/** Dropping a bound key's last component bounds by the remaining prefix—exclusively. */
+/**
+ * Dropping a bound key's last component bounds by the remaining
+ * prefix—exclusively.
+ */
 const excludePrefix = (tag: BoundTag): BoundTag =>
   tag === "gt" || tag === "gte" ? "gt" : "lt";
 
@@ -215,7 +218,9 @@ const peelBound = (
         }),
       );
 
-/** `eq` every component of `key` but the last, which gets the bound tag. */
+/**
+ * `eq` every component of `key` but the last, which gets the bound tag.
+ */
 const rangeOpsFor = (
   prefixOps: ReadonlyArray<RangeOp>,
   fields: KeyFields,
@@ -242,8 +247,8 @@ const rangeOpsFor = (
   });
 
 /**
- * Decompose the range between `bounds.lower` and `bounds.upper` (over the
- * full index-key `fields`, `_id` tiebreaker included) into a sequence of
+ * Decompose the range between `bounds.lower` and `bounds.upper` (over the full
+ * index-key `fields`, `_id` tiebreaker included) into a sequence of
  * Convex-expressible ranges, ordered for the given direction.
  *
  * @experimental

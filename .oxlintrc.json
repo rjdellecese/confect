@@ -10,7 +10,15 @@
     "oxc",
     "effecttsgo"
   ],
-  "jsPlugins": ["confect-oxlint-rules"],
+  "jsPlugins": [
+    "confect-oxlint-rules",
+    { "name": "jsdoc-style", "specifier": "eslint-plugin-jsdoc" }
+  ],
+  "settings": {
+    "jsdoc": {
+      "tagNamePreference": { "typeParam": "typeParam" }
+    }
+  },
   "options": {
     "typeAware": true,
     "denyWarnings": true,
@@ -34,6 +42,22 @@
     "**/.mintlify/**"
   ],
   "rules": {
+    "jsdoc-style/check-alignment": "error",
+    "jsdoc-style/check-line-alignment": [
+      "error",
+      "never",
+      {
+        "disableWrapIndent": true,
+        "preserveMainDescriptionPostDelimiter": true
+      }
+    ],
+    "jsdoc-style/no-multi-asterisks": ["error", { "allowWhitespace": true }],
+    "jsdoc-style/require-asterisk-prefix": "error",
+    "jsdoc-style/require-hyphen-before-param-description": [
+      "error",
+      "always",
+      { "tags": { "template": "always", "typeParam": "always" } }
+    ],
     "no-unused-vars": [
       "error",
       {

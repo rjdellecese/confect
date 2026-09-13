@@ -43,20 +43,19 @@ const confectCliEntryUrl = new URL(
 );
 
 /**
- * Build a Vitest `globalSetup` that runs `confect codegen` against the
- * given fixture directory before the suite starts.
+ * Build a Vitest `globalSetup` that runs `confect codegen` against the given
+ * fixture directory before the suite starts.
  *
- * The CLI walks up from `process.cwd()` to find the nearest `package.json`
- * (see `@confect/cli`'s `ProjectRoot`), which it then treats as the project
- * root when locating the Convex directory. Each fixture project therefore
- * needs to be the cwd while its codegen runs. We chdir for the duration
- * of the codegen call and restore the original cwd via `ensuring`.
+ * The CLI walks up from `process.cwd()` to find the nearest `package.json` (see
+ * `@confect/cli`'s `ProjectRoot`), which it then treats as the project root
+ * when locating the Convex directory. Each fixture project therefore needs to
+ * be the cwd while its codegen runs. We chdir for the duration of the codegen
+ * call and restore the original cwd via `ensuring`.
  *
  * Codegen runs both locally and on CI. The fixtures' generated outputs
  * (`confect/_generated/` and the wrapper files under `convex/`) are committed
- * to the repo, and CI verifies (via the `verify-codegen-committed` action)
- * that codegen produces no changes—i.e. that the committed outputs are
- * up-to-date.
+ * to the repo, and CI verifies (via the `verify-codegen-committed` action) that
+ * codegen produces no changes—i.e. that the committed outputs are up-to-date.
  */
 export const setupForFixture =
   (baseDir: string, fixtureSubpath: string) => () =>

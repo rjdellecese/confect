@@ -5,7 +5,8 @@ import type * as FunctionRegistryItem from "./FunctionRegistryItem";
 import type * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 
 /**
- * A middleware spec paired with its implementation for one function's type—the resolved form `buildForGroup` hands to `makeRegisteredFunction`.
+ * A middleware spec paired with its implementation for one function's type—the
+ * resolved form `buildForGroup` hands to `makeRegisteredFunction`.
  */
 export interface ResolvedMiddleware {
   readonly middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec;
@@ -15,12 +16,13 @@ export interface ResolvedMiddleware {
 
 /**
  * Pair each middleware spec attached to a function with its registered
- * implementation for the function's type. Both misses are ruled out by the
- * type system (`GroupImpl.finalize` demands every attached middleware's
- * `MiddlewareImpl` service; `MiddlewareImpl.make`/`makeByFunctionType` cover exactly
- * the declared functionTypes, which `GroupSpec.middleware` requires to cover every
- * function). Spec identity is checked separately because implementation services
- * are keyed by string, so the type system cannot distinguish same-key specs.
+ * implementation for the function's type. Both misses are ruled out by the type
+ * system (`GroupImpl.finalize` demands every attached middleware's
+ * `MiddlewareImpl` service; `MiddlewareImpl.make`/`makeByFunctionType` cover
+ * exactly the declared functionTypes, which `GroupSpec.middleware` requires to
+ * cover every function). Spec identity is checked separately because
+ * implementation services are keyed by string, so the type system cannot
+ * distinguish same-key specs.
  */
 export const resolve = (
   functionRegistryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,

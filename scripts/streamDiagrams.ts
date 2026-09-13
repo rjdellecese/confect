@@ -10,20 +10,22 @@ import * as Runtime from "effect/Runtime";
 /**
  * Generates the stream diagrams on the Streams docs page.
  *
- * A diagram is a set of tracks. A track is read left to right in key order—the marble-diagram convention, with the index's ordering as the axis in
- * place of time. Its name sits on the line above it, and the track curls up
- * into the name (`╰`) rather than sitting beside it, so the diagram is no
- * wider than its columns. Every track in one diagram shares the same
- * columns, so elements that line up vertically hold the same position in
- * the output's order. Generating them keeps the notation consistent and the
- * columns aligned; the page marks each block with an MDX comment naming the
- * diagram (`stream-diagram: name`) and this script fills in the fenced
- * `text` block that follows.
+ * A diagram is a set of tracks. A track is read left to right in key order—the
+ * marble-diagram convention, with the index's ordering as the axis in place of
+ * time. Its name sits on the line above it, and the track curls up into the
+ * name (`╰`) rather than sitting beside it, so the diagram is no wider than its
+ * columns. Every track in one diagram shares the same columns, so elements that
+ * line up vertically hold the same position in the output's order. Generating
+ * them keeps the notation consistent and the columns aligned; the page marks
+ * each block with an MDX comment naming the diagram (`stream-diagram: name`)
+ * and this script fills in the fenced `text` block that follows.
  */
 
 const PAGE = "apps/docs/server/database/streams.mdx";
 const COLUMN_WIDTH = 12;
-/** Joins a track to the name printed above it. */
+/**
+ * Joins a track to the name printed above it.
+ */
 const CORNER = "╰";
 
 export class StreamDiagramsError extends Data.TaggedError(
@@ -38,7 +40,9 @@ export class StreamDiagramsError extends Data.TaggedError(
   }
 }
 
-/** A column's element label, or `undefined` for a stretch of empty track. */
+/**
+ * A column's element label, or `undefined` for a stretch of empty track.
+ */
 type Cell = string | undefined;
 
 export const cell = (label: string): string =>
@@ -49,9 +53,10 @@ const gap = "─".repeat(COLUMN_WIDTH);
 const keyCell = (key: string): string => `  ${key}`.padEnd(COLUMN_WIDTH);
 
 /**
- * A track: a named stream, one cell per column, ending in `end`. The name
- * is printed on the line above, and the track starts with the corner that
- * joins it to the name. `start` shifts both right by that many columns—an inner stream of a join begins where its outer element is.
+ * A track: a named stream, one cell per column, ending in `end`. The name is
+ * printed on the line above, and the track starts with the corner that joins it
+ * to the name. `start` shifts both right by that many columns—an inner stream
+ * of a join begins where its outer element is.
  */
 export const track = (
   name: string,
@@ -71,20 +76,26 @@ export const track = (
   );
 };
 
-/** The keys printed beneath a track's elements. */
+/**
+ * The keys printed beneath a track's elements.
+ */
 export const keys = (values: ReadonlyArray<Cell>): string =>
   " " +
   values
     .map((key) => (key === undefined ? " ".repeat(COLUMN_WIDTH) : keyCell(key)))
     .join("");
 
-/** The operation between an input track and its output. */
+/**
+ * The operation between an input track and its output.
+ */
 const op = (text: string): string => `╞═ ${text} ═╡`;
 
 const lines = (...rows: ReadonlyArray<string>): string =>
   rows.map((row) => row.trimEnd()).join("\n");
 
-/** A cursor between two keys, drawn at the start of column `column`. */
+/**
+ * A cursor between two keys, drawn at the start of column `column`.
+ */
 const cursorAt = (column: number): string =>
   " ".repeat(1 + COLUMN_WIDTH * column) + "╎";
 
@@ -294,7 +305,9 @@ export const diagrams: Readonly<Record<string, string>> = {
 const MARKED_BLOCK =
   /\{\/\* stream-diagram: ([a-z-]+) \*\/\}\n\n?```text\n[\s\S]*?\n```/g;
 
-/** The page with every marked diagram block regenerated. */
+/**
+ * The page with every marked diagram block regenerated.
+ */
 export const renderDiagrams = Effect.fnUntraced(function* (
   source: string,
 ): Effect.fn.Return<string, StreamDiagramsError> {

@@ -41,7 +41,9 @@ class DeclarationEmit extends Context.Service<
      * and every assertion below expects it to be empty.
      */
     readonly diagnostics: string;
-    /** Emitted `.d.ts` text, keyed by the `entries` name it came from. */
+    /**
+     * Emitted `.d.ts` text, keyed by the `entries` name it came from.
+     */
     readonly declarations: Record<string, string>;
   }
 >()("@confect/server/test/mock-backend/declarationEmit.test/DeclarationEmit") {}

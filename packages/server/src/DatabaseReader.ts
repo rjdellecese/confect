@@ -80,10 +80,10 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 };
 
 /**
- * The tag's *Identifier* (the Effect requirements-channel type) is
+ * The tag's _Identifier_ (the Effect requirements-channel type) is
  * `Docs`-independent so a helper's `R` channel is the same whether or not a
  * codegen document registry is supplied—this keeps it identical to what
- * `Handler`/runtime provisioning provide. The tag's *Service* (what `yield*`
+ * `Handler`/runtime provisioning provide. The tag's _Service_ (what `yield*`
  * produces) carries `Docs`, so queries resolve to the named doc interfaces.
  */
 export type DatabaseReaderTag<

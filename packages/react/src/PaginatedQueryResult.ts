@@ -17,15 +17,15 @@ type TypeId = typeof TypeId;
  *
  * Every variant carries `results`, including `Failure`: when a later page
  * fails, the pages already loaded are still worth rendering alongside the
- * error, so they are not discarded. `Failure` additionally carries the
- * query's decoded typed error.
+ * error, so they are not discarded. `Failure` additionally carries the query's
+ * decoded typed error.
  *
- * `loadMore` appears only on `CanLoadMore`, the one state it can make
- * progress from. The underlying Convex hook exposes it on every status, but
- * calling it while a page is in flight, once the list is exhausted, or after
- * a failure is an intentional no-op there; narrowing to `CanLoadMore`—via
- * {@link isCanLoadMore} or {@link match}—makes that statically apparent
- * instead of silently dropping the call.
+ * `loadMore` appears only on `CanLoadMore`, the one state it can make progress
+ * from. The underlying Convex hook exposes it on every status, but calling it
+ * while a page is in flight, once the list is exhausted, or after a failure is
+ * an intentional no-op there; narrowing to `CanLoadMore`—via
+ * {@link isCanLoadMore} or {@link match}—makes that statically apparent instead
+ * of silently dropping the call.
  *
  * When the query declares no `error` schema (`E` is `never`), the `Failure`
  * variant is excluded from the type entirely, so `isLoading` is accessible
@@ -49,8 +49,8 @@ export type PaginatedQueryResult<Item, E = never> = [E] extends [never]
 
 /**
  * Every variant regardless of `E`—the parameter type for guards and
- * {@link match}, since `PaginatedQueryResult` itself excludes `Failure` when
- * `E` is `never`.
+ * {@link match}, since `PaginatedQueryResult` itself excludes `Failure` when `E`
+ * is `never`.
  */
 export type Variants<Item, E = never> =
   | LoadingFirstPage<Item, E>
@@ -119,7 +119,9 @@ export interface Failure<Item, E = never> extends PaginatedQueryResult.Proto<
 > {
   readonly _tag: "Failure";
   readonly error: E;
-  /** The pages loaded before the failure. */
+  /**
+   * The pages loaded before the failure.
+   */
   readonly results: ReadonlyArray<Item>;
 }
 
@@ -275,9 +277,9 @@ type MatchReturns<E, V, W, X, Y, Z> = [E] extends [never]
   : V | W | X | Y | Z;
 
 /**
- * Matches a {@link PaginatedQueryResult} to the appropriate handler based on
- * its tag. If the provided result cannot fail (i.e. `E` is `never`),
- * `onFailure` is not required.
+ * Matches a {@link PaginatedQueryResult} to the appropriate handler based on its
+ * tag. If the provided result cannot fail (i.e. `E` is `never`), `onFailure` is
+ * not required.
  */
 export const match: {
   <Item, E, V, W, X, Y, Z = never>(

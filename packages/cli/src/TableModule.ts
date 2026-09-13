@@ -22,8 +22,8 @@ export const TABLES_DIRNAME = "tables";
  * `confect/tables/`.
  *
  * - `relativePath`—path from `confect/` to the file (e.g. `tables/notes.ts`).
- * - `tableName`—the file basename (e.g. `notes`). This is also the import
- *   binding used in generated files, and the table name surfaced to Convex.
+ * - `tableName`—the file basename (e.g. `notes`). This is also the import binding
+ *   used in generated files, and the table name surfaced to Convex.
  */
 export interface TableModule {
   readonly relativePath: string;
@@ -71,8 +71,8 @@ const byTableName = Order.mapInput(
  * identifier with no leading underscore (Convex reserves `_<name>` for system
  * tables).
  *
- * This step does *not* bundle the table modules. It runs early in the codegen
- * pipeline so the `_generated/id.ts` constructor can be emitted *before* any
+ * This step does _not_ bundle the table modules. It runs early in the codegen
+ * pipeline so the `_generated/id.ts` constructor can be emitted _before_ any
  * user-authored table is bundled (those modules import from `_generated/id.ts`
  * for cross-table refs).
  *
@@ -123,12 +123,12 @@ export const discover = Effect.gen(function* () {
 });
 
 /**
- * Bundle every discovered table module and verify that its default export is
- * an {@link Table.UnnamedTable} (the result of `Table.make(...)` before a
- * name has been bound). Fails with {@link InvalidTableDefaultExportError} if
- * any module's default export is missing or has the wrong shape.
+ * Bundle every discovered table module and verify that its default export is an
+ * {@link Table.UnnamedTable} (the result of `Table.make(...)` before a name has
+ * been bound). Fails with {@link InvalidTableDefaultExportError} if any
+ * module's default export is missing or has the wrong shape.
  *
- * Must run *after* `_generated/id.ts` has been emitted, because user-authored
+ * Must run _after_ `_generated/id.ts` has been emitted, because user-authored
  * table modules typically `import { Id } from "../_generated/id"` for
  * cross-table references.
  */

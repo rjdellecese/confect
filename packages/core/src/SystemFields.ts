@@ -13,7 +13,8 @@ import * as Struct from "effect/Struct";
 import * as GenericId from "./GenericId";
 
 /**
- * Produces a schema for Convex system fields. In Confect, system fields include `_id`.
+ * Produces a schema for Convex system fields. In Confect, system fields include
+ * `_id`.
  */
 export const SystemFields = <TableName extends string>(tableName: TableName) =>
   Schema.Struct({
@@ -154,10 +155,11 @@ const makeExtendAst = (
 /**
  * Extend a table schema with Convex system fields.
  *
- * A plain `Struct` gains the fields via `Schema.fieldsAssign` and a `Union`
- * has them distributed across its members, preserving the schema's
- * `Struct`/`Union` structure. Any other object-shaped schema—one built with
- * `Schema.decodeTo`/`Schema.encodeKeys`, a branded struct, a suspended schema—is extended at the AST level: every object node in its encoding chain
+ * A plain `Struct` gains the fields via `Schema.fieldsAssign` and a `Union` has
+ * them distributed across its members, preserving the schema's `Struct`/`Union`
+ * structure. Any other object-shaped schema—one built with
+ * `Schema.decodeTo`/`Schema.encodeKeys`, a branded struct, a suspended
+ * schema—is extended at the AST level: every object node in its encoding chain
  * gains the system fields, and each transformation is wrapped so the fields
  * bypass the user-defined getters. Schemas that do not resolve to an object
  * shape at every step (such as `Schema.Class`, whose decoded values are class
@@ -218,9 +220,9 @@ export const extendWithSystemFields = <
 };
 
 /**
- * Applies the system fields to a single struct, mirroring `Schema.fieldsAssign`.
- * Any other (already-extended or opaque) schema falls back to a `Codec` carrying
- * the system-field document shape.
+ * Applies the system fields to a single struct, mirroring
+ * `Schema.fieldsAssign`. Any other (already-extended or opaque) schema falls
+ * back to a `Codec` carrying the system-field document shape.
  */
 type ApplySystemFields<TableName extends string, S> =
   S extends Schema.Struct<infer Fields extends Schema.Struct.Fields>
@@ -240,10 +242,10 @@ type ApplySystemFields<TableName extends string, S> =
  * This mirrors the runtime {@link extendWithSystemFields}: a `Struct` gains the
  * system fields directly (matching `Schema.fieldsAssign`), and a `Union` has
  * them distributed across its members (matching
- * `union.mapMembers(Tuple.map(Schema.fieldsAssign(...)))`). The `Struct`/`Union`
- * structure is preserved rather than collapsed to a bare `Codec`; any other
- * schema falls back to a `Codec` carrying the system-field document shape,
- * matching the runtime's AST-level extension.
+ * `union.mapMembers(Tuple.map(Schema.fieldsAssign(...)))`). The
+ * `Struct`/`Union` structure is preserved rather than collapsed to a bare
+ * `Codec`; any other schema falls back to a `Codec` carrying the system-field
+ * document shape, matching the runtime's AST-level extension.
  */
 export type ExtendWithSystemFields<
   TableName extends string,

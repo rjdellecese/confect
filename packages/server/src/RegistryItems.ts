@@ -15,9 +15,9 @@ export interface RegistryItems {
 
 /**
  * The names of the function-shaped entries in a group's (flat, isolated)
- * registry. `FunctionImpl.make` registers each function under a
- * single-segment key, so the registry built for one group contains exactly
- * that group's functions at the top level.
+ * registry. `FunctionImpl.make` registers each function under a single-segment
+ * key, so the registry built for one group contains exactly that group's
+ * functions at the top level.
  */
 export const functionNames = (items: RegistryItems): ReadonlyArray<string> =>
   pipe(
@@ -29,8 +29,8 @@ export const functionNames = (items: RegistryItems): ReadonlyArray<string> =>
   );
 
 /**
- * The keys of the middleware implementations registered into a group's
- * registry (stored under `middleware:<key>` entries by `MiddlewareImpl`).
+ * The keys of the middleware implementations registered into a group's registry
+ * (stored under `middleware:<key>` entries by `MiddlewareImpl`).
  */
 export const middlewareKeys = (items: RegistryItems): ReadonlyArray<string> =>
   pipe(

@@ -27,7 +27,9 @@ export interface ArgsSchema<
   readonly fields: ArgsFields_;
 }
 
-/** Erased structural view used after the exact field map is no longer needed. */
+/**
+ * Erased structural view used after the exact field map is no longer needed.
+ */
 export type AnyArgsSchema = ArgsSchema<ArgsFields>;
 
 export type FunctionProvenance = Data.TaggedEnum<{
@@ -44,12 +46,11 @@ export type FunctionProvenance = Data.TaggedEnum<{
 }>;
 
 /**
- * The declaration shape of a Confect function—orthogonal to both the
- * provenance origin (Confect vs Convex) and the function type
- * (query/mutation/action). A `Standard` function declares its args fields and
- * returns schema directly; a `Paginated` function declares user-args fields
- * and an item schema from which the Convex-facing `args`/`returns` are
- * composed.
+ * The declaration shape of a Confect function—orthogonal to both the provenance
+ * origin (Confect vs Convex) and the function type (query/mutation/action). A
+ * `Standard` function declares its args fields and returns schema directly; a
+ * `Paginated` function declares user-args fields and an item schema from which
+ * the Convex-facing `args`/`returns` are composed.
  */
 export type ConfectKind = Standard | Paginated;
 
@@ -62,11 +63,17 @@ export interface Paginated<
   Item extends Schema.Codec<any, any> = Schema.Codec<any, any>,
 > {
   readonly _tag: "Paginated";
-  /** User-declared args—no `paginationOpts`. */
+  /**
+   * User-declared args—no `paginationOpts`.
+   */
   readonly userArgs: ArgsSchema<UserArgsFields_>;
-  /** Page element schema. */
+  /**
+   * Page element schema.
+   */
   readonly item: Item;
-  /** Mutable array of items—the page decode target. */
+  /**
+   * Mutable array of items—the page decode target.
+   */
   readonly page: Schema.Codec<any, any>;
 }
 
@@ -105,18 +112,20 @@ export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
 const Standard: Standard = { _tag: "Standard" };
 
 /**
- * Build a `Confect` provenance from lazy args-fields and schema thunks.
- * `args`, `returns`, and `error` are exposed as sync lazy memoised getters
- * (via {@link Lazy.defineProperty}) that only evaluate their thunk on first
- * access, mirroring how `Table` defers `Fields`/`Doc`. This keeps importing the
- * assembled `_generated/spec.ts` cheap—no `Schema.Struct(...)`/`Schema.Array(...)` work runs at module load; it is deferred to the first
- * invocation that actually compiles validators or runs a codec.
+ * Build a `Confect` provenance from lazy args-fields and schema thunks. `args`,
+ * `returns`, and `error` are exposed as sync lazy memoised getters (via
+ * {@link Lazy.defineProperty}) that only evaluate their thunk on first access,
+ * mirroring how `Table` defers `Fields`/`Doc`. This keeps importing the
+ * assembled `_generated/spec.ts` cheap—no
+ * `Schema.Struct(...)`/`Schema.Array(...)` work runs at module load; it is
+ * deferred to the first invocation that actually compiles validators or runs a
+ * codec.
  *
  * The object is built by hand rather than through `FunctionProvenance.Confect`
  * because the `Data` constructor copies its input with `Object.assign`, which
- * would force the getters at construction time and defeat the laziness.
- * `error` is only installed when an `errorThunk` is provided, so its absence
- * is observable via `"error" in provenance` without forcing anything; nothing
+ * would force the getters at construction time and defeat the laziness. `error`
+ * is only installed when an `errorThunk` is provided, so its absence is
+ * observable via `"error" in provenance` without forcing anything; nothing
  * relies on `Data`'s structural `Equal`/`Hash` for provenance values.
  */
 export const Confect = <
@@ -140,8 +149,8 @@ export const Confect = <
 };
 
 /**
- * The composed args schema of a paginated query: the user-declared fields
- * plus the `paginationOpts` field managed by Convex's pagination protocol.
+ * The composed args schema of a paginated query: the user-declared fields plus
+ * the `paginationOpts` field managed by Convex's pagination protocol.
  *
  * The fields-first representation keeps the user-declared map available for
  * type-level composition without reconstructing it from an erased schema.
@@ -156,8 +165,8 @@ export type PaginatedArgs<UserArgsFields extends ArgsFields> = Schema.Struct<
 >;
 
 /**
- * The composed returns schema of a paginated query: a `PaginationResult` of
- * the item schema. Same deferred-conditional device as {@link PaginatedArgs}.
+ * The composed returns schema of a paginated query: a `PaginationResult` of the
+ * item schema. Same deferred-conditional device as {@link PaginatedArgs}.
  */
 export type PaginatedReturns<Item extends Schema.Codec<any, any>> =
   PaginationResult.PaginationResult<Item> extends infer ComposedReturns extends
@@ -182,8 +191,8 @@ export interface AnyConfectPaginated extends AnyConfect {
 
 /**
  * Build the provenance of a paginated query from lazy schema thunks, with the
- * same laziness contract as {@link Confect}. The user-facing schemas live on
- * the `Paginated` kind (`kind.userArgs`, `kind.item`, `kind.page`)—the kind
+ * same laziness contract as {@link Confect}. The user-facing schemas live on the
+ * `Paginated` kind (`kind.userArgs`, `kind.item`, `kind.page`)—the kind
  * container is built eagerly (it is cheap) while the schemas inside it stay
  * lazy. The composed Convex-facing `args`/`returns` are derived lazily from
  * them: `args` spreads the user fields plus `paginationOpts`, and `returns`
