@@ -644,7 +644,7 @@ export const merge = <
   );
   if (Option.isSome(incompatible)) {
     throw new Error(
-      `QueryStream.merge: all streams must share an order and order-key layout (got ${head.order} ${QueryStreamKeyLayout.describe(head.keyLayout)} and ${incompatible.value.order} ${QueryStreamKeyLayout.describe(incompatible.value.keyLayout)})`,
+      `QueryStream.merge: all streams must share an order and order-key layout (got ${head.order} ${QueryStreamKeyLayout.format(head.keyLayout)} and ${incompatible.value.order} ${QueryStreamKeyLayout.format(incompatible.value.keyLayout)})`,
     );
   }
   return mergeUnchecked(streams);
@@ -1161,7 +1161,7 @@ const makeFlatMap = <
     }
     if (!QueryStreamKeyLayout.compatible(inner.keyLayout, innerLayout)) {
       throw new Error(
-        `QueryStream.flatMap: inner stream order-key layout (${QueryStreamKeyLayout.describe(inner.keyLayout)}) differs from innerLayout (${QueryStreamKeyLayout.describe(innerLayout)})`,
+        `QueryStream.flatMap: inner stream order-key layout (${QueryStreamKeyLayout.format(inner.keyLayout)}) differs from innerLayout (${QueryStreamKeyLayout.format(innerLayout)})`,
       );
     }
     return inner;

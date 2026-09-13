@@ -240,10 +240,10 @@ describe("QueryStreamKeyLayout", () => {
     expect(QueryStreamKeyLayout.compatible(explicitFirst, implicitFirst)).toBe(
       false,
     );
-    expect(QueryStreamKeyLayout.describe(explicitFirst)).toBe(
+    expect(QueryStreamKeyLayout.format(explicitFirst)).toBe(
       '["_id", <implicit _id>]',
     );
-    expect(QueryStreamKeyLayout.describe(implicitFirst)).toBe(
+    expect(QueryStreamKeyLayout.format(implicitFirst)).toBe(
       '[<implicit _id>, "_id"]',
     );
 
@@ -312,7 +312,7 @@ describe("QueryStreamKeyLayout", () => {
         QueryStreamKeyLabels.make(["same", "same", ""]),
       ),
     );
-    expect(QueryStreamKeyLayout.describe(renamed)).toBe(
+    expect(QueryStreamKeyLayout.format(renamed)).toBe(
       '[<implicit _id>, "same", <implicit _id>, "same", ""]',
     );
     expect(QueryStreamKeyLayout.runtimeWidth(renamed)).toBe(5);

@@ -134,8 +134,8 @@ export const concat = <
 ): QueryStreamKeyLayout<readonly [...LeftLabels, ...RightLabels]> =>
   make(Array.appendAll(segments(self), segments(that)));
 
-/** Describe explicit labels and hidden IDs in compatibility errors. @experimental */
-export const describe = (self: QueryStreamKeyLayout): string => {
+/** Format visible labels and implicit IDs for diagnostics. @experimental */
+export const format = (self: QueryStreamKeyLayout): string => {
   const quoteLabels = (labels: QueryStreamKeyLabels.QueryStreamKeyLabels) =>
     Array.map(QueryStreamKeyLabels.toArray(labels), (label) =>
       JSON.stringify(label),
