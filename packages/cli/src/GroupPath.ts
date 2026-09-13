@@ -1,4 +1,4 @@
-import { type GroupSpec, type Spec } from "@confect/core";
+import { type GroupSpec, Spec } from "@confect/core";
 import * as Path from "effect/Path";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
@@ -71,7 +71,7 @@ export const getGroupSpec = (
       onEmpty: () => Option.none(),
       onNonEmpty: (head, tail) =>
         pipe(
-          Record.get(spec.groups, head),
+          Record.get(Spec.groups(spec), head),
           Option.flatMap((group) =>
             Array.isArrayNonEmpty(tail)
               ? getGroupSpecHelper(group, tail)

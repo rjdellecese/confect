@@ -6,7 +6,7 @@ import type * as FunctionSpec from "./FunctionSpec";
 import type * as GroupSpec from "./GroupSpec";
 import type * as MiddlewareSpec from "./MiddlewareSpec";
 import * as Ref from "./Ref";
-import type * as Spec from "./Spec";
+import * as Spec from "./Spec";
 
 export type Refs<
   Spec_ extends Spec.AnyWithProps,
@@ -98,7 +98,7 @@ type Any =
 export const make = <Spec_ extends Spec.AnyWithProps>(
   spec: Spec_,
 ): FromSpec<Spec_> => {
-  const refs = makeHelper(spec.groups);
+  const refs = makeHelper(Spec.groups(spec));
   return {
     public: refs as Refs<Spec_, Ref.AnyPublic>,
     internal: refs as Refs<Spec_, Ref.AnyInternal>,

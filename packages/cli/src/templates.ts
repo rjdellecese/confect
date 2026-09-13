@@ -120,19 +120,17 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
     );
   } else {
     yield* cbw.writeLine(
-      `const databaseSchema: $DatabaseSchema.DatabaseSchema<`,
+      `const databaseSchema: $DatabaseSchema.DatabaseSchema<{`,
     );
     yield* cbw.indent(
       Effect.forEach(
         tableModules,
-        ({ tableName }, i) =>
-          cbw.writeLine(
-            `typeof ${tableName}${i === tableModules.length - 1 ? "" : " |"}`,
-          ),
+        ({ tableName }) =>
+          cbw.writeLine(`readonly ${tableName}: typeof ${tableName};`),
         { discard: true },
       ),
     );
-    yield* cbw.writeLine(`> = $DatabaseSchema.make({`);
+    yield* cbw.writeLine(`}> = $DatabaseSchema.make({`);
     yield* cbw.indent(
       Effect.gen(function* () {
         for (const { tableName } of tableModules) {
@@ -841,16 +839,18 @@ const assembledSpecEffect = Effect.fnUntraced(function* ({
   if (nodes.length === 0) {
     yield* cbw.write(`Spec.Spec`);
   } else {
-    yield* cbw.write(`Spec.Spec<`);
+    yield* cbw.write(`Spec.Spec<{`);
     yield* cbw.newLine();
     yield* cbw.indent(
       Effect.gen(function* () {
         for (const node of nodes) {
-          yield* cbw.writeLine(`| ${rootGroupTypeMember(node)}`);
+          yield* cbw.writeLine(
+            `readonly ${node.segment}: ${rootGroupTypeMember(node)};`,
+          );
         }
       }),
     );
-    yield* cbw.write(`>`);
+    yield* cbw.write(`}>`);
   }
   // The assembled spec is runtime-agnostic: a Node group's `makeNode()` is
   // already baked into its imported leaf spec, so the root is always
