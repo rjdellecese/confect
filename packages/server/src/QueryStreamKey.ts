@@ -25,10 +25,12 @@ export interface Prefix {
 /**
  * Index coordinates retain the path belonging to each value.
  */
+export type IndexEntries = ReadonlyArray<
+  readonly [string, QueryStreamOrderKey.QueryStreamOrderKey[number]]
+>;
+
 export interface IndexPrefix {
-  readonly [IndexPrefixTypeId]: ReadonlyArray<
-    readonly [string, QueryStreamOrderKey.QueryStreamOrderKey[number]]
-  >;
+  readonly [IndexPrefixTypeId]: IndexEntries;
 }
 
 export class KeyWidthMismatchError extends Data.TaggedError(
@@ -102,11 +104,8 @@ export const indexPrefix = (
         }),
       );
 
-export const indexEntries = (
-  self: IndexPrefix,
-): ReadonlyArray<
-  readonly [string, QueryStreamOrderKey.QueryStreamOrderKey[number]]
-> => self[IndexPrefixTypeId];
+export const indexEntries = (self: IndexPrefix): IndexEntries =>
+  self[IndexPrefixTypeId];
 
 /**
  * Equality values are restored only when crossing into index coordinates.

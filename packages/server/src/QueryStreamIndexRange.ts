@@ -287,10 +287,8 @@ export const apply = (
 
 type BoundTag = "gt" | "gte" | "lt" | "lte";
 
-type IndexEntries = ReturnType<typeof QueryStreamKey.indexEntries>;
-
 class TaggedBound extends Data.Class<{
-  readonly indexEntries: IndexEntries;
+  readonly indexEntries: QueryStreamKey.IndexEntries;
   readonly tag: BoundTag;
 }> {}
 
@@ -304,7 +302,7 @@ const excludePrefix = (tag: BoundTag): BoundTag =>
  * Peel a bound down to the single entry that feeds the middle range.
  */
 const peelBound = (
-  indexEntries: IndexEntries,
+  indexEntries: QueryStreamKey.IndexEntries,
   tag: BoundTag,
 ): {
   readonly peeled: ReadonlyArray<TaggedBound>;
@@ -325,7 +323,7 @@ const peelBound = (
  */
 const rangeFor = (
   prefix: ReadonlyArray<Equality>,
-  indexEntries: IndexEntries,
+  indexEntries: QueryStreamKey.IndexEntries,
   tag: BoundTag,
 ): QueryStreamIndexRange =>
   Option.match(Array.last(indexEntries), {
