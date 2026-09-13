@@ -333,8 +333,8 @@ describe("QueryStreamIndexRange.fromBounds", () => {
         [1, 1],
       ];
       const ordered = order === "asc" ? keys : keys.toReversed();
-      const endpoints = [[], [0], [1], ...keys].flatMap((key) =>
-        [true, false].map((inclusive) => ({ orderKey: key, inclusive })),
+      const endpoints = [[], [0], [1], ...keys].flatMap((orderKey) =>
+        [true, false].map((inclusive) => ({ orderKey, inclusive })),
       );
       const layout = Result.getOrThrow(Layout.fromIndex(["a", "_id"]));
       const admits = (bounds: QueryStreamKeyBounds.IndexBounds) => {

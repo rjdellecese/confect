@@ -331,7 +331,7 @@ describe("QueryStream iterator lifecycle", () => {
           Option.some(
             new QueryStream.Element({
               doc: Option.none(),
-              key: ["b", 3, "b1"],
+              orderKey: ["b", 3, "b1"],
             }),
           ),
         );

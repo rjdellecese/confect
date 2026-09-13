@@ -2,14 +2,14 @@ import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
 import * as Key from "@confect/server/QueryStreamKey";
 import * as Layout from "@confect/server/QueryStreamKeyLayout";
 import * as Result from "effect/Result";
-import type { QueryStreamOrderKey as Values } from "@confect/server/QueryStreamOrderKey";
+import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Option from "effect/Option";
 
 const admits =
   (side: "lower" | "upper") =>
   (bound: Option.Option<QueryStreamKeyBounds.KeyBound>) =>
-  (values: Values) => {
+  (values: QueryStreamOrderKey.QueryStreamOrderKey) => {
     const layout = Result.getOrThrow(
       Layout.fromIndex(Array.from({ length: values.length }, () => "_id")),
     );
@@ -36,10 +36,10 @@ describe("QueryStreamKeyBounds", () => {
   it.each([true, false])(
     "admits the endpoint only for inclusive=%s bounds",
     (inclusive) => {
-      const key = ["a"];
-      const bound = Option.some({ orderKey: key, inclusive });
-      expect(admittedByLower(bound)(key)).toBe(inclusive);
-      expect(admittedByUpper(bound)(key)).toBe(inclusive);
+      const orderKey = ["a"];
+      const bound = Option.some({ orderKey: orderKey, inclusive });
+      expect(admittedByLower(bound)(orderKey)).toBe(inclusive);
+      expect(admittedByUpper(bound)(orderKey)).toBe(inclusive);
     },
   );
 
@@ -63,14 +63,14 @@ describe("QueryStreamKeyBounds", () => {
         );
       }
       const upper = { orderKey: lower.orderKey, inclusive: !lower.inclusive };
-      for (const [key, position] of [
+      for (const [orderKey, position] of [
         [["a", 1], 2.5],
         [["a", 2], 4.5],
       ] as const) {
-        expect(admittedByLower(Option.some(lower))(key)).toBe(
+        expect(admittedByLower(Option.some(lower))(orderKey)).toBe(
           position > leftIndex,
         );
-        expect(admittedByUpper(Option.some(upper))(key)).toBe(
+        expect(admittedByUpper(Option.some(upper))(orderKey)).toBe(
           position < leftIndex,
         );
       }
@@ -96,9 +96,9 @@ describe("QueryStreamKeyBounds", () => {
       const bound = Option.some({ orderKey: ["b"], inclusive });
       const lower = admittedByLower(bound);
       const upper = admittedByUpper(bound);
-      for (const key of [["b"], ["b", 0], ["b", 99, "id"]]) {
-        expect(lower(key)).toBe(inclusive);
-        expect(upper(key)).toBe(inclusive);
+      for (const orderKey of [["b"], ["b", 0], ["b", 99, "id"]]) {
+        expect(lower(orderKey)).toBe(inclusive);
+        expect(upper(orderKey)).toBe(inclusive);
       }
       expect(lower(["a", 99])).toBe(false);
       expect(lower(["c", 0])).toBe(true);
@@ -112,9 +112,9 @@ describe("QueryStreamKeyBounds", () => {
       Option.none(),
       Option.some({ orderKey: [], inclusive: true }),
     ]) {
-      for (const key of [[], [undefined], ["a", 1]]) {
-        expect(admittedByLower(bound)(key)).toBe(true);
-        expect(admittedByUpper(bound)(key)).toBe(true);
+      for (const orderKey of [[], [undefined], ["a", 1]]) {
+        expect(admittedByLower(bound)(orderKey)).toBe(true);
+        expect(admittedByUpper(bound)(orderKey)).toBe(true);
       }
     }
     const excluded = Option.some({ orderKey: [], inclusive: false });

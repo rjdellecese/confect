@@ -680,11 +680,11 @@ describe("QueryStream", () => {
               const elements = yield* Stream.runCollect(leaf.annotated);
               const texts = yield* collectTexts(leaf);
               const start = {
-                orderKey: Array.getUnsafe(elements, 1).key,
+                orderKey: Array.getUnsafe(elements, 1).orderKey,
                 inclusive: startInclusive,
               };
               const end = {
-                orderKey: Array.getUnsafe(elements, 5).key,
+                orderKey: Array.getUnsafe(elements, 5).orderKey,
                 inclusive: endInclusive,
               };
               const bounds = { start, end };
@@ -893,11 +893,11 @@ describe("QueryStream", () => {
                 const result = yield* Stream.runCollect(
                   QueryStream.narrow(joined, {
                     start: {
-                      orderKey: Array.getUnsafe(elements, 0).key,
+                      orderKey: Array.getUnsafe(elements, 0).orderKey,
                       inclusive: startInclusive,
                     },
                     end: {
-                      orderKey: Array.getUnsafe(elements, endIndex).key,
+                      orderKey: Array.getUnsafe(elements, endIndex).orderKey,
                       inclusive: endInclusive,
                     },
                   }).annotated,
@@ -1675,7 +1675,7 @@ describe("QueryStream", () => {
               { innerLayout, onEmpty: (doc) => doc },
             );
             const annotated = yield* Stream.runCollect(placeholders.annotated);
-            expect(annotated[0].key.slice(-4)).toEqual([
+            expect(annotated[0].orderKey.slice(-4)).toEqual([
               null,
               null,
               null,
@@ -1809,10 +1809,10 @@ describe("QueryStream", () => {
             );
 
             for (const cursor of [page.continueCursor, page.splitCursor]) {
-              const key = yield* Schema.decodeEffect(
+              const orderKey = yield* Schema.decodeEffect(
                 QueryStreamCursor.codecForLayout(source.keyLayout),
               )(cursor);
-              expect(key).toHaveLength(3);
+              expect(orderKey).toHaveLength(3);
 
               for (const bound of ["cursor", "endCursor"] as const) {
                 const result = yield* QueryStream.paginate(relabeled, {

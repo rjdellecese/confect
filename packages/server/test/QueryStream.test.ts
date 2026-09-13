@@ -65,7 +65,7 @@ describe("QueryStream.merge", () => {
                 (rank) =>
                   new QueryStream.Element({
                     doc: Option.some(`${label}:${rank}`),
-                    key: [rank],
+                    orderKey: [rank],
                   }),
               ),
             ),
@@ -148,8 +148,8 @@ describe("QueryStream key layouts", () => {
           "asc",
           Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
           Stream.make(
-            new QueryStream.Element({ doc: Option.some(1), key: [1] }),
-            new QueryStream.Element({ doc: Option.some(2), key: [2] }),
+            new QueryStream.Element({ doc: Option.some(1), orderKey: [1] }),
+            new QueryStream.Element({ doc: Option.some(2), orderKey: [2] }),
           ),
         );
         const joined = QueryStream.flatMap(
@@ -179,7 +179,9 @@ describe("QueryStream key layouts", () => {
       const outer = new QueryStream.QueryStream(
         "asc",
         Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
-        Stream.make(new QueryStream.Element({ doc: Option.some(1), key: [1] })),
+        Stream.make(
+          new QueryStream.Element({ doc: Option.some(1), orderKey: [1] }),
+        ),
       );
       let layout = explicitFirst;
       const joined = QueryStream.flatMap(
@@ -212,8 +214,11 @@ describe("QueryStream key layouts", () => {
           "asc",
           Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
           Stream.make(
-            new QueryStream.Element({ doc: Option.some("asc"), key: [1] }),
-            new QueryStream.Element({ doc: Option.some("desc"), key: [2] }),
+            new QueryStream.Element({ doc: Option.some("asc"), orderKey: [1] }),
+            new QueryStream.Element({
+              doc: Option.some("desc"),
+              orderKey: [2],
+            }),
           ),
         );
         const layout = Result.getOrThrowWith(
@@ -251,28 +256,32 @@ describe("QueryStream key layouts", () => {
 describe("QueryStream.Element", () => {
   it("constructs an element with an inferred document type and readonly fields", () => {
     const doc = Option.some({ text: "hello" });
-    const key: QueryStreamOrderKey.QueryStreamOrderKey = ["hello", 1, "id"];
-    const element = new QueryStream.Element({ doc, key });
+    const orderKey: QueryStreamOrderKey.QueryStreamOrderKey = [
+      "hello",
+      1,
+      "id",
+    ];
+    const element = new QueryStream.Element({ doc, orderKey });
 
     expectTypeOf(element).toEqualTypeOf<
       QueryStream.Element<{ text: string }>
     >();
     expectTypeOf(element).toExtend<{
       readonly doc: Option.Option<{ text: string }>;
-      readonly key: QueryStreamOrderKey.QueryStreamOrderKey;
+      readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey;
     }>();
     expect(element.doc).toBe(doc);
-    expect(element.key).toBe(key);
+    expect(element.orderKey).toBe(orderKey);
     expect(element.pipe((value) => Option.isSome(value.doc))).toBe(true);
   });
 
   it("constructs a filtered-out element without losing its order key", () => {
-    const key: QueryStreamOrderKey.QueryStreamOrderKey = [undefined, "id"];
-    const element = new QueryStream.Element({ doc: Option.none(), key });
+    const orderKey: QueryStreamOrderKey.QueryStreamOrderKey = [undefined, "id"];
+    const element = new QueryStream.Element({ doc: Option.none(), orderKey });
 
     expectTypeOf(element).toEqualTypeOf<QueryStream.Element<never>>();
     expect(element.doc).toEqual(Option.none());
-    expect(element.key).toBe(key);
+    expect(element.orderKey).toBe(orderKey);
   });
 });
 
@@ -297,7 +306,7 @@ describe.each(["asc", "desc"] as const)(
                 (value) =>
                   new QueryStream.Element({
                     doc: Option.some(value),
-                    key: [value],
+                    orderKey: [value],
                   }),
               ),
             ),
@@ -346,7 +355,7 @@ describe.each(["asc", "desc"] as const)(
                 reads++;
                 return new QueryStream.Element({
                   doc: Option.some("apple"),
-                  key: ["apple", 1, "id"],
+                  orderKey: ["apple", 1, "id"],
                 });
               }),
             ),
@@ -412,7 +421,7 @@ describe.each(["asc", "desc"] as const)(
               (id) =>
                 new QueryStream.Element({
                   doc: Option.some(id),
-                  key: ["apple", 1, id],
+                  orderKey: ["apple", 1, id],
                 }),
             ),
           ),
@@ -450,7 +459,7 @@ describe.each(["asc", "desc"] as const)(
           order,
           Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
           Stream.make(
-            new QueryStream.Element({ doc: Option.some(1), key: [1] }),
+            new QueryStream.Element({ doc: Option.some(1), orderKey: [1] }),
           ),
         );
         const result = yield* QueryStream.paginate(source, {
@@ -470,9 +479,9 @@ describe.each(["asc", "desc"] as const)(
 
 describe("QueryStream", () => {
   const elements = [
-    new QueryStream.Element({ doc: Option.some(1), key: [1] }),
-    new QueryStream.Element({ doc: Option.none<number>(), key: [2] }),
-    new QueryStream.Element({ doc: Option.some(3), key: [3] }),
+    new QueryStream.Element({ doc: Option.some(1), orderKey: [1] }),
+    new QueryStream.Element({ doc: Option.none<number>(), orderKey: [2] }),
+    new QueryStream.Element({ doc: Option.some(3), orderKey: [3] }),
   ];
   const source = new QueryStream.QueryStream(
     "asc",
@@ -497,9 +506,9 @@ describe("QueryStream", () => {
         const result = yield* Stream.runCollect(transformed.annotated);
 
         expect(result).toEqual([
-          new QueryStream.Element({ doc: Option.none(), key: [1] }),
-          new QueryStream.Element({ doc: Option.none(), key: [2] }),
-          new QueryStream.Element({ doc: Option.some("3"), key: [3] }),
+          new QueryStream.Element({ doc: Option.none(), orderKey: [1] }),
+          new QueryStream.Element({ doc: Option.none(), orderKey: [2] }),
+          new QueryStream.Element({ doc: Option.some("3"), orderKey: [3] }),
         ]);
         for (const element of result) {
           expect(element).toBeInstanceOf(QueryStream.Element);
@@ -524,9 +533,9 @@ describe("QueryStream", () => {
 
         expect(visited).toEqual([1, 3]);
         expect(result).toEqual([
-          new QueryStream.Element({ doc: Option.some("1"), key: [1] }),
-          new QueryStream.Element({ doc: Option.none(), key: [2] }),
-          new QueryStream.Element({ doc: Option.some("3"), key: [3] }),
+          new QueryStream.Element({ doc: Option.some("1"), orderKey: [1] }),
+          new QueryStream.Element({ doc: Option.none(), orderKey: [2] }),
+          new QueryStream.Element({ doc: Option.some("3"), orderKey: [3] }),
         ]);
         for (const element of result) {
           expect(element).toBeInstanceOf(QueryStream.Element);

@@ -290,7 +290,7 @@ type BoundTag = "gt" | "gte" | "lt" | "lte";
 type IndexEntries = ReturnType<typeof QueryStreamKey.indexEntries>;
 
 class TaggedBound extends Data.Class<{
-  readonly entries: IndexEntries;
+  readonly indexEntries: IndexEntries;
   readonly tag: BoundTag;
 }> {}
 
@@ -304,18 +304,18 @@ const excludePrefix = (tag: BoundTag): BoundTag =>
  * Peel a bound down to the single entry that feeds the middle range.
  */
 const peelBound = (
-  entries: IndexEntries,
+  indexEntries: IndexEntries,
   tag: BoundTag,
 ): {
   readonly peeled: ReadonlyArray<TaggedBound>;
   readonly final: TaggedBound;
 } =>
-  entries.length <= 1
-    ? { peeled: [], final: new TaggedBound({ entries, tag }) }
+  indexEntries.length <= 1
+    ? { peeled: [], final: new TaggedBound({ indexEntries, tag }) }
     : pipe(
-        peelBound(Array.dropRight(entries, 1), excludePrefix(tag)),
+        peelBound(Array.dropRight(indexEntries, 1), excludePrefix(tag)),
         ({ final, peeled }) => ({
-          peeled: Array.prepend(peeled, new TaggedBound({ entries, tag })),
+          peeled: Array.prepend(peeled, new TaggedBound({ indexEntries, tag })),
           final,
         }),
       );
@@ -325,16 +325,16 @@ const peelBound = (
  */
 const rangeFor = (
   prefix: ReadonlyArray<Equality>,
-  entries: IndexEntries,
+  indexEntries: IndexEntries,
   tag: BoundTag,
 ): QueryStreamIndexRange =>
-  Option.match(Array.last(entries), {
+  Option.match(Array.last(indexEntries), {
     onNone: () => make({ equalities: prefix, bounded: Option.none() }),
     onSome: ([fieldPath, value]) =>
       make({
         equalities: Array.appendAll(
           prefix,
-          Array.map(Array.dropRight(entries, 1), ([path, pinned]) => ({
+          Array.map(Array.dropRight(indexEntries, 1), ([path, pinned]) => ({
             fieldPath: path,
             value: pinned,
           })),
@@ -365,10 +365,10 @@ export const fromBounds = (
   QueryStreamKey.KeyWidthMismatchError
 > =>
   Result.gen(function* () {
-    const lowerEntries = QueryStreamKey.indexEntries(
+    const lowerIndexEntries = QueryStreamKey.indexEntries(
       yield* QueryStreamKey.indexPrefix(fieldPaths, bounds.lower.orderKey),
     );
-    const upperEntries = QueryStreamKey.indexEntries(
+    const upperIndexEntries = QueryStreamKey.indexEntries(
       yield* QueryStreamKey.indexPrefix(fieldPaths, bounds.upper.orderKey),
     );
     // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
@@ -387,52 +387,54 @@ export const fromBounds = (
       Array.length,
     );
     const equalities = pipe(
-      Array.take(lowerEntries, commonLength),
+      Array.take(lowerIndexEntries, commonLength),
       Array.map(([fieldPath, value]) => ({ fieldPath, value })),
     );
 
     const lower = peelBound(
-      Array.drop(lowerEntries, commonLength),
+      Array.drop(lowerIndexEntries, commonLength),
       bounds.lower.inclusive ? "gte" : "gt",
     );
     const upper = peelBound(
-      Array.drop(upperEntries, commonLength),
+      Array.drop(upperIndexEntries, commonLength),
       bounds.upper.inclusive ? "lte" : "lt",
     );
 
-    const startRanges = Array.map(lower.peeled, ({ entries, tag }) =>
-      rangeFor(equalities, entries, tag),
+    const startRanges = Array.map(lower.peeled, ({ indexEntries, tag }) =>
+      rangeFor(equalities, indexEntries, tag),
     );
     const endRanges = Array.reverse(
-      Array.map(upper.peeled, ({ entries, tag }) =>
-        rangeFor(equalities, entries, tag),
+      Array.map(upper.peeled, ({ indexEntries, tag }) =>
+        rangeFor(equalities, indexEntries, tag),
       ),
     );
 
-    const { entries: lowerFinalKey, tag: lowerFinalTag } = lower.final;
-    const { entries: upperFinalKey, tag: upperFinalTag } = upper.final;
+    const { indexEntries: lowerFinalIndexEntries, tag: lowerFinalTag } =
+      lower.final;
+    const { indexEntries: upperFinalIndexEntries, tag: upperFinalTag } =
+      upper.final;
     const middleRange =
-      Array.isReadonlyArrayNonEmpty(lowerFinalKey) &&
-      Array.isReadonlyArrayNonEmpty(upperFinalKey)
+      Array.isReadonlyArrayNonEmpty(lowerFinalIndexEntries) &&
+      Array.isReadonlyArrayNonEmpty(upperFinalIndexEntries)
         ? make({
             equalities,
             bounded: Option.some({
-              fieldPath: Array.headNonEmpty(lowerFinalKey)[0],
+              fieldPath: Array.headNonEmpty(lowerFinalIndexEntries)[0],
               interval: Interval.Between({
                 lower: {
-                  value: Array.headNonEmpty(lowerFinalKey)[1],
+                  value: Array.headNonEmpty(lowerFinalIndexEntries)[1],
                   inclusive: lowerFinalTag === "gte",
                 },
                 upper: {
-                  value: Array.headNonEmpty(upperFinalKey)[1],
+                  value: Array.headNonEmpty(upperFinalIndexEntries)[1],
                   inclusive: upperFinalTag === "lte",
                 },
               }),
             }),
           })
-        : Array.isReadonlyArrayNonEmpty(lowerFinalKey)
-          ? rangeFor(equalities, lowerFinalKey, lowerFinalTag)
-          : rangeFor(equalities, upperFinalKey, upperFinalTag);
+        : Array.isReadonlyArrayNonEmpty(lowerFinalIndexEntries)
+          ? rangeFor(equalities, lowerFinalIndexEntries, lowerFinalTag)
+          : rangeFor(equalities, upperFinalIndexEntries, upperFinalTag);
 
     const ranges = Array.appendAll(
       Array.appendAll(startRanges, Array.of(middleRange)),
