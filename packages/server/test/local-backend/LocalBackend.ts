@@ -5,7 +5,6 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Schedule from "effect/Schedule";
@@ -58,7 +57,7 @@ export const maxCacheAge = Duration.seconds(
  * CLI takes the "existing deployment" path and skips boilerplate codegen that
  * would otherwise overwrite committed fixture files.
  */
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const path = yield* Path.Path;
   const spawner = yield* ChildProcessSpawner;
   const parentScope = yield* Effect.scope;
@@ -93,26 +92,24 @@ export const make = Effect.gen(function* () {
     const attemptScope = yield* Scope.fork(parentScope);
     return yield* Effect.gen(function* () {
       const handle = yield* spawner.spawn(command);
-      let versionLookupFailed = false;
-      const readySeen = yield* Stream.merge(
+      const { readySeen, versionLookupFailed } = yield* Stream.merge(
         handle.stdout.pipe(Stream.decodeText(), Stream.splitLines),
         handle.stderr.pipe(Stream.decodeText(), Stream.splitLines),
       ).pipe(
-        Stream.tap((line) =>
-          Effect.sync(() => {
-            if (
+        Stream.takeUntil((line) => line.includes(READY_LINE)),
+        Stream.runFold(
+          () => ({ readySeen: false, versionLookupFailed: false }),
+          (state, line) => ({
+            readySeen: line.includes(READY_LINE),
+            versionLookupFailed:
+              state.versionLookupFailed ||
               line.includes("Failed to fetch latest backend version") ||
-              /version\.convex\.dev returned (?:429|5\d{2}):/.test(line)
-            ) {
-              versionLookupFailed = true;
-            }
+              /version\.convex\.dev returned (?:429|5\d{2}):/.test(line),
           }),
         ),
-        Stream.filter((line) => line.includes(READY_LINE)),
-        Stream.runHead,
       );
 
-      if (Option.isSome(readySeen)) {
+      if (readySeen) {
         return { client: new ConvexHttpClient(URL) };
       }
 
