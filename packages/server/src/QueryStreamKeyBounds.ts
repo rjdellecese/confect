@@ -3,7 +3,6 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import type * as Record from "effect/Record";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
-import type { QueryStreamOrderKey as OrderKey } from "./QueryStreamOrderKey";
 
 // A bound's key may be a *prefix* of the full key: bounding by `["a"]` means
 // bounding by the whole family of keys that start with `"a"`. To compare
@@ -18,7 +17,7 @@ import type { QueryStreamOrderKey as OrderKey } from "./QueryStreamOrderKey";
  * @experimental
  */
 export interface KeyBound {
-  readonly key: OrderKey;
+  readonly key: QueryStreamOrderKey.QueryStreamOrderKey;
   readonly inclusive: boolean;
 }
 
@@ -48,7 +47,7 @@ export interface IndexBounds {
 type CutKind = "predecessor" | "exact" | "successor";
 
 interface KeyCut {
-  readonly key: OrderKey;
+  readonly key: QueryStreamOrderKey.QueryStreamOrderKey;
   readonly kind: CutKind;
 }
 
@@ -80,7 +79,10 @@ const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
   return selfIsShorter ? shorterOrdering : (-shorterOrdering as -1 | 1);
 });
 
-const exactCut = (key: OrderKey): KeyCut => ({ key, kind: "exact" });
+const exactCut = (key: QueryStreamOrderKey.QueryStreamOrderKey): KeyCut => ({
+  key,
+  kind: "exact",
+});
 
 const lowerCut = (bound: KeyBound): KeyCut => ({
   key: bound.key,
@@ -158,7 +160,7 @@ export const intersectIndexBounds = (
  */
 export const admittedByLower =
   (lower: Option.Option<KeyBound>) =>
-  (key: OrderKey): boolean =>
+  (key: QueryStreamOrderKey.QueryStreamOrderKey): boolean =>
     Option.match(lower, {
       onNone: () => true,
       onSome: (bound) => KeyCutOrder(exactCut(key), lowerCut(bound)) > 0,
@@ -171,7 +173,7 @@ export const admittedByLower =
  */
 export const admittedByUpper =
   (upper: Option.Option<KeyBound>) =>
-  (key: OrderKey): boolean =>
+  (key: QueryStreamOrderKey.QueryStreamOrderKey): boolean =>
     Option.match(upper, {
       onNone: () => true,
       onSome: (bound) => KeyCutOrder(exactCut(key), upperCut(bound)) < 0,
