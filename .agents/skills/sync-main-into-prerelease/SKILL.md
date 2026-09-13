@@ -28,7 +28,7 @@ workflows may stack on its open PR, but must not implement their own sync logic.
 The repository audit enforces the invariant:
 
 ```bash
-node scripts/auditPrereleaseSync.mjs --main-ref origin/main --head-ref HEAD
+bun run scripts/auditPrereleaseSync.ts --main-ref origin/main --head-ref HEAD
 ```
 
 ## Build the sync
