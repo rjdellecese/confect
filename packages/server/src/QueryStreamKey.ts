@@ -4,23 +4,31 @@ import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
 import type * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 
-const CompleteTypeId = "~@confect/server/QueryStreamKey/Complete";
-const PrefixTypeId = "~@confect/server/QueryStreamKey/Prefix";
+const TypeId = "~@confect/server/QueryStreamKey";
 const IndexPrefixTypeId = "~@confect/server/QueryStreamKey/IndexPrefix";
 
+interface Payload {
+  readonly layout: QueryStreamKeyLayout.QueryStreamKeyLayout;
+  readonly values: QueryStreamOrderKey.QueryStreamOrderKey;
+}
+
+// The tag stays inside the opaque payload so changing an outer tag cannot
+// promote a prefix to a complete key without parsing it.
+type State = Data.TaggedEnum<{
+  Complete: Payload;
+  Prefix: Payload;
+}>;
+const State = Data.taggedEnum<State>();
+
 export interface Complete {
-  readonly [CompleteTypeId]: {
-    readonly layout: QueryStreamKeyLayout.QueryStreamKeyLayout;
-    readonly values: QueryStreamOrderKey.QueryStreamOrderKey;
-  };
+  readonly [TypeId]: Data.TaggedEnum.Value<State, "Complete">;
 }
 
 export interface Prefix {
-  readonly [PrefixTypeId]: {
-    readonly layout: QueryStreamKeyLayout.QueryStreamKeyLayout;
-    readonly values: QueryStreamOrderKey.QueryStreamOrderKey;
-  };
+  readonly [TypeId]: Data.TaggedEnum.Value<State, "Prefix">;
 }
+
+export type QueryStreamKey = Complete | Prefix;
 
 /**
  * Index coordinates retain the path belonging to each value.
@@ -51,7 +59,7 @@ export const complete = (
 ): Result.Result<Complete, KeyWidthMismatchError> => {
   const width = QueryStreamKeyLayout.runtimeWidth(layout);
   return values.length === width
-    ? Result.succeed({ [CompleteTypeId]: { layout, values } })
+    ? Result.succeed({ [TypeId]: State.Complete({ layout, values }) })
     : Result.fail(
         new KeyWidthMismatchError({
           kind: "complete",
@@ -67,7 +75,7 @@ export const prefix = (
 ): Result.Result<Prefix, KeyWidthMismatchError> => {
   const width = QueryStreamKeyLayout.runtimeWidth(layout);
   return values.length <= width
-    ? Result.succeed({ [PrefixTypeId]: { layout, values } })
+    ? Result.succeed({ [TypeId]: State.Prefix({ layout, values }) })
     : Result.fail(
         new KeyWidthMismatchError({
           kind: "prefix",
@@ -78,17 +86,11 @@ export const prefix = (
 };
 
 export const values = (
-  self: Complete,
-): QueryStreamOrderKey.QueryStreamOrderKey => self[CompleteTypeId].values;
+  self: QueryStreamKey,
+): QueryStreamOrderKey.QueryStreamOrderKey => self[TypeId].values;
 export const layout = (
-  self: Complete,
-): QueryStreamKeyLayout.QueryStreamKeyLayout => self[CompleteTypeId].layout;
-export const prefixValues = (
-  self: Prefix,
-): QueryStreamOrderKey.QueryStreamOrderKey => self[PrefixTypeId].values;
-export const asPrefix = (self: Complete): Prefix => ({
-  [PrefixTypeId]: self[CompleteTypeId],
-});
+  self: QueryStreamKey,
+): QueryStreamKeyLayout.QueryStreamKeyLayout => self[TypeId].layout;
 
 export const indexPrefix = (
   fieldPaths: ReadonlyArray<string>,
@@ -113,6 +115,6 @@ export const indexEntries = (self: IndexPrefix): IndexEntries =>
 export const toIndexPrefix = (
   fieldPaths: ReadonlyArray<string>,
   equalities: QueryStreamOrderKey.QueryStreamOrderKey,
-  self: Prefix,
+  self: QueryStreamKey,
 ): Result.Result<IndexPrefix, KeyWidthMismatchError> =>
-  indexPrefix(fieldPaths, Array.appendAll(equalities, prefixValues(self)));
+  indexPrefix(fieldPaths, Array.appendAll(equalities, values(self)));

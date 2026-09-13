@@ -218,7 +218,7 @@ export interface ParsedBounds {
 }
 
 const rawBound = (bound: ParsedBound): KeyBound => ({
-  orderKey: QueryStreamKey.prefixValues(bound.orderKey),
+  orderKey: QueryStreamKey.values(bound.orderKey),
   inclusive: bound.inclusive,
 });
 

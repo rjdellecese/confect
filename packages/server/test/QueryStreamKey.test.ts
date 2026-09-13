@@ -3,12 +3,16 @@ import * as Key from "@confect/server/QueryStreamKey";
 import * as Layout from "@confect/server/QueryStreamKeyLayout";
 import * as IndexRange from "@confect/server/QueryStreamIndexRange";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Result from "effect/Result";
 
 const layout = Result.getOrThrow(Layout.fromIndex(["score"]));
 
 describe("QueryStreamKey", () => {
   it("distinguishes complete keys, stream prefixes, and index prefixes", () => {
+    expectTypeOf<Key.Complete>().toExtend<Key.QueryStreamKey>();
+    expectTypeOf<Key.Prefix>().toExtend<Key.QueryStreamKey>();
+    expectTypeOf<Key.IndexPrefix>().not.toExtend<Key.QueryStreamKey>();
     expectTypeOf<Key.Complete>().not.toExtend<Key.Prefix>();
     expectTypeOf<Key.Prefix>().not.toExtend<Key.Complete>();
     expectTypeOf<Key.Prefix>().not.toExtend<Key.IndexPrefix>();
@@ -16,15 +20,46 @@ describe("QueryStreamKey", () => {
     const values = Object.freeze([3, "id"]);
     const key = Result.getOrThrow(Key.complete(layout, values));
     expect(Key.values(key)).toBe(values);
-    expect(Key.prefixValues(Key.asPrefix(key))).toBe(values);
     expect(Key.layout(key)).toBe(layout);
     for (const prefix of [[], [3], values]) {
-      expect(Result.isSuccess(Key.prefix(layout, prefix))).toBe(true);
+      const parsed = Result.getOrThrow(Key.prefix(layout, prefix));
+      expect(Key.values(parsed)).toBe(prefix);
+      expect(Key.layout(parsed)).toBe(layout);
+      const retagged = { ...parsed, _tag: "Complete" as const };
+      expectTypeOf<typeof retagged>().not.toExtend<Key.Complete>();
     }
     for (const invalid of [[], [3], [3, "id", 4]]) {
       expect(Result.isFailure(Key.complete(layout, invalid))).toBe(true);
     }
     expect(Result.isFailure(Key.prefix(layout, [3, "id", 4]))).toBe(true);
+  });
+
+  it("reads either parsing guarantee through the shared key type", () => {
+    const keys: ReadonlyArray<Key.QueryStreamKey> = [
+      Result.getOrThrow(Key.complete(layout, [3, "id"])),
+      Result.getOrThrow(Key.prefix(layout, [3])),
+    ];
+    expect(Array.map(keys, Key.values)).toEqual([[3, "id"], [3]]);
+    expect(Array.map(keys, Key.layout)).toEqual([layout, layout]);
+    expect(
+      Array.map(keys, (key) =>
+        Key.indexEntries(
+          Result.getOrThrow(
+            Key.toIndexPrefix(["category", "score", "_id"], ["a"], key),
+          ),
+        ),
+      ),
+    ).toEqual([
+      [
+        ["category", "a"],
+        ["score", 3],
+        ["_id", "id"],
+      ],
+      [
+        ["category", "a"],
+        ["score", 3],
+      ],
+    ]);
   });
 
   it("accepts complete zero-width keys", () => {
