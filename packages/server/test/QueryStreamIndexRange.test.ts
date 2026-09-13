@@ -52,20 +52,20 @@ describe("QueryStreamIndexRange.builder", () => {
     const lower = pinned.gt("score", 1);
     const upper = pinned.lte("score", 5);
     expect(QueryStreamIndexRange.toBounds(root)).toEqual({
-      lower: { key: [], inclusive: true },
-      upper: { key: [], inclusive: true },
+      lower: { orderKey: [], inclusive: true },
+      upper: { orderKey: [], inclusive: true },
     });
     expect(QueryStreamIndexRange.toBounds(pinned)).toEqual({
-      lower: { key: ["a"], inclusive: true },
-      upper: { key: ["a"], inclusive: true },
+      lower: { orderKey: ["a"], inclusive: true },
+      upper: { orderKey: ["a"], inclusive: true },
     });
     expect(QueryStreamIndexRange.toBounds(lower)).toEqual({
-      lower: { key: ["a", 1], inclusive: false },
-      upper: { key: ["a"], inclusive: true },
+      lower: { orderKey: ["a", 1], inclusive: false },
+      upper: { orderKey: ["a"], inclusive: true },
     });
     expect(QueryStreamIndexRange.toBounds(upper)).toEqual({
-      lower: { key: ["a"], inclusive: true },
-      upper: { key: ["a", 5], inclusive: true },
+      lower: { orderKey: ["a"], inclusive: true },
+      upper: { orderKey: ["a", 5], inclusive: true },
     });
     for (const [range, length] of [
       [root, 0],
@@ -80,7 +80,7 @@ describe("QueryStreamIndexRange.builder", () => {
       expect(range).not.toHaveProperty("eqCount");
     }
     expect(
-      QueryStreamIndexRange.toBounds(root.eq("category", "b")).lower.key,
+      QueryStreamIndexRange.toBounds(root.eq("category", "b")).lower.orderKey,
     ).toEqual(["b"]);
   });
 
@@ -221,16 +221,16 @@ describe("QueryStreamIndexRange.apply", () => {
 describe("QueryStreamIndexRange.toBounds", () => {
   it("keeps an unconstrained range unbounded and pins equalities on both endpoints", () => {
     expect(QueryStreamIndexRange.toBounds(builder())).toEqual({
-      lower: { key: [], inclusive: true },
-      upper: { key: [], inclusive: true },
+      lower: { orderKey: [], inclusive: true },
+      upper: { orderKey: [], inclusive: true },
     });
     expect(
       QueryStreamIndexRange.toBounds(
         builder().eq("category", "a").eq("score", 2),
       ),
     ).toEqual({
-      lower: { key: ["a", 2], inclusive: true },
-      upper: { key: ["a", 2], inclusive: true },
+      lower: { orderKey: ["a", 2], inclusive: true },
+      upper: { orderKey: ["a", 2], inclusive: true },
     });
   });
 
@@ -239,23 +239,23 @@ describe("QueryStreamIndexRange.toBounds", () => {
     (lowerTag) => {
       const lower = builder().eq("category", "a")[lowerTag]("score", 1);
       expect(QueryStreamIndexRange.toBounds(lower)).toEqual({
-        lower: { key: ["a", 1], inclusive: lowerTag === "gte" },
-        upper: { key: ["a"], inclusive: true },
+        lower: { orderKey: ["a", 1], inclusive: lowerTag === "gte" },
+        upper: { orderKey: ["a"], inclusive: true },
       });
       for (const upperTag of ["lt", "lte"] as const) {
         expect(
           QueryStreamIndexRange.toBounds(lower[upperTag]("score", 5)),
         ).toEqual({
-          lower: { key: ["a", 1], inclusive: lowerTag === "gte" },
-          upper: { key: ["a", 5], inclusive: upperTag === "lte" },
+          lower: { orderKey: ["a", 1], inclusive: lowerTag === "gte" },
+          upper: { orderKey: ["a", 5], inclusive: upperTag === "lte" },
         });
         expect(
           QueryStreamIndexRange.toBounds(
             builder().eq("category", "a")[upperTag]("score", 5),
           ),
         ).toEqual({
-          lower: { key: ["a"], inclusive: true },
-          upper: { key: ["a", 5], inclusive: upperTag === "lte" },
+          lower: { orderKey: ["a"], inclusive: true },
+          upper: { orderKey: ["a", 5], inclusive: upperTag === "lte" },
         });
       }
     },
@@ -267,21 +267,21 @@ describe("QueryStreamIndexRange.fromBounds", () => {
     "decomposes a compound interval in %s order",
     (order) => {
       const bounds = {
-        lower: { key: [1, 2, 3], inclusive: false },
-        upper: { key: [1, 3, 2], inclusive: true },
+        lower: { orderKey: [1, 2, 3], inclusive: false },
+        upper: { orderKey: [1, 3, 2], inclusive: true },
       };
       const expected = [
         {
-          lower: { key: [1, 2, 3], inclusive: false },
-          upper: { key: [1, 2], inclusive: true },
+          lower: { orderKey: [1, 2, 3], inclusive: false },
+          upper: { orderKey: [1, 2], inclusive: true },
         },
         {
-          lower: { key: [1, 2], inclusive: false },
-          upper: { key: [1, 3], inclusive: false },
+          lower: { orderKey: [1, 2], inclusive: false },
+          upper: { orderKey: [1, 3], inclusive: false },
         },
         {
-          lower: { key: [1, 3], inclusive: true },
-          upper: { key: [1, 3, 2], inclusive: true },
+          lower: { orderKey: [1, 3], inclusive: true },
+          upper: { orderKey: [1, 3, 2], inclusive: true },
         },
       ];
       const ranges = QueryStreamIndexRange.fromBounds(
@@ -335,15 +335,17 @@ describe("QueryStreamIndexRange.fromBounds", () => {
       ];
       const ordered = order === "asc" ? keys : keys.toReversed();
       const endpoints = [[], [0], [1], ...keys].flatMap((key) =>
-        [true, false].map((inclusive) => ({ key, inclusive })),
+        [true, false].map((inclusive) => ({ orderKey: key, inclusive })),
       );
       const admits =
         (bounds: QueryStreamKeyBounds.IndexBounds) =>
-        (key: ReadonlyArray<number>) =>
+        (orderKey: ReadonlyArray<number>) =>
           QueryStreamKeyBounds.admittedByLower(Option.some(bounds.lower))(
-            key,
+            orderKey,
           ) &&
-          QueryStreamKeyBounds.admittedByUpper(Option.some(bounds.upper))(key);
+          QueryStreamKeyBounds.admittedByUpper(Option.some(bounds.upper))(
+            orderKey,
+          );
       for (const lower of endpoints)
         for (const upper of endpoints) {
           const bounds = { lower, upper };
@@ -366,32 +368,32 @@ describe("QueryStreamIndexRange.fromBounds", () => {
     (order) => {
       const cases: ReadonlyArray<QueryStreamKeyBounds.IndexBounds> = [
         {
-          lower: { key: [2], inclusive: true },
-          upper: { key: [1], inclusive: true },
+          lower: { orderKey: [2], inclusive: true },
+          upper: { orderKey: [1], inclusive: true },
         },
         {
-          lower: { key: [1], inclusive: false },
-          upper: { key: [1], inclusive: true },
+          lower: { orderKey: [1], inclusive: false },
+          upper: { orderKey: [1], inclusive: true },
         },
         {
-          lower: { key: [1], inclusive: true },
-          upper: { key: [1], inclusive: false },
+          lower: { orderKey: [1], inclusive: true },
+          upper: { orderKey: [1], inclusive: false },
         },
         {
-          lower: { key: [1], inclusive: false },
-          upper: { key: [1], inclusive: false },
+          lower: { orderKey: [1], inclusive: false },
+          upper: { orderKey: [1], inclusive: false },
         },
         {
-          lower: { key: [1], inclusive: false },
-          upper: { key: [1, 2], inclusive: true },
+          lower: { orderKey: [1], inclusive: false },
+          upper: { orderKey: [1, 2], inclusive: true },
         },
         {
-          lower: { key: [1, 2], inclusive: true },
-          upper: { key: [1], inclusive: false },
+          lower: { orderKey: [1, 2], inclusive: true },
+          upper: { orderKey: [1], inclusive: false },
         },
         {
-          lower: { key: [], inclusive: false },
-          upper: { key: [], inclusive: true },
+          lower: { orderKey: [], inclusive: false },
+          upper: { orderKey: [], inclusive: true },
         },
       ];
       for (const bounds of cases) {

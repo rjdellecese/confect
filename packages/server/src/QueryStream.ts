@@ -510,7 +510,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
     (fieldPath) => String.split(fieldPath, "."),
   );
   // `eq`-pinned values form a shared prefix of both bound keys.
-  const eqValues = Array.take(bounds.lower.key, equalityPrefixLength);
+  const eqValues = Array.take(bounds.lower.orderKey, equalityPrefixLength);
   const ranges = QueryStreamIndexRange.fromBounds(
     fullFieldPaths,
     reflection.order,
@@ -553,7 +553,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   );
 
   const toFullKeySpace = (bound: KeyBound): KeyBound => ({
-    key: Array.appendAll(eqValues, bound.key),
+    orderKey: Array.appendAll(eqValues, bound.orderKey),
     inclusive: bound.inclusive,
   });
 
@@ -1378,18 +1378,18 @@ const makeFlatMap = <
     }),
   );
 
-  const split = ({ key, inclusive }: KeyBound): FlatMapBound =>
-    key.length <= outerLength
-      ? FlatMapBound.Outer({ key, inclusive })
+  const split = ({ orderKey, inclusive }: KeyBound): FlatMapBound =>
+    orderKey.length <= outerLength
+      ? FlatMapBound.Outer({ orderKey, inclusive })
       : FlatMapBound.Inner({
-          outer: Array.take(key, outerLength),
-          inner: { key: Array.drop(key, outerLength), inclusive },
+          outer: Array.take(orderKey, outerLength),
+          inner: { orderKey: Array.drop(orderKey, outerLength), inclusive },
         });
 
   const outerBound = (bound: FlatMapBound): KeyBound =>
     FlatMapBound.$match(bound, {
-      Outer: ({ key, inclusive }) => ({ key, inclusive }),
-      Inner: ({ outer }) => ({ key: outer, inclusive: true }),
+      Outer: ({ orderKey, inclusive }) => ({ orderKey, inclusive }),
+      Inner: ({ outer }) => ({ orderKey: outer, inclusive: true }),
     });
 
   return new QueryStream(
@@ -1586,9 +1586,9 @@ const makeDistinct = <
   order: Direction,
   bounds: KeyBounds,
 ): QueryStream<Doc, Labels, Direction, E, R> => {
-  const afterKey = (key: OrderKey): KeyBounds => {
+  const afterKey = (orderKey: OrderKey): KeyBounds => {
     const pastGroup: KeyBound = {
-      key,
+      orderKey,
       inclusive: false,
     };
     return order === "asc"
@@ -1598,9 +1598,9 @@ const makeDistinct = <
   const groupBound = (
     bound: Option.Option<KeyBound>,
   ): Option.Option<KeyBound> =>
-    Option.map(bound, ({ inclusive, key }) => ({
-      key: Array.take(key, distinctLength),
-      inclusive: key.length > distinctLength || inclusive,
+    Option.map(bound, ({ inclusive, orderKey }) => ({
+      orderKey: Array.take(orderKey, distinctLength),
+      inclusive: orderKey.length > distinctLength || inclusive,
     }));
   const isAdmitted = (key: OrderKey) =>
     QueryStreamKeyBounds.admittedByLower(bounds.lower)(key) &&
@@ -1641,8 +1641,8 @@ const makeDistinct = <
               narrowByKeyBounds(current, afterKey(prefix)),
             );
             const { firstKey, selected } = yield* narrowByKeyBounds(self, {
-              lower: Option.some({ key: prefix, inclusive: true }),
-              upper: Option.some({ key: prefix, inclusive: true }),
+              lower: Option.some({ orderKey: prefix, inclusive: true }),
+              upper: Option.some({ orderKey: prefix, inclusive: true }),
             }).annotated.pipe(
               Stream.run(
                 Sink.fold(
@@ -1740,7 +1740,7 @@ export const reverse = <
 
 /**
  * Restrict a stream to keys between `start` and `end`. Provide at least one
- * endpoint, each with key values and a required `inclusive` flag; omit the
+ * endpoint, each with an `orderKey` and a required `inclusive` flag; omit the
  * other endpoint to leave that side unbounded.
  *
  * Endpoints follow stream order: `start` is the lower key when ascending and
@@ -2084,8 +2084,14 @@ export const paginate: {
       });
     }
 
-    const start = Option.map(after, (key) => ({ key, inclusive: false }));
-    const end = Option.map(until, (key) => ({ key, inclusive: true }));
+    const start = Option.map(after, (orderKey) => ({
+      orderKey,
+      inclusive: false,
+    }));
+    const end = Option.map(until, (orderKey) => ({
+      orderKey,
+      inclusive: true,
+    }));
     const narrowed = narrowByKeyBounds(
       self,
       self.order === "asc"

@@ -419,14 +419,14 @@ Operation order determines which document represents each group. Apply `filter` 
 
 ### Narrow to a key range
 
-`QueryStream.narrow` restricts a stream to the order keys between `start` and `end`. Each endpoint has a `key` and a required `inclusive` flag, so you can choose any combination of inclusive and exclusive bounds. Provide at least one endpoint; omit the other to leave that side unbounded.
+`QueryStream.narrow` restricts a stream to the order keys between `start` and `end`. Each endpoint has an `orderKey` and a required `inclusive` flag, so you can choose any combination of inclusive and exclusive bounds. Provide at least one endpoint; omit the other to leave that side unbounded.
 
 Endpoints follow **stream order**: on an ascending stream, `start` is the lower key; on a descending stream, it is the upper key. Narrowing intersects existing bounds, so repeated calls can only restrict the range further.
 
 ```ts
 const between = QueryStream.narrow(reader.table("notes").stream("by_text"), {
-  start: { key: ["banana", 2, "n2"], inclusive: false },
-  end: { key: ["cherry", 4, "n4"], inclusive: true },
+  start: { orderKey: ["banana", 2, "n2"], inclusive: false },
+  end: { orderKey: ["cherry", 4, "n4"], inclusive: true },
 });
 ```
 
@@ -460,8 +460,8 @@ const duringDay = reader
   .stream("by_creation_time")
   .pipe(
     QueryStream.narrow({
-      start: { key: [startTime], inclusive: true },
-      end: { key: [endTime], inclusive: false },
+      start: { orderKey: [startTime], inclusive: true },
+      end: { orderKey: [endTime], inclusive: false },
     }),
   );
 ```
