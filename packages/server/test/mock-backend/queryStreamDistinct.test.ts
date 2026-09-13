@@ -133,18 +133,18 @@ describe("QueryStream distinct representatives", () => {
 
           const a2 = rows.find((row) => row.tag === "a2");
           assert(a2 !== undefined);
-          const key = [a2.text, a2._creationTime, a2._id];
+          const orderKey = [a2.text, a2._creationTime, a2._id];
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                start: { orderKey: key, inclusive: true },
+                start: { orderKey: orderKey, inclusive: true },
               }),
             ),
           ).toEqual([]);
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                end: { orderKey: key, inclusive: true },
+                end: { orderKey: orderKey, inclusive: true },
               }),
             ),
           ).toEqual(["a1"]);
@@ -306,34 +306,34 @@ describe("QueryStream distinct representatives", () => {
           const { source, rows } = yield* fixture;
           const a1 = rows.find((row) => row.tag === "a1");
           assert(a1 !== undefined);
-          const key = [a1.text, a1._creationTime, a1._id];
+          const orderKey = [a1.text, a1._creationTime, a1._id];
           const distinct = source.pipe(QueryStream.distinct(["text"]));
 
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                start: { orderKey: key, inclusive: true },
+                start: { orderKey: orderKey, inclusive: true },
               }),
             ),
           ).toEqual(["a1", "b1", "c1"]);
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                start: { orderKey: key, inclusive: false },
+                start: { orderKey: orderKey, inclusive: false },
               }),
             ),
           ).toEqual(["b1", "c1"]);
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                end: { orderKey: key, inclusive: true },
+                end: { orderKey: orderKey, inclusive: true },
               }),
             ),
           ).toEqual(["a1"]);
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                end: { orderKey: key, inclusive: false },
+                end: { orderKey: orderKey, inclusive: false },
               }),
             ),
           ).toEqual([]);

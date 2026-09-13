@@ -63,7 +63,8 @@ import type {
   Flip,
 } from "./QueryStreamOrderDirection";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
-import type { QueryStreamOrderKey as OrderKey } from "./QueryStreamOrderKey";
+import * as QueryStreamIndexPrefix from "./QueryStreamIndexPrefix";
+import * as QueryStreamKey from "./QueryStreamKey";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
 import type {
   KeyBound,
@@ -183,7 +184,7 @@ export type TypeId = typeof TypeId;
  */
 export class Element<Doc> extends Data.Class<{
   readonly doc: Option.Option<Doc>;
-  readonly key: OrderKey;
+  readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey;
 }> {}
 
 // -----------------------------------------------------------------------------
@@ -511,10 +512,9 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   );
   // `eq`-pinned values form a shared prefix of both bound keys.
   const eqValues = Array.take(bounds.lower.orderKey, equalityPrefixLength);
-  const ranges = QueryStreamIndexRange.fromBounds(
-    fullFieldPaths,
-    reflection.order,
-    bounds,
+  const ranges = Result.getOrThrowWith(
+    QueryStreamIndexRange.fromBounds(fullFieldPaths, reflection.order, bounds),
+    identity,
   );
 
   const encodedDocuments = Stream.fromIterable(ranges).pipe(
@@ -543,7 +543,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
         (doc) =>
           new Element({
             doc: Option.some(doc as Doc),
-            key: QueryStreamOrderKey.extract(
+            orderKey: QueryStreamOrderKey.extract(
               encoded as Record.ReadonlyRecord<string, unknown>,
               keyPaths,
             ),
@@ -553,7 +553,20 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   );
 
   const toFullKeySpace = (bound: KeyBound): KeyBound => ({
-    orderKey: Array.appendAll(eqValues, bound.orderKey),
+    orderKey: QueryStreamIndexPrefix.values(
+      Result.getOrThrowWith(
+        Result.flatMap(
+          QueryStreamKey.prefix(keyLayout, bound.orderKey),
+          (prefix) =>
+            QueryStreamIndexPrefix.fromStreamKey(
+              fullFieldPaths,
+              eqValues,
+              prefix,
+            ),
+        ),
+        identity,
+      ),
+    ),
     inclusive: bound.inclusive,
   });
 
@@ -655,7 +668,9 @@ const fillMergeSource = <Doc, E>(
  * exhausted or an input stopped before its next key was known.
  */
 const mergeStep =
-  <Doc, E>(PositionOrder: Order.Order<OrderKey>) =>
+  <Doc, E>(
+    PositionOrder: Order.Order<QueryStreamOrderKey.QueryStreamOrderKey>,
+  ) =>
   (
     sources: ReadonlyArray<MergeSource<Doc, E>>,
   ): Effect.Effect<
@@ -689,7 +704,7 @@ const mergeStep =
                   onNone: () =>
                     Option.some(new MergeCandidate({ index, element: head })),
                   onSome: ({ element: bestElement }) =>
-                    isEarlier(head.key, bestElement.key)
+                    isEarlier(head.orderKey, bestElement.orderKey)
                       ? Option.some(
                           new MergeCandidate({ index, element: head }),
                         )
@@ -842,7 +857,8 @@ const transform = <
     self.keyLayout,
     Stream.map(
       self.annotated,
-      ({ doc, key }) => new Element({ doc: Option.flatMap(doc, f), key }),
+      ({ doc, orderKey }) =>
+        new Element({ doc: Option.flatMap(doc, f), orderKey }),
     ),
     undefined,
     (keyBounds) => transform(narrowByKeyBounds(self, keyBounds), f),
@@ -871,12 +887,15 @@ const transformEffect = <
     self.keyLayout,
     Stream.mapEffect(
       self.annotated,
-      ({ doc, key }) =>
+      ({ doc, orderKey }) =>
         Option.match(doc, {
           onNone: () =>
-            Effect.succeed(new Element({ doc: Option.none<Doc2>(), key })),
+            Effect.succeed(new Element({ doc: Option.none<Doc2>(), orderKey })),
           onSome: (value) =>
-            Effect.map(f(value), (mapped) => new Element({ doc: mapped, key })),
+            Effect.map(
+              f(value),
+              (mapped) => new Element({ doc: mapped, orderKey }),
+            ),
         }),
       // Order is preserved at any concurrency: elements are emitted in
       // input order however their effects finish.
@@ -1166,7 +1185,7 @@ export const flatMap = dual<
  * Inner bounds that apply only to the outer row whose key is `outer`.
  */
 interface InnerRefinement {
-  readonly outer: OrderKey;
+  readonly outer: QueryStreamOrderKey.QueryStreamOrderKey;
   readonly inner: KeyBound;
 }
 
@@ -1257,7 +1276,7 @@ const makeFlatMap = <
   const keyLayout = QueryStreamKeyLayout.concat(self.keyLayout, innerLayout);
   // The inner key of an outer document that contributes no inner elements
   // (filtered out, or an empty inner stream).
-  const nullPadding: OrderKey = Array.makeBy(
+  const nullPadding: QueryStreamOrderKey.QueryStreamOrderKey = Array.makeBy(
     QueryStreamKeyLayout.runtimeWidth(innerLayout),
     () => null,
   );
@@ -1282,7 +1301,9 @@ const makeFlatMap = <
     return inner;
   };
 
-  const innerBoundsFor = (outerKey: OrderKey): KeyBounds => ({
+  const innerBoundsFor = (
+    outerKey: QueryStreamOrderKey.QueryStreamOrderKey,
+  ): KeyBounds => ({
     lower: Option.map(
       Option.filter(
         refinements.lower,
@@ -1306,23 +1327,27 @@ const makeFlatMap = <
   // `onEmpty` placeholder. Either sits at the outer key followed by `null`s,
   // and is emitted only if that position is within the inner bounds.
   const markerStream = (
-    outerKey: OrderKey,
+    outerKey: QueryStreamOrderKey.QueryStreamOrderKey,
     innerBounds: KeyBounds,
     doc: Option.Option<Doc2 | Doc3>,
-  ): Stream.Stream<Element<Doc2 | Doc3>> =>
-    QueryStreamKeyBounds.admittedByLower(innerBounds.lower)(nullPadding) &&
-    QueryStreamKeyBounds.admittedByUpper(innerBounds.upper)(nullPadding)
+  ): Stream.Stream<Element<Doc2 | Doc3>> => {
+    const { aboveLower, belowUpper } = keyPredicates(innerLayout, innerBounds);
+    return aboveLower(nullPadding) && belowUpper(nullPadding)
       ? Stream.succeed(
-          new Element({ doc, key: Array.appendAll(outerKey, nullPadding) }),
+          new Element({
+            doc,
+            orderKey: Array.appendAll(outerKey, nullPadding),
+          }),
         )
       : Stream.empty;
+  };
 
   const annotated: Stream.Stream<
     Element<Doc2 | Doc3>,
     E | E2,
     R | R2
   > = self.annotated.pipe(
-    Stream.flatMap(({ doc: outerDoc, key: outerKey }) => {
+    Stream.flatMap(({ doc: outerDoc, orderKey: outerKey }) => {
       const innerBounds = innerBoundsFor(outerKey);
       return Option.match(outerDoc, {
         onNone: () => markerStream(outerKey, innerBounds, Option.none()),
@@ -1330,10 +1355,10 @@ const makeFlatMap = <
           const inner = validated(f(doc));
           return narrowByKeyBounds(inner, innerBounds).annotated.pipe(
             Stream.map(
-              ({ doc: innerDoc, key: innerKey }) =>
+              ({ doc: innerDoc, orderKey: innerKey }) =>
                 new Element({
                   doc: innerDoc,
-                  key: Array.appendAll(outerKey, innerKey),
+                  orderKey: Array.appendAll(outerKey, innerKey),
                 }),
             ),
             Stream.orElseIfEmpty(() =>
@@ -1586,7 +1611,9 @@ const makeDistinct = <
   order: Direction,
   bounds: KeyBounds,
 ): QueryStream<Doc, Labels, Direction, E, R> => {
-  const afterKey = (orderKey: OrderKey): KeyBounds => {
+  const afterKey = (
+    orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
+  ): KeyBounds => {
     const pastGroup: KeyBound = {
       orderKey,
       inclusive: false,
@@ -1602,9 +1629,9 @@ const makeDistinct = <
       orderKey: Array.take(orderKey, distinctLength),
       inclusive: orderKey.length > distinctLength || inclusive,
     }));
-  const isAdmitted = (key: OrderKey) =>
-    QueryStreamKeyBounds.admittedByLower(bounds.lower)(key) &&
-    QueryStreamKeyBounds.admittedByUpper(bounds.upper)(key);
+  const { aboveLower, belowUpper } = keyPredicates(self.keyLayout, bounds);
+  const isAdmitted = (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
+    aboveLower(orderKey) && belowUpper(orderKey);
   const annotated = Stream.unwrap(
     Effect.map(QueryStreamReadBudget.current, (budgetStatus) =>
       Stream.paginate(
@@ -1625,15 +1652,15 @@ const makeDistinct = <
             const discovered = yield* Stream.runHead(current.annotated);
             if (Option.isNone(discovered)) return Tuple.make([], Option.none());
             const element = discovered.value;
-            const { doc, key } = element;
-            const prefix = Array.take(key, distinctLength);
+            const { doc, orderKey } = element;
+            const prefix = Array.take(orderKey, distinctLength);
             if (order === self.order) {
               const nextKey = Option.match(doc, {
-                onNone: () => key,
+                onNone: () => orderKey,
                 onSome: () => prefix,
               });
               return Tuple.make(
-                isAdmitted(key) ? [element] : [],
+                isAdmitted(orderKey) ? [element] : [],
                 Option.some(narrowByKeyBounds(current, afterKey(nextKey))),
               );
             }
@@ -1647,14 +1674,15 @@ const makeDistinct = <
               Stream.run(
                 Sink.fold(
                   () => ({
-                    firstKey: Option.none<OrderKey>(),
+                    firstKey:
+                      Option.none<QueryStreamOrderKey.QueryStreamOrderKey>(),
                     selected: Option.none<Element<Doc>>(),
                   }),
                   (probe) => Option.isNone(probe.selected),
                   (probe, candidate: Element<Doc>) =>
                     Effect.succeed({
                       firstKey: Option.orElse(probe.firstKey, () =>
-                        Option.some(candidate.key),
+                        Option.some(candidate.orderKey),
                       ),
                       selected: Option.as(candidate.doc, candidate),
                     }),
@@ -1664,16 +1692,21 @@ const makeDistinct = <
             if (Option.isSome(selected)) {
               const representative = selected.value;
               return Tuple.make(
-                isAdmitted(representative.key) ? [representative] : [],
+                isAdmitted(representative.orderKey) ? [representative] : [],
                 next,
               );
             }
             if (yield* QueryStreamReadBudget.isStopped(budgetStatus))
               return Tuple.make([], Option.none());
-            const checkpoint = Option.getOrElse(firstKey, () => key);
+            const checkpoint = Option.getOrElse(firstKey, () => orderKey);
             return Tuple.make(
               isAdmitted(checkpoint)
-                ? [new Element({ doc: Option.none<Doc>(), key: checkpoint })]
+                ? [
+                    new Element({
+                      doc: Option.none<Doc>(),
+                      orderKey: checkpoint,
+                    }),
+                  ]
                 : [],
               next,
             );
@@ -1821,16 +1854,39 @@ const narrowByKeyBounds = <
 >(
   self: QueryStream<Doc, Labels, Direction, E, R>,
   bounds: KeyBounds,
-): QueryStream<Doc, Labels, Direction, E, R> =>
-  Option.isNone(bounds.lower) && Option.isNone(bounds.upper)
+): QueryStream<Doc, Labels, Direction, E, R> => {
+  const parsed = Result.getOrThrowWith(
+    QueryStreamKeyBounds.parse(self.keyLayout, bounds),
+    identity,
+  );
+  return Option.isNone(parsed.lower) && Option.isNone(parsed.upper)
     ? self
     : self.narrowWith !== undefined
-      ? self.narrowWith(bounds)
+      ? self.narrowWith(QueryStreamKeyBounds.toBounds(parsed))
       : narrowInMemory(self, bounds);
+};
 
 /**
  * The fallback for streams that don't know how to rebuild themselves.
  */
+const keyPredicates = (
+  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  bounds: KeyBounds,
+) => {
+  const parsed = Result.getOrThrowWith(
+    QueryStreamKeyBounds.parse(layout, bounds),
+    identity,
+  );
+  const complete = (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
+    Result.getOrThrowWith(QueryStreamKey.complete(layout, orderKey), identity);
+  return {
+    aboveLower: (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
+      QueryStreamKeyBounds.admittedByLower(parsed.lower)(complete(orderKey)),
+    belowUpper: (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
+      QueryStreamKeyBounds.admittedByUpper(parsed.upper)(complete(orderKey)),
+  };
+};
+
 const narrowInMemory = <
   Doc,
   Labels extends ReadonlyArray<string>,
@@ -1845,17 +1901,16 @@ const narrowInMemory = <
     annotated: Stream.Stream<Element<Doc>, E, R>,
   ) => Stream.Stream<Element<Doc>, E, R>;
 
-  const aboveLower = QueryStreamKeyBounds.admittedByLower(bounds.lower);
-  const belowUpper = QueryStreamKeyBounds.admittedByUpper(bounds.upper);
+  const { aboveLower, belowUpper } = keyPredicates(self.keyLayout, bounds);
 
   const dropOutOfRange: Narrower =
     self.order === "asc"
-      ? Stream.dropWhile(({ key }) => !aboveLower(key))
-      : Stream.dropWhile(({ key }) => !belowUpper(key));
+      ? Stream.dropWhile(({ orderKey }) => !aboveLower(orderKey))
+      : Stream.dropWhile(({ orderKey }) => !belowUpper(orderKey));
   const takeInRange: Narrower =
     self.order === "asc"
-      ? Stream.takeWhile(({ key }) => belowUpper(key))
-      : Stream.takeWhile(({ key }) => aboveLower(key));
+      ? Stream.takeWhile(({ orderKey }) => belowUpper(orderKey))
+      : Stream.takeWhile(({ orderKey }) => aboveLower(orderKey));
 
   return new QueryStream(
     self.order,
@@ -1975,14 +2030,16 @@ const PageStop = Data.taggedEnum<PageStop>();
 
 class PaginateState<Doc> extends Data.Class<{
   readonly page: Chunk.Chunk<Doc>;
-  readonly readKeys: Chunk.Chunk<OrderKey>;
+  readonly readKeys: Chunk.Chunk<QueryStreamOrderKey.QueryStreamOrderKey>;
   readonly stop: Option.Option<PageStop>;
 }> {}
 
 /**
  * Where a split page divides: the midpoint of the keys read so far.
  */
-const midpointKey = (readKeys: Chunk.Chunk<OrderKey>): OrderKey =>
+const midpointKey = (
+  readKeys: Chunk.Chunk<QueryStreamOrderKey.QueryStreamOrderKey>,
+): QueryStreamOrderKey.QueryStreamOrderKey =>
   Chunk.getUnsafe(readKeys, Math.floor((Chunk.size(readKeys) - 1) / 2));
 
 /**
@@ -2118,8 +2175,8 @@ export const paginate: {
               stop: Option.none(),
             }),
           (state) => Option.isNone(state.stop),
-          (state, { doc, key }: Element<Doc>) => {
-            const readKeys = Chunk.append(state.readKeys, key);
+          (state, { doc, orderKey }: Element<Doc>) => {
+            const readKeys = Chunk.append(state.readKeys, orderKey);
             const page = Option.match(doc, {
               onNone: () => state.page,
               onSome: (value) => Chunk.append(state.page, value),

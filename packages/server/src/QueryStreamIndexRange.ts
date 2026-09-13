@@ -7,12 +7,14 @@ import type {
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import { identity, pipe } from "effect/Function";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import type * as Types from "effect/Types";
+import * as QueryStreamIndexPrefix from "./QueryStreamIndexPrefix";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
 import type { IndexBounds } from "./QueryStreamKeyBounds";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
-import type { QueryStreamOrderKey as OrderKey } from "./QueryStreamOrderKey";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 
 type Head<FieldPaths extends ReadonlyArray<string>> =
@@ -287,60 +289,61 @@ export const apply = (
 type BoundTag = "gt" | "gte" | "lt" | "lte";
 
 class TaggedBound extends Data.Class<{
-  readonly orderKey: OrderKey;
+  readonly indexEntries: QueryStreamIndexPrefix.IndexEntries;
   readonly tag: BoundTag;
 }> {}
 
 /**
- * Dropping a bound key's last component bounds by the remaining
- * prefix—exclusively.
+ * Dropping a bound's last entry bounds the remaining prefix exclusively.
  */
 const excludePrefix = (tag: BoundTag): BoundTag =>
-  tag === "gt" || tag === "gte" ? "gt" : "lt";
+  Match.value(tag).pipe(
+    Match.whenOr("gt", "gte", () => "gt" as const),
+    Match.whenOr("lt", "lte", () => "lt" as const),
+    Match.exhaustive,
+  );
 
 /**
- * Peel a bound key down to a single component: each peeled entry becomes an
- * exact-prefix segment, the final (shortest) entry feeds the middle range.
+ * Peel a bound down to the single entry that feeds the middle range.
  */
 const peelBound = (
-  orderKey: OrderKey,
+  indexEntries: QueryStreamIndexPrefix.IndexEntries,
   tag: BoundTag,
 ): {
   readonly peeled: ReadonlyArray<TaggedBound>;
   readonly final: TaggedBound;
 } =>
-  orderKey.length <= 1
-    ? { peeled: [], final: new TaggedBound({ orderKey, tag }) }
+  indexEntries.length <= 1
+    ? { peeled: [], final: new TaggedBound({ indexEntries, tag }) }
     : pipe(
-        peelBound(Array.dropRight(orderKey, 1), excludePrefix(tag)),
+        peelBound(Array.dropRight(indexEntries, 1), excludePrefix(tag)),
         ({ final, peeled }) => ({
-          peeled: Array.prepend(peeled, new TaggedBound({ orderKey, tag })),
+          peeled: Array.prepend(peeled, new TaggedBound({ indexEntries, tag })),
           final,
         }),
       );
 
 /**
- * `eq` every component of `orderKey` but the last, which gets the bound tag.
+ * Pin every entry but the last, which gets the bound tag.
  */
 const rangeFor = (
   prefix: ReadonlyArray<Equality>,
-  fieldPaths: ReadonlyArray<string>,
-  orderKey: OrderKey,
+  indexEntries: QueryStreamIndexPrefix.IndexEntries,
   tag: BoundTag,
 ): QueryStreamIndexRange =>
-  Option.match(Array.last(orderKey), {
+  Option.match(Array.last(indexEntries), {
     onNone: () => make({ equalities: prefix, bounded: Option.none() }),
-    onSome: (value) =>
+    onSome: ([fieldPath, value]) =>
       make({
         equalities: Array.appendAll(
           prefix,
-          Array.map(
-            Array.zip(fieldPaths, Array.dropRight(orderKey, 1)),
-            ([fieldPath, pinned]) => ({ fieldPath, value: pinned }),
-          ),
+          Array.map(Array.dropRight(indexEntries, 1), ([path, pinned]) => ({
+            fieldPath: path,
+            value: pinned,
+          })),
         ),
         bounded: Option.some({
-          fieldPath: fieldPaths[orderKey.length - 1]!,
+          fieldPath,
           interval:
             tag === "gt" || tag === "gte"
               ? Interval.Lower({ lower: { value, inclusive: tag === "gte" } })
@@ -360,77 +363,88 @@ export const fromBounds = (
   fieldPaths: ReadonlyArray<string>,
   order: OrderDirection,
   bounds: IndexBounds,
-): ReadonlyArray<QueryStreamIndexRange> => {
-  // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
-  // upper inclusive at `k`—the half-open (k, k]—both cut at
-  // successor(k).
-  if (QueryStreamKeyBounds.isEmpty(bounds)) {
-    return [];
-  }
+): Result.Result<
+  ReadonlyArray<QueryStreamIndexRange>,
+  QueryStreamIndexPrefix.IndexPrefixWidthMismatchError
+> =>
+  Result.gen(function* () {
+    const lowerIndexEntries = QueryStreamIndexPrefix.entries(
+      yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.lower.orderKey),
+    );
+    const upperIndexEntries = QueryStreamIndexPrefix.entries(
+      yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.upper.orderKey),
+    );
+    // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
+    // upper inclusive at `k`—the half-open (k, k]—both cut at
+    // successor(k).
+    if (QueryStreamKeyBounds.isEmpty(bounds)) {
+      return [];
+    }
 
-  const commonLength = pipe(
-    Array.zip(bounds.lower.orderKey, bounds.upper.orderKey),
-    Array.takeWhile(
-      ([lowerValue, upperValue]) =>
-        QueryStreamOrderKey.ValueOrder(lowerValue, upperValue) === 0,
-    ),
-    Array.length,
-  );
-  const equalities = pipe(
-    Array.zip(Array.take(fieldPaths, commonLength), bounds.lower.orderKey),
-    Array.map(([fieldPath, value]) => ({ fieldPath, value })),
-  );
-  const restFieldPaths = Array.drop(fieldPaths, commonLength);
+    const commonLength = pipe(
+      Array.zip(bounds.lower.orderKey, bounds.upper.orderKey),
+      Array.takeWhile(
+        ([lowerValue, upperValue]) =>
+          QueryStreamOrderKey.ValueOrder(lowerValue, upperValue) === 0,
+      ),
+      Array.length,
+    );
+    const equalities = pipe(
+      Array.take(lowerIndexEntries, commonLength),
+      Array.map(([fieldPath, value]) => ({ fieldPath, value })),
+    );
 
-  const lower = peelBound(
-    Array.drop(bounds.lower.orderKey, commonLength),
-    bounds.lower.inclusive ? "gte" : "gt",
-  );
-  const upper = peelBound(
-    Array.drop(bounds.upper.orderKey, commonLength),
-    bounds.upper.inclusive ? "lte" : "lt",
-  );
+    const lower = peelBound(
+      Array.drop(lowerIndexEntries, commonLength),
+      bounds.lower.inclusive ? "gte" : "gt",
+    );
+    const upper = peelBound(
+      Array.drop(upperIndexEntries, commonLength),
+      bounds.upper.inclusive ? "lte" : "lt",
+    );
 
-  const startRanges = Array.map(lower.peeled, ({ orderKey, tag }) =>
-    rangeFor(equalities, restFieldPaths, orderKey, tag),
-  );
-  const endRanges = Array.reverse(
-    Array.map(upper.peeled, ({ orderKey, tag }) =>
-      rangeFor(equalities, restFieldPaths, orderKey, tag),
-    ),
-  );
+    const startRanges = Array.map(lower.peeled, ({ indexEntries, tag }) =>
+      rangeFor(equalities, indexEntries, tag),
+    );
+    const endRanges = Array.reverse(
+      Array.map(upper.peeled, ({ indexEntries, tag }) =>
+        rangeFor(equalities, indexEntries, tag),
+      ),
+    );
 
-  const { orderKey: lowerFinalKey, tag: lowerFinalTag } = lower.final;
-  const { orderKey: upperFinalKey, tag: upperFinalTag } = upper.final;
-  const middleRange =
-    Array.isReadonlyArrayNonEmpty(lowerFinalKey) &&
-    Array.isReadonlyArrayNonEmpty(upperFinalKey)
-      ? make({
-          equalities,
-          bounded: Option.some({
-            fieldPath: restFieldPaths[0]!,
-            interval: Interval.Between({
-              lower: {
-                value: Array.headNonEmpty(lowerFinalKey),
-                inclusive: lowerFinalTag === "gte",
-              },
-              upper: {
-                value: Array.headNonEmpty(upperFinalKey),
-                inclusive: upperFinalTag === "lte",
-              },
+    const { indexEntries: lowerFinalIndexEntries, tag: lowerFinalTag } =
+      lower.final;
+    const { indexEntries: upperFinalIndexEntries, tag: upperFinalTag } =
+      upper.final;
+    const middleRange =
+      Array.isReadonlyArrayNonEmpty(lowerFinalIndexEntries) &&
+      Array.isReadonlyArrayNonEmpty(upperFinalIndexEntries)
+        ? make({
+            equalities,
+            bounded: Option.some({
+              fieldPath: Array.headNonEmpty(lowerFinalIndexEntries)[0],
+              interval: Interval.Between({
+                lower: {
+                  value: Array.headNonEmpty(lowerFinalIndexEntries)[1],
+                  inclusive: lowerFinalTag === "gte",
+                },
+                upper: {
+                  value: Array.headNonEmpty(upperFinalIndexEntries)[1],
+                  inclusive: upperFinalTag === "lte",
+                },
+              }),
             }),
-          }),
-        })
-      : Array.isReadonlyArrayNonEmpty(lowerFinalKey)
-        ? rangeFor(equalities, restFieldPaths, lowerFinalKey, lowerFinalTag)
-        : rangeFor(equalities, restFieldPaths, upperFinalKey, upperFinalTag);
+          })
+        : Array.isReadonlyArrayNonEmpty(lowerFinalIndexEntries)
+          ? rangeFor(equalities, lowerFinalIndexEntries, lowerFinalTag)
+          : rangeFor(equalities, upperFinalIndexEntries, upperFinalTag);
 
-  const ranges = Array.appendAll(
-    Array.appendAll(startRanges, Array.of(middleRange)),
-    endRanges,
-  );
-  return order === "desc" ? Array.reverse(ranges) : ranges;
-};
+    const ranges = Array.appendAll(
+      Array.appendAll(startRanges, Array.of(middleRange)),
+      endRanges,
+    );
+    return order === "desc" ? Array.reverse(ranges) : ranges;
+  });
 
 /**
  * Derive full-index bounds directly from the structural range.
