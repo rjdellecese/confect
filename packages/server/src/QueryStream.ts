@@ -73,6 +73,7 @@ import type {
   NarrowBounds,
 } from "./QueryStreamKeyBounds";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
+import * as QueryStreamPagination from "./QueryStreamPagination";
 import * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 
 /**
@@ -154,13 +155,10 @@ export class MissingReversalRecipeError extends Data.TaggedError(
  *
  * @experimental
  */
-export class EmptyInitialPageError extends Data.TaggedError(
-  "EmptyInitialPageError",
-) {
-  override get message(): string {
-    return "QueryStream.paginate: numItems of 0 with a null cursor is not supported";
-  }
-}
+export {
+  EmptyInitialPageError,
+  InvalidPageSizeError,
+} from "./QueryStreamPagination";
 
 /**
  * Runtime identifier used to distinguish query streams from plain streams.
@@ -1972,12 +1970,6 @@ export const unique = Effect.fn("QueryStream.unique")(
 // -----------------------------------------------------------------------------
 
 /**
- * Recommend splitting a page after this many logical keys have been scanned,
- * including keys of filtered elements.
- */
-const SOFT_MAX_SCAN_LENGTH = 16000;
-
-/**
  * Convex pagination options interpreted over a query stream's stored keys. Pass
  * a paginated query handler's `paginationOpts` directly to `paginate`.
  *
@@ -2020,27 +2012,6 @@ export type PaginateOptions = ConvexPaginationOptions;
  * @experimental
  */
 export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
-
-type PageStop = Data.TaggedEnum<{
-  ItemLimit: {};
-  ReadLimit: {};
-}>;
-
-const PageStop = Data.taggedEnum<PageStop>();
-
-class PaginateState<Doc> extends Data.Class<{
-  readonly page: Chunk.Chunk<Doc>;
-  readonly readKeys: Chunk.Chunk<QueryStreamOrderKey.QueryStreamOrderKey>;
-  readonly stop: Option.Option<PageStop>;
-}> {}
-
-/**
- * Where a split page divides: the midpoint of the keys read so far.
- */
-const midpointKey = (
-  readKeys: Chunk.Chunk<QueryStreamOrderKey.QueryStreamOrderKey>,
-): QueryStreamOrderKey.QueryStreamOrderKey =>
-  Chunk.getUnsafe(readKeys, Math.floor((Chunk.size(readKeys) - 1) / 2));
 
 /**
  * Return an effect producing one page of a composed query stream. Start with
@@ -2128,38 +2099,51 @@ export const paginate: {
       ),
       Effect.orDie,
     );
-    const after = Option.fromNullOr(decoded.after);
-    const until = Option.fromNullOr(decoded.until);
-    if (options.numItems === 0) {
-      if (options.cursor === null) {
-        return yield* Effect.die(new EmptyInitialPageError());
-      }
-      return yield* Effect.succeed<PaginationResult<Doc>>({
+    const complete = (values: QueryStreamOrderKey.QueryStreamOrderKey) =>
+      Result.getOrThrowWith(
+        QueryStreamKey.complete(self.keyLayout, values),
+        identity,
+      );
+    const after = Option.map(Option.fromNullOr(decoded.after), complete);
+    const range = Option.match(endCursor, {
+      onNone: () => QueryStreamPagination.Range.Unpinned(),
+      onSome: () =>
+        decoded.until === null
+          ? QueryStreamPagination.Range.ThroughEnd()
+          : QueryStreamPagination.Range.ThroughKey({
+              key: complete(decoded.until),
+            }),
+    });
+    const request = yield* QueryStreamPagination.parseRequest(
+      options.numItems,
+      options.cursor,
+      after,
+      range,
+    ).pipe(Effect.fromResult, Effect.orDie);
+    if (request._tag === "Unchanged") {
+      return {
         page: [],
         isDone: false,
-        continueCursor: options.cursor,
-      });
+        continueCursor: request.cursor,
+      } satisfies PaginationResult<Doc>;
     }
-
-    const start = Option.map(after, (orderKey) => ({
-      orderKey,
+    const start = Option.map(request.after, (key) => ({
+      orderKey: QueryStreamKey.values(key),
       inclusive: false,
     }));
-    const end = Option.map(until, (orderKey) => ({
-      orderKey,
-      inclusive: true,
-    }));
+    const end =
+      request.range._tag === "ThroughKey"
+        ? Option.some({
+            orderKey: QueryStreamKey.values(request.range.key),
+            inclusive: true,
+          })
+        : Option.none<KeyBound>();
     const narrowed = narrowByKeyBounds(
       self,
       self.order === "asc"
         ? { lower: start, upper: end }
         : { lower: end, upper: start },
     );
-    // With an endCursor the page runs to it, however many items that is.
-    const maxRows = Option.match(endCursor, {
-      onNone: () => Option.some(options.numItems),
-      onSome: () => Option.none<number>(),
-    });
     const budget = yield* QueryStreamReadBudget.make({
       maximumRowsRead: Option.fromUndefinedOr(options.maximumRowsRead),
       maximumBytesRead: Option.fromUndefinedOr(options.maximumBytesRead),
@@ -2168,133 +2152,56 @@ export const paginate: {
       Stream.run(
         narrowed.annotated,
         Sink.fold(
-          () =>
-            new PaginateState<Doc>({
-              page: Chunk.empty(),
-              readKeys: Chunk.empty(),
-              stop: Option.none(),
-            }),
-          (state) => Option.isNone(state.stop),
-          (state, { doc, orderKey }: Element<Doc>) => {
-            const readKeys = Chunk.append(state.readKeys, orderKey);
-            const page = Option.match(doc, {
-              onNone: () => state.page,
-              onSome: (value) => Chunk.append(state.page, value),
-            });
-            return Effect.map(
-              QueryStreamReadBudget.isExhausted(budget),
-              (hitLimit) =>
-                new PaginateState({
-                  page,
-                  readKeys,
-                  stop: hitLimit
-                    ? Option.some(PageStop.ReadLimit())
-                    : Option.exists(
-                          maxRows,
-                          (limit) => Chunk.size(page) >= limit,
-                        )
-                      ? Option.some(PageStop.ItemLimit())
-                      : Option.none(),
-                }),
-            );
-          },
+          () => QueryStreamPagination.initial<Doc>(),
+          (state) => state._tag === "Reading",
+          (state, { doc, orderKey }: Element<Doc>) =>
+            Effect.map(QueryStreamReadBudget.isExhausted(budget), (hitLimit) =>
+              QueryStreamPagination.record(
+                request,
+                state,
+                doc,
+                complete(orderKey),
+                hitLimit,
+              ),
+            ),
         ),
       ),
       QueryStreamReadBudget.provide(budget),
     );
     const stopped = yield* QueryStreamReadBudget.isStopped(Option.some(budget));
-    const limited =
-      stopped || Option.exists(collected.stop, PageStop.$is("ReadLimit"));
-    if (
-      limited &&
-      (Chunk.isEmpty(collected.readKeys) ||
-        Option.exists(
-          until,
-          (endpoint) =>
-            QueryStreamOrderKey.Order(
-              midpointKey(collected.readKeys),
-              endpoint,
-            ) === 0,
-        ))
-    ) {
-      const error = yield* QueryStreamReadBudget.exceeded(budget);
-      return yield* error;
+    const outcome = QueryStreamPagination.finish(request, collected, stopped);
+    if (Result.isFailure(outcome)) {
+      return yield* yield* QueryStreamReadBudget.exceeded(budget);
     }
-    const state = stopped
-      ? new PaginateState({
-          page: collected.page,
-          readKeys: collected.readKeys,
-          stop: Option.some(PageStop.ReadLimit()),
-        })
-      : collected;
-    const page = Chunk.toArray(state.page);
-    // `stopped` implies at least one element was read, so the last
-    // read key exists exactly when the fold stopped early.
-    const stoppedAt = Option.flatMap(state.stop, () =>
-      Chunk.last(state.readKeys),
-    );
-    return yield* Option.match(stoppedAt, {
-      onSome: (lastKey) =>
-        Effect.gen(function* () {
-          return Option.exists(state.stop, PageStop.$is("ReadLimit"))
-            ? {
-                page,
-                isDone: false,
-                continueCursor: yield* encodeCursor(lastKey),
-                pageStatus: "SplitRequired" as const,
-                splitCursor: yield* encodeCursor(midpointKey(state.readKeys)),
-              }
-            : // A growing page that had to scan far past its item budget
-              // (a filter-heavy stream) recommends a split so reactive
-              // clients can subdivide it instead of re-scanning forever.
-              Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH
-              ? {
-                  page,
-                  isDone: false,
-                  continueCursor: yield* encodeCursor(lastKey),
-                  pageStatus: "SplitRecommended" as const,
-                  splitCursor: yield* encodeCursor(midpointKey(state.readKeys)),
-                }
-              : {
-                  page,
-                  isDone: false,
-                  continueCursor: yield* encodeCursor(lastKey),
-                };
-        }),
-      // The narrowed stream was exhausted: either we reached the
-      // pinned end cursor (more may follow it) or the true end of
-      // the stream. An endCursor-pinned page that has grown well
-      // past its requested size recommends a split, so reactive
-      // clients can subdivide it.
-      onNone: () =>
-        Effect.gen(function* () {
-          // Any pinned page—including one pinned to the end of the
-          // stream—that has grown well past its requested size
-          // recommends a split.
-          const shouldRecommendSplit =
-            Option.isSome(endCursor) &&
-            (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
-              Chunk.size(state.page) > options.numItems + 1);
-          return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
-            ? {
-                page,
-                isDone: false,
-                continueCursor: Option.getOrElse(
-                  pinnedEnd,
-                  () => QueryStreamCursor.END_CURSOR,
-                ),
-                pageStatus: "SplitRecommended" as const,
-                splitCursor: yield* encodeCursor(midpointKey(state.readKeys)),
-              }
-            : {
-                page,
-                isDone: Option.isNone(pinnedEnd),
-                continueCursor: Option.getOrElse(
-                  pinnedEnd,
-                  () => QueryStreamCursor.END_CURSOR,
-                ),
-              };
-        }),
-    }).pipe(Effect.orDie);
+    const result = outcome.success;
+    const encode = (key: QueryStreamKey.Complete) =>
+      encodeCursor(QueryStreamKey.values(key)).pipe(Effect.orDie);
+    const page = Array.fromIterable(result.page);
+    switch (result._tag) {
+      case "Done":
+        return {
+          page,
+          isDone: true,
+          continueCursor: QueryStreamCursor.END_CURSOR,
+        };
+      case "Continue":
+        return {
+          page,
+          isDone: false,
+          continueCursor: yield* encode(result.key),
+        };
+      case "SplitRequired":
+      case "SplitRecommended":
+        return {
+          page,
+          isDone: false,
+          continueCursor:
+            result.continuation._tag === "End"
+              ? QueryStreamCursor.END_CURSOR
+              : yield* encode(result.continuation.key),
+          pageStatus: result._tag,
+          splitCursor: yield* encode(result.split),
+        };
+    }
   }),
 );
