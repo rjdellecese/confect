@@ -1,11 +1,21 @@
 import type { BuildError, BundlerError } from "@confect/cli/BuildError";
 import type * as CodegenError from "@confect/cli/CodegenError";
-import type { ConfectDirectory } from "@confect/cli/ConfectDirectory";
-import type { ConvexDirectory } from "@confect/cli/ConvexDirectory";
+import type {
+  ConfectDirectory,
+  ConfectDirectoryNotFoundError,
+} from "@confect/cli/ConfectDirectory";
+import type {
+  ConvexDirectory,
+  ConvexDirectoryNotFoundError,
+  InvalidConvexJsonError,
+} from "@confect/cli/ConvexDirectory";
 import type * as FunctionPaths from "@confect/cli/FunctionPaths";
 import type * as GroupPath from "@confect/cli/GroupPath";
 import type * as GroupPaths from "@confect/cli/GroupPaths";
-import type { ProjectRoot } from "@confect/cli/ProjectRoot";
+import type {
+  ProjectRoot,
+  ProjectRootNotFoundError,
+} from "@confect/cli/ProjectRoot";
 import * as TableModule from "@confect/cli/TableModule";
 import { codegenHandler } from "@confect/cli/confect/codegen";
 import { dev } from "@confect/cli/confect/dev";
@@ -16,6 +26,7 @@ import type { NoSuchElementError } from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
+import type * as Option from "effect/Option";
 import type * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import * as Ref from "effect/Ref";
@@ -84,13 +95,18 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
   expectTypeOf(dev).toEqualTypeOf<
     Command.Command<
       "dev",
-      {},
+      { componentDir: Option.Option<string> },
       {},
       | BundlerError
+      | ConfectDirectoryNotFoundError
+      | ConvexDirectoryNotFoundError
       | GroupPath.GroupModulePathIsNotATypeScriptFileError
+      | InvalidConvexJsonError
       | NoSuchElementError
-      | PlatformError,
-      GenerationServices | ProjectRoot
+      | PlatformError
+      | ProjectRootNotFoundError
+      | Schema.SchemaError,
+      FileServices
     >
   >();
 });
