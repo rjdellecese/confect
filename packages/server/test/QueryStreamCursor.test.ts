@@ -1,3 +1,4 @@
+import { identity } from "effect/Function";
 import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
@@ -32,7 +33,10 @@ describe("QueryStreamCursor schema", () => {
     expect(serialized).toBe(
       Schema.encodeSync(
         QueryStreamCursor.codecForLayout(
-          QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+          Result.getOrThrowWith(
+            QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+            identity,
+          ),
         ),
       )(["apple", 1, "id"]),
     );
@@ -93,7 +97,10 @@ describe("QueryStreamCursor serialization", () => {
     const fieldPaths = key.map((_, index) =>
       index === key.length - 1 ? "_id" : `field${index}`,
     );
-    const layout = QueryStreamKeyLayout.fromIndex(fieldPaths);
+    const layout = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex(fieldPaths),
+      identity,
+    );
     const cursor = Schema.encodeSync(QueryStreamCursor.codecForLayout(layout))(
       key,
     );
@@ -115,8 +122,14 @@ describe("QueryStreamCursor serialization", () => {
     const layout = Result.getOrThrow(
       QueryStreamKeyLayout.rename(
         QueryStreamKeyLayout.concat(
-          QueryStreamKeyLayout.fromIndex(["author.role", "_creationTime"], 1),
-          QueryStreamKeyLayout.fromIndex(["text"]),
+          Result.getOrThrowWith(
+            QueryStreamKeyLayout.fromIndex(["author.role", "_creationTime"], 1),
+            identity,
+          ),
+          Result.getOrThrowWith(
+            QueryStreamKeyLayout.fromIndex(["text"]),
+            identity,
+          ),
         ),
         QueryStreamKeyLabels.make(["created", "body"]),
       ),
@@ -133,8 +146,14 @@ describe("QueryStreamCursor serialization", () => {
   });
 
   it("preserves the existing wire projection for explicit and implicit ID labels", () => {
-    const explicit = QueryStreamKeyLayout.fromIndex(["_id"]);
-    const implicit = QueryStreamKeyLayout.fromIndex([]);
+    const explicit = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex(["_id"]),
+      identity,
+    );
+    const implicit = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex([]),
+      identity,
+    );
     expect(QueryStreamKeyLayout.compatible(explicit, implicit)).toBe(false);
     const serialized = Schema.encodeSync(
       QueryStreamCursor.codecForLayout(explicit),
@@ -148,7 +167,10 @@ describe("QueryStreamCursor serialization", () => {
     expect(() =>
       Schema.encodeSync(
         QueryStreamCursor.codecForLayout(
-          QueryStreamKeyLayout.fromIndex(["_id"], 1),
+          Result.getOrThrowWith(
+            QueryStreamKeyLayout.fromIndex(["_id"], 1),
+            identity,
+          ),
         ),
       )([1]),
     ).toThrow("key and fields must have the same length");
@@ -175,14 +197,23 @@ describe("QueryStreamCursor serialization", () => {
   it("validates field names and their order, not just their count", () => {
     const cursor = Schema.encodeSync(
       QueryStreamCursor.codecForLayout(
-        QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+        Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+          identity,
+        ),
       ),
     )(["apple", 1, "id"]);
 
     for (const layout of [
-      QueryStreamKeyLayout.fromIndex(["body", "_creationTime"]),
-      QueryStreamKeyLayout.fromIndex(["_creationTime", "text"]),
-      QueryStreamKeyLayout.fromIndex(["text"]),
+      Result.getOrThrowWith(
+        QueryStreamKeyLayout.fromIndex(["body", "_creationTime"]),
+        identity,
+      ),
+      Result.getOrThrowWith(
+        QueryStreamKeyLayout.fromIndex(["_creationTime", "text"]),
+        identity,
+      ),
+      Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["text"]), identity),
     ]) {
       expect(() =>
         Schema.decodeSync(QueryStreamCursor.codecForLayout(layout))(cursor),
@@ -193,7 +224,10 @@ describe("QueryStreamCursor serialization", () => {
   it("distinguishes an empty order key from the end sentinel", () => {
     const cursor = Schema.encodeSync(
       QueryStreamCursor.codecForLayout(
-        QueryStreamKeyLayout.fromIndex(["_id"], 1),
+        Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["_id"], 1),
+          identity,
+        ),
       ),
     )([]);
 
@@ -201,7 +235,10 @@ describe("QueryStreamCursor serialization", () => {
     expect(
       Schema.decodeSync(
         QueryStreamCursor.codecForLayout(
-          QueryStreamKeyLayout.fromIndex(["_id"], 1),
+          Result.getOrThrowWith(
+            QueryStreamKeyLayout.fromIndex(["_id"], 1),
+            identity,
+          ),
         ),
       )(cursor),
     ).toEqual([]);
@@ -238,7 +275,10 @@ describe("QueryStreamCursor serialization", () => {
 
         const layout = Result.getOrThrow(
           QueryStreamKeyLayout.rename(
-            QueryStreamKeyLayout.fromIndex(["optional", "integer", "_id"]),
+            Result.getOrThrowWith(
+              QueryStreamKeyLayout.fromIndex(["optional", "integer", "_id"]),
+              identity,
+            ),
             QueryStreamKeyLabels.make(["optional", "integer", "bytes"]),
           ),
         );

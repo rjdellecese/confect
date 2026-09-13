@@ -1,3 +1,4 @@
+import { identity } from "effect/Function";
 import { QueryStreamKeyLayout as PublicKeyLayout } from "@confect/server";
 import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
@@ -66,7 +67,10 @@ describe("QueryStreamKeyLayout", () => {
   ])(
     "constructs the remaining scan key for $fieldPaths pinned by $count",
     ({ fieldPaths, count, visible, width, segments }) => {
-      const layout = QueryStreamKeyLayout.fromIndex(fieldPaths, count);
+      const layout = Result.getOrThrowWith(
+        QueryStreamKeyLayout.fromIndex(fieldPaths, count),
+        identity,
+      );
       expect(QueryStreamKeyLayout.segments(layout)).toEqual(segments);
       expect(
         QueryStreamKeyLabels.toArray(
@@ -80,27 +84,46 @@ describe("QueryStreamKeyLayout", () => {
   it.each([-1, 0.5, 2, NaN, Infinity])(
     "rejects an invalid equality prefix: %s",
     (count) => {
-      expect(() => QueryStreamKeyLayout.fromIndex(["_id"], count)).toThrow(
-        "invalid equality prefix length",
+      const result = QueryStreamKeyLayout.fromIndex(["_id"], count);
+      expectTypeOf(result).toEqualTypeOf<
+        Result.Result<
+          QueryStreamKeyLayout.QueryStreamKeyLayout<ReadonlyArray<string>>,
+          QueryStreamKeyLayout.InvalidEqualityPrefixError
+        >
+      >();
+      const error = Result.getOrThrow(Result.flip(result));
+      expect(error).toBeInstanceOf(
+        QueryStreamKeyLayout.InvalidEqualityPrefixError,
       );
+      expect(error).toMatchObject({
+        _tag: "InvalidEqualityPrefixError",
+        fieldPaths: ["_id"],
+        eqCount: count,
+      });
     },
   );
 
   it("tracks logical tuples through pinning, composition, and renaming", () => {
-    const pinned = QueryStreamKeyLayout.fromIndex(["text", "_creationTime"], 1);
+    const pinned = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex(["text", "_creationTime"], 1),
+      identity,
+    );
     expectTypeOf(pinned).toEqualTypeOf<
       QueryStreamKeyLayout.QueryStreamKeyLayout<["_creationTime"]>
     >();
     expectTypeOf<
       QueryStreamKeyLayout.RemainingFieldPaths<["_id"], 0 | 1>
     >().toEqualTypeOf<["_id"] | []>();
-    const zero = QueryStreamKeyLayout.fromIndex(["_id"], 1);
+    const zero = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex(["_id"], 1),
+      identity,
+    );
     expectTypeOf(zero).toEqualTypeOf<
       QueryStreamKeyLayout.QueryStreamKeyLayout<[]>
     >();
     const joined = QueryStreamKeyLayout.concat(
       pinned,
-      QueryStreamKeyLayout.fromIndex(["_id"]),
+      Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["_id"]), identity),
     );
     expectTypeOf(joined).toEqualTypeOf<
       QueryStreamKeyLayout.QueryStreamKeyLayout<
@@ -136,12 +159,15 @@ describe("QueryStreamKeyLayout", () => {
   it("keeps a hidden ID before a renamed explicit component", () => {
     const explicit = Result.getOrThrow(
       QueryStreamKeyLayout.rename(
-        QueryStreamKeyLayout.fromIndex(["_id"]),
+        Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["_id"]),
+          identity,
+        ),
         QueryStreamKeyLabels.make(["hello"]),
       ),
     );
     const joined = QueryStreamKeyLayout.concat(
-      QueryStreamKeyLayout.fromIndex([]),
+      Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
       explicit,
     );
     expect(QueryStreamKeyLayout.segments(joined)).toEqual([
@@ -160,8 +186,11 @@ describe("QueryStreamKeyLayout", () => {
 
   it("resolves logical prefixes including only intervening hidden IDs", () => {
     const layout = QueryStreamKeyLayout.concat(
-      QueryStreamKeyLayout.fromIndex(["text"]),
-      QueryStreamKeyLayout.fromIndex(["created"]),
+      Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["text"]), identity),
+      Result.getOrThrowWith(
+        QueryStreamKeyLayout.fromIndex(["created"]),
+        identity,
+      ),
     );
     expect(
       Result.getOrThrow(
@@ -192,16 +221,25 @@ describe("QueryStreamKeyLayout", () => {
       ["text", "_id"],
       ["text", "created", "extra"],
     ]) {
-      expect(
-        Result.isFailure(
-          QueryStreamKeyLayout.resolvePrefix(
-            layout,
-            QueryStreamKeyLabels.make(invalid),
-          ),
-        ),
-      ).toBe(true);
+      const prefixLabels = QueryStreamKeyLabels.make(invalid);
+      const result = QueryStreamKeyLayout.resolvePrefix(layout, prefixLabels);
+      expectTypeOf(result).toEqualTypeOf<
+        Result.Result<number, QueryStreamKeyLayout.InvalidLabelPrefixError>
+      >();
+      const error = Result.getOrThrow(Result.flip(result));
+      expect(error).toBeInstanceOf(
+        QueryStreamKeyLayout.InvalidLabelPrefixError,
+      );
+      expect(error).toMatchObject({
+        _tag: "InvalidLabelPrefixError",
+        labels: QueryStreamKeyLayout.visibleLabels(layout),
+        prefixLabels,
+      });
     }
-    const zero = QueryStreamKeyLayout.fromIndex(["_id"], 1);
+    const zero = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex(["_id"], 1),
+      identity,
+    );
     expect(
       Result.getOrThrow(
         QueryStreamKeyLayout.resolvePrefix(zero, QueryStreamKeyLabels.make([])),
@@ -220,13 +258,16 @@ describe("QueryStreamKeyLayout", () => {
   it("compares visible labels and implicit positions without requiring identical segments", () => {
     const explicitFirst = Result.getOrThrow(
       QueryStreamKeyLayout.rename(
-        QueryStreamKeyLayout.fromIndex(["text"]),
+        Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["text"]),
+          identity,
+        ),
         QueryStreamKeyLabels.make(["_id"]),
       ),
     );
     const implicitFirst = QueryStreamKeyLayout.concat(
-      QueryStreamKeyLayout.fromIndex([]),
-      QueryStreamKeyLayout.fromIndex(["_id"]),
+      Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
+      Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["_id"]), identity),
     );
     expect(
       QueryStreamKeyLabels.toArray(
@@ -249,29 +290,47 @@ describe("QueryStreamKeyLayout", () => {
 
     const explicit = Result.getOrThrow(
       QueryStreamKeyLayout.rename(
-        QueryStreamKeyLayout.fromIndex(["_id"]),
+        Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["_id"]),
+          identity,
+        ),
         QueryStreamKeyLabels.make(["text"]),
       ),
     );
     const composed = QueryStreamKeyLayout.concat(
       explicit,
-      QueryStreamKeyLayout.fromIndex(["created"]),
+      Result.getOrThrowWith(
+        QueryStreamKeyLayout.fromIndex(["created"]),
+        identity,
+      ),
     );
-    const single = QueryStreamKeyLayout.fromIndex(["text", "created"]);
+    const single = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex(["text", "created"]),
+      identity,
+    );
     expect(QueryStreamKeyLayout.compatible(composed, single)).toBe(true);
     expect(QueryStreamKeyLayout.compatible(single, composed)).toBe(true);
     expect(QueryStreamKeyLayout.compatible(single, explicit)).toBe(false);
     expect(
       QueryStreamKeyLayout.compatible(
         single,
-        QueryStreamKeyLayout.fromIndex(["other", "created"]),
+        Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["other", "created"]),
+          identity,
+        ),
       ),
     ).toBe(false);
   });
 
   it("distinguishes zero-width keys and consecutive implicit IDs", () => {
-    const zero = QueryStreamKeyLayout.fromIndex(["_id"], 1);
-    const one = QueryStreamKeyLayout.fromIndex([]);
+    const zero = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex(["_id"], 1),
+      identity,
+    );
+    const one = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex([]),
+      identity,
+    );
     const two = QueryStreamKeyLayout.concat(one, one);
     expect(QueryStreamKeyLayout.compatible(zero, one)).toBe(false);
     expect(QueryStreamKeyLayout.compatible(one, two)).toBe(false);
@@ -283,7 +342,7 @@ describe("QueryStreamKeyLayout", () => {
     ).toBe(true);
     const withLabel = QueryStreamKeyLayout.concat(
       two,
-      QueryStreamKeyLayout.fromIndex(["text"]),
+      Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["text"]), identity),
     );
     expect(
       Result.getOrThrow(
@@ -298,12 +357,18 @@ describe("QueryStreamKeyLayout", () => {
   it("parses replacements across explicit and implicit-only segments without losing positions", () => {
     const layout = QueryStreamKeyLayout.concat(
       QueryStreamKeyLayout.concat(
-        QueryStreamKeyLayout.fromIndex([]),
-        QueryStreamKeyLayout.fromIndex(["_id"]),
+        Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
+        Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["_id"]),
+          identity,
+        ),
       ),
       QueryStreamKeyLayout.concat(
-        QueryStreamKeyLayout.fromIndex([]),
-        QueryStreamKeyLayout.fromIndex(["text", "_id"]),
+        Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
+        Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["text", "_id"]),
+          identity,
+        ),
       ),
     );
     const renamed = Result.getOrThrow(
@@ -317,23 +382,38 @@ describe("QueryStreamKeyLayout", () => {
     );
     expect(QueryStreamKeyLayout.runtimeWidth(renamed)).toBe(5);
     for (const incomplete of [[], ["a"], ["a", "b"], ["a", "b", "c", "d"]]) {
-      expect(
-        Result.isFailure(
-          QueryStreamKeyLayout.rename(
-            layout,
-            QueryStreamKeyLabels.make(incomplete),
-          ),
-        ),
-      ).toBe(true);
+      const replacementLabels = QueryStreamKeyLabels.make(incomplete);
+      const result = QueryStreamKeyLayout.rename(layout, replacementLabels);
+      expectTypeOf(result).toEqualTypeOf<
+        Result.Result<
+          QueryStreamKeyLayout.QueryStreamKeyLayout<Array<string>>,
+          QueryStreamKeyLayout.LabelCountMismatchError
+        >
+      >();
+      const error = Result.getOrThrow(Result.flip(result));
+      expect(error).toBeInstanceOf(
+        QueryStreamKeyLayout.LabelCountMismatchError,
+      );
+      expect(error).toMatchObject({
+        _tag: "LabelCountMismatchError",
+        labels: QueryStreamKeyLayout.visibleLabels(layout),
+        replacementLabels,
+      });
     }
   });
 
   it("preserves inputs through composition and renaming", () => {
     const fieldPaths = ["text"] as const;
-    const outer = QueryStreamKeyLayout.fromIndex(fieldPaths);
+    const outer = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex(fieldPaths),
+      identity,
+    );
     const joined = QueryStreamKeyLayout.concat(
       outer,
-      QueryStreamKeyLayout.fromIndex(["created"]),
+      Result.getOrThrowWith(
+        QueryStreamKeyLayout.fromIndex(["created"]),
+        identity,
+      ),
     );
     const aliases = ["body", "time"] as const;
     const renamed = Result.getOrThrow(
@@ -358,7 +438,10 @@ describe("QueryStreamKeyLayout", () => {
         ),
       ),
     ).toBe(true);
-    const zero = QueryStreamKeyLayout.fromIndex(["_id"], 1);
+    const zero = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex(["_id"], 1),
+      identity,
+    );
     expect(
       QueryStreamKeyLabels.toArray(
         QueryStreamKeyLayout.visibleLabels(

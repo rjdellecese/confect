@@ -89,35 +89,88 @@ type DropPrefix<
         : ReadonlyArray<string>;
 
 /**
+ * The equality prefix cannot select a whole number of source field paths.
+ *
+ * @experimental
+ */
+export class InvalidEqualityPrefixError extends Data.TaggedError(
+  "InvalidEqualityPrefixError",
+)<{
+  readonly fieldPaths: ReadonlyArray<string>;
+  readonly eqCount: number;
+}> {
+  override get message(): string {
+    return `QueryStreamKeyLayout.fromIndex: invalid equality prefix length (${this.eqCount}) for ${this.fieldPaths.length} field paths`;
+  }
+}
+
+/**
+ * The requested labels do not form a prefix of the layout's visible labels.
+ *
+ * @experimental
+ */
+export class InvalidLabelPrefixError extends Data.TaggedError(
+  "InvalidLabelPrefixError",
+)<{
+  readonly labels: QueryStreamKeyLabels.QueryStreamKeyLabels;
+  readonly prefixLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
+}> {
+  override get message(): string {
+    return `Labels ([${Array.join(QueryStreamKeyLabels.toArray(this.prefixLabels), ", ")}]) must be a prefix of the ordering labels ([${Array.join(QueryStreamKeyLabels.toArray(this.labels), ", ")}])`;
+  }
+}
+
+/**
+ * The replacement labels cannot fill exactly the layout's visible positions.
+ *
+ * @experimental
+ */
+export class LabelCountMismatchError extends Data.TaggedError(
+  "LabelCountMismatchError",
+)<{
+  readonly labels: QueryStreamKeyLabels.QueryStreamKeyLabels;
+  readonly replacementLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
+}> {
+  override get message(): string {
+    return `Replacement labels ([${Array.join(QueryStreamKeyLabels.toArray(this.replacementLabels), ", ")}]) must have as many labels as the ordering labels ([${Array.join(QueryStreamKeyLabels.toArray(this.labels), ", ")}])`;
+  }
+}
+
+/**
  * Construct a scan layout from the original index field paths, before equality
  * pinning. Only an ID absent from the end of that original key is implicit.
  * Pinning every field of `by_id` produces a zero-width layout; pinning every
- * visible field of another index leaves its implicit ID.
+ * visible field of another index leaves its implicit ID. Invalid equality
+ * prefix lengths return `InvalidEqualityPrefixError`.
  *
  * @experimental
  */
 export function fromIndex<const FieldPaths extends ReadonlyArray<string>>(
   fieldPaths: FieldPaths,
-): QueryStreamKeyLayout<Types.Mutable<FieldPaths>>;
+): Result.Result<
+  QueryStreamKeyLayout<Types.Mutable<FieldPaths>>,
+  InvalidEqualityPrefixError
+>;
 export function fromIndex<
   const FieldPaths extends ReadonlyArray<string>,
   const Count extends number,
 >(
   fieldPaths: FieldPaths,
   eqCount: Count,
-): QueryStreamKeyLayout<RemainingFieldPaths<FieldPaths, Count>>;
+): Result.Result<
+  QueryStreamKeyLayout<RemainingFieldPaths<FieldPaths, Count>>,
+  InvalidEqualityPrefixError
+>;
 export function fromIndex(
   fieldPaths: ReadonlyArray<string>,
   eqCount = 0,
-): QueryStreamKeyLayout {
+): Result.Result<QueryStreamKeyLayout, InvalidEqualityPrefixError> {
   if (
     !Number.isInteger(eqCount) ||
     eqCount < 0 ||
     eqCount > fieldPaths.length
   ) {
-    throw new Error(
-      "QueryStreamKeyLayout.fromIndex: invalid equality prefix length",
-    );
+    return Result.fail(new InvalidEqualityPrefixError({ fieldPaths, eqCount }));
   }
   const labels = Array.drop(fieldPaths, eqCount);
   const componentSegments: ReadonlyArray<Segment> = Option.exists(
@@ -133,7 +186,7 @@ export function fromIndex(
         ],
       })
     : [Segment.WithImplicitId({ labels: QueryStreamKeyLabels.make(labels) })];
-  return make(componentSegments);
+  return Result.succeed(make(componentSegments));
 }
 
 /**
@@ -245,15 +298,11 @@ export const compatible = (
 export const resolvePrefix = (
   self: QueryStreamKeyLayout,
   prefixLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
-): Result.Result<number, Error> => {
+): Result.Result<number, InvalidLabelPrefixError> => {
   const labels = visibleLabels(self);
   return Option.match(QueryStreamKeyLabels.stripPrefix(labels, prefixLabels), {
     onNone: () =>
-      Result.fail(
-        new Error(
-          `QueryStream.distinct: labels ([${Array.join(QueryStreamKeyLabels.toArray(prefixLabels), ", ")}]) must be a prefix of the stream's ordering labels ([${Array.join(QueryStreamKeyLabels.toArray(labels), ", ")}])`,
-        ),
-      ),
+      Result.fail(new InvalidLabelPrefixError({ labels, prefixLabels })),
     onSome: (rest) => {
       const prefix = Array.take(
         visiblePositions(self),
@@ -304,7 +353,7 @@ export const rename = <ReplacementLabels extends ReadonlyArray<string>>(
   replacementLabels: QueryStreamKeyLabels.QueryStreamKeyLabels<ReplacementLabels>,
 ): Result.Result<
   QueryStreamKeyLayout<Types.Mutable<ReplacementLabels>>,
-  Error
+  LabelCountMismatchError
 > => {
   const consumed = Array.reduce(
     segments(self),
@@ -329,8 +378,9 @@ export const rename = <ReplacementLabels extends ReadonlyArray<string>>(
   return Result.fromOption(
     parsed,
     () =>
-      new Error(
-        `QueryStream.renameKey: replacementLabels ([${Array.join(QueryStreamKeyLabels.toArray(replacementLabels), ", ")}]) must have as many labels as the stream's ordering labels ([${Array.join(QueryStreamKeyLabels.toArray(visibleLabels(self)), ", ")}])`,
-      ),
+      new LabelCountMismatchError({
+        labels: visibleLabels(self),
+        replacementLabels,
+      }),
   );
 };

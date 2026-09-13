@@ -1,3 +1,4 @@
+import { identity } from "effect/Function";
 import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
@@ -206,7 +207,10 @@ describe("QueryStream", () => {
           type Note =
             typeof notes extends Stream.Stream<infer A, any, any> ? A : never;
           const nothing = QueryStream.empty<Note>()(
-            QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+            Result.getOrThrowWith(
+              QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+              identity,
+            ),
           );
 
           expect(
@@ -874,9 +878,10 @@ describe("QueryStream", () => {
                           order,
                         ),
                     {
-                      innerLayout: QueryStreamKeyLayout.fromIndex([
-                        "_creationTime",
-                      ]),
+                      innerLayout: Result.getOrThrowWith(
+                        QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                        identity,
+                      ),
                     },
                   ),
                 );
@@ -1010,7 +1015,10 @@ describe("QueryStream", () => {
                   .table("notes")
                   .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
               {
-                innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                innerLayout: Result.getOrThrowWith(
+                  QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                  identity,
+                ),
               },
             ),
           );
@@ -1033,7 +1041,10 @@ describe("QueryStream", () => {
                   .table("notes")
                   .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
               {
-                innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                innerLayout: Result.getOrThrowWith(
+                  QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                  identity,
+                ),
               },
             ),
           );
@@ -1080,9 +1091,10 @@ describe("QueryStream", () => {
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
                 {
-                  innerLayout: QueryStreamKeyLayout.fromIndex([
-                    "_creationTime",
-                  ]),
+                  innerLayout: Result.getOrThrowWith(
+                    QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                    identity,
+                  ),
                 },
               ),
             );
@@ -1135,7 +1147,10 @@ describe("QueryStream", () => {
             // steps past it like any element.
             const joined = outer.pipe(
               QueryStream.flatMap(inner, {
-                innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                innerLayout: Result.getOrThrowWith(
+                  QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                  identity,
+                ),
                 onEmpty: (note) => ({ tag: `none for ${note.text}` }),
               }),
             );
@@ -1152,7 +1167,10 @@ describe("QueryStream", () => {
             const withoutX0 = outer.pipe(
               QueryStream.filter((note) => note.text !== "x0"),
               QueryStream.flatMap(inner, {
-                innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                innerLayout: Result.getOrThrowWith(
+                  QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                  identity,
+                ),
                 onEmpty: (note) => ({ tag: `none for ${note.text}` }),
               }),
             );
@@ -1271,9 +1289,10 @@ describe("QueryStream", () => {
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
                 {
-                  innerLayout: QueryStreamKeyLayout.fromIndex([
-                    "_creationTime",
-                  ]),
+                  innerLayout: Result.getOrThrowWith(
+                    QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                    identity,
+                  ),
                 },
               ),
             );
@@ -1485,9 +1504,10 @@ describe("QueryStream", () => {
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
                 {
-                  innerLayout: QueryStreamKeyLayout.fromIndex([
-                    "_creationTime",
-                  ]),
+                  innerLayout: Result.getOrThrowWith(
+                    QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                    identity,
+                  ),
                 },
               ),
             );
@@ -2042,7 +2062,10 @@ describe("QueryStream types", () => {
 
       // flatMap concatenates order keys at the type level.
       const joined = QueryStream.flatMap(bounded, (_note) => pinned, {
-        innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+        innerLayout: Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+          identity,
+        ),
       });
       expectTypeOf<LabelsOf<typeof joined>>().toEqualTypeOf<
         readonly ["text", "_creationTime", "_creationTime"]
@@ -2056,7 +2079,10 @@ describe("QueryStream types", () => {
 
       const joinedMismatched = QueryStream.flatMap(bounded, (_note) => pinned, {
         // @ts-expect-error—innerLayout must match the inner stream's order key.
-        innerLayout: QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+        innerLayout: Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+          identity,
+        ),
       });
       void joinedMismatched;
 
@@ -2089,14 +2115,20 @@ describe("QueryStream types", () => {
 
       // empty takes its document type explicitly and its key literally.
       const nothing = QueryStream.empty<{ readonly text: string }>()(
-        QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+        Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+          identity,
+        ),
       );
       expectTypeOf<LabelsOf<typeof nothing>>().toEqualTypeOf<
         ["text", "_creationTime"]
       >();
       expectTypeOf<DirectionOf<typeof nothing>>().toEqualTypeOf<"asc">();
       const nothingDescending = QueryStream.empty<{ readonly text: string }>()(
-        QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+        Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+          identity,
+        ),
         "desc",
       );
       expectTypeOf<
@@ -2105,7 +2137,10 @@ describe("QueryStream types", () => {
 
       // With onEmpty, the elements are the inner documents or the placeholder.
       const withPlaceholder = QueryStream.flatMap(bounded, (_note) => pinned, {
-        innerLayout: QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+        innerLayout: Result.getOrThrowWith(
+          QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+          identity,
+        ),
         onEmpty: (note) => ({ missingFor: note.text }),
       });
       expectTypeOf<LabelsOf<typeof withPlaceholder>>().toEqualTypeOf<
@@ -2179,10 +2214,10 @@ describe("QueryStream types", () => {
         // @ts-expect-error—inner streams must run in the outer direction.
         (_note) => descending,
         {
-          innerLayout: QueryStreamKeyLayout.fromIndex([
-            "text",
-            "_creationTime",
-          ]),
+          innerLayout: Result.getOrThrowWith(
+            QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+            identity,
+          ),
         },
       );
       void mixedJoin;
@@ -2190,10 +2225,10 @@ describe("QueryStream types", () => {
       // runtime-chosen inner direction widens the join's.
       const dynamicInnerJoin = bounded.pipe(
         QueryStream.flatMap((_note) => dynamic, {
-          innerLayout: QueryStreamKeyLayout.fromIndex([
-            "text",
-            "_creationTime",
-          ]),
+          innerLayout: Result.getOrThrowWith(
+            QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+            identity,
+          ),
         }),
       );
       expectTypeOf<

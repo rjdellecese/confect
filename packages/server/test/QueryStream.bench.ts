@@ -1,3 +1,5 @@
+import { identity } from "effect/Function";
+import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import { bench } from "confect-bench-harness";
 import * as QueryStream from "@confect/server/QueryStream";
@@ -17,8 +19,14 @@ interface Message {
 
 // Empty streams stand in for `reader.table(...).stream(...)`, so the
 // counts cover the combinators' types rather than the initializer's.
-const notesLayout = QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]);
-const messagesLayout = QueryStreamKeyLayout.fromIndex(["_creationTime"]);
+const notesLayout = Result.getOrThrowWith(
+  QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+  identity,
+);
+const messagesLayout = Result.getOrThrowWith(
+  QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+  identity,
+);
 const notes = QueryStream.empty<Note>()(notesLayout);
 const moreNotes = QueryStream.empty<Note>()(notesLayout);
 const messagesOf = (_note: Note) =>

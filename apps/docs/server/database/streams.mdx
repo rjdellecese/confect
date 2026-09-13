@@ -189,7 +189,7 @@ The type parameter `Labels` tracks the visible labels of a stream's ordering. At
 
 Pass visible ordering labels to `distinct` and replacement labels to `renameKey`. Pass a typed `keyLayout` to `empty` and to `flatMap` as `innerLayout`: it records the visible labels and every implicit ID. Use runtime key values for exact `narrow` boundaries and cursor serialization. Preserve every `_id` in a boundary: it distinguishes documents with otherwise equal keys. A [flat-map](#flat-map) keeps an ID for each level of the join, not just the final document.
 
-A layout is a sequence of component keys. Each component has visible labels and may end in an implicit ID. A join concatenates components; renaming changes only visible labels. For example, `QueryStreamKeyLayout.fromIndex(["_id"], 1)` describes a fully pinned `by_id` scan with no runtime positions, while `QueryStreamKeyLayout.fromIndex(["text", "_creationTime"], 2)` retains one implicit ID. Both have the visible labels `[]`, so visible labels alone cannot identify a layout. Renaming changes these labels into aliases; they need not identify properties of the emitted document. Index extraction and range construction continue to use the original source field paths.
+A layout is a sequence of component keys. Each component has visible labels and may end in an implicit ID. A join concatenates components; renaming changes only visible labels. For example, `QueryStreamKeyLayout.fromIndex(["_id"], 1)` succeeds with a layout describing a fully pinned `by_id` scan with no runtime positions, while the layout returned by `QueryStreamKeyLayout.fromIndex(["text", "_creationTime"], 2)` retains one implicit ID. Both have the visible labels `[]`, so visible labels alone cannot identify a layout. Renaming changes these labels into aliases; they need not identify properties of the emitted document. Index extraction and range construction continue to use the original source field paths.
 
 `QueryStreamKeyLabels` represents the ordered names of visible key components. It preserves duplicates and can be empty. `QueryStreamKeyLayout.visibleLabels(layout)` returns this value, retaining the layout's literal tuple type. Use `QueryStreamKeyLabels.toArray(labels)` to inspect the names.
 
@@ -199,7 +199,9 @@ A layout is a sequence of component keys. Each component has visible labels and 
 import { QueryStreamKeyLabels, QueryStreamKeyLayout } from "@confect/server";
 import * as Result from "effect/Result";
 
-const layout = QueryStreamKeyLayout.fromIndex(["authorId", "_creationTime"]);
+const layout = Result.getOrThrow(
+  QueryStreamKeyLayout.fromIndex(["authorId", "_creationTime"]),
+);
 const renamed = Result.getOrThrow(
   QueryStreamKeyLayout.rename(
     layout,
@@ -210,6 +212,8 @@ const renamed = Result.getOrThrow(
 QueryStreamKeyLabels.toArray(QueryStreamKeyLayout.visibleLabels(renamed));
 // readonly ["author", "created"]
 ```
+
+`fromIndex`, `resolvePrefix`, and `rename` return `Result` values. Their failures are `InvalidEqualityPrefixError`, `InvalidLabelPrefixError`, and `LabelCountMismatchError`, respectively, with structured inputs available for inspection. Handle the result directly, or yield it inside `Effect.gen` to retain the typed failure channel. These examples use `Result.getOrThrow` for fixed, known-valid layouts. Stream combinators treat invalid arguments as API misuse and throw the named error; failures discovered while running a stream become defects.
 
 Labels provide sequence equality, concatenation, and prefix parsing. A layout additionally records the positions of implicit IDs, so matching visible labels alone does not establish layout compatibility.
 
@@ -231,13 +235,16 @@ Pass the document type as a type argument, then the layout of the streams it wil
 ```ts
 import { QueryStreamKeyLayout } from "@confect/server";
 import * as Array from "effect/Array";
+import * as Result from "effect/Result";
 import type { NotesDoc } from "./confect/_generated/docs";
 
 const notesByRoles = (roles: ReadonlyArray<"admin" | "user">) =>
   Array.match(roles, {
     onEmpty: () =>
       QueryStream.empty<NotesDoc>()(
-        QueryStreamKeyLayout.fromIndex(["author.role", "_creationTime"], 1),
+        Result.getOrThrow(
+          QueryStreamKeyLayout.fromIndex(["author.role", "_creationTime"], 1),
+        ),
       ),
     onNonEmpty: (some) =>
       QueryStream.merge(
@@ -513,14 +520,14 @@ An outer document whose inner stream is empty contributes no elements. Use [`onE
 
 ```ts
 import { QueryStreamKeyLayout } from "@confect/server";
+import * as Result from "effect/Result";
 
 // The comments on admin notes, grouped by note in note order and by
 // creation time within each note.
 const commentsOn = (note: NotesDoc) =>
   reader.table("comments").stream("by_note", (q) => q.eq("noteId", note._id));
-const innerLayout = QueryStreamKeyLayout.fromIndex(
-  ["noteId", "_creationTime"],
-  1,
+const innerLayout = Result.getOrThrow(
+  QueryStreamKeyLayout.fromIndex(["noteId", "_creationTime"], 1),
 );
 
 reader

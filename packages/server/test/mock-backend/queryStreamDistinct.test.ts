@@ -1,3 +1,4 @@
+import { identity } from "effect/Function";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
@@ -438,10 +439,10 @@ describe("QueryStream distinct representatives", () => {
                     )
                     .pipe(QueryStream.distinct(["text"])),
                 {
-                  innerLayout: QueryStreamKeyLayout.fromIndex([
-                    "text",
-                    "_creationTime",
-                  ]),
+                  innerLayout: Result.getOrThrowWith(
+                    QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+                    identity,
+                  ),
                   onEmpty: (row) => ({ tag: `none for ${row.text}` }),
                 },
               ),
@@ -480,9 +481,10 @@ describe("QueryStream distinct representatives", () => {
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", row.tag ?? "")),
                 {
-                  innerLayout: QueryStreamKeyLayout.fromIndex([
-                    "_creationTime",
-                  ]),
+                  innerLayout: Result.getOrThrowWith(
+                    QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+                    identity,
+                  ),
                   onEmpty: (row) => ({ tag: `none for ${row.text}` }),
                 },
               ),
@@ -980,10 +982,10 @@ describe("QueryStream distinct read budgets", () => {
                     )
                     .pipe(QueryStream.distinct(["text"])),
                 {
-                  innerLayout: QueryStreamKeyLayout.fromIndex([
-                    "text",
-                    "_creationTime",
-                  ]),
+                  innerLayout: Result.getOrThrowWith(
+                    QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+                    identity,
+                  ),
                   onEmpty: () => ({ tag: "missing" }),
                 },
               ),

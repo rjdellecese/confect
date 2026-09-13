@@ -74,6 +74,82 @@ import type { AnyIndexRangeSpec } from "./QueryStreamIndexRange";
 import * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 
 /**
+ * Streams cannot be merged because their direction or key layout differs.
+ *
+ * @experimental
+ */
+export class IncompatibleStreamsError extends Data.TaggedError(
+  "IncompatibleStreamsError",
+)<{
+  readonly expectedOrder: OrderDirection;
+  readonly actualOrder: OrderDirection;
+  readonly expectedLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
+  readonly actualLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
+}> {
+  override get message(): string {
+    return `QueryStream.merge: all streams must share an order and order-key layout (got ${this.expectedOrder} ${QueryStreamKeyLayout.format(this.expectedLayout)} and ${this.actualOrder} ${QueryStreamKeyLayout.format(this.actualLayout)})`;
+  }
+}
+
+/**
+ * An inner stream uses a different direction from its outer stream.
+ *
+ * @experimental
+ */
+export class InnerStreamOrderMismatchError extends Data.TaggedError(
+  "InnerStreamOrderMismatchError",
+)<{
+  readonly expected: OrderDirection;
+  readonly actual: OrderDirection;
+}> {
+  override get message(): string {
+    return `QueryStream.flatMap: inner stream order (${this.actual}) differs from the outer stream's (${this.expected})`;
+  }
+}
+
+/**
+ * An inner stream does not have the declared layout.
+ *
+ * @experimental
+ */
+export class InnerStreamLayoutMismatchError extends Data.TaggedError(
+  "InnerStreamLayoutMismatchError",
+)<{
+  readonly expected: QueryStreamKeyLayout.QueryStreamKeyLayout;
+  readonly actual: QueryStreamKeyLayout.QueryStreamKeyLayout;
+}> {
+  override get message(): string {
+    return `QueryStream.flatMap: inner stream order-key layout (${QueryStreamKeyLayout.format(this.actual)}) differs from innerLayout (${QueryStreamKeyLayout.format(this.expected)})`;
+  }
+}
+
+/**
+ * A stream constructed externally did not provide a reversal recipe.
+ *
+ * @experimental
+ */
+export class MissingReversalRecipeError extends Data.TaggedError(
+  "MissingReversalRecipeError",
+) {
+  override get message(): string {
+    return "QueryStream.reverse: this stream cannot be reversed without a reversal recipe";
+  }
+}
+
+/**
+ * A zero-sized first page cannot produce a continuation cursor.
+ *
+ * @experimental
+ */
+export class EmptyInitialPageError extends Data.TaggedError(
+  "EmptyInitialPageError",
+) {
+  override get message(): string {
+    return "QueryStream.paginate: numItems of 0 with a null cursor is not supported";
+  }
+}
+
+/**
  * @experimental
  */
 export const TypeId = "~@confect/server/QueryStream";
@@ -242,7 +318,8 @@ export const isQueryStream = (u: unknown): u is Any =>
  * type argument in a first, otherwise empty call:
  * `QueryStream.empty<NotesDoc>()(source.keyLayout, "desc")`. Reuse the layout
  * of compatible streams, or construct a scan layout with
- * `QueryStreamKeyLayout.fromIndex(["text", "_creationTime"])`.
+ * `QueryStreamKeyLayout.fromIndex(["text", "_creationTime"])`, handling its
+ * `Result` before passing the layout.
  *
  * @experimental
  */
@@ -390,9 +467,12 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   const fullFieldPaths = QueryStreamIndexRange.completeFieldPaths(
     reflection.indexFieldPaths,
   );
-  const keyLayout = QueryStreamKeyLayout.fromIndex(
-    reflection.indexFieldPaths,
-    reflection.spec.eqCount,
+  const keyLayout = Result.getOrThrowWith(
+    QueryStreamKeyLayout.fromIndex(
+      reflection.indexFieldPaths,
+      reflection.spec.eqCount,
+    ),
+    identity,
   );
   const keyPaths = Array.map(
     Array.drop(fullFieldPaths, reflection.spec.eqCount),
@@ -647,9 +727,12 @@ export const merge = <
       !QueryStreamKeyLayout.compatible(stream.keyLayout, head.keyLayout),
   );
   if (Option.isSome(incompatible)) {
-    throw new Error(
-      `QueryStream.merge: all streams must share an order and order-key layout (got ${head.order} ${QueryStreamKeyLayout.format(head.keyLayout)} and ${incompatible.value.order} ${QueryStreamKeyLayout.format(incompatible.value.keyLayout)})`,
-    );
+    throw new IncompatibleStreamsError({
+      expectedOrder: head.order,
+      actualOrder: incompatible.value.order,
+      expectedLayout: head.keyLayout,
+      actualLayout: incompatible.value.keyLayout,
+    });
   }
   return mergeUnchecked(streams);
 };
@@ -1164,14 +1247,16 @@ const makeFlatMap = <
     inner: QueryStream<Doc2, InnerLabels, Direction, E2, R2>,
   ): QueryStream<Doc2, InnerLabels, Direction, E2, R2> => {
     if (inner.order !== self.order) {
-      throw new Error(
-        `QueryStream.flatMap: inner stream order (${inner.order}) differs from the outer stream's (${self.order})`,
-      );
+      throw new InnerStreamOrderMismatchError({
+        expected: self.order,
+        actual: inner.order,
+      });
     }
     if (!QueryStreamKeyLayout.compatible(inner.keyLayout, innerLayout)) {
-      throw new Error(
-        `QueryStream.flatMap: inner stream order-key layout (${QueryStreamKeyLayout.format(inner.keyLayout)}) differs from innerLayout (${QueryStreamKeyLayout.format(innerLayout)})`,
-      );
+      throw new InnerStreamLayoutMismatchError({
+        expected: innerLayout,
+        actual: inner.keyLayout,
+      });
     }
     return inner;
   };
@@ -1635,9 +1720,7 @@ export const reverse = <
   self: QueryStream<Doc, Labels, Direction, E, R>,
 ): QueryStream<Doc, Labels, Flip<Direction>, E, R> => {
   if (self.reverseWith === undefined) {
-    throw new Error(
-      "QueryStream.reverse: this stream cannot be reversed without a reversal recipe",
-    );
+    throw new MissingReversalRecipeError();
   }
   return self.reverseWith();
 };
@@ -1924,11 +2007,7 @@ export const paginate: {
     const until = Option.fromNullOr(decoded.until);
     if (options.numItems === 0) {
       if (options.cursor === null) {
-        return yield* Effect.die(
-          new Error(
-            "QueryStream.paginate: numItems of 0 with a null cursor is not supported",
-          ),
-        );
+        return yield* Effect.die(new EmptyInitialPageError());
       }
       return yield* Effect.succeed<PaginationResult<Doc>>({
         page: [],
