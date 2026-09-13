@@ -2,6 +2,12 @@ import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
 import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Option from "effect/Option";
+import type {
+  IndexRange as ConvexIndexRange,
+  IndexRangeBuilder as ConvexIndexRangeBuilder,
+  GenericDocument,
+} from "convex/server";
+import type { KeyValue } from "@confect/server/QueryStreamOrderKey";
 import type { GenericId } from "convex/values";
 
 type Doc = {
@@ -130,62 +136,85 @@ describe("QueryStreamIndexRange.builder", () => {
 });
 
 describe("QueryStreamIndexRange.apply", () => {
+  type Call = readonly [
+    tag: "eq" | "gt" | "gte" | "lt" | "lte",
+    fieldPath: string,
+    value: KeyValue,
+  ];
+
+  class RecordedRange {
+    constructor(readonly calls: ReadonlyArray<Call> = []) {}
+  }
+
+  class UpperBuilder extends RecordedRange {
+    lt(fieldPath: string, value: KeyValue): RecordedRange {
+      return new RecordedRange([...this.calls, ["lt", fieldPath, value]]);
+    }
+    lte(fieldPath: string, value: KeyValue): RecordedRange {
+      return new RecordedRange([...this.calls, ["lte", fieldPath, value]]);
+    }
+  }
+
+  class RecordingBuilder extends UpperBuilder {
+    eq(fieldPath: string, value: KeyValue): RecordingBuilder {
+      return new RecordingBuilder([...this.calls, ["eq", fieldPath, value]]);
+    }
+    gt(fieldPath: string, value: KeyValue): UpperBuilder {
+      return new UpperBuilder([...this.calls, ["gt", fieldPath, value]]);
+    }
+    gte(fieldPath: string, value: KeyValue): UpperBuilder {
+      return new UpperBuilder([...this.calls, ["gte", fieldPath, value]]);
+    }
+  }
+
+  // Convex exports IndexRange only as a type; the recording fixture supplies
+  // its behavior without access to the SDK's private nominal marker.
+  const recordingBuilder = () =>
+    new RecordingBuilder() as RecordingBuilder &
+      ConvexIndexRangeBuilder<GenericDocument, string[]>;
+
   it.each(["eq", "gt", "gte", "lt", "lte"] as const)(
     "applies %s with its receiver and preserves missing field values",
     (tag) => {
       for (const value of ["hello", undefined]) {
-        const final = {};
-        const calls: unknown[] = [];
-        const receiver = {
-          [tag](this: unknown, field: string, received: unknown) {
-            calls.push(this, field, received);
-            return final;
-          },
-        };
+        const receiver = recordingBuilder();
         const range = QueryStreamIndexRange.builder<
           Doc & { text?: string },
           ["text"]
         >()[tag]("text", value);
-        expect(QueryStreamIndexRange.apply(range, receiver)).toBe(final);
-        expect(calls).toEqual([receiver, "text", value]);
+        const result = QueryStreamIndexRange.apply(range, receiver);
+        expectTypeOf(result).toEqualTypeOf<ConvexIndexRange>();
+        expectTypeOf(QueryStreamIndexRange.apply)
+          .parameter(1)
+          .toEqualTypeOf<ConvexIndexRangeBuilder<GenericDocument, string[]>>();
+        expect(result).toHaveProperty("calls", [[tag, "text", value]]);
+        expect(result).not.toBe(receiver);
+        expect(receiver.calls).toEqual([]);
       }
     },
   );
 
   it("threads returned Convex builders through an equality prefix and both endpoints", () => {
-    const calls: unknown[] = [];
-    const final = {};
-    const upper = {
-      lte(field: string, value: unknown) {
-        calls.push(["lte", field, value]);
-        return final;
-      },
-    };
-    const lower = {
-      gt(field: string, value: unknown) {
-        calls.push(["gt", field, value]);
-        return upper;
-      },
-    };
-    const target = {
-      eq(field: string, value: unknown) {
-        calls.push(["eq", field, value]);
-        return lower;
-      },
-    };
+    const target = recordingBuilder();
     expect(QueryStreamIndexRange.apply(builder(), target)).toBe(target);
-    expect(calls).toEqual([]);
-    expect(
-      QueryStreamIndexRange.apply(
-        builder().eq("category", "a").gt("score", 1).lte("score", 5),
-        target,
-      ),
-    ).toBe(final);
-    expect(calls).toEqual([
-      ["eq", "category", "a"],
-      ["gt", "score", 1],
-      ["lte", "score", 5],
-    ]);
+    expect(target.calls).toEqual([]);
+    const result = QueryStreamIndexRange.apply(
+      builder()
+        .eq("category", "a")
+        .eq("score", 1)
+        .gt("_id", "first" as GenericId<"items">)
+        .lte("_id", "last" as GenericId<"items">),
+      target,
+    );
+    expect(result).toEqual(
+      new RecordedRange([
+        ["eq", "category", "a"],
+        ["eq", "score", 1],
+        ["gt", "_id", "first"],
+        ["lte", "_id", "last"],
+      ]),
+    );
+    expect(target.calls).toEqual([]);
   });
 });
 

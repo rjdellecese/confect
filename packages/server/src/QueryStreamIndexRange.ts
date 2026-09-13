@@ -1,4 +1,9 @@
-import type { GenericDocument, FieldTypeFromFieldPath } from "convex/server";
+import type {
+  GenericDocument,
+  FieldTypeFromFieldPath,
+  IndexRange as ConvexIndexRange,
+  IndexRangeBuilder as ConvexIndexRangeBuilder,
+} from "convex/server";
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import { identity, pipe } from "effect/Function";
@@ -203,20 +208,60 @@ export const builder = <
 export const equalityPrefixLength = (self: QueryStreamIndexRange): number =>
   self[TypeId].equalities.length;
 
+interface ConvexUpperBoundBuilder extends ConvexIndexRange {
+  readonly lt: (
+    fieldPath: string,
+    value: QueryStreamOrderKey.KeyValue,
+  ) => ConvexIndexRange;
+  readonly lte: (
+    fieldPath: string,
+    value: QueryStreamOrderKey.KeyValue,
+  ) => ConvexIndexRange;
+}
+
+interface ConvexRangeBuilder extends ConvexUpperBoundBuilder {
+  readonly eq: (
+    fieldPath: string,
+    value: QueryStreamOrderKey.KeyValue,
+  ) => ConvexRangeBuilder;
+  readonly gt: (
+    fieldPath: string,
+    value: QueryStreamOrderKey.KeyValue,
+  ) => ConvexUpperBoundBuilder;
+  readonly gte: (
+    fieldPath: string,
+    value: QueryStreamOrderKey.KeyValue,
+  ) => ConvexUpperBoundBuilder;
+}
+
 /**
  * Apply one range to Convex's index-range builder.
  */
-export const apply = (self: QueryStreamIndexRange, q: any): any => {
+export const apply = (
+  self: QueryStreamIndexRange,
+  q: ConvexIndexRangeBuilder<GenericDocument, string[]>,
+): ConvexIndexRange => {
   const { equalities, bounded } = self[TypeId];
-  const prefix = Array.reduce(equalities, q, (target, { fieldPath, value }) =>
-    target.eq(fieldPath, value),
+  // Convex tracks equality progress through a static field tuple. These paths
+  // are runtime data; the range model owns their ordering. Its runtime builder
+  // supports further equality calls, even when the SDK type has lost the tuple.
+  const prefix = Array.reduce(
+    equalities,
+    q as ConvexRangeBuilder,
+    (target, { fieldPath, value }) => target.eq(fieldPath, value),
   );
   return Option.match(bounded, {
     onNone: () => prefix,
     onSome: ({ fieldPath, interval }) => {
-      const lower = (target: any, endpoint: Endpoint): any =>
+      const lower = (
+        target: ConvexRangeBuilder,
+        endpoint: Endpoint,
+      ): ConvexUpperBoundBuilder =>
         target[endpoint.inclusive ? "gte" : "gt"](fieldPath, endpoint.value);
-      const upper = (target: any, endpoint: Endpoint): any =>
+      const upper = (
+        target: ConvexUpperBoundBuilder,
+        endpoint: Endpoint,
+      ): ConvexIndexRange =>
         target[endpoint.inclusive ? "lte" : "lt"](fieldPath, endpoint.value);
       return Interval.$match(interval, {
         Lower: ({ lower: endpoint }) => lower(prefix, endpoint),
