@@ -38,9 +38,8 @@ export interface SuccessValue {
 
 /**
  * The wrap-style middleware implementation shape: receives the downstream
- * effect (the remaining middleware plus the function handler) and the
- * covered invocation's metadata, and returns the effect that runs in its
- * place.
+ * effect (the remaining middleware plus the function handler) and the covered
+ * invocation's metadata, and returns the effect that runs in its place.
  *
  * Mirrors `RpcMiddleware.RpcMiddleware` in Effect.
  */
@@ -68,8 +67,8 @@ export interface AnyMiddlewareImpl {
 }
 
 /**
- * The class shape produced by {@link MiddlewareSpec}. Only the static side is ever
- * used—the class is a value-level carrier for the middleware's key, its
+ * The class shape produced by {@link MiddlewareSpec}. Only the static side is
+ * ever used—the class is a value-level carrier for the middleware's key, its
  * declared functionTypes, and its (lazily-evaluated) error schema, plus the
  * type-level `Provides`/`Error` metadata. It is deliberately not a
  * `Context.Tag`: implementations are registered through the group `Registry`
@@ -133,8 +132,8 @@ export type Provides<MiddlewareSpec_ extends AnyMiddlewareSpec> =
     : never;
 
 /**
- * The services a middleware's implementation may consume from middleware
- * that runs earlier in the same chain (type-level only, like `provides`).
+ * The services a middleware's implementation may consume from middleware that
+ * runs earlier in the same chain (type-level only, like `provides`).
  */
 export type Requires<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
@@ -165,16 +164,20 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
  * encode through, and the function types it may attach to.
  *
  * ```ts
- * class RequireUser extends MiddlewareSpec.MiddlewareSpec<RequireUser, {
- *   provides: CurrentUser
- * }>()("RequireUser", {
+ * class RequireUser extends MiddlewareSpec.MiddlewareSpec<
+ *   RequireUser,
+ *   {
+ *     provides: CurrentUser;
+ *   }
+ * >()("RequireUser", {
  *   error: () => NotSignedIn,
  *   functionTypes: { query: true, mutation: true, action: false },
  * }) {}
  * ```
  *
  * The implementation is server-only and supplied separately via
- * `MiddlewareImpl.make` (or `makeByFunctionType`/`provides`) in `@confect/server`.
+ * `MiddlewareImpl.make` (or `makeByFunctionType`/`provides`) in
+ * `@confect/server`.
  */
 export const MiddlewareSpec =
   <Self, Config extends { provides?: any; requires?: any } = {}>() =>
@@ -265,10 +268,9 @@ type FunctionTypeOf<FunctionSpec_ extends FunctionSpec.AnyWithProps> =
 type ValidationResult<Errors> = [Errors] extends [never] ? unknown : Errors;
 
 /**
- * A matching-type Convex-provenance function is rejected rather than
- * silently skipped: its raw handler passes through Confect untouched, so
- * the middleware could not actually cover it, and skipping it would be a
- * policy hole.
+ * A matching-type Convex-provenance function is rejected rather than silently
+ * skipped: its raw handler passes through Confect untouched, so the middleware
+ * could not actually cover it, and skipping it would be a policy hole.
  */
 export type ValidateFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
@@ -295,8 +297,8 @@ export type ValidateFunction<
   : never;
 
 /**
- * Attachment order is chain order, so requiring `requires` to be satisfied
- * by already-attached middleware is exactly requiring the provider to run
+ * Attachment order is chain order, so requiring `requires` to be satisfied by
+ * already-attached middleware is exactly requiring the provider to run
  * earlier.
  */
 export type ValidateAttach<
@@ -344,14 +346,14 @@ type GroupOverlap<
     : never;
 
 /**
- * The parameter-type validation applied to the group spec at
- * `GroupImpl.make`: every function's attached middleware must have its
- * `requires` services provided by some middleware covering that function
- * (the group's or the function's own). Checked here—with the group fully
- * assembled—rather than at the spec builders, because a function-level
- * middleware's `requires` may legitimately be satisfied by a group
- * middleware the function spec never sees, and group attachment is
- * declaratively order-independent with respect to `addFunction`.
+ * The parameter-type validation applied to the group spec at `GroupImpl.make`:
+ * every function's attached middleware must have its `requires` services
+ * provided by some middleware covering that function (the group's or the
+ * function's own). Checked here—with the group fully assembled—rather than at
+ * the spec builders, because a function-level middleware's `requires` may
+ * legitimately be satisfied by a group middleware the function spec never sees,
+ * and group attachment is declaratively order-independent with respect to
+ * `addFunction`.
  */
 export type ValidateImplRequires<
   Functions_ extends FunctionSpec.AnyWithProps,

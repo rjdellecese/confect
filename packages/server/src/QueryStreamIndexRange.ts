@@ -25,8 +25,9 @@ type Tail<FieldPaths extends ReadonlyArray<string>> =
     : ReadonlyArray<string>;
 
 /**
- * Complete the source index paths with Convex's implicit ID tiebreaker.
- * These paths address the encoded document and are never ordering aliases.
+ * Complete the source index paths with Convex's implicit ID tiebreaker. These
+ * paths address the encoded document and are never ordering aliases.
+ *
  * @experimental
  */
 export const completeFieldPaths = (
@@ -79,9 +80,9 @@ export type AnyIndexRangeSpec = IndexRangeSpec<ReadonlyArray<string>>;
 export type Remaining<Spec> = Spec extends IndexRangeSpec<infer R> ? R : never;
 
 /**
- * A typed index-range builder. `eq` must target the next unpinned index
- * field, and consumes it; `gt`/`gte`/`lt`/`lte` bound the next field without
- * consuming it (bounded field paths still vary within the range).
+ * A typed index-range builder. `eq` must target the next unpinned index field,
+ * and consumes it; `gt`/`gte`/`lt`/`lte` bound the next field without consuming
+ * it (bounded field paths still vary within the range).
  *
  * @experimental
  */
@@ -201,7 +202,10 @@ class TaggedBound extends Data.Class<{
   readonly tag: BoundTag;
 }> {}
 
-/** Dropping a bound key's last component bounds by the remaining prefix—exclusively. */
+/**
+ * Dropping a bound key's last component bounds by the remaining
+ * prefix—exclusively.
+ */
 const excludePrefix = (tag: BoundTag): BoundTag =>
   tag === "gt" || tag === "gte" ? "gt" : "lt";
 
@@ -226,7 +230,9 @@ const peelBound = (
         }),
       );
 
-/** `eq` every component of `key` but the last, which gets the bound tag. */
+/**
+ * `eq` every component of `key` but the last, which gets the bound tag.
+ */
 const rangeOpsFor = (
   prefixOps: ReadonlyArray<RangeOp>,
   fieldPaths: ReadonlyArray<string>,

@@ -15,7 +15,9 @@ import { join } from "node:path";
 
 const PACKAGES_DIR = "packages";
 
-/** Files that must never reach a consumer, with the reason shown on failure. */
+/**
+ * Files that must never reach a consumer, with the reason shown on failure.
+ */
 const DENIED = [
   [/\.tsbuildinfo$/, "TypeScript incremental build cache"],
   [/(^|\/)node_modules\//, "nested node_modules"],

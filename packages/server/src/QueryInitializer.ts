@@ -112,18 +112,17 @@ export interface QueryInitializer<
    * Effect `Stream` of documents in index order that stays mergeable and
    * paginable.
    *
-   * In SQL terms: an index range scan—`SELECT * FROM table WHERE <range>
-   * ORDER BY <index fields> [DESC]`; `eq` calls are the equality
-   * predicates, the bound calls are the range predicates. The value is a
-   * reusable description of a query: each run re-runs the index query.   *
-   * The typed range builder consumes `eq`-pinned fields from the index's
-   * field tuple at the type level, so the stream's order-key type is
-   * exactly the fields that still vary (the `ORDER BY` columns left after
-   * the equality predicates). The order direction is part of the
-   * type too: omitted, it is `"asc"`; a literal is tracked as that literal,
-   * and a value known only at runtime as the union. The order parameter is
-   * either absent or a direction—never `undefined`—so the type can't
-   * claim a literal the runtime default would contradict.
+   * In SQL terms: an index range scan—`SELECT * FROM table WHERE <range> ORDER
+   * BY <index fields> [DESC]`; `eq` calls are the equality predicates, the
+   * bound calls are the range predicates. The value is a reusable description
+   * of a query: each run re-runs the index query. * The typed range builder
+   * consumes `eq`-pinned fields from the index's field tuple at the type level,
+   * so the stream's order-key type is exactly the fields that still vary (the
+   * `ORDER BY` columns left after the equality predicates). The order direction
+   * is part of the type too: omitted, it is `"asc"`; a literal is tracked as
+   * that literal, and a value known only at runtime as the union. The order
+   * parameter is either absent or a direction—never `undefined`—so the type
+   * can't claim a literal the runtime default would contradict.
    */
   readonly stream: {
     <

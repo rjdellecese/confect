@@ -129,7 +129,10 @@ export type WithName<
   Name_ extends Name<Group>,
 > = Extract<Group, { readonly name: Name_ }>;
 
-/** Assigns a segment name to a leaf group created with {@link make} for typing and refs. */
+/**
+ * Assigns a segment name to a leaf group created with {@link make} for typing
+ * and refs.
+ */
 export type NamedAt<Group extends Any, Name_ extends string> = Omit<
   Group,
   "name"

@@ -32,9 +32,9 @@ const USER_TIMEOUT_SECONDS = 1;
 const SYSTEM_TIMEOUT_SECONDS = 1;
 
 /**
- * Duration after which a query whose handler observed time is evicted from
- * the local backend's reactive cache. Exported so tests can derive their
- * sleep from it rather than hard-coding a magic number.
+ * Duration after which a query whose handler observed time is evicted from the
+ * local backend's reactive cache. Exported so tests can derive their sleep from
+ * it rather than hard-coding a magic number.
  */
 export const maxCacheAge = Duration.seconds(
   USER_TIMEOUT_SECONDS + SYSTEM_TIMEOUT_SECONDS + 1,
@@ -42,13 +42,13 @@ export const maxCacheAge = Duration.seconds(
 
 /**
  * Spawn `convex dev` from `test/local-backend/fixtures/` with reduced UDF
- * timeouts. The CLI keeps the local backend alive for the lifetime of the
- * scope and is signalled on scope close; the `ConvexHttpClient` is shared
- * by every test case.
+ * timeouts. The CLI keeps the local backend alive for the lifetime of the scope
+ * and is signalled on scope close; the `ConvexHttpClient` is shared by every
+ * test case.
  *
- * `.convex/` and `.env.local` are intentionally preserved between runs so
- * the CLI takes the "existing deployment" path and skips boilerplate
- * codegen that would otherwise overwrite committed fixture files.
+ * `.convex/` and `.env.local` are intentionally preserved between runs so the
+ * CLI takes the "existing deployment" path and skips boilerplate codegen that
+ * would otherwise overwrite committed fixture files.
  */
 const make = Effect.gen(function* () {
   const path = yield* Path.Path;

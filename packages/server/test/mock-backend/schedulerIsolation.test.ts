@@ -4,8 +4,8 @@
  * Regression test for Effect's cooperative fiber yielding inside Convex's
  * query/mutation isolate, which bans `setTimeout` and has no `setImmediate`.
  * The fixture handlers run well past `MaxOpsBeforeYield` (2048) fiber
- * operations, forcing scheduler yields mid-handler; they only succeed if
- * every yield dispatches through the microtask queue rather than timer APIs.
+ * operations, forcing scheduler yields mid-handler; they only succeed if every
+ * yield dispatches through the microtask queue rather than timer APIs.
  *
  * Deliberately a plain async vitest test rather than `it.effect`/TestConfect:
  * `@effect/vitest` runs the outer test fiber on Effect's default scheduler,
@@ -35,9 +35,9 @@ const expectedSum = (5000 * 5001) / 2;
  * Simulate the Convex query/mutation isolate for the duration of `run`:
  * `setTimeout` throws Convex's error, and `setImmediate` (absent in the
  * isolate, so Effect's default scheduler would fall back to `setTimeout`)
- * throws too, so any timer use surfaces as a test failure. Effect resolves
- * both via `globalThis` property lookup at dispatch time, so swapping the
- * properties intercepts it.
+ * throws too, so any timer use surfaces as a test failure. Effect resolves both
+ * via `globalThis` property lookup at dispatch time, so swapping the properties
+ * intercepts it.
  */
 const withConvexIsolateTimers = <A>(run: () => Promise<A>): Promise<A> => {
   const originalSetTimeout = globalThis.setTimeout;

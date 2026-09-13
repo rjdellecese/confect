@@ -42,11 +42,11 @@ const functionsEffect = Effect.fnUntraced(function* ({
 });
 
 /**
- * Emit `convex/schema.ts` as a one-line re-export of the codegen-emitted
- * deploy schema in `confect/_generated/convexSchema.ts`. Deploy-time
- * consumers (the Convex CLI, `convex-test`) keep reading
- * `convex/schema.ts`; the runtime `DatabaseSchema` in
- * `confect/_generated/schema.ts` is untouched by this file.
+ * Emit `convex/schema.ts` as a one-line re-export of the codegen-emitted deploy
+ * schema in `confect/_generated/convexSchema.ts`. Deploy-time consumers (the
+ * Convex CLI, `convex-test`) keep reading `convex/schema.ts`; the runtime
+ * `DatabaseSchema` in `confect/_generated/schema.ts` is untouched by this
+ * file.
  */
 export const schema = ({
   convexSchemaImportPath,
@@ -71,24 +71,23 @@ interface TableModuleBinding {
 }
 
 /**
- * Emit `confect/_generated/schema.ts`—the runtime `DatabaseSchema` used
- * by impls and the per-group registries (and downstream by per-function
- * bundles for codec lookup). Every table wrapper at
- * `confect/_generated/tables/<name>.ts` is imported statically and
- * registered as a value entry on the `DatabaseSchema.make({...})` call.
- * Per-table laziness lives inside each `Table`: its `Fields` and `Doc`
- * are lazy memoised getters that only evaluate the
- * user-supplied field-schema callback on first access, so unused tables in
- * a function bundle never pay schema-construction cost despite the
- * static import.
+ * Emit `confect/_generated/schema.ts`—the runtime `DatabaseSchema` used by
+ * impls and the per-group registries (and downstream by per-function bundles
+ * for codec lookup). Every table wrapper at
+ * `confect/_generated/tables/<name>.ts` is imported statically and registered
+ * as a value entry on the `DatabaseSchema.make({...})` call. Per-table laziness
+ * lives inside each `Table`: its `Fields` and `Doc` are lazy memoised getters
+ * that only evaluate the user-supplied field-schema callback on first access,
+ * so unused tables in a function bundle never pay schema-construction cost
+ * despite the static import.
  *
  * The `DatabaseSchema` import is aliased to `$DatabaseSchema` because each
  * table is imported under its own (filename-derived) name; a table named
- * `DatabaseSchema` would otherwise collide with the library import and emit
- * a duplicate-binding file. The leading `$` makes the alias collision-proof:
+ * `DatabaseSchema` would otherwise collide with the library import and emit a
+ * duplicate-binding file. The leading `$` makes the alias collision-proof:
  * `validateConfectTableIdentifier` requires names to match
- * `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid table import
- * can ever shadow it.
+ * `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid table import can
+ * ever shadow it.
  */
 export const runtimeSchema = ({
   tableModules,
@@ -156,13 +155,12 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
  * `defineTable` binding; the generated table wrappers themselves stay
  * client-safe (`Fields`/`Doc` from `@confect/core`).
  *
- * The `defineSchema` and `Table` imports are aliased with a leading `$`
- * because each table is imported under its own (filename-derived) name; a
- * table named `defineSchema` or `Table` would otherwise collide with the
- * library import and emit a duplicate-binding file.
- * `validateConfectTableIdentifier` requires names to match
- * `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid table import
- * can ever shadow them.
+ * The `defineSchema` and `Table` imports are aliased with a leading `$` because
+ * each table is imported under its own (filename-derived) name; a table named
+ * `defineSchema` or `Table` would otherwise collide with the library import and
+ * emit a duplicate-binding file. `validateConfectTableIdentifier` requires
+ * names to match `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid
+ * table import can ever shadow them.
  */
 export const convexSchema = ({
   tableModules,
@@ -210,14 +208,14 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
 });
 
 /**
- * Emit `confect/_generated/id.ts`—a type-constrained `Id` constructor and
- * a `TableNames` union derived from the user's `confect/tables/*.ts`
- * filenames. User-authored table modules import `Id` from this file to
- * declare cross-table id references without typing the destination name as
- * a free string (and without ever importing each other transitively).
+ * Emit `confect/_generated/id.ts`—a type-constrained `Id` constructor and a
+ * `TableNames` union derived from the user's `confect/tables/*.ts` filenames.
+ * User-authored table modules import `Id` from this file to declare cross-table
+ * id references without typing the destination name as a free string (and
+ * without ever importing each other transitively).
  *
- * When the table directory is empty the `TableNames` union resolves to
- * `never`, which still lets the file typecheck against an empty workspace.
+ * When the table directory is empty the `TableNames` union resolves to `never`,
+ * which still lets the file typecheck against an empty workspace.
  */
 export const id = ({ tableNames }: Parameters<typeof idEffect>[0]) =>
   idEffect({ tableNames });
@@ -250,9 +248,9 @@ const idEffect = Effect.fnUntraced(function* ({
 
 /**
  * Emit `confect/_generated/tables/<tableName>.ts`—a two-line wrapper that
- * imports the user-authored `UnnamedTable` and binds the file basename to
- * it, producing the fully-named `Table` value that downstream consumers
- * (schema, specs, impls) read.
+ * imports the user-authored `UnnamedTable` and binds the file basename to it,
+ * producing the fully-named `Table` value that downstream consumers (schema,
+ * specs, impls) read.
  */
 export const tableWrapper = ({
   tableName,
@@ -331,20 +329,18 @@ const authConfigEffect = Effect.fnUntraced(function* ({
 
 /**
  * Emit `confect/_generated/components.ts`—a typed registry of the Convex
- * components installed via `app.use(...)` in `convex/convex.config.ts`.
- * Mirrors the `components` export of Convex's generated
- * `convex/_generated/api`: the runtime value is `componentsGeneric()` (a
- * name-preserving proxy), and each entry is typed with the `ComponentApi`
- * that component packages export from `_generated/component.js`. Unlike
- * `convex/_generated/api`, this file exists before `convex codegen` ever
- * runs, so impl modules can import it safely—`confect codegen` bundles and
- * evaluates each impl's import graph, and `convex/_generated/api` doesn't
- * exist yet at that point.
+ * components installed via `app.use(...)` in `convex/convex.config.ts`. Mirrors
+ * the `components` export of Convex's generated `convex/_generated/api`: the
+ * runtime value is `componentsGeneric()` (a name-preserving proxy), and each
+ * entry is typed with the `ComponentApi` that component packages export from
+ * `_generated/component.js`. Unlike `convex/_generated/api`, this file exists
+ * before `convex codegen` ever runs, so impl modules can import it
+ * safely—`confect codegen` bundles and evaluates each impl's import graph, and
+ * `convex/_generated/api` doesn't exist yet at that point.
  *
  * The `as any` cast is confined here: `componentsGeneric()` is typed
- * `AnyChildComponents`, which deliberately doesn't overlap the precise
- * registry type; the `Components` annotation on the const supplies the
- * real type.
+ * `AnyChildComponents`, which deliberately doesn't overlap the precise registry
+ * type; the `Components` annotation on the const supplies the real type.
  */
 export const components = ({
   components: installedComponents,
@@ -412,11 +408,11 @@ const refsEffect = Effect.fnUntraced(function* ({
  * Emit `_generated/docs.ts`: one named `type <table>` alias per table plus a
  * `Docs` registry. Each alias is `Document.Document<typeof schemaDefinition,
  * "<table>">`, so it stays structurally exact while giving the document a
- * *name*—declaration emit then prints e.g. `NotesDoc` instead of expanding
- * the row structure. A `type` alias (rather than an extending `interface`) is
- * used so it works for every document shape: object tables, but also union
- * schemas (`Schema.Union`) and other non-object documents, which an `interface
- * … extends` cannot represent (TS2312). The registry is threaded into the
+ * _name_—declaration emit then prints e.g. `NotesDoc` instead of expanding the
+ * row structure. A `type` alias (rather than an extending `interface`) is used
+ * so it works for every document shape: object tables, but also union schemas
+ * (`Schema.Union`) and other non-object documents, which an `interface …
+ * extends` cannot represent (TS2312). The registry is threaded into the
  * generated `DatabaseReader`/`DatabaseWriter` tags so query/mutation helpers
  * print named documents with no user annotations.
  */

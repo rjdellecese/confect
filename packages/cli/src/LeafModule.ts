@@ -33,9 +33,9 @@ export interface LeafModule {
   /**
    * The runtime declared by the group's spec—`"Node"` for
    * `GroupSpec.makeNode()`, `"Convex"` for `GroupSpec.make()`. `None` while the
-   * runtime is unknown: discovery (`toLeafModule`) works from the file path alone,
-   * which does not determine the runtime, so this is filled in once the spec has
-   * been bundled and validated (see `validateSpec`).
+   * runtime is unknown: discovery (`toLeafModule`) works from the file path
+   * alone, which does not determine the runtime, so this is filled in once the
+   * spec has been bundled and validated (see `validateSpec`).
    */
   readonly runtime: Option.Option<"Convex" | "Node">;
   readonly specImportPath: string;
@@ -199,18 +199,18 @@ const absoluteModulePath = Effect.fnUntraced(function* (relativePath: string) {
  * Every `*.spec.ts` is reachable from `_generated/spec.ts`, which the client
  * imports through `_generated/refs.ts`—so a spec's whole import graph is
  * bundled into the browser whether or not the client calls those functions.
- * Server logic co-located with a declaration therefore ships to users, silently.
+ * Server logic co-located with a declaration therefore ships to users,
+ * silently.
  *
  * `@confect/server` is a sound proxy for "server logic lives here": an
- * implementation can't be written without `FunctionImpl`/`MiddlewareImpl`,
- * both of which live there. Table `Doc`/`Fields` schemas live in
- * `@confect/core`, so the documented `notes.Doc` pattern in a spec must not
- * reach `@confect/server` even through `tables/` or `_generated/`. The check
- * runs over the spec bundle's transitive inputs rather than the spec module
- * alone, so it also covers middleware declarations under
- * `confect/middleware/` (which codegen otherwise never visits) and any
- * shared helper a spec pulls in—while only ever flagging modules that
- * genuinely reach the client.
+ * implementation can't be written without `FunctionImpl`/`MiddlewareImpl`, both
+ * of which live there. Table `Doc`/`Fields` schemas live in `@confect/core`, so
+ * the documented `notes.Doc` pattern in a spec must not reach `@confect/server`
+ * even through `tables/` or `_generated/`. The check runs over the spec
+ * bundle's transitive inputs rather than the spec module alone, so it also
+ * covers middleware declarations under `confect/middleware/` (which codegen
+ * otherwise never visits) and any shared helper a spec pulls in—while only ever
+ * flagging modules that genuinely reach the client.
  */
 const validateClientSafety = Effect.fnUntraced(function* (
   leaf: LeafModule,
@@ -291,13 +291,12 @@ const findFinalizedGroupImpl = <S>(
   Array.findFirst(context.mapUnsafe.values(), GroupImpl.isFinalizedGroupImpl);
 
 /**
- * Build the impl layer with a fresh `Registry` so each validation is
- * isolated from prior validations' `FunctionImpl.make` writes. The CLI no
- * longer reads the registry directly—`GroupImpl.finalize` snapshots the
- * registered function names onto the produced `Finalized` `GroupImpl`
- * service value—but a fresh `Ref` is still required because the default
- * `Context.Reference` is cached globally and would otherwise accumulate
- * items across impls.
+ * Build the impl layer with a fresh `Registry` so each validation is isolated
+ * from prior validations' `FunctionImpl.make` writes. The CLI no longer reads
+ * the registry directly—`GroupImpl.finalize` snapshots the registered function
+ * names onto the produced `Finalized` `GroupImpl` service value—but a fresh
+ * `Ref` is still required because the default `Context.Reference` is cached
+ * globally and would otherwise accumulate items across impls.
  */
 const buildImplLayer = Effect.fnUntraced(function* (
   implLayer: Layer.Layer<unknown>,

@@ -5,9 +5,10 @@ import * as Option from "effect/Option";
 const TypeId = "@confect/server/QueryStreamKeyLabels";
 
 /**
- * Ordered names for the visible components of a stream's ordering key.
- * Names may repeat, and the sequence may be empty. They are aliases, not
- * document field paths; implicit ID positions have no visible label.
+ * Ordered names for the visible components of a stream's ordering key. Names
+ * may repeat, and the sequence may be empty. They are aliases, not document
+ * field paths; implicit ID positions have no visible label.
+ *
  * @experimental
  */
 export interface QueryStreamKeyLabels<
@@ -16,27 +17,47 @@ export interface QueryStreamKeyLabels<
   readonly [TypeId]: Readonly<Labels>;
 }
 
-/** Wrap a tuple of names as a labels value. @experimental */
+/**
+ * Wrap a tuple of names as a labels value.
+ *
+ * @experimental
+ */
 export const make = <const Labels extends ReadonlyArray<string>>(
   labels: Labels,
 ): QueryStreamKeyLabels<Labels> => ({ [TypeId]: labels });
 
-/** Inspect the names in visible key order. @experimental */
+/**
+ * Inspect the names in visible key order.
+ *
+ * @experimental
+ */
 export const toArray = <Labels extends ReadonlyArray<string>>(
   self: QueryStreamKeyLabels<Labels>,
 ): Readonly<Labels> => self[TypeId];
 
-/** Number of visible ordering components. @experimental */
+/**
+ * Number of visible ordering components.
+ *
+ * @experimental
+ */
 export const size = (self: QueryStreamKeyLabels): number =>
   toArray(self).length;
 
 const ArrayEquivalence = Equivalence_.Array(Equivalence_.String);
 
-/** Equality includes both label order and multiplicity. @experimental */
+/**
+ * Equality includes both label order and multiplicity.
+ *
+ * @experimental
+ */
 export const Equivalence: Equivalence_.Equivalence<QueryStreamKeyLabels> =
   Equivalence_.mapInput(ArrayEquivalence, toArray);
 
-/** Concatenate labels, preserving their literal tuple types. @experimental */
+/**
+ * Concatenate labels, preserving their literal tuple types.
+ *
+ * @experimental
+ */
 export function concat<
   Left extends ReadonlyArray<string>,
   Right extends ReadonlyArray<string>,
@@ -52,8 +73,9 @@ export function concat(
 }
 
 /**
- * Parse a matching prefix, returning the labels left after it.
- * A reordered, skipped, or overlong prefix has no result.
+ * Parse a matching prefix, returning the labels left after it. A reordered,
+ * skipped, or overlong prefix has no result.
+ *
  * @experimental
  */
 export const stripPrefix = (
@@ -65,9 +87,10 @@ export const stripPrefix = (
     : Option.none();
 
 /**
- * Consume one replacement chunk with the template's tuple shape. The names
- * may differ, but a nonempty template produces a nonempty chunk. Failure
- * means there are too few labels; success also returns the unconsumed labels.
+ * Consume one replacement chunk with the template's tuple shape. The names may
+ * differ, but a nonempty template produces a nonempty chunk. Failure means
+ * there are too few labels; success also returns the unconsumed labels.
+ *
  * @experimental
  */
 export function consume<Template extends ReadonlyArray<string>>(

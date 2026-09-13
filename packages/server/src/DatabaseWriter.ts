@@ -56,7 +56,8 @@ export interface DatabaseWriterTableAccessor<
  * The service shape backing the `DatabaseWriter` tag. Named (rather than an
  * inferred anonymous object) so declaration emit prints
  * `DatabaseWriterService<…>` by reference instead of expanding the data model.
- * `Docs` is the optional named document registry (see `DatabaseReaderService`).
+ * `Docs` is the optional named document registry (see
+ * `DatabaseReaderService`).
  */
 export interface DatabaseWriterService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -78,8 +79,9 @@ export interface DatabaseWriterService<
 }
 
 /**
- * The tag's *Identifier* is `Docs`-independent (see `DatabaseReaderTag`); only
- * the *Service* carries `Docs` so writer inputs print the named doc interfaces.
+ * The tag's _Identifier_ is `Docs`-independent (see `DatabaseReaderTag`); only
+ * the _Service_ carries `Docs` so writer inputs print the named doc
+ * interfaces.
  */
 export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

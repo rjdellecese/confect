@@ -9,9 +9,10 @@ import type * as Types from "effect/Types";
 import * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 
 /**
- * One component of a stream key. An implicit ID can only terminate a
- * segment; an explicit segment contains only visible positions, including
- * an explicit ID or its alias. Empty keys have no segments.
+ * One component of a stream key. An implicit ID can only terminate a segment;
+ * an explicit segment contains only visible positions, including an explicit ID
+ * or its alias. Empty keys have no segments.
+ *
  * @experimental
  */
 export type Segment = Data.TaggedEnum<{
@@ -29,8 +30,10 @@ const Segment = Data.taggedEnum<Segment>();
 const TypeId = "@confect/server/QueryStreamKeyLayout";
 
 /**
- * The runtime layout witnessing the visible ordering labels `Labels`. Construct layouts
- * with `fromIndex`, `concat`, and `rename`, or reuse a stream's `keyLayout`.
+ * The runtime layout witnessing the visible ordering labels `Labels`. Construct
+ * layouts with `fromIndex`, `concat`, and `rename`, or reuse a stream's
+ * `keyLayout`.
+ *
  * @experimental
  */
 export interface QueryStreamKeyLayout<
@@ -50,11 +53,19 @@ const make = <Labels extends ReadonlyArray<string>>(
   [TypeId]: { _Labels: identity, segments },
 });
 
-/** The component segments, including their implicit ID positions. @experimental */
+/**
+ * The component segments, including their implicit ID positions.
+ *
+ * @experimental
+ */
 export const segments = (self: QueryStreamKeyLayout): ReadonlyArray<Segment> =>
   self[TypeId].segments;
 
-/** The source field paths remaining after an equality prefix. @experimental */
+/**
+ * The source field paths remaining after an equality prefix.
+ *
+ * @experimental
+ */
 export type RemainingFieldPaths<
   FieldPaths extends ReadonlyArray<string>,
   Count extends number,
@@ -82,6 +93,7 @@ type DropPrefix<
  * pinning. Only an ID absent from the end of that original key is implicit.
  * Pinning every field of `by_id` produces a zero-width layout; pinning every
  * visible field of another index leaves its implicit ID.
+ *
  * @experimental
  */
 export function fromIndex<const FieldPaths extends ReadonlyArray<string>>(
@@ -124,7 +136,11 @@ export function fromIndex(
   return make(componentSegments);
 }
 
-/** Concatenate layouts without losing component tiebreakers. @experimental */
+/**
+ * Concatenate layouts without losing component tiebreakers.
+ *
+ * @experimental
+ */
 export const concat = <
   LeftLabels extends ReadonlyArray<string>,
   RightLabels extends ReadonlyArray<string>,
@@ -134,7 +150,11 @@ export const concat = <
 ): QueryStreamKeyLayout<readonly [...LeftLabels, ...RightLabels]> =>
   make(Array.appendAll(segments(self), segments(that)));
 
-/** Format visible labels and implicit IDs for diagnostics. @experimental */
+/**
+ * Format visible labels and implicit IDs for diagnostics.
+ *
+ * @experimental
+ */
 export const format = (self: QueryStreamKeyLayout): string => {
   const quoteLabels = (labels: QueryStreamKeyLabels.QueryStreamKeyLabels) =>
     Array.map(QueryStreamKeyLabels.toArray(labels), (label) =>
@@ -151,7 +171,11 @@ export const format = (self: QueryStreamKeyLayout): string => {
   return `[${Array.join(tokens, ", ")}]`;
 };
 
-/** The labels available to `distinct` and `renameKey`. @experimental */
+/**
+ * The labels available to `distinct` and `renameKey`.
+ *
+ * @experimental
+ */
 export function visibleLabels<Labels extends ReadonlyArray<string>>(
   self: QueryStreamKeyLayout<Labels>,
 ): QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>;
@@ -170,7 +194,11 @@ const segmentWidth = Segment.$match({
   Explicit: ({ labels }) => QueryStreamKeyLabels.size(labels),
 });
 
-/** Number of positions in an element's runtime key. @experimental */
+/**
+ * Number of positions in an element's runtime key.
+ *
+ * @experimental
+ */
 export const runtimeWidth = (self: QueryStreamKeyLayout): number =>
   Array.reduce(
     segments(self),
@@ -195,7 +223,11 @@ const visiblePositions = (
 
 const PositionsEquivalence = Equivalence.Array(Equivalence.Number);
 
-/** Compare labels and implicit positions, independently of segmentation. @experimental */
+/**
+ * Compare labels and implicit positions, independently of segmentation.
+ *
+ * @experimental
+ */
 export const compatible = (
   self: QueryStreamKeyLayout,
   that: QueryStreamKeyLayout,
@@ -205,8 +237,9 @@ export const compatible = (
   PositionsEquivalence(visiblePositions(self), visiblePositions(that));
 
 /**
- * Parse a logical prefix and resolve its runtime width. Hidden IDs before
- * the last selected label are included; hidden IDs after it are not.
+ * Parse a logical prefix and resolve its runtime width. Hidden IDs before the
+ * last selected label are included; hidden IDs after it are not.
+ *
  * @experimental
  */
 export const resolvePrefix = (
@@ -261,7 +294,11 @@ const consumeSegment = (
       ),
   });
 
-/** Relabel visible positions, preserving every implicit ID. @experimental */
+/**
+ * Relabel visible positions, preserving every implicit ID.
+ *
+ * @experimental
+ */
 export const rename = <ReplacementLabels extends ReadonlyArray<string>>(
   self: QueryStreamKeyLayout,
   replacementLabels: QueryStreamKeyLabels.QueryStreamKeyLabels<ReplacementLabels>,

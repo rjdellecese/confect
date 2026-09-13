@@ -53,6 +53,7 @@ export const END_CURSOR = "[]";
 /**
  * Bind cursor encoding and decoding to a layout. Runtime labels are derived
  * here; the version-1 envelope retains its `keyFields` property.
+ *
  * @experimental
  */
 export const codecForLayout = (

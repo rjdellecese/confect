@@ -5,7 +5,9 @@ import { cell, diagrams, keys, renderDiagrams, track } from "./streamDiagrams";
 const runTest = <A, E>(effect: Effect.Effect<A, E>): Promise<A> =>
   Effect.runPromise(effect);
 
-/** The rendered page, or the error's message when rendering fails. */
+/**
+ * The rendered page, or the error's message when rendering fails.
+ */
 const renderedOrMessage = (source: string): Effect.Effect<string> =>
   renderDiagrams(source).pipe(
     Effect.catchTag("StreamDiagramsError", (error) =>

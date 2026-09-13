@@ -49,7 +49,9 @@ export interface AnyWithProps extends Any {
 export type Groups<Spec_ extends AnyWithProps> =
   Spec_[TypeId][keyof Spec_[TypeId]];
 
-/** The group record stored by a spec, with its precise member types. */
+/**
+ * The group record stored by a spec, with its precise member types.
+ */
 export const groups = <Spec_ extends AnyWithProps>(
   self: Spec_,
 ): Spec_[TypeId] => self[TypeId];

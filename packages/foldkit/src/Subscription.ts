@@ -44,17 +44,17 @@ const paginatedError = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
 
 /**
  * The dependency record of a `reactiveQuery` entry. `None` means the
- * subscription is closed; a change from one `Some` to another tears the
- * server subscription down and reopens it with the new args.
+ * subscription is closed; a change from one `Some` to another tears the server
+ * subscription down and reopens it with the new args.
  */
 export interface Dependencies<Query extends Ref.AnyConfectPublicQuery> {
   readonly args: Option.Option<Ref.Args<Query>>;
 }
 
 /**
- * Maps a reactive query's emissions into the app's Messages. Every failure—the ref's typed error, a transport error, or a codec error—arrives via
- * `onError`, so the resulting stream's error channel is `never`, as Foldkit
- * requires.
+ * Maps a reactive query's emissions into the app's Messages. Every failure—the
+ * ref's typed error, a transport error, or a codec error—arrives via `onError`,
+ * so the resulting stream's error channel is `never`, as Foldkit requires.
  */
 export interface Handlers<
   Query extends Ref.AnyConfectPublicQuery,
@@ -78,13 +78,13 @@ type ArgsConfig<Query extends Ref.AnyConfectPublicQuery, Model> = {
     });
 
 /**
- * A `dependenciesToStream` body for a hand-written subscription entry: runs
- * the ref as a reactive query against the `Client` resource and maps
- * every emission and every failure into a Message. Query failures are values,
- * so the subscription remains live and can later emit a successful result.
+ * A `dependenciesToStream` body for a hand-written subscription entry: runs the
+ * ref as a reactive query against the `Client` resource and maps every emission
+ * and every failure into a Message. Query failures are values, so the
+ * subscription remains live and can later emit a successful result.
  *
- * Prefer `reactiveQuery`, which builds the whole entry; reach for this when
- * you need control over the entry's dependencies (custom gating, extra
+ * Prefer `reactiveQuery`, which builds the whole entry; reach for this when you
+ * need control over the entry's dependencies (custom gating, extra
  * dependencies).
  */
 export const reactiveQueryStream =
@@ -108,30 +108,34 @@ export const reactiveQueryStream =
 
 /**
  * A complete Foldkit subscription entry for a Confect reactive query. The
- * leading thunk fixes the `Model` type (TypeScript cannot partially infer
- * type arguments), so the `args` extractor's parameter is already typed.
- * Pass the result as an entry value to `Subscription.make`:
+ * leading thunk fixes the `Model` type (TypeScript cannot partially infer type
+ * arguments), so the `args` extractor's parameter is already typed. Pass the
+ * result as an entry value to `Subscription.make`:
  *
  * ```ts
- * import * as Confect from "@confect/foldkit"
- * import * as Subscription from "foldkit/subscription"
+ * import * as Confect from "@confect/foldkit";
+ * import * as Subscription from "foldkit/subscription";
  *
  * const subscriptions = Subscription.make<
  *   Model,
  *   Message,
  *   Confect.Client.Client
  * >()(() => ({
- *   note: Confect.Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
- *     args: (model) => Option.map(model.noteId, (noteId) => ({ noteId })),
- *     onSuccess: (note) => SucceededGetNote({ note }),
- *     onError: (error) => FailedGetNote({ message: String(error) }),
- *   }),
- * }))
+ *   note: Confect.Subscription.reactiveQuery<Model>()(
+ *     refs.public.notes.get,
+ *     {
+ *       args: (model) =>
+ *         Option.map(model.noteId, (noteId) => ({ noteId })),
+ *       onSuccess: (note) => SucceededGetNote({ note }),
+ *       onError: (error) => FailedGetNote({ message: String(error) }),
+ *     },
+ *   ),
+ * }));
  * ```
  *
  * The entry's dependencies are the query args wrapped in `Option`: `None`
- * closes the subscription, a change from one `Some` to another unsubscribes
- * and resubscribes with the new args, and structurally equal args leave the
+ * closes the subscription, a change from one `Some` to another unsubscribes and
+ * resubscribes with the new args, and structurally equal args leave the
  * subscription running (equivalence is derived from the ref's args schema).
  * Queries without args may omit `args`, leaving the subscription always open.
  */
@@ -169,18 +173,17 @@ export const reactiveQuery =
 
 /**
  * A complete Foldkit subscription entry that keeps exactly one live reactive
- * page subscription in sync with a `PaginatedQuery` machine in the Model.
- * The machine state is the single source of truth: navigation and
- * split-pinning change the derived args, while `Idle` closes the subscription.
- * Pagination ids are allocated here and installed by the first settlement.
+ * page subscription in sync with a `PaginatedQuery` machine in the Model. The
+ * machine state is the single source of truth: navigation and split-pinning
+ * change the derived args, while `Idle` closes the subscription. Pagination ids
+ * are allocated here and installed by the first settlement.
  *
- * The leading thunk fixes the `Model` type (TypeScript cannot partially
- * infer type arguments), so the `state` extractor's parameter is already
- * typed:
+ * The leading thunk fixes the `Model` type (TypeScript cannot partially infer
+ * type arguments), so the `state` extractor's parameter is already typed:
  *
  * ```ts
- * import * as Confect from "@confect/foldkit"
- * import * as Subscription from "foldkit/subscription"
+ * import * as Confect from "@confect/foldkit";
+ * import * as Subscription from "foldkit/subscription";
  *
  * const subscriptions = Subscription.make<
  *   Model,
@@ -191,13 +194,13 @@ export const reactiveQuery =
  *     state: (model) => model.notes,
  *     onSettled: (settlement) => SettledGetNotesPage({ settlement }),
  *   }),
- * }))
+ * }));
  * ```
  *
  * Pass the settlement to `PaginatedQuery.settle` in `update`. The request
  * identity is included in both success and failure Messages, so superseded
- * outcomes cannot settle a newer page or pagination session. Query failures
- * do not close the Convex subscription; a later result can recover naturally.
+ * outcomes cannot settle a newer page or pagination session. Query failures do
+ * not close the Convex subscription; a later result can recover naturally.
  */
 type DependenciesSchema<Dependencies_> = Schema.Schema<Dependencies_> & {
   readonly fields: Schema.Struct.Fields;

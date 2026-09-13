@@ -13,6 +13,7 @@
     "cross-env": "10.1.0",
     "dpdm": "4.3.0",
     "effect": "4.0.0-rc.115",
+    "eslint-plugin-jsdoc": "64.3.10",
     "opensrc": "0.7.3",
     "oxfmt": "0.67.0",
     "oxlint": "1.82.0",

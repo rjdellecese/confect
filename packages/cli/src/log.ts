@@ -21,9 +21,8 @@ import { ProjectRoot } from "./ProjectRoot";
 // --- Path styling ---
 
 /**
- * Render a relative path with the directory portion dimmed
- * (`Ansi.blackBright`) and the file leaf rendered in the default terminal
- * color.
+ * Render a relative path with the directory portion dimmed (`Ansi.blackBright`)
+ * and the file leaf rendered in the default terminal color.
  */
 export const formatPath = (relativePath: string): string => {
   const lastSep = Math.max(
@@ -157,11 +156,10 @@ const renderImportFailedError = (error: ImportFailedError): string => {
 };
 
 /**
- * Render a {@link BundleFailedError} as a multi-line, ANSI-styled string:
- * a one-line `✘ <file>: build errors` header followed by the
- * gutter-prefixed esbuild diagnostic block. Multi-line is appropriate
- * here because a single `BundleFailedError` carries an array of distinct
- * esbuild messages.
+ * Render a {@link BundleFailedError} as a multi-line, ANSI-styled string: a
+ * one-line `✘ <file>: build errors` header followed by the gutter-prefixed
+ * esbuild diagnostic block. Multi-line is appropriate here because a single
+ * `BundleFailedError` carries an array of distinct esbuild messages.
  */
 const renderBundleFailedError = (error: BundleFailedError): string => {
   const messages = error.errors as readonly esbuild.Message[];
@@ -176,8 +174,8 @@ const renderBundleFailedError = (error: BundleFailedError): string => {
 
 /**
  * Render any {@link BuildError} into a styled, ready-to-print string.
- * `ImportFailedError` collapses to a single line; `BundleFailedError`
- * expands to a header plus one diagnostic block per esbuild message.
+ * `ImportFailedError` collapses to a single line; `BundleFailedError` expands
+ * to a header plus one diagnostic block per esbuild message.
  */
 export const renderBuildError = (error: BuildError): string =>
   Match.value(error).pipe(
@@ -190,8 +188,8 @@ export const logBuildError = (error: BuildError) =>
   Console.error(renderBuildError(error));
 
 /**
- * Render a flat list of esbuild messages as a single error block with a
- * generic `✘ Build errors` header.
+ * Render a flat list of esbuild messages as a single error block with a generic
+ * `✘ Build errors` header.
  */
 const renderCoalescedBuildErrors = (
   messages: readonly esbuild.Message[],

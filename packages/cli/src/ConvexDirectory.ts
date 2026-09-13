@@ -27,6 +27,7 @@ export class ConvexDirectoryNotFoundError extends Schema.TaggedError<ConvexDirec
 
 /**
  * Schema for `convex.json` configuration file.
+ *
  * @see https://docs.convex.dev/production/project-configuration
  */
 const ConvexJsonConfig = Schema.fromJsonString(

@@ -1,8 +1,7 @@
 /**
- * Handlers exercise Confect's storage services inside the real Convex
- * isolate. Both decode Convex's string return values with
- * `Schema.URLFromString`, so they only succeed if that string→URL decode
- * works in the isolate.
+ * Handlers exercise Confect's storage services inside the real Convex isolate.
+ * Both decode Convex's string return values with `Schema.URLFromString`, so
+ * they only succeed if that string→URL decode works in the isolate.
  */
 
 import { FunctionImpl, GroupImpl } from "@confect/server";

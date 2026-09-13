@@ -28,7 +28,8 @@ export const append = (groupPath: GroupPath, groupName: string): GroupPath =>
   make([...groupPath.pathSegments, groupName]);
 
 /**
- * Expects a path string of the form `./group1/group2.ts`, relative to the Convex functions directory.
+ * Expects a path string of the form `./group1/group2.ts`, relative to the
+ * Convex functions directory.
  */
 export const fromGroupModulePath = Effect.fnUntraced(function* (
   groupModulePath: string,

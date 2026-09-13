@@ -38,7 +38,11 @@ const make = (
   );
 
 /**
- * A Confect client which uses a WebSocket to communicate with your Convex backend and supports reactive query subscriptions. The WebSocket connection is managed by the layer's scope and closed automatically when the scope ends. Wraps [ConvexClient](https://docs.convex.dev/api/classes/browser.ConvexClient).
+ * A Confect client which uses a WebSocket to communicate with your Convex
+ * backend and supports reactive query subscriptions. The WebSocket connection
+ * is managed by the layer's scope and closed automatically when the scope ends.
+ * Wraps
+ * [ConvexClient](https://docs.convex.dev/api/classes/browser.ConvexClient).
  */
 export const WebSocketClient = Context.Service<
   Effect.Success<ReturnType<typeof make>>

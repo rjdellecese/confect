@@ -36,8 +36,8 @@ export interface Base<
 
 /**
  * A reference to a single Convex function, as callers see it: the wire name
- * plus the data needed to encode args, decode returns, and decode typed
- * errors. A ref is one of two shapes, keyed by the spec's provenance.
+ * plus the data needed to encode args, decode returns, and decode typed errors.
+ * A ref is one of two shapes, keyed by the spec's provenance.
  */
 export type Ref<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
@@ -81,8 +81,8 @@ export type ConfectRef<
 /**
  * Internal form used while mapping a spec to a ref. Supplying the already
  * derived value types avoids repeatedly expanding `Schema.Struct` for every
- * leaf in a generated ref tree; the public `ConfectRef` alias still derives
- * the same values from its fields and schemas.
+ * leaf in a generated ref tree; the public `ConfectRef` alias still derives the
+ * same values from its fields and schemas.
  */
 interface ConfectRefWithTypes<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
@@ -125,7 +125,9 @@ export interface ConvexRef<
 
 export type Any = Ref<any, any, any, any, any>;
 
-/** Erased Confect-provenance ref used by provenance-specific APIs. */
+/**
+ * Erased Confect-provenance ref used by provenance-specific APIs.
+ */
 export type AnyConfect = Extract<Any, { readonly _tag: "Confect" }>;
 
 export type AnyInternal = Ref<any, "internal", any, any, any>;
@@ -228,7 +230,9 @@ export type Args<Ref_> = Ref_ extends { readonly "~Args": infer Args_ }
   ? Args_
   : never;
 
-/** The field map captured by a Confect-provenance ref. */
+/**
+ * The field map captured by a Confect-provenance ref.
+ */
 export type ArgsFields<Ref_> = Ref_ extends {
   readonly _tag: "Confect";
   readonly args: {
@@ -238,7 +242,9 @@ export type ArgsFields<Ref_> = Ref_ extends {
   ? ArgsFields_
   : never;
 
-/** The assembled args schema carried by a Confect-provenance ref. */
+/**
+ * The assembled args schema carried by a Confect-provenance ref.
+ */
 export type ArgsSchema<Ref_> = Ref_ extends {
   readonly _tag: "Confect";
   readonly args: infer ArgsSchema_ extends FunctionProvenance.AnyArgsSchema;
@@ -481,11 +487,11 @@ export const isConvexError = (error: unknown): error is ConvexError<Value> =>
 /**
  * Build a callback-style handler that decodes the ref's typed error from a
  * caught `ConvexError`, or else forwards the value to `mapUnknownError`. The
- * fallback is also invoked when the input *is* a `ConvexError` but the ref
- * doesn't declare a typed-error schema—by definition such a value falls
- * outside the ref's error contract. Useful when adapting non-Effect APIs (e.g.
- * emitter callbacks for streamed subscriptions) to the same error semantics
- * that `runWithCodec` provides.
+ * fallback is also invoked when the input _is_ a `ConvexError` but the ref
+ * doesn't declare a typed-error schema—by definition such a value falls outside
+ * the ref's error contract. Useful when adapting non-Effect APIs (e.g. emitter
+ * callbacks for streamed subscriptions) to the same error semantics that
+ * `runWithCodec` provides.
  */
 export const decodeErrorOrElse =
   <Ref_ extends Any, E>(ref: Ref_, mapUnknownError: (error: unknown) => E) =>
@@ -519,13 +525,13 @@ const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
   );
 
 /**
- * Decode `encodedError` against the ref's error schema—the function's
- * declared `error` schema unioned with its covering middlewares' error
- * schemas. Returns `None` if the ref declares no typed error at all (Confect
- * ref without an `error` schema and without failing middleware, or a
- * Convex-provenance ref)—by definition there's nothing to decode the value
- * into, and the caller is responsible for deciding what to do (typically:
- * surface the original value as a defect).
+ * Decode `encodedError` against the ref's error schema—the function's declared
+ * `error` schema unioned with its covering middlewares' error schemas. Returns
+ * `None` if the ref declares no typed error at all (Confect ref without an
+ * `error` schema and without failing middleware, or a Convex-provenance ref)—by
+ * definition there's nothing to decode the value into, and the caller is
+ * responsible for deciding what to do (typically: surface the original value as
+ * a defect).
  */
 export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
@@ -541,18 +547,17 @@ export const decodeError = <Ref_ extends Any>(
 
 /**
  * Synchronous counterpart to `decodeError`. Returns `None` when the value is
- * not this ref's typed error—either because the ref declares no `error`
- * schema, or because `encodedError` doesn't match the one it declares.
+ * not this ref's typed error—either because the ref declares no `error` schema,
+ * or because `encodedError` doesn't match the one it declares.
  *
  * The second case is reachable in normal operation: Convex raises its own
- * `ConvexError`s (an `InvalidCursor` pagination error, for instance), and
- * those never match a user-declared error schema. Callers pair this with a
- * fallback that surfaces the original error, so failing to decode must not
- * throw—a `ParseError` here would replace the real error with an opaque one
- * and lose the only useful diagnostic. Hence the `Option` suffix rather than
- * `Sync`, matching `Schema.decodeUnknownOption`: the sibling `*Sync` helpers
- * in this module all throw on a parse failure, and this one deliberately
- * doesn't.
+ * `ConvexError`s (an `InvalidCursor` pagination error, for instance), and those
+ * never match a user-declared error schema. Callers pair this with a fallback
+ * that surfaces the original error, so failing to decode must not throw—a
+ * `ParseError` here would replace the real error with an opaque one and lose
+ * the only useful diagnostic. Hence the `Option` suffix rather than `Sync`,
+ * matching `Schema.decodeUnknownOption`: the sibling `*Sync` helpers in this
+ * module all throw on a parse failure, and this one deliberately doesn't.
  */
 export const decodeErrorOption = <Ref_ extends Any>(
   ref: Ref_,
@@ -589,10 +594,11 @@ const paginatedKind = (ref: AnyConfect): FunctionProvenance.Paginated =>
   );
 
 /**
- * Encode the args of a paginated query ref via its user-args schema—`paginationOpts` is excluded, since the pagination protocol fields are
+ * Encode the args of a paginated query ref via its user-args
+ * schema—`paginationOpts` is excluded, since the pagination protocol fields are
  * managed by the client (e.g. `usePaginatedQuery` from `convex/react`), not by
- * the caller. Requires a ref built with `FunctionSpec.publicPaginatedQuery`
- * (or `internalPaginatedQuery`).
+ * the caller. Requires a ref built with `FunctionSpec.publicPaginatedQuery` (or
+ * `internalPaginatedQuery`).
  */
 export const encodePaginatedQueryArgsSync = <
   Ref_ extends AnyPublicPaginatedQuery,

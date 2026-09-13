@@ -3,8 +3,8 @@
  * query/mutation isolate, which bans `setTimeout` and has no `setImmediate`.
  * The fixture handlers run well past `MaxOpsBeforeYield` (2048) fiber
  * operations, forcing scheduler yields mid-handler; without the microtask
- * scheduler that `RegisteredConvexFunction` installs, the backend rejects
- * with "Can't use setTimeout in queries and mutations."
+ * scheduler that `RegisteredConvexFunction` installs, the backend rejects with
+ * "Can't use setTimeout in queries and mutations."
  */
 
 import { Ref } from "@confect/core";

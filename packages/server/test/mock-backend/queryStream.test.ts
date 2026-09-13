@@ -29,7 +29,9 @@ const collectTexts = <E, R>(
     Effect.map((docs) => docs.map((doc) => doc.text)),
   );
 
-/** Walk a stream page by page until exhausted, returning the pages. */
+/**
+ * Walk a stream page by page until exhausted, returning the pages.
+ */
 const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
   stream: QueryStream.QueryStream<
     Doc,

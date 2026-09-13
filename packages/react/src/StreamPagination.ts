@@ -2,21 +2,23 @@
  * EXPERIMENTAL—the pure state machine behind {@link useStreamPaginatedQuery}
  * (see `notes/stream-based-querying.md` in the repo root).
  *
- * Reactive pagination without the query journal: every loaded page—including the first—is pinned to a fixed index range by echoing its
- * `continueCursor` back as the next subscription's `endCursor` (the last
- * page pins to the end-of-stream sentinel once exhausted), so adjacent
- * pages stay exactly contiguous and pages never shed items as data changes—the "range-defined pages" the Fully Reactive Pagination article calls
- * for, and the mechanism of `convex-helpers/react`'s `usePaginatedQuery`.
+ * Reactive pagination without the query journal: every loaded page—including
+ * the first—is pinned to a fixed index range by echoing its `continueCursor`
+ * back as the next subscription's `endCursor` (the last page pins to the
+ * end-of-stream sentinel once exhausted), so adjacent pages stay exactly
+ * contiguous and pages never shed items as data changes—the "range-defined
+ * pages" the Fully Reactive Pagination article calls for, and the mechanism of
+ * `convex-helpers/react`'s `usePaginatedQuery`.
  *
- * Pinning a freshly loaded page, loading more, and splitting an overgrown
- * page are the same transition shape: the affected page keeps rendering
- * while its replacement subscriptions ("ongoing split") load, and is
- * swapped out once all of them have results.
+ * Pinning a freshly loaded page, loading more, and splitting an overgrown page
+ * are the same transition shape: the affected page keeps rendering while its
+ * replacement subscriptions ("ongoing split") load, and is swapped out once all
+ * of them have results.
  *
- * This module is framework-free (it imports only `effect/*` and a type
- * from `convex/server`); it lives here for now because the React hook is
- * its only consumer—a second client (e.g. `@confect/foldkit`) should
- * prompt a move down to `@confect/js`.
+ * This module is framework-free (it imports only `effect/*` and a type from
+ * `convex/server`); it lives here for now because the React hook is its only
+ * consumer—a second client (e.g. `@confect/foldkit`) should prompt a move down
+ * to `@confect/js`.
  */
 import type { PaginationResult } from "convex/server";
 import * as Array from "effect/Array";
@@ -24,27 +26,35 @@ import * as Option from "effect/Option";
 import { pipe } from "effect/Function";
 import * as Record from "effect/Record";
 
-/** The `paginationOpts` one subscribed page queries with. */
+/**
+ * The `paginationOpts` one subscribed page queries with.
+ */
 export interface PageRequest {
   readonly numItems: number;
   readonly cursor: string | null;
-  /** Present once the page is pinned to a fixed range. */
+  /**
+   * Present once the page is pinned to a fixed range.
+   */
   readonly endCursor?: string;
   /**
-   * Per-page read budgets, forwarded to the server so a scan-heavy page
-   * fails over to `SplitRequired` instead of exceeding query limits.
+   * Per-page read budgets, forwarded to the server so a scan-heavy page fails
+   * over to `SplitRequired` instead of exceeding query limits.
    */
   readonly maximumRowsRead?: number;
   readonly maximumBytesRead?: number;
 }
 
-/** The per-page read budgets every growing page is requested with. */
+/**
+ * The per-page read budgets every growing page is requested with.
+ */
 export interface ReadBudget {
   readonly maximumRowsRead?: number | undefined;
   readonly maximumBytesRead?: number | undefined;
 }
 
-/** A fresh growing-page request (no `endCursor`). */
+/**
+ * A fresh growing-page request (no `endCursor`).
+ */
 const growingRequest = (
   numItems: number,
   cursor: string | null,
@@ -62,9 +72,13 @@ const growingRequest = (
 
 export interface State {
   readonly nextPageKey: number;
-  /** Page keys in display order. */
+  /**
+   * Page keys in display order.
+   */
   readonly pageKeys: ReadonlyArray<string>;
-  /** The request each subscribed page queries with, by page key. */
+  /**
+   * The request each subscribed page queries with, by page key.
+   */
   readonly pages: Record.ReadonlyRecord<string, PageRequest>;
   /**
    * Pages being replaced by one (a pin) or two (a split) narrower
@@ -74,7 +88,9 @@ export interface State {
   readonly ongoingSplits: Record.ReadonlyRecord<string, ReadonlyArray<string>>;
 }
 
-/** The skipped state: nothing subscribed. */
+/**
+ * The skipped state: nothing subscribed.
+ */
 export const empty: State = {
   nextPageKey: 0,
   pageKeys: [],
@@ -82,7 +98,9 @@ export const empty: State = {
   ongoingSplits: Record.empty(),
 };
 
-/** One growing (unpinned) page from the start of the stream. */
+/**
+ * One growing (unpinned) page from the start of the stream.
+ */
 export const initial = (
   initialNumItems: number,
   budget: ReadBudget = {},
@@ -96,9 +114,9 @@ export const initial = (
 /**
  * Pin a freshly loaded growing page at its `continueCursor` (or, once
  * exhausted, at the end-of-stream sentinel), so it stops being a sliding
- * window: a pinned page grows and shrinks with the data in its range but
- * never sheds items past its edges. Modeled as a one-replacement split so
- * the original keeps rendering until the pinned twin has a result.
+ * window: a pinned page grows and shrinks with the data in its range but never
+ * sheds items past its edges. Modeled as a one-replacement split so the
+ * original keeps rendering until the pinned twin has a result.
  */
 export const pin =
   (key: string, endCursor: string): ((state: State) => State) =>
@@ -123,9 +141,9 @@ export const pin =
     });
 
 /**
- * Pin the growing last page at `continueCursor` and start a new growing
- * page from there. Modeled as a split of the last page into its pinned
- * replacement and the new page, so the swap waits for both.
+ * Pin the growing last page at `continueCursor` and start a new growing page
+ * from there. Modeled as a split of the last page into its pinned replacement
+ * and the new page, so the swap waits for both.
  */
 export const loadMore =
   (
@@ -181,10 +199,10 @@ export const loadMore =
     );
 
 /**
- * Split the page at `key` in two at `splitCursor`. The first replacement
- * pins at the split point; the second keeps the page's own `endCursor`—for a pinned page its original end (so a truncated `SplitRequired` page
- * loses none of its range), and for a growing page no end at all (it keeps
- * growing).
+ * Split the page at `key` in two at `splitCursor`. The first replacement pins
+ * at the split point; the second keeps the page's own `endCursor`—for a pinned
+ * page its original end (so a truncated `SplitRequired` page loses none of its
+ * range), and for a growing page no end at all (it keeps growing).
  */
 export const split =
   (key: string, splitCursor: string): ((state: State) => State) =>
@@ -210,7 +228,9 @@ export const split =
       },
     });
 
-/** Swap a completed split's replacements in for the original page. */
+/**
+ * Swap a completed split's replacements in for the original page.
+ */
 export const completeSplit =
   (key: string): ((state: State) => State) =>
   (state) =>
@@ -226,19 +246,25 @@ export const completeSplit =
       }),
     });
 
-/** Whether the last (rendered) page is currently being split or pinned. */
+/**
+ * Whether the last (rendered) page is currently being split or pinned.
+ */
 export const isLastPageSplitting = (state: State): boolean =>
   Option.exists(Array.last(state.pageKeys), (lastKey) =>
     Record.has(state.ongoingSplits, lastKey),
   );
 
-/** Build one subscription request per subscribed page. */
+/**
+ * Build one subscription request per subscribed page.
+ */
 export const pageRequests = <A>(
   state: State,
   f: (page: PageRequest) => A,
 ): Record.ReadonlyRecord<string, A> => Record.map(state.pages, f);
 
-/** The per-page results a render observes, keyed like {@link pageRequests}. */
+/**
+ * The per-page results a render observes, keyed like {@link pageRequests}.
+ */
 export type Results = Record.ReadonlyRecord<
   string,
   PageResult | Error | undefined
@@ -249,32 +275,40 @@ export type Results = Record.ReadonlyRecord<
 // -----------------------------------------------------------------------------
 
 /**
- * The wire shape of one loaded page—`PaginationResult` from
- * `convex/server`, so the protocol has a single source of truth.
+ * The wire shape of one loaded page—`PaginationResult` from `convex/server`, so
+ * the protocol has a single source of truth.
  */
 export type PageResult = PaginationResult<unknown>;
 
 /**
- * What one render pass derives from the subscribed pages' results: the
- * items to show, the trailing complete result (absent while the tail is
- * loading or force-splitting), state transitions to apply, and whether a
- * failure or an invalid cursor was hit.
+ * What one render pass derives from the subscribed pages' results: the items to
+ * show, the trailing complete result (absent while the tail is loading or
+ * force-splitting), state transitions to apply, and whether a failure or an
+ * invalid cursor was hit.
  */
 export type Interpretation =
   | { readonly _tag: "ResetRequired" }
   | {
       readonly _tag: "Failed";
       readonly error: unknown;
-      /** Encoded items loaded before the failing page. */
+      /**
+       * Encoded items loaded before the failing page.
+       */
       readonly items: ReadonlyArray<unknown>;
     }
   | {
       readonly _tag: "Interpreted";
-      /** Encoded items across the loaded pages, in order. */
+      /**
+       * Encoded items across the loaded pages, in order.
+       */
       readonly items: ReadonlyArray<unknown>;
-      /** The last page's result, when every page has loaded completely. */
+      /**
+       * The last page's result, when every page has loaded completely.
+       */
       readonly lastResult: Option.Option<PageResult>;
-      /** Split/swap transitions this render discovered. */
+      /**
+       * Split/swap transitions this render discovered.
+       */
       readonly transitions: ReadonlyArray<(state: State) => State>;
     };
 
@@ -285,12 +319,12 @@ const interpreted = (
 ): Interpretation => ({ _tag: "Interpreted", items, lastResult, transitions });
 
 /**
- * Walk the pages in display order, concatenating their items and
- * collecting the transitions to apply (completed split swaps, recommended
- * splits, eager splits of pages that outgrew `initialNumItems`).
+ * Walk the pages in display order, concatenating their items and collecting the
+ * transitions to apply (completed split swaps, recommended splits, eager splits
+ * of pages that outgrew `initialNumItems`).
  *
- * `isInvalidCursorError` marks errors that call for a full pagination
- * reset rather than a failure (the cursor no longer matches the query).
+ * `isInvalidCursorError` marks errors that call for a full pagination reset
+ * rather than a failure (the cursor no longer matches the query).
  */
 export const interpret = (
   state: State,

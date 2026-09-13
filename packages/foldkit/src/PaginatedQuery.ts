@@ -11,7 +11,9 @@ import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
 import * as Client from "./Client";
 
-/** Identifies the cursor range fetched for one page. */
+/**
+ * Identifies the cursor range fetched for one page.
+ */
 export interface PageDescriptor {
   readonly cursor: string | null;
   readonly endCursor: Option.Option<string>;
@@ -22,7 +24,9 @@ export const PageDescriptor = Schema.Struct({
   endCursor: Schema.Option(Schema.String),
 });
 
-/** Options that remain fixed for one pagination session. */
+/**
+ * Options that remain fixed for one pagination session.
+ */
 export interface Options {
   readonly initialNumItems: number;
   readonly maximumRowsRead?: number;
@@ -38,7 +42,9 @@ export const Options = Schema.Struct({
   maximumBytesRead: Schema.optionalKey(PositiveInt),
 });
 
-/** Why the machine is fetching its current target. */
+/**
+ * Why the machine is fetching its current target.
+ */
 export type Direction =
   | "Initial"
   | "Next"
@@ -47,7 +53,9 @@ export type Direction =
   | "Split"
   | "Reset";
 
-/** A complete page that can remain on screen while another page is fetched. */
+/**
+ * A complete page that can remain on screen while another page is fetched.
+ */
 export interface Page<Item_> {
   readonly descriptor: PageDescriptor;
   readonly number: number;
@@ -89,12 +97,16 @@ interface PhaseDefinition extends Data.TaggedEnum.WithGenerics<2> {
 
 const Phase = Data.taggedEnum<PhaseDefinition>();
 
-/** A closed machine that retains its generation for stale-result rejection. */
+/**
+ * A closed machine that retains its generation for stale-result rejection.
+ */
 export type Idle = Data.TaggedEnum<{
   Idle: { readonly generation: number };
 }>;
 
-/** A live cursor-pagination session. */
+/**
+ * A live cursor-pagination session.
+ */
 export type Active<Item_, UserArgs_, Error_> = Data.TaggedEnum<{
   Active: {
     readonly generation: number;
@@ -108,7 +120,9 @@ export type Active<Item_, UserArgs_, Error_> = Data.TaggedEnum<{
   };
 }>;
 
-/** A schema-backed cursor-pagination machine. */
+/**
+ * A schema-backed cursor-pagination machine.
+ */
 export type State<Item_, UserArgs_, Error_> =
   | Idle
   | Active<Item_, UserArgs_, Error_>;
@@ -119,7 +133,9 @@ interface StateDefinition extends Data.TaggedEnum.WithGenerics<3> {
 
 const State = Data.taggedEnum<StateDefinition>();
 
-/** The logical request from which a subscription allocates a session id. */
+/**
+ * The logical request from which a subscription allocates a session id.
+ */
 export interface SubscriptionRequest<UserArgs_> {
   readonly generation: number;
   readonly args: UserArgs_;
@@ -129,7 +145,9 @@ export interface SubscriptionRequest<UserArgs_> {
   readonly descriptor: PageDescriptor;
 }
 
-/** The complete identity and arguments of a subscribed page request. */
+/**
+ * The complete identity and arguments of a subscribed page request.
+ */
 export interface Request<UserArgs_> {
   readonly generation: number;
   readonly args: UserArgs_;
@@ -139,7 +157,9 @@ export interface Request<UserArgs_> {
   readonly descriptor: PageDescriptor;
 }
 
-/** The successful payload returned by a Convex paginated query. */
+/**
+ * The successful payload returned by a Convex paginated query.
+ */
 export interface PageResult<Item_> {
   readonly page: ReadonlyArray<Item_>;
   readonly isDone: boolean;
@@ -149,8 +169,8 @@ export interface PageResult<Item_> {
 }
 
 /**
- * One correlated subscription outcome. Both success and failure travel
- * through this value so `settle` can mirror `AsyncData.settle`.
+ * One correlated subscription outcome. Both success and failure travel through
+ * this value so `settle` can mirror `AsyncData.settle`.
  */
 export interface Settlement<Item_, UserArgs_, Error_> {
   readonly request: Request<UserArgs_>;
@@ -173,18 +193,24 @@ interface FunctionErrorDefinition extends Data.TaggedEnum.WithGenerics<1> {
   readonly taggedEnum: TaggedFunctionError<this["A"]>;
 }
 
-/** Constructs a declared function or middleware failure envelope. */
+/**
+ * Constructs a declared function or middleware failure envelope.
+ */
 export const FunctionError =
   Data.taggedEnum<FunctionErrorDefinition>().FunctionError;
 
-/** A declared function or middleware failure, kept distinct from client errors. */
+/**
+ * A declared function or middleware failure, kept distinct from client errors.
+ */
 export type FunctionError<Query extends Ref.AnyConfectPublicPaginatedQuery> = [
   Ref.Error<Query>,
 ] extends [never]
   ? never
   : TaggedFunctionError<Ref.Error<Query>>;
 
-/** Every failure a paginated query subscription can settle with. */
+/**
+ * Every failure a paginated query subscription can settle with.
+ */
 export type Error<Query extends Ref.AnyConfectPublicPaginatedQuery> =
   | FunctionError<Query>
   | PaginationError.InvalidCursor
@@ -205,7 +231,9 @@ type MachineActive<Query extends Ref.AnyConfectPublicPaginatedQuery> = Active<
   Error<Query>
 >;
 
-/** The schema-and-constructor bundle returned by `make`. */
+/**
+ * The schema-and-constructor bundle returned by `make`.
+ */
 export interface PaginatedQuery<
   Query extends Ref.AnyConfectPublicPaginatedQuery,
 > {
@@ -295,7 +323,9 @@ const SerializableSchemaError = Schema.instanceOf(Schema.SchemaError, {
     }),
 });
 
-/** Builds a page machine from a paginated ref. */
+/**
+ * Builds a page machine from a paginated ref.
+ */
 export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   ref: Query,
 ): PaginatedQuery<Query> => {
@@ -483,7 +513,9 @@ const descriptorEquals = (a: PageDescriptor, b: PageDescriptor): boolean =>
       }),
   });
 
-/** Returns the logical request currently driving the subscription. */
+/**
+ * Returns the logical request currently driving the subscription.
+ */
 export const getSubscriptionRequest = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
 ): SubscriptionRequest<UserArgs_> => ({
@@ -495,7 +527,9 @@ export const getSubscriptionRequest = <Item_, UserArgs_, Error_>(
   descriptor: state.current,
 });
 
-/** Attaches the client-allocated pagination id to a logical request. */
+/**
+ * Attaches the client-allocated pagination id to a logical request.
+ */
 export const allocateRequest = <UserArgs_>(
   request: SubscriptionRequest<UserArgs_>,
   paginationId: number,
@@ -525,12 +559,16 @@ const pendingPhase = <Item_>(
     onSome: (page) => Phase.Refreshing<Item_, never>({ data: page, direction }),
   });
 
-/** Close the subscription while retaining its generation tombstone. */
+/**
+ * Close the subscription while retaining its generation tombstone.
+ */
 export const close = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
 ): Idle => State.Idle({ generation: state.generation });
 
-/** Start a fresh pagination session at page one while retaining visible data. */
+/**
+ * Start a fresh pagination session at page one while retaining visible data.
+ */
 export const reset = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
 ): Active<Item_, UserArgs_, Error_> => ({
@@ -546,13 +584,13 @@ export const reset = <Item_, UserArgs_, Error_>(
 /**
  * Navigate to the next page, retaining the current page while it loads.
  *
- * The page being left is pushed onto the stack *pinned* to the range it
- * displayed—its cursor to its continuation cursor—so `prev` reloads
- * exactly that range rather than the first `initialNumItems` documents
- * after its cursor, however the data has moved meanwhile. Convex's own
- * pagination keeps that range in its query journal; stream-paginated
- * queries have no journal, so the pin is what keeps consecutive pages
- * gap-free and duplicate-free for them.
+ * The page being left is pushed onto the stack _pinned_ to the range it
+ * displayed—its cursor to its continuation cursor—so `prev` reloads exactly
+ * that range rather than the first `initialNumItems` documents after its
+ * cursor, however the data has moved meanwhile. Convex's own pagination keeps
+ * that range in its query journal; stream-paginated queries have no journal, so
+ * the pin is what keeps consecutive pages gap-free and duplicate-free for
+ * them.
  */
 export const next = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
@@ -589,7 +627,9 @@ export const next = <Item_, UserArgs_, Error_>(
     Match.exhaustive,
   );
 
-/** Navigate to the previous page, retaining the current page while it loads. */
+/**
+ * Navigate to the previous page, retaining the current page while it loads.
+ */
 export const prev = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
 ): Option.Option<Active<Item_, UserArgs_, Error_>> =>
@@ -619,7 +659,9 @@ export const prev = <Item_, UserArgs_, Error_>(
     Match.exhaustive,
   );
 
-/** Navigate to page one without invalidating the current pagination session. */
+/**
+ * Navigate to page one without invalidating the current pagination session.
+ */
 export const first = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
 ): Option.Option<Active<Item_, UserArgs_, Error_>> =>
@@ -641,7 +683,9 @@ export const first = <Item_, UserArgs_, Error_>(
     Match.exhaustive,
   );
 
-/** Whether a request still names the machine's live pagination session/page. */
+/**
+ * Whether a request still names the machine's live pagination session/page.
+ */
 export const isCurrentRequest = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
   candidate: Request<UserArgs_>,
@@ -810,7 +854,9 @@ export const settle: {
     ),
 );
 
-/** The complete page currently available to render. */
+/**
+ * The complete page currently available to render.
+ */
 export const getPage = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): Option.Option<Page<Item_>> =>
@@ -820,13 +866,17 @@ export const getPage = <Item_, UserArgs_, Error_>(
     Match.exhaustive,
   );
 
-/** The items currently available to render. */
+/**
+ * The items currently available to render.
+ */
 export const getItems = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): Option.Option<ReadonlyArray<Item_>> =>
   Option.map(getPage(state), (page) => page.items);
 
-/** The error from the most recent failed request, if any. */
+/**
+ * The error from the most recent failed request, if any.
+ */
 export const getError = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): Option.Option<Error_> =>
@@ -844,7 +894,9 @@ export const getError = <Item_, UserArgs_, Error_>(
     Match.exhaustive,
   );
 
-/** The 1-indexed page number currently targeted by the subscription. */
+/**
+ * The 1-indexed page number currently targeted by the subscription.
+ */
 export const targetPageNumber = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
 ): number => state.prevStack.length + 1;
@@ -959,7 +1011,9 @@ export const canPrev = <Item_, UserArgs_, Error_>(
     Match.exhaustive,
   );
 
-/** Pattern-match exhaustively on the machine's AsyncData-style state. */
+/**
+ * Pattern-match exhaustively on the machine's AsyncData-style state.
+ */
 export const match: {
   <Item_, Error_, A, B, C, D, E, F>(handlers: {
     readonly onIdle: (idle: Idle) => A;

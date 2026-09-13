@@ -93,7 +93,9 @@ export type MutationServices<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >;
 
-/** Shared by both action runtimes. */
+/**
+ * Shared by both action runtimes.
+ */
 export type ActionServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =

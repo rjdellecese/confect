@@ -4,7 +4,9 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-/** A Convex pagination cursor that no longer describes the current query. */
+/**
+ * A Convex pagination cursor that no longer describes the current query.
+ */
 export class InvalidCursor extends Schema.TaggedError<InvalidCursor>()(
   "InvalidCursor",
   {
@@ -40,7 +42,9 @@ const fromErrorMessage = (
     ? Option.some(new InvalidCursor({ cause: error }))
     : Option.none();
 
-/** Recognizes an invalid-cursor error emitted by a Convex query. */
+/**
+ * Recognizes an invalid-cursor error emitted by a Convex query.
+ */
 export const fromConvexQueryError = (
   error: unknown,
 ): Option.Option<InvalidCursor> =>
@@ -59,7 +63,9 @@ export const fromConvexQueryError = (
     Match.exhaustive,
   );
 
-/** Recognizes the error data attached to Convex's invalid-cursor error. */
+/**
+ * Recognizes the error data attached to Convex's invalid-cursor error.
+ */
 export const fromConvexErrorData = (
   errorData: unknown,
 ): Option.Option<InvalidCursor> =>
