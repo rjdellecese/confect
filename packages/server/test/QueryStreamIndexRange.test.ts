@@ -1,6 +1,7 @@
 import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
-import type * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
+import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import * as Option from "effect/Option";
 import type { GenericId } from "convex/values";
 
 type Doc = {
@@ -12,60 +13,13 @@ type Doc = {
 };
 
 const builder = () =>
-  QueryStreamIndexRange.rangeBuilder<Doc, ["category", "score", "_id"]>();
+  QueryStreamIndexRange.builder<Doc, ["category", "score", "_id"]>();
 
-describe("QueryStreamIndexRange.completeFieldPaths", () => {
-  it.each([
-    { fieldPaths: [], expected: ["_id"] },
-    {
-      fieldPaths: ["author.role", "_creationTime"],
-      expected: ["author.role", "_creationTime", "_id"],
-    },
-    { fieldPaths: ["_id"], expected: ["_id"] },
-    { fieldPaths: ["_id", "text"], expected: ["_id", "text", "_id"] },
-  ])(
-    "completes the physical index paths for $fieldPaths",
-    ({ fieldPaths, expected }) => {
-      const completed = QueryStreamIndexRange.completeFieldPaths(fieldPaths);
-      expect(completed).toEqual(expected);
-    },
-  );
-});
-
-describe("QueryStreamIndexRange operations", () => {
-  it.each(["eq", "gt", "gte", "lt", "lte"] as const)(
-    "constructs %s operations with the existing record shape",
-    (tag) => {
-      const root = QueryStreamIndexRange.rangeBuilder<
-        Doc & { text?: string },
-        ["text"]
-      >();
-      for (const value of ["hello", undefined]) {
-        expect(
-          QueryStreamIndexRange.toOperations(root[tag]("text", value)),
-        ).toStrictEqual([{ _tag: tag, field: "text", value }]);
-      }
-    },
-  );
-
-  it("constructs precisely tagged operations", () => {
-    const op = {
-      _tag: "eq",
-      field: "category",
-      value: "hello",
-    } satisfies QueryStreamIndexRange.RangeOp;
-    expectTypeOf(op._tag).toEqualTypeOf<"eq">();
-    expect(
-      QueryStreamIndexRange.toOperations(builder().eq("category", "hello")),
-    ).toEqual([op]);
-  });
-});
-
-describe("QueryStreamIndexRange.rangeBuilder", () => {
+describe("QueryStreamIndexRange.builder", () => {
   it("preserves field tuple inference", () => {
     type Fields = readonly ["category", "_id"];
     type Builder<F extends ReadonlyArray<string>> =
-      QueryStreamIndexRange.RangeBuilder<Doc, F>;
+      QueryStreamIndexRange.Builder<Doc, F>;
     expectTypeOf<
       Parameters<Builder<Fields>["eq"]>[0]
     >().toEqualTypeOf<"category">();
@@ -86,69 +40,42 @@ describe("QueryStreamIndexRange.rangeBuilder", () => {
     >().toEqualTypeOf<ReadonlyArray<string>>();
   });
 
-  it("returns independent branches without mutating a reused builder", () => {
+  it("keeps branches independent and derives the equality prefix length", () => {
     const root = Object.freeze(builder());
     const pinned = Object.freeze(root.eq("category", "a"));
     const lower = pinned.gt("score", 1);
     const upper = pinned.lte("score", 5);
-    const other = root.eq("category", "b");
-    expect(root.eqCount).toBe(0);
-    expect(QueryStreamIndexRange.toOperations(root)).toEqual([]);
-    expect(pinned.eqCount).toBe(1);
-    expect(QueryStreamIndexRange.toOperations(pinned)).toEqual([
-      { _tag: "eq", field: "category", value: "a" },
-    ]);
-    expect(QueryStreamIndexRange.toOperations(lower)).toEqual([
-      ...QueryStreamIndexRange.toOperations(pinned),
-      { _tag: "gt", field: "score", value: 1 },
-    ]);
-    expect(QueryStreamIndexRange.toOperations(upper)).toEqual([
-      ...QueryStreamIndexRange.toOperations(pinned),
-      { _tag: "lte", field: "score", value: 5 },
-    ]);
-    expect(QueryStreamIndexRange.toOperations(other)).toEqual([
-      { _tag: "eq", field: "category", value: "b" },
-    ]);
-    expect(lower.eqCount).toBe(1);
-    expect(upper.eqCount).toBe(1);
-    expect(pinned).not.toBe(root);
-    expect(lower).not.toBe(pinned);
-    expect(upper).not.toBe(lower);
-    expect(pinned.eq("score", 2).eqCount).toBe(2);
-  });
-
-  it("derives the equality count from the prefix", () => {
-    const root = builder();
-    const pinned = root.eq("category", "a").eq("score", 2);
-    const id = "item" as GenericId<"items">;
-    const lower = pinned.gt("_id", id);
-    const bounded = lower.lte("_id", id);
-    const expectedOps = [
-      { _tag: "eq", field: "category", value: "a" },
-      { _tag: "eq", field: "score", value: 2 },
-    ];
-
-    for (const [spec, expectedCount] of [
+    expect(QueryStreamIndexRange.toBounds(root)).toEqual({
+      lower: { key: [], inclusive: true },
+      upper: { key: [], inclusive: true },
+    });
+    expect(QueryStreamIndexRange.toBounds(pinned)).toEqual({
+      lower: { key: ["a"], inclusive: true },
+      upper: { key: ["a"], inclusive: true },
+    });
+    expect(QueryStreamIndexRange.toBounds(lower)).toEqual({
+      lower: { key: ["a", 1], inclusive: false },
+      upper: { key: ["a"], inclusive: true },
+    });
+    expect(QueryStreamIndexRange.toBounds(upper)).toEqual({
+      lower: { key: ["a"], inclusive: true },
+      upper: { key: ["a", 5], inclusive: true },
+    });
+    for (const [range, length] of [
       [root, 0],
-      [pinned, 2],
-      [lower, 2],
-      [bounded, 2],
-      [pinned.eq("_id", id), 3],
+      [pinned, 1],
+      [lower, 1],
+      [upper, 1],
+      [pinned.eq("score", 2), 2],
     ] as const) {
-      expect(spec.eqCount).toBe(expectedCount);
-      expect({ ...spec }.eqCount).toBe(expectedCount);
+      expect(QueryStreamIndexRange.equalityPrefixLength(range)).toBe(length);
+      const copied = { ...range, eqCount: 99 };
+      expect(QueryStreamIndexRange.equalityPrefixLength(copied)).toBe(length);
+      expect(range).not.toHaveProperty("eqCount");
     }
-    expect(QueryStreamIndexRange.toOperations(root)).toEqual([]);
-    expect(QueryStreamIndexRange.toOperations(pinned)).toEqual(expectedOps);
-    expect(QueryStreamIndexRange.toOperations(lower)).toEqual([
-      ...expectedOps,
-      { _tag: "gt", field: "_id", value: id },
-    ]);
-    expect(QueryStreamIndexRange.toOperations(bounded)).toEqual([
-      ...expectedOps,
-      { _tag: "gt", field: "_id", value: id },
-      { _tag: "lte", field: "_id", value: id },
-    ]);
+    expect(
+      QueryStreamIndexRange.toBounds(root.eq("category", "b")).lower.key,
+    ).toEqual(["b"]);
   });
 
   it("consumes equality fields while preserving bounded fields and their value types", () => {
@@ -187,65 +114,89 @@ describe("QueryStreamIndexRange.rangeBuilder", () => {
       [field: "score", value: number]
     >();
     expectTypeOf<keyof typeof lower>().toEqualTypeOf<
-      | keyof QueryStreamIndexRange.IndexRangeSpec<["score", "_id"]>
+      | keyof QueryStreamIndexRange.QueryStreamIndexRange<["score", "_id"]>
       | "lt"
       | "lte"
     >();
     expectTypeOf(bounded).toEqualTypeOf<
-      QueryStreamIndexRange.IndexRangeSpec<["score", "_id"]>
+      QueryStreamIndexRange.QueryStreamIndexRange<["score", "_id"]>
     >();
     expectTypeOf(allPinned.eq).parameter(0).toEqualTypeOf<never>();
-    const nested = QueryStreamIndexRange.rangeBuilder<Doc, ["nested.active"]>();
+    const nested = QueryStreamIndexRange.builder<Doc, ["nested.active"]>();
     expectTypeOf(nested.eq).parameters.toEqualTypeOf<
       [field: "nested.active", value: boolean]
     >();
   });
 });
 
-describe("QueryStreamIndexRange replay", () => {
+describe("QueryStreamIndexRange.apply", () => {
   it.each(["eq", "gt", "gte", "lt", "lte"] as const)(
-    "replays %s with its receiver, field, and value",
+    "applies %s with its receiver and preserves missing field values",
     (tag) => {
-      const final = {};
-      const calls: unknown[] = [];
-      const receiver = {
-        [tag](this: unknown, field: string, value: unknown) {
-          calls.push(this, field, value);
-          return final;
-        },
-      };
-      const op: QueryStreamIndexRange.RangeOp = {
-        _tag: tag,
-        field: "score",
-        value: undefined,
-      };
-      expect(QueryStreamIndexRange.applyOps([op], receiver)).toBe(final);
-      expect(calls).toEqual([receiver, "score", undefined]);
+      for (const value of ["hello", undefined]) {
+        const final = {};
+        const calls: unknown[] = [];
+        const receiver = {
+          [tag](this: unknown, field: string, received: unknown) {
+            calls.push(this, field, received);
+            return final;
+          },
+        };
+        const range = QueryStreamIndexRange.builder<
+          Doc & { text?: string },
+          ["text"]
+        >()[tag]("text", value);
+        expect(QueryStreamIndexRange.apply(range, receiver)).toBe(final);
+        expect(calls).toEqual([receiver, "text", value]);
+      }
     },
   );
 
-  it("threads each returned builder through operations in order", () => {
-    const spec = builder().eq("category", "a").gt("score", 1).lte("score", 5);
-    const target = builder();
-    const result = QueryStreamIndexRange.applyRange(spec, target);
-    expect(QueryStreamIndexRange.toOperations(result)).toEqual(
-      QueryStreamIndexRange.toOperations(spec),
-    );
-    expect(result.eqCount).toBe(1);
-    expect(QueryStreamIndexRange.toOperations(target)).toEqual([]);
-    expect(QueryStreamIndexRange.applyOps([], target)).toBe(target);
-    expect(QueryStreamIndexRange.applyRange(builder(), target)).toBe(target);
+  it("threads returned Convex builders through an equality prefix and both endpoints", () => {
+    const calls: unknown[] = [];
+    const final = {};
+    const upper = {
+      lte(field: string, value: unknown) {
+        calls.push(["lte", field, value]);
+        return final;
+      },
+    };
+    const lower = {
+      gt(field: string, value: unknown) {
+        calls.push(["gt", field, value]);
+        return upper;
+      },
+    };
+    const target = {
+      eq(field: string, value: unknown) {
+        calls.push(["eq", field, value]);
+        return lower;
+      },
+    };
+    expect(QueryStreamIndexRange.apply(builder(), target)).toBe(target);
+    expect(calls).toEqual([]);
+    expect(
+      QueryStreamIndexRange.apply(
+        builder().eq("category", "a").gt("score", 1).lte("score", 5),
+        target,
+      ),
+    ).toBe(final);
+    expect(calls).toEqual([
+      ["eq", "category", "a"],
+      ["gt", "score", 1],
+      ["lte", "score", 5],
+    ]);
   });
 });
 
-describe("QueryStreamIndexRange.boundsFromSpec", () => {
-  it("keeps an empty spec unbounded and pins equalities on both endpoints", () => {
-    expect(QueryStreamIndexRange.boundsFromSpec(builder())).toEqual({
+describe("QueryStreamIndexRange.toBounds", () => {
+  it("keeps an unconstrained range unbounded and pins equalities on both endpoints", () => {
+    expect(QueryStreamIndexRange.toBounds(builder())).toEqual({
       lower: { key: [], inclusive: true },
       upper: { key: [], inclusive: true },
     });
     expect(
-      QueryStreamIndexRange.boundsFromSpec(
+      QueryStreamIndexRange.toBounds(
         builder().eq("category", "a").eq("score", 2),
       ),
     ).toEqual({
@@ -258,19 +209,19 @@ describe("QueryStreamIndexRange.boundsFromSpec", () => {
     "folds %s and each upper-bound variant onto the equality prefix",
     (lowerTag) => {
       const lower = builder().eq("category", "a")[lowerTag]("score", 1);
-      expect(QueryStreamIndexRange.boundsFromSpec(lower)).toEqual({
+      expect(QueryStreamIndexRange.toBounds(lower)).toEqual({
         lower: { key: ["a", 1], inclusive: lowerTag === "gte" },
         upper: { key: ["a"], inclusive: true },
       });
       for (const upperTag of ["lt", "lte"] as const) {
         expect(
-          QueryStreamIndexRange.boundsFromSpec(lower[upperTag]("score", 5)),
+          QueryStreamIndexRange.toBounds(lower[upperTag]("score", 5)),
         ).toEqual({
           lower: { key: ["a", 1], inclusive: lowerTag === "gte" },
           upper: { key: ["a", 5], inclusive: upperTag === "lte" },
         });
         expect(
-          QueryStreamIndexRange.boundsFromSpec(
+          QueryStreamIndexRange.toBounds(
             builder().eq("category", "a")[upperTag]("score", 5),
           ),
         ).toEqual({
@@ -282,7 +233,7 @@ describe("QueryStreamIndexRange.boundsFromSpec", () => {
   );
 });
 
-describe("QueryStreamIndexRange.splitRange", () => {
+describe("QueryStreamIndexRange.fromBounds", () => {
   it.each(["asc", "desc"] as const)(
     "decomposes a compound interval in %s order",
     (order) => {
@@ -290,59 +241,94 @@ describe("QueryStreamIndexRange.splitRange", () => {
         lower: { key: [1, 2, 3], inclusive: false },
         upper: { key: [1, 3, 2], inclusive: true },
       };
-      const expected: ReadonlyArray<
-        ReadonlyArray<QueryStreamIndexRange.RangeOp>
-      > = [
-        [
-          { _tag: "eq", field: "f1", value: 1 },
-          { _tag: "eq", field: "f2", value: 2 },
-          { _tag: "gt", field: "f3", value: 3 },
-        ],
-        [
-          { _tag: "eq", field: "f1", value: 1 },
-          { _tag: "gt", field: "f2", value: 2 },
-          { _tag: "lt", field: "f2", value: 3 },
-        ],
-        [
-          { _tag: "eq", field: "f1", value: 1 },
-          { _tag: "eq", field: "f2", value: 3 },
-          { _tag: "lte", field: "f3", value: 2 },
-        ],
+      const expected = [
+        {
+          lower: { key: [1, 2, 3], inclusive: false },
+          upper: { key: [1, 2], inclusive: true },
+        },
+        {
+          lower: { key: [1, 2], inclusive: false },
+          upper: { key: [1, 3], inclusive: false },
+        },
+        {
+          lower: { key: [1, 3], inclusive: true },
+          upper: { key: [1, 3, 2], inclusive: true },
+        },
       ];
-      expect(
-        QueryStreamIndexRange.splitRange(["f1", "f2", "f3"], order, bounds),
-      ).toEqual(order === "asc" ? expected : expected.toReversed());
+      const ranges = QueryStreamIndexRange.fromBounds(
+        ["f1", "f2", "f3"],
+        order,
+        bounds,
+      );
+      expectTypeOf(ranges).toEqualTypeOf<
+        ReadonlyArray<QueryStreamIndexRange.QueryStreamIndexRange>
+      >();
+      expect(ranges.map(QueryStreamIndexRange.toBounds)).toEqual(
+        order === "asc" ? expected : expected.toReversed(),
+      );
+      expect(ranges.map(QueryStreamIndexRange.equalityPrefixLength)).toEqual([
+        2, 1, 2,
+      ]);
     },
   );
 
-  it("represents unbounded and inclusive equal-prefix ranges with only equality operations", () => {
-    expect(
-      QueryStreamIndexRange.splitRange(
-        ["category", "score"],
+  it("preserves unconstrained, equality-only, and one-sided ranges", () => {
+    const pinned = builder().eq("category", "a");
+    for (const range of [
+      builder(),
+      pinned,
+      pinned.gt("score", 2),
+      pinned.gte("score", 2),
+      pinned.lt("score", 2),
+      pinned.lte("score", 2),
+    ]) {
+      const bounds = QueryStreamIndexRange.toBounds(range);
+      const ranges = QueryStreamIndexRange.fromBounds(
+        ["category", "score", "_id"],
         "asc",
-        QueryStreamIndexRange.boundsFromSpec(builder()),
-      ),
-    ).toEqual([[]]);
-    expect(
-      QueryStreamIndexRange.splitRange(
-        ["category", "score"],
-        "asc",
-        QueryStreamIndexRange.boundsFromSpec(builder().eq("category", "a")),
-      ),
-    ).toEqual([[{ _tag: "eq", field: "category", value: "a" }]]);
+        bounds,
+      );
+      expect(ranges.map(QueryStreamIndexRange.toBounds)).toEqual([bounds]);
+      expect(ranges.map(QueryStreamIndexRange.equalityPrefixLength)).toEqual([
+        QueryStreamIndexRange.equalityPrefixLength(range),
+      ]);
+    }
   });
 
-  it.each(["gt", "gte", "lt", "lte"] as const)(
-    "preserves a one-sided %s range after an equality prefix",
-    (tag) => {
-      const spec = builder().eq("category", "a")[tag]("score", 2);
-      expect(
-        QueryStreamIndexRange.splitRange(
-          ["category", "score", "_id"],
-          "asc",
-          QueryStreamIndexRange.boundsFromSpec(spec),
-        ),
-      ).toEqual([QueryStreamIndexRange.toOperations(spec)]);
+  it.each(["asc", "desc"] as const)(
+    "partitions every tested prefix interval exactly once and in %s order",
+    (order) => {
+      const keys = [
+        [0, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1],
+      ];
+      const ordered = order === "asc" ? keys : keys.toReversed();
+      const endpoints = [[], [0], [1], ...keys].flatMap((key) =>
+        [true, false].map((inclusive) => ({ key, inclusive })),
+      );
+      const admits =
+        (bounds: QueryStreamKeyBounds.IndexBounds) =>
+        (key: ReadonlyArray<number>) =>
+          QueryStreamKeyBounds.admittedByLower(Option.some(bounds.lower))(
+            key,
+          ) &&
+          QueryStreamKeyBounds.admittedByUpper(Option.some(bounds.upper))(key);
+      for (const lower of endpoints)
+        for (const upper of endpoints) {
+          const bounds = { lower, upper };
+          const ranges = QueryStreamIndexRange.fromBounds(
+            ["a", "b"],
+            order,
+            bounds,
+          );
+          expect(
+            ranges.flatMap((range) =>
+              ordered.filter(admits(QueryStreamIndexRange.toBounds(range))),
+            ),
+          ).toEqual(ordered.filter(admits(bounds)));
+        }
     },
   );
 
@@ -381,7 +367,7 @@ describe("QueryStreamIndexRange.splitRange", () => {
       ];
       for (const bounds of cases) {
         expect(
-          QueryStreamIndexRange.splitRange(["score", "_id"], order, bounds),
+          QueryStreamIndexRange.fromBounds(["score", "_id"], order, bounds),
         ).toEqual([]);
       }
     },

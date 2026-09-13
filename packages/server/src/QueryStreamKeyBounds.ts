@@ -35,7 +35,7 @@ export interface KeyBounds {
 
 /**
  * Bounds in _full index-key space_: `eq`-pinned values appear as a shared
- * prefix of both keys (`splitRange` re-derives them as `eq` constraints). An
+ * prefix of both keys (`fromBounds` re-derives them as `eq` constraints). An
  * empty key bounds nothing.
  *
  * @experimental

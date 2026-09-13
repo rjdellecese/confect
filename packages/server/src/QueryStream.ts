@@ -72,7 +72,6 @@ import type {
   NarrowBounds,
 } from "./QueryStreamKeyBounds";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
-import type { AnyIndexRangeSpec } from "./QueryStreamIndexRange";
 import * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 
 /**
@@ -424,14 +423,14 @@ export interface Reflection<Direction extends OrderDirection = OrderDirection> {
    */
   readonly indexFieldPaths: ReadonlyArray<string>;
   /**
-   * Recorded index constraints. Equality constraints pin the first `eqCount`
-   * fields, removing them from the stream's order key; range bounds do not.
+   * Index constraints. Equality constraints pin leading fields, removing them
+   * from the stream's order key; range bounds do not.
    */
-  readonly spec: AnyIndexRangeSpec;
+  readonly range: QueryStreamIndexRange.QueryStreamIndexRange;
   readonly order: Direction;
   /**
    * Effective bounds in full index-key values, including pinned fields and ID
-   * tiebreakers. If absent, bounds come from `spec`; supplied bounds intersect
+   * tiebreakers. If absent, bounds come from `range`; supplied bounds intersect
    * those constraints rather than replacing them.
    */
   readonly bounds?: IndexBounds;
@@ -463,12 +462,23 @@ export const fromReflection = <
   makeLeaf(
     reflection,
     reflection.bounds === undefined
-      ? QueryStreamIndexRange.boundsFromSpec(reflection.spec)
+      ? QueryStreamIndexRange.toBounds(reflection.range)
       : QueryStreamKeyBounds.intersectIndexBounds(
-          QueryStreamIndexRange.boundsFromSpec(reflection.spec),
+          QueryStreamIndexRange.toBounds(reflection.range),
           reflection.bounds,
         ),
   );
+
+/**
+ * Complete the source index paths with Convex's implicit ID tiebreaker. These
+ * paths address the encoded document and are never ordering aliases.
+ */
+const completeFieldPaths = (
+  fieldPaths: ReadonlyArray<string>,
+): ReadonlyArray<string> =>
+  Option.exists(Array.last(fieldPaths), (fieldPath) => fieldPath === "_id")
+    ? fieldPaths
+    : Array.append(fieldPaths, "_id");
 
 const makeLeaf = <Doc, Direction extends OrderDirection>(
   reflection: Reflection<Direction>,
@@ -484,36 +494,37 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   // fields plus the implicit `_id` tiebreaker (already explicit for
   // `by_id`). Convex accepts range constraints on `_creationTime` and
   // `_id` even though its index types don't advertise them.
-  const fullFieldPaths = QueryStreamIndexRange.completeFieldPaths(
-    reflection.indexFieldPaths,
+  const fullFieldPaths = completeFieldPaths(reflection.indexFieldPaths);
+  const equalityPrefixLength = QueryStreamIndexRange.equalityPrefixLength(
+    reflection.range,
   );
   const keyLayout = Result.getOrThrowWith(
     QueryStreamKeyLayout.fromIndex(
       reflection.indexFieldPaths,
-      reflection.spec.eqCount,
+      equalityPrefixLength,
     ),
     identity,
   );
   const keyPaths = Array.map(
-    Array.drop(fullFieldPaths, reflection.spec.eqCount),
+    Array.drop(fullFieldPaths, equalityPrefixLength),
     (fieldPath) => String.split(fieldPath, "."),
   );
   // `eq`-pinned values form a shared prefix of both bound keys.
-  const eqValues = Array.take(bounds.lower.key, reflection.spec.eqCount);
-  const segments = QueryStreamIndexRange.splitRange(
+  const eqValues = Array.take(bounds.lower.key, equalityPrefixLength);
+  const ranges = QueryStreamIndexRange.fromBounds(
     fullFieldPaths,
     reflection.order,
     bounds,
   );
 
-  const encodedDocuments = Stream.fromIterable(segments).pipe(
-    Stream.flatMap((segment) =>
+  const encodedDocuments = Stream.fromIterable(ranges).pipe(
+    Stream.flatMap((range) =>
       Stream.suspend(() =>
         Stream.fromAsyncIterable(
           reflection.reader
             .query(reflection.tableName)
             .withIndex(reflection.indexName, (q) =>
-              QueryStreamIndexRange.applyOps(segment, q),
+              QueryStreamIndexRange.apply(range, q),
             )
             .order(reflection.order),
           identity,
