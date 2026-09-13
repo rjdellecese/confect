@@ -85,8 +85,6 @@ Contains a single default `Refs` export, which is a map of your Convex functions
 
 Contains the runtime `DatabaseSchema`—the codec-lookup view of your tables. Impls import it and pass it to `FunctionImpl.make`/`GroupImpl.make`. It is generated from `confect/tables/*.ts` and intentionally avoids any `convex/server` import so a runtime cold start never evaluates `defineSchema(...)`. Each table's field-schema is constructed lazily on the first access to its `Fields` or `Doc` and then cached, so a function only pays the schema-construction cost at cold start for the tables it actually touches via `db.table(name)`. Use this when a test or a non-codegen-generated module needs to refer to your `DatabaseSchema` type or value.
 
-Use `DatabaseSchema.tables(databaseSchema)` to inspect the bound table record. Reading this record does not evaluate the tables' schemas. A handwritten type annotation takes the record shape, for example `DatabaseSchema.DatabaseSchema<{ readonly notes: typeof notes }>`. `DatabaseSchema.Tables<typeof databaseSchema>` derives the union of its table types.
-
 #### `tables/`
 
 Contains one wrapper module per user-authored table (for example `tables/notes.ts` for `confect/tables/notes.ts`). Each wrapper applies the filename-derived table name to the `Table` defined in `confect/tables/<name>.ts` and re-exports it as the default. Specs, impls, and other consumers should default-import from `confect/_generated/tables/<name>` to reach a table's `Doc`, `Fields`, and `tableName` properties—for example, `import notes from "../_generated/tables/notes"` and then `notes.Doc`. These wrappers are client-safe: they do not import `@confect/server`, so a spec that uses `notes.Doc` can ship in `_generated/refs.ts` without pulling the server package into the browser.
@@ -98,8 +96,6 @@ Contains Effect service wrappers for Convex platform capabilities, scoped to you
 #### `spec.ts`
 
 Contains your assembled Confect spec—every function group, of any runtime (including Node action groups)—used to build `refs.ts`.
-
-When inspecting the assembled spec in tooling or tests, use `Spec.groups(spec)` to access its group record. `Spec.Spec` takes that record's type, and `Spec.Groups<typeof spec>` derives its member union. The immutable `add` and `addAt` builders infer this record automatically; adding a group at an existing name replaces the previous group's value and type.
 
 ### `auth.ts`
 
