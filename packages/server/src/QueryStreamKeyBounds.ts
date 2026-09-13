@@ -1,7 +1,7 @@
 import * as Array from "effect/Array";
+import * as Data from "effect/Data";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
-import type * as Record from "effect/Record";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 
 // A bound's key may be a *prefix* of the full key: bounding by `["a"]` means
@@ -44,18 +44,18 @@ export interface IndexBounds {
   readonly upper: KeyBound;
 }
 
-type CutKind = "predecessor" | "exact" | "successor";
+type KeyCut = Data.TaggedEnum<{
+  Predecessor: { readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey };
+  Exact: { readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey };
+  Successor: { readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey };
+}>;
+const KeyCut = Data.taggedEnum<KeyCut>();
 
-interface KeyCut {
-  readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey;
-  readonly kind: CutKind;
-}
-
-const cutKindRank: Record.ReadonlyRecord<CutKind, number> = {
-  predecessor: 0,
-  exact: 1,
-  successor: 2,
-};
+const cutRank = KeyCut.$match({
+  Predecessor: () => 0,
+  Exact: () => 1,
+  Successor: () => 2,
+});
 
 const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
   const minLength = Math.min(self.orderKey.length, that.orderKey.length);
@@ -67,7 +67,7 @@ const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
     return prefixOrdering;
   }
   if (self.orderKey.length === that.orderKey.length) {
-    return Order.Number(cutKindRank[self.kind], cutKindRank[that.kind]);
+    return Order.Number(cutRank(self), cutRank(that));
   }
   // One key is a proper prefix of the other. The shorter cut sits just
   // before (`predecessor`) or just after (`successor`) *every* key
@@ -75,26 +75,23 @@ const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
   // always full keys, so an `exact` cut is never the shorter one here.)
   const selfIsShorter = self.orderKey.length < that.orderKey.length;
   const shorter = selfIsShorter ? self : that;
-  const shorterOrdering = shorter.kind === "predecessor" ? -1 : 1;
+  const shorterOrdering = KeyCut.$match(shorter, {
+    Predecessor: () => -1 as const,
+    Exact: () => 1 as const,
+    Successor: () => 1 as const,
+  });
   return selfIsShorter ? shorterOrdering : (-shorterOrdering as -1 | 1);
 });
 
-const exactCut = (
-  orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
-): KeyCut => ({
-  orderKey,
-  kind: "exact",
-});
+const lowerCut = (bound: KeyBound): KeyCut =>
+  bound.inclusive
+    ? KeyCut.Predecessor({ orderKey: bound.orderKey })
+    : KeyCut.Successor({ orderKey: bound.orderKey });
 
-const lowerCut = (bound: KeyBound): KeyCut => ({
-  orderKey: bound.orderKey,
-  kind: bound.inclusive ? "predecessor" : "successor",
-});
-
-const upperCut = (bound: KeyBound): KeyCut => ({
-  orderKey: bound.orderKey,
-  kind: bound.inclusive ? "successor" : "predecessor",
-});
+const upperCut = (bound: KeyBound): KeyCut =>
+  bound.inclusive
+    ? KeyCut.Successor({ orderKey: bound.orderKey })
+    : KeyCut.Predecessor({ orderKey: bound.orderKey });
 
 /**
  * The stricter (later) of two lower bounds.
@@ -165,7 +162,8 @@ export const admittedByLower =
   (orderKey: QueryStreamOrderKey.QueryStreamOrderKey): boolean =>
     Option.match(lower, {
       onNone: () => true,
-      onSome: (bound) => KeyCutOrder(exactCut(orderKey), lowerCut(bound)) > 0,
+      onSome: (bound) =>
+        KeyCutOrder(KeyCut.Exact({ orderKey }), lowerCut(bound)) > 0,
     });
 
 /**
@@ -178,7 +176,8 @@ export const admittedByUpper =
   (orderKey: QueryStreamOrderKey.QueryStreamOrderKey): boolean =>
     Option.match(upper, {
       onNone: () => true,
-      onSome: (bound) => KeyCutOrder(exactCut(orderKey), upperCut(bound)) < 0,
+      onSome: (bound) =>
+        KeyCutOrder(KeyCut.Exact({ orderKey }), upperCut(bound)) < 0,
     });
 
 /**
