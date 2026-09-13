@@ -13,14 +13,17 @@ it.effect(
   () =>
     Effect.gen(function* () {
       const reads = MutableRef.make(0);
+
       const options = {
         functionNames: ["first"],
         registeredFunctionsImportPath: "./original",
         get useNode() {
           MutableRef.increment(reads);
+
           return false;
         },
       };
+
       const render = templates.functions(options);
       expect(MutableRef.get(reads)).toBe(1);
       options.functionNames = ["replacement"];
@@ -34,10 +37,12 @@ it.effect(
       expect(first).not.toContain("replacement");
       expect(first).not.toContain('"use node"');
       expect(MutableRef.get(reads)).toBe(1);
+
       const defaultOptions: Parameters<typeof templates.functions>[0] = {
         functionNames: ["defaulted"],
         registeredFunctionsImportPath: "./defaulted",
       };
+
       const defaultRender = templates.functions(defaultOptions);
       defaultOptions.useNode = true;
       expect(yield* defaultRender).not.toContain('"use node"');
@@ -70,6 +75,7 @@ it.effect(
           },
         ],
       });
+
       const first = yield* render;
       expect(yield* render).toBe(first);
       expect(first).toContain(
@@ -90,12 +96,15 @@ it.effect(
       const second = new CodeBlockWriter({ indentNumberOfSpaces: 4 });
       const receiver = CodeBlockWriter.prototype.indent.bind(second);
       const runs = MutableRef.make(0);
+
       const line = Effect.andThen(Line, (text) => {
         MutableRef.increment(runs);
+
         return text === "fail"
           ? Effect.fail("failure" as const)
           : second.writeLine(text);
       });
+
       const indented = second.indent(line);
       expectTypeOf(indented).toEqualTypeOf<
         Effect.Effect<void, "failure", Line>
@@ -118,6 +127,7 @@ it.effect(
         Effect.provideService(Line, "fail"),
         Effect.result,
       );
+
       assert(Result.isFailure(failed));
       expect(failed.failure).toBe("failure");
     }),
@@ -126,14 +136,18 @@ it.effect(
 it.effect("keeps internal helpers within their caller's span", () =>
   Effect.gen(function* () {
     const spans: Array<Tracer.Span> = [];
+
     const tracer = Tracer.make({
       span(options) {
         const span = new Tracer.NativeSpan(options);
         spans.push(span);
+
         return span;
       },
     });
+
     const writer = new CodeBlockWriter();
+
     const parentName = yield* writer
       .indent(
         Effect.gen(function* () {
@@ -146,6 +160,7 @@ it.effect("keeps internal helpers within their caller's span", () =>
         Effect.withSpan("caller"),
         Effect.provideService(Tracer.Tracer, tracer),
       );
+
     expect(parentName).toBe("caller");
     expect(spans.map((span) => span.name)).toEqual(["caller"]);
   }),

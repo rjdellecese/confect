@@ -14,6 +14,7 @@ const send = FunctionImpl.make(
   "send",
   Effect.fn(function* ({ to, subject, body }) {
     const spawner = yield* ChildProcessSpawner;
+
     const result = yield* spawner
       .string(
         ChildProcess.make("echo", [

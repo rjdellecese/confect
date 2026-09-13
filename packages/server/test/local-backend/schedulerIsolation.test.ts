@@ -22,6 +22,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
     it.effect("a query exceeding the fiber op budget succeeds", () =>
       Effect.gen(function* () {
         const { client } = yield* LocalBackend.LocalBackend;
+
         const result = yield* Effect.promise(() =>
           client.query(
             Ref.getFunctionReference(
@@ -30,6 +31,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             {},
           ),
         );
+
         expect(result).toBe(expectedSum);
       }),
     );
@@ -37,6 +39,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
     it.effect("a mutation exceeding the fiber op budget succeeds", () =>
       Effect.gen(function* () {
         const { client } = yield* LocalBackend.LocalBackend;
+
         const result = yield* Effect.promise(() =>
           client.mutation(
             Ref.getFunctionReference(
@@ -45,6 +48,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             {},
           ),
         );
+
         expect(result).toBe(expectedSum);
       }),
     );

@@ -16,6 +16,7 @@ import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
 
 export const TypeId = "~@confect/core/Table";
+
 export type TypeId = typeof TypeId;
 
 // -----------------------------------------------------------------------------
@@ -275,8 +276,9 @@ const makeBound = <
   SearchIndexes_,
   VectorIndexes_
 > => {
+  // SAFETY: Fields and Doc are installed lazily below before the table escapes; ~TableValidator is a phantom witness.
   const bound = {
-    [TypeId]: TypeId as TypeId,
+    [TypeId]: TypeId,
     tableName,
     indexes: state.indexes,
     searchIndexes: state.searchIndexes,
@@ -293,10 +295,7 @@ const makeBound = <
   Lazy.defineProperty(bound, "Fields", () => state.lazyFields());
 
   Lazy.defineProperty(bound, "Doc", () =>
-    SystemFields.extendWithSystemFields(
-      tableName,
-      (bound as { Fields: TableSchema_ }).Fields,
-    ),
+    SystemFields.extendWithSystemFields(tableName, bound.Fields),
   );
 
   return bound;
@@ -350,6 +349,7 @@ const makeUnnamed = <
   const index: UnnamedTableFunction<"index"> = (name, fields) =>
     makeUnnamed({
       lazyFields: state.lazyFields,
+      // SAFETY: The computed name is the callback's IndexName and fields its typed path tuple; TypeScript cannot infer the corresponding generic mapped-record key from this spread.
       indexes: {
         ...state.indexes,
         [name]: fields,
@@ -365,6 +365,7 @@ const makeUnnamed = <
     makeUnnamed({
       lazyFields: state.lazyFields,
       indexes: state.indexes,
+      // SAFETY: The computed name and config come from this searchIndex callback's generic arguments; the spread preserves every existing named index.
       searchIndexes: {
         ...state.searchIndexes,
         [name]: indexConfig,
@@ -380,35 +381,36 @@ const makeUnnamed = <
       lazyFields: state.lazyFields,
       indexes: state.indexes,
       searchIndexes: state.searchIndexes,
+      // SAFETY: The computed name and config come from this vectorIndex callback's generic arguments; the spread preserves every existing named index.
       vectorIndexes: {
         ...state.vectorIndexes,
         [name]: indexConfig,
       } as any,
     });
 
+  // SAFETY: Object.assign installs the metadata and builder methods on the callable; ~TableValidator is a phantom witness with no runtime property.
   return Object.assign(bind, {
-    [TypeId]: TypeId as TypeId,
+    [TypeId]: TypeId,
     indexes: state.indexes,
     searchIndexes: state.searchIndexes,
     vectorIndexes: state.vectorIndexes,
     index,
     searchIndex,
     vectorIndex,
-  }) as UnnamedTable_;
+  } as const) as UnnamedTable_;
 };
 
 export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
   lazyFields: () => TableSchema_,
 ): UnnamedTable<TableSchema_, TableSchemaToTableValidator<TableSchema_>> => {
   type TableValidator_ = TableSchemaToTableValidator<TableSchema_>;
-  type UnnamedTable_ = UnnamedTable<TableSchema_, TableValidator_>;
 
   return makeUnnamed<TableSchema_, TableValidator_, {}, {}, {}>({
     lazyFields,
     indexes: {},
     searchIndexes: {},
     vectorIndexes: {},
-  }) as UnnamedTable_;
+  });
 };
 
 // Vendored types from convex-js, partially modified. Ideally we could use these directly. See https://github.com/get-convex/convex-js/pull/14

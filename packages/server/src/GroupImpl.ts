@@ -14,6 +14,7 @@ import type * as FunctionImpl from "./FunctionImpl";
 import type * as MiddlewareImpl from "./MiddlewareImpl";
 
 export const TypeId = "~@confect/server/GroupImpl";
+
 export type TypeId = typeof TypeId;
 
 export type FinalizationStatus = "Unfinalized" | "Finalized";
@@ -46,6 +47,7 @@ export const isGroupImpl = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 export interface AnyFinalized extends GroupImpl<"Finalized"> {}
+
 export interface AnyUnfinalized extends GroupImpl<"Unfinalized"> {}
 
 export const isFinalizedGroupImpl = (u: unknown): u is AnyFinalized =>
@@ -105,11 +107,7 @@ export const make = <
       registeredFunctionNames: [],
       registeredMiddlewareKeys: [],
     },
-  ) as Layer.Layer<
-    GroupImpl<"Unfinalized">,
-    never,
-    FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
-  >;
+  );
 
 const findUnfinalizedGroupImpl = <S>(
   context: Context.Context<S>,
@@ -150,6 +148,7 @@ export const finalize = (
             Effect.gen(function* () {
               const registry = yield* Registry.Registry;
               const items = yield* Ref.get(registry);
+
               return {
                 [TypeId]: TypeId,
                 finalizationStatus: "Finalized" as const,

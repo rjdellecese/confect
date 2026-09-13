@@ -39,15 +39,18 @@ export const make = (
 ): OptimisticLocalStore => ({
   getQuery: (queryRef, ...rest) => {
     const functionReference = Ref.getFunctionReference(queryRef);
+    // SAFETY: OptionalArgs permits omission only for an empty args schema, so the fallback satisfies that ref's args type.
     const args = (rest[0] ?? {}) as Ref.Args<typeof queryRef>;
     const encodedArgs = Ref.encodeArgsSync(queryRef, args);
     const encoded = convexLocalStore.getQuery(functionReference, encodedArgs);
+
     return encoded === undefined
       ? Option.none()
       : Option.some(Ref.decodeReturnsSync(queryRef, encoded));
   },
   getAllQueries: (queryRef) => {
     const functionReference = Ref.getFunctionReference(queryRef);
+
     return convexLocalStore
       .getAllQueries(functionReference)
       .map(({ args, value }) => ({
@@ -61,10 +64,12 @@ export const make = (
   setQuery: (queryRef, args, value) => {
     const functionReference = Ref.getFunctionReference(queryRef);
     const encodedArgs = Ref.encodeArgsSync(queryRef, args);
+
     const encodedValue = Option.match(value, {
       onNone: () => undefined,
       onSome: (decoded) => Ref.encodeReturnsSync(queryRef, decoded),
     });
+
     convexLocalStore.setQuery(functionReference, encodedArgs, encodedValue);
   },
 });

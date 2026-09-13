@@ -63,6 +63,7 @@ export const validateAll = (
 ): Result.Result<void, ValidationError> => {
   for (const [index, attachment] of attachments.entries()) {
     const schema = attachment.spec.options;
+
     if (schema !== undefined && !Schema.is(schema)(attachment.options)) {
       return Result.fail(
         ValidationError.InvalidOptions({
@@ -72,11 +73,15 @@ export const validateAll = (
         }),
       );
     }
+
     const equivalent =
       schema === undefined ? undefined : Schema.toEquivalence(schema);
+
     for (const [previousIndex, previous] of attachments.entries()) {
       if (previousIndex === index) break;
+
       if (previous.spec.key !== attachment.spec.key) continue;
+
       if (previous.spec !== attachment.spec) {
         return Result.fail(
           ValidationError.ConflictingSpecs({
@@ -87,6 +92,7 @@ export const validateAll = (
           }),
         );
       }
+
       if (
         equivalent === undefined ||
         equivalent(previous.options, attachment.options)
@@ -102,5 +108,6 @@ export const validateAll = (
       }
     }
   }
+
   return Result.void;
 };

@@ -18,6 +18,7 @@
 export const defineProperty = <T extends object, K extends PropertyKey>(
   target: T,
   key: K,
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This generic property installer accepts a computed value of any type and never inspects it.
   compute: () => unknown,
 ): void => {
   Object.defineProperty(target, key, {
@@ -31,6 +32,7 @@ export const defineProperty = <T extends object, K extends PropertyKey>(
         enumerable: true,
         configurable: false,
       });
+
       return value;
     },
   });

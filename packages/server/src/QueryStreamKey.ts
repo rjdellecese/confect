@@ -15,9 +15,11 @@ export type QueryStreamKey = Data.TaggedEnum<{
   Complete: Payload;
   Prefix: Payload;
 }>;
+
 const QueryStreamKey = Data.taggedEnum<QueryStreamKey>();
 
 export type Complete = Data.TaggedEnum.Value<QueryStreamKey, "Complete">;
+
 export type Prefix = Data.TaggedEnum.Value<QueryStreamKey, "Prefix">;
 
 export class KeyWidthMismatchError extends Data.TaggedError(
@@ -37,6 +39,7 @@ export const complete = (
   values: QueryStreamOrderKey.QueryStreamOrderKey,
 ): Result.Result<Complete, KeyWidthMismatchError> => {
   const width = QueryStreamKeyLayout.runtimeWidth(layout);
+
   return values.length === width
     ? Result.succeed(
         QueryStreamKey.Complete({ [TypeId]: TypeId, layout, values }),
@@ -55,6 +58,7 @@ export const prefix = (
   values: QueryStreamOrderKey.QueryStreamOrderKey,
 ): Result.Result<Prefix, KeyWidthMismatchError> => {
   const width = QueryStreamKeyLayout.runtimeWidth(layout);
+
   return values.length <= width
     ? Result.succeed(
         QueryStreamKey.Prefix({ [TypeId]: TypeId, layout, values }),
@@ -71,6 +75,7 @@ export const prefix = (
 export const values = (
   self: QueryStreamKey,
 ): QueryStreamOrderKey.QueryStreamOrderKey => self.values;
+
 export const layout = (
   self: QueryStreamKey,
 ): QueryStreamKeyLayout.QueryStreamKeyLayout => self.layout;

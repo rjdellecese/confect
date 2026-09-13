@@ -49,41 +49,42 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
   Table_.VectorIndexes<Table>
 > => {
   const cached = tableDefinitionCache.get(table);
+
   if (cached !== undefined) {
-    return cached as TableDefinition<
-      Table_.TableValidator<Table>,
-      Table_.Indexes<Table>,
-      Table_.SearchIndexes<Table>,
-      Table_.VectorIndexes<Table>
-    >;
+    return cached;
   }
 
   let definition: TableDefinition<any, any, any, any> = defineTable(
     compileTableSchema(table.Fields),
   );
-  for (const [name, indexFields] of Object.entries(
-    table.indexes as Record<string, any>,
-  )) {
-    definition = definition.index(name, indexFields);
+
+  for (const [name, indexFields] of Object.entries(table.indexes)) {
+    definition = definition.index(
+      name,
+      // SAFETY: Table.index accepts a nonempty field tuple; AnyWithProps erases that tuple to GenericTableIndexes during iteration.
+      indexFields as [string, ...string[]],
+    );
   }
+
   for (const [name, config] of Object.entries(
+    // SAFETY: Table.searchIndex stores its original SearchIndexConfig unchanged; AnyWithProps exposes Convex's type-level filter-field union instead of the runtime array.
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The original SearchIndexConfig is stored unchanged; Convex's erased metadata models filter fields as a union rather than the runtime array.
     table.searchIndexes as Record<string, any>,
   )) {
     definition = definition.searchIndex(name, config);
   }
+
   for (const [name, config] of Object.entries(
+    // SAFETY: Table.vectorIndex stores its original VectorIndexConfig unchanged; AnyWithProps exposes Convex's type-level filter-field union instead of the runtime array.
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The original VectorIndexConfig is stored unchanged; Convex's erased metadata models filter fields as a union rather than the runtime array.
     table.vectorIndexes as Record<string, any>,
   )) {
     definition = definition.vectorIndex(name, config);
   }
 
   tableDefinitionCache.set(table, definition);
-  return definition as TableDefinition<
-    Table_.TableValidator<Table>,
-    Table_.Indexes<Table>,
-    Table_.SearchIndexes<Table>,
-    Table_.VectorIndexes<Table>
-  >;
+
+  return definition;
 };
 
 // -----------------------------------------------------------------------------

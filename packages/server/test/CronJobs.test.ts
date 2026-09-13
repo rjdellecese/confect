@@ -320,6 +320,7 @@ describe("CronJobs.make", () => {
 describe("CronJobs.add", () => {
   test("adds a cron job and populates convexCronJobs", () => {
     const ref = makeMutationRef("sessions", "clearStale");
+
     const cron = Cron.make({
       minutes: [0],
       hours: [],
@@ -327,6 +328,7 @@ describe("CronJobs.add", () => {
       months: [],
       weekdays: [],
     });
+
     const cronJob = CronJob.make("clear sessions", cron, ref);
 
     const result = CronJobs.make().add(cronJob);
@@ -388,6 +390,7 @@ describe("CronJobs.add", () => {
 
   test("does not mutate previous CronJobs instance", () => {
     const ref = makeMutationRef("sessions", "clearStale");
+
     const cron = Cron.make({
       minutes: [0],
       hours: [],
@@ -454,6 +457,7 @@ describe("CronJobs.add", () => {
 
   test("convexCronJobs.export() serializes all jobs", () => {
     const ref = makeMutationRef("sessions", "clearStale");
+
     const cron = Cron.make({
       minutes: [0],
       hours: [],
@@ -465,6 +469,7 @@ describe("CronJobs.add", () => {
     const result = CronJobs.make().add(
       CronJob.make("clear sessions", cron, ref),
     );
+
     const parsed = JSON.parse(JSON.stringify(result.convexCronJobs.crons));
 
     expect(parsed).toEqual({
@@ -478,6 +483,7 @@ describe("CronJobs.add", () => {
 
   test("passes encoded args to convexCronJobs for a cron schedule", () => {
     const ref = makeMutationRefWithArgs("payments", "sendEmail");
+
     const cronJob = CronJob.make(
       "payment reminder",
       Cron.parseUnsafe("0 16 1 * *"),
@@ -496,6 +502,7 @@ describe("CronJobs.add", () => {
 
   test("passes encoded args to convexCronJobs for an interval schedule", () => {
     const ref = makeMutationRefWithArgs("notifications", "send");
+
     const cronJob = CronJob.make("send notification", Duration.hours(1), ref, {
       email: "user@example.com",
     });

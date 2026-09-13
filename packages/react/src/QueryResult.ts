@@ -6,6 +6,7 @@ import * as Pipeable from "effect/Pipeable";
 import * as Predicate from "effect/Predicate";
 
 const TypeId = "~@confect/react/QueryResult";
+
 type TypeId = typeof TypeId;
 
 /**
@@ -54,11 +55,8 @@ export const isQueryResult = (u: unknown): u is QueryResult<unknown, unknown> =>
 
 const QueryResultProto = {
   [TypeId]: TypeId,
-  pipe(this: QueryResult<any, any>, ...args: ReadonlyArray<unknown>) {
-    return Pipeable.pipeArguments(
-      this,
-      args as unknown as Parameters<typeof Pipeable.pipeArguments>[1],
-    );
+  pipe() {
+    return Pipeable.pipeArguments(this, arguments);
   },
   [Equal.symbol](
     this: QueryResult<any, any>,
@@ -67,22 +65,26 @@ const QueryResultProto = {
     if (this._tag !== that._tag) {
       return false;
     }
+
     return Match.value(this).pipe(
       Match.tag(
         "Loading",
-        (self) => self.skipped === (that as Loading<any, any>).skipped,
+        (self) => isLoading(that) && self.skipped === that.skipped,
       ),
-      Match.tag("Success", (self) =>
-        Equal.equals(self.value, (that as Success<any, any>).value),
+      Match.tag(
+        "Success",
+        (self) => isSuccess(that) && Equal.equals(self.value, that.value),
       ),
-      Match.tag("Failure", (self) =>
-        Equal.equals(self.error, (that as Failure<any, any>).error),
+      Match.tag(
+        "Failure",
+        (self) => isFailure(that) && Equal.equals(self.error, that.error),
       ),
       Match.exhaustive,
     );
   },
   [Hash.symbol](this: QueryResult<any, any>): number {
     const tagHash = Hash.string(this._tag);
+
     return Match.value(this).pipe(
       Match.tag("Loading", (self) =>
         Hash.combine(tagHash)(Hash.hash(self.skipped)),
@@ -118,15 +120,15 @@ export const fail = <E, A = never>(error: E): Failure<A, E> =>
 
 export const isLoading = <A, E>(
   queryResult: QueryResult<A, E>,
-): queryResult is Loading<A, E> => queryResult._tag === "Loading";
+): queryResult is Loading<A, E> => Predicate.isTagged(queryResult, "Loading");
 
 export const isSuccess = <A, E>(
   queryResult: QueryResult<A, E>,
-): queryResult is Success<A, E> => queryResult._tag === "Success";
+): queryResult is Success<A, E> => Predicate.isTagged(queryResult, "Success");
 
 export const isFailure = <A, E>(
   queryResult: QueryResult<A, E>,
-): queryResult is Failure<A, E> => queryResult._tag === "Failure";
+): queryResult is Failure<A, E> => Predicate.isTagged(queryResult, "Failure");
 
 type MatchOptions<A, E, X, Y, Z> = {
   readonly onLoading: (skipped: boolean) => X;
@@ -161,6 +163,7 @@ export const match: {
     self: QueryResult<A, E>,
     options: MatchOptions<A, E, X, Y, Z>,
   ): MatchReturns<E, X, Y, Z> =>
+    // SAFETY: Z is returned only by onFailure, which is absent when E is never; TypeScript cannot reduce the generic conditional return type.
     Match.value(self).pipe(
       Match.tag("Loading", (loading) => options.onLoading(loading.skipped)),
       Match.tag("Success", (success) => options.onSuccess(success.value)),
@@ -168,6 +171,7 @@ export const match: {
         if (Predicate.hasProperty(options, "onFailure")) {
           return options.onFailure(failure.error);
         }
+
         throw new Error(
           "`onFailure` is required when error schema is provided",
         );

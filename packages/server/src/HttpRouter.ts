@@ -112,6 +112,7 @@ export const make = (routes: Routes): ConvexHttpRouter => {
     const services = Effect.runSync(
       Effect.scoped(Layer.build(RegisteredFunction.baseActionLayer(ctx))),
     );
+
     return handler(request, services);
   });
 
@@ -123,6 +124,7 @@ export const make = (routes: Routes): ConvexHttpRouter => {
       method,
       handler: httpAction,
     };
+
     convexHttpRouter.route(routeSpec);
   });
 
@@ -142,6 +144,7 @@ const applyMonkeyPatches = () => {
       return true;
     }
   })();
+
   if (urlCredentialsBroken) {
     URL = class extends URL {
       override get username() {
@@ -160,6 +163,7 @@ const applyMonkeyPatches = () => {
       return true;
     }
   })();
+
   if (requestSignalBroken) {
     // `configurable` so repeated definition—e.g. module re-evaluation in a
     // long-lived environment—does not throw.

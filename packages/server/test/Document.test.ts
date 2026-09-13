@@ -1,4 +1,4 @@
-import type { GenericId } from "@confect/core/GenericId";
+import { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
@@ -14,7 +14,7 @@ const NoteSchema = Schema.Struct({
 
 const convexNote = {
   content: "Hello, world!",
-  _id: "abc123" as GenericId<"notes">,
+  _id: Schema.decodeUnknownSync(GenericId("notes"))("abc123"),
   _creationTime: 1_234_567_890,
 };
 
@@ -66,7 +66,7 @@ describe("Document.decode", () => {
 
         const convexPost = {
           content: "A post",
-          _id: "post456" as GenericId<"posts">,
+          _id: yield* Schema.decodeUnknownEffect(GenericId("posts"))("post456"),
           _creationTime: 9_876_543_210,
         };
 
@@ -96,9 +96,11 @@ describe("Document.decode", () => {
       const result = yield* Effect.result(
         Document.decode("notes", NoteSchema)(invalidNote),
       );
+
       if (Result.isSuccess(result)) {
         throw new Error("expected document decoding to fail");
       }
+
       const error = result.failure;
 
       expect(error).toBeInstanceOf(Document.DocumentDecodeError);
@@ -139,6 +141,7 @@ describe("Document.encode", () => {
 describe("Document.Document", () => {
   it("distributes system fields over union-schema tables", () => {
     const events = unnamedEvents("events");
+
     type Doc = TableInfo.TableInfo<typeof events>["document"];
 
     expectTypeOf<Document.WithoutSystemFields<Doc>>().toEqualTypeOf<

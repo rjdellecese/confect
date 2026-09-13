@@ -2,7 +2,6 @@ import type {
   OrderedQuery as ConvexOrderedQuery,
   QueryInitializer as ConvexQueryInitializer,
   DocumentByInfo,
-  GenericTableIndexes,
   Indexes,
   IndexRange,
   IndexRangeBuilder,
@@ -18,9 +17,9 @@ import type { GenericId } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
-import type { ReadonlyRecord } from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type {
@@ -34,7 +33,6 @@ import * as QueryStream from "./QueryStream";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 import type * as Table from "./Table";
-import type * as TableInfo from "./TableInfo";
 
 type ConvexTableInfoFor<
   DataModel_ extends DataModel.AnyWithProps,
@@ -213,8 +211,11 @@ export const make = <
   table: Table.WithName<Tables, TableName>,
 ): QueryInitializer<DataModel.FromTables<Tables>, TableName> => {
   type DataModel_ = DataModel.FromTables<Tables>;
+
   type ConvexDataModel_ = DataModel.ToConvex<DataModel_>;
+
   type ThisQueryInitializer = QueryInitializer<DataModel_, TableName>;
+
   type QueryInitializerFunction<
     FunctionName extends keyof ThisQueryInitializer,
   > = ThisQueryInitializer[FunctionName];
@@ -234,9 +235,8 @@ export const make = <
     DataModel.DocumentWithName<DataModel_, TableName>,
     Document.DocumentDecodeError | GetByIndexFailure
   > => {
-    const indexFieldPaths: GenericTableIndexes[keyof GenericTableIndexes] = (
-      table.indexes as GenericTableIndexes
-    )[indexName as keyof GenericTableIndexes]!;
+    // SAFETY: IndexName comes from the table's Convex index metadata, whose keys are strings; keyof over the unresolved data-model generic also admits number and symbol.
+    const indexFieldPaths = table.indexes[indexName as string]!;
 
     return pipe(
       Effect.promise(() =>
@@ -246,7 +246,8 @@ export const make = <
             Array.reduce(
               indexFieldValues,
               q,
-              (q_, v, i) => q_.eq(indexFieldPaths[i] as any, v as any) as any,
+              // SAFETY: IndexFieldTypesForEq pairs each value with this index's field at the same position; the reduction advances the runtime builder, but TypeScript cannot track its changing tuple position.
+              (q_, v, i) => q_.eq(indexFieldPaths[i], v as any) as any,
             ),
           )
           .unique(),
@@ -258,6 +259,7 @@ export const make = <
             () =>
               new GetByIndexFailure({
                 tableName,
+                // SAFETY: IndexName comes from Convex's string-keyed index metadata for this table.
                 indexName: indexName as string,
                 indexFieldValues,
               }),
@@ -268,22 +270,19 @@ export const make = <
     );
   };
 
+  // SAFETY: The overloads distinguish a lone document ID from an index name followed by its field values; the implementation dispatches by that arity and returns the matching decoded document effect.
   const get: QueryInitializerFunction<"get"> = ((
     ...args: Parameters<QueryInitializerFunction<"get">>
   ) => {
     if (args.length === 1) {
+      // SAFETY: A single argument selects the document-ID overload; Parameters retains only the index overload and cannot express this branch.
       const id = args[0] as GenericId<TableName>;
 
       return getById(tableName, convexDatabaseReader, table)(id);
     } else {
       const [indexName, ...indexFieldValues] = args;
 
-      return getByIndex(
-        indexName as keyof Indexes<
-          DataModel.TableInfoWithName<DataModel_, TableName>
-        >,
-        indexFieldValues,
-      );
+      return getByIndex(indexName, indexFieldValues);
     }
   }) as QueryInitializerFunction<"get">;
 
@@ -327,7 +326,7 @@ export const make = <
             applyWithIndex: (q) => q.withIndex(indexName),
             applyOrder: (q) => q.order("asc"),
           }
-        : typeof indexRangeOrOrder === "function"
+        : Predicate.isFunction(indexRangeOrOrder)
           ? order === undefined
             ? {
                 applyWithIndex: (q) =>
@@ -353,15 +352,10 @@ export const make = <
     return OrderedQuery.make<
       DataModel.TableInfoWithName_<DataModel_, TableName>,
       TableName
-    >(
-      orderedQuery,
-      tableName,
-      table.Fields as TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >,
-    );
+    >(orderedQuery, tableName, table.Fields);
   };
 
+  // SAFETY: fromReflection receives this table's index fields and the callback's range spec unchanged; the overloads retain the corresponding field tuple and direction that the erased implementation signature cannot express.
   const stream: QueryInitializerFunction<"stream"> = ((
     indexName: string,
     indexRangeOrOrder?:
@@ -382,31 +376,28 @@ export const make = <
 
     // The type-level field tuple appends the `_creationTime` tiebreaker, but
     // the runtime `table.indexes` record stores only the declared fields—append it here.
-    const indexFieldPaths: ReadonlyArray<string> =
-      indexName === "by_id"
-        ? ["_id"]
-        : indexName === "by_creation_time"
-          ? ["_creationTime"]
-          : pipe(
-              Option.fromUndefinedOr(
-                (
-                  table.indexes as ReadonlyRecord<string, ReadonlyArray<string>>
-                )[indexName],
+    const indexFieldPaths: ReadonlyArray<string> = Match.value(indexName).pipe(
+      Match.when("by_id", () => ["_id"]),
+      Match.when("by_creation_time", () => ["_creationTime"]),
+      Match.orElse(() =>
+        pipe(
+          Option.fromUndefinedOr(table.indexes[indexName]),
+          // An unknown index name is a defect, not an empty field list:
+          // silently empty fields would make key extraction and range
+          // splitting target the wrong fields.
+          Option.getOrThrowWith(
+            () =>
+              new Error(
+                `QueryInitializer.stream: table "${tableName}" has no index named "${indexName}"`,
               ),
-              // An unknown index name is a defect, not an empty field list:
-              // silently empty fields would make key extraction and range
-              // splitting target the wrong fields.
-              Option.getOrThrowWith(
-                () =>
-                  new Error(
-                    `QueryInitializer.stream: table "${tableName}" has no index named "${indexName}"`,
-                  ),
-              ),
-              Array.append("_creationTime"),
-            );
+          ),
+          Array.append("_creationTime"),
+        ),
+      ),
+    );
 
     return QueryStream.fromReflection({
-      reader: convexDatabaseReader as QueryStream.ReflectionReader,
+      reader: convexDatabaseReader,
       tableName,
       tableSchema: table.Fields,
       indexName,
@@ -428,9 +419,7 @@ export const make = <
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),
       tableName,
-      table.Fields as TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >,
+      table.Fields,
     );
 
   return {
@@ -490,7 +479,7 @@ export class GetByIndexFailure extends Schema.TaggedError<GetByIndexFailure>()(
   override get message(): string {
     return `No documents found in table '${this.tableName}' with index '${this.indexName}' and field values '${JSON.stringify(
       this.indexFieldValues,
-      (_key, value) => (typeof value === "bigint" ? value.toString() : value),
+      (_key, value) => (Predicate.isBigInt(value) ? value.toString() : value),
     )}'`;
   }
 }

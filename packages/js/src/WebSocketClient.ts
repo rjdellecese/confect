@@ -14,6 +14,7 @@ const make = (
     address,
     Effect.sync(() => {
       const convexClient = new ConvexClient(address, options);
+
       return {
         setAuth: (fetchToken, onChange) =>
           onChange === undefined

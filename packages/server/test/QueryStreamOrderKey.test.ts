@@ -20,9 +20,11 @@ describe("QueryStreamOrderKey", () => {
       ["nested"],
       { nested: "value" },
     ];
+
     const Json = Schema.fromJsonString(
       Schema.toCodecJson(QueryStreamOrderKey.QueryStreamOrderKey),
     );
+
     const encoded = Schema.encodeSync(Json)(values);
     expect(Schema.decodeSync(Json)(encoded)).toEqual(values);
     expect(JSON.parse(encoded)[0]).toEqual({ $undefined: true });
@@ -61,6 +63,7 @@ describe("QueryStreamOrderKey", () => {
       [1],
       { a: 1 },
     ];
+
     for (const left of values) {
       for (const right of values) {
         expect(QueryStreamOrderKey.ValueOrder(left, right)).toBe(

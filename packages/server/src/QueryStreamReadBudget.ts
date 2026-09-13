@@ -74,6 +74,7 @@ const record = (
   bytesRead: Array.reduce(
     documents,
     counts.bytesRead,
+    // SAFETY: accountFor receives encoded Convex documents before decoding or transformation; getDocumentSize reads that wire representation.
     (bytes, document) => bytes + getDocumentSize(document as GenericDocument),
   ),
 });
@@ -87,9 +88,11 @@ export const make = Effect.fnUntraced(function* (
   const unlimited =
     Option.isNone(limits.maximumRowsRead) &&
     Option.isNone(limits.maximumBytesRead);
+
   const stateRef = yield* SynchronizedRef.make<State>(
     State.Active({ rowsRead: 0, bytesRead: 0 }),
   );
+
   const accountForPull: (
     pull: Pull.Pull<Array.NonEmptyReadonlyArray<unknown>>,
   ) => Pull.Pull<Array.NonEmptyReadonlyArray<unknown>> = unlimited
@@ -110,7 +113,9 @@ export const make = Effect.fnUntraced(function* (
                 State.Stopped(readCounts(state)),
               );
             }
+
             const documents = yield* pull;
+
             return Tuple.make(
               Option.some(documents),
               State.Active(record(state, documents)),
@@ -124,6 +129,7 @@ export const make = Effect.fnUntraced(function* (
             }),
           ),
         );
+
   return QueryStreamReadBudget.of({
     isUnlimited: Effect.succeed(unlimited),
     isStopped: Effect.map(SynchronizedRef.get(stateRef), State.$is("Stopped")),

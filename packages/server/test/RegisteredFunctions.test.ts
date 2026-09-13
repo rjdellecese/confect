@@ -23,15 +23,18 @@ import notes from "./mock-backend/fixtures/confect/groups/notes.impl";
 describe("Registered functions", () => {
   it("types public Query functions as RegisteredQuery<public, ...>", () => {
     expectTypeOf(registeredFunctions.list).toExtend<
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The assertion intentionally checks assignability to Convex's broad public-query contract.
       RegisteredQuery<"public", Record<string, unknown>, unknown>
     >();
     expectTypeOf(registeredFunctions.getFirst).toExtend<
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The assertion intentionally checks assignability to Convex's broad public-query contract.
       RegisteredQuery<"public", Record<string, unknown>, unknown>
     >();
   });
 
   it("types internal Query functions as RegisteredQuery<internal, ...>", () => {
     expectTypeOf(registeredFunctions.internalGetFirst).toExtend<
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The assertion intentionally checks assignability to Convex's broad internal-query contract.
       RegisteredQuery<"internal", Record<string, unknown>, unknown>
     >();
   });
@@ -43,6 +46,7 @@ describe("buildForGroup", () => {
       options: () => Schema.Struct({ label: Schema.String }),
       functionTypes: { query: true, mutation: false, action: false },
     }) {}
+
     class OtherPolicy extends MiddlewareSpec.MiddlewareSpec<OtherPolicy>()(
       "Policy",
       {
@@ -50,7 +54,8 @@ describe("buildForGroup", () => {
         functionTypes: { query: true, mutation: false, action: false },
       },
     ) {}
-    class SameShapePolicy extends MiddlewareSpec.MiddlewareSpec<SameShapePolicy>()(
+
+    class EquivalentPolicy extends MiddlewareSpec.MiddlewareSpec<EquivalentPolicy>()(
       "Policy",
       {
         options: () => Schema.Struct({ label: Schema.String }),
@@ -62,9 +67,10 @@ describe("buildForGroup", () => {
       name: "get",
       returns: () => Schema.String,
     }).middleware(Policy, { label: "internal" });
+
     const group = GroupSpec.make().addFunction(query);
 
-    for (const implementationSpec of [OtherPolicy, SameShapePolicy]) {
+    for (const implementationSpec of [OtherPolicy, EquivalentPolicy]) {
       const layer = GroupImpl.make(databaseSchema, group).pipe(
         Layer.provide(
           FunctionImpl.make(databaseSchema, group, "get", () =>
@@ -80,6 +86,7 @@ describe("buildForGroup", () => {
         ),
         GroupImpl.finalize,
       );
+
       expect(() =>
         RegisteredFunctions.buildForGroup<typeof group>(
           databaseSchema,
@@ -103,9 +110,11 @@ describe("buildForGroup", () => {
       name: "get",
       returns: () => Schema.String,
     }).middleware(GroupPolicy, { label: "same" });
+
     const group = GroupSpec.make()
       .middleware(GroupPolicy, { label: "same" })
       .addFunction(query);
+
     const layer = GroupImpl.make(databaseSchema, group).pipe(
       Layer.provide(
         FunctionImpl.make(databaseSchema, group, "get", () =>
@@ -117,6 +126,7 @@ describe("buildForGroup", () => {
       ),
       GroupImpl.finalize,
     );
+
     expect(() =>
       RegisteredFunctions.buildForGroup<typeof group>(
         databaseSchema,

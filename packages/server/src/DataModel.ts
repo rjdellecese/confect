@@ -3,6 +3,7 @@ import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
 export declare const TypeId: "~@confect/server/DataModel";
+
 export type TypeId = typeof TypeId;
 
 export interface DataModel<

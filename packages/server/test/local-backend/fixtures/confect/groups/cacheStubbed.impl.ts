@@ -52,6 +52,7 @@ const confectWithLog = FunctionImpl.make(
   () =>
     Effect.gen(function* () {
       yield* Effect.logInfo("cacheStubbed.confectWithLog");
+
       return yield* Random.next;
     }),
 );

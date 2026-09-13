@@ -7,6 +7,7 @@ export const clean = Effect.fn("Clean.remove")(function* (
   targets: ReadonlyArray<string>,
 ) {
   const fs = yield* FileSystem.FileSystem;
+
   for (const target of targets) {
     yield* fs.remove(target, { recursive: true, force: true });
   }

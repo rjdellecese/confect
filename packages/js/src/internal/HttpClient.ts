@@ -15,15 +15,21 @@ export interface Transport {
   readonly clearAuth: () => void;
   readonly query: (
     functionReference: Ref.FunctionReference<Ref.AnyPublicQuery>,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This raw transport receives args encoded by Ref.runWithCodec; their representation depends on the ref.
     encodedArgs: unknown,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Ref.runWithCodec owns return decoding after this raw transport promise resolves.
   ) => PromiseLike<unknown>;
   readonly mutation: (
     functionReference: Ref.FunctionReference<Ref.AnyPublicMutation>,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This raw transport receives args encoded by Ref.runWithCodec; their representation depends on the ref.
     encodedArgs: unknown,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Ref.runWithCodec owns return decoding after this raw transport promise resolves.
   ) => PromiseLike<unknown>;
   readonly action: (
     functionReference: Ref.FunctionReference<Ref.AnyPublicAction>,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This raw transport receives args encoded by Ref.runWithCodec; their representation depends on the ref.
     encodedArgs: unknown,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Ref.runWithCodec owns return decoding after this raw transport promise resolves.
   ) => PromiseLike<unknown>;
 }
 
@@ -58,7 +64,9 @@ export const make = (client: Transport) => {
     Ref.Returns<Query>,
     Ref.Error<Query> | HttpClientError | Schema.SchemaError
   > => {
+    // SAFETY: OptionalArgs permits omission only for an empty argument record; supplied args already have this ref's Args type.
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
+
     return runQuery(
       Ref.runWithCodec(
         ref,
@@ -77,7 +85,9 @@ export const make = (client: Transport) => {
     Ref.Returns<Mutation>,
     Ref.Error<Mutation> | HttpClientError | Schema.SchemaError
   > => {
+    // SAFETY: OptionalArgs permits omission only for an empty argument record; supplied args already have this ref's Args type.
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
+
     return runMutation(
       Ref.runWithCodec(
         ref,
@@ -96,7 +106,9 @@ export const make = (client: Transport) => {
     Ref.Returns<Action>,
     Ref.Error<Action> | HttpClientError | Schema.SchemaError
   > => {
+    // SAFETY: OptionalArgs permits omission only for an empty argument record; supplied args already have this ref's Args type.
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
+
     return runAction(
       Ref.runWithCodec(
         ref,

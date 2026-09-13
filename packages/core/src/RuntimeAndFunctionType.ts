@@ -12,10 +12,11 @@ const make = <
 >(
   runtime: Runtime_,
   functionType: FunctionType_,
-): { readonly runtime: Runtime_; readonly functionType: FunctionType_ } => ({
-  runtime,
-  functionType,
-});
+) =>
+  ({
+    runtime,
+    functionType,
+  }) as const;
 
 export type AnyQuery = Extract<
   RuntimeAndFunctionType,
@@ -45,13 +46,17 @@ export type GetFunctionType<
 > = RuntimeAndFunctionType_["functionType"];
 
 export const ConvexQuery = make("Convex", "query");
+
 export type ConvexQuery = typeof ConvexQuery;
 
 export const ConvexMutation = make("Convex", "mutation");
+
 export type ConvexMutation = typeof ConvexMutation;
 
 export const ConvexAction = make("Convex", "action");
+
 export type ConvexAction = typeof ConvexAction;
 
 export const NodeAction = make("Node", "action");
+
 export type NodeAction = typeof NodeAction;

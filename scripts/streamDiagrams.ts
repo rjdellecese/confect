@@ -22,7 +22,9 @@ import * as Runtime from "effect/Runtime";
  */
 
 const PAGE = "apps/docs/server/database/streams.mdx";
+
 const COLUMN_WIDTH = 12;
+
 /**
  * Joins a track to the name printed above it.
  */
@@ -65,6 +67,7 @@ export const track = (
   start = 0,
 ): string => {
   const indent = " ".repeat(COLUMN_WIDTH * start);
+
   return (
     indent +
     name +
@@ -100,6 +103,7 @@ const cursorAt = (column: number): string =>
   " ".repeat(1 + COLUMN_WIDTH * column) + "╎";
 
 const BY_TEXT = ["n1", "n3", "n2", "n5", "n4", "n6"];
+
 const BY_TEXT_KEYS = [
   "[apple,1]",
   "[apple,3]",
@@ -108,9 +112,10 @@ const BY_TEXT_KEYS = [
   "[cherry,4]",
   "[date,6]",
 ];
+
 const FILTERED = ["n1", "n3", "n2", "n5", "n4", "(n6)"];
 
-export const diagrams: Readonly<Record<string, string>> = {
+export const diagrams = {
   legend: lines(track("by_text", BY_TEXT), keys(BY_TEXT_KEYS)),
 
   creating: lines(
@@ -299,7 +304,7 @@ export const diagrams: Readonly<Record<string, string>> = {
     "",
     `${cursorAt(2)}${cell("n2").slice(1)}${cell("n5")}╎  exactly this range, however many documents it holds`,
   ),
-};
+} as const satisfies Readonly<Record<string, string>>;
 
 // The formatter keeps a blank line between an MDX comment and a fence.
 const MARKED_BLOCK =
@@ -313,26 +318,35 @@ export const renderDiagrams = Effect.fnUntraced(function* (
 ): Effect.fn.Return<string, StreamDiagramsError> {
   const seen = new Set<string>();
   let unknown: string | undefined;
+
   const rendered = source.replace(MARKED_BLOCK, (match, name: string) => {
-    const diagram = diagrams[name];
+    const diagram = Object.entries(diagrams).find(([key]) => key === name)?.[1];
+
     if (diagram === undefined) {
       unknown ??= name;
+
       return match;
     }
+
     seen.add(name);
+
     return `{/* stream-diagram: ${name} */}\n\n\`\`\`text\n${diagram}\n\`\`\``;
   });
+
   if (unknown !== undefined) {
     return yield* new StreamDiagramsError({
       reason: `${PAGE} references an unknown diagram: ${unknown}`,
     });
   }
+
   const unused = Object.keys(diagrams).filter((name) => !seen.has(name));
+
   if (unused.length > 0) {
     return yield* new StreamDiagramsError({
       reason: `${PAGE} has no block for: ${unused.join(", ")}`,
     });
   }
+
   return rendered;
 });
 
@@ -352,6 +366,7 @@ export const syncStreamDiagrams = Effect.fn("StreamDiagrams.sync")(function* (
 
   if (rendered === source) {
     yield* Console.log(`ok  ${PAGE} diagrams are up to date`);
+
     return;
   }
 
@@ -369,11 +384,13 @@ export const streamDiagramsMain = Effect.fn("StreamDiagrams.main")(function* (
   args: ReadonlyArray<string>,
 ) {
   const unknownArgument = args.find((argument) => argument !== "--check");
+
   if (unknownArgument !== undefined) {
     return yield* new StreamDiagramsError({
       reason: `Unknown argument: ${unknownArgument}`,
     });
   }
+
   yield* syncStreamDiagrams({ check: args.includes("--check") });
 });
 

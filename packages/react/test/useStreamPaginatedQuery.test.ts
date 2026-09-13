@@ -5,20 +5,17 @@ import * as Schema from "effect/Schema";
 import * as MutableRef from "effect/MutableRef";
 import { assert, beforeEach, describe, expect, test } from "@effect/vitest";
 import { vi } from "vitest";
-import { useStreamPaginatedQuery } from "@confect/react";
+import type { StreamPagination } from "@confect/react";
+import { PaginatedQueryResult } from "@confect/react";
+import { createHooks, type ConvexHooks } from "../src/internal/hooks";
+import { convexHooks } from "../src/internal/convex";
 
-const useQueriesMock = vi.fn();
+const useQueriesMock = vi.fn<ConvexHooks["useQueries"]>();
 
-vi.mock("convex/react", () => ({
-  useQuery: vi.fn(),
-  useMutation: vi.fn(),
-  useAction: vi.fn(),
-  usePaginatedQuery: () => {
-    throw new Error("unexpected call to the public usePaginatedQuery");
-  },
-  usePaginatedQueryInternal: vi.fn(),
-  useQueries: (...args: unknown[]) => useQueriesMock(...args),
-}));
+const { useStreamPaginatedQuery } = createHooks({
+  ...convexHooks,
+  useQueries: useQueriesMock,
+});
 
 const Item = Schema.Struct({ value: Schema.FiniteFromString });
 
@@ -57,19 +54,21 @@ const listOrFail = Ref.make(
  * `paginationOpts`—so tests observe exactly which page ranges the hook
  * subscribes, and control when each loads.
  */
-const responses = MutableRef.make(new Map<string, unknown>());
+const responses = MutableRef.make(
+  new Map<string, StreamPagination.PageResult | Error>(),
+);
 
-const respond = (paginationOpts: object, result: unknown) => {
+const respond = (
+  paginationOpts: StreamPagination.PageRequest,
+  result: StreamPagination.PageResult | Error,
+) => {
   MutableRef.get(responses).set(JSON.stringify(paginationOpts), result);
 };
 
 const subscribedOpts = () =>
-  Object.values(
-    useQueriesMock.mock.lastCall![0] as Record<
-      string,
-      { args: { paginationOpts: object } }
-    >,
-  ).map((request) => request.args.paginationOpts);
+  Object.values(useQueriesMock.mock.lastCall![0]).map(
+    (request) => request.args.paginationOpts,
+  );
 
 /**
  * Snapshot `result.current` without TypeScript carrying narrowing from an
@@ -81,16 +80,15 @@ const current = <A>(result: { readonly current: A }): A => result.current;
 beforeEach(() => {
   MutableRef.set(responses, new Map());
   useQueriesMock.mockReset();
-  useQueriesMock.mockImplementation(
-    (queries: Record<string, { args: { paginationOpts: unknown } }>) =>
-      Object.fromEntries(
-        Object.entries(queries).map(([key, request]) => [
-          key,
-          MutableRef.get(responses).get(
-            JSON.stringify(request.args.paginationOpts),
-          ),
-        ]),
-      ),
+  useQueriesMock.mockImplementation((queries) =>
+    Object.fromEntries(
+      Object.entries(queries).map(([key, request]) => [
+        key,
+        MutableRef.get(responses).get(
+          JSON.stringify(request.args.paginationOpts),
+        ),
+      ]),
+    ),
   );
 });
 
@@ -98,7 +96,7 @@ beforeEach(() => {
  * Respond to the initial growing page and its pinned twin so the hook settles
  * at one pinned first page (the state every loaded page reaches).
  */
-const respondFirstPage = (result: object) => {
+const respondFirstPage = (result: StreamPagination.PageResult) => {
   respond({ numItems: 2, cursor: null }, result);
   respond({ numItems: 2, cursor: null, endCursor: "c0" }, result);
 };
@@ -126,7 +124,7 @@ describe("useStreamPaginatedQuery", () => {
       { numItems: 2, cursor: null, endCursor: "c0" },
     ]);
     const whilePinning = current(result);
-    assert(whilePinning._tag === "LoadingMore");
+    assert(PaginatedQueryResult.isLoadingMore(whilePinning));
     expect(whilePinning.results).toEqual([{ value: 1 }, { value: 2 }]);
 
     respond(
@@ -143,7 +141,7 @@ describe("useStreamPaginatedQuery", () => {
       { numItems: 2, cursor: null, endCursor: "c0" },
     ]);
     const pinned = current(result);
-    assert(pinned._tag === "CanLoadMore");
+    assert(PaginatedQueryResult.isCanLoadMore(pinned));
     expect(pinned.results).toEqual([{ value: 1 }, { value: 2 }]);
   });
 
@@ -156,9 +154,8 @@ describe("useStreamPaginatedQuery", () => {
       ),
     );
 
-    const request = Object.values(
-      useQueriesMock.mock.lastCall![0] as Record<string, { args: object }>,
-    )[0]!;
+    const request = Object.values(useQueriesMock.mock.lastCall![0])[0]!;
+
     expect(request.args).toEqual({
       count: "42",
       paginationOpts: { numItems: 2, cursor: null },
@@ -169,13 +166,15 @@ describe("useStreamPaginatedQuery", () => {
     const { result } = renderHook(() =>
       useStreamPaginatedQuery(list, {}, { initialNumItems: 2 }),
     );
-    assert(result.current._tag === "LoadingFirstPage");
+
+    assert(PaginatedQueryResult.isLoadingFirstPage(result.current));
     expect(result.current.skipped).toBe(false);
 
     const { result: skipped } = renderHook(() =>
       useStreamPaginatedQuery(list, "skip", { initialNumItems: 2 }),
     );
-    assert(skipped.current._tag === "LoadingFirstPage");
+
+    assert(PaginatedQueryResult.isLoadingFirstPage(skipped.current));
     expect(skipped.current.skipped).toBe(true);
     expect(subscribedOpts()).toEqual([]);
   });
@@ -190,11 +189,12 @@ describe("useStreamPaginatedQuery", () => {
     const { result, rerender } = renderHook(() =>
       useStreamPaginatedQuery(list, {}, { initialNumItems: 2 }),
     );
+
     rerender();
-    assert(current(result)._tag === "CanLoadMore");
+    assert(PaginatedQueryResult.isCanLoadMore(current(result)));
     act(() => {
       const canLoadMore = current(result);
-      assert(canLoadMore._tag === "CanLoadMore");
+      assert(PaginatedQueryResult.isCanLoadMore(canLoadMore));
       canLoadMore.loadMore(2);
     });
 
@@ -205,7 +205,7 @@ describe("useStreamPaginatedQuery", () => {
       { numItems: 2, cursor: "c0" },
     ]);
     const whileLoading = current(result);
-    assert(whileLoading._tag === "LoadingMore");
+    assert(PaginatedQueryResult.isLoadingMore(whileLoading));
     expect(whileLoading.results).toEqual([{ value: 1 }, { value: 2 }]);
 
     respond(
@@ -226,7 +226,7 @@ describe("useStreamPaginatedQuery", () => {
       { numItems: 2, cursor: "c0", endCursor: "c1" },
     ]);
     const afterSwap = current(result);
-    assert(afterSwap._tag === "Exhausted");
+    assert(PaginatedQueryResult.isExhausted(afterSwap));
     expect(afterSwap.results).toEqual([
       { value: 1 },
       { value: 2 },
@@ -258,7 +258,7 @@ describe("useStreamPaginatedQuery", () => {
       { numItems: 2, cursor: "s" },
     ]);
     const whileSplitting = current(result);
-    assert(whileSplitting._tag === "LoadingMore");
+    assert(PaginatedQueryResult.isLoadingMore(whileSplitting));
     expect(whileSplitting.results).toEqual([
       { value: 1 },
       { value: 2 },
@@ -294,7 +294,7 @@ describe("useStreamPaginatedQuery", () => {
       { numItems: 2, cursor: "s", endCursor: "c0" },
     ]);
     const afterSplit = current(result);
-    assert(afterSplit._tag === "CanLoadMore");
+    assert(PaginatedQueryResult.isCanLoadMore(afterSplit));
     expect(afterSplit.results).toEqual([
       { value: 1 },
       { value: 2 },
@@ -324,13 +324,14 @@ describe("useStreamPaginatedQuery", () => {
     const { result, rerender } = renderHook(() =>
       useStreamPaginatedQuery(list, {}, { initialNumItems: 2, ...budget }),
     );
+
     rerender();
 
     // Every page carries the budgets: the first page, the pinned twin it
     // is replaced by (a pinned range can still grow past a budget), and
     // each page `loadMore` appends.
     const canLoadMore = current(result);
-    assert(canLoadMore._tag === "CanLoadMore");
+    assert(PaginatedQueryResult.isCanLoadMore(canLoadMore));
     act(() => {
       canLoadMore.loadMore(2);
     });
@@ -359,7 +360,7 @@ describe("useStreamPaginatedQuery", () => {
     // The incomplete page's items are withheld while its halves load; the
     // second half keeps the growing tail rather than pinning at the
     // truncation point, so no range is orphaned.
-    assert(result.current._tag === "LoadingFirstPage");
+    assert(PaginatedQueryResult.isLoadingFirstPage(result.current));
     expect(subscribedOpts()).toEqual([
       { numItems: 2, cursor: null },
       { numItems: 2, cursor: null, endCursor: "s" },
@@ -377,19 +378,20 @@ describe("useStreamPaginatedQuery", () => {
     const { result, rerender } = renderHook(() =>
       useStreamPaginatedQuery(listOrFail, {}, { initialNumItems: 2 }),
     );
+
     rerender();
     act(() => {
       const canLoadMore = current(result);
-      assert(canLoadMore._tag === "CanLoadMore");
+      assert(PaginatedQueryResult.isCanLoadMore(canLoadMore));
       canLoadMore.loadMore(2);
     });
     respond(
       { numItems: 2, cursor: "c0" },
-      new ConvexError({ _tag: "Boom", reason: "nope" }),
+      new ConvexError(Schema.encodeSync(Boom)(new Boom({ reason: "nope" }))),
     );
     rerender();
 
-    assert(result.current._tag === "Failure");
+    assert(PaginatedQueryResult.isFailure(result.current));
     expect(result.current.error).toBeInstanceOf(Boom);
     expect(result.current.error.reason).toBe("nope");
     expect(result.current.results).toEqual([{ value: 1 }]);
@@ -415,10 +417,11 @@ describe("useStreamPaginatedQuery", () => {
     const { result, rerender } = renderHook(() =>
       useStreamPaginatedQuery(list, {}, { initialNumItems: 2 }),
     );
+
     rerender();
     act(() => {
       const canLoadMore = current(result);
-      assert(canLoadMore._tag === "CanLoadMore");
+      assert(PaginatedQueryResult.isCanLoadMore(canLoadMore));
       canLoadMore.loadMore(2);
     });
     respond(
@@ -432,7 +435,7 @@ describe("useStreamPaginatedQuery", () => {
     expect(subscribedOpts()).toEqual([
       { numItems: 2, cursor: null, endCursor: "c0" },
     ]);
-    assert(current(result)._tag === "CanLoadMore");
+    assert(PaginatedQueryResult.isCanLoadMore(current(result)));
     expect(current(result).results).toEqual([{ value: 1 }, { value: 2 }]);
   });
 });

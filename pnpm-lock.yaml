@@ -189,6 +189,9 @@ importers:
       '@effect/tsgo':
         specifier: 0.44.0
         version: 0.44.0
+      '@oxlint/plugins':
+        specifier: 1.82.0
+        version: 1.82.0
       '@types/bun':
         specifier: 1.3.14
         version: 1.3.14
@@ -2592,6 +2595,10 @@ packages:
 
   '@oxlint/plugins@1.80.0':
     resolution: {integrity: sha512-QRgH1XqQEYNHa4f1vvPQ5fAdNdncHGIUG1ZWLlGIZHky3qwCEeAKYitZNbZMtaXtAQAAFFTOwqUfzESvimqZNA==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+
+  '@oxlint/plugins@1.82.0':
+    resolution: {integrity: sha512-IDF4UXBNOaCeLoEpVxf5Bg85KOWdeuBEkbo1rGzS2vXcbD+GT1asBSeeTC+5BgW6NFTHVByd6N5giHsFPGtwAA==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
   '@pnpm/deps.graph-sequencer@1100.0.1':
@@ -9740,6 +9747,8 @@ snapshots:
   '@oxlint/plugins@1.79.0': {}
 
   '@oxlint/plugins@1.80.0': {}
+
+  '@oxlint/plugins@1.82.0': {}
 
   '@pnpm/deps.graph-sequencer@1100.0.1': {}
 

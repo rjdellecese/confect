@@ -22,6 +22,7 @@ export type Error<Query extends Ref.AnyConfectPublicQuery> =
   | Client.WebSocketClientError
   | Schema.SchemaError;
 
+// SAFETY: The branches preserve framework errors and wrap only the remaining Ref.Error<Query>; Match cannot reduce its generic exclusions or FunctionError's conditional never case.
 const paginatedError = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   error: Error<Query>,
 ): PaginatedQuery.Error<Query> =>
@@ -160,7 +161,8 @@ export const reactiveQuery =
       modelToDependencies: (model) => ({
         args:
           modelToArgs === undefined
-            ? Option.some({} as Ref.Args<Query>)
+            ? // SAFETY: ArgsConfig permits an omitted args mapper only for refs whose argument record is empty.
+              Option.some({} as Ref.Args<Query>)
             : modelToArgs(model),
       }),
       dependenciesToStream: ({ args }) =>
@@ -253,9 +255,11 @@ export const paginatedQuery =
   > => {
     const ref = machine.ref;
     const composedArgsSchema = ref.args;
+
     const requestEquivalence = Schema.toEquivalence(
       machine.subscriptionRequestSchema,
     );
+
     const optionalRequestEquivalence = Option.makeEquivalence<
       PaginatedQuery.SubscriptionRequest<
         PaginatedQuery.UserArgs<PaginatedQueryRef>
@@ -291,14 +295,18 @@ export const paginatedQuery =
             Stream.unwrap(
               Effect.gen(function* () {
                 const client = yield* Client.Client;
+
                 const paginationId = yield* client.resolvePaginationId(
                   subscriptionRequest.paginationId,
                 );
+
                 const allocatedRequest = PaginatedQuery.allocateRequest(
                   subscriptionRequest,
                   paginationId,
                 );
+
                 const { descriptor, options } = allocatedRequest;
+
                 const composedArgs = composedArgsSchema.make({
                   ...allocatedRequest.args,
                   paginationOpts: {
@@ -325,6 +333,7 @@ export const paginatedQuery =
                     }),
                   },
                 });
+
                 return client.reactiveQueryResult(ref, composedArgs).pipe(
                   Stream.map((result) =>
                     config.onSettled({

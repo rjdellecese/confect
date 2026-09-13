@@ -111,5 +111,6 @@ export function consume(
 }> {
   if (size(self) < size(template)) return Option.none();
   const [prefix, rest] = Array.splitAt(toArray(self), size(template));
+
   return Option.some({ prefix: make(prefix), rest: make(rest) });
 }

@@ -8,6 +8,7 @@ import type * as Schema from "effect/Schema";
 import type * as Handler from "./Handler";
 
 export const TypeId = "~@confect/server/FunctionRegistryItem";
+
 export type TypeId = typeof TypeId;
 
 export const isFunctionRegistryItem = (value: unknown): value is AnyWithProps =>
@@ -57,7 +58,7 @@ export const make = ({
     Match.tag("Convex", (): AnyWithProps =>
       Object.assign(Object.create(FunctionRegistryItemProto), {
         _tag: "Convex" as const,
-        handler: handler as Handler.AnyConvexProvenance,
+        handler,
       }),
     ),
     Match.tag("Confect", (provenance): AnyWithProps => {
@@ -70,16 +71,17 @@ export const make = ({
           ...groupMiddlewareAttachments,
           ...functionSpec.middlewareAttachments,
         ],
-        handler: handler as Handler.AnyConfectProvenance,
+        handler,
       });
 
       Lazy.defineProperty(item, "args", () => provenance.args);
       Lazy.defineProperty(item, "returns", () => provenance.returns);
+
       if ("error" in provenance) {
         Lazy.defineProperty(item, "error", () => provenance.error);
       }
 
-      return item as AnyWithProps;
+      return item;
     }),
     Match.exhaustive,
   );

@@ -39,6 +39,7 @@ export type TestClient = typeof TestClient.Identifier;
 
 const failRejection = <Ref_ extends CoreRef.Any>(
   ref: Ref_,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This test adapter models arbitrary transport rejections before the ref's typed error decoder runs.
   rejection: unknown,
 ): Effect.Effect<
   never,
@@ -47,6 +48,7 @@ const failRejection = <Ref_ extends CoreRef.Any>(
   if (Schema.is(Client.WebSocketClientError)(rejection)) {
     return Effect.fail(rejection);
   }
+
   if (Schema.isSchemaError(rejection)) {
     return Effect.fail(rejection);
   }
@@ -60,13 +62,16 @@ const failRejection = <Ref_ extends CoreRef.Any>(
 export const layer = Layer.effectContext(
   Effect.gen(function* () {
     const recordedCalls = yield* Ref.make<ReadonlyArray<Call>>([]);
+
     const nextResult = yield* Ref.make<
       Effect.Effect<Result.Result<unknown, unknown>>
     >(Effect.succeed(Result.succeed({})));
+
     const nextReactiveQueryResults = yield* Ref.make<
       Stream.Stream<Result.Result<unknown, unknown>, never, never>
     >(Stream.empty);
 
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The recorder retains each ref's arguments without interpreting or narrowing their values.
     const record = (method: Call["method"], ref: CoreRef.Any, args: unknown) =>
       Ref.update(recordedCalls, (calls) => [
         ...calls,
@@ -79,14 +84,17 @@ export const layer = Layer.effectContext(
 
     const invoke = Effect.fn("TestClient.invoke")(function* <
       Ref_ extends CoreRef.Any,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The shared test transport records arguments from different refs without claiming a common decoded shape.
     >(method: "query" | "mutation" | "action", ref: Ref_, args: unknown) {
       yield* record(method, ref, args);
       const effect = yield* Ref.get(nextResult);
       const result = yield* effect;
+
       const encodedReturns = yield* Result.match(result, {
         onFailure: (rejection) => failRejection(ref, rejection),
         onSuccess: Effect.succeed,
       });
+
       return yield* CoreRef.decodeReturns(ref, encodedReturns);
     });
 
@@ -155,6 +163,7 @@ export const layer = Layer.effectContext(
     };
 
     const client = yield* Client.make(webSocketClient);
+
     const service: Service = {
       ...client,
       calls: Effect.fn("TestClient.calls")(function* () {

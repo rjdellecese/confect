@@ -4,6 +4,7 @@ import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
@@ -72,15 +73,19 @@ export const packProblems = (
   files: ReadonlyArray<string>,
 ): ReadonlyArray<typeof PackProblem.Type> => {
   const problems: Array<typeof PackProblem.Type> = [];
+
   if (!files.some((path) => path.startsWith("dist/")))
     problems.push({
       path: "dist/",
       reason: "no build output packed—did this run before `pnpm build`?",
     });
+
   for (const path of files) {
     const denial = DENIED.find(([pattern]) => pattern.test(path));
+
     if (denial) problems.push({ path, reason: denial[1] });
   }
+
   return problems;
 };
 
@@ -89,9 +94,12 @@ export const publishedPackages = Effect.fn("PackContents.publishedPackages")(
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const directories: Array<string> = [];
+
     for (const name of yield* fs.readDirectory(packagesDirectory)) {
       const directory = path.join(packagesDirectory, name);
+
       if ((yield* fs.stat(directory)).type !== "Directory") continue;
+
       const manifest = yield* fs
         .readFileString(path.join(directory, "package.json"))
         .pipe(
@@ -104,9 +112,11 @@ export const publishedPackages = Effect.fn("PackContents.publishedPackages")(
           ),
           Effect.option,
         );
-      if (manifest._tag === "Some" && manifest.value.private !== true)
+
+      if (Option.isSome(manifest) && manifest.value.private !== true)
         directories.push(directory);
     }
+
     return directories;
   },
 );
@@ -124,6 +134,7 @@ export const decodePackedFiles = Effect.fn("PackContents.decodePackedFiles")(
     )(stdout).pipe(
       Effect.mapError((cause) => new InvalidPackOutput({ directory, cause })),
     );
+
     return output[0].files.map((file) => file.path);
   },
 );
@@ -132,12 +143,14 @@ export const packedFiles = Effect.fn("PackContents.packedFiles")(function* (
   directory: string,
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+
   const handle = yield* spawner.spawn(
     ChildProcess.make("npm", ["pack", "--dry-run", "--json"], {
       cwd: directory,
       stdin: "ignore",
     }),
   );
+
   const result = yield* Effect.all(
     {
       exitCode: handle.exitCode,
@@ -146,12 +159,14 @@ export const packedFiles = Effect.fn("PackContents.packedFiles")(function* (
     },
     { concurrency: "unbounded" },
   );
+
   if (result.exitCode !== 0)
     return yield* new NpmPackError({
       directory,
       exitCode: result.exitCode,
       stderr: result.stderr,
     });
+
   return yield* decodePackedFiles(directory, result.stdout);
 }, Effect.scoped);
 
@@ -161,15 +176,18 @@ export const checkPackContents = Effect.fn("PackContents.check")(function* (
   const failures: Array<
     (typeof InvalidPackContents.prototype.packages)[number]
   > = [];
+
   for (const directory of yield* publishedPackages(packagesDirectory)) {
     const files = yield* packedFiles(directory);
     const problems = packProblems(files);
+
     if (problems.length === 0) {
       yield* Console.log(`ok  ${directory} (${files.length} files)`);
     } else {
       failures.push({ directory, problems });
     }
   }
+
   if (failures.length > 0)
     return yield* new InvalidPackContents({ packages: failures });
 });

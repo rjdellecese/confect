@@ -16,12 +16,7 @@ const fnSpec = <const Name extends string>(name: Name) =>
 
 const databaseSchema = DatabaseSchema.make({});
 
-// The handler type FunctionImpl.make infers for a strongly-typed DatabaseSchema
-// is more specific than the empty `DatabaseSchema.make({})` used here can
-// satisfy; the runtime behavior being tested is independent of the handler
-// shape, so we cast the placeholder to `never` (a subtype of every expected
-// handler type) to keep the test focused on registration.
-const handler = (() => Effect.succeed(null)) as never;
+const handler = () => Effect.succeed(null);
 
 /**
  * Build a layer against a fresh, isolated `Registry` (mirroring how
@@ -36,6 +31,7 @@ const collectRegistry = Effect.fnUntraced(function* <RIn>(
     Effect.scoped,
     Effect.provideService(Registry.Registry, ref),
   );
+
   return yield* Ref.get(ref);
 });
 
@@ -58,8 +54,8 @@ describe("FunctionImpl.make", () => {
         // No project-wide dot-path nesting: functions live at the top level
         // of their group's isolated registry, keyed by their own name.
         expect(Object.keys(registry).sort()).toEqual(["insert", "list"]);
-        expect((registry as Record<string, unknown>).insert).toBeDefined();
-        expect((registry as Record<string, unknown>).list).toBeDefined();
+        expect(registry.insert).toBeDefined();
+        expect(registry.list).toBeDefined();
       }),
   );
 
@@ -75,6 +71,7 @@ describe("FunctionImpl.make", () => {
         const parentRegistry = yield* collectRegistry(
           FunctionImpl.make(databaseSchema, parent, "parentFn", handler),
         );
+
         const childRegistry = yield* collectRegistry(
           FunctionImpl.make(databaseSchema, child, "childFn", handler),
         );
@@ -106,9 +103,11 @@ describe("GroupImpl.finalize", () => {
 
         const registeredFunctionNames = yield* Effect.gen(function* () {
           const ref = yield* Ref.make<RegistryItems.RegistryItems>({});
+
           const context = yield* Layer.build(groupLayer).pipe(
             Effect.provideService(Registry.Registry, ref),
           );
+
           return Context.get(
             context,
             GroupImpl.GroupImpl({ finalizationStatus: "Finalized" }),

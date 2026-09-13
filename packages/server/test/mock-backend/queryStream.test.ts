@@ -9,7 +9,8 @@ import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import * as Array from "effect/Array";
 import * as Context from "effect/Context";
-import { getDocumentSize, type Value } from "convex/values";
+import * as Data from "effect/Data";
+import { getDocumentSize } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
@@ -20,8 +21,11 @@ import type * as Types from "effect/Types";
 import {
   DatabaseReader,
   DatabaseWriter,
+  MutationCtx,
 } from "./fixtures/confect/_generated/services";
 import * as TestConfect from "./TestConfect";
+
+const Segment = Data.taggedEnum<QueryStreamKeyLayout.Segment>();
 
 const collectTexts = <E, R>(
   stream: Stream.Stream<{ text: string }, E, R>,
@@ -59,11 +63,13 @@ const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
       Effect.flatMap((result) => {
         const collected =
           result.page.length === 0 ? pages : [...pages, result.page];
+
         return result.isDone
           ? Effect.succeed(collected)
           : go(result.continueCursor, collected);
       }),
     );
+
   return go(null, []);
 };
 
@@ -89,11 +95,13 @@ describe("QueryStream", () => {
           const ascending = yield* collectTexts(
             reader.table("notes").stream("by_text"),
           );
+
           expect(ascending).toEqual(["apple", "banana", "cherry"]);
 
           const descending = yield* collectTexts(
             reader.table("notes").stream("by_text", "desc"),
           );
+
           expect(descending).toEqual(["cherry", "banana", "apple"]);
         }),
       );
@@ -170,6 +178,7 @@ describe("QueryStream", () => {
           const fromB = yield* collectTexts(
             reader.table("notes").stream("by_text", (q) => q.gte("text", "b")),
           );
+
           expect(fromB).toEqual(["banana", "cherry"]);
 
           const bOnly = yield* collectTexts(
@@ -177,6 +186,7 @@ describe("QueryStream", () => {
               .table("notes")
               .stream("by_text", (q) => q.gte("text", "b").lt("text", "c")),
           );
+
           expect(bOnly).toEqual(["banana"]);
 
           const exactly = yield* collectTexts(
@@ -184,6 +194,7 @@ describe("QueryStream", () => {
               .table("notes")
               .stream("by_text", (q) => q.eq("text", "apple")),
           );
+
           expect(exactly).toEqual(["apple"]);
         }),
       );
@@ -200,8 +211,10 @@ describe("QueryStream", () => {
 
           const reader = yield* DatabaseReader;
           const notes = reader.table("notes").stream("by_text");
+
           type Note =
             typeof notes extends Stream.Stream<infer A, any, any> ? A : never;
+
           const nothing = QueryStream.empty<Note>()(
             Result.getOrThrowWith(
               QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
@@ -212,10 +225,12 @@ describe("QueryStream", () => {
           expect(
             yield* collectTexts(QueryStream.merge([nothing, notes])),
           ).toEqual(["a", "b"]);
+
           const page = yield* QueryStream.paginate(nothing, {
             numItems: 5,
             cursor: null,
           });
+
           expect(page.page).toEqual([]);
           assertEquals(page.isDone, true);
 
@@ -234,6 +249,7 @@ describe("QueryStream", () => {
                   ),
                 ),
             });
+
           expect(yield* collectTexts(only([]))).toEqual([]);
           expect(yield* collectTexts(only(["b", "a"]))).toEqual(["a", "b"]);
         }),
@@ -255,6 +271,7 @@ describe("QueryStream", () => {
             QueryStreamOrderDirection.QueryStreamOrderDirection,
             QueryStreamOrderDirection.QueryStreamOrderDirection,
           ] = ["asc", "desc"];
+
           expect(() =>
             QueryStream.merge([
               reader.table("notes").stream("by_text", directions[0]),
@@ -296,18 +313,22 @@ describe("QueryStream", () => {
             streamFor("a", "asc"),
             streamFor("b", "asc"),
           ]);
+
           const tags = yield* Stream.runCollect(merged).pipe(
             Effect.map((docs) => docs.map((doc) => doc.tag)),
           );
+
           expect(tags).toEqual(["1", "2", "3", "4"]);
 
           const mergedDesc = QueryStream.merge([
             streamFor("a", "desc"),
             streamFor("b", "desc"),
           ]);
+
           const tagsDesc = yield* Stream.runCollect(mergedDesc).pipe(
             Effect.map((docs) => docs.map((doc) => doc.tag)),
           );
+
           expect(tagsDesc).toEqual(["4", "3", "2", "1"]);
         }),
       );
@@ -334,6 +355,7 @@ describe("QueryStream", () => {
                 ),
               ),
           );
+
           expect(filtered).toEqual(["apple", "cherry"]);
         }),
       );
@@ -379,6 +401,7 @@ describe("QueryStream", () => {
             numItems: 2,
             cursor: null,
           });
+
           expect(tagsOf(page1.page)).toEqual(["1", "2"]);
           assertEquals(page1.isDone, false);
 
@@ -388,6 +411,7 @@ describe("QueryStream", () => {
             numItems: 2,
             cursor: page1.continueCursor,
           });
+
           expect(tagsOf(page2.page)).toEqual(["4", "5"]);
           assertEquals(page2.isDone, false);
 
@@ -395,6 +419,7 @@ describe("QueryStream", () => {
             numItems: 2,
             cursor: page2.continueCursor,
           });
+
           expect(tagsOf(page3.page)).toEqual(["6"]);
           assertEquals(page3.isDone, true);
           assertEquals(page3.continueCursor, QueryStreamCursor.END_CURSOR);
@@ -418,6 +443,7 @@ describe("QueryStream", () => {
             numItems: 2,
             cursor: null,
           });
+
           expect(page1.page.map((doc) => doc.text)).toEqual(["a", "b"]);
 
           // Re-request the same page pinned to its end cursor: `numItems`
@@ -428,6 +454,7 @@ describe("QueryStream", () => {
             cursor: null,
             endCursor: page1.continueCursor,
           });
+
           expect(pinned.page.map((doc) => doc.text)).toEqual(["a", "b"]);
           assertEquals(pinned.isDone, false);
           assertEquals(pinned.continueCursor, page1.continueCursor);
@@ -474,10 +501,12 @@ describe("QueryStream", () => {
             yield* insertNotes(["a", "b"]);
             const reader = yield* DatabaseReader;
             const source = reader.table("notes").stream("by_text");
+
             const first = yield* QueryStream.paginate(source, {
               cursor: null,
               numItems: 1,
             });
+
             const result = yield* QueryStream.paginate(source, {
               cursor: null,
               endCursor: ` \n${first.continueCursor}\n `,
@@ -508,17 +537,26 @@ describe("QueryStream", () => {
 
           const reader = yield* DatabaseReader;
           const notes = reader.table("notes").stream("by_text");
+
           const initials = (page: ReadonlyArray<{ text: string }>) =>
             page.map((note) => note.text[0]);
-          const [first] = yield* Stream.runCollect(notes);
-          const maximumBytesRead =
-            2.5 * getDocumentSize(first as unknown as Record<string, Value>);
+
+          const ctx = yield* MutationCtx;
+
+          const first = yield* Effect.promise(() =>
+            ctx.db.query("notes").withIndex("by_text").first(),
+          );
+
+          assert(first !== null);
+
+          const maximumBytesRead = 2.5 * getDocumentSize(first);
 
           const page = yield* QueryStream.paginate(notes, {
             numItems: 10,
             cursor: null,
             maximumBytesRead,
           });
+
           expect(initials(page.page)).toEqual(["a", "b", "c"]);
           expect(page.pageStatus).toEqual("SplitRequired");
           assertEquals(page.isDone, false);
@@ -529,6 +567,7 @@ describe("QueryStream", () => {
             cursor: page.continueCursor,
             maximumBytesRead,
           });
+
           expect(initials(rest.page)).toEqual(["d", "e"]);
           assertEquals(rest.isDone, true);
 
@@ -537,6 +576,7 @@ describe("QueryStream", () => {
             numItems: 10,
             cursor: null,
           });
+
           expect(whole.page).toHaveLength(5);
 
           // The budget reaches the leaves through combinators: a merge of
@@ -546,6 +586,7 @@ describe("QueryStream", () => {
             reader.table("notes").stream("by_text", (q) => q.lt("text", "c")),
             reader.table("notes").stream("by_text", (q) => q.gte("text", "c")),
           ]);
+
           const budgeted = (
             cursor: string | null,
             pages: ReadonlyArray<ReadonlyArray<string>>,
@@ -567,6 +608,7 @@ describe("QueryStream", () => {
                     ]),
               ),
             );
+
           const pages = yield* budgeted(null, []);
           expect(pages.length).toBeGreaterThan(1);
           expect(pages.flat()).toEqual(["a", "b", "c", "d", "e"]);
@@ -584,6 +626,7 @@ describe("QueryStream", () => {
           yield* insertNotes(["a", "b", "c", "b"]);
 
           const reader = yield* DatabaseReader;
+
           const leaf = reader
             .table("notes")
             .stream("by_text", (q) => q.eq("text", "b"));
@@ -592,6 +635,7 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
+
           const afterKey = (yield* Schema.decodeEffect(QueryStreamCursor.Json)(
             page1.continueCursor,
           )).orderKey;
@@ -628,6 +672,7 @@ describe("QueryStream", () => {
           yield* insertNotes(["a", "b", "c", "d"]);
 
           const reader = yield* DatabaseReader;
+
           const derived = reader
             .table("notes")
             .stream("by_text")
@@ -640,6 +685,7 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
+
           const afterKey = (yield* Schema.decodeEffect(QueryStreamCursor.Json)(
             page1.continueCursor,
           )).orderKey;
@@ -648,6 +694,7 @@ describe("QueryStream", () => {
           // still reach the leaf rather than falling back to in-memory
           // key filtering.
           expect(derived.narrowWith).toBeDefined();
+
           const narrowed = QueryStream.narrow(derived, {
             start: { orderKey: afterKey, inclusive: false },
           });
@@ -676,6 +723,7 @@ describe("QueryStream", () => {
               yield* insertNotes(["a", "b", "b", "c", "d", "d", "e"]);
               const reader = yield* DatabaseReader;
               const leaf = reader.table("notes").stream("by_text", order);
+
               const elements = yield* Stream.runCollect(leaf.annotated).pipe(
                 Effect.provideServiceEffect(
                   QueryStreamReadBudget.QueryStreamReadBudget,
@@ -685,28 +733,36 @@ describe("QueryStream", () => {
                   }),
                 ),
               );
+
               const texts = yield* collectTexts(leaf);
+
               const start = {
                 orderKey: Array.getUnsafe(elements, 1).orderKey,
                 inclusive: startInclusive,
               };
+
               const end = {
                 orderKey: Array.getUnsafe(elements, 5).orderKey,
                 inclusive: endInclusive,
               };
+
               const bounds = { start, end };
+
               const prefixBounds = {
                 start: { ...start, orderKey: [Array.getUnsafe(texts, 1)] },
                 end: { ...end, orderKey: [Array.getUnsafe(texts, 5)] },
               };
+
               const expected = texts.slice(
                 startInclusive ? 1 : 2,
                 endInclusive ? 6 : 5,
               );
+
               const expectedPrefixes = texts.slice(
                 startInclusive ? 1 : 3,
                 endInclusive ? 6 : 4,
               );
+
               const narrowed = QueryStream.narrow(leaf, bounds);
               expect(narrowed.reflection?.bounds).toEqual({
                 lower: order === "asc" ? start : end,
@@ -719,6 +775,7 @@ describe("QueryStream", () => {
                 typeof order,
                 Stream.Error<typeof leaf>
               >(leaf.order, leaf.keyLayout, leaf.annotated);
+
               const composed = QueryStream.merge([
                 reader
                   .table("notes")
@@ -732,6 +789,7 @@ describe("QueryStream", () => {
                 ),
                 QueryStream.map((note) => ({ ...note })),
               );
+
               for (const stream of [leaf, fallback, composed]) {
                 expect(
                   yield* collectTexts(stream.pipe(QueryStream.narrow(bounds))),
@@ -802,24 +860,29 @@ describe("QueryStream", () => {
               const reader = yield* DatabaseReader;
               const leaf = reader.table("notes").stream("by_text", order);
               const texts = yield* collectTexts(leaf);
+
               const start = {
                 orderKey: [Array.getUnsafe(texts, 1)],
                 inclusive: true,
               };
+
               const end = {
                 orderKey: [Array.getUnsafe(texts, 3)],
                 inclusive: false,
               };
+
               expect(
                 yield* collectTexts(QueryStream.narrow(leaf, { start })),
               ).toEqual(texts.slice(1));
               expect(
                 yield* collectTexts(QueryStream.narrow(leaf, { end })),
               ).toEqual(texts.slice(0, 3));
+
               const bounded = leaf.pipe(
                 QueryStream.narrow({ start }),
                 QueryStream.narrow({ end }),
               );
+
               expect(yield* collectTexts(bounded)).toEqual(texts.slice(1, 3));
               expect(
                 yield* collectTexts(
@@ -864,6 +927,7 @@ describe("QueryStream", () => {
             Effect.gen(function* () {
               const writer = yield* DatabaseWriter;
               const reader = yield* DatabaseReader;
+
               for (const [text, tag] of [
                 ["b", "b1"],
                 ["b", "b2"],
@@ -874,6 +938,7 @@ describe("QueryStream", () => {
               ] as const) {
                 yield* writer.table("notes").insert({ text, tag });
               }
+
               const joined = reader
                 .table("notes")
                 .stream("by_text", (q) => q.gte("text", "x"), order)
@@ -895,6 +960,7 @@ describe("QueryStream", () => {
                     },
                   ),
                 );
+
               const elements = yield* Stream.runCollect(joined.annotated).pipe(
                 Effect.provideServiceEffect(
                   QueryStreamReadBudget.QueryStreamReadBudget,
@@ -904,6 +970,7 @@ describe("QueryStream", () => {
                   }),
                 ),
               );
+
               // Exercise endpoints within one outer row and across two rows.
               for (const endIndex of [1, 3]) {
                 const result = yield* Stream.runCollect(
@@ -926,6 +993,7 @@ describe("QueryStream", () => {
                     }),
                   ),
                 );
+
                 expect(result).toEqual(
                   elements.slice(
                     startInclusive ? 0 : 1,
@@ -996,6 +1064,7 @@ describe("QueryStream", () => {
           yield* insertNotes(["banana", "apple", "cherry"]);
 
           const reader = yield* DatabaseReader;
+
           const stream = reader
             .table("notes")
             .stream("by_text", (q) => q.gte("text", "b"));
@@ -1034,6 +1103,7 @@ describe("QueryStream", () => {
           const outer = reader
             .table("notes")
             .stream("by_text", (q) => q.gte("text", "x"));
+
           const joined = outer.pipe(
             QueryStream.flatMap(
               (note) =>
@@ -1052,6 +1122,7 @@ describe("QueryStream", () => {
           const tags = yield* Stream.runCollect(joined).pipe(
             Effect.map((docs) => docs.map((doc) => doc.tag)),
           );
+
           // x1 → the "a" rows in creation order, x2 → the "b" row, and
           // x3's empty inner stream contributes nothing visible.
           expect(tags).toEqual(["a1", "a2", "b1"]);
@@ -1074,9 +1145,11 @@ describe("QueryStream", () => {
               },
             ),
           );
+
           const filteredTags = yield* Stream.runCollect(filteredJoin).pipe(
             Effect.map((docs) => docs.map((doc) => doc.tag)),
           );
+
           expect(filteredTags).toEqual(["a1", "a2"]);
         }),
       );
@@ -1161,8 +1234,10 @@ describe("QueryStream", () => {
             const outer = reader
               .table("notes")
               .stream("by_text", (q) => q.gte("text", "x"));
+
             type Note =
               typeof outer extends Stream.Stream<infer A, any, any> ? A : never;
+
             const inner = (note: Note) =>
               reader
                 .table("notes")
@@ -1180,6 +1255,7 @@ describe("QueryStream", () => {
                 onEmpty: (note) => ({ tag: `none for ${note.text}` }),
               }),
             );
+
             const pages = yield* paginateAll(joined, 1);
             expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
               ["none for x0"],
@@ -1200,6 +1276,7 @@ describe("QueryStream", () => {
                 onEmpty: (note) => ({ tag: `none for ${note.text}` }),
               }),
             );
+
             expect(
               yield* Stream.runCollect(withoutX0).pipe(
                 Effect.map((docs) => docs.map((doc) => doc.tag)),
@@ -1220,6 +1297,7 @@ describe("QueryStream", () => {
 
           const reader = yield* DatabaseReader;
           const notes = reader.table("notes").stream("by_text");
+
           // The first element's effect finishes last.
           const slowForA = (text: string) =>
             Effect.succeed(text.toUpperCase()).pipe(
@@ -1231,6 +1309,7 @@ describe("QueryStream", () => {
               concurrency: "unbounded",
             }),
           );
+
           expect(yield* Stream.runCollect(shouted)).toEqual(["A", "B", "C"]);
 
           const withoutB = QueryStream.filterEffect(
@@ -1238,6 +1317,7 @@ describe("QueryStream", () => {
             (note) => Effect.map(slowForA(note.text), (text) => text !== "B"),
             { concurrency: 2 },
           );
+
           expect(yield* collectTexts(withoutB)).toEqual(["a", "c"]);
 
           // Still a query stream: it paginates.
@@ -1245,6 +1325,7 @@ describe("QueryStream", () => {
             numItems: 2,
             cursor: null,
           });
+
           expect(page.page).toEqual(["A", "B"]);
         }),
       );
@@ -1295,6 +1376,7 @@ describe("QueryStream", () => {
             QueryStream.filter((note) => note.text !== "x1"),
             QueryStream.map((note) => note.text),
           );
+
           expect(yield* Stream.runCollect(QueryStream.reverse(feed))).toEqual([
             "x2",
             "x0",
@@ -1322,6 +1404,7 @@ describe("QueryStream", () => {
                 },
               ),
             );
+
           const pages = yield* paginateAll(QueryStream.reverse(joined), 1);
           expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
             ["b1"],
@@ -1370,6 +1453,7 @@ describe("QueryStream", () => {
               .stream("by_text")
               .pipe(QueryStream.distinct(["text"])),
           );
+
           expect(firstPerText).toEqual(["a1", "b1", "c1"]);
 
           // In descending order, the first document of each group is the
@@ -1380,6 +1464,7 @@ describe("QueryStream", () => {
               .stream("by_text", "desc")
               .pipe(QueryStream.distinct(["text"])),
           );
+
           expect(firstPerTextDesc).toEqual(["c1", "b2", "a2"]);
         }),
       );
@@ -1423,6 +1508,7 @@ describe("QueryStream", () => {
               Effect.succeed(note.tag !== "b1"),
             ),
           );
+
           const filteredPages = yield* paginateAll(filtered, 1);
           expect(
             filteredPages.map((page) => page.map((doc) => doc.tag)),
@@ -1459,6 +1545,7 @@ describe("QueryStream", () => {
           const byText = reader
             .table("notes")
             .stream("by_text", (q) => q.lt("text", "x"));
+
           const byRole = reader
             .table("notes")
             .stream("by_role", (q) => q.gte("author.role", "admin"));
@@ -1474,6 +1561,7 @@ describe("QueryStream", () => {
           const tags = yield* Stream.runCollect(merged).pipe(
             Effect.map((docs) => docs.map((doc) => doc.tag)),
           );
+
           expect(tags).toEqual(["ta1", "tr1", "ta2", "tr2"]);
 
           // Pagination narrows through the relabeling into both leaves:
@@ -1537,15 +1625,14 @@ describe("QueryStream", () => {
                 },
               ),
             );
+
           expect(QueryStreamKeyLayout.segments(joined.keyLayout)).toEqual([
-            {
-              _tag: "WithImplicitId",
+            Segment.WithImplicitId({
               labels: QueryStreamKeyLabels.make(["text", "_creationTime"]),
-            },
-            {
-              _tag: "WithImplicitId",
+            }),
+            Segment.WithImplicitId({
               labels: QueryStreamKeyLabels.make(["_creationTime"]),
-            },
+            }),
           ]);
 
           // Relabeling names only the type-visible positions.
@@ -1556,15 +1643,14 @@ describe("QueryStream", () => {
               "innerCreated",
             ]),
           );
+
           expect(QueryStreamKeyLayout.segments(relabeled.keyLayout)).toEqual([
-            {
-              _tag: "WithImplicitId",
+            Segment.WithImplicitId({
               labels: QueryStreamKeyLabels.make(["outerText", "outerCreated"]),
-            },
-            {
-              _tag: "WithImplicitId",
+            }),
+            Segment.WithImplicitId({
               labels: QueryStreamKeyLabels.make(["innerCreated"]),
-            },
+            }),
           ]);
           const pages = yield* paginateAll(relabeled, 1);
           expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
@@ -1603,50 +1689,59 @@ describe("QueryStream", () => {
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
           const reader = yield* DatabaseReader;
+
           for (const text of ["outer", "outer", "middle", "middle"]) {
             yield* writer.table("notes").insert({ text });
           }
+
           for (const tag of ["l1", "l2"]) {
             yield* writer.table("notes").insert({ text: "leaf", tag });
           }
+
           const scan = (text: string) =>
             reader.table("notes").stream("by_text", (q) => q.eq("text", text));
+
           const leaf = scan("leaf");
+
           const inner = QueryStream.flatMap(scan("middle"), () => leaf, {
             innerLayout: leaf.keyLayout,
           });
+
           const joined = QueryStream.flatMap(scan("outer"), () => inner, {
             innerLayout: inner.keyLayout,
           });
+
           expect(QueryStreamKeyLayout.segments(joined.keyLayout)).toEqual([
-            {
-              _tag: "WithImplicitId",
+            Segment.WithImplicitId({
               labels: QueryStreamKeyLabels.make(["_creationTime"]),
-            },
-            {
-              _tag: "WithImplicitId",
+            }),
+            Segment.WithImplicitId({
               labels: QueryStreamKeyLabels.make(["_creationTime"]),
-            },
-            {
-              _tag: "WithImplicitId",
+            }),
+            Segment.WithImplicitId({
               labels: QueryStreamKeyLabels.make(["_creationTime"]),
-            },
+            }),
           ]);
+
           const renamed = QueryStream.renameKey(joined, [
             "outer",
             "middle",
             "leaf",
           ]);
+
           const merged = QueryStream.merge([
             renamed,
             QueryStream.empty<Stream.Success<typeof renamed>>()(
               renamed.keyLayout,
             ),
           ]);
+
           const expected = ["l1", "l2", "l1", "l2", "l1", "l2", "l1", "l2"];
+
           const tags = (
             pages: ReadonlyArray<ReadonlyArray<{ tag?: string }>>,
           ) => pages.flatMap((page) => page.map((doc) => doc.tag));
+
           expect(tags(yield* paginateAll(merged, 1))).toEqual(expected);
           expect(
             tags(yield* paginateAll(QueryStream.reverse(merged), 2)),
@@ -1666,38 +1761,48 @@ describe("QueryStream", () => {
             const writer = yield* DatabaseWriter;
             const reader = yield* DatabaseReader;
             const id = yield* writer.table("notes").insert({ text: "only" });
+
             const pinned = reader
               .table("notes")
               .stream("by_id", (q) => q.eq("_id", id));
+
             const outer = reader.table("notes").stream("by_creation_time");
+
             const joined = QueryStream.flatMap(outer, () => pinned, {
               innerLayout: pinned.keyLayout,
             });
+
             expect(QueryStreamKeyLayout.segments(joined.keyLayout)).toEqual(
               QueryStreamKeyLayout.segments(outer.keyLayout),
             );
             expect(
               (yield* paginateAll(joined, 1)).flat().map((doc) => doc.text),
             ).toEqual(["only"]);
+
             const zeroEmpty = QueryStream.empty<
               Stream.Success<typeof pinned>
             >()(pinned.keyLayout);
+
             expect(
               QueryStreamKeyLayout.segments(
                 QueryStream.merge([pinned, zeroEmpty]).keyLayout,
               ),
             ).toEqual([]);
+
             const innerLayout = QueryStreamKeyLayout.concat(
               outer.keyLayout,
               outer.keyLayout,
             );
+
             const compositeEmpty =
               QueryStream.empty<Stream.Success<typeof outer>>()(innerLayout);
+
             const placeholders = QueryStream.flatMap(
               outer,
               () => compositeEmpty,
               { innerLayout, onEmpty: (doc) => doc },
             );
+
             const annotated = yield* Stream.runCollect(
               placeholders.annotated,
             ).pipe(
@@ -1709,6 +1814,7 @@ describe("QueryStream", () => {
                 }),
               ),
             );
+
             expect(annotated[0].orderKey.slice(-4)).toEqual([
               null,
               null,
@@ -1736,6 +1842,7 @@ describe("QueryStream", () => {
           yield* writer.table("notes").insert({ text: "other" });
 
           const reader = yield* DatabaseReader;
+
           // Pinning the whole `by_id` key leaves an *empty* order key; the
           // cursor round-trip must not rebuild ranges past the index's
           // fields.
@@ -1747,12 +1854,14 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
+
           expect(page1.page.map((doc) => doc.text)).toEqual(["only"]);
 
           const page2 = yield* QueryStream.paginate(pinned, {
             numItems: 1,
             cursor: page1.continueCursor,
           });
+
           expect(page2.page).toEqual([]);
           assertEquals(page2.isDone, true);
         }),
@@ -1777,6 +1886,7 @@ describe("QueryStream", () => {
               numItems: 2,
               cursor: null,
             });
+
             // A page pinned as (cursor, cursor] is the empty range—the
             // boundary row must not be re-emitted by the pushed-down ranges.
             const emptyPinned = yield* QueryStream.paginate(stream, {
@@ -1784,6 +1894,7 @@ describe("QueryStream", () => {
               cursor: page1.continueCursor,
               endCursor: page1.continueCursor,
             });
+
             expect(emptyPinned.page).toEqual([]);
           }),
         );
@@ -1812,9 +1923,8 @@ describe("QueryStream", () => {
           for (const cursor of ["_notjson", "[1, 2]"]) {
             const defect = yield* fromCursor(cursor);
             assert(Predicate.hasProperty(defect, "data"));
-            expect(
-              (defect.data as { paginationError?: string }).paginationError,
-            ).toBe("InvalidCursor");
+            assert(Predicate.hasProperty(defect.data, "paginationError"));
+            expect(defect.data.paginationError).toBe("InvalidCursor");
           }
         }),
       );
@@ -1832,12 +1942,15 @@ describe("QueryStream", () => {
             yield* insertNotes(["a", "b", "c"]);
             const reader = yield* DatabaseReader;
             const source = reader.table("notes").stream("by_text");
+
             const page = yield* QueryStream.paginate(source, {
               cursor: null,
               numItems: 10,
               maximumRowsRead: 2,
             });
+
             assert(Predicate.isString(page.splitCursor));
+
             const relabeled = source.pipe(
               QueryStream.renameKey(["body", "_creationTime"]),
             );
@@ -1846,6 +1959,7 @@ describe("QueryStream", () => {
               const orderKey = yield* Schema.decodeEffect(
                 QueryStreamCursor.codecForLayout(source.keyLayout),
               )(cursor);
+
               expect(orderKey).toHaveLength(3);
 
               for (const bound of ["cursor", "endCursor"] as const) {
@@ -1854,6 +1968,7 @@ describe("QueryStream", () => {
                   numItems: 10,
                   [bound]: cursor,
                 }).pipe(Effect.catchDefect(Effect.succeed));
+
                 expect(result).toMatchObject({
                   data: { paginationError: "InvalidCursor" },
                 });
@@ -1867,7 +1982,9 @@ describe("QueryStream", () => {
                 numItems: 10,
               },
             );
+
             expect(rest.page).toEqual(["c"]);
+
             const previous = yield* QueryStream.paginate(
               QueryStream.reverse(source),
               {
@@ -1875,6 +1992,7 @@ describe("QueryStream", () => {
                 numItems: 10,
               },
             );
+
             expect(previous.page.map((note) => note.text)).toEqual(["a"]);
           }),
         );
@@ -1903,6 +2021,7 @@ describe("QueryStream", () => {
             numItems: 2,
             cursor: null,
           });
+
           expect(page1.page).toEqual(["A", "C"]);
 
           // The filtered-out "b" still advanced the cursor.
@@ -1910,6 +2029,7 @@ describe("QueryStream", () => {
             numItems: 2,
             cursor: page1.continueCursor,
           });
+
           expect(page2.page).toEqual(["D"]);
           assertEquals(page2.isDone, true);
         }),
@@ -1926,6 +2046,7 @@ describe("QueryStream", () => {
           yield* insertNotes(["apple", "banana", "banana"]);
 
           const reader = yield* DatabaseReader;
+
           const byText = (text: string) =>
             reader.table("notes").stream("by_text", (q) => q.eq("text", text));
 
@@ -1941,6 +2062,7 @@ describe("QueryStream", () => {
           const two = yield* Effect.result(
             QueryStream.unique(byText("banana")),
           );
+
           assertEquals(
             Result.match(two, {
               onFailure: (error) => error._tag,
@@ -1958,6 +2080,7 @@ describe("QueryStream types", () => {
   // Read off the stream's phantom markers, so these need no updating when
   // the class gains a parameter.
   type LabelsOf<S extends QueryStream.Any> = Types.Invariant.Type<S["~labels"]>;
+
   type DirectionOf<S extends QueryStream.Any> = Types.Covariant.Type<
     S["~direction"]
   >;
@@ -1979,6 +2102,7 @@ describe("QueryStream types", () => {
       const pinned = reader
         .table("notes")
         .stream("by_text", (q) => q.eq("text", "x"));
+
       expectTypeOf<LabelsOf<typeof pinned>>().toEqualTypeOf<
         ["_creationTime"]
       >();
@@ -1987,6 +2111,7 @@ describe("QueryStream types", () => {
       const bounded = reader
         .table("notes")
         .stream("by_text", (q) => q.gte("text", "a"));
+
       expectTypeOf<LabelsOf<typeof bounded>>().toEqualTypeOf<
         ["text", "_creationTime"]
       >();
@@ -2001,6 +2126,7 @@ describe("QueryStream types", () => {
         { text: string },
         Document.DocumentDecodeError
       > = pinned;
+
       void asStream;
 
       // …and generic Stream combinators degrade it to a plain Stream.
@@ -2024,11 +2150,13 @@ describe("QueryStream types", () => {
       void emptyBounds;
       // @ts-expect-error—the data-last form also requires an endpoint.
       QueryStream.narrow({});
+
       // @ts-expect-error—explicitly undefined endpoints are still absent.
       const absentBounds = QueryStream.narrow(full, {
         start: undefined,
         end: undefined,
       });
+
       void absentBounds;
       // @ts-expect-error—an undefined start alone is not a bound.
       QueryStream.narrow({ start: undefined });
@@ -2052,20 +2180,24 @@ describe("QueryStream types", () => {
         .table("notes")
         // @ts-expect-error—`eq` must target the next index field.
         .stream("by_text", (q) => q.eq("tag", "x"));
+
       void wrongField;
 
       const wrongValue = reader
         .table("notes")
         // @ts-expect-error—the value must match the field's type.
         .stream("by_text", (q) => q.eq("text", 42));
+
       void wrongValue;
 
       const afterBound = reader.table("notes").stream("by_text", (q) => {
         const lowerBounded = q.gte("text", "a");
         // @ts-expect-error—after a lower bound, `eq` is gone.
         void lowerBounded.eq;
+
         return lowerBounded;
       });
+
       void afterBound;
 
       // Pure `filter`/`map` keep the order key and leave E/R untouched.
@@ -2073,6 +2205,7 @@ describe("QueryStream types", () => {
         pinned,
         (note) => note.text !== "",
       );
+
       expectTypeOf<LabelsOf<typeof pureFiltered>>().toEqualTypeOf<
         ["_creationTime"]
       >();
@@ -2092,6 +2225,7 @@ describe("QueryStream types", () => {
       const filtered = QueryStream.filterEffect(pinned, (note) =>
         Effect.flatMap(SomeService, (service) => service.check(note.text)),
       );
+
       expectTypeOf<
         typeof filtered extends Stream.Stream<any, any, infer R> ? R : never
       >().toEqualTypeOf<SomeService>();
@@ -2103,6 +2237,7 @@ describe("QueryStream types", () => {
           identity,
         ),
       });
+
       expectTypeOf<LabelsOf<typeof joined>>().toEqualTypeOf<
         readonly ["text", "_creationTime", "_creationTime"]
       >();
@@ -2120,6 +2255,7 @@ describe("QueryStream types", () => {
           identity,
         ),
       });
+
       void joinedMismatched;
 
       // distinct preserves the order key and requires a prefix of it.
@@ -2141,6 +2277,7 @@ describe("QueryStream types", () => {
         "renamed",
         "_creationTime",
       ]);
+
       expectTypeOf<LabelsOf<typeof relabeled>>().toEqualTypeOf<
         ["renamed", "_creationTime"]
       >();
@@ -2156,10 +2293,12 @@ describe("QueryStream types", () => {
           identity,
         ),
       );
+
       expectTypeOf<LabelsOf<typeof nothing>>().toEqualTypeOf<
         ["text", "_creationTime"]
       >();
       expectTypeOf<DirectionOf<typeof nothing>>().toEqualTypeOf<"asc">();
+
       const nothingDescending = QueryStream.empty<{ readonly text: string }>()(
         Result.getOrThrowWith(
           QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
@@ -2167,6 +2306,7 @@ describe("QueryStream types", () => {
         ),
         "desc",
       );
+
       expectTypeOf<
         DirectionOf<typeof nothingDescending>
       >().toEqualTypeOf<"desc">();
@@ -2179,6 +2319,7 @@ describe("QueryStream types", () => {
         ),
         onEmpty: (note) => ({ missingFor: note.text }),
       });
+
       expectTypeOf<LabelsOf<typeof withPlaceholder>>().toEqualTypeOf<
         readonly ["text", "_creationTime", "_creationTime"]
       >();
@@ -2202,14 +2343,19 @@ describe("QueryStream types", () => {
       expectTypeOf<DirectionOf<typeof full>>().toEqualTypeOf<"asc">();
       const descending = reader.table("notes").stream("by_text", "desc");
       expectTypeOf<DirectionOf<typeof descending>>().toEqualTypeOf<"desc">();
+
       const descendingBounded = reader
         .table("notes")
         .stream("by_text", (q) => q.gte("text", "a"), "desc");
+
       expectTypeOf<
         DirectionOf<typeof descendingBounded>
       >().toEqualTypeOf<"desc">();
+
+      // SAFETY: This type-only test intentionally widens a valid direction to exercise the runtime-direction overload rather than literal inference.
       const runtimeOrder =
         "asc" as QueryStreamOrderDirection.QueryStreamOrderDirection;
+
       const dynamic = reader.table("notes").stream("by_text", runtimeOrder);
       expectTypeOf<
         DirectionOf<typeof dynamic>
@@ -2223,6 +2369,7 @@ describe("QueryStream types", () => {
         unknown,
         unknown
       > = full;
+
       void widened;
 
       // Combinators preserve it, and merging different directions is a
@@ -2245,6 +2392,7 @@ describe("QueryStream types", () => {
       expectTypeOf<
         DirectionOf<typeof dynamicLed>
       >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
+
       const mixedJoin = QueryStream.flatMap(
         bounded,
         // @ts-expect-error—inner streams must run in the outer direction.
@@ -2256,7 +2404,9 @@ describe("QueryStream types", () => {
           ),
         },
       );
+
       void mixedJoin;
+
       // In the data-last form the inner streams fix the direction, so a
       // runtime-chosen inner direction widens the join's.
       const dynamicInnerJoin = bounded.pipe(
@@ -2267,6 +2417,7 @@ describe("QueryStream types", () => {
           ),
         }),
       );
+
       expectTypeOf<
         DirectionOf<typeof dynamicInnerJoin>
       >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
@@ -2283,6 +2434,7 @@ describe("QueryStream types", () => {
         DirectionOf<typeof reversedDynamic>
       >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();
     });
+
     void _typeChecks;
   });
 });

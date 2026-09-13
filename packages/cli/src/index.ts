@@ -10,9 +10,11 @@ import { cliApp } from "./cliApp";
 const canReRaiseSignals = process.platform !== "win32";
 
 let interrupted = false;
+
 process.prependListener("SIGINT", () => {
   interrupted = true;
 });
+
 process.on("exit", () => {
   if (interrupted && canReRaiseSignals) {
     process.kill(process.pid, "SIGINT");

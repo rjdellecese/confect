@@ -110,15 +110,18 @@ describe("GroupPath.getGroupSpec", () => {
   test("returns correct group when multiple groups exist at the same level", () => {
     const notes = GroupSpec.makeAt("notes");
     const random = GroupSpec.makeAt("random");
+
     const notesAndRandom = GroupSpec.makeAt("notesAndRandom")
       .addGroup(notes)
       .addGroup(random);
+
     const spec = Spec.make().add(notesAndRandom);
 
     const notesResult = GroupPath.getGroupSpec(
       spec,
       makeGroupPathObj(["notesAndRandom", "notes"]),
     );
+
     const randomResult = GroupPath.getGroupSpec(
       spec,
       makeGroupPathObj(["notesAndRandom", "random"]),
@@ -139,6 +142,7 @@ describe("GroupPath.getGroupSpec", () => {
       spec,
       makeGroupPathObj(["users"]),
     );
+
     const postsResult = GroupPath.getGroupSpec(
       spec,
       makeGroupPathObj(["posts"]),
