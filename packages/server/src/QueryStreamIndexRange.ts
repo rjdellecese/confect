@@ -11,7 +11,7 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import type * as Types from "effect/Types";
-import * as QueryStreamKey from "./QueryStreamKey";
+import * as QueryStreamIndexPrefix from "./QueryStreamIndexPrefix";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
 import type { IndexBounds } from "./QueryStreamKeyBounds";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
@@ -289,7 +289,7 @@ export const apply = (
 type BoundTag = "gt" | "gte" | "lt" | "lte";
 
 class TaggedBound extends Data.Class<{
-  readonly indexEntries: QueryStreamKey.IndexEntries;
+  readonly indexEntries: QueryStreamIndexPrefix.IndexEntries;
   readonly tag: BoundTag;
 }> {}
 
@@ -307,7 +307,7 @@ const excludePrefix = (tag: BoundTag): BoundTag =>
  * Peel a bound down to the single entry that feeds the middle range.
  */
 const peelBound = (
-  indexEntries: QueryStreamKey.IndexEntries,
+  indexEntries: QueryStreamIndexPrefix.IndexEntries,
   tag: BoundTag,
 ): {
   readonly peeled: ReadonlyArray<TaggedBound>;
@@ -328,7 +328,7 @@ const peelBound = (
  */
 const rangeFor = (
   prefix: ReadonlyArray<Equality>,
-  indexEntries: QueryStreamKey.IndexEntries,
+  indexEntries: QueryStreamIndexPrefix.IndexEntries,
   tag: BoundTag,
 ): QueryStreamIndexRange =>
   Option.match(Array.last(indexEntries), {
@@ -365,14 +365,14 @@ export const fromBounds = (
   bounds: IndexBounds,
 ): Result.Result<
   ReadonlyArray<QueryStreamIndexRange>,
-  QueryStreamKey.KeyWidthMismatchError
+  QueryStreamIndexPrefix.IndexPrefixWidthMismatchError
 > =>
   Result.gen(function* () {
-    const lowerIndexEntries = QueryStreamKey.indexEntries(
-      yield* QueryStreamKey.indexPrefix(fieldPaths, bounds.lower.orderKey),
+    const lowerIndexEntries = QueryStreamIndexPrefix.entries(
+      yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.lower.orderKey),
     );
-    const upperIndexEntries = QueryStreamKey.indexEntries(
-      yield* QueryStreamKey.indexPrefix(fieldPaths, bounds.upper.orderKey),
+    const upperIndexEntries = QueryStreamIndexPrefix.entries(
+      yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.upper.orderKey),
     );
     // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
     // upper inclusive at `k`—the half-open (k, k]—both cut at

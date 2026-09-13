@@ -63,6 +63,7 @@ import type {
   Flip,
 } from "./QueryStreamOrderDirection";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import * as QueryStreamIndexPrefix from "./QueryStreamIndexPrefix";
 import * as QueryStreamKey from "./QueryStreamKey";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
 import type {
@@ -552,18 +553,19 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   );
 
   const toFullKeySpace = (bound: KeyBound): KeyBound => ({
-    orderKey: Array.map(
-      QueryStreamKey.indexEntries(
-        Result.getOrThrowWith(
-          Result.flatMap(
-            QueryStreamKey.prefix(keyLayout, bound.orderKey),
-            (prefix) =>
-              QueryStreamKey.toIndexPrefix(fullFieldPaths, eqValues, prefix),
-          ),
-          identity,
+    orderKey: QueryStreamIndexPrefix.values(
+      Result.getOrThrowWith(
+        Result.flatMap(
+          QueryStreamKey.prefix(keyLayout, bound.orderKey),
+          (prefix) =>
+            QueryStreamIndexPrefix.fromStreamKey(
+              fullFieldPaths,
+              eqValues,
+              prefix,
+            ),
         ),
+        identity,
       ),
-      ([, value]) => value,
     ),
     inclusive: bound.inclusive,
   });

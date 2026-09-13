@@ -1,3 +1,4 @@
+import * as QueryStreamIndexPrefix from "@confect/server/QueryStreamIndexPrefix";
 import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
 import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -270,6 +271,26 @@ describe("QueryStreamIndexRange.toBounds", () => {
 });
 
 describe("QueryStreamIndexRange.fromBounds", () => {
+  it("returns a named error when either bound exceeds the index width", () => {
+    for (const [lower, upper] of [
+      [[3, "id"], []],
+      [[], [3, "id"]],
+    ] as const) {
+      const split = QueryStreamIndexRange.fromBounds(["score"], "asc", {
+        lower: { orderKey: lower, inclusive: true },
+        upper: { orderKey: upper, inclusive: true },
+      });
+      expect(split).toEqual(
+        Result.fail(
+          new QueryStreamIndexPrefix.IndexPrefixWidthMismatchError({
+            width: 1,
+            actual: 2,
+          }),
+        ),
+      );
+    }
+  });
+
   it.each(["asc", "desc"] as const)(
     "decomposes a compound interval in %s order",
     (order) => {

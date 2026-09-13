@@ -3,6 +3,7 @@ import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
+import * as QueryStreamKey from "@confect/server/QueryStreamKey";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import * as QueryStream from "@confect/server/QueryStream";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -545,6 +546,16 @@ describe("QueryStream", () => {
 });
 
 describe("QueryStream boundary errors", () => {
+  it("rejects oversized bounds before constructing a scan", () => {
+    const layout = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["score"]));
+    const source = QueryStream.empty<never>()(layout);
+    expect(() =>
+      QueryStream.narrow(source, {
+        start: { orderKey: [3, "id", 4], inclusive: true },
+      }),
+    ).toThrow(QueryStreamKey.KeyWidthMismatchError);
+  });
+
   const layout = Result.getOrThrowWith(
     QueryStreamKeyLayout.fromIndex([]),
     identity,
