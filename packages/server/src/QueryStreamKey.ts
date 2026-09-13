@@ -8,27 +8,19 @@ const TypeId = "~@confect/server/QueryStreamKey";
 const IndexPrefixTypeId = "~@confect/server/QueryStreamKey/IndexPrefix";
 
 interface Payload {
+  readonly [TypeId]: typeof TypeId;
   readonly layout: QueryStreamKeyLayout.QueryStreamKeyLayout;
   readonly values: QueryStreamOrderKey.QueryStreamOrderKey;
 }
 
-// The tag stays inside the opaque payload so changing an outer tag cannot
-// promote a prefix to a complete key without parsing it.
-type State = Data.TaggedEnum<{
+export type QueryStreamKey = Data.TaggedEnum<{
   Complete: Payload;
   Prefix: Payload;
 }>;
-const State = Data.taggedEnum<State>();
+const QueryStreamKey = Data.taggedEnum<QueryStreamKey>();
 
-export interface Complete {
-  readonly [TypeId]: Data.TaggedEnum.Value<State, "Complete">;
-}
-
-export interface Prefix {
-  readonly [TypeId]: Data.TaggedEnum.Value<State, "Prefix">;
-}
-
-export type QueryStreamKey = Complete | Prefix;
+export type Complete = Data.TaggedEnum.Value<QueryStreamKey, "Complete">;
+export type Prefix = Data.TaggedEnum.Value<QueryStreamKey, "Prefix">;
 
 /**
  * Index coordinates retain the path belonging to each value.
@@ -59,7 +51,9 @@ export const complete = (
 ): Result.Result<Complete, KeyWidthMismatchError> => {
   const width = QueryStreamKeyLayout.runtimeWidth(layout);
   return values.length === width
-    ? Result.succeed({ [TypeId]: State.Complete({ layout, values }) })
+    ? Result.succeed(
+        QueryStreamKey.Complete({ [TypeId]: TypeId, layout, values }),
+      )
     : Result.fail(
         new KeyWidthMismatchError({
           kind: "complete",
@@ -75,7 +69,9 @@ export const prefix = (
 ): Result.Result<Prefix, KeyWidthMismatchError> => {
   const width = QueryStreamKeyLayout.runtimeWidth(layout);
   return values.length <= width
-    ? Result.succeed({ [TypeId]: State.Prefix({ layout, values }) })
+    ? Result.succeed(
+        QueryStreamKey.Prefix({ [TypeId]: TypeId, layout, values }),
+      )
     : Result.fail(
         new KeyWidthMismatchError({
           kind: "prefix",
@@ -87,10 +83,10 @@ export const prefix = (
 
 export const values = (
   self: QueryStreamKey,
-): QueryStreamOrderKey.QueryStreamOrderKey => self[TypeId].values;
+): QueryStreamOrderKey.QueryStreamOrderKey => self.values;
 export const layout = (
   self: QueryStreamKey,
-): QueryStreamKeyLayout.QueryStreamKeyLayout => self[TypeId].layout;
+): QueryStreamKeyLayout.QueryStreamKeyLayout => self.layout;
 
 export const indexPrefix = (
   fieldPaths: ReadonlyArray<string>,

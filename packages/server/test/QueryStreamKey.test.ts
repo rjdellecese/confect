@@ -4,6 +4,7 @@ import * as Layout from "@confect/server/QueryStreamKeyLayout";
 import * as IndexRange from "@confect/server/QueryStreamIndexRange";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Array from "effect/Array";
+import * as Match from "effect/Match";
 import * as Result from "effect/Result";
 
 const layout = Result.getOrThrow(Layout.fromIndex(["score"]));
@@ -17,7 +18,7 @@ describe("QueryStreamKey", () => {
     expectTypeOf<Key.Prefix>().not.toExtend<Key.Complete>();
     expectTypeOf<Key.Prefix>().not.toExtend<Key.IndexPrefix>();
     expectTypeOf<readonly [number, string]>().not.toExtend<Key.Complete>();
-    const values = Object.freeze([3, "id"]);
+    const values = [3, "id"] as const;
     const key = Result.getOrThrow(Key.complete(layout, values));
     expect(Key.values(key)).toBe(values);
     expect(Key.layout(key)).toBe(layout);
@@ -25,13 +26,38 @@ describe("QueryStreamKey", () => {
       const parsed = Result.getOrThrow(Key.prefix(layout, prefix));
       expect(Key.values(parsed)).toBe(prefix);
       expect(Key.layout(parsed)).toBe(layout);
-      const retagged = { ...parsed, _tag: "Complete" as const };
-      expectTypeOf<typeof retagged>().not.toExtend<Key.Complete>();
     }
     for (const invalid of [[], [3], [3, "id", 4]]) {
       expect(Result.isFailure(Key.complete(layout, invalid))).toBe(true);
     }
     expect(Result.isFailure(Key.prefix(layout, [3, "id", 4]))).toBe(true);
+  });
+
+  it("exposes the parsing guarantee for exhaustive matching", () => {
+    const keys: ReadonlyArray<Key.QueryStreamKey> = [
+      Result.getOrThrow(Key.complete(layout, [3, "id"])),
+      Result.getOrThrow(Key.prefix(layout, [3, "id"])),
+    ];
+    expect(
+      Array.map(keys, (key) =>
+        Match.value(key).pipe(
+          Match.tag("Complete", (complete) => {
+            expectTypeOf<typeof complete>().toEqualTypeOf<Key.Complete>();
+            expect(complete.layout).toBe(layout);
+            return ["complete", complete.values] as const;
+          }),
+          Match.tag("Prefix", (prefix) => {
+            expectTypeOf<typeof prefix>().toEqualTypeOf<Key.Prefix>();
+            expect(prefix.layout).toBe(layout);
+            return ["prefix", prefix.values] as const;
+          }),
+          Match.exhaustive,
+        ),
+      ),
+    ).toEqual([
+      ["complete", [3, "id"]],
+      ["prefix", [3, "id"]],
+    ]);
   });
 
   it("reads either parsing guarantee through the shared key type", () => {
