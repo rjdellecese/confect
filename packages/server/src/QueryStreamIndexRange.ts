@@ -2,7 +2,6 @@ import type { GenericDocument, FieldTypeFromFieldPath } from "convex/server";
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import { identity, pipe } from "effect/Function";
-import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import type * as Types from "effect/Types";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
@@ -55,18 +54,39 @@ export type RangeOp = Data.TaggedEnum<{
 
 const RangeOp = Data.taggedEnum<RangeOp>();
 
+interface Equality {
+  readonly fieldPath: string;
+  readonly value: QueryStreamOrderKey.KeyValue;
+}
+
+interface Endpoint {
+  readonly value: QueryStreamOrderKey.KeyValue;
+  readonly inclusive: boolean;
+}
+
+type Interval = Data.TaggedEnum<{
+  Lower: { readonly lower: Endpoint };
+  Upper: { readonly upper: Endpoint };
+  Between: { readonly lower: Endpoint; readonly upper: Endpoint };
+}>;
+const Interval = Data.taggedEnum<Interval>();
+
+interface Range {
+  readonly equalities: ReadonlyArray<Equality>;
+  readonly bounded: Option.Option<{
+    readonly fieldPath: string;
+    readonly interval: Interval;
+  }>;
+}
+
 /**
- * The result of applying a range callback: the recorded operations, plus a
- * phantom `Remaining`—the index field paths not consumed by `eq` pinning.
- *
- * @experimental
+ * The equality prefix followed by at most one bounded field.
  */
 export interface IndexRangeSpec<out FieldPaths extends ReadonlyArray<string>> {
-  readonly [RangeSpecTypeId]: {
+  readonly [RangeSpecTypeId]: Range & {
     readonly _Remaining: Types.Covariant<FieldPaths>;
   };
   readonly eqCount: number;
-  readonly ops: ReadonlyArray<RangeOp>;
 }
 
 /**
@@ -131,30 +151,108 @@ export interface LowerBoundedRange<
   ) => IndexRangeSpec<FieldPaths>;
 }
 
-const makeRangeBuilder = (
-  ops: ReadonlyArray<RangeOp>,
-): RangeBuilder<GenericDocument, ReadonlyArray<string>> => {
-  const push =
-    (tag: RangeOp["_tag"]) =>
-    (fieldPath: string, value: QueryStreamOrderKey.KeyValue) =>
-      makeRangeBuilder(
-        Array.append(ops, RangeOp[tag]({ field: fieldPath, value })),
-      );
+const makeSpec = (range: Range): AnyIndexRangeSpec => ({
+  [RangeSpecTypeId]: {
+    ...range,
+    _Remaining: identity as Types.Covariant<ReadonlyArray<string>>,
+  },
+  get eqCount() {
+    return range.equalities.length;
+  },
+});
 
+const makeRangeBuilder = (
+  equalities: ReadonlyArray<Equality>,
+): RangeBuilder<GenericDocument, ReadonlyArray<string>> => {
+  const upper =
+    (inclusive: boolean) =>
+    (fieldPath: string, value: QueryStreamOrderKey.KeyValue) =>
+      makeSpec({
+        equalities,
+        bounded: Option.some({
+          fieldPath,
+          interval: Interval.Upper({ upper: { value, inclusive } }),
+        }),
+      });
+  const lower =
+    (inclusive: boolean) =>
+    (
+      fieldPath: string,
+      value: QueryStreamOrderKey.KeyValue,
+    ): LowerBoundedRange<GenericDocument, ReadonlyArray<string>> => {
+      const endpoint = { value, inclusive };
+      const finish =
+        (upperInclusive: boolean) =>
+        (_fieldPath: string, upperValue: QueryStreamOrderKey.KeyValue) =>
+          makeSpec({
+            equalities,
+            bounded: Option.some({
+              fieldPath,
+              interval: Interval.Between({
+                lower: endpoint,
+                upper: { value: upperValue, inclusive: upperInclusive },
+              }),
+            }),
+          });
+      return {
+        ...makeSpec({
+          equalities,
+          bounded: Option.some({
+            fieldPath,
+            interval: Interval.Lower({ lower: endpoint }),
+          }),
+        }),
+        lt: finish(false),
+        lte: finish(true),
+      };
+    };
   return {
-    [RangeSpecTypeId]: {
-      _Remaining: identity as Types.Covariant<ReadonlyArray<string>>,
-    },
-    get eqCount() {
-      return Array.takeWhile(ops, (op) => op._tag === "eq").length;
-    },
-    ops,
-    eq: push("eq"),
-    gt: push("gt"),
-    gte: push("gte"),
-    lt: push("lt"),
-    lte: push("lte"),
+    ...makeSpec({ equalities, bounded: Option.none() }),
+    eq: (fieldPath, value) =>
+      makeRangeBuilder(Array.append(equalities, { fieldPath, value })),
+    gt: lower(false),
+    gte: lower(true),
+    lt: upper(false),
+    lte: upper(true),
   };
+};
+
+/**
+ * Derive Convex operations only at the query adapter boundary.
+ */
+export const toOperations = (
+  spec: AnyIndexRangeSpec,
+): ReadonlyArray<RangeOp> => {
+  const { equalities, bounded } = spec[RangeSpecTypeId];
+  const prefix = Array.map(equalities, ({ fieldPath, value }) =>
+    RangeOp.eq({ field: fieldPath, value }),
+  );
+  return Option.match(bounded, {
+    onNone: () => prefix,
+    onSome: ({ fieldPath, interval }) => {
+      const lower = (endpoint: Endpoint) =>
+        RangeOp[endpoint.inclusive ? "gte" : "gt"]({
+          field: fieldPath,
+          value: endpoint.value,
+        });
+      const upper = (endpoint: Endpoint) =>
+        RangeOp[endpoint.inclusive ? "lte" : "lt"]({
+          field: fieldPath,
+          value: endpoint.value,
+        });
+      return Array.appendAll(
+        prefix,
+        Interval.$match(interval, {
+          Lower: ({ lower: endpoint }) => [lower(endpoint)],
+          Upper: ({ upper: endpoint }) => [upper(endpoint)],
+          Between: (endpoints) => [
+            lower(endpoints.lower),
+            upper(endpoints.upper),
+          ],
+        }),
+      );
+    },
+  });
 };
 
 /**
@@ -177,12 +275,12 @@ export const applyOps = (ops: ReadonlyArray<RangeOp>, q: any): any =>
   Array.reduce(ops, q, (builder, op) => builder[op._tag](op.field, op.value));
 
 /**
- * Replay a recorded range spec onto Convex's real `IndexRangeBuilder`.
+ * Apply a structural range spec onto Convex's real `IndexRangeBuilder`.
  *
  * @experimental
  */
 export const applyRange = (spec: AnyIndexRangeSpec, q: any): any =>
-  applyOps(spec.ops, q);
+  applyOps(toOperations(spec), q);
 
 // Convex index ranges have the shape `eq(f1) … eq(fn), gt/gte(fm)?,
 // lt/lte(fm)?`—every field path pinned except the last, which may carry two
@@ -337,49 +435,26 @@ export const splitRange = (
 };
 
 /**
- * Fold a range spec's recorded ops into full-index-key bounds.
- *
- * @experimental
+ * Derive full-index bounds directly from the structural range.
  */
-export const boundsFromSpec = (spec: AnyIndexRangeSpec): IndexBounds =>
-  Array.reduce(
-    spec.ops,
-    {
-      lower: {
-        key: Array.empty<QueryStreamOrderKey.KeyValue>(),
-        inclusive: true,
-      },
-      upper: {
-        key: Array.empty<QueryStreamOrderKey.KeyValue>(),
-        inclusive: true,
-      },
-    } as IndexBounds,
-    (bounds, op) =>
-      Match.value(op._tag).pipe(
-        Match.when("eq", (): IndexBounds => ({
-          lower: {
-            key: Array.append(bounds.lower.key, op.value),
-            inclusive: bounds.lower.inclusive,
-          },
-          upper: {
-            key: Array.append(bounds.upper.key, op.value),
-            inclusive: bounds.upper.inclusive,
-          },
-        })),
-        Match.whenOr("gt", "gte", (tag): IndexBounds => ({
-          lower: {
-            key: Array.append(bounds.lower.key, op.value),
-            inclusive: tag === "gte",
-          },
-          upper: bounds.upper,
-        })),
-        Match.whenOr("lt", "lte", (tag): IndexBounds => ({
-          lower: bounds.lower,
-          upper: {
-            key: Array.append(bounds.upper.key, op.value),
-            inclusive: tag === "lte",
-          },
-        })),
-        Match.exhaustive,
-      ),
-  );
+export const boundsFromSpec = (spec: AnyIndexRangeSpec): IndexBounds => {
+  const { equalities, bounded } = spec[RangeSpecTypeId];
+  const key = Array.map(equalities, (equality) => equality.value);
+  const unbounded = { key, inclusive: true };
+  const endpoint = ({ value, inclusive }: Endpoint) => ({
+    key: Array.append(key, value),
+    inclusive,
+  });
+  return Option.match(bounded, {
+    onNone: () => ({ lower: unbounded, upper: unbounded }),
+    onSome: ({ interval }) =>
+      Interval.$match(interval, {
+        Lower: ({ lower }) => ({ lower: endpoint(lower), upper: unbounded }),
+        Upper: ({ upper }) => ({ lower: unbounded, upper: endpoint(upper) }),
+        Between: ({ lower, upper }) => ({
+          lower: endpoint(lower),
+          upper: endpoint(upper),
+        }),
+      }),
+  });
+};

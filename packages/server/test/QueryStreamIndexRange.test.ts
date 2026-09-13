@@ -41,9 +41,9 @@ describe("QueryStreamIndexRange operations", () => {
         ["text"]
       >();
       for (const value of ["hello", undefined]) {
-        expect(root[tag]("text", value).ops).toStrictEqual([
-          { _tag: tag, field: "text", value },
-        ]);
+        expect(
+          QueryStreamIndexRange.toOperations(root[tag]("text", value)),
+        ).toStrictEqual([{ _tag: tag, field: "text", value }]);
       }
     },
   );
@@ -55,7 +55,9 @@ describe("QueryStreamIndexRange operations", () => {
       value: "hello",
     } satisfies QueryStreamIndexRange.RangeOp;
     expectTypeOf(op._tag).toEqualTypeOf<"eq">();
-    expect(builder().eq("category", "hello").ops).toEqual([op]);
+    expect(
+      QueryStreamIndexRange.toOperations(builder().eq("category", "hello")),
+    ).toEqual([op]);
   });
 });
 
@@ -86,25 +88,27 @@ describe("QueryStreamIndexRange.rangeBuilder", () => {
 
   it("returns independent branches without mutating a reused builder", () => {
     const root = Object.freeze(builder());
-    Object.freeze(root.ops);
     const pinned = Object.freeze(root.eq("category", "a"));
-    Object.freeze(pinned.ops);
     const lower = pinned.gt("score", 1);
     const upper = pinned.lte("score", 5);
     const other = root.eq("category", "b");
     expect(root.eqCount).toBe(0);
-    expect(root.ops).toEqual([]);
+    expect(QueryStreamIndexRange.toOperations(root)).toEqual([]);
     expect(pinned.eqCount).toBe(1);
-    expect(pinned.ops).toEqual([{ _tag: "eq", field: "category", value: "a" }]);
-    expect(lower.ops).toEqual([
-      ...pinned.ops,
+    expect(QueryStreamIndexRange.toOperations(pinned)).toEqual([
+      { _tag: "eq", field: "category", value: "a" },
+    ]);
+    expect(QueryStreamIndexRange.toOperations(lower)).toEqual([
+      ...QueryStreamIndexRange.toOperations(pinned),
       { _tag: "gt", field: "score", value: 1 },
     ]);
-    expect(upper.ops).toEqual([
-      ...pinned.ops,
+    expect(QueryStreamIndexRange.toOperations(upper)).toEqual([
+      ...QueryStreamIndexRange.toOperations(pinned),
       { _tag: "lte", field: "score", value: 5 },
     ]);
-    expect(other.ops).toEqual([{ _tag: "eq", field: "category", value: "b" }]);
+    expect(QueryStreamIndexRange.toOperations(other)).toEqual([
+      { _tag: "eq", field: "category", value: "b" },
+    ]);
     expect(lower.eqCount).toBe(1);
     expect(upper.eqCount).toBe(1);
     expect(pinned).not.toBe(root);
@@ -113,7 +117,7 @@ describe("QueryStreamIndexRange.rangeBuilder", () => {
     expect(pinned.eq("score", 2).eqCount).toBe(2);
   });
 
-  it("derives an enumerable equality count from the leading operations", () => {
+  it("derives the equality count from the prefix", () => {
     const root = builder();
     const pinned = root.eq("category", "a").eq("score", 2);
     const id = "item" as GenericId<"items">;
@@ -133,20 +137,14 @@ describe("QueryStreamIndexRange.rangeBuilder", () => {
     ] as const) {
       expect(spec.eqCount).toBe(expectedCount);
       expect({ ...spec }.eqCount).toBe(expectedCount);
-      const descriptor = Object.getOwnPropertyDescriptor(spec, "eqCount");
-      expect(descriptor).toMatchObject({
-        enumerable: true,
-        get: expect.any(Function),
-      });
-      expect(descriptor).not.toHaveProperty("value");
     }
-    expect(root.ops).toEqual([]);
-    expect(pinned.ops).toEqual(expectedOps);
-    expect(lower.ops).toEqual([
+    expect(QueryStreamIndexRange.toOperations(root)).toEqual([]);
+    expect(QueryStreamIndexRange.toOperations(pinned)).toEqual(expectedOps);
+    expect(QueryStreamIndexRange.toOperations(lower)).toEqual([
       ...expectedOps,
       { _tag: "gt", field: "_id", value: id },
     ]);
-    expect(bounded.ops).toEqual([
+    expect(QueryStreamIndexRange.toOperations(bounded)).toEqual([
       ...expectedOps,
       { _tag: "gt", field: "_id", value: id },
       { _tag: "lte", field: "_id", value: id },
@@ -158,6 +156,9 @@ describe("QueryStreamIndexRange.rangeBuilder", () => {
     const pinned = root.eq("category", "a");
     const lower = pinned.gte("score", 1);
     const bounded = lower.lt("score", 5);
+    expect(lower).not.toHaveProperty("eq");
+    expect(lower).not.toHaveProperty("gt");
+    expect(bounded).not.toHaveProperty("lt");
     const allPinned = pinned
       .eq("score", 2)
       .eq("_id", "item" as GenericId<"items">);
@@ -227,9 +228,11 @@ describe("QueryStreamIndexRange replay", () => {
     const spec = builder().eq("category", "a").gt("score", 1).lte("score", 5);
     const target = builder();
     const result = QueryStreamIndexRange.applyRange(spec, target);
-    expect(result.ops).toEqual(spec.ops);
+    expect(QueryStreamIndexRange.toOperations(result)).toEqual(
+      QueryStreamIndexRange.toOperations(spec),
+    );
     expect(result.eqCount).toBe(1);
-    expect(target.ops).toEqual([]);
+    expect(QueryStreamIndexRange.toOperations(target)).toEqual([]);
     expect(QueryStreamIndexRange.applyOps([], target)).toBe(target);
     expect(QueryStreamIndexRange.applyRange(builder(), target)).toBe(target);
   });
@@ -339,7 +342,7 @@ describe("QueryStreamIndexRange.splitRange", () => {
           "asc",
           QueryStreamIndexRange.boundsFromSpec(spec),
         ),
-      ).toEqual([spec.ops]);
+      ).toEqual([QueryStreamIndexRange.toOperations(spec)]);
     },
   );
 

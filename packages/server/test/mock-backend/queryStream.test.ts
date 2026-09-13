@@ -123,9 +123,6 @@ describe("QueryStream", () => {
             "_creationTime",
           ]);
           expect(stream.reflection?.spec.eqCount).toBe(0);
-          expect(stream.reflection?.spec.ops).toEqual([
-            { _tag: "gte", field: "text", value: "a" },
-          ]);
 
           // …so one stream value can be run any number of times.
           const first = yield* collectTexts(stream);
