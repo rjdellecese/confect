@@ -1,6 +1,36 @@
 import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
+import * as Key from "@confect/server/QueryStreamKey";
+import * as Layout from "@confect/server/QueryStreamKeyLayout";
+import * as Result from "effect/Result";
+import type { QueryStreamOrderKey as Values } from "@confect/server/QueryStreamOrderKey";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Option from "effect/Option";
+
+const admits =
+  (side: "lower" | "upper") =>
+  (bound: Option.Option<QueryStreamKeyBounds.KeyBound>) =>
+  (values: Values) => {
+    const layout = Result.getOrThrow(
+      Layout.fromIndex(Array.from({ length: values.length }, () => "_id")),
+    );
+    // An empty explicit layout has no implicit ID.
+    const actualLayout =
+      values.length === 0
+        ? Result.getOrThrow(Layout.fromIndex(["_id"], 1))
+        : layout;
+    const key = Result.getOrThrow(Key.complete(actualLayout, values));
+    const bounds = Result.getOrThrow(
+      QueryStreamKeyBounds.parse(actualLayout, {
+        lower: side === "lower" ? bound : Option.none(),
+        upper: side === "upper" ? bound : Option.none(),
+      }),
+    );
+    return side === "lower"
+      ? QueryStreamKeyBounds.admittedByLower(bounds.lower)(key)
+      : QueryStreamKeyBounds.admittedByUpper(bounds.upper)(key);
+  };
+const admittedByLower = admits("lower");
+const admittedByUpper = admits("upper");
 
 describe("QueryStreamKeyBounds", () => {
   it.each([true, false])(
@@ -8,8 +38,8 @@ describe("QueryStreamKeyBounds", () => {
     (inclusive) => {
       const key = ["a"];
       const bound = Option.some({ orderKey: key, inclusive });
-      expect(QueryStreamKeyBounds.admittedByLower(bound)(key)).toBe(inclusive);
-      expect(QueryStreamKeyBounds.admittedByUpper(bound)(key)).toBe(inclusive);
+      expect(admittedByLower(bound)(key)).toBe(inclusive);
+      expect(admittedByUpper(bound)(key)).toBe(inclusive);
     },
   );
 
@@ -37,12 +67,12 @@ describe("QueryStreamKeyBounds", () => {
         [["a", 1], 2.5],
         [["a", 2], 4.5],
       ] as const) {
-        expect(
-          QueryStreamKeyBounds.admittedByLower(Option.some(lower))(key),
-        ).toBe(position > leftIndex);
-        expect(
-          QueryStreamKeyBounds.admittedByUpper(Option.some(upper))(key),
-        ).toBe(position < leftIndex);
+        expect(admittedByLower(Option.some(lower))(key)).toBe(
+          position > leftIndex,
+        );
+        expect(admittedByUpper(Option.some(upper))(key)).toBe(
+          position < leftIndex,
+        );
       }
     }
   });
@@ -64,8 +94,8 @@ describe("QueryStreamKeyBounds", () => {
     "admits the entire prefix family only for inclusive=%s endpoints",
     (inclusive) => {
       const bound = Option.some({ orderKey: ["b"], inclusive });
-      const lower = QueryStreamKeyBounds.admittedByLower(bound);
-      const upper = QueryStreamKeyBounds.admittedByUpper(bound);
+      const lower = admittedByLower(bound);
+      const upper = admittedByUpper(bound);
       for (const key of [["b"], ["b", 0], ["b", 99, "id"]]) {
         expect(lower(key)).toBe(inclusive);
         expect(upper(key)).toBe(inclusive);
@@ -83,13 +113,13 @@ describe("QueryStreamKeyBounds", () => {
       Option.some({ orderKey: [], inclusive: true }),
     ]) {
       for (const key of [[], [undefined], ["a", 1]]) {
-        expect(QueryStreamKeyBounds.admittedByLower(bound)(key)).toBe(true);
-        expect(QueryStreamKeyBounds.admittedByUpper(bound)(key)).toBe(true);
+        expect(admittedByLower(bound)(key)).toBe(true);
+        expect(admittedByUpper(bound)(key)).toBe(true);
       }
     }
     const excluded = Option.some({ orderKey: [], inclusive: false });
-    expect(QueryStreamKeyBounds.admittedByLower(excluded)(["a"])).toBe(false);
-    expect(QueryStreamKeyBounds.admittedByUpper(excluded)(["a"])).toBe(false);
+    expect(admittedByLower(excluded)(["a"])).toBe(false);
+    expect(admittedByUpper(excluded)(["a"])).toBe(false);
   });
 
   it("chooses the stricter lower and upper bounds independently of argument order", () => {

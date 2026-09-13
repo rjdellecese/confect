@@ -64,6 +64,7 @@ import type {
 } from "./QueryStreamOrderDirection";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 import type { QueryStreamOrderKey as OrderKey } from "./QueryStreamOrderKey";
+import * as QueryStreamKey from "./QueryStreamKey";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
 import type {
   KeyBound,
@@ -511,10 +512,9 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   );
   // `eq`-pinned values form a shared prefix of both bound keys.
   const eqValues = Array.take(bounds.lower.orderKey, equalityPrefixLength);
-  const ranges = QueryStreamIndexRange.fromBounds(
-    fullFieldPaths,
-    reflection.order,
-    bounds,
+  const ranges = Result.getOrThrowWith(
+    QueryStreamIndexRange.fromBounds(fullFieldPaths, reflection.order, bounds),
+    identity,
   );
 
   const encodedDocuments = Stream.fromIterable(ranges).pipe(
@@ -553,7 +553,19 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   );
 
   const toFullKeySpace = (bound: KeyBound): KeyBound => ({
-    orderKey: Array.appendAll(eqValues, bound.orderKey),
+    orderKey: Array.map(
+      QueryStreamKey.indexEntries(
+        Result.getOrThrowWith(
+          Result.flatMap(
+            QueryStreamKey.prefix(keyLayout, bound.orderKey),
+            (prefix) =>
+              QueryStreamKey.toIndexPrefix(fullFieldPaths, eqValues, prefix),
+          ),
+          identity,
+        ),
+      ),
+      ([, value]) => value,
+    ),
     inclusive: bound.inclusive,
   });
 
@@ -1309,13 +1321,14 @@ const makeFlatMap = <
     outerKey: OrderKey,
     innerBounds: KeyBounds,
     doc: Option.Option<Doc2 | Doc3>,
-  ): Stream.Stream<Element<Doc2 | Doc3>> =>
-    QueryStreamKeyBounds.admittedByLower(innerBounds.lower)(nullPadding) &&
-    QueryStreamKeyBounds.admittedByUpper(innerBounds.upper)(nullPadding)
+  ): Stream.Stream<Element<Doc2 | Doc3>> => {
+    const { aboveLower, belowUpper } = keyPredicates(innerLayout, innerBounds);
+    return aboveLower(nullPadding) && belowUpper(nullPadding)
       ? Stream.succeed(
           new Element({ doc, key: Array.appendAll(outerKey, nullPadding) }),
         )
       : Stream.empty;
+  };
 
   const annotated: Stream.Stream<
     Element<Doc2 | Doc3>,
@@ -1602,9 +1615,8 @@ const makeDistinct = <
       orderKey: Array.take(orderKey, distinctLength),
       inclusive: orderKey.length > distinctLength || inclusive,
     }));
-  const isAdmitted = (key: OrderKey) =>
-    QueryStreamKeyBounds.admittedByLower(bounds.lower)(key) &&
-    QueryStreamKeyBounds.admittedByUpper(bounds.upper)(key);
+  const { aboveLower, belowUpper } = keyPredicates(self.keyLayout, bounds);
+  const isAdmitted = (key: OrderKey) => aboveLower(key) && belowUpper(key);
   const annotated = Stream.unwrap(
     Effect.map(QueryStreamReadBudget.current, (budgetStatus) =>
       Stream.paginate(
@@ -1821,16 +1833,39 @@ const narrowByKeyBounds = <
 >(
   self: QueryStream<Doc, Labels, Direction, E, R>,
   bounds: KeyBounds,
-): QueryStream<Doc, Labels, Direction, E, R> =>
-  Option.isNone(bounds.lower) && Option.isNone(bounds.upper)
+): QueryStream<Doc, Labels, Direction, E, R> => {
+  const parsed = Result.getOrThrowWith(
+    QueryStreamKeyBounds.parse(self.keyLayout, bounds),
+    identity,
+  );
+  return Option.isNone(parsed.lower) && Option.isNone(parsed.upper)
     ? self
     : self.narrowWith !== undefined
-      ? self.narrowWith(bounds)
+      ? self.narrowWith(QueryStreamKeyBounds.toBounds(parsed))
       : narrowInMemory(self, bounds);
+};
 
 /**
  * The fallback for streams that don't know how to rebuild themselves.
  */
+const keyPredicates = (
+  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  bounds: KeyBounds,
+) => {
+  const parsed = Result.getOrThrowWith(
+    QueryStreamKeyBounds.parse(layout, bounds),
+    identity,
+  );
+  const complete = (key: OrderKey) =>
+    Result.getOrThrowWith(QueryStreamKey.complete(layout, key), identity);
+  return {
+    aboveLower: (key: OrderKey) =>
+      QueryStreamKeyBounds.admittedByLower(parsed.lower)(complete(key)),
+    belowUpper: (key: OrderKey) =>
+      QueryStreamKeyBounds.admittedByUpper(parsed.upper)(complete(key)),
+  };
+};
+
 const narrowInMemory = <
   Doc,
   Labels extends ReadonlyArray<string>,
@@ -1845,8 +1880,7 @@ const narrowInMemory = <
     annotated: Stream.Stream<Element<Doc>, E, R>,
   ) => Stream.Stream<Element<Doc>, E, R>;
 
-  const aboveLower = QueryStreamKeyBounds.admittedByLower(bounds.lower);
-  const belowUpper = QueryStreamKeyBounds.admittedByUpper(bounds.upper);
+  const { aboveLower, belowUpper } = keyPredicates(self.keyLayout, bounds);
 
   const dropOutOfRange: Narrower =
     self.order === "asc"

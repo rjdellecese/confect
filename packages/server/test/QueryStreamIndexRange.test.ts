@@ -8,7 +8,14 @@ import type {
   GenericDocument,
 } from "convex/server";
 import type { KeyValue } from "@confect/server/QueryStreamOrderKey";
+import * as Result from "effect/Result";
+import * as Key from "@confect/server/QueryStreamKey";
+import * as Layout from "@confect/server/QueryStreamKeyLayout";
 import type { GenericId } from "convex/values";
+
+const fromBounds = (
+  ...args: Parameters<typeof QueryStreamIndexRange.fromBounds>
+) => Result.getOrThrow(QueryStreamIndexRange.fromBounds(...args));
 
 type Doc = {
   _id: GenericId<"items">;
@@ -284,11 +291,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
           upper: { orderKey: [1, 3, 2], inclusive: true },
         },
       ];
-      const ranges = QueryStreamIndexRange.fromBounds(
-        ["f1", "f2", "f3"],
-        order,
-        bounds,
-      );
+      const ranges = fromBounds(["f1", "f2", "f3"], order, bounds);
       expectTypeOf(ranges).toEqualTypeOf<
         ReadonlyArray<QueryStreamIndexRange.QueryStreamIndexRange>
       >();
@@ -312,11 +315,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
       pinned.lte("score", 2),
     ]) {
       const bounds = QueryStreamIndexRange.toBounds(range);
-      const ranges = QueryStreamIndexRange.fromBounds(
-        ["category", "score", "_id"],
-        "asc",
-        bounds,
-      );
+      const ranges = fromBounds(["category", "score", "_id"], "asc", bounds);
       expect(ranges.map(QueryStreamIndexRange.toBounds)).toEqual([bounds]);
       expect(ranges.map(QueryStreamIndexRange.equalityPrefixLength)).toEqual([
         QueryStreamIndexRange.equalityPrefixLength(range),
@@ -337,23 +336,26 @@ describe("QueryStreamIndexRange.fromBounds", () => {
       const endpoints = [[], [0], [1], ...keys].flatMap((key) =>
         [true, false].map((inclusive) => ({ orderKey: key, inclusive })),
       );
-      const admits =
-        (bounds: QueryStreamKeyBounds.IndexBounds) =>
-        (orderKey: ReadonlyArray<number>) =>
-          QueryStreamKeyBounds.admittedByLower(Option.some(bounds.lower))(
-            orderKey,
-          ) &&
-          QueryStreamKeyBounds.admittedByUpper(Option.some(bounds.upper))(
-            orderKey,
+      const layout = Result.getOrThrow(Layout.fromIndex(["a", "_id"]));
+      const admits = (bounds: QueryStreamKeyBounds.IndexBounds) => {
+        const parsed = Result.getOrThrow(
+          QueryStreamKeyBounds.parse(layout, {
+            lower: Option.some(bounds.lower),
+            upper: Option.some(bounds.upper),
+          }),
+        );
+        return (values: ReadonlyArray<number>) => {
+          const key = Result.getOrThrow(Key.complete(layout, values));
+          return (
+            QueryStreamKeyBounds.admittedByLower(parsed.lower)(key) &&
+            QueryStreamKeyBounds.admittedByUpper(parsed.upper)(key)
           );
+        };
+      };
       for (const lower of endpoints)
         for (const upper of endpoints) {
           const bounds = { lower, upper };
-          const ranges = QueryStreamIndexRange.fromBounds(
-            ["a", "b"],
-            order,
-            bounds,
-          );
+          const ranges = fromBounds(["a", "b"], order, bounds);
           expect(
             ranges.flatMap((range) =>
               ordered.filter(admits(QueryStreamIndexRange.toBounds(range))),
@@ -397,9 +399,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
         },
       ];
       for (const bounds of cases) {
-        expect(
-          QueryStreamIndexRange.fromBounds(["score", "_id"], order, bounds),
-        ).toEqual([]);
+        expect(fromBounds(["score", "_id"], order, bounds)).toEqual([]);
       }
     },
   );
