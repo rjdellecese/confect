@@ -3,16 +3,23 @@ import { ConvexHttpClient } from "convex/browser";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as Schedule from "effect/Schedule";
+import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
 class BackendNotReadyError extends Schema.TaggedError<BackendNotReadyError>()(
   "BackendNotReadyError",
+  { message: Schema.String },
+) {}
+
+class BackendVersionLookupError extends Schema.TaggedError<BackendVersionLookupError>()(
+  "BackendVersionLookupError",
   { message: Schema.String },
 ) {}
 
@@ -53,6 +60,7 @@ export const maxCacheAge = Duration.seconds(
 const make = Effect.gen(function* () {
   const path = yield* Path.Path;
   const spawner = yield* ChildProcessSpawner;
+  const parentScope = yield* Effect.scope;
   const fixturesDir = path.resolve(import.meta.dirname, "./fixtures");
 
   const command = ChildProcess.make(
@@ -80,14 +88,54 @@ const make = Effect.gen(function* () {
     },
   );
 
-  const handle = yield* spawner.spawn(command);
+  return yield* Effect.gen(function* () {
+    const attemptScope = yield* Scope.fork(parentScope);
+    return yield* Effect.gen(function* () {
+      const handle = yield* spawner.spawn(command);
+      const { readySeen, versionLookupFailed } = yield* Stream.merge(
+        handle.stdout.pipe(Stream.decodeText(), Stream.splitLines),
+        handle.stderr.pipe(Stream.decodeText(), Stream.splitLines),
+      ).pipe(
+        Stream.takeUntil((line) => line.includes(READY_LINE)),
+        Stream.runFold(
+          () => ({ readySeen: false, versionLookupFailed: false }),
+          (state, line) => ({
+            readySeen: line.includes(READY_LINE),
+            versionLookupFailed:
+              state.versionLookupFailed ||
+              line.includes("Failed to fetch latest backend version") ||
+              /version\.convex\.dev returned (?:429|5\d{2}):/.test(line),
+          }),
+        ),
+      );
 
-  // If the streams close before READY_LINE appears, `Stream.runHead` returns
-  // `None` and we fail explicitly rather than letting the timeout hide it.
-  const readySeen = yield* handle.all.pipe(
-    Stream.decodeText(),
-    Stream.filter((chunk) => chunk.includes(READY_LINE)),
-    Stream.runHead,
+      if (readySeen) {
+        return { client: new ConvexHttpClient(URL) };
+      }
+
+      const exitCode = yield* handle.exitCode;
+      if (exitCode !== 0 && versionLookupFailed) {
+        return yield* new BackendVersionLookupError({
+          message: `convex dev exited with code ${exitCode} after a transient backend version lookup failure`,
+        });
+      }
+      return yield* new BackendNotReadyError({
+        message: `convex dev exited with code ${exitCode} before printing "${READY_LINE}"`,
+      });
+    }).pipe(
+      Scope.provide(attemptScope),
+      Effect.onExit((exit) =>
+        Exit.isFailure(exit) ? Scope.close(attemptScope, exit) : Effect.void,
+      ),
+    );
+  }).pipe(
+    Effect.retry({
+      while: (error) => error._tag === "BackendVersionLookupError",
+      schedule: Schedule.exponential("1 second").pipe(
+        Schedule.jittered,
+        Schedule.upTo({ times: 2 }),
+      ),
+    }),
     Effect.timeoutOrElse({
       duration: "90 seconds",
       orElse: () =>
@@ -98,16 +146,6 @@ const make = Effect.gen(function* () {
         ),
     }),
   );
-
-  return yield* Option.match(readySeen, {
-    onSome: () => Effect.succeed({ client: new ConvexHttpClient(URL) }),
-    onNone: () =>
-      Effect.fail(
-        new BackendNotReadyError({
-          message: `convex dev exited before printing "${READY_LINE}"`,
-        }),
-      ),
-  });
 });
 
 export const layer = Layer.effect(LocalBackend, make).pipe(
