@@ -7,6 +7,7 @@ import type {
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import { identity, pipe } from "effect/Function";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import type * as Types from "effect/Types";
@@ -296,7 +297,11 @@ class TaggedBound extends Data.Class<{
  * Dropping a bound's last entry bounds the remaining prefix exclusively.
  */
 const excludePrefix = (tag: BoundTag): BoundTag =>
-  tag === "gt" || tag === "gte" ? "gt" : "lt";
+  Match.value(tag).pipe(
+    Match.whenOr("gt", "gte", () => "gt" as const),
+    Match.whenOr("lt", "lte", () => "lt" as const),
+    Match.exhaustive,
+  );
 
 /**
  * Peel a bound down to the single entry that feeds the middle range.
