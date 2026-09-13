@@ -1,4 +1,5 @@
 import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
+import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import { describe, expect, it } from "@effect/vitest";
@@ -22,6 +23,12 @@ const documents = [
   { _id: "b2", _creationTime: 4, group: "b" },
 ];
 
+interface RecordedConstraint {
+  readonly _tag: "eq" | "gt" | "gte" | "lt" | "lte";
+  readonly field: string;
+  readonly value: QueryStreamOrderKey.KeyValue;
+}
+
 type Document = (typeof documents)[number];
 
 interface ReaderRun {
@@ -44,10 +51,10 @@ const makeReader = (pending?: PendingRead) => {
   const reader: QueryStream.ReflectionReader = {
     query: () => ({
       withIndex: (_indexName, indexRange) => {
-        const operations: Array<QueryStreamIndexRange.RangeOp> = [];
+        const operations: Array<RecordedConstraint> = [];
         const record =
-          (_tag: QueryStreamIndexRange.RangeOp["_tag"]) =>
-          (field: string, value: QueryStreamIndexRange.RangeOp["value"]) => {
+          (_tag: RecordedConstraint["_tag"]) =>
+          (field: string, value: RecordedConstraint["value"]) => {
             operations.push({ _tag, field, value });
             return builder;
           };
@@ -141,7 +148,7 @@ const makeReader = (pending?: PendingRead) => {
     tableSchema,
     indexName: "by_group",
     indexFieldPaths: ["group", "_creationTime"],
-    spec: QueryStreamIndexRange.rangeBuilder<
+    range: QueryStreamIndexRange.builder<
       Document,
       ["group", "_creationTime"]
     >(),

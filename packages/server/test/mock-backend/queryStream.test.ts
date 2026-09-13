@@ -122,10 +122,6 @@ describe("QueryStream", () => {
             "text",
             "_creationTime",
           ]);
-          expect(stream.reflection?.spec.eqCount).toBe(0);
-          expect(stream.reflection?.spec.ops).toEqual([
-            { _tag: "gte", field: "text", value: "a" },
-          ]);
 
           // …so one stream value can be run any number of times.
           const first = yield* collectTexts(stream);
@@ -602,18 +598,18 @@ describe("QueryStream", () => {
           )).orderKey;
 
           const narrowed = QueryStream.narrow(leaf, {
-            start: { key: afterKey, inclusive: false },
+            start: { orderKey: afterKey, inclusive: false },
           });
 
           // The narrowed stream is a rebuilt *leaf*—not an in-memory
           // fallback—whose lower bound is the pinned prefix plus the
           // cursor key, exclusive.
           expect(narrowed.reflection?.bounds?.lower).toEqual({
-            key: ["b", ...afterKey],
+            orderKey: ["b", ...afterKey],
             inclusive: false,
           });
           expect(narrowed.reflection?.bounds?.upper).toEqual({
-            key: ["b"],
+            orderKey: ["b"],
             inclusive: true,
           });
 
@@ -654,7 +650,7 @@ describe("QueryStream", () => {
           // key filtering.
           expect(derived.narrowWith).toBeDefined();
           const narrowed = QueryStream.narrow(derived, {
-            start: { key: afterKey, inclusive: false },
+            start: { orderKey: afterKey, inclusive: false },
           });
 
           expect(yield* collectTexts(narrowed)).toEqual(["B", "D"]);
@@ -684,17 +680,17 @@ describe("QueryStream", () => {
               const elements = yield* Stream.runCollect(leaf.annotated);
               const texts = yield* collectTexts(leaf);
               const start = {
-                key: Array.getUnsafe(elements, 1).key,
+                orderKey: Array.getUnsafe(elements, 1).key,
                 inclusive: startInclusive,
               };
               const end = {
-                key: Array.getUnsafe(elements, 5).key,
+                orderKey: Array.getUnsafe(elements, 5).key,
                 inclusive: endInclusive,
               };
               const bounds = { start, end };
               const prefixBounds = {
-                start: { ...start, key: [Array.getUnsafe(texts, 1)] },
-                end: { ...end, key: [Array.getUnsafe(texts, 5)] },
+                start: { ...start, orderKey: [Array.getUnsafe(texts, 1)] },
+                end: { ...end, orderKey: [Array.getUnsafe(texts, 5)] },
               };
               const expected = texts.slice(
                 startInclusive ? 1 : 2,
@@ -739,7 +735,10 @@ describe("QueryStream", () => {
                   yield* collectTexts(
                     QueryStream.narrow(stream, {
                       start,
-                      end: { key: start.key, inclusive: endInclusive },
+                      end: {
+                        orderKey: start.orderKey,
+                        inclusive: endInclusive,
+                      },
                     }),
                   ),
                 ).toEqual(startInclusive && endInclusive ? [texts[1]] : []);
@@ -796,11 +795,11 @@ describe("QueryStream", () => {
               const leaf = reader.table("notes").stream("by_text", order);
               const texts = yield* collectTexts(leaf);
               const start = {
-                key: [Array.getUnsafe(texts, 1)],
+                orderKey: [Array.getUnsafe(texts, 1)],
                 inclusive: true,
               };
               const end = {
-                key: [Array.getUnsafe(texts, 3)],
+                orderKey: [Array.getUnsafe(texts, 3)],
                 inclusive: false,
               };
               expect(
@@ -818,10 +817,13 @@ describe("QueryStream", () => {
                 yield* collectTexts(
                   QueryStream.narrow(bounded, {
                     start: {
-                      key: [Array.getUnsafe(texts, 0)],
+                      orderKey: [Array.getUnsafe(texts, 0)],
                       inclusive: true,
                     },
-                    end: { key: [Array.getUnsafe(texts, 4)], inclusive: true },
+                    end: {
+                      orderKey: [Array.getUnsafe(texts, 4)],
+                      inclusive: true,
+                    },
                   }),
                 ),
               ).toEqual(texts.slice(1, 3));
@@ -891,11 +893,11 @@ describe("QueryStream", () => {
                 const result = yield* Stream.runCollect(
                   QueryStream.narrow(joined, {
                     start: {
-                      key: Array.getUnsafe(elements, 0).key,
+                      orderKey: Array.getUnsafe(elements, 0).key,
                       inclusive: startInclusive,
                     },
                     end: {
-                      key: Array.getUnsafe(elements, endIndex).key,
+                      orderKey: Array.getUnsafe(elements, endIndex).key,
                       inclusive: endInclusive,
                     },
                   }).annotated,
@@ -1974,8 +1976,8 @@ describe("QueryStream types", () => {
       >();
 
       // Narrowing requires at least one defined endpoint in either call form.
-      const start = { key: ["a"], inclusive: true };
-      const end = { key: ["z"], inclusive: false };
+      const start = { orderKey: ["a"], inclusive: true };
+      const end = { orderKey: ["z"], inclusive: false };
       const startOnly = QueryStream.narrow(full, { start });
       const endOnly = full.pipe(QueryStream.narrow({ end }));
       const between = QueryStream.narrow(full, { start, end });

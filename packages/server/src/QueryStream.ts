@@ -72,7 +72,6 @@ import type {
   NarrowBounds,
 } from "./QueryStreamKeyBounds";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
-import type { AnyIndexRangeSpec } from "./QueryStreamIndexRange";
 import * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 
 /**
@@ -424,14 +423,14 @@ export interface Reflection<Direction extends OrderDirection = OrderDirection> {
    */
   readonly indexFieldPaths: ReadonlyArray<string>;
   /**
-   * Recorded index constraints. Equality constraints pin the first `eqCount`
-   * fields, removing them from the stream's order key; range bounds do not.
+   * Index constraints. Equality constraints pin leading fields, removing them
+   * from the stream's order key; range bounds do not.
    */
-  readonly spec: AnyIndexRangeSpec;
+  readonly range: QueryStreamIndexRange.QueryStreamIndexRange;
   readonly order: Direction;
   /**
    * Effective bounds in full index-key values, including pinned fields and ID
-   * tiebreakers. If absent, bounds come from `spec`; supplied bounds intersect
+   * tiebreakers. If absent, bounds come from `range`; supplied bounds intersect
    * those constraints rather than replacing them.
    */
   readonly bounds?: IndexBounds;
@@ -463,12 +462,23 @@ export const fromReflection = <
   makeLeaf(
     reflection,
     reflection.bounds === undefined
-      ? QueryStreamIndexRange.boundsFromSpec(reflection.spec)
+      ? QueryStreamIndexRange.toBounds(reflection.range)
       : QueryStreamKeyBounds.intersectIndexBounds(
-          QueryStreamIndexRange.boundsFromSpec(reflection.spec),
+          QueryStreamIndexRange.toBounds(reflection.range),
           reflection.bounds,
         ),
   );
+
+/**
+ * Complete the source index paths with Convex's implicit ID tiebreaker. These
+ * paths address the encoded document and are never ordering aliases.
+ */
+const completeFieldPaths = (
+  fieldPaths: ReadonlyArray<string>,
+): ReadonlyArray<string> =>
+  Option.exists(Array.last(fieldPaths), (fieldPath) => fieldPath === "_id")
+    ? fieldPaths
+    : Array.append(fieldPaths, "_id");
 
 const makeLeaf = <Doc, Direction extends OrderDirection>(
   reflection: Reflection<Direction>,
@@ -484,36 +494,37 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   // fields plus the implicit `_id` tiebreaker (already explicit for
   // `by_id`). Convex accepts range constraints on `_creationTime` and
   // `_id` even though its index types don't advertise them.
-  const fullFieldPaths = QueryStreamIndexRange.completeFieldPaths(
-    reflection.indexFieldPaths,
+  const fullFieldPaths = completeFieldPaths(reflection.indexFieldPaths);
+  const equalityPrefixLength = QueryStreamIndexRange.equalityPrefixLength(
+    reflection.range,
   );
   const keyLayout = Result.getOrThrowWith(
     QueryStreamKeyLayout.fromIndex(
       reflection.indexFieldPaths,
-      reflection.spec.eqCount,
+      equalityPrefixLength,
     ),
     identity,
   );
   const keyPaths = Array.map(
-    Array.drop(fullFieldPaths, reflection.spec.eqCount),
+    Array.drop(fullFieldPaths, equalityPrefixLength),
     (fieldPath) => String.split(fieldPath, "."),
   );
   // `eq`-pinned values form a shared prefix of both bound keys.
-  const eqValues = Array.take(bounds.lower.key, reflection.spec.eqCount);
-  const segments = QueryStreamIndexRange.splitRange(
+  const eqValues = Array.take(bounds.lower.orderKey, equalityPrefixLength);
+  const ranges = QueryStreamIndexRange.fromBounds(
     fullFieldPaths,
     reflection.order,
     bounds,
   );
 
-  const encodedDocuments = Stream.fromIterable(segments).pipe(
-    Stream.flatMap((segment) =>
+  const encodedDocuments = Stream.fromIterable(ranges).pipe(
+    Stream.flatMap((range) =>
       Stream.suspend(() =>
         Stream.fromAsyncIterable(
           reflection.reader
             .query(reflection.tableName)
             .withIndex(reflection.indexName, (q) =>
-              QueryStreamIndexRange.applyOps(segment, q),
+              QueryStreamIndexRange.apply(range, q),
             )
             .order(reflection.order),
           identity,
@@ -542,7 +553,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   );
 
   const toFullKeySpace = (bound: KeyBound): KeyBound => ({
-    key: Array.appendAll(eqValues, bound.key),
+    orderKey: Array.appendAll(eqValues, bound.orderKey),
     inclusive: bound.inclusive,
   });
 
@@ -1367,18 +1378,18 @@ const makeFlatMap = <
     }),
   );
 
-  const split = ({ key, inclusive }: KeyBound): FlatMapBound =>
-    key.length <= outerLength
-      ? FlatMapBound.Outer({ key, inclusive })
+  const split = ({ orderKey, inclusive }: KeyBound): FlatMapBound =>
+    orderKey.length <= outerLength
+      ? FlatMapBound.Outer({ orderKey, inclusive })
       : FlatMapBound.Inner({
-          outer: Array.take(key, outerLength),
-          inner: { key: Array.drop(key, outerLength), inclusive },
+          outer: Array.take(orderKey, outerLength),
+          inner: { orderKey: Array.drop(orderKey, outerLength), inclusive },
         });
 
   const outerBound = (bound: FlatMapBound): KeyBound =>
     FlatMapBound.$match(bound, {
-      Outer: ({ key, inclusive }) => ({ key, inclusive }),
-      Inner: ({ outer }) => ({ key: outer, inclusive: true }),
+      Outer: ({ orderKey, inclusive }) => ({ orderKey, inclusive }),
+      Inner: ({ outer }) => ({ orderKey: outer, inclusive: true }),
     });
 
   return new QueryStream(
@@ -1575,9 +1586,9 @@ const makeDistinct = <
   order: Direction,
   bounds: KeyBounds,
 ): QueryStream<Doc, Labels, Direction, E, R> => {
-  const afterKey = (key: OrderKey): KeyBounds => {
+  const afterKey = (orderKey: OrderKey): KeyBounds => {
     const pastGroup: KeyBound = {
-      key,
+      orderKey,
       inclusive: false,
     };
     return order === "asc"
@@ -1587,9 +1598,9 @@ const makeDistinct = <
   const groupBound = (
     bound: Option.Option<KeyBound>,
   ): Option.Option<KeyBound> =>
-    Option.map(bound, ({ inclusive, key }) => ({
-      key: Array.take(key, distinctLength),
-      inclusive: key.length > distinctLength || inclusive,
+    Option.map(bound, ({ inclusive, orderKey }) => ({
+      orderKey: Array.take(orderKey, distinctLength),
+      inclusive: orderKey.length > distinctLength || inclusive,
     }));
   const isAdmitted = (key: OrderKey) =>
     QueryStreamKeyBounds.admittedByLower(bounds.lower)(key) &&
@@ -1630,8 +1641,8 @@ const makeDistinct = <
               narrowByKeyBounds(current, afterKey(prefix)),
             );
             const { firstKey, selected } = yield* narrowByKeyBounds(self, {
-              lower: Option.some({ key: prefix, inclusive: true }),
-              upper: Option.some({ key: prefix, inclusive: true }),
+              lower: Option.some({ orderKey: prefix, inclusive: true }),
+              upper: Option.some({ orderKey: prefix, inclusive: true }),
             }).annotated.pipe(
               Stream.run(
                 Sink.fold(
@@ -1729,7 +1740,7 @@ export const reverse = <
 
 /**
  * Restrict a stream to keys between `start` and `end`. Provide at least one
- * endpoint, each with key values and a required `inclusive` flag; omit the
+ * endpoint, each with an `orderKey` and a required `inclusive` flag; omit the
  * other endpoint to leave that side unbounded.
  *
  * Endpoints follow stream order: `start` is the lower key when ascending and
@@ -2073,8 +2084,14 @@ export const paginate: {
       });
     }
 
-    const start = Option.map(after, (key) => ({ key, inclusive: false }));
-    const end = Option.map(until, (key) => ({ key, inclusive: true }));
+    const start = Option.map(after, (orderKey) => ({
+      orderKey,
+      inclusive: false,
+    }));
+    const end = Option.map(until, (orderKey) => ({
+      orderKey,
+      inclusive: true,
+    }));
     const narrowed = narrowByKeyBounds(
       self,
       self.order === "asc"

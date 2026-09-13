@@ -130,18 +130,18 @@ export interface QueryInitializer<
         ConvexTableInfoFor<DataModel_, TableName>
       > &
         string,
-      Spec extends QueryStreamIndexRange.AnyIndexRangeSpec,
+      Range extends QueryStreamIndexRange.QueryStreamIndexRange,
     >(
       indexName: IndexName,
       indexRange: (
-        q: QueryStreamIndexRange.RangeBuilder<
+        q: QueryStreamIndexRange.Builder<
           TableInfoFor<DataModel_, TableName>["convexDocument"],
           NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
         >,
-      ) => Spec,
+      ) => Range,
     ): QueryStream.QueryStream<
       Doc,
-      QueryStreamIndexRange.Remaining<Spec>,
+      QueryStreamIndexRange.Remaining<Range>,
       "asc",
       Document.DocumentDecodeError,
       never
@@ -151,20 +151,20 @@ export interface QueryInitializer<
         ConvexTableInfoFor<DataModel_, TableName>
       > &
         string,
-      Spec extends QueryStreamIndexRange.AnyIndexRangeSpec,
+      Range extends QueryStreamIndexRange.QueryStreamIndexRange,
       Direction extends OrderDirection,
     >(
       indexName: IndexName,
       indexRange: (
-        q: QueryStreamIndexRange.RangeBuilder<
+        q: QueryStreamIndexRange.Builder<
           TableInfoFor<DataModel_, TableName>["convexDocument"],
           NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
         >,
-      ) => Spec,
+      ) => Range,
       order: Direction,
     ): QueryStream.QueryStream<
       Doc,
-      QueryStreamIndexRange.Remaining<Spec>,
+      QueryStreamIndexRange.Remaining<Range>,
       Direction,
       Document.DocumentDecodeError,
       never
@@ -366,8 +366,8 @@ export const make = <
     indexName: string,
     indexRangeOrOrder?:
       | ((
-          q: QueryStreamIndexRange.RangeBuilder<any, any>,
-        ) => QueryStreamIndexRange.AnyIndexRangeSpec)
+          q: QueryStreamIndexRange.Builder<any, any>,
+        ) => QueryStreamIndexRange.QueryStreamIndexRange)
       | OrderDirection,
     maybeOrder?: OrderDirection,
   ) => {
@@ -375,11 +375,10 @@ export const make = <
       ? indexRangeOrOrder
       : (maybeOrder ?? "asc");
 
-    // With no range callback, the leaf gets an empty spec (no ops, no
-    // pinned fields).
-    const spec = Predicate.isFunction(indexRangeOrOrder)
-      ? indexRangeOrOrder(QueryStreamIndexRange.rangeBuilder())
-      : QueryStreamIndexRange.rangeBuilder();
+    // Without a range callback, the leaf scans the entire index.
+    const range = Predicate.isFunction(indexRangeOrOrder)
+      ? indexRangeOrOrder(QueryStreamIndexRange.builder())
+      : QueryStreamIndexRange.builder();
 
     // The type-level field tuple appends the `_creationTime` tiebreaker, but
     // the runtime `table.indexes` record stores only the declared fields—append it here.
@@ -412,7 +411,7 @@ export const make = <
       tableSchema: table.Fields,
       indexName,
       indexFieldPaths,
-      spec,
+      range,
       order,
     });
   }) as QueryInitializerFunction<"stream">;

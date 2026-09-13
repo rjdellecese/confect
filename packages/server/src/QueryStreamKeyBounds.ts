@@ -1,9 +1,8 @@
 import * as Array from "effect/Array";
+import * as Data from "effect/Data";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
-import type * as Record from "effect/Record";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
-import type { QueryStreamOrderKey as OrderKey } from "./QueryStreamOrderKey";
 
 // A bound's key may be a *prefix* of the full key: bounding by `["a"]` means
 // bounding by the whole family of keys that start with `"a"`. To compare
@@ -18,7 +17,7 @@ import type { QueryStreamOrderKey as OrderKey } from "./QueryStreamOrderKey";
  * @experimental
  */
 export interface KeyBound {
-  readonly key: OrderKey;
+  readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey;
   readonly inclusive: boolean;
 }
 
@@ -35,7 +34,7 @@ export interface KeyBounds {
 
 /**
  * Bounds in _full index-key space_: `eq`-pinned values appear as a shared
- * prefix of both keys (`splitRange` re-derives them as `eq` constraints). An
+ * prefix of both keys (`fromBounds` re-derives them as `eq` constraints). An
  * empty key bounds nothing.
  *
  * @experimental
@@ -45,52 +44,54 @@ export interface IndexBounds {
   readonly upper: KeyBound;
 }
 
-type CutKind = "predecessor" | "exact" | "successor";
+type KeyCut = Data.TaggedEnum<{
+  Predecessor: { readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey };
+  Exact: { readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey };
+  Successor: { readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey };
+}>;
+const KeyCut = Data.taggedEnum<KeyCut>();
 
-interface KeyCut {
-  readonly key: OrderKey;
-  readonly kind: CutKind;
-}
-
-const cutKindRank: Record.ReadonlyRecord<CutKind, number> = {
-  predecessor: 0,
-  exact: 1,
-  successor: 2,
-};
+const cutRank = KeyCut.$match({
+  Predecessor: () => 0,
+  Exact: () => 1,
+  Successor: () => 2,
+});
 
 const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
-  const minLength = Math.min(self.key.length, that.key.length);
+  const minLength = Math.min(self.orderKey.length, that.orderKey.length);
   const prefixOrdering = QueryStreamOrderKey.Order(
-    Array.take(self.key, minLength),
-    Array.take(that.key, minLength),
+    Array.take(self.orderKey, minLength),
+    Array.take(that.orderKey, minLength),
   );
   if (prefixOrdering !== 0) {
     return prefixOrdering;
   }
-  if (self.key.length === that.key.length) {
-    return Order.Number(cutKindRank[self.kind], cutKindRank[that.kind]);
+  if (self.orderKey.length === that.orderKey.length) {
+    return Order.Number(cutRank(self), cutRank(that));
   }
   // One key is a proper prefix of the other. The shorter cut sits just
   // before (`predecessor`) or just after (`successor`) *every* key
   // extending its prefix—the longer one included. (`exact` cuts are
   // always full keys, so an `exact` cut is never the shorter one here.)
-  const selfIsShorter = self.key.length < that.key.length;
+  const selfIsShorter = self.orderKey.length < that.orderKey.length;
   const shorter = selfIsShorter ? self : that;
-  const shorterOrdering = shorter.kind === "predecessor" ? -1 : 1;
+  const shorterOrdering = KeyCut.$match(shorter, {
+    Predecessor: () => -1 as const,
+    Exact: () => 1 as const,
+    Successor: () => 1 as const,
+  });
   return selfIsShorter ? shorterOrdering : (-shorterOrdering as -1 | 1);
 });
 
-const exactCut = (key: OrderKey): KeyCut => ({ key, kind: "exact" });
+const lowerCut = (bound: KeyBound): KeyCut =>
+  bound.inclusive
+    ? KeyCut.Predecessor({ orderKey: bound.orderKey })
+    : KeyCut.Successor({ orderKey: bound.orderKey });
 
-const lowerCut = (bound: KeyBound): KeyCut => ({
-  key: bound.key,
-  kind: bound.inclusive ? "predecessor" : "successor",
-});
-
-const upperCut = (bound: KeyBound): KeyCut => ({
-  key: bound.key,
-  kind: bound.inclusive ? "successor" : "predecessor",
-});
+const upperCut = (bound: KeyBound): KeyCut =>
+  bound.inclusive
+    ? KeyCut.Successor({ orderKey: bound.orderKey })
+    : KeyCut.Predecessor({ orderKey: bound.orderKey });
 
 /**
  * The stricter (later) of two lower bounds.
@@ -158,10 +159,11 @@ export const intersectIndexBounds = (
  */
 export const admittedByLower =
   (lower: Option.Option<KeyBound>) =>
-  (key: OrderKey): boolean =>
+  (orderKey: QueryStreamOrderKey.QueryStreamOrderKey): boolean =>
     Option.match(lower, {
       onNone: () => true,
-      onSome: (bound) => KeyCutOrder(exactCut(key), lowerCut(bound)) > 0,
+      onSome: (bound) =>
+        KeyCutOrder(KeyCut.Exact({ orderKey }), lowerCut(bound)) > 0,
     });
 
 /**
@@ -171,10 +173,11 @@ export const admittedByLower =
  */
 export const admittedByUpper =
   (upper: Option.Option<KeyBound>) =>
-  (key: OrderKey): boolean =>
+  (orderKey: QueryStreamOrderKey.QueryStreamOrderKey): boolean =>
     Option.match(upper, {
       onNone: () => true,
-      onSome: (bound) => KeyCutOrder(exactCut(key), upperCut(bound)) < 0,
+      onSome: (bound) =>
+        KeyCutOrder(KeyCut.Exact({ orderKey }), upperCut(bound)) < 0,
     });
 
 /**

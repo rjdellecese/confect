@@ -136,12 +136,16 @@ describe("QueryStream distinct representatives", () => {
           const key = [a2.text, a2._creationTime, a2._id];
           expect(
             yield* tags(
-              QueryStream.narrow(distinct, { start: { key, inclusive: true } }),
+              QueryStream.narrow(distinct, {
+                start: { orderKey: key, inclusive: true },
+              }),
             ),
           ).toEqual([]);
           expect(
             yield* tags(
-              QueryStream.narrow(distinct, { end: { key, inclusive: true } }),
+              QueryStream.narrow(distinct, {
+                end: { orderKey: key, inclusive: true },
+              }),
             ),
           ).toEqual(["a1"]);
 
@@ -262,28 +266,30 @@ describe("QueryStream distinct representatives", () => {
             expect(
               yield* tags(
                 QueryStream.narrow(distinct, {
-                  start: { key: key2, inclusive },
+                  start: { orderKey: key2, inclusive },
                 }),
               ),
             ).toEqual(["b1", "c1"]);
             expect(
               yield* tags(
-                QueryStream.narrow(distinct, { end: { key: key2, inclusive } }),
+                QueryStream.narrow(distinct, {
+                  end: { orderKey: key2, inclusive },
+                }),
               ),
             ).toEqual(["a1"]);
             expect(
               yield* tags(
                 QueryStream.narrow(distinct, {
-                  start: { key: key2, inclusive },
-                  end: { key: key3, inclusive },
+                  start: { orderKey: key2, inclusive },
+                  end: { orderKey: key3, inclusive },
                 }),
               ),
             ).toEqual([]);
             expect(
               yield* tags(
                 QueryStream.narrow(QueryStream.reverse(distinct), {
-                  start: { key: key3, inclusive },
-                  end: { key: key2, inclusive },
+                  start: { orderKey: key3, inclusive },
+                  end: { orderKey: key2, inclusive },
                 }),
               ),
             ).toEqual([]);
@@ -305,24 +311,30 @@ describe("QueryStream distinct representatives", () => {
 
           expect(
             yield* tags(
-              QueryStream.narrow(distinct, { start: { key, inclusive: true } }),
+              QueryStream.narrow(distinct, {
+                start: { orderKey: key, inclusive: true },
+              }),
             ),
           ).toEqual(["a1", "b1", "c1"]);
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                start: { key, inclusive: false },
+                start: { orderKey: key, inclusive: false },
               }),
             ),
           ).toEqual(["b1", "c1"]);
           expect(
             yield* tags(
-              QueryStream.narrow(distinct, { end: { key, inclusive: true } }),
+              QueryStream.narrow(distinct, {
+                end: { orderKey: key, inclusive: true },
+              }),
             ),
           ).toEqual(["a1"]);
           expect(
             yield* tags(
-              QueryStream.narrow(distinct, { end: { key, inclusive: false } }),
+              QueryStream.narrow(distinct, {
+                end: { orderKey: key, inclusive: false },
+              }),
             ),
           ).toEqual([]);
         }),
@@ -343,7 +355,7 @@ describe("QueryStream distinct representatives", () => {
             .pipe(
               QueryStream.narrow({
                 start: {
-                  key: [a2.text, a2._creationTime, a2._id],
+                  orderKey: [a2.text, a2._creationTime, a2._id],
                   inclusive: true,
                 },
               }),
