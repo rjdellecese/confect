@@ -40,6 +40,48 @@ describe("QueryStreamReadBudget", () => {
     ).toMatchObject({ rowsRead: 0, bytesRead: 0 });
   });
 
+  it.effect.each(["maximumRowsRead", "maximumBytesRead"] as const)(
+    "parses %s before allocating a budget",
+    (field) =>
+      Effect.gen(function* () {
+        for (const value of [-1, 0.5, NaN, Infinity, -Infinity]) {
+          const error = yield* QueryStreamReadBudget.make({
+            maximumRowsRead: Option.none(),
+            maximumBytesRead: Option.none(),
+            [field]: Option.some(value),
+          }).pipe(Effect.flip);
+          expect(error).toBeInstanceOf(
+            QueryStreamReadBudget.InvalidReadLimitError,
+          );
+          expect(error.field).toBe(field);
+          expect(error.value).toBe(value);
+        }
+      }),
+  );
+
+  it.effect.each(["rows", "bytes"] as const)(
+    "stops at either %s limit when both limits are present",
+    (firstLimit) =>
+      Effect.gen(function* () {
+        const doc = { _id: "n1", _creationTime: 1, text: "hello" };
+        const budget = yield* QueryStreamReadBudget.make({
+          maximumRowsRead: Option.some(firstLimit === "rows" ? 1 : 10),
+          maximumBytesRead: Option.some(firstLimit === "bytes" ? 1 : 10000),
+        });
+        const result = yield* QueryStreamReadBudget.charge(
+          Stream.fromIterable([doc, doc]).pipe(Stream.rechunk(1)),
+        ).pipe(Stream.runCollect, QueryStreamReadBudget.provide(budget));
+        expect(result).toEqual([doc]);
+        expect(yield* QueryStreamReadBudget.exceeded(budget)).toMatchObject({
+          rowsRead: 1,
+          bytesRead: getDocumentSize(doc),
+        });
+        expect(
+          yield* QueryStreamReadBudget.isStopped(Option.some(budget)),
+        ).toBe(true);
+      }),
+  );
+
   it.effect("defaults to unrestricted reads without a shared budget", () =>
     Effect.gen(function* () {
       expect(Option.isNone(yield* QueryStreamReadBudget.current)).toBe(true);

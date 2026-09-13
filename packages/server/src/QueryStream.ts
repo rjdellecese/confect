@@ -156,10 +156,18 @@ export class MissingReversalRecipeError extends Data.TaggedError(
  *
  * @experimental
  */
-export {
-  EmptyInitialPageError,
-  InvalidPageSizeError,
-} from "./QueryStreamPagination";
+export { EmptyInitialPageError } from "./QueryStreamPagination";
+
+/**
+ * Invalid numeric pagination options. @experimental.
+ */
+export { InvalidPageSizeError } from "./QueryStreamPagination";
+export { InvalidReadLimitError } from "./QueryStreamReadBudget";
+
+/**
+ * A read budget prevented a safe continuation boundary. @experimental.
+ */
+export { ReadBudgetExceededError } from "./QueryStreamReadBudget";
 
 /**
  * Runtime identifier used to distinguish query streams from plain streams.
@@ -2150,7 +2158,7 @@ export const paginate: {
     const budget = yield* QueryStreamReadBudget.make({
       maximumRowsRead: Option.fromUndefinedOr(options.maximumRowsRead),
       maximumBytesRead: Option.fromUndefinedOr(options.maximumBytesRead),
-    });
+    }).pipe(Effect.orDie);
     const collected = yield* pipe(
       Stream.run(
         narrowed.annotated,
