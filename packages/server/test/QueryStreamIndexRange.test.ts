@@ -14,6 +14,24 @@ type Doc = {
 const builder = () =>
   QueryStreamIndexRange.rangeBuilder<Doc, ["category", "score", "_id"]>();
 
+describe("QueryStreamIndexRange.completeFieldPaths", () => {
+  it.each([
+    { fieldPaths: [], expected: ["_id"] },
+    {
+      fieldPaths: ["author.role", "_creationTime"],
+      expected: ["author.role", "_creationTime", "_id"],
+    },
+    { fieldPaths: ["_id"], expected: ["_id"] },
+    { fieldPaths: ["_id", "text"], expected: ["_id", "text", "_id"] },
+  ])(
+    "completes the physical index paths for $fieldPaths",
+    ({ fieldPaths, expected }) => {
+      const completed = QueryStreamIndexRange.completeFieldPaths(fieldPaths);
+      expect(completed).toEqual(expected);
+    },
+  );
+});
+
 describe("QueryStreamIndexRange operations", () => {
   it.each(["eq", "gt", "gte", "lt", "lte"] as const)(
     "constructs %s operations with the existing record shape",

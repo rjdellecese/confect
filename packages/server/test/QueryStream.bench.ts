@@ -1,7 +1,8 @@
-import * as QueryStreamKeyFields from "@confect/server/QueryStreamKeyFields";
+import { identity } from "effect/Function";
+import * as Result from "effect/Result";
+import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import { bench } from "confect-bench-harness";
 import * as QueryStream from "@confect/server/QueryStream";
-import * as Stream from "effect/Stream";
 
 interface Note {
   readonly _id: string;
@@ -16,29 +17,20 @@ interface Message {
   readonly noteId: string;
 }
 
-// Hand-built leaves stand in for `reader.table(...).stream(...)`, so the
+// Empty streams stand in for `reader.table(...).stream(...)`, so the
 // counts cover the combinators' types rather than the initializer's.
-const leaf = <Doc, Key extends ReadonlyArray<string>>(
-  keyFields: ReadonlyArray<string>,
-) =>
-  new QueryStream.QueryStream(
-    "asc",
-    QueryStreamKeyFields.fromIndex(keyFields.slice(0, -1)),
-    Stream.empty,
-  ) as unknown as QueryStream.QueryStream<Doc, Key, "asc", never, never>;
-
-const notes = leaf<Note, ["text", "_creationTime"]>([
-  "text",
-  "_creationTime",
-  "_id",
-]);
-const moreNotes = leaf<Note, ["text", "_creationTime"]>([
-  "text",
-  "_creationTime",
-  "_id",
-]);
+const notesLayout = Result.getOrThrowWith(
+  QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
+  identity,
+);
+const messagesLayout = Result.getOrThrowWith(
+  QueryStreamKeyLayout.fromIndex(["_creationTime"]),
+  identity,
+);
+const notes = QueryStream.empty<Note>()(notesLayout);
+const moreNotes = QueryStream.empty<Note>()(notesLayout);
 const messagesOf = (_note: Note) =>
-  leaf<Message, ["_creationTime"]>(["_creationTime", "_id"]);
+  QueryStream.empty<Message>()(messagesLayout);
 const paginationOpts: QueryStream.PaginateOptions = {
   numItems: 10,
   cursor: null,
@@ -46,7 +38,7 @@ const paginationOpts: QueryStream.PaginateOptions = {
 
 bench("filter", () => {
   return QueryStream.filter(notes, (note) => note.tag !== "hidden");
-}).types([185, "instantiations"]);
+}).types([186, "instantiations"]);
 
 bench("merge", () => {
   return QueryStream.merge([notes, moreNotes]);
@@ -54,16 +46,18 @@ bench("merge", () => {
 
 bench("flatMap", () => {
   return QueryStream.flatMap(notes, messagesOf, {
-    innerKey: ["_creationTime"],
+    innerLayout: messagesLayout,
   });
-}).types([192, "instantiations"]);
+}).types([156, "instantiations"]);
 
 bench("stream → filter → merge → flatMap → paginate", () => {
   return QueryStream.merge([
     QueryStream.filter(notes, (note) => note.tag !== "hidden"),
     moreNotes,
   ]).pipe(
-    QueryStream.flatMap(messagesOf, { innerKey: ["_creationTime"] }),
+    QueryStream.flatMap(messagesOf, {
+      innerLayout: messagesLayout,
+    }),
     QueryStream.paginate(paginationOpts),
   );
-}).types([2491, "instantiations"]);
+}).types([486, "instantiations"]);

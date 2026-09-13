@@ -1,6 +1,9 @@
 # Capy repository instructions
 
 - Never read `.env.local` files.
+- Treat library inputs as immutable by convention. Do not defensively copy or freeze them to guard against caller mutation; library operations must also preserve their inputs.
+- Keep a functional core and an imperative shell. Return named, tagged errors with structured payloads from fallible core operations (for example, in `Result`); let boundary code decide whether to fail, die, or throw. Do not use generic `Error` values for modeled failures.
+- Document stream-query APIs through `QueryStream`. Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers.
 - Do not inspect dependency source in `node_modules`, `.pnpm-store`, or `.pnpm`. Run `pnpm opensrc path <package-name>` and inspect the returned source path instead. Cached package versions are listed in `~/.opensrc/sources.json`.
 - After editing a file type supported by Oxfmt, run `pnpm oxfmt --write <file>` on the edited file.
 - After editing JavaScript or TypeScript, run `pnpm oxlint --fix <file>` on the edited file and report any remaining diagnostics.

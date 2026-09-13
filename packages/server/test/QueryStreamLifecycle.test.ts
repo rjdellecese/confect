@@ -140,7 +140,7 @@ const makeReader = (pending?: PendingRead) => {
     tableName: "documents",
     tableSchema,
     indexName: "by_group",
-    indexFields: ["group", "_creationTime"],
+    indexFieldPaths: ["group", "_creationTime"],
     spec: QueryStreamIndexRange.rangeBuilder<
       Document,
       ["group", "_creationTime"]

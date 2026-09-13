@@ -234,7 +234,7 @@ export const make = <
     DataModel.DocumentWithName<DataModel_, TableName>,
     Document.DocumentDecodeError | GetByIndexFailure
   > => {
-    const indexFields: GenericTableIndexes[keyof GenericTableIndexes] = (
+    const indexFieldPaths: GenericTableIndexes[keyof GenericTableIndexes] = (
       table.indexes as GenericTableIndexes
     )[indexName as keyof GenericTableIndexes]!;
 
@@ -246,7 +246,7 @@ export const make = <
             Array.reduce(
               indexFieldValues,
               q,
-              (q_, v, i) => q_.eq(indexFields[i] as any, v as any) as any,
+              (q_, v, i) => q_.eq(indexFieldPaths[i] as any, v as any) as any,
             ),
           )
           .unique(),
@@ -383,7 +383,7 @@ export const make = <
 
     // The type-level field tuple appends the `_creationTime` tiebreaker, but
     // the runtime `table.indexes` record stores only the declared fields—append it here.
-    const indexFields: ReadonlyArray<string> =
+    const indexFieldPaths: ReadonlyArray<string> =
       indexName === "by_id"
         ? ["_id"]
         : indexName === "by_creation_time"
@@ -411,7 +411,7 @@ export const make = <
       tableName,
       tableSchema: table.Fields,
       indexName,
-      indexFields,
+      indexFieldPaths,
       spec,
       order,
     });
