@@ -1,4 +1,4 @@
-import type { GroupSpec, Spec } from "@confect/core";
+import { type GroupSpec, Spec } from "@confect/core";
 import { pipe } from "effect/Function";
 import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
@@ -14,7 +14,11 @@ export const FunctionPaths = Schema.HashSet(FunctionPath.FunctionPath).pipe(
 export type FunctionPaths = typeof FunctionPaths.Type;
 
 export const make = (spec: Spec.AnyWithProps): FunctionPaths =>
-  makeHelper(spec.groups, Option.none(), FunctionPaths.make(HashSet.empty()));
+  makeHelper(
+    Spec.groups(spec),
+    Option.none(),
+    FunctionPaths.make(HashSet.empty()),
+  );
 
 const makeHelper = (
   groups: {

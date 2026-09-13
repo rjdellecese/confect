@@ -1,5 +1,6 @@
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
+import * as Struct from "effect/Struct";
 import * as GroupSpec from "./GroupSpec";
 
 export const TypeId = "~@confect/core/Spec";
@@ -15,61 +16,71 @@ export const isSpec = (u: unknown): u is AnyWithProps =>
  * group lives on the group itself (`GroupSpec.runtime`) and on each function's
  * `RuntimeAndFunctionType`; the spec does not carry a runtime of its own.
  */
-export interface Spec<Groups_ extends GroupSpec.AnyWithProps = never> {
-  readonly [TypeId]: TypeId;
-  readonly groups: {
-    [GroupName in GroupSpec.Name<Groups_>]: GroupSpec.WithName<
-      Groups_,
-      GroupName
-    >;
-  };
-  readonly "~Groups": Groups_;
+export interface Spec<
+  Groups_ extends Record.ReadonlyRecord<string, GroupSpec.AnyWithProps> = {},
+> {
+  readonly [TypeId]: Readonly<Groups_>;
 
   add<Group extends GroupSpec.AnyWithProps>(
     group: Group,
-  ): Spec<Groups_ | Group>;
+  ): Spec<
+    Struct.Assign<Groups_, Record.ReadonlyRecord<GroupSpec.Name<Group>, Group>>
+  >;
 
   addAt<const Name extends string, Group extends GroupSpec.AnyWithProps>(
     name: Name,
     group: Group,
-  ): Spec<Groups_ | GroupSpec.NamedAt<Group, Name>>;
+  ): Spec<
+    Struct.Assign<
+      Groups_,
+      Record.ReadonlyRecord<Name, GroupSpec.NamedAt<Group, Name>>
+    >
+  >;
 }
 
 export interface Any {
-  readonly [TypeId]: TypeId;
+  readonly [TypeId]: unknown;
 }
 
-export interface AnyWithProps extends Spec<GroupSpec.AnyWithProps> {}
+export interface AnyWithProps extends Any {
+  readonly [TypeId]: Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>;
+}
 
-export type Groups<Spec_ extends AnyWithProps> = Spec_["~Groups"];
+export type Groups<Spec_ extends AnyWithProps> =
+  Spec_[TypeId][keyof Spec_[TypeId]];
 
-const Proto = {
-  [TypeId]: TypeId,
+/**
+ * The group record stored by a spec, with its precise member types.
+ */
+export const groups = <Spec_ extends AnyWithProps>(
+  self: Spec_,
+): Spec_[TypeId] => self[TypeId];
 
-  add<Group extends GroupSpec.AnyWithProps>(this: AnyWithProps, group: Group) {
-    return makeProto({
-      groups: Record.set(this.groups, group.name, group),
-    });
+const makeRecord = <
+  Groups_ extends Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
+>(
+  record: Groups_,
+): Spec<Groups_> => ({
+  [TypeId]: record,
+  add<Group extends GroupSpec.AnyWithProps>(group: Group) {
+    return makeRecord(
+      Struct.assign(
+        record,
+        Record.singleton<GroupSpec.Name<Group>, Group>(group.name, group),
+      ),
+    );
   },
-
-  addAt<Group extends GroupSpec.AnyWithProps>(
-    this: AnyWithProps,
-    name: string,
+  addAt<const Name extends string, Group extends GroupSpec.AnyWithProps>(
+    name: Name,
     group: Group,
   ) {
-    return makeProto({
-      groups: Record.set(this.groups, name, GroupSpec.withName(name, group)),
-    });
+    return makeRecord(
+      Struct.assign(
+        record,
+        Record.singleton(name, GroupSpec.withName(name, group)),
+      ),
+    );
   },
-};
+});
 
-const makeProto = <Groups_ extends GroupSpec.AnyWithProps>({
-  groups,
-}: {
-  groups: Record.ReadonlyRecord<string, Groups_>;
-}): Spec<Groups_> =>
-  Object.assign(Object.create(Proto), {
-    groups,
-  }) as Spec<Groups_>;
-
-export const make = (): Spec => makeProto({ groups: {} });
+export const make = (): Spec => makeRecord({});

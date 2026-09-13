@@ -2,7 +2,7 @@ import type { GenericDatabaseReader } from "convex/server";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 import type { BaseDatabaseReader } from "@confect/core/Types";
-import type * as DatabaseSchema from "./DatabaseSchema";
+import * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as QueryInitializer from "./QueryInitializer";
 import * as Table from "./Table";
@@ -12,7 +12,7 @@ type IncludedTables<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | Table.SystemTables;
 
 type IncludedDataModel<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
-  DataModel.DataModel<IncludedTables<DatabaseSchema_>>;
+  DataModel.FromTables<IncludedTables<DatabaseSchema_>>;
 
 export interface DatabaseReaderService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -67,7 +67,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
           ? (Table.systemTables as Record<string, Table.AnyWithProps>)[
               tableName
             ]
-          : databaseSchema.tables[tableName]
+          : DatabaseSchema.tables(databaseSchema)[tableName]
       ) as Table.WithName<IncludedTables<DatabaseSchema_>, TableName>;
 
       return QueryInitializer.make<IncludedTables<DatabaseSchema_>, TableName>(

@@ -11,7 +11,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
-import type * as DatabaseSchema from "./DatabaseSchema";
+import * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type { DocumentByName as DocumentByName_ } from "./DataModel";
 import * as Document from "./Document";
@@ -102,10 +102,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   const table = <const TableName extends DataModel.TableNames<DataModel_>>(
     tableName: TableName,
   ) => {
-    const tableDef = databaseSchema.tables[tableName] as Table.WithName<
-      DatabaseSchema.Tables<DatabaseSchema_>,
-      TableName
-    >;
+    const tableDef = DatabaseSchema.tables(databaseSchema)[tableName];
 
     const insert = Effect.fn("DatabaseWriter.insert")(function* (
       document: Document.WithoutSystemFields<
@@ -140,7 +137,10 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         DataModel.TableInfoWithName_<DataModel_, TableName>
       >;
 
-      const originalDecodedDoc = yield* QueryInitializer.getById(
+      const originalDecodedDoc = yield* QueryInitializer.getById<
+        Table.AnyWithProps,
+        TableName
+      >(
         tableName,
         convexDatabaseWriter as any,
         tableDef,
