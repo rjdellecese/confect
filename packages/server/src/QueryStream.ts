@@ -316,10 +316,8 @@ export const isQueryStream = (u: unknown): u is Any =>
  *
  * Nothing can infer the document type from no documents, so it is supplied as a
  * type argument in a first, otherwise empty call:
- * `QueryStream.empty<NotesDoc>()(source.keyLayout, "desc")`. Reuse the layout
- * of compatible streams, or construct a scan layout with
- * `QueryStreamKeyLayout.fromIndex(["text", "_creationTime"])`, handling its
- * `Result` before passing the layout.
+ * `QueryStream.empty<NotesDoc>()(source.keyLayout, "desc")`. Reuse a compatible
+ * stream's layout; creating that stream does not read documents.
  *
  * @experimental
  */
