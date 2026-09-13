@@ -1,7 +1,10 @@
 import * as Pagination from "@confect/server/QueryStreamPagination";
 import * as Key from "@confect/server/QueryStreamKey";
 import * as Layout from "@confect/server/QueryStreamKeyLayout";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import * as Array from "effect/Array";
+import type * as Chunk from "effect/Chunk";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 
@@ -12,13 +15,21 @@ const request = (
   range: Pagination.Range = Pagination.Range.Unpinned(),
 ): Pagination.ScanRequest => {
   const parsed = Result.getOrThrow(
-    Pagination.parseRequest(numItems, null, Option.none(), range),
+    Pagination.parseRequest(numItems, Pagination.Start.Beginning(), range),
   );
-  if (parsed._tag === "Unchanged") throw new Error("Expected a scan request");
-  return parsed;
+  return Match.value(parsed).pipe(
+    Match.tagsExhaustive({
+      Scan: (scan) => scan,
+      Unchanged: () => {
+        throw new Pagination.EmptyInitialPageError();
+      },
+    }),
+  );
 };
 const scan = (req: Pagination.ScanRequest, count: number, filtered = false) =>
-  Array.from({ length: count }, (_, index) => index + 1).reduce(
+  Array.reduce(
+    Array.drop(Array.range(0, count), 1),
+    Pagination.initial<number>(),
     (state, value) =>
       Pagination.record(
         req,
@@ -27,17 +38,33 @@ const scan = (req: Pagination.ScanRequest, count: number, filtered = false) =>
         key(value),
         false,
       ),
-    Pagination.initial<number>(),
   );
 
 describe("QueryStreamPagination", () => {
+  it("requires progress in each stopped variant", () => {
+    type Stopped = Extract<
+      Pagination.QueryStreamPagination<number>,
+      { readonly _tag: "ItemLimit" | "ReadLimit" }
+    >;
+    expectTypeOf<Stopped["progress"]>().toEqualTypeOf<
+      Chunk.NonEmptyChunk<Key.Complete>
+    >();
+    expectTypeOf<{
+      readonly _tag: "After";
+      readonly cursor: string;
+    }>().not.toExtend<Pagination.Start>();
+    expectTypeOf<{
+      readonly _tag: "After";
+      readonly orderKey: Key.Complete;
+    }>().not.toExtend<Pagination.Start>();
+  });
+
   it.each([-1, 1.5, NaN, Infinity])(
     "rejects invalid page size %s",
     (numItems) => {
       const parsed = Pagination.parseRequest(
         numItems,
-        null,
-        Option.none(),
+        Pagination.Start.Beginning(),
         Pagination.Range.Unpinned(),
       );
       expect(Result.isFailure(parsed)).toBe(true);
@@ -51,16 +78,14 @@ describe("QueryStreamPagination", () => {
       Result.getOrThrow(
         Pagination.parseRequest(
           0,
-          "original",
-          Option.some(key(1)),
+          Pagination.Start.After({ cursor: "original", orderKey: key(1) }),
           Pagination.Range.Unpinned(),
         ),
       ),
     ).toEqual({ _tag: "Unchanged", cursor: "original" });
     const initial = Pagination.parseRequest(
       0,
-      null,
-      Option.none(),
+      Pagination.Start.Beginning(),
       Pagination.Range.Unpinned(),
     );
     expect(Result.isFailure(initial)).toBe(true);
@@ -78,13 +103,13 @@ describe("QueryStreamPagination", () => {
     expect(Result.getOrThrow(Pagination.finish(req, stopped, false))).toEqual({
       _tag: "Continue",
       page: [1, 2],
-      key: key(2),
+      orderKey: key(2),
     });
   });
 
   it("reads pinned ranges past the requested item count", () => {
     for (const range of [
-      Pagination.Range.ThroughKey({ key: key(9) }),
+      Pagination.Range.ThroughKey({ orderKey: key(9) }),
       Pagination.Range.ThroughEnd(),
     ]) {
       const req = request(2, range);
@@ -93,11 +118,11 @@ describe("QueryStreamPagination", () => {
       expect(Result.getOrThrow(Pagination.finish(req, state, false))).toEqual({
         _tag: "SplitRecommended",
         page: [1, 2, 3, 4],
-        split: key(2),
+        splitOrderKey: key(2),
         continuation:
           range._tag === "ThroughKey"
-            ? Pagination.Continuation.Key({ key: key(9) })
-            : Pagination.Continuation.End(),
+            ? { _tag: "Key", orderKey: key(9) }
+            : { _tag: "End" },
       });
     }
   });
@@ -108,7 +133,10 @@ describe("QueryStreamPagination", () => {
     expect(Result.isFailure(empty)).toBe(true);
     if (Result.isFailure(empty))
       expect(empty.failure.reason).toBe("NoProgress");
-    const pinned = request(2, Pagination.Range.ThroughKey({ key: key(1) }));
+    const pinned = request(
+      2,
+      Pagination.Range.ThroughKey({ orderKey: key(1) }),
+    );
     const boundary = Pagination.finish(pinned, scan(pinned, 1), true);
     expect(Result.isFailure(boundary)).toBe(true);
     if (Result.isFailure(boundary))
@@ -118,8 +146,8 @@ describe("QueryStreamPagination", () => {
     ).toEqual({
       _tag: "SplitRequired",
       page: [],
-      continuation: Pagination.Continuation.Key({ key: key(1) }),
-      split: key(1),
+      continuation: { _tag: "Key", orderKey: key(1) },
+      splitOrderKey: key(1),
     });
   });
 

@@ -41,6 +41,7 @@ import * as Chunk from "effect/Chunk";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Filter from "effect/Filter";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
@@ -2084,41 +2085,44 @@ export const paginate: {
   >(self: QueryStream<Doc, Labels, Direction, E, R>, options: PaginateOptions) {
     const cursorSchema = QueryStreamCursor.codecForLayout(self.keyLayout);
     const encodeCursor = Schema.encodeEffect(cursorSchema);
-    const decodeCursor = Schema.decodeEffect(Schema.NullOr(cursorSchema));
-    const endCursor = Option.fromNullishOr(options.endCursor);
-    const pinnedEnd = Option.filter(
-      endCursor,
-      (cursor) => cursor !== QueryStreamCursor.END_CURSOR,
-    );
+    const decodeCursor = Schema.decodeEffect(cursorSchema);
+    const complete = (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
+      Result.getOrThrowWith(
+        QueryStreamKey.complete(self.keyLayout, orderKey),
+        identity,
+      );
     const decoded = yield* Effect.all({
-      after: decodeCursor(options.cursor),
-      until: decodeCursor(Option.getOrNull(pinnedEnd)),
+      start: Option.match(Option.fromNullOr(options.cursor), {
+        onNone: () => Effect.succeed(QueryStreamPagination.Start.Beginning()),
+        onSome: (cursor) =>
+          Effect.map(decodeCursor(cursor), (orderKey) =>
+            QueryStreamPagination.Start.After({
+              cursor,
+              orderKey: complete(orderKey),
+            }),
+          ),
+      }),
+      range: Option.match(Option.fromNullishOr(options.endCursor), {
+        onNone: () => Effect.succeed(QueryStreamPagination.Range.Unpinned()),
+        onSome: (cursor) =>
+          cursor === QueryStreamCursor.END_CURSOR
+            ? Effect.succeed(QueryStreamPagination.Range.ThroughEnd())
+            : Effect.map(decodeCursor(cursor), (orderKey) =>
+                QueryStreamPagination.Range.ThroughKey({
+                  orderKey: complete(orderKey),
+                }),
+              ),
+      }),
     }).pipe(
       Effect.mapError(
         () => new ConvexError({ paginationError: "InvalidCursor" }),
       ),
       Effect.orDie,
     );
-    const complete = (values: QueryStreamOrderKey.QueryStreamOrderKey) =>
-      Result.getOrThrowWith(
-        QueryStreamKey.complete(self.keyLayout, values),
-        identity,
-      );
-    const after = Option.map(Option.fromNullOr(decoded.after), complete);
-    const range = Option.match(endCursor, {
-      onNone: () => QueryStreamPagination.Range.Unpinned(),
-      onSome: () =>
-        decoded.until === null
-          ? QueryStreamPagination.Range.ThroughEnd()
-          : QueryStreamPagination.Range.ThroughKey({
-              key: complete(decoded.until),
-            }),
-    });
     const request = yield* QueryStreamPagination.parseRequest(
       options.numItems,
-      options.cursor,
-      after,
-      range,
+      decoded.start,
+      decoded.range,
     ).pipe(Effect.fromResult, Effect.orDie);
     if (request._tag === "Unchanged") {
       return {
@@ -2127,17 +2131,16 @@ export const paginate: {
         continueCursor: request.cursor,
       } satisfies PaginationResult<Doc>;
     }
-    const start = Option.map(request.after, (key) => ({
-      orderKey: QueryStreamKey.values(key),
+    const start = Option.map(request.after, (orderKey) => ({
+      orderKey: orderKey.values,
       inclusive: false,
     }));
-    const end =
-      request.range._tag === "ThroughKey"
-        ? Option.some({
-            orderKey: QueryStreamKey.values(request.range.key),
-            inclusive: true,
-          })
-        : Option.none<KeyBound>();
+    const end = QueryStreamPagination.Range.$match(request.range, {
+      Unpinned: () => Option.none<KeyBound>(),
+      ThroughEnd: () => Option.none<KeyBound>(),
+      ThroughKey: ({ orderKey }) =>
+        Option.some({ orderKey: orderKey.values, inclusive: true }),
+    });
     const narrowed = narrowByKeyBounds(
       self,
       self.order === "asc"
@@ -2173,35 +2176,50 @@ export const paginate: {
     if (Result.isFailure(outcome)) {
       return yield* yield* QueryStreamReadBudget.exceeded(budget);
     }
-    const result = outcome.success;
-    const encode = (key: QueryStreamKey.Complete) =>
-      encodeCursor(QueryStreamKey.values(key)).pipe(Effect.orDie);
-    const page = Array.fromIterable(result.page);
-    switch (result._tag) {
-      case "Done":
+    const encode = (orderKey: QueryStreamKey.Complete) =>
+      encodeCursor(orderKey.values).pipe(Effect.orDie);
+    const encodeSplit = (
+      result: Extract<
+        QueryStreamPagination.Outcome<Doc>,
+        { readonly _tag: "SplitRequired" | "SplitRecommended" }
+      >,
+    ) =>
+      Effect.gen(function* () {
+        const continueCursor = yield* Match.value(result.continuation).pipe(
+          Match.tagsExhaustive({
+            End: () => Effect.succeed(QueryStreamCursor.END_CURSOR),
+            Key: ({ orderKey }) => encode(orderKey),
+          }),
+        );
         return {
-          page,
-          isDone: true,
-          continueCursor: QueryStreamCursor.END_CURSOR,
-        };
-      case "Continue":
-        return {
-          page,
+          page: Array.fromIterable(result.page),
           isDone: false,
-          continueCursor: yield* encode(result.key),
-        };
-      case "SplitRequired":
-      case "SplitRecommended":
-        return {
-          page,
-          isDone: false,
-          continueCursor:
-            result.continuation._tag === "End"
-              ? QueryStreamCursor.END_CURSOR
-              : yield* encode(result.continuation.key),
+          continueCursor,
           pageStatus: result._tag,
-          splitCursor: yield* encode(result.split),
-        };
-    }
+          splitCursor: yield* encode(result.splitOrderKey),
+        } satisfies PaginationResult<Doc>;
+      });
+    return yield* Match.value(outcome.success).pipe(
+      Match.tagsExhaustive({
+        Done: ({ page }) =>
+          Effect.succeed({
+            page: Array.fromIterable(page),
+            isDone: true,
+            continueCursor: QueryStreamCursor.END_CURSOR,
+          } satisfies PaginationResult<Doc>),
+        Continue: ({ page, orderKey }) =>
+          Effect.map(
+            encode(orderKey),
+            (continueCursor) =>
+              ({
+                page: Array.fromIterable(page),
+                isDone: false,
+                continueCursor,
+              }) satisfies PaginationResult<Doc>,
+          ),
+        SplitRequired: encodeSplit,
+        SplitRecommended: encodeSplit,
+      }),
+    );
   }),
 );
