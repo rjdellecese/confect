@@ -374,7 +374,8 @@ export const fromBounds = (
       ([lowerValue, upperValue]) =>
         QueryStreamOrderKey.ValueOrder(lowerValue, upperValue) === 0,
     ),
-  ).length;
+    Array.length
+  );
   const equalities = pipe(
     Array.zip(Array.take(fieldPaths, commonLength), bounds.lower.key),
     Array.map(([fieldPath, value]) => ({ fieldPath, value })),
