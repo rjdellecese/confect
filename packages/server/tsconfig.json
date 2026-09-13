@@ -16,6 +16,13 @@
       "~/*": ["./test/mock-backend/fixtures/confect/*"]
     }
   },
-  "exclude": ["coverage", "dist", "node_modules"],
+  "exclude": [
+    "coverage",
+    "dist",
+    "node_modules",
+    // Convex emits unused imports and an incorrect nested API import in these
+    // unused helpers. Imported ComponentApi types remain in the checked graph.
+    "test/local-backend/fixtures/components/*/convex/_generated"
+  ],
   "extends": ["../../tsconfig.base.json"]
 }
