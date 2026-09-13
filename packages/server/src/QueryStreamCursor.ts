@@ -1,4 +1,7 @@
 import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as QueryStreamKey from "./QueryStreamKey";
+import * as SchemaIssue from "effect/SchemaIssue";
 import * as Match from "effect/Match";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
@@ -21,22 +24,20 @@ const segmentRuntimeLabels = Match.type<QueryStreamKeyLayout.Segment>().pipe(
 /**
  * @experimental
  */
-export class QueryStreamCursor extends Schema.Class<QueryStreamCursor>(
-  "QueryStreamCursor",
-)(
-  Schema.Struct({
-    version: Schema.Literal(1),
-    keyFields: RuntimeLabels,
-    orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
-  }).check(
-    Schema.makeFilter(
-      (cursor) => cursor.orderKey.length === cursor.keyFields.length,
-      {
-        message: "key and fields must have the same length",
-      },
-    ),
+export const QueryStreamCursor = Schema.Struct({
+  version: Schema.Literal(1),
+  keyFields: RuntimeLabels,
+  orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
+}).check(
+  Schema.makeFilter(
+    (cursor) => cursor.orderKey.length === cursor.keyFields.length,
+    { message: "key and fields must have the same length" },
   ),
-) {}
+);
+
+export interface QueryStreamCursor extends Schema.Schema.Type<
+  typeof QueryStreamCursor
+> {}
 
 /**
  * @experimental
@@ -69,15 +70,37 @@ export const codecForLayout = (
       { message: "Cursor order-key fields do not match the stream" },
     ),
   ).pipe(
-    Schema.decodeTo(QueryStreamOrderKey.QueryStreamOrderKey, {
-      decode: SchemaGetter.transform((cursor) => cursor.orderKey),
-      encode: SchemaGetter.transformEffect((orderKey) =>
-        QueryStreamCursor.makeEffect({
-          version: 1,
-          keyFields: runtimeLabels,
-          orderKey,
-        }),
+    Schema.decodeTo(
+      Schema.declare(QueryStreamKey.isComplete).check(
+        Schema.makeFilter(
+          (orderKey) =>
+            QueryStreamKeyLayout.compatible(orderKey.layout, layout),
+          { message: "Cursor key does not belong to the stream layout" },
+        ),
       ),
-    }),
+      {
+        decode: SchemaGetter.transformEffect((cursor, options) =>
+          Effect.fromResult(
+            QueryStreamKey.complete(layout, cursor.orderKey),
+          ).pipe(
+            Effect.mapError(
+              (error) =>
+                new SchemaIssue.InvalidValue(
+                  { message: error.message },
+                  cursor.orderKey,
+                  options,
+                ),
+            ),
+          ),
+        ),
+        encode: SchemaGetter.transformEffect((orderKey) =>
+          QueryStreamCursor.makeEffect({
+            version: 1,
+            keyFields: runtimeLabels,
+            orderKey: orderKey.values,
+          }),
+        ),
+      },
+    ),
   );
 };
