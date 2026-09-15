@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "@convex-dev/workpool": "0.4.12",
-    "@effect/tsgo": "0.45.0",
+    "@effect/tsgo": "0.44.0",
     "@effect/vitest": "4.0.0-rc.115",
     "@types/node": "24.13.3",
     "@vitest/coverage-v8": "5.0.0",
