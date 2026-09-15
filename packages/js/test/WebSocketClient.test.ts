@@ -16,6 +16,7 @@ import * as WebSocketClient from "@confect/js/WebSocketClient";
 import * as InternalWebSocketClient from "../src/internal/WebSocketClient";
 
 type Operation = FunctionType | "reactiveQuery";
+
 type RequestOperation = FunctionType;
 
 interface Call {
@@ -24,6 +25,7 @@ interface Call {
 }
 
 interface TestSubscription {
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The fixture must emit malformed as well as valid payloads to exercise subscription decoding failures.
   readonly emit: (value: unknown) => Effect.Effect<void>;
   readonly fail: (error: Error) => Effect.Effect<void>;
 }
@@ -32,7 +34,7 @@ interface TestTransport extends InternalWebSocketClient.Transport {
   readonly calls: (operation: Operation) => Effect.Effect<ReadonlyArray<Call>>;
   readonly failNext: (
     operation: RequestOperation,
-    rejection: unknown,
+    rejection: Error,
   ) => Effect.Effect<void>;
   readonly nextSubscription: () => Effect.Effect<TestSubscription>;
   readonly closeCount: () => Effect.Effect<number>;
@@ -51,9 +53,11 @@ const TestWebSocketClientLayer = Layer.effectContext(
     const context = yield* Effect.context<never>();
     const runSync = Effect.runSyncWith(context);
     const runPromise = Effect.runPromiseWith(context);
+
     const calls = yield* EffectRef.make<
       Readonly<Record<Operation, ReadonlyArray<Call>>>
     >({ query: [], mutation: [], action: [], reactiveQuery: [] });
+
     const rejections = yield* EffectRef.make<
       Readonly<Record<RequestOperation, Option.Option<unknown>>>
     >({
@@ -61,6 +65,7 @@ const TestWebSocketClientLayer = Layer.effectContext(
       mutation: Option.none(),
       action: Option.none(),
     });
+
     const subscriptions = yield* Queue.unbounded<TestSubscription>();
     const closed = yield* EffectRef.make(0);
     const unsubscribed = yield* EffectRef.make(0);
@@ -70,6 +75,7 @@ const TestWebSocketClientLayer = Layer.effectContext(
       functionReference: Parameters<
         InternalWebSocketClient.Transport[RequestOperation | "onUpdate"]
       >[0],
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The recorder retains encoded arguments from different refs without interpreting them.
       args: unknown,
     ) =>
       EffectRef.update(calls, (current) => ({
@@ -85,16 +91,20 @@ const TestWebSocketClientLayer = Layer.effectContext(
       functionReference: Parameters<
         InternalWebSocketClient.Transport[RequestOperation]
       >[0],
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The shared transport fixture accepts each ref's raw encoded representation.
       args: unknown,
     ) {
       yield* recordCall(operation, functionReference, args);
+
       const rejection = yield* EffectRef.modify(rejections, (current) => [
         current[operation],
         { ...current, [operation]: Option.none() },
       ]);
+
       if (Option.isSome(rejection)) {
         throw rejection.value;
       }
+
       return {};
     });
 
@@ -103,9 +113,9 @@ const TestWebSocketClientLayer = Layer.effectContext(
       functionReference: Parameters<
         InternalWebSocketClient.Transport[RequestOperation]
       >[0],
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The promise adapter preserves the raw transport contract exercised by the codec tests.
       args: unknown,
-    ): Promise<unknown> =>
-      runPromise(invokeEffect(operation, functionReference, args));
+    ) => runPromise(invokeEffect(operation, functionReference, args));
 
     const service = TestWebSocketTransport.of({
       setAuth: () => {},
@@ -123,6 +133,7 @@ const TestWebSocketClientLayer = Layer.effectContext(
           emit: (value) => Effect.sync(() => onUpdate(value)),
           fail: (error) => Effect.sync(() => onError(error)),
         });
+
         return () => {
           runSync(EffectRef.update(unsubscribed, (count) => count + 1));
         };
@@ -294,6 +305,7 @@ describe("WebSocketClient", () => {
       Effect.gen(function* () {
         const client = yield* WebSocketClient.WebSocketClient;
         const transport = yield* TestWebSocketTransport;
+
         const fiber = yield* client
           .reactiveQuery(noArgsQueryRef)
           .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
@@ -309,6 +321,7 @@ describe("WebSocketClient", () => {
       Effect.gen(function* () {
         const client = yield* WebSocketClient.WebSocketClient;
         const transport = yield* TestWebSocketTransport;
+
         const fiber = yield* client
           .reactiveQuery(argsQueryRef, { id: "abc" })
           .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
@@ -326,6 +339,7 @@ describe("WebSocketClient", () => {
       Effect.gen(function* () {
         const client = yield* WebSocketClient.WebSocketClient;
         const transport = yield* TestWebSocketTransport;
+
         const fiber = yield* client
           .reactiveQuery(noArgsQueryRef)
           .pipe(Stream.take(1), Stream.runDrain, Effect.forkChild);
@@ -344,6 +358,7 @@ describe("WebSocketClient", () => {
       const transport = yield* TestWebSocketTransport.pipe(
         Effect.provide(TestWebSocketClientLayer),
       );
+
       expect(yield* transport.closeCount()).toBe(1);
     }),
   );
@@ -445,13 +460,16 @@ describe("WebSocketClient error decoding", () => {
       const transport = yield* TestWebSocketTransport;
       yield* transport.failNext(
         "query",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* WebSocketClient.WebSocketClient;
 
       const result = yield* Effect.result(
         client.query(queryWithError, { id: "abc" }),
       );
+
       assert(Result.isFailure(result));
       assert(Schema.is(NotFound)(result.failure));
       expect(result.failure.id).toBe("abc");
@@ -467,6 +485,7 @@ describe("WebSocketClient error decoding", () => {
       const result = yield* Effect.result(
         client.query(queryWithError, { id: "abc" }),
       );
+
       assert(Result.isFailure(result));
       expect(result.failure).toBeInstanceOf(
         WebSocketClient.WebSocketClientError,
@@ -479,13 +498,16 @@ describe("WebSocketClient error decoding", () => {
       const transport = yield* TestWebSocketTransport;
       yield* transport.failNext(
         "mutation",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* WebSocketClient.WebSocketClient;
 
       const result = yield* Effect.result(
         client.mutation(mutationWithError, { id: "abc" }),
       );
+
       assert(Result.isFailure(result));
       expect(result.failure).toBeInstanceOf(NotFound);
     }).pipe(Effect.provide(TestWebSocketClientLayer)),
@@ -496,13 +518,16 @@ describe("WebSocketClient error decoding", () => {
       const transport = yield* TestWebSocketTransport;
       yield* transport.failNext(
         "action",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* WebSocketClient.WebSocketClient;
 
       const result = yield* Effect.result(
         client.action(actionWithError, { id: "abc" }),
       );
+
       assert(Result.isFailure(result));
       expect(result.failure).toBeInstanceOf(NotFound);
     }).pipe(Effect.provide(TestWebSocketClientLayer)),
@@ -512,6 +537,7 @@ describe("WebSocketClient error decoding", () => {
     Effect.gen(function* () {
       const client = yield* WebSocketClient.WebSocketClient;
       const transport = yield* TestWebSocketTransport;
+
       const fiber = yield* client
         .reactiveQuery(queryWithError, { id: "abc" })
         .pipe(
@@ -523,7 +549,9 @@ describe("WebSocketClient error decoding", () => {
 
       const subscription = yield* transport.nextSubscription();
       yield* subscription.fail(
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
 
       const result = yield* Fiber.join(fiber);
@@ -537,6 +565,7 @@ describe("WebSocketClient error decoding", () => {
     Effect.gen(function* () {
       const client = yield* WebSocketClient.WebSocketClient;
       const transport = yield* TestWebSocketTransport;
+
       const fiber = yield* client
         .reactiveQuery(queryWithError, { id: "abc" })
         .pipe(
@@ -561,13 +590,16 @@ describe("WebSocketClient error decoding", () => {
     Effect.gen(function* () {
       const client = yield* WebSocketClient.WebSocketClient;
       const transport = yield* TestWebSocketTransport;
+
       const fiber = yield* client
         .reactiveQueryResult(queryWithError, { id: "abc" })
         .pipe(Stream.take(2), Stream.runCollect, Effect.forkChild);
 
       const subscription = yield* transport.nextSubscription();
       yield* subscription.fail(
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       yield* subscription.emit({ text: "recovered" });
 

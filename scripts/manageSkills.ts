@@ -37,16 +37,19 @@ export const manageSkills = Effect.fn("Skills.manage")(function* (
 ) {
   const childProcesses = yield* ChildProcessSpawner.ChildProcessSpawner;
   const executable = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+
   const command = ChildProcess.make(executable, ["exec", "skills", ...args], {
     stdin: "inherit",
     stdout: "inherit",
     stderr: "inherit",
   });
+
   const exitCode = yield* childProcesses.exitCode(command);
 
   if (exitCode !== 0) {
     return yield* new SkillsCommandFailed({ exitCode });
   }
+
   if (shouldSyncSkillIgnore(args[0])) {
     yield* syncSkillIgnore();
   }

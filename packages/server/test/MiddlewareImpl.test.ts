@@ -79,6 +79,7 @@ describe("implementation options", () => {
           readonly functionVisibility: "public" | "internal";
           readonly args: unknown;
         }>();
+
         return effect;
       },
     );
@@ -90,18 +91,21 @@ describe("implementation options", () => {
         expectTypeOf(options).toEqualTypeOf<{
           readonly tolerateMissing: boolean;
         }>();
+
         return effect;
       },
       mutation: (effect, { options }) => {
         expectTypeOf(options).toEqualTypeOf<{
           readonly tolerateMissing: boolean;
         }>();
+
         return effect;
       },
       action: (effect, { options }) => {
         expectTypeOf(options).toEqualTypeOf<{
           readonly tolerateMissing: boolean;
         }>();
+
         return effect;
       },
     });
@@ -113,6 +117,7 @@ describe("implementation options", () => {
       expectTypeOf(context.invocation).toEqualTypeOf<
         MiddlewareSpec.MiddlewareOptions["invocation"]
       >();
+
       return effect;
     });
   });
@@ -131,19 +136,23 @@ describe("implementation options", () => {
         "options" | "invocation"
       >();
       expectTypeOf(context.options).toBeUndefined();
+
       return effect;
     });
     MiddlewareImpl.makeByFunctionType(databaseSchema, UndefinedPolicy, {
       query: (effect, { options }) => {
         expectTypeOf(options).toBeUndefined();
+
         return effect;
       },
       mutation: (effect, { options }) => {
         expectTypeOf(options).toBeUndefined();
+
         return effect;
       },
       action: (effect, { options }) => {
         expectTypeOf(options).toBeUndefined();
+
         return effect;
       },
     });
@@ -154,6 +163,7 @@ describe("implementation options", () => {
       expectTypeOf(invocation).toEqualTypeOf<
         MiddlewareSpec.MiddlewareOptions["invocation"]
       >();
+
       return effect;
     });
     MiddlewareImpl.makeByFunctionType(databaseSchema, Observe, {
@@ -162,6 +172,7 @@ describe("implementation options", () => {
         expectTypeOf(context.invocation).toEqualTypeOf<
           MiddlewareSpec.MiddlewareOptions["invocation"]
         >();
+
         return effect;
       },
       mutation: (effect, context) => {
@@ -169,6 +180,7 @@ describe("implementation options", () => {
         expectTypeOf(context.invocation).toEqualTypeOf<
           MiddlewareSpec.MiddlewareOptions["invocation"]
         >();
+
         return effect;
       },
       action: (effect, context) => {
@@ -176,6 +188,7 @@ describe("implementation options", () => {
         expectTypeOf(context.invocation).toEqualTypeOf<
           MiddlewareSpec.MiddlewareOptions["invocation"]
         >();
+
         return effect;
       },
     });
@@ -277,6 +290,7 @@ describe("implementation service bounds", () => {
   type ReaderService = DatabaseReaderModule.DatabaseReader<
     typeof databaseSchema
   >;
+
   type WriterService = DatabaseWriterModule.DatabaseWriter<
     typeof databaseSchema
   >;
@@ -285,10 +299,12 @@ describe("implementation service bounds", () => {
     typeof databaseSchema,
     "query" | "mutation" | "action"
   >;
+
   type QueryMutation = MiddlewareImpl.CommonServices<
     typeof databaseSchema,
     "query" | "mutation"
   >;
+
   type MutationOnly = MiddlewareImpl.CommonServices<
     typeof databaseSchema,
     "mutation"
@@ -317,6 +333,7 @@ describe("implementation service bounds", () => {
     // provides it cannot eliminate the requirement—its output environment
     // would keep `Viewer`, which `CommonServices` excludes.
     type Impl = MiddlewareSpec.MiddlewareImpl<Viewer, NoViewer, never>;
+
     type IncomingEnvironment =
       Parameters<Impl>[0] extends EffectNamespace.Effect<any, any, infer R>
         ? R
@@ -369,11 +386,12 @@ describe("group assembly enforcement", () => {
   it("throws at build time when a middleware implementation is missing", () => {
     const missingMiddleware = GroupImpl.make(databaseSchema, coveredGroup).pipe(
       Layer.provide(viewerNameImpl),
-    ) as unknown as Layer.Layer<GroupImpl.GroupImpl<"Unfinalized">>;
+    );
 
     expect(() =>
       RegisteredFunctions.buildForGroup<typeof coveredGroup>(
         databaseSchema,
+        // @ts-expect-error Deliberately bypass finalization's static completeness check to exercise the runtime missing-middleware error.
         GroupImpl.finalize(missingMiddleware),
         RegisteredConvexFunction.make,
       ),

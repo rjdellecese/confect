@@ -18,6 +18,7 @@ import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -144,6 +145,7 @@ export const applyMiddleware = <A, E, R>(
         "options" in middleware.middlewareSpec
           ? { options: middleware.options, invocation }
           : { invocation };
+
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
       return middleware.middlewareImpl(wrapped, context);
     },
@@ -167,11 +169,12 @@ export const combineErrorSchemas = (
       resolvedMiddlewares.map(({ middlewareSpec }) => middlewareSpec),
     ),
   ];
-  return schemas.length === 0
-    ? undefined
-    : schemas.length === 1
-      ? schemas[0]
-      : Schema.Union(schemas);
+
+  return Match.value(schemas.length).pipe(
+    Match.when(0, () => undefined),
+    Match.when(1, () => schemas[0]),
+    Match.orElse(() => Schema.Union(schemas)),
+  );
 };
 
 /**
@@ -212,6 +215,7 @@ export const runHandlerPromise =
     // A `ConvexError` defect escapes into the (escaped) failure channel so
     // the `throw` below rethrows it with its identity intact.
     const rethrowConvexErrorDefects = Effect.catchDefect(
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Defects can be arbitrary thrown values; only ConvexError is promoted and every other defect is preserved.
       (defect: unknown): Effect.Effect<never, ConvexError<any>> =>
         defect instanceof ConvexError
           ? Effect.fail(defect)
@@ -232,6 +236,7 @@ export const runHandlerPromise =
               ),
             ),
           );
+
     return Effect.runPromise(
       Effect.result(rethrowConvexErrorDefects(withConvexError)),
       runOptions,
@@ -286,6 +291,7 @@ export const actionFunctionBase = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
+
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* applyMiddleware(
         handler(decodedArgs),
@@ -297,6 +303,7 @@ export const actionFunctionBase = <
           args: decodedArgs,
         },
       ).pipe(Effect.provide(createLayer(ctx)));
+
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),

@@ -6,14 +6,19 @@ import * as Schema from "effect/Schema";
 describe("DatabaseSchema", () => {
   it("stores the precise table record without evaluating table schemas", () => {
     let evaluated = 0;
+
     const notes = Table.make(() => {
       evaluated++;
+
       return Schema.Struct({ text: Schema.String });
     })("notes");
+
     const users = Table.make(() => {
       evaluated++;
+
       return Schema.Struct({ name: Schema.String });
     })("users");
+
     const input = { notes, users };
     const schema = DatabaseSchema.make(input);
     expect(DatabaseSchema.isDatabaseSchema(schema)).toBe(true);

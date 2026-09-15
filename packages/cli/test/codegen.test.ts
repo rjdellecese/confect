@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -45,6 +46,7 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
         "tags",
         "users",
       ]);
+
       for (const table of tables) {
         expect(String.startsWith(`tables${path.sep}`)(table.relativePath)).toBe(
           true,
@@ -140,13 +142,15 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       );
 
       assert(Result.isFailure(result));
-      assert(result.failure._tag === "DuplicateTableNameError");
+      assert(Predicate.isTagged(result.failure, "DuplicateTableNameError"));
+
       const byName = Object.fromEntries(
         result.failure.collisions.map((c) => [
           c.tableName,
           [...c.tablePaths].sort(),
         ]),
       );
+
       expect(byName).toEqual({
         notes: [
           path.join("tables", "a", "notes.ts"),
@@ -231,6 +235,7 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
     Effect.gen(function* () {
       const parent = leaf("notes.spec.ts", ["notes"]);
       const child = leaf("notes/archived.spec.ts", ["notes", "archived"]);
+
       const parentGroupSpec = GroupSpec.make().addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -251,6 +256,7 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
       Effect.gen(function* () {
         const parent = leaf("notes.spec.ts", ["notes"]);
         const child = leaf("notes/archived.spec.ts", ["notes", "archived"]);
+
         const parentGroupSpec = GroupSpec.make().addFunction(
           FunctionSpec.publicQuery({
             name: "archived",
@@ -280,12 +286,14 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
       Effect.gen(function* () {
         const parent = leaf("notes.spec.ts", ["notes"]);
         const child = leaf("notes/archived.spec.ts", ["notes", "archived"]);
+
         const inner = GroupSpec.makeAt("inner").addFunction(
           FunctionSpec.publicQuery({
             name: "list",
             returns: () => emptyReturns,
           }),
         );
+
         const parentGroupSpec = GroupSpec.make().addGroupAt("archived", inner);
 
         const result = yield* Effect.result(
@@ -316,6 +324,7 @@ const leafFor = Effect.fnUntraced(function* (
   pathSegments: [string, ...string[]],
 ) {
   const specImportPath = yield* specImportPathFromGenerated(relativePath);
+
   return {
     relativePath,
     pathSegments,
@@ -338,10 +347,12 @@ for (const { name, pathLayer, sep } of [
         () =>
           Effect.gen(function* () {
             const parent = yield* leafFor("notes.spec.ts", ["notes"]);
+
             const child = yield* leafFor(`notes${sep}archived.spec.ts`, [
               "notes",
               "archived",
             ]);
+
             const parentGroupSpec = GroupSpec.make().addFunction(
               FunctionSpec.publicQuery({
                 name: "archived",
@@ -350,6 +361,7 @@ for (const { name, pathLayer, sep } of [
             );
 
             const path = yield* Path.Path;
+
             const result = yield* Effect.result(
               validateNoParentChildNameCollisions(
                 [parent, child],

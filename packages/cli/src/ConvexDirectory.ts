@@ -46,6 +46,7 @@ export class InvalidConvexJsonError extends Schema.TaggedError<InvalidConvexJson
     const detail = Predicate.isError(this.cause)
       ? `: ${this.cause.message}`
       : "";
+
     return `Failed to parse convex.json${detail}`;
   }
 }

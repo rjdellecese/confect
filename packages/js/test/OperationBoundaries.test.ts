@@ -6,6 +6,7 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
@@ -25,7 +26,9 @@ const definition = {
 };
 
 const queryRef = Ref.make("notes", FunctionSpec.publicQuery(definition));
+
 const mutationRef = Ref.make("notes", FunctionSpec.publicMutation(definition));
+
 const actionRef = Ref.make("notes", FunctionSpec.publicAction(definition));
 
 type Client =
@@ -61,7 +64,8 @@ const operations: ReadonlyArray<{
 const clients = [
   {
     name: "HttpClient",
-    make: (invoke: (args: unknown) => Promise<unknown>) =>
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The injected transport observes encoded args to test that codec work happens at execution time.
+    make: (invoke: (args: unknown) => Promise<string>) =>
       HttpClient.make({
         url: "https://test.convex.cloud",
         setAuth: () => {},
@@ -73,7 +77,8 @@ const clients = [
   },
   {
     name: "WebSocketClient",
-    make: (invoke: (args: unknown) => Promise<unknown>) =>
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The injected transport observes encoded args to test that codec work happens at execution time.
+    make: (invoke: (args: unknown) => Promise<string>) =>
       WebSocketClient.make("https://test.convex.cloud", {
         setAuth: () => {},
         close: () => Promise.resolve(),
@@ -116,13 +121,15 @@ describe.each(clients)("$name operation boundaries", ({ name, make }) => {
           const [parent, ...children] = span.mock.results.map(
             (result) => result.value,
           );
+
           for (const child of children) {
             expect(Option.getOrThrow(child.parent)).toBe(parent);
             expect(child.traceId).toBe(parent.traceId);
             expect(child.status._tag).toBe("Ended");
-            assert(child.status._tag === "Ended");
+            assert(Predicate.isTagged(child.status, "Ended"));
             expect(Exit.isSuccess(child.status.exit)).toBe(true);
           }
+
           expect(children[0]).not.toBe(children[1]);
         }),
     );
@@ -133,9 +140,15 @@ describe.each(clients)("$name operation boundaries", ({ name, make }) => {
         Effect.gen(function* () {
           const tracer = yield* Tracer.Tracer;
           const span = vi.fn(tracer.span.bind(tracer));
-          const client = make(() =>
-            Promise.reject(new ConvexError({ _tag: "NotFound", id: "abc" })),
+
+          const encodedError = yield* Schema.encodeEffect(NotFound)(
+            new NotFound({ id: "abc" }),
           );
+
+          const client = make(() =>
+            Promise.reject(new ConvexError(encodedError)),
+          );
+
           const result = yield* operation
             .run(client)
             .pipe(
@@ -152,7 +165,7 @@ describe.each(clients)("$name operation boundaries", ({ name, make }) => {
           ]);
           const child = span.mock.results[1]?.value;
           assert(child !== undefined);
-          assert(child.status._tag === "Ended");
+          assert(Predicate.isTagged(child.status, "Ended"));
           assert(Exit.isFailure(child.status.exit));
           expect(
             Option.getOrThrow(Cause.findErrorOption(child.status.exit.cause)),
@@ -171,6 +184,8 @@ describe.each(clients)("$name operation boundaries", ({ name, make }) => {
             RegisteredQuery<"public", Record<string, never>, string>
           >()("list"),
         );
+
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The spy models a raw transport and must observe whatever encoded value the ref supplies.
         const invoke = vi.fn((_args: unknown) => Promise.resolve("found"));
         const client = make(invoke);
         const effect = client.query(ref);

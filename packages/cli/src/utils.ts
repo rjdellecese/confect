@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import type { FunctionSpec, Spec } from "@confect/core";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -57,10 +58,12 @@ export const toModuleImportPath = Effect.fnUntraced(function* (
   relativePath: string,
 ) {
   const path = yield* Path.Path;
+
   const withoutExt = toPosixPath(
     path,
     yield* removePathExtension(relativePath),
   );
+
   return String.startsWith(".")(withoutExt) ? withoutExt : `./${withoutExt}`;
 });
 
@@ -69,13 +72,17 @@ export const writeFileStringAndLog = Effect.fnUntraced(function* (
   contents: string,
 ) {
   const fs = yield* FileSystem.FileSystem;
+
   if (!(yield* fs.exists(filePath))) {
     yield* fs.writeFileString(filePath, contents);
     yield* markWritten;
     yield* logFileAdded(filePath);
+
     return;
   }
+
   const existing = yield* fs.readFileString(filePath);
+
   if (existing !== contents) {
     yield* fs.writeFileString(filePath, contents);
     yield* markWritten;
@@ -114,14 +121,19 @@ export const writeFileString = Effect.fnUntraced(function* (
   if (!(yield* fs.exists(filePath))) {
     yield* fs.writeFileString(filePath, contents);
     yield* markWritten;
+
     return "Added";
   }
+
   const existing = yield* fs.readFileString(filePath);
+
   if (existing !== contents) {
     yield* fs.writeFileString(filePath, contents);
     yield* markWritten;
+
     return "Modified";
   }
+
   return "Unchanged";
 });
 
@@ -138,7 +150,9 @@ export const removePathIfExists = Effect.fnUntraced(function* (
     .remove(filePath)
     .pipe(
       Effect.catchTag("PlatformError", (error) =>
-        error.reason._tag === "NotFound" ? Effect.void : Effect.fail(error),
+        Predicate.isTagged(error.reason, "NotFound")
+          ? Effect.void
+          : Effect.fail(error),
       ),
     );
 });
@@ -196,6 +210,7 @@ const generateGroupModuleEffect = Effect.fnUntraced(function* ({
   const modulePath = path.join(convexDirectory, relativeModulePath);
 
   const directoryPath = path.dirname(modulePath);
+
   if (!(yield* fs.exists(directoryPath))) {
     yield* fs.makeDirectory(directoryPath, { recursive: true });
   }
@@ -209,14 +224,19 @@ const generateGroupModuleEffect = Effect.fnUntraced(function* ({
   if (!(yield* fs.exists(modulePath))) {
     yield* fs.writeFileString(modulePath, functionsContentsString);
     yield* markWritten;
+
     return "Added" as const;
   }
+
   const existing = yield* fs.readFileString(modulePath);
+
   if (existing !== functionsContentsString) {
     yield* fs.writeFileString(modulePath, functionsContentsString);
     yield* markWritten;
+
     return "Modified" as const;
   }
+
   return "Unchanged" as const;
 });
 
@@ -277,12 +297,14 @@ export const generateFunctions = Effect.fnUntraced(function* (
   const overlappingGroupPaths = GroupPaths.GroupPaths.make(
     HashSet.intersection(groupPathsFromFs, groupPathsFromSpec),
   );
+
   yield* Effect.forEach(
     overlappingGroupPaths,
     Effect.fnUntraced(function* (groupPath: GroupPath.GroupPath) {
       const group = yield* Effect.fromOption(
         GroupPath.getGroupSpec(spec, groupPath),
       );
+
       const functionNames = pipe(
         group.functions,
         Record.values,
@@ -294,16 +316,20 @@ export const generateFunctions = Effect.fnUntraced(function* (
         ),
         Array.map((fn) => fn.name),
       );
+
       const relativeModulePath = yield* GroupPath.modulePath(groupPath);
       const modulePath = path.join(convexDirectory, relativeModulePath);
+
       const registeredFunctionsImportPath =
         yield* registeredFunctionsImportPathForGroup(groupPath, modulePath);
+
       const result = yield* generateGroupModule({
         groupPath,
         functionNames,
         registeredFunctionsImportPath,
         useNode: group.runtime === "Node",
       });
+
       if (result === "Modified") {
         yield* logFileModified(modulePath);
       }
@@ -313,12 +339,14 @@ export const generateFunctions = Effect.fnUntraced(function* (
   const extinctGroupPaths = GroupPaths.GroupPaths.make(
     HashSet.difference(groupPathsFromFs, groupPathsFromSpec),
   );
+
   yield* removeGroups(extinctGroupPaths);
   yield* logGroupPaths(extinctGroupPaths, logFileRemoved);
 
   const newGroupPaths = GroupPaths.GroupPaths.make(
     HashSet.difference(groupPathsFromSpec, groupPathsFromFs),
   );
+
   yield* writeGroups(spec, newGroupPaths);
   yield* logGroupPaths(newGroupPaths, logFileAdded);
 
@@ -341,6 +369,7 @@ const getGroupPathsFromFs = Effect.gen(function* () {
   const allConvexPaths = yield* fs.readDirectory(convexDirectory, {
     recursive: true,
   });
+
   const groupPathArray = yield* pipe(
     allConvexPaths,
     Array.filter(
@@ -353,6 +382,7 @@ const getGroupPathsFromFs = Effect.gen(function* () {
       GroupPath.fromGroupModulePath(groupModulePath),
     ),
   );
+
   return GroupPaths.GroupPaths.make(HashSet.fromIterable(groupPathArray));
 });
 
@@ -387,6 +417,7 @@ export const writeGroups = (
     Effect.fnUntraced(function* (groupPath: GroupPath.GroupPath) {
       const path = yield* Path.Path;
       const convexDirectory = yield* ConvexDirectory.get;
+
       const group = yield* Effect.fromOption(
         GroupPath.getGroupSpec(spec, groupPath),
       );
@@ -405,6 +436,7 @@ export const writeGroups = (
 
       const relativeModulePath = yield* GroupPath.modulePath(groupPath);
       const modulePath = path.join(convexDirectory, relativeModulePath);
+
       const registeredFunctionsImportPath =
         yield* registeredFunctionsImportPathForGroup(groupPath, modulePath);
 
@@ -440,14 +472,18 @@ const generateOptionalFile = Effect.fnUntraced(function* (
   }
 
   const convexFilePath = path.join(convexDirectory, convexFile);
+
   const relativeImportPath = path.relative(
     path.dirname(convexFilePath),
     confectFilePath,
   );
+
   const contents = yield* generateContents(
     yield* toModuleImportPath(relativeImportPath),
   );
+
   const change = yield* writeFileString(convexFilePath, contents);
+
   return Option.some({ change, convexFilePath });
 });
 

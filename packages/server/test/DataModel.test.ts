@@ -8,12 +8,17 @@ it("derives the same data model from a schema record and its table union", () =>
   const notes = Table.make(() => Schema.Struct({ text: Schema.String }))(
     "notes",
   );
+
   const users = Table.make(() => Schema.Struct({ name: Schema.String }))(
     "users",
   );
+
   const schema = DatabaseSchema.make({ notes, users });
+
   type FromSchema = DataModel.FromSchema<typeof schema>;
+
   type FromTables = DataModel.FromTables<typeof notes | typeof users>;
+
   expectTypeOf<DataModel.Tables<FromSchema>>().toEqualTypeOf<
     typeof notes | typeof users
   >();
@@ -34,6 +39,7 @@ it("derives the same data model from a schema record and its table union", () =>
 
 it("derives no tables from an empty record", () => {
   type Empty = DataModel.DataModel<{}>;
+
   expectTypeOf<DataModel.Tables<Empty>>().toBeNever();
   expectTypeOf<keyof DataModel.ToConvex<Empty>>().toBeNever();
 });

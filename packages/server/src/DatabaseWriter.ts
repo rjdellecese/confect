@@ -1,10 +1,4 @@
-import type {
-  BetterOmit,
-  DocumentByName,
-  Expand,
-  GenericDatabaseWriter,
-  WithoutSystemFields,
-} from "convex/server";
+import type { GenericDatabaseWriter } from "convex/server";
 import type { GenericId } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Context from "effect/Context";
@@ -17,7 +11,6 @@ import type { DocumentByName as DocumentByName_ } from "./DataModel";
 import * as Document from "./Document";
 import * as QueryInitializer from "./QueryInitializer";
 import type * as Table from "./Table";
-import type * as TableInfo from "./TableInfo";
 
 /**
  * The argument accepted by `patch`: like `Partial<Doc>`, but the fields that
@@ -116,12 +109,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       );
 
       const id = yield* Effect.promise(() =>
-        convexDatabaseWriter.insert(
-          tableName,
-          encodedDocument as WithoutSystemFields<
-            DocumentByName<DataModel.ToConvex<DataModel_>, TableName>
-          >,
-        ),
+        convexDatabaseWriter.insert(tableName, encodedDocument),
       );
 
       return id;
@@ -133,16 +121,14 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         Document.WithoutSystemFields<DocumentByName_<DataModel_, TableName>>
       >,
     ) {
-      const tableSchema = tableDef.Fields as TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >;
+      const tableSchema = tableDef.Fields;
 
       const originalDecodedDoc = yield* QueryInitializer.getById<
         Table.AnyWithProps,
         TableName
       >(
         tableName,
-        convexDatabaseWriter as any,
+        convexDatabaseWriter,
         tableDef,
       )(id);
 
@@ -157,15 +143,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       );
 
       yield* Effect.promise(() =>
-        convexDatabaseWriter.replace(
-          id,
-          updatedEncodedDoc as Expand<
-            BetterOmit<
-              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
-              "_creationTime" | "_id"
-            >
-          >,
-        ),
+        convexDatabaseWriter.replace(id, updatedEncodedDoc),
       );
     });
 
@@ -182,15 +160,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       );
 
       yield* Effect.promise(() =>
-        convexDatabaseWriter.replace(
-          id,
-          updatedEncodedDoc as Expand<
-            BetterOmit<
-              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
-              "_creationTime" | "_id"
-            >
-          >,
-        ),
+        convexDatabaseWriter.replace(id, updatedEncodedDoc),
       );
     });
 
@@ -207,7 +177,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
   return {
     table,
-  } as DatabaseWriterService<DatabaseSchema_>;
+  };
 };
 
 export const DatabaseWriter = <

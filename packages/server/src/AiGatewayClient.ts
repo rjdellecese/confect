@@ -18,6 +18,7 @@ export {
  * The OpenAI-compatible client service configured for the Convex AI gateway.
  */
 export const AiGatewayClient = OpenAiClient.OpenAiClient;
+
 export type AiGatewayClient = OpenAiClient.OpenAiClient;
 
 /**

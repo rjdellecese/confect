@@ -23,6 +23,7 @@ import * as Schema from "effect/Schema";
 import type * as Command from "effect/unstable/cli/Command";
 
 type FileServices = FileSystem.FileSystem | Path.Path;
+
 type GenerationServices = FileServices | ConfectDirectory | ConvexDirectory;
 
 it("preserves actual workflow inputs and inferred result, error, and service types", () => {
@@ -110,6 +111,7 @@ it.effect(
       const calls = yield* Ref.make<ReadonlyArray<readonly [string, number]>>(
         [],
       );
+
       const visit = Effect.fnUntraced(function* (
         entry: TableModule.TableModule,
         index: number,
@@ -119,11 +121,14 @@ it.effect(
           ...previous,
           [entry.relativePath, index] as const,
         ]);
+
         if (entry.tableName === "rejected") {
           return yield* new Rejected({ relativePath: entry.relativePath });
         }
+
         return `${prefix}${entry.relativePath}:${index}`;
       });
+
       expectTypeOf(visit).parameters.toEqualTypeOf<
         [entry: TableModule.TableModule, index: number]
       >();
@@ -138,6 +143,7 @@ it.effect(
         { tableName: "first", relativePath: "tables/first.ts" },
         { tableName: "second", relativePath: "tables/second.ts" },
       ];
+
       const visits = Effect.forEach(entries, visit);
       expectTypeOf(visits).toEqualTypeOf<
         Effect.Effect<Array<string>, Rejected, Prefix>
@@ -163,6 +169,7 @@ it.effect(
         [{ tableName: "rejected", relativePath: "tables/rejected.ts" }],
         visit,
       ).pipe(Effect.provideService(Prefix, "./"), Effect.flip);
+
       expect(error).toEqual(
         new Rejected({ relativePath: "tables/rejected.ts" }),
       );
@@ -176,10 +183,12 @@ it.effect("preserves generic callback specialization through forEach", () =>
     ): Effect.fn.Return<A, E, R> {
       return yield* effect;
     });
+
     const task: Effect.Effect<"value", Rejected, Prefix> = Effect.as(
       Prefix,
       "value" as const,
     );
+
     const result = Effect.forEach([task], evaluate);
     expectTypeOf(result).toEqualTypeOf<
       Effect.Effect<Array<"value">, Rejected, Prefix>

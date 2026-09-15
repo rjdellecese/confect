@@ -19,8 +19,10 @@ export type WithoutSystemFields<Doc> = Doc extends unknown
   : never;
 
 export type Any = any;
+
 export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The schema-keyed decoder cache accepts untrusted documents and validates them with the selected table codec.
 type Decode = (doc: unknown) => Effect.Effect<unknown, Schema.SchemaError>;
 
 const decoderCache = new WeakMap<Schema.Codec<any, any>, Map<string, Decode>>();
@@ -34,16 +36,19 @@ const getDecoder = (
     (() => {
       const map = new Map<string, Decode>();
       decoderCache.set(tableSchema, map);
+
       return map;
     })();
 
   return (
     byTable.get(tableName) ??
     (() => {
-      const decoder = Schema.decodeUnknownEffect(
+      const decoder: Decode = Schema.decodeUnknownEffect(
         SystemFields.extendWithSystemFields(tableName, tableSchema),
-      ) as Decode;
+      );
+
       byTable.set(tableName, decoder);
+
       return decoder;
     })()
   );
@@ -106,6 +111,7 @@ export const decode = Function.dual<
       ),
       Effect.map(
         (decodedDoc) =>
+          // SAFETY: getDecoder selects the codec cached by this exact table schema and table name; successful decoding establishes its document type including system fields.
           decodedDoc as DataModel.TableInfoWithName_<
             DataModel_,
             TableName
@@ -114,6 +120,7 @@ export const decode = Function.dual<
     ),
 );
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The schema-keyed encoder cache erases table-specific decoded types; the selected codec validates each input.
 type Encode = (doc: unknown) => Effect.Effect<unknown, Schema.SchemaError>;
 
 const encoderCache = new WeakMap<Schema.Codec<any, any>, Encode>();
@@ -121,8 +128,9 @@ const encoderCache = new WeakMap<Schema.Codec<any, any>, Encode>();
 const getEncoder = (tableSchema: Schema.Codec<any, any>): Encode =>
   encoderCache.get(tableSchema) ??
   (() => {
-    const encoder = Schema.encodeEffect(tableSchema) as Encode;
+    const encoder: Encode = Schema.encodeEffect(tableSchema);
     encoderCache.set(tableSchema, encoder);
+
     return encoder;
   })();
 
@@ -183,6 +191,7 @@ export const encode = Function.dual<
       ),
       Effect.map(
         (encodedDoc) =>
+          // SAFETY: getEncoder selects the encoder cached by this exact table schema; successful encoding produces that table's encoded document representation.
           encodedDoc as DataModel.TableInfoWithName_<
             DataModel_,
             TableName

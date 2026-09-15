@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import {
   checkPackContents,
   decodePackedFiles,
@@ -42,6 +43,7 @@ test("denies every class of unwanted packed file without changing inputs", () =>
     "tsconfig.json",
     "dist/tsconfig.src.json",
   ];
+
   const before = [...files];
   expect(packProblems(files).map(({ path }) => path)).toEqual(files.slice(1));
   expect(files).toEqual(before);
@@ -56,6 +58,7 @@ test("decodes npm output and rejects malformed or empty responses", () =>
           '[{"files":[{"path":"dist/index.js"}]}]',
         ),
       ).toEqual(["dist/index.js"]);
+
       for (const output of ["{", "[]", '[{"files":[{"path":42}]}]']) {
         const error = yield* decodePackedFiles("pkg", output).pipe(Effect.flip);
         expect(error._tag).toBe("InvalidPackOutput");
@@ -69,9 +72,11 @@ test("discovers only published packages with readable valid manifests", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
+
       const root = yield* fs.makeTempDirectoryScoped({
         prefix: "confect-pack-discovery-",
       });
+
       for (const [name, manifest] of [
         ["public", "{}"],
         ["private", '{"private":true}'],
@@ -80,12 +85,14 @@ test("discovers only published packages with readable valid manifests", () =>
       ] as const) {
         const directory = path.join(root, name);
         yield* fs.makeDirectory(directory);
+
         if (manifest !== undefined)
           yield* fs.writeFileString(
             path.join(directory, "package.json"),
             manifest,
           );
       }
+
       yield* fs.writeFileString(path.join(root, "not-a-directory"), "ignored");
       expect(yield* publishedPackages(root)).toEqual([
         path.join(root, "public"),
@@ -100,9 +107,11 @@ test(
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
+
         const root = yield* fs.makeTempDirectoryScoped({
           prefix: "confect-pack-check-",
         });
+
         for (const name of ["one", "two"]) {
           const directory = path.join(root, name);
           yield* fs.makeDirectory(path.join(directory, "dist"), {
@@ -117,6 +126,7 @@ test(
             "export {};\n",
           );
         }
+
         yield* checkPackContents(root);
         yield* fs.writeFileString(
           path.join(root, "one", "dist", "cache.tsbuildinfo"),
@@ -125,7 +135,8 @@ test(
         yield* fs.remove(path.join(root, "two", "dist"), { recursive: true });
         const error = yield* checkPackContents(root).pipe(Effect.flip);
         expect(error._tag).toBe("InvalidPackContents");
-        if (error._tag === "InvalidPackContents") {
+
+        if (Predicate.isTagged(error, "InvalidPackContents")) {
           expect(error.packages).toHaveLength(2);
           expect(
             error.packages
@@ -135,6 +146,7 @@ test(
               .sort(),
           ).toEqual(["dist/", "dist/cache.tsbuildinfo"]);
         }
+
         yield* fs.writeFileString(path.join(root, "one", "package.json"), "{");
         expect(
           (yield* packedFiles(path.join(root, "one")).pipe(Effect.flip))._tag,

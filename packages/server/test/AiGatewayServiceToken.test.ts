@@ -81,6 +81,7 @@ describe("AiGatewayServiceToken", () => {
       const unexpected = new Error(
         "NotAiGatewayDisabled is not a documented error code",
       );
+
       const serviceToken = makeAiGatewayServiceToken(() =>
         Promise.reject(unexpected),
       );
@@ -92,7 +93,7 @@ describe("AiGatewayServiceToken", () => {
   );
 });
 
-const getServiceTokenError = (rejection: unknown) =>
+const getServiceTokenError = (rejection: Error) =>
   makeAiGatewayServiceToken(() => Promise.reject(rejection))
     .get("ai-gateway")
     .pipe(Effect.flip);

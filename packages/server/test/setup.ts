@@ -11,12 +11,14 @@ const runCommand = (
 ): Effect.Effect<void, never, ChildProcessSpawner> =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner;
+
     const exitCode = yield* spawner.exitCode(
       ChildProcess.make(command, args, {
         stdout: "inherit",
         stderr: "inherit",
       }),
     );
+
     if (exitCode !== 0) {
       return yield* Effect.die(
         new Error(`${command} failed (exit code ${exitCode})`),

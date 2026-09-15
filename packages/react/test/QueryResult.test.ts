@@ -1,9 +1,18 @@
 import { pipe } from "effect/Function";
 import * as Equal from "effect/Equal";
 import * as Hash from "effect/Hash";
+import * as Data from "effect/Data";
 import { describe, expect, expectTypeOf, test } from "@effect/vitest";
 
 import * as QueryResult from "@confect/react/QueryResult";
+
+const plain = Data.taggedEnum<
+  Data.TaggedEnum<{
+    Loading: { skipped: boolean };
+    Success: { value: number };
+    NotFound: { id: string };
+  }>
+>();
 
 describe("constructors", () => {
   test("load sets Loading with skipped", () => {
@@ -44,12 +53,10 @@ describe("isQueryResult", () => {
   });
 
   test("is false for plain objects and other values", () => {
-    expect(QueryResult.isQueryResult({ _tag: "Loading", skipped: false })).toBe(
+    expect(QueryResult.isQueryResult(plain.Loading({ skipped: false }))).toBe(
       false,
     );
-    expect(QueryResult.isQueryResult({ _tag: "Success", value: 1 })).toBe(
-      false,
-    );
+    expect(QueryResult.isQueryResult(plain.Success({ value: 1 }))).toBe(false);
     expect(QueryResult.isQueryResult(null)).toBe(false);
     expect(QueryResult.isQueryResult(undefined)).toBe(false);
   });
@@ -69,13 +76,13 @@ describe("Equal", () => {
     expect(Equal.equals(QueryResult.succeed(1), QueryResult.succeed(2))).toBe(
       false,
     );
-    const err = { _tag: "NotFound", id: "a" };
+    const err = plain.NotFound({ id: "a" });
     expect(Equal.equals(QueryResult.fail(err), QueryResult.fail(err))).toBe(
       true,
     );
     expect(
       Equal.equals(
-        QueryResult.fail({ _tag: "NotFound", id: "b" }),
+        QueryResult.fail(plain.NotFound({ id: "b" })),
         QueryResult.fail(err),
       ),
     ).toBe(false);
@@ -83,10 +90,7 @@ describe("Equal", () => {
 
   test("differs across tags for same underlying bits", () => {
     expect(
-      Equal.equals(
-        QueryResult.load(false) as QueryResult.QueryResult<1, never>,
-        QueryResult.succeed(1),
-      ),
+      Equal.equals(QueryResult.load<1>(false), QueryResult.succeed(1)),
     ).toBe(false);
   });
 });
@@ -115,6 +119,7 @@ describe("pipe", () => {
         onSuccess: (n) => n * 3,
       }),
     );
+
     expect(r).toBe(6);
   });
 });
@@ -162,6 +167,7 @@ describe("match", () => {
       onLoading: (s) => `L:${s}`,
       onSuccess: (v) => `S:${v}`,
     });
+
     expectTypeOf(f)
       .parameter(0)
       .toExtend<QueryResult.QueryResult<number, never>>();
@@ -198,11 +204,13 @@ describe("match", () => {
 describe("namespace type helpers", () => {
   test("Success extracts the success type parameter from QueryResult", () => {
     type R = QueryResult.QueryResult<number, "e">;
+
     expectTypeOf<QueryResult.QueryResult.Success<R>>().toEqualTypeOf<number>();
   });
 
   test("Failure extracts the failure type parameter from QueryResult", () => {
     type R = QueryResult.QueryResult<number, "e">;
+
     expectTypeOf<QueryResult.QueryResult.Failure<R>>().toEqualTypeOf<"e">();
   });
 });

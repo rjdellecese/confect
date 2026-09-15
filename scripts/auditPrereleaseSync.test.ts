@@ -129,9 +129,11 @@ test("rejects a changeset duplicated between pending and prereleased storage", (
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
+
       const repository = yield* fs.makeTempDirectoryScoped({
         prefix: "confect-changeset-audit-",
       });
+
       expect(yield* findDuplicateChangesets(repository)).toEqual([]);
       yield* fs.makeDirectory(path.join(repository, ".changeset", "pre"), {
         recursive: true,
@@ -145,9 +147,11 @@ test("rejects a changeset duplicated between pending and prereleased storage", (
         "shipped",
       );
       expect(yield* findDuplicateChangesets(repository)).toEqual(["same-id"]);
+
       const error = yield* auditPrereleaseSync({ repository }).pipe(
         Effect.flip,
       );
+
       expect(error._tag).toBe("DuplicateChangesets");
     }).pipe(Effect.scoped),
   ));
@@ -158,9 +162,11 @@ test("requires ancestry even when main and the prerelease line have identical tr
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+
       const repository = yield* fs.makeTempDirectoryScoped({
         prefix: "confect-ancestry-audit-",
       });
+
       const git = Effect.fn("PrereleaseSyncTest.git")(function* (
         ...args: Array<string>
       ) {
@@ -171,8 +177,10 @@ test("requires ancestry even when main and the prerelease line have identical tr
             stderr: "inherit",
           }),
         );
+
         expect(Number(code)).toBe(0);
       });
+
       yield* git("init", "--initial-branch=main");
       yield* git("config", "user.name", "Prerelease Sync Test");
       yield* git("config", "user.email", "sync-test@example.invalid");
@@ -199,11 +207,13 @@ test("requires ancestry even when main and the prerelease line have identical tr
         ),
       ).toBe("");
       expect(yield* isAncestor("main", "v10", repository)).toBe(false);
+
       const error = yield* auditPrereleaseSync({
         headRef: "v10",
         mainRef: "main",
         repository,
       }).pipe(Effect.flip);
+
       expect(error._tag).toBe("MissingMainAncestry");
       expect(error.message).toMatch(
         /real merge even if its tree diff is empty/,

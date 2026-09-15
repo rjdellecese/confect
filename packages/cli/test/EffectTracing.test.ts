@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as Bundler from "@confect/cli/Bundler";
 import * as CodegenError from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -19,23 +20,28 @@ import * as Tracer from "effect/Tracer";
 
 const makeRecordingTracer = () => {
   const spans: Array<Tracer.Span> = [];
+
   const tracer = Tracer.make({
     span(options) {
       const span = new Tracer.NativeSpan(options);
       spans.push(span);
+
       return span;
     },
   });
+
   return { spans, tracer };
 };
 
 const makeProject = Effect.fnUntraced(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+
   const root = yield* fs.makeTempDirectoryScoped({
     directory: import.meta.dirname,
     prefix: "tracing-",
   });
+
   const confect = path.join(root, "confect");
   const convex = path.join(root, "convex");
   yield* fs.makeDirectory(confect);
@@ -58,6 +64,7 @@ const makeProject = Effect.fnUntraced(function* () {
     path.join(convex, "convex.config.ts"),
     'import { defineApp } from "convex/server";\nexport default defineApp();\n',
   );
+
   return {
     confect,
     convex,
@@ -89,23 +96,27 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           );
           const reads = MutableRef.make(0);
           const relativePath = MutableRef.make("table.ts");
+
           const table: TableModule.TableModule = {
             tableName: "notes",
             get relativePath() {
               MutableRef.increment(reads);
+
               return MutableRef.get(relativePath);
             },
           };
+
           const validate = TableModule.validate([table]).pipe(
             Effect.provide(directories),
           );
+
           expect(MutableRef.get(reads)).toBe(0);
           yield* validate;
           expect(MutableRef.get(reads)).toBe(1);
 
           MutableRef.set(relativePath, "invalid.ts");
           const error = yield* Effect.flip(validate);
-          assert(error._tag === "InvalidTableDefaultExportError");
+          assert(Predicate.isTagged(error, "InvalidTableDefaultExportError"));
           expect(error.tablePath).toBe("invalid.ts");
           expect(MutableRef.get(reads)).toBe(2);
         }),
@@ -117,6 +128,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
         Effect.gen(function* () {
           const { directories } = yield* makeProject();
           const { spans, tracer } = makeRecordingTracer();
+
           const pass = codegenHandler.pipe(
             Effect.provide(directories),
             Effect.provideService(Tracer.Tracer, tracer),
@@ -131,6 +143,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           const passes = spans.filter((span) => span.name === "Cli.codegen");
           expect(passes).toHaveLength(2);
           expect(passes[0]).not.toBe(passes[1]);
+
           for (const name of [
             "LeafModule.validateSpec",
             "LeafModule.validateImpl",
@@ -138,14 +151,18 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           ]) {
             const operations = spans.filter((span) => span.name === name);
             expect(operations).toHaveLength(2);
+
             for (const operation of operations) {
               expect(passes).toContain(Option.getOrUndefined(operation.parent));
             }
           }
+
           const bundles = spans.filter(
             (span) => span.name === "Bundler.bundle",
           );
+
           expect(bundles.length).toBeGreaterThan(0);
+
           for (const bundle of bundles) {
             const parent = Option.getOrUndefined(bundle.parent);
             assert(parent?._tag === "Span");
@@ -156,8 +173,9 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
               "ConvexConfig.discoverInstalledComponents",
             ]).toContain(parent.name);
           }
+
           for (const span of spans) {
-            assert(span.status._tag === "Ended");
+            assert(Predicate.isTagged(span.status, "Ended"));
             expect(Exit.isSuccess(span.status.exit)).toBe(true);
           }
         }),
@@ -174,10 +192,12 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const { confect, convex, directories } = yield* makeProject();
+
           const file =
             kind === "config"
               ? path.join(convex, "convex.config.ts")
               : path.join(confect, `notes.${kind}.ts`);
+
           yield* fs.writeFileString(file, "export default {};\n");
           const { spans, tracer } = makeRecordingTracer();
 
@@ -188,12 +208,14 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           );
 
           expect(Option.isNone(result)).toBe(true);
+
           for (const operationName of ["Cli.codegen", name]) {
             const span = spans.find(
               (candidate) => candidate.name === operationName,
             );
+
             assert(span !== undefined);
-            assert(span.status._tag === "Ended");
+            assert(Predicate.isTagged(span.status, "Ended"));
             expect(Exit.isFailure(span.status.exit)).toBe(true);
           }
         }),
@@ -206,6 +228,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
         const directory = yield* fs.makeTempDirectoryScoped();
         const entry = path.join(directory, "entry.ts");
         const { spans, tracer } = makeRecordingTracer();
+
         const bundle = Bundler.bundle(entry).pipe(
           Effect.provideService(Tracer.Tracer, tracer),
         );
@@ -216,8 +239,8 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
         yield* fs.remove(entry);
         expect(Exit.isFailure(yield* Effect.exit(bundle))).toBe(true);
         expect(spans).toHaveLength(2);
-        assert(spans[0]?.status._tag === "Ended");
-        assert(spans[1]?.status._tag === "Ended");
+        assert(Predicate.isTagged(spans[0]?.status, "Ended"));
+        assert(Predicate.isTagged(spans[1]?.status, "Ended"));
         expect(Exit.isSuccess(spans[0].status.exit)).toBe(true);
         expect(Exit.isFailure(spans[1].status.exit)).toBe(true);
       }),

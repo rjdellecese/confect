@@ -40,6 +40,7 @@ describe("Table.tableDefinition", () => {
           dimensions: 1536,
         })("notes"),
     );
+
     type ConfectNotesTableDefinition = typeof confectNotesTableDefinition;
 
     const convexNotesTableDefinition = defineTable({
@@ -65,6 +66,7 @@ describe("Table.tableDefinition", () => {
         filterFields: ["author.name", "tag"],
         dimensions: 1536,
       });
+
     type ConvexNotesTableDefinition = typeof convexNotesTableDefinition;
 
     expectTypeOf<ConfectNotesTableDefinition>().toExtend<
@@ -164,10 +166,13 @@ describe("Table.tableDefinition", () => {
   describe("lazy compilation", () => {
     const makeInstrumented = () => {
       const calls = { count: 0 };
+
       const lazyFields = () => {
         calls.count += 1;
+
         return Schema.Struct({ text: Schema.String });
       };
+
       return { calls, lazyFields };
     };
 
@@ -203,6 +208,7 @@ describe("Table.tableDefinition", () => {
           dimensions: 4,
           filterFields: ["tag"],
         });
+
       expect(first).toStrictEqual(expected);
     });
 

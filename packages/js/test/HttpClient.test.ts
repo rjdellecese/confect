@@ -23,7 +23,7 @@ interface TestTransport extends InternalHttpClient.Transport {
   readonly calls: (operation: Operation) => Effect.Effect<ReadonlyArray<Call>>;
   readonly failNext: (
     operation: Operation,
-    rejection: unknown,
+    rejection: Error,
   ) => Effect.Effect<void>;
   readonly auth: () => Effect.Effect<Option.Option<string>>;
 }
@@ -40,9 +40,11 @@ const TestHttpClientLayer = Layer.effectContext(
     const context = yield* Effect.context<never>();
     const runSync = Effect.runSyncWith(context);
     const runPromise = Effect.runPromiseWith(context);
+
     const calls = yield* EffectRef.make<
       Readonly<Record<Operation, ReadonlyArray<Call>>>
     >({ query: [], mutation: [], action: [] });
+
     const rejections = yield* EffectRef.make<
       Readonly<Record<Operation, Option.Option<unknown>>>
     >({
@@ -50,11 +52,13 @@ const TestHttpClientLayer = Layer.effectContext(
       mutation: Option.none(),
       action: Option.none(),
     });
+
     const auth = yield* EffectRef.make<Option.Option<string>>(Option.none());
 
     const invokeEffect = Effect.fnUntraced(function* (
       operation: Operation,
       functionReference: Parameters<InternalHttpClient.Transport[Operation]>[0],
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This transport fixture records encoded arguments from different ref codecs without altering them.
       args: unknown,
     ) {
       yield* EffectRef.update(calls, (current) => ({
@@ -64,22 +68,25 @@ const TestHttpClientLayer = Layer.effectContext(
           { name: getFunctionName(functionReference), args },
         ],
       }));
+
       const rejection = yield* EffectRef.modify(rejections, (current) => [
         current[operation],
         { ...current, [operation]: Option.none() },
       ]);
+
       if (Option.isSome(rejection)) {
         throw rejection.value;
       }
+
       return {};
     });
 
     const invoke = (
       operation: Operation,
       functionReference: Parameters<InternalHttpClient.Transport[Operation]>[0],
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This promise adapter preserves the raw transport contract exercised by the codec tests.
       args: unknown,
-    ): Promise<unknown> =>
-      runPromise(invokeEffect(operation, functionReference, args));
+    ) => runPromise(invokeEffect(operation, functionReference, args));
 
     const service = TestHttpTransport.of({
       url: "https://test.convex.cloud",
@@ -352,13 +359,16 @@ describe("HttpClient error decoding", () => {
       const transport = yield* TestHttpTransport;
       yield* transport.failNext(
         "query",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* HttpClient.HttpClient;
 
       const result = yield* Effect.result(
         client.query(queryWithError, { id: "abc" }),
       );
+
       assert(Result.isFailure(result));
       assert(Schema.is(NotFound)(result.failure));
       expect(result.failure.id).toBe("abc");
@@ -375,6 +385,7 @@ describe("HttpClient error decoding", () => {
       const result = yield* Effect.result(
         client.query(queryWithError, { id: "abc" }),
       );
+
       assert(Result.isFailure(result));
       assert(Schema.is(HttpClient.HttpClientError)(result.failure));
       expect(result.failure.cause).toBe(rejection);
@@ -386,13 +397,16 @@ describe("HttpClient error decoding", () => {
       const transport = yield* TestHttpTransport;
       yield* transport.failNext(
         "mutation",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* HttpClient.HttpClient;
 
       const result = yield* Effect.result(
         client.mutation(mutationWithError, { id: "abc" }),
       );
+
       assert(Result.isFailure(result));
       expect(result.failure).toBeInstanceOf(NotFound);
     }).pipe(Effect.provide(TestHttpClientLayer)),
@@ -407,6 +421,7 @@ describe("HttpClient error decoding", () => {
       const result = yield* Effect.result(
         client.mutation(mutationWithError, { id: "abc" }),
       );
+
       assert(Result.isFailure(result));
       expect(result.failure).toBeInstanceOf(HttpClient.HttpClientError);
     }).pipe(Effect.provide(TestHttpClientLayer)),
@@ -417,13 +432,16 @@ describe("HttpClient error decoding", () => {
       const transport = yield* TestHttpTransport;
       yield* transport.failNext(
         "action",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* HttpClient.HttpClient;
 
       const result = yield* Effect.result(
         client.action(actionWithError, { id: "abc" }),
       );
+
       assert(Result.isFailure(result));
       expect(result.failure).toBeInstanceOf(NotFound);
     }).pipe(Effect.provide(TestHttpClientLayer)),
@@ -438,6 +456,7 @@ describe("HttpClient error decoding", () => {
       const result = yield* Effect.result(
         client.action(actionWithError, { id: "abc" }),
       );
+
       assert(Result.isFailure(result));
       expect(result.failure).toBeInstanceOf(HttpClient.HttpClientError);
     }).pipe(Effect.provide(TestHttpClientLayer)),

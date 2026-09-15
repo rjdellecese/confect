@@ -9,7 +9,9 @@ import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 // Serialized labels are a cursor boundary representation. They include every
 // runtime position but do not preserve segment boundaries or implicitness.
 const RuntimeLabels = Schema.Array(Schema.String);
+
 const RuntimeLabelsEquivalence = Schema.toEquivalence(RuntimeLabels);
+
 const segmentRuntimeLabels = Match.type<QueryStreamKeyLayout.Segment>().pipe(
   Match.tagsExhaustive({
     WithImplicitId: ({ labels }) =>
@@ -63,6 +65,7 @@ export const codecForLayout = (
     QueryStreamKeyLayout.segments(layout),
     segmentRuntimeLabels,
   );
+
   return Json.check(
     Schema.makeFilter(
       (cursor) => RuntimeLabelsEquivalence(cursor.keyFields, runtimeLabels),

@@ -109,7 +109,7 @@ export interface AnyConvex extends Convex<DefaultFunctionArgs, any> {}
 
 export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
 
-const Standard: Standard = { _tag: "Standard" };
+const Standard: Standard = Data.taggedEnum<Standard>().Standard();
 
 /**
  * Build a `Confect` provenance from lazy args-fields and schema thunks. `args`,
@@ -141,10 +141,12 @@ export const Confect = <
 
   Lazy.defineProperty(provenance, "args", () => Schema.Struct(args()));
   Lazy.defineProperty(provenance, "returns", returns);
+
   if (error !== undefined) {
     Lazy.defineProperty(provenance, "error", error);
   }
 
+  // SAFETY: The getters above supply args, returns, and the optional error; ~ArgsFields is a type-only witness.
   return provenance as Confect<ArgsFields_, Returns, Error, Standard>;
 };
 
@@ -209,6 +211,7 @@ export const ConfectPaginated = <
   error?: () => Error,
 ): ConfectPaginated<UserArgsFields_, Item, Error> => {
   const kind = { _tag: "Paginated" as const };
+  // SAFETY: All three schema getters are installed below before kind escapes, and none is evaluated during installation.
   const paginatedKind = kind as Paginated<UserArgsFields_, Item>;
 
   Lazy.defineProperty(kind, "userArgs", () => Schema.Struct(userArgs()));
@@ -218,16 +221,19 @@ export const ConfectPaginated = <
   );
 
   const provenance = { _tag: "Confect" as const, kind: paginatedKind };
+  // SAFETY: The getters below compose precisely the declared paginated args and returns; ~ArgsFields is a type-only witness.
   const self = provenance as ConfectPaginated<UserArgsFields_, Item, Error>;
 
   Lazy.defineProperty(provenance, "args", () => {
     const fields = paginatedKind.userArgs.fields;
+
     if ("paginationOpts" in fields) {
       throw new globalThis.Error(
         "A paginated query's args schema must not declare `paginationOpts`—" +
           "it is added automatically from the `PaginationOptions` schema",
       );
     }
+
     return Schema.Struct({
       ...fields,
       paginationOpts: PaginationOptions.PaginationOptions,
@@ -236,6 +242,7 @@ export const ConfectPaginated = <
   Lazy.defineProperty(provenance, "returns", () =>
     PaginationResult.PaginationResult(paginatedKind.item),
   );
+
   if (error !== undefined) {
     Lazy.defineProperty(provenance, "error", error);
   }
@@ -245,6 +252,8 @@ export const ConfectPaginated = <
 
 export const Convex = <Args extends DefaultFunctionArgs, Returns>() =>
   FunctionProvenance.Convex(
+    // SAFETY: ~args and ~returns are phantom type witnesses; the constructor must receive an empty payload so only its tag exists at runtime.
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The payload omits phantom argument/return witnesses so native Convex provenance stores only its tag at runtime.
     {} as {
       "~args": Args;
       "~returns": Returns;

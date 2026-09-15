@@ -7,6 +7,7 @@ import type * as Refs from "@confect/core/Refs";
 import * as Spec from "@confect/core/Spec";
 
 const Args = { id: Schema.String };
+
 const Returns = Schema.String;
 
 // --- Small spec: 1 group, 2 functions ---
@@ -25,6 +26,7 @@ const SmallSpec = Spec.make().add(
       }),
     ),
 );
+
 type SmallSpec = typeof SmallSpec;
 
 // --- Medium spec (original): 4 groups, 12 functions ---
@@ -341,17 +343,21 @@ type LargeSpec = typeof LargeSpec;
 
 // Baseline expression: force the Refs module types to load so module-level
 // instantiations are not counted in individual benchmarks.
+// SAFETY: This placeholder is discarded; the benchmark measures type instantiations and never reads reference properties.
 void ({} as Refs.Refs<any>);
 
 bench("Refs<Spec> (unfiltered)", () => {
+  // SAFETY: The benchmark instantiates Refs without reading the placeholder's runtime properties.
   return {} as Refs.Refs<MediumSpec>;
 }).types([2274, "instantiations"]);
 
 bench("Refs<Spec, AnyPublic> (public-filtered)", () => {
+  // SAFETY: The benchmark instantiates public Refs without reading the placeholder's runtime properties.
   return {} as Refs.Refs<MediumSpec, Ref.AnyPublic>;
 }).types([2351, "instantiations"]);
 
 bench("Refs<Spec, AnyInternal> (internal-filtered)", () => {
+  // SAFETY: The benchmark instantiates internal Refs without reading the placeholder's runtime properties.
   return {} as Refs.Refs<MediumSpec, Ref.AnyInternal>;
 }).types([2335, "instantiations"]);
 
@@ -360,10 +366,12 @@ bench("Refs<Spec, AnyInternal> (internal-filtered)", () => {
 // instantiation count. The gap between them proves lazy evaluation.
 
 bench("resolve one leaf", () => {
+  // SAFETY: Only the indexed leaf type is measured; the placeholder is never used as a runtime reference.
   return {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["list"];
 }).types([2654, "instantiations"]);
 
 bench("resolve all leaves", () => {
+  // SAFETY: These placeholders instantiate each indexed leaf type; none is used as a runtime reference.
   return [
     {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["list"],
     {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["create"],
@@ -377,22 +385,27 @@ bench("resolve all leaves", () => {
 // --- Small spec (1 group, 2 functions) ---
 
 bench("small: Refs (unfiltered)", () => {
+  // SAFETY: The benchmark instantiates Refs without reading the placeholder's runtime properties.
   return {} as Refs.Refs<SmallSpec>;
 }).types([884, "instantiations"]);
 
 bench("small: Refs (public-filtered)", () => {
+  // SAFETY: The benchmark instantiates public Refs without reading the placeholder's runtime properties.
   return {} as Refs.Refs<SmallSpec, Ref.AnyPublic>;
 }).types([909, "instantiations"]);
 
 bench("small: Refs (internal-filtered)", () => {
+  // SAFETY: The benchmark instantiates internal Refs without reading the placeholder's runtime properties.
   return {} as Refs.Refs<SmallSpec, Ref.AnyInternal>;
 }).types([950, "instantiations"]);
 
 bench("small: Refs (resolve one leaf)", () => {
+  // SAFETY: Only the indexed leaf type is measured; the placeholder is never used as a runtime reference.
   return {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"];
 }).types([1095, "instantiations"]);
 
 bench("small: Refs (resolve all leaves)", () => {
+  // SAFETY: These placeholders instantiate each indexed leaf type; none is used as a runtime reference.
   return [
     {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"],
     {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["logout"],
@@ -402,23 +415,29 @@ bench("small: Refs (resolve all leaves)", () => {
 // --- Large spec (8 groups, 28 functions) ---
 
 bench("large: Refs (unfiltered)", () => {
+  // SAFETY: The benchmark instantiates Refs without reading the placeholder's runtime properties.
   return {} as Refs.Refs<LargeSpec>;
 }).types([3913, "instantiations"]);
 
 bench("large: Refs (public-filtered)", () => {
+  // SAFETY: The benchmark instantiates public Refs without reading the placeholder's runtime properties.
   return {} as Refs.Refs<LargeSpec, Ref.AnyPublic>;
 }).types([3991, "instantiations"]);
 
 bench("large: Refs (internal-filtered)", () => {
+  // SAFETY: The benchmark instantiates internal Refs without reading the placeholder's runtime properties.
   return {} as Refs.Refs<LargeSpec, Ref.AnyInternal>;
 }).types([3969, "instantiations"]);
 
 bench("large: Refs (resolve one leaf)", () => {
+  // SAFETY: Only the indexed leaf type is measured; the placeholder is never used as a runtime reference.
   return {} as Refs.Refs<LargeSpec, Ref.AnyPublic>["users"]["list"];
 }).types([4320, "instantiations"]);
 
 bench("large: Refs (resolve all leaves)", () => {
   type PublicRefs = Refs.Refs<LargeSpec, Ref.AnyPublic>;
+
+  // SAFETY: These placeholders instantiate each indexed leaf type; none is used as a runtime reference.
   return [
     {} as PublicRefs["users"]["list"],
     {} as PublicRefs["users"]["create"],

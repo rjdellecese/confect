@@ -11,6 +11,7 @@ import * as GroupPaths from "./GroupPaths";
 export const FunctionPaths = Schema.HashSet(FunctionPath.FunctionPath).pipe(
   Schema.brand("@confect/cli/FunctionPaths"),
 );
+
 export type FunctionPaths = typeof FunctionPaths.Type;
 
 export const make = (spec: Spec.AnyWithProps): FunctionPaths =>
@@ -61,19 +62,14 @@ export const groupPaths = (
 export const diff = (
   previousFunctions: FunctionPaths,
   currentFunctions: FunctionPaths,
-): {
-  functionsAdded: FunctionPaths;
-  functionsRemoved: FunctionPaths;
-  groupsRemoved: GroupPaths.GroupPaths;
-  groupsAdded: GroupPaths.GroupPaths;
-  groupsChanged: GroupPaths.GroupPaths;
-} => {
+) => {
   const currentGroups = groupPaths(currentFunctions);
   const previousGroups = groupPaths(previousFunctions);
 
   const groupsAdded = GroupPaths.GroupPaths.make(
     HashSet.difference(currentGroups, previousGroups),
   );
+
   const groupsRemoved = GroupPaths.GroupPaths.make(
     HashSet.difference(previousGroups, currentGroups),
   );
@@ -81,6 +77,7 @@ export const diff = (
   const functionsAdded = FunctionPaths.make(
     HashSet.difference(currentFunctions, previousFunctions),
   );
+
   const existingGroupsToWhichFunctionsWereAdded = GroupPaths.GroupPaths.make(
     HashSet.intersection(currentGroups, groupPaths(functionsAdded)),
   );
@@ -88,6 +85,7 @@ export const diff = (
   const functionsRemoved = FunctionPaths.make(
     HashSet.difference(previousFunctions, currentFunctions),
   );
+
   const existingGroupsToWhichFunctionsWereRemoved = GroupPaths.GroupPaths.make(
     HashSet.intersection(previousGroups, groupPaths(functionsRemoved)),
   );

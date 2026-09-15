@@ -29,6 +29,7 @@ export class LocalBackend extends Context.Service<
 >()("@confect/server/test/local-backend/LocalBackend") {}
 
 const READY_LINE = "Convex functions ready!";
+
 const URL = "http://127.0.0.1:3210";
 
 // Knobs read by `crates/common/src/knobs.rs` in convex-backend. Lowering
@@ -36,6 +37,7 @@ const URL = "http://127.0.0.1:3210";
 // per `crates/application/src/cache/mod.rs`) to ~3s so a single test run
 // can wait past the cache eviction window.
 const USER_TIMEOUT_SECONDS = 1;
+
 const SYSTEM_TIMEOUT_SECONDS = 1;
 
 /**
@@ -90,8 +92,10 @@ const make = Effect.gen(function* () {
 
   return yield* Effect.gen(function* () {
     const attemptScope = yield* Scope.fork(parentScope);
+
     return yield* Effect.gen(function* () {
       const handle = yield* spawner.spawn(command);
+
       const { readySeen, versionLookupFailed } = yield* Stream.merge(
         handle.stdout.pipe(Stream.decodeText(), Stream.splitLines),
         handle.stderr.pipe(Stream.decodeText(), Stream.splitLines),
@@ -114,11 +118,13 @@ const make = Effect.gen(function* () {
       }
 
       const exitCode = yield* handle.exitCode;
+
       if (exitCode !== 0 && versionLookupFailed) {
         return yield* new BackendVersionLookupError({
           message: `convex dev exited with code ${exitCode} after a transient backend version lookup failure`,
         });
       }
+
       return yield* new BackendNotReadyError({
         message: `convex dev exited with code ${exitCode} before printing "${READY_LINE}"`,
       });
@@ -130,7 +136,7 @@ const make = Effect.gen(function* () {
     );
   }).pipe(
     Effect.retry({
-      while: (error) => error._tag === "BackendVersionLookupError",
+      while: Schema.is(BackendVersionLookupError),
       schedule: Schedule.exponential("1 second").pipe(
         Schedule.jittered,
         Schedule.upTo({ times: 2 }),

@@ -52,6 +52,7 @@ type KeyCut = Data.TaggedEnum<{
   Exact: { readonly orderKey: QueryStreamKey.Complete };
   Successor: { readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey };
 }>;
+
 const KeyCut = Data.taggedEnum<KeyCut>();
 
 const cutRank = KeyCut.$match({
@@ -70,28 +71,34 @@ const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
   const selfValues = cutValues(self);
   const thatValues = cutValues(that);
   const minLength = Math.min(selfValues.length, thatValues.length);
+
   const prefixOrdering = QueryStreamOrderKey.Order(
     Array.take(selfValues, minLength),
     Array.take(thatValues, minLength),
   );
+
   if (prefixOrdering !== 0) {
     return prefixOrdering;
   }
+
   if (selfValues.length === thatValues.length) {
     return Order.Number(cutRank(self), cutRank(that));
   }
+
   // One key is a proper prefix of the other. The shorter cut sits just
   // before (`predecessor`) or just after (`successor`) *every* key
   // extending its prefix—the longer one included. (`exact` cuts are
   // always full keys, so an `exact` cut is never the shorter one here.)
   const selfIsShorter = selfValues.length < thatValues.length;
   const shorter = selfIsShorter ? self : that;
+
   const shorterOrdering = KeyCut.$match(shorter, {
     Predecessor: () => -1 as const,
     Exact: () => 1 as const,
     Successor: () => 1 as const,
   });
-  return selfIsShorter ? shorterOrdering : (-shorterOrdering as -1 | 1);
+
+  return selfIsShorter ? shorterOrdering : shorterOrdering === -1 ? 1 : -1;
 });
 
 const lowerCut = (bound: KeyBound): KeyCut =>
@@ -234,9 +241,11 @@ export const parse = (
           Option.some({ orderKey: prefix, inclusive }),
         ),
     });
+
   return Result.gen(function* () {
     const lower = yield* endpoint(bounds.lower);
     const upper = yield* endpoint(bounds.upper);
+
     return { lower, upper };
   });
 };

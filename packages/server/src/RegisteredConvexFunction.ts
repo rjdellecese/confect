@@ -145,6 +145,7 @@ const queryClock: Clock.Clock = {
         () => resume(Effect.void),
         Duration.toMillis(duration),
       );
+
       return Effect.sync(() => clearTimeout(handle));
     }),
 };
@@ -201,6 +202,7 @@ const queryFunction = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
+
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* RegisteredFunction.applyMiddleware(
         handler(decodedArgs),
@@ -228,6 +230,7 @@ const queryFunction = <
           ),
         ),
       );
+
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
@@ -319,6 +322,7 @@ const mutationFunction = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
+
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* RegisteredFunction.applyMiddleware(
         handler(decodedArgs),
@@ -330,6 +334,7 @@ const mutationFunction = <
           args: decodedArgs,
         },
       ).pipe(Effect.provide(mutationLayer(databaseSchema, ctx)));
+
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),

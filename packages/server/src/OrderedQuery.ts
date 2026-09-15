@@ -81,19 +81,23 @@ export const make = <
       Document.decode(tableName, tableSchema),
     );
 
-    return {
+    const result: PaginationResult<TableInfo_["document"]> = {
       page: parsedPage,
       isDone: paginationResult.isDone,
       continueCursor: paginationResult.continueCursor,
-      /* v8 ignore start */
-      ...(paginationResult.splitCursor
-        ? { splitCursor: paginationResult.splitCursor }
-        : {}),
-      ...(paginationResult.pageStatus
-        ? { pageStatus: paginationResult.pageStatus }
-        : {}),
-      /* v8 ignore stop */
     };
+
+    /* v8 ignore start */
+    if (paginationResult.splitCursor) {
+      result.splitCursor = paginationResult.splitCursor;
+    }
+
+    if (paginationResult.pageStatus) {
+      result.pageStatus = paginationResult.pageStatus;
+    }
+    /* v8 ignore stop */
+
+    return result;
   });
 
   return {

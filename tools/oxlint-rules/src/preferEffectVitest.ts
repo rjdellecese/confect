@@ -21,7 +21,9 @@ const importedName = (
   if (specifier.type !== "ImportSpecifier") {
     return Option.none();
   }
+
   const imported = specifier.imported;
+
   return Option.some(
     imported.type === "Identifier" ? imported.name : imported.value,
   );
@@ -48,6 +50,7 @@ export const preferEffectVitest = Rule.define({
   }),
   create: function* () {
     const ctx = yield* RuleContext;
+
     return Visitor.on("ImportDeclaration", (node) =>
       Option.match(AST.matchImport(node, "vitest"), {
         onNone: () => Effect.void,
@@ -55,6 +58,7 @@ export const preferEffectVitest = Rule.define({
           const importedNames = Array.getSomes(
             Array.map(matched.specifiers, importedName),
           );
+
           const isVitestOnly = (name: string) =>
             Array.contains(vitestOnlyNames, name);
 

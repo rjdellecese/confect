@@ -14,8 +14,10 @@ const make = (scheduler: ConvexScheduler) => ({
   ) => {
     const delayMs = Duration.toMillis(delay);
     const functionReference = Ref.getFunctionReference(ref);
+
     const encodedArgs = Ref.encodeArgsSync(
       ref,
+      // SAFETY: OptionalArgs permits omission only when Args has no keys; otherwise args[0] is the required Args value.
       (args[0] ?? {}) as Ref.Args<Ref_>,
     );
 
@@ -30,8 +32,10 @@ const make = (scheduler: ConvexScheduler) => ({
   ) => {
     const timestamp = DateTime.toEpochMillis(dateTime);
     const functionReference = Ref.getFunctionReference(ref);
+
     const encodedArgs = Ref.encodeArgsSync(
       ref,
+      // SAFETY: OptionalArgs permits omission only when Args has no keys; otherwise args[0] is the required Args value.
       (args[0] ?? {}) as Ref.Args<Ref_>,
     );
 
@@ -44,6 +48,7 @@ const make = (scheduler: ConvexScheduler) => ({
 export const Scheduler = Context.Service<ReturnType<typeof make>>(
   "@confect/server/Scheduler",
 );
+
 export type Scheduler = typeof Scheduler.Identifier;
 
 export const layer = (scheduler: ConvexScheduler) =>

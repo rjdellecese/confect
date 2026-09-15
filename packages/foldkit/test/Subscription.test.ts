@@ -1,5 +1,5 @@
 import { FunctionSpec, PaginationError, Ref } from "@confect/core";
-import { describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, it } from "@effect/vitest";
 import type { RegisteredQuery } from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
@@ -43,12 +43,16 @@ interface Model {
 }
 
 const SucceededGetNote = m("SucceededGetNote", { note: Schema.Unknown });
+
 const FailedGetNote = m("FailedGetNote", { error: Schema.Unknown });
+
 type Message = typeof SucceededGetNote.Type | typeof FailedGetNote.Type;
 
 const noteHandlers = {
-  onSuccess: (note: unknown) => SucceededGetNote({ note }),
-  onError: (error: unknown) => FailedGetNote({ error }),
+  onSuccess: (note: Ref.Returns<typeof listQueryRef>) =>
+    SucceededGetNote({ note }),
+  onError: (error: Subscription.Error<typeof listQueryRef>) =>
+    FailedGetNote({ error }),
 };
 
 const makeNoteEntry = () =>
@@ -62,6 +66,7 @@ describe("Subscription", () => {
   describe("reactiveQuery", () => {
     it("extracts Option-wrapped args and defaults no-args queries open", () => {
       const entry = makeNoteEntry();
+
       const noArgs = Subscription.reactiveQuery<Model>()(
         listQueryRef,
         noteHandlers,
@@ -81,6 +86,7 @@ describe("Subscription", () => {
     it.effect("None dependencies produce an empty stream", () =>
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
+
         const messages = yield* Stream.runCollect(
           makeNoteEntry().dependenciesToStream({ args: Option.none() }),
         );
@@ -152,21 +158,22 @@ describe("Subscription", () => {
         // @ts-expect-error—only Confect-provenance refs are supported
         Subscription.reactiveQuery<Model>()(convexGetQueryRef, noteHandlers);
 
-      expect(typeof makeConvexEntry).toBe("function");
+      expect(makeConvexEntry).toBeTypeOf("function");
     });
 
     it("requires args and is accepted by Foldkit Subscription.make", () => {
       const requiresArgs = () =>
         // @ts-expect-error—declared args require an extractor
         Subscription.reactiveQuery<Model>()(getQueryRef, noteHandlers);
+
       const subscriptions = FoldkitSubscription.make<
         Model,
         Message,
         Client.Client
       >()(() => ({ note: makeNoteEntry() }));
 
-      expect(typeof requiresArgs).toBe("function");
-      expect(typeof subscriptions.note.dependenciesToStream).toBe("function");
+      expect(requiresArgs).toBeTypeOf("function");
+      expect(subscriptions.note.dependenciesToStream).toBeTypeOf("function");
     });
   });
 
@@ -201,7 +208,7 @@ describe("Subscription", () => {
         // @ts-expect-error—only Confect-provenance refs are supported
         Subscription.reactiveQueryStream(convexGetQueryRef, noteHandlers);
 
-      expect(typeof makeConvexStream).toBe("function");
+      expect(makeConvexStream).toBeTypeOf("function");
     });
   });
 });
@@ -223,7 +230,9 @@ const paginateRef = Ref.make(
 );
 
 const Notes = PaginatedQuery.make(paginateRef);
+
 type PaginatedState = typeof Notes.schema.Type;
+
 type PaginatedActive = PaginatedQuery.Active<
   PaginatedQuery.Item<typeof paginateRef>,
   PaginatedQuery.UserArgs<typeof paginateRef>,
@@ -282,8 +291,8 @@ const allocatedRequest = (
 const settlePage = (
   state: PaginatedActive,
   overrides: Partial<PaginatedQuery.PageResult<{ readonly text: string }>> = {},
-): PaginatedActive =>
-  PaginatedQuery.settle(state, {
+): PaginatedActive => {
+  const settled = PaginatedQuery.settle(state, {
     request: allocatedRequest(state),
     result: Result.succeed({
       page: [{ text: "a" }],
@@ -291,18 +300,28 @@ const settlePage = (
       continueCursor: "c1",
       ...overrides,
     }),
-  }) as PaginatedActive;
+  });
+
+  assert(!PaginatedQuery.isIdle(settled));
+
+  return settled;
+};
 
 const failPage = (
   state: PaginatedActive,
   error: PaginatedQuery.Error<
     typeof paginateRef
   > = new Client.WebSocketClientError({ cause: "offline" }),
-): PaginatedActive =>
-  PaginatedQuery.settle(state, {
+): PaginatedActive => {
+  const settled = PaginatedQuery.settle(state, {
     request: allocatedRequest(state),
     result: Result.fail(error),
-  }) as PaginatedActive;
+  });
+
+  assert(!PaginatedQuery.isIdle(settled));
+
+  return settled;
+};
 
 const streamFor = (
   entry: ReturnType<typeof makePaginatedEntry>,
@@ -357,6 +376,7 @@ describe("Subscription.paginatedQuery", () => {
         );
         const entry = makePaginatedEntry();
         const state = initialMachine();
+
         const subscriptionRequest =
           PaginatedQuery.getSubscriptionRequest(state);
 
@@ -402,6 +422,7 @@ describe("Subscription.paginatedQuery", () => {
           ),
         );
         const entry = makePaginatedEntry();
+
         const logicalRequest = {
           ...PaginatedQuery.getSubscriptionRequest(initialMachine()),
           paginationId: Option.some(42),
@@ -437,6 +458,7 @@ describe("Subscription.paginatedQuery", () => {
           ),
         );
         const entry = makePaginatedEntry();
+
         const restoredRequest = {
           ...PaginatedQuery.getSubscriptionRequest(initialMachine()),
           paginationId: Option.some(42_000),
@@ -445,6 +467,7 @@ describe("Subscription.paginatedQuery", () => {
         const restoredMessages = yield* Stream.runCollect(
           streamFor(entry, restoredRequest),
         );
+
         const freshMessages = yield* Stream.runCollect(
           streamFor(
             entry,
@@ -502,17 +525,22 @@ describe("Subscription.paginatedQuery", () => {
       () =>
         Effect.gen(function* () {
           const testClient = yield* TestClient.TestClient;
+
           const cause = new ConvexError({
             isConvexSystemError: true,
             paginationError: "InvalidCursor",
           });
+
           const transportError = new Client.WebSocketClientError({
             cause: new Error("offline"),
           });
+
           const decoded = Schema.decodeUnknownResult(Schema.Finite)("bad");
+
           if (Result.isSuccess(decoded)) {
             throw new Error("expected schema decoding to fail");
           }
+
           yield* testClient.setReactiveQueryResults(
             Stream.make(
               Result.fail(new Client.WebSocketClientError({ cause })),
@@ -546,13 +574,16 @@ describe("Subscription.paginatedQuery", () => {
       () =>
         Effect.gen(function* () {
           const testClient = yield* TestClient.TestClient;
+
           const rawInvalidCursor = {
             isConvexSystemError: true,
             paginationError: "InvalidCursor",
           } as const;
+
           yield* testClient.setReactiveQueryResults(
             Stream.make(Result.fail(rawInvalidCursor)),
           );
+
           const entry = Subscription.paginatedQuery<BroadErrorPaginatedModel>()(
             BroadErrorNotes,
             {
@@ -560,9 +591,11 @@ describe("Subscription.paginatedQuery", () => {
               onSettled: (settlement) => settlement,
             },
           );
+
           const state = BroadErrorNotes.init(BroadErrorNotes.idle, {
             initialNumItems: 2,
           });
+
           const request = PaginatedQuery.getSubscriptionRequest(state);
 
           const settlements = yield* Stream.runCollect(
@@ -571,6 +604,7 @@ describe("Subscription.paginatedQuery", () => {
               () => ({ request: Option.some(request) }),
             ),
           );
+
           const settlement = settlements[0]!;
 
           expect(settlement.result).toEqual(
@@ -580,6 +614,7 @@ describe("Subscription.paginatedQuery", () => {
           );
           const reset = PaginatedQuery.settle(state, settlement);
           expect(PaginatedQuery.isLoading(reset)).toBe(true);
+
           if (!PaginatedQuery.isIdle(reset)) {
             expect(reset.paginationId).toEqual(Option.none());
             expect(reset.generation).toBe(state.generation + 1);
@@ -591,6 +626,7 @@ describe("Subscription.paginatedQuery", () => {
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
         const entry = makePaginatedEntry();
+
         const messages = yield* Stream.runCollect(
           entry.dependenciesToStream({ request: Option.none() }, () => ({
             request: Option.none(),
@@ -607,6 +643,7 @@ describe("Subscription.paginatedQuery", () => {
     it("ignores only pagination-id installation", () => {
       const entry = makePaginatedEntry();
       const base = PaginatedQuery.getSubscriptionRequest(initialMachine());
+
       const deps = (request: typeof base) => ({
         request: Option.some(request),
       });
@@ -645,9 +682,11 @@ describe("Subscription.paginatedQuery", () => {
     it("derives a settlement schema for every canonical error", () => {
       const state = initialMachine();
       const schemaResult = Schema.decodeUnknownResult(Schema.Finite)("bad");
+
       if (Result.isSuccess(schemaResult)) {
         throw new Error("expected schema decoding to fail");
       }
+
       const errors: ReadonlyArray<PaginatedQuery.Error<typeof paginateRef>> = [
         PaginatedQuery.FunctionError({
           error: new PageDenied({ reason: "private" }),
@@ -662,6 +701,7 @@ describe("Subscription.paginatedQuery", () => {
           request: allocatedRequest(state),
           result: Result.fail(error),
         };
+
         const encoded = Schema.encodeSync(Notes.settlement)(settlement);
         expect(Schema.decodeUnknownSync(Notes.settlement)(encoded)).toEqual(
           settlement,
@@ -676,14 +716,15 @@ describe("Subscription.paginatedQuery", () => {
           state: (model: PaginatedModel) => model.notes,
           onSettled: SettledGetNotesPage,
         });
+
       const subscriptions = FoldkitSubscription.make<
         PaginatedModel,
         typeof SettledGetNotesPage.Type,
         Client.Client
       >()(() => ({ notesPage: makePaginatedEntry() }));
 
-      expect(typeof invalid).toBe("function");
-      expect(typeof subscriptions.notesPage.dependenciesToStream).toBe(
+      expect(invalid).toBeTypeOf("function");
+      expect(subscriptions.notesPage.dependenciesToStream).toBeTypeOf(
         "function",
       );
     });

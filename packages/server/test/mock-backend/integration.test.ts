@@ -100,6 +100,7 @@ describe("DatabaseWriter", () => {
 
   it("patch accepts undefined only where the field type allows it", () => {
     const patchNote = (writer: DatabaseWriter) => writer.table("notes").patch;
+
     type Patch = Parameters<ReturnType<typeof patchNote>>[1];
 
     expectTypeOf<{ tag: undefined }>().toExtend<Patch>();
@@ -124,6 +125,7 @@ describe("MutationRunner", () => {
       const note = yield* c.query(refs.public.databaseReader.getNote, {
         noteId,
       });
+
       expectTypeOf(note).toEqualTypeOf<(typeof notes.Doc)["Type"]>();
       assertEquals(note.text, text);
     }).pipe(Effect.provide(TestConfect.layer)),
@@ -140,7 +142,7 @@ describe("ActionRunner", () => {
       );
 
       expectTypeOf(result).toEqualTypeOf<number>();
-      assertEquals(typeof result, "number");
+      expect(result).toBeTypeOf("number");
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
@@ -333,6 +335,7 @@ describe("paginate", () => {
 
 const expectFailure = <A, E>(result: Result.Result<A, E>): E => {
   assert(Result.isFailure(result));
+
   return result.failure;
 };
 
@@ -341,11 +344,13 @@ const expectFailure = <A, E>(result: Result.Result<A, E>): E => {
 // arbitrary strings when the spec declares Id<"notes">.
 const insertAndDeleteNote = Effect.gen(function* () {
   const c = yield* TestConfect.TestConfect;
+
   return yield* c.run(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
       const id = yield* writer.table("notes").insert({ text: "transient" });
       yield* writer.table("notes").delete(id);
+
       return id;
     }),
     Id("notes"),
@@ -439,7 +444,9 @@ describe("typed errors", () => {
           { noteId: missingId },
         );
 
-        expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
+        expect(result).toStrictEqual(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: missingId })),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -450,6 +457,7 @@ describe("typed errors", () => {
         const noteId = yield* c.run(
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
+
             return yield* writer.table("notes").insert({ text: "hello" });
           }),
           Id("notes"),
@@ -460,7 +468,11 @@ describe("typed errors", () => {
           { noteId },
         );
 
-        expect(result).toStrictEqual({ _tag: "Ok", text: "hello" });
+        expect(result).toStrictEqual(
+          Schema.TaggedStruct("Ok", { text: Schema.String }).make({
+            text: "hello",
+          }),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -474,7 +486,9 @@ describe("typed errors", () => {
           { noteId: missingId, asAdmin: true },
         );
 
-        expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
+        expect(result).toStrictEqual(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: missingId })),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -488,10 +502,11 @@ describe("typed errors", () => {
           { noteId: missingId, asAdmin: false },
         );
 
-        expect(result).toStrictEqual({
-          _tag: "Forbidden",
-          reason: "admin required",
-        });
+        expect(result).toStrictEqual(
+          yield* Schema.encodeEffect(Forbidden)(
+            new Forbidden({ reason: "admin required" }),
+          ),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -502,6 +517,7 @@ describe("typed errors", () => {
         const noteId = yield* c.run(
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
+
             return yield* writer.table("notes").insert({ text: "to delete" });
           }),
           Id("notes"),
@@ -512,7 +528,7 @@ describe("typed errors", () => {
           { noteId, asAdmin: true },
         );
 
-        expect(result).toStrictEqual({ _tag: "Ok" });
+        expect(result).toStrictEqual(Schema.TaggedStruct("Ok", {}).make({}));
 
         const remaining = yield* c.query(refs.public.databaseReader.listNotes);
         assertEquals(remaining.length, 0);
@@ -528,7 +544,9 @@ describe("typed errors", () => {
           { kind: "notFound" },
         );
 
-        expect(result).toStrictEqual({ _tag: "NotFound", id: "missing" });
+        expect(result).toStrictEqual(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "missing" })),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -541,10 +559,11 @@ describe("typed errors", () => {
           { kind: "forbidden" },
         );
 
-        expect(result).toStrictEqual({
-          _tag: "Forbidden",
-          reason: "no access",
-        });
+        expect(result).toStrictEqual(
+          yield* Schema.encodeEffect(Forbidden)(
+            new Forbidden({ reason: "no access" }),
+          ),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
@@ -562,6 +581,7 @@ describe("typed errors", () => {
               noteId: missingId,
             }),
           );
+
           const notFound = expectFailure(queryResult);
           assert(Schema.is(NotFound)(notFound));
           expect(notFound.id).toBe(missingId);
@@ -572,6 +592,7 @@ describe("typed errors", () => {
               asAdmin: false,
             }),
           );
+
           const forbidden = expectFailure(mutationResult);
           assert(Schema.is(Forbidden)(forbidden));
           expect(forbidden.reason).toBe("admin required");
@@ -615,7 +636,11 @@ describe("typed errors", () => {
             { noteId: missingId },
           );
 
-          expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
+          expect(result).toStrictEqual(
+            yield* Schema.encodeEffect(NotFound)(
+              new NotFound({ id: missingId }),
+            ),
+          );
         }).pipe(Effect.provide(TestConfect.layer)),
     );
   });

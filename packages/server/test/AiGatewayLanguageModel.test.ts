@@ -3,6 +3,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Predicate from "effect/Predicate";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -41,6 +42,7 @@ const testAiGatewayLayer = (options: TestAiGatewayOptions) =>
       const requests = yield* Ref.make<
         ReadonlyArray<HttpClientRequest.HttpClientRequest>
       >([]);
+
       const serviceTokenCalls = yield* Ref.make<ReadonlyArray<"ai-gateway">>(
         [],
       );
@@ -53,6 +55,7 @@ const testAiGatewayLayer = (options: TestAiGatewayOptions) =>
         requests: Ref.get(requests),
         serviceTokenCalls: Ref.get(serviceTokenCalls),
       });
+
       const httpClient = HttpClient.make((request) =>
         Ref.update(requests, (captured) => [...captured, request]).pipe(
           Effect.andThen(Effect.sync(() => options.respond(request))),
@@ -114,6 +117,7 @@ describe("AiGatewayLanguageModel", () => {
         assert.strictEqual(requests.length, 1);
         const [request] = requests;
         assert.isDefined(request);
+
         if (request === undefined) {
           return;
         }
@@ -172,9 +176,11 @@ describe("AiGatewayLanguageModel", () => {
     test.effect("streams text through the gateway", () =>
       Effect.gen(function* () {
         const gateway = yield* TestAiGateway;
+
         const partsChunk = yield* LanguageModel.streamText({
           prompt: "hello",
         }).pipe(Stream.runCollect);
+
         const parts = globalThis.Array.from(partsChunk);
 
         assert.strictEqual(
@@ -204,6 +210,7 @@ describe("AiGatewayLanguageModel", () => {
       () =>
         Effect.gen(function* () {
           const gateway = yield* TestAiGateway;
+
           const error = yield* LanguageModel.generateText({
             prompt: "hello",
           }).pipe(
@@ -223,7 +230,7 @@ describe("AiGatewayLanguageModel", () => {
 
 const jsonResponse = (
   request: HttpClientRequest.HttpClientRequest,
-  body: unknown,
+  body: Schema.Json,
 ): HttpClientResponse.HttpClientResponse =>
   HttpClientResponse.fromWeb(
     request,
@@ -266,9 +273,10 @@ const RequestBody = Schema.fromJsonString(
 const requestBody = Effect.fnUntraced(function* (
   request: HttpClientRequest.HttpClientRequest,
 ) {
-  if (request.body._tag !== "Uint8Array") {
+  if (!Predicate.isTagged(request.body, "Uint8Array")) {
     return yield* Effect.die(new Error("Expected a Uint8Array request body"));
   }
+
   return yield* Schema.decodeEffect(RequestBody)(
     new TextDecoder().decode(request.body.body),
   );

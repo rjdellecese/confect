@@ -15,6 +15,7 @@ describe("QueryStreamCursor schema", () => {
       keyFields: ["text", "_creationTime", "_id"],
       orderKey: ["apple", 1, "id"],
     });
+
     const serialized = Schema.encodeSync(QueryStreamCursor.Json)(cursor);
 
     expect(cursor).toBeInstanceOf(QueryStreamCursor.QueryStreamCursor);
@@ -94,13 +95,16 @@ describe("QueryStreamCursor serialization", () => {
       ["nested"],
       { nested: "value" },
     ];
+
     const fieldPaths = key.map((_, index) =>
       index === key.length - 1 ? "_id" : `field${index}`,
     );
+
     const layout = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex(fieldPaths),
       identity,
     );
+
     const cursor = Schema.encodeSync(QueryStreamCursor.codecForLayout(layout))(
       key,
     );
@@ -134,6 +138,7 @@ describe("QueryStreamCursor serialization", () => {
         QueryStreamKeyLabels.make(["created", "body"]),
       ),
     );
+
     const codec = QueryStreamCursor.codecForLayout(layout);
     const key = [123, "outer-id", "hello", "inner-id"];
     const encoded = Schema.encodeSync(codec)(key);
@@ -150,14 +155,18 @@ describe("QueryStreamCursor serialization", () => {
       QueryStreamKeyLayout.fromIndex(["_id"]),
       identity,
     );
+
     const implicit = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex([]),
       identity,
     );
+
     expect(QueryStreamKeyLayout.compatible(explicit, implicit)).toBe(false);
+
     const serialized = Schema.encodeSync(
       QueryStreamCursor.codecForLayout(explicit),
     )(["id"]);
+
     expect(
       Schema.encodeSync(QueryStreamCursor.codecForLayout(implicit))(["id"]),
     ).toBe(serialized);
@@ -253,16 +262,21 @@ describe("QueryStreamCursor serialization", () => {
           keyFields: ["optional", "integer", "bytes"],
           orderKey: [undefined, 42n, new Uint8Array([1, 2]).buffer],
         });
+
         const encoded = yield* Schema.encodeEffect(QueryStreamCursor.Json)(
           value,
         );
+
         const decoded = yield* Schema.decodeEffect(QueryStreamCursor.Json)(
           encoded,
         );
+
         expect(decoded).toEqual(value);
+
         const wire = yield* Schema.decodeEffect(
           Schema.fromJsonString(Schema.Json),
         )(encoded);
+
         expect(wire).toEqual({
           version: 1,
           keyFields: value.keyFields,
@@ -282,6 +296,7 @@ describe("QueryStreamCursor serialization", () => {
             QueryStreamKeyLabels.make(["optional", "integer", "bytes"]),
           ),
         );
+
         const bound = QueryStreamCursor.codecForLayout(layout);
         expectTypeOf<
           typeof bound.Type

@@ -147,6 +147,7 @@ layer(BundlerLayer)("bundle", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
+
       // Entry lives under the repo so the externalized `effect` resolves from
       // the temp `.mjs` (externals load relative to it, not bundled).
       const tempDir = yield* fs.makeTempDirectoryScoped({
@@ -195,6 +196,7 @@ layer(BundlerLayer)("importersOfPackage", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
+
       // Under the repo so the externalized `effect` resolves from the temp
       // `.mjs` that `bundle-require` writes beside the entry.
       const tempDir = yield* fs.makeTempDirectoryScoped({
@@ -257,6 +259,7 @@ layer(BundlerLayer)("importersOfPackage", (it) => {
         "@scope/lib",
         () => true,
       );
+
       expect(
         yield* Effect.forEach(importers, (importer) => fs.realPath(importer)),
       ).toStrictEqual([yield* fs.realPath(entry)]);
@@ -267,6 +270,7 @@ layer(BundlerLayer)("importersOfPackage", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
+
       const tempDir = yield* fs.makeTempDirectoryScoped({
         directory: process.cwd(),
       });

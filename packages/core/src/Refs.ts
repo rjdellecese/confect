@@ -99,8 +99,11 @@ export const make = <Spec_ extends Spec.AnyWithProps>(
   spec: Spec_,
 ): FromSpec<Spec_> => {
   const refs = makeHelper(Spec.groups(spec));
+
   return {
+    // SAFETY: makeHelper mirrors the spec's group paths and function names; this view exposes only public leaves without removing internal leaves at runtime.
     public: refs as Refs<Spec_, Ref.AnyPublic>,
+    // SAFETY: The same complete tree contains every internal leaf selected by the mapped Refs type.
     internal: refs as Refs<Spec_, Ref.AnyInternal>,
   };
 };
@@ -110,6 +113,7 @@ const makeHelper = (
   convexFunctionNamespace: Option.Option<string> = Option.none(),
 ): Any =>
   pipe(
+    // SAFETY: Spec.groups returns actual GroupSpec builders; GroupSpec.Any erases their fields but does not change their runtime shape.
     groups as Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
     Record.map((group, name) => {
       const currentConvexFunctionNamespace = Option.match(

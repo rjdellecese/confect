@@ -5,6 +5,7 @@ import type * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
@@ -73,6 +74,7 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
       if (args.namespace === COMPONENT_CONFIG_NAMESPACE) {
         return { path: args.path };
       }
+
       if (args.namespace !== "file" && args.namespace !== "") return undefined;
 
       const importer =
@@ -82,6 +84,7 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
       // (`.../convex.config`), which npm `exports` maps resolve but plain
       // file resolution may not—probe the same candidates Convex does.
       const extension = path.extname(args.path);
+
       const candidates = [
         args.path,
         ...(extension === ".js"
@@ -110,7 +113,9 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
     build.onLoad(
       { filter: /.*/, namespace: COMPONENT_CONFIG_NAMESPACE },
       (args) => {
+        // SAFETY: This namespace's onResolve callback always sets pluginData to the original string import specifier.
         const specifier = (args.pluginData as { specifier: string }).specifier;
+
         // The injected path is the definition's *directory*, matching the
         // Convex runtime's convention—so even if a future convex version
         // stops reading `defaultName`, `app.use`'s last-resort fallback
@@ -123,6 +128,7 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
         // specifier.
         const isBareSpecifier =
           !String.startsWith(".")(specifier) && !path.isAbsolute(specifier);
+
         const componentDefinitionPath = isBareSpecifier
           ? String.replace(CONVEX_CONFIG_SUFFIX, "")(specifier)
           : path.dirname(args.path);
@@ -198,17 +204,14 @@ export const discoverInstalledComponents = Effect.fn(
     plugins: [componentConfigPlugin(path)],
   }).pipe(Effect.mapError((error) => fromBundlerError(displayPath, error)));
 
-  const app = module.default as
-    | { _isRoot?: unknown; export?: unknown }
-    | null
-    | undefined;
+  const isApp = Schema.is(
+    Schema.Struct({
+      _isRoot: Schema.Literal(true),
+      export: Schema.declare(Predicate.isFunction),
+    }),
+  );
 
-  if (
-    app === null ||
-    typeof app !== "object" ||
-    app._isRoot !== true ||
-    typeof app.export !== "function"
-  ) {
+  if (!isApp(module.default)) {
     return yield* new InvalidConvexConfigError({
       configPath: displayPath,
       reason:
@@ -216,8 +219,10 @@ export const discoverInstalledComponents = Effect.fn(
     });
   }
 
+  const app = module.default;
+
   const analysis = yield* Effect.try({
-    try: () => (app.export as () => unknown)(),
+    try: () => app.export(),
     catch: (cause) =>
       new InvalidConvexConfigError({
         configPath: displayPath,
@@ -255,6 +260,7 @@ export const discoverInstalledComponents = Effect.fn(
       Option.isNone(String.match(VALID_COMPONENT_NAME)(name)),
     ),
   );
+
   if (Array.isArrayNonEmpty(invalidNames)) {
     return yield* new InvalidConvexConfigError({
       configPath: displayPath,
@@ -273,6 +279,7 @@ export const discoverInstalledComponents = Effect.fn(
     Array.filter(([, group]) => group.length > 1),
     Array.map(([name]) => name),
   );
+
   if (Array.isArrayNonEmpty(duplicateNames)) {
     return yield* new InvalidConvexConfigError({
       configPath: displayPath,
@@ -298,9 +305,11 @@ export const typeImportPath = (
   if (!path.isAbsolute(componentDefinitionPath)) {
     return componentDefinitionPath;
   }
+
   const relative = toPosixPath(
     path,
     path.relative(confectGeneratedDirectory, componentDefinitionPath),
   );
+
   return String.startsWith(".")(relative) ? relative : `./${relative}`;
 };

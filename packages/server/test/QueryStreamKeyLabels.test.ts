@@ -44,6 +44,7 @@ describe("QueryStreamKeyLabels", () => {
         QueryStreamKeyLabels.make(["a", "b", "a"]),
       ),
     ).toBe(true);
+
     for (const other of [["a", "a", "b"], ["a", "b"], ["a", "b", "c"], []]) {
       expect(
         QueryStreamKeyLabels.Equivalence(
@@ -86,9 +87,11 @@ describe("QueryStreamKeyLabels", () => {
   ])("parses prefix $prefix into the remaining labels", ({ prefix, rest }) => {
     const labels = QueryStreamKeyLabels.make(["a", "a", "b"]);
     const selected = QueryStreamKeyLabels.make(prefix);
+
     const remaining = Option.getOrThrow(
       QueryStreamKeyLabels.stripPrefix(labels, selected),
     );
+
     expect(QueryStreamKeyLabels.toArray(remaining)).toEqual(rest);
     expect(
       QueryStreamKeyLabels.Equivalence(
@@ -119,6 +122,7 @@ describe("QueryStreamKeyLabels", () => {
         QueryStreamKeyLabels.make(["authorId", "_creationTime"]),
       ),
     );
+
     expectTypeOf(parsed.prefix).toEqualTypeOf<
       QueryStreamKeyLabels.QueryStreamKeyLabels<readonly [string, string]>
     >();
@@ -136,17 +140,21 @@ describe("QueryStreamKeyLabels", () => {
 
   it("consumes zero or all labels and rejects an incomplete replacement chunk", () => {
     const labels = QueryStreamKeyLabels.make(["a"]);
+
     const empty = Option.getOrThrow(
       QueryStreamKeyLabels.consume(labels, QueryStreamKeyLabels.make([])),
     );
+
     expectTypeOf(empty.prefix).toEqualTypeOf<
       QueryStreamKeyLabels.QueryStreamKeyLabels<readonly []>
     >();
     expect(QueryStreamKeyLabels.size(empty.prefix)).toBe(0);
     expect(QueryStreamKeyLabels.Equivalence(empty.rest, labels)).toBe(true);
+
     const full = Option.getOrThrow(
       QueryStreamKeyLabels.consume(labels, labels),
     );
+
     expect(QueryStreamKeyLabels.Equivalence(full.prefix, labels)).toBe(true);
     expect(QueryStreamKeyLabels.size(full.rest)).toBe(0);
     expect(

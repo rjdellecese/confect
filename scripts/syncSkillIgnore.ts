@@ -10,12 +10,18 @@ import * as Runtime from "effect/Runtime";
 import * as Schema from "effect/Schema";
 
 const LOCK_FILE = "skills-lock.json";
+
 const IGNORE_FILE = ".ignore";
+
 const LOCK_VERSION = 1;
+
 const START_MARKER = "# skills-lock:start";
+
 const END_MARKER = "# skills-lock:end";
+
 const GENERATED_COMMENT =
   "# Generated from skills-lock.json by `pnpm skills:sync-ignore`.";
+
 const quoteJsonString = Schema.encodeSync(Schema.fromJsonString(Schema.String));
 
 export class SkillIgnoreError extends Data.TaggedError("SkillIgnoreError")<{
@@ -61,6 +67,7 @@ export const vendoredSkillDirectories = Effect.fnUntraced(function* (
       reason: `Unsupported ${LOCK_FILE} version; expected ${LOCK_VERSION}`,
     });
   }
+
   if (!Predicate.isObject(lock.skills)) {
     return yield* new SkillIgnoreError({
       reason: `${LOCK_FILE} must contain a skills object`,
@@ -68,14 +75,17 @@ export const vendoredSkillDirectories = Effect.fnUntraced(function* (
   }
 
   const directories = new Map<string, string>();
+
   for (const skillName of Object.keys(lock.skills)) {
     const directory = installedDirectoryName(skillName);
     const existing = directories.get(directory);
+
     if (existing !== undefined) {
       return yield* new SkillIgnoreError({
         reason: `${LOCK_FILE} entries ${quoteJsonString(existing)} and ${quoteJsonString(skillName)} map to the same installed directory`,
       });
     }
+
     directories.set(directory, skillName);
   }
 
@@ -97,11 +107,13 @@ export const updateManagedBlock = Effect.fnUntraced(function* (
   managedBlock: string,
 ) {
   const lines = ignoreText.replaceAll("\r\n", "\n").split("\n");
+
   if (lines.at(-1) === "") lines.pop();
 
   const startIndexes = lines.flatMap((line, index) =>
     line === START_MARKER ? [index] : [],
   );
+
   const endIndexes = lines.flatMap((line, index) =>
     line === END_MARKER ? [index] : [],
   );
@@ -111,6 +123,7 @@ export const updateManagedBlock = Effect.fnUntraced(function* (
       reason: `${IGNORE_FILE} has an incomplete skills-lock block`,
     });
   }
+
   if (startIndexes.length > 1) {
     return yield* new SkillIgnoreError({
       reason: `${IGNORE_FILE} has multiple skills-lock blocks`,
@@ -118,17 +131,20 @@ export const updateManagedBlock = Effect.fnUntraced(function* (
   }
 
   const managedLines = managedBlock.split("\n");
+
   if (startIndexes.length === 0) {
     if (lines.length > 0 && lines.at(-1) !== "") lines.push("");
     lines.push(...managedLines);
   } else {
     const start = startIndexes[0];
     const end = endIndexes[0];
+
     if (start > end) {
       return yield* new SkillIgnoreError({
         reason: `${IGNORE_FILE} has an invalid skills-lock block`,
       });
     }
+
     lines.splice(start, end - start + 1, ...managedLines);
   }
 
@@ -137,6 +153,7 @@ export const updateManagedBlock = Effect.fnUntraced(function* (
 
 const readIgnoreFile = Effect.fnUntraced(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
+
   return (yield* fs.exists(path)) ? yield* fs.readFileString(path) : "";
 });
 
@@ -148,11 +165,14 @@ export const syncSkillIgnore = Effect.fn("SkillIgnore.sync")(function* (
   const cwd = options.cwd ?? process.cwd();
   const lockPath = path.resolve(cwd, LOCK_FILE);
   const ignorePath = path.resolve(cwd, IGNORE_FILE);
+
   const [lockText, ignoreText] = yield* Effect.all(
     [fs.readFileString(lockPath), readIgnoreFile(ignorePath)],
     { concurrency: "unbounded" },
   );
+
   const directories = yield* vendoredSkillDirectories(lockText);
+
   const expected = yield* updateManagedBlock(
     ignoreText,
     renderManagedBlock(directories),
@@ -160,6 +180,7 @@ export const syncSkillIgnore = Effect.fn("SkillIgnore.sync")(function* (
 
   if (expected === ignoreText) {
     yield* Console.log(`ok  ${IGNORE_FILE} matches ${LOCK_FILE}`);
+
     return;
   }
 
@@ -177,11 +198,13 @@ export const syncSkillIgnoreMain = Effect.fn("SkillIgnore.main")(function* (
   args: ReadonlyArray<string>,
 ) {
   const unknownArgument = args.find((argument) => argument !== "--check");
+
   if (unknownArgument !== undefined) {
     return yield* new SkillIgnoreError({
       reason: `Unknown argument: ${unknownArgument}`,
     });
   }
+
   yield* syncSkillIgnore({ check: args.includes("--check") });
 });
 

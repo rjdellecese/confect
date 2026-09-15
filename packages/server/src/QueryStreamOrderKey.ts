@@ -15,9 +15,11 @@ import * as SchemaIssue from "effect/SchemaIssue";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 
 const UNDEFINED_SENTINEL = { $undefined: true } as const;
+
 const KeyValue = Schema.declare<Value | undefined>(
   (value): value is Value | undefined =>
     value === undefined ||
+    // SAFETY: convexToJson recursively validates values and throws for unsupported representations; Result.try turns rejection into a failed predicate.
     Result.isSuccess(Result.try(() => convexToJson(value as Value))),
   {
     toCodecJson: () =>
@@ -32,6 +34,7 @@ const KeyValue = Schema.declare<Value | undefined>(
                 )(value),
                 {
                   onSuccess: () => undefined,
+                  // SAFETY: Schema.Json validated this JSON tree; jsonToConvex only reads it, so its mutable JSONValue parameter does not require copying readonly containers.
                   onFailure: () =>
                     jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
                 },
@@ -73,9 +76,11 @@ export type QueryStreamOrderKey = typeof QueryStreamOrderKey.Type;
  *
  * @experimental
  */
-export const ValueOrder: Order_.Order<KeyValue> = Order_.make(
-  (self, that) => Math.sign(compareValues(self, that)) as -1 | 0 | 1,
-);
+export const ValueOrder: Order_.Order<KeyValue> = Order_.make((self, that) => {
+  const comparison = compareValues(self, that);
+
+  return comparison < 0 ? -1 : comparison > 0 ? 1 : 0;
+});
 
 /**
  * `Order` over order keys: lexicographic by `ValueOrder`, then by length—also
@@ -103,11 +108,13 @@ export const extract = (
   encoded: Record.ReadonlyRecord<string, unknown>,
   keyPaths: ReadonlyArray<ReadonlyArray<string>>,
 ): QueryStreamOrderKey =>
+  // SAFETY: These paths name indexed fields in an encoded Convex document; each leaf is a Convex Value or an absent optional field.
   Array.map(keyPaths, (path) =>
-    Array.reduce(
+    Array.reduce<string, unknown>(
       path,
-      encoded as unknown,
+      encoded,
       (value, segment) =>
+        // SAFETY: Index field paths traverse encoded document objects; optional intermediate fields may be absent, which optional access preserves as undefined.
         (value as Record.ReadonlyRecord<string, unknown> | undefined)?.[
           segment
         ],

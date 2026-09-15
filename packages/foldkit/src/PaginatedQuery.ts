@@ -34,6 +34,7 @@ export interface Options {
 }
 
 const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0));
+
 const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
 export const Options = Schema.Struct({
@@ -331,10 +332,13 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
 ): PaginatedQuery<Query> => {
   const kind = paginatedKindOrThrow(ref);
   const hasUserArgs = globalThis.Object.keys(kind.userArgs.fields).length > 0;
+
   const functionErrorSchemas = [
     ...("error" in ref && ref.error !== undefined ? [ref.error] : []),
     ...MiddlewareSpec.errorSchemas(ref.middlewareSpecs),
   ];
+
+  // SAFETY: These are exactly the framework errors and the declared function/middleware errors in Error<Query>; the collected schema array loses that ref-specific union.
   const errorSchema = Schema.Union([
     PaginationError.InvalidCursor,
     Client.WebSocketClientError,
@@ -350,6 +354,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
           }),
         ]),
   ]) as Schema.Codec<Error<Query>, unknown>;
+
   const directions = Schema.Literals([
     "Initial",
     "Next",
@@ -358,6 +363,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
     "Split",
     "Reset",
   ]);
+
   const page = Schema.Struct({
     descriptor: PageDescriptor,
     number: PositiveInt,
@@ -365,6 +371,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
     continueCursor: Schema.String,
     isDone: Schema.Boolean,
   });
+
   const phase = Schema.TaggedUnion({
     Loading: { direction: directions },
     Refreshing: { data: page, direction: directions },
@@ -372,6 +379,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
     Failure: { error: errorSchema },
     Stale: { data: page, error: errorSchema },
   });
+
   const subscriptionRequestSchema: PaginatedQuery<Query>["subscriptionRequestSchema"] =
     Schema.Struct({
       generation: PositiveInt,
@@ -381,6 +389,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
       requestId: PositiveInt,
       descriptor: PageDescriptor,
     });
+
   const requestSchema: PaginatedQuery<Query>["requestSchema"] = Schema.Struct({
     generation: PositiveInt,
     args: kind.userArgs,
@@ -389,6 +398,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
     requestId: PositiveInt,
     descriptor: PageDescriptor,
   });
+
   const pageResult = Schema.Struct({
     page: kind.page,
     isDone: Schema.Boolean,
@@ -402,6 +412,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
       ]),
     ),
   });
+
   const schema: PaginatedQuery<Query>["schema"] = Schema.TaggedUnion({
     Idle: { generation: NonNegativeInt },
     Active: {
@@ -415,6 +426,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
       phase,
     },
   });
+
   const settlement: PaginatedQuery<Query>["settlement"] = Schema.Struct({
     request: requestSchema,
     result: Schema.Result(pageResult, errorSchema),
@@ -430,13 +442,16 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
       Match.when(undefined, () =>
         initialState(
           state.generation + 1,
+          // SAFETY: The two-argument init signature is available only when UserArgs<Query> has no keys.
           {} as UserArgs<Query>,
+          // SAFETY: With no third argument, the public init signature places Options in the second argument.
           argsOrOptions as Options,
         ),
       ),
       Match.when(Match.defined, (definedOptions) =>
         initialState(
           state.generation + 1,
+          // SAFETY: A supplied options argument selects the public signature with UserArgs<Query> immediately before it.
           argsOrOptions as UserArgs<Query>,
           definedOptions,
         ),
@@ -454,6 +469,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
       Match.when(Match.defined, (definedOptions) =>
         initialState(
           state.generation + 1,
+          // SAFETY: A supplied options argument selects the public signature with UserArgs<Query> immediately before it.
           argsOrOptions as UserArgs<Query>,
           definedOptions,
         ),
@@ -470,6 +486,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
               Match.when(true, () =>
                 initialState(
                   state.generation + 1,
+                  // SAFETY: hasUserArgs was computed from this ref's user-args fields; this branch selects the args-taking reinitialize signature.
                   definedArgsOrOptions as UserArgs<Query>,
                   state.options,
                 ),
@@ -478,6 +495,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
                 initialState(
                   state.generation + 1,
                   state.args,
+                  // SAFETY: A ref without user-args fields accepts only Options after the state in reinitialize.
                   definedArgsOrOptions as Options,
                 ),
               ),
@@ -606,6 +624,7 @@ export const next = <Item_, UserArgs_, Error_>(
             data.descriptor.endCursor,
             () => data.continueCursor,
           );
+
           return Option.some({
             ...state,
             requestId: state.requestId + 1,
@@ -637,6 +656,7 @@ export const prev = <Item_, UserArgs_, Error_>(
     Match.withReturnType<Option.Option<Active<Item_, UserArgs_, Error_>>>(),
     Match.tag("Success", ({ data }) => {
       const current = state.prevStack.at(-1);
+
       return Match.value(current).pipe(
         Match.withReturnType<Option.Option<Active<Item_, UserArgs_, Error_>>>(),
         Match.when(undefined, () => Option.none()),
@@ -735,14 +755,18 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
   result: PageResult<Item_>,
 ): Active<Item_, UserArgs_, Error_> => {
   const splitCursor = result.splitCursor;
+
   const splitSignaled = Match.value(result.pageStatus).pipe(
     Match.whenOr("SplitRecommended", "SplitRequired", () => true),
     Match.whenOr(null, undefined, () => false),
     Match.exhaustive,
   );
+
   const shouldSplit =
-    typeof splitCursor === "string" &&
+    splitCursor !== null &&
+    splitCursor !== undefined &&
     (splitSignaled || result.page.length > 2 * state.options.initialNumItems);
+
   const shouldRetreat =
     result.page.length === 0 && result.isDone && state.prevStack.length > 0;
 
@@ -750,6 +774,7 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
     Match.withReturnType<Active<Item_, UserArgs_, Error_>>(),
     Match.when(true, () => {
       const deliveredPage = pageFromResult(state, result);
+
       const previous = Match.value(result.pageStatus).pipe(
         Match.withReturnType<Option.Option<Page<Item_>>>(),
         Match.when("SplitRequired", () => phaseData(state.phase)),
@@ -758,6 +783,7 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
         ),
         Match.exhaustive,
       );
+
       return {
         ...state,
         requestId: state.requestId + 1,
@@ -835,6 +861,7 @@ export const settle: {
               ...active,
               paginationId: Option.some(settlement.request.paginationId),
             };
+
             return Result.match(settlement.result, {
               onSuccess: (result) => settleSuccess(allocated, result),
               onFailure: (error) =>
@@ -939,32 +966,32 @@ type WithPhase<State_, Phase_> = Omit<State_, "phase"> & {
 
 export const isIdle = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
-): state is Idle => state._tag === "Idle";
+): state is Idle => State.$is("Idle")(state);
 
 export const isLoading = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): state is WithPhase<Active<Item_, UserArgs_, Error_>, Loading> =>
-  state._tag === "Active" && state.phase._tag === "Loading";
+  State.$is("Active")(state) && Phase.$is("Loading")(state.phase);
 
 export const isRefreshing = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): state is WithPhase<Active<Item_, UserArgs_, Error_>, Refreshing<Item_>> =>
-  state._tag === "Active" && state.phase._tag === "Refreshing";
+  State.$is("Active")(state) && Phase.$is("Refreshing")(state.phase);
 
 export const isSuccess = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): state is WithPhase<Active<Item_, UserArgs_, Error_>, Success<Item_>> =>
-  state._tag === "Active" && state.phase._tag === "Success";
+  State.$is("Active")(state) && Phase.$is("Success")(state.phase);
 
 export const isFailure = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): state is WithPhase<Active<Item_, UserArgs_, Error_>, Failure<Error_>> =>
-  state._tag === "Active" && state.phase._tag === "Failure";
+  State.$is("Active")(state) && Phase.$is("Failure")(state.phase);
 
 export const isStale = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): state is WithPhase<Active<Item_, UserArgs_, Error_>, Stale<Item_, Error_>> =>
-  state._tag === "Active" && state.phase._tag === "Stale";
+  State.$is("Active")(state) && Phase.$is("Stale")(state.phase);
 
 export const isPending = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1049,6 +1076,7 @@ export const match: {
       readonly onSuccess: (success: Success<Item_>) => F;
     },
   ): A | B | C | D | E | F =>
+    // SAFETY: Every exhaustive branch returns its corresponding handler result A through F; Match's Unify cannot reduce unconstrained generic return types.
     Match.value(state).pipe(
       Match.tag("Idle", handlers.onIdle),
       Match.tag("Active", ({ phase }) =>

@@ -97,6 +97,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
 ): RegisteredFunctionsForGroupSpec<Group> => {
   const registryItems = Effect.gen(function* () {
     const registry = yield* Registry.Registry;
+
     return yield* Ref.get(registry);
   }).pipe(
     Effect.provide(groupLayer),
@@ -110,7 +111,9 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   const { functionRegistryItems, middlewareRegistryItems } =
     partitionRegistryItems(registryItems);
 
+  // SAFETY: The finalized group layer registers its functions before this snapshot; mapping each registered handler preserves the spec's function names and registered-function kinds.
   return mapLeaves<FunctionRegistryItem.AnyWithProps, RegisteredFunction.Any>(
+    // SAFETY: partitionRegistryItems removes middleware entries from this isolated group's flat registry, leaving the functions registered by FunctionImpl.make.
     functionRegistryItems as {
       [key: string]: FunctionRegistryItem.AnyWithProps;
     },
@@ -135,7 +138,10 @@ const partitionRegistryItems = (registryItems: RegistryItems.RegistryItems) => {
     string,
     MiddlewareRegistryItem.MiddlewareRegistryItem
   >();
+
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Partitioning preserves heterogeneous registry entries; the later function-item refinement identifies registered handlers.
   const functionRegistryItems: Record<string, unknown> = {};
+
   for (const [key, value] of Object.entries(registryItems)) {
     if (MiddlewareRegistryItem.isMiddlewareRegistryItem(value)) {
       middlewareRegistryItems.set(value.middlewareSpec.key, value);
@@ -143,5 +149,6 @@ const partitionRegistryItems = (registryItems: RegistryItems.RegistryItems) => {
       functionRegistryItems[key] = value;
     }
   }
+
   return { functionRegistryItems, middlewareRegistryItems };
 };

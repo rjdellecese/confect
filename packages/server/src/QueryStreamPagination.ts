@@ -10,6 +10,7 @@ import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 const PageSize = Schema.Natural.pipe(
   Schema.brand("~@confect/server/QueryStreamPagination/PageSize"),
 );
+
 type PageSize = typeof PageSize.Type;
 
 export class InvalidPageSizeError extends Data.TaggedError(
@@ -35,6 +36,7 @@ export type Range = Data.TaggedEnum<{
   ThroughKey: { readonly orderKey: QueryStreamKey.Complete };
   ThroughEnd: {};
 }>;
+
 export const Range = Data.taggedEnum<Range>();
 
 export type Start = Data.TaggedEnum<{
@@ -44,6 +46,7 @@ export type Start = Data.TaggedEnum<{
     readonly cursor: string;
   };
 }>;
+
 export const Start = Data.taggedEnum<Start>();
 
 export interface ScanRequest {
@@ -56,6 +59,7 @@ export type Request = Data.TaggedEnum<{
   Unchanged: { readonly cursor: string };
   Scan: ScanRequest;
 }>;
+
 const Request = Data.taggedEnum<Request>();
 
 export const parseRequest = (
@@ -90,6 +94,7 @@ export const parseRequest = (
  * A nonempty scan, including filtered markers.
  */
 type Progress = Chunk.NonEmptyChunk<QueryStreamKey.Complete>;
+
 const append = (
   progress: Option.Option<Progress>,
   orderKey: QueryStreamKey.Complete,
@@ -98,6 +103,7 @@ const append = (
     onNone: () => Chunk.of(orderKey),
     onSome: (orderKeys) => Chunk.append(orderKeys, orderKey),
   });
+
 const midpoint = (progress: Progress): QueryStreamKey.Complete =>
   Option.getOrElse(
     Chunk.get(progress, Math.floor((Chunk.size(progress) - 1) / 2)),
@@ -117,9 +123,11 @@ export type QueryStreamPagination<Doc> = Data.TaggedEnum<{
   ItemLimit: Stopped<Doc>;
   ReadLimit: Stopped<Doc>;
 }>;
+
 interface PaginationDefinition extends Data.TaggedEnum.WithGenerics<1> {
   readonly taggedEnum: QueryStreamPagination<this["A"]>;
 }
+
 const QueryStreamPagination = Data.taggedEnum<PaginationDefinition>();
 
 export const initial = <Doc>(): QueryStreamPagination<Doc> =>
@@ -139,15 +147,18 @@ export const record = <Doc>(
     Match.tagsExhaustive({
       Reading: (reading) => {
         const progress = append(reading.progress, orderKey);
+
         const page = Option.match(doc, {
           onNone: () => reading.page,
           onSome: (value) => Chunk.append(reading.page, value),
         });
+
         const continueReading = () =>
           QueryStreamPagination.Reading({
             page,
             progress: Option.some(progress),
           });
+
         return readLimit
           ? QueryStreamPagination.ReadLimit({ page, progress })
           : Range.$match(request.range, {
@@ -168,6 +179,7 @@ export type Continuation = Data.TaggedEnum<{
   End: {};
   Key: { readonly orderKey: QueryStreamKey.Complete };
 }>;
+
 const Continuation = Data.taggedEnum<Continuation>();
 
 interface Split<Doc> {
@@ -185,6 +197,12 @@ export type Outcome<Doc> = Data.TaggedEnum<{
   SplitRequired: Split<Doc>;
   SplitRecommended: Split<Doc>;
 }>;
+
+interface OutcomeDefinition extends Data.TaggedEnum.WithGenerics<1> {
+  readonly taggedEnum: Outcome<this["A"]>;
+}
+
+const Outcome = Data.taggedEnum<OutcomeDefinition>();
 
 export class UnsafePageBoundaryError extends Data.TaggedError(
   "UnsafePageBoundaryError",
@@ -217,6 +235,7 @@ export const finish = <Doc>(
   upstreamStopped: boolean,
 ): Result.Result<Outcome<Doc>, UnsafePageBoundaryError> => {
   const page = Chunk.toArray(self.page);
+
   const stopped = (
     progress: Option.Option<Progress>,
     readLimit: boolean,
@@ -228,6 +247,7 @@ export const finish = <Doc>(
       ),
       (scanned): Result.Result<Outcome<Doc>, UnsafePageBoundaryError> => {
         const splitOrderKey = midpoint(scanned);
+
         const atEnd = Range.$match(request.range, {
           Unpinned: () => false,
           ThroughEnd: () => false,
@@ -235,31 +255,36 @@ export const finish = <Doc>(
             QueryStreamOrderKey.Order(splitOrderKey.values, orderKey.values) ===
             0,
         });
+
         if (readLimit && atEnd) {
           return Result.fail(
             new UnsafePageBoundaryError({ reason: "NoInteriorSplit" }),
           );
         }
+
         const orderKey = Chunk.lastNonEmpty(scanned);
+
         if (readLimit)
-          return Result.succeed({
-            _tag: "SplitRequired",
-            page,
-            continuation: Continuation.Key({ orderKey }),
-            splitOrderKey,
-          });
+          return Result.succeed(
+            Outcome.SplitRequired({
+              page,
+              continuation: Continuation.Key({ orderKey }),
+              splitOrderKey,
+            }),
+          );
+
         return Result.succeed(
           Chunk.size(scanned) >= SOFT_MAX_SCAN_LENGTH
-            ? {
-                _tag: "SplitRecommended",
+            ? Outcome.SplitRecommended({
                 page,
                 continuation: Continuation.Key({ orderKey }),
                 splitOrderKey,
-              }
-            : { _tag: "Continue", page, orderKey },
+              })
+            : Outcome.Continue({ page, orderKey }),
         );
       },
     );
+
   const exhausted = (progress: Option.Option<Progress>): Outcome<Doc> => {
     const finishRange = (
       continuation: Continuation,
@@ -272,24 +297,26 @@ export const finish = <Doc>(
           (Chunk.size(scanned) >= SOFT_MAX_SCAN_LENGTH ||
             page.length > request.numItems + 1),
       );
+
       return Option.match(split, {
-        onSome: (scanned): Outcome<Doc> => ({
-          _tag: "SplitRecommended",
-          page,
-          continuation,
-          splitOrderKey: midpoint(scanned),
-        }),
+        onSome: (scanned): Outcome<Doc> =>
+          Outcome.SplitRecommended({
+            page,
+            continuation,
+            splitOrderKey: midpoint(scanned),
+          }),
         onNone: () =>
           Continuation.$match(continuation, {
-            End: (): Outcome<Doc> => ({ _tag: "Done", page }),
-            Key: ({ orderKey }): Outcome<Doc> => ({
-              _tag: "Continue",
-              page,
-              orderKey,
-            }),
+            End: (): Outcome<Doc> => Outcome.Done({ page }),
+            Key: ({ orderKey }): Outcome<Doc> =>
+              Outcome.Continue({
+                page,
+                orderKey,
+              }),
           }),
       });
     };
+
     return Range.$match(request.range, {
       Unpinned: () => finishRange(Continuation.End(), false),
       ThroughEnd: () => finishRange(Continuation.End(), true),
@@ -297,6 +324,7 @@ export const finish = <Doc>(
         finishRange(Continuation.Key({ orderKey }), true),
     });
   };
+
   return Match.value(self).pipe(
     Match.tagsExhaustive({
       Reading: ({ progress }) =>

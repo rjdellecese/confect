@@ -2,6 +2,7 @@ import * as Predicate from "effect/Predicate";
 import type * as Table from "./Table";
 
 export const TypeId = "~@confect/server/DatabaseSchema";
+
 export type TypeId = typeof TypeId;
 
 export interface Any {

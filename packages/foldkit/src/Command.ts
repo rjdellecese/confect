@@ -210,60 +210,68 @@ function makeDefinition<
   interrupt?: InterruptOption<Ref_, KeyField>,
 ): Definition<Name, Ref_, SuccessMessage | ErrorMessage> {
   type Fields = Ref.ArgsSchema<Ref_>["fields"];
+
   type FoldkitArgs = SchemaArgs<Ref_>;
 
   const fields: Fields = ref.args.fields;
+
   const execute = (args: FoldkitArgs | undefined) =>
     runWithArgs(
+      // SAFETY: Foldkit receives this ref's argument fields; OptionalArgs allows an omitted value only for an empty record, otherwise the same record is passed as a singleton tuple.
       ...((args === undefined ? [] : [args]) as Ref.OptionalArgs<Ref_>),
     );
 
-  return Match.value(interrupt).pipe(
+  const definition = Match.value(interrupt).pipe(
     Match.withReturnType<
-      Definition<Name, Ref_, SuccessMessage | ErrorMessage>
-    >(),
-    Match.when(
-      undefined,
-      () =>
-        FoldkitCommand.define(name, {
-          args: fields,
-          messages,
-          execute,
-        }) as Definition<Name, Ref_, SuccessMessage | ErrorMessage>,
-    ),
-    Match.when(
-      true,
-      (nameKeyedInterrupt) =>
-        FoldkitCommand.define(name, {
-          args: fields,
-          messages,
-          interrupt: nameKeyedInterrupt,
-          execute,
-        }) as InterruptibleDefinition<
-          Name,
-          Ref_,
-          SuccessMessage | ErrorMessage
-        >,
-    ),
-    Match.when(Match.defined, (keyedInterrupt) => {
-      const definition: FoldkitCommand.CommandDefinitionWithArgs<
+      FoldkitCommand.CommandDefinitionWithArgs<
         Name,
         Fields,
         ReturnType<typeof execute>
-      > = FoldkitCommand.define(name, {
+      >
+    >(),
+    Match.when(undefined, () =>
+      FoldkitCommand.define(name, {
+        args: fields,
+        messages,
+        execute,
+      }),
+    ),
+    Match.when(true, (nameKeyedInterrupt) =>
+      FoldkitCommand.define(name, {
+        args: fields,
+        messages,
+        interrupt: nameKeyedInterrupt,
+        execute,
+      }),
+    ),
+    Match.when(Match.defined, (keyedInterrupt) =>
+      FoldkitCommand.define(name, {
         args: fields,
         messages,
         interrupt: keyedInterrupt,
         execute,
-      });
-      return definition as Definition<
-        Name,
-        Ref_,
-        SuccessMessage | ErrorMessage
-      >;
-    }),
+      }),
+    ),
     Match.exhaustive,
   );
+
+  // SAFETY: Foldkit forwards undefined to execute for standard/name-keyed definitions. OptionalArgs permits that only for empty refs, which cannot declare keyed interrupt fields. Omit args here because Foldkit's required-args signature does not describe the omitted case.
+  const invoke = definition as (
+    args?: FoldkitArgs,
+  ) => Omit<ReturnType<typeof definition>, "args">;
+
+  const normalized = (args?: FoldkitArgs) => ({
+    ...invoke(args),
+    args: args ?? {},
+  });
+
+  Object.defineProperties(
+    normalized,
+    Object.getOwnPropertyDescriptors(definition),
+  );
+
+  // SAFETY: The copied descriptors preserve Foldkit's name, brand, and Interrupt constructor. Arguments retain the ref's fields, omitted args are normalized on the instance, and OptionalArgs restricts omission to empty refs.
+  return normalized as Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
 }
 
 type FactoryConfig<
@@ -383,6 +391,7 @@ const makeFactory = <BoundRef extends Ref.AnyConfect>(
     },
   ): Definition<Name, Ref_, SuccessMessage | ErrorMessage> {
     const runWithArgs = effectHelper(ref, config);
+
     return Match.value(config.interrupt).pipe(
       Match.withReturnType<
         Definition<Name, Ref_, SuccessMessage | ErrorMessage>
