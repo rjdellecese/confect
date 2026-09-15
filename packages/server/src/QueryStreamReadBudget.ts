@@ -7,6 +7,7 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import type * as Pull from "effect/Pull";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as SynchronizedRef from "effect/SynchronizedRef";
 import * as Tuple from "effect/Tuple";
@@ -29,12 +30,24 @@ export interface QueryStreamReadBudget {
   ) => Stream.Stream<unknown>;
 }
 
-/**
- * @experimental
- */
-export interface Limits {
-  readonly maximumRowsRead: Option.Option<number>;
-  readonly maximumBytesRead: Option.Option<number>;
+const ReadLimit = Schema.Natural.pipe(
+  Schema.brand("~@confect/server/QueryStreamReadBudget/ReadLimit"),
+);
+
+export const Limits = Schema.Struct({
+  maximumRowsRead: Schema.OptionFromOptionalKey(ReadLimit),
+  maximumBytesRead: Schema.OptionFromOptionalKey(ReadLimit),
+});
+export type Limits = typeof Limits.Type;
+
+export class InvalidReadLimitError extends Data.TaggedError(
+  "InvalidReadLimitError",
+)<{
+  readonly cause: Schema.SchemaError;
+}> {
+  override get message(): string {
+    return `Invalid read limits: ${this.cause.message}`;
+  }
 }
 
 export interface ReadCounts {
