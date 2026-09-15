@@ -7,7 +7,6 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import type * as Pull from "effect/Pull";
-import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as SynchronizedRef from "effect/SynchronizedRef";
@@ -31,54 +30,25 @@ export interface QueryStreamReadBudget {
   ) => Stream.Stream<unknown>;
 }
 
-/**
- * @experimental
- */
-export interface Limits {
-  readonly maximumRowsRead: Option.Option<number>;
-  readonly maximumBytesRead: Option.Option<number>;
-}
-
 const ReadLimit = Schema.Natural.pipe(
   Schema.brand("~@confect/server/QueryStreamReadBudget/ReadLimit"),
 );
-type ReadLimit = typeof ReadLimit.Type;
 
-interface ParsedLimits {
-  readonly maximumRowsRead: Option.Option<ReadLimit>;
-  readonly maximumBytesRead: Option.Option<ReadLimit>;
-}
+export const Limits = Schema.Struct({
+  maximumRowsRead: Schema.OptionFromOptional(ReadLimit),
+  maximumBytesRead: Schema.OptionFromOptional(ReadLimit),
+});
+export type Limits = typeof Limits.Type;
 
 export class InvalidReadLimitError extends Data.TaggedError(
   "InvalidReadLimitError",
 )<{
-  readonly field: keyof Limits;
-  readonly value: number;
+  readonly cause: Schema.SchemaError;
 }> {
   override get message(): string {
-    return `QueryStream.paginate: ${this.field} must be a nonnegative integer (received ${this.value})`;
+    return `Invalid read limits: ${this.cause.message}`;
   }
 }
-
-const parseLimits = (
-  limits: Limits,
-): Result.Result<ParsedLimits, InvalidReadLimitError> => {
-  const parse = (field: keyof Limits) =>
-    Option.match(limits[field], {
-      onNone: () => Result.succeed(Option.none<ReadLimit>()),
-      onSome: (value) =>
-        Schema.decodeResult(ReadLimit)(value).pipe(
-          Result.map(Option.some),
-          Result.mapError(() => new InvalidReadLimitError({ field, value })),
-        ),
-    });
-  return Result.gen(function* () {
-    return {
-      maximumRowsRead: yield* parse("maximumRowsRead"),
-      maximumBytesRead: yield* parse("maximumBytesRead"),
-    };
-  });
-};
 
 export interface ReadCounts {
   readonly rowsRead: number;
@@ -96,7 +66,7 @@ export const QueryStreamReadBudget = Context.Service<QueryStreamReadBudget>(
   "@confect/server/QueryStreamReadBudget",
 );
 
-const isExhausted = (state: State, limits: ParsedLimits): boolean =>
+const isExhausted = (state: State, limits: Limits): boolean =>
   State.$match(state, {
     Stopped: () => true,
     Active: ({ rowsRead, bytesRead }) =>
@@ -125,9 +95,8 @@ const record = (
  * @experimental
  */
 export const make = Effect.fnUntraced(function* (
-  input: Limits,
-): Effect.fn.Return<QueryStreamReadBudget, InvalidReadLimitError> {
-  const limits = yield* Effect.fromResult(parseLimits(input));
+  limits: Limits,
+): Effect.fn.Return<QueryStreamReadBudget> {
   const unlimited =
     Option.isNone(limits.maximumRowsRead) &&
     Option.isNone(limits.maximumBytesRead);
