@@ -6,6 +6,7 @@ import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import type * as Pull from "effect/Pull";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -13,36 +14,40 @@ import * as SynchronizedRef from "effect/SynchronizedRef";
 import * as Tuple from "effect/Tuple";
 
 /**
- * A page exhausted its read budget without a safe logical continuation.
- *
  * @experimental
  */
-export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceededError>()(
-  "ReadBudgetExceededError",
-  { rowsRead: Schema.Natural, bytesRead: Schema.optionalKey(Schema.Natural) },
-) {
-  override get message() {
-    return "The read budget was exhausted before a safe page boundary; increase the budget or simplify the query";
-  }
-}
-
-const TypeId = "~@confect/server/QueryStreamReadBudget";
-
 export interface QueryStreamReadBudget {
-  readonly [TypeId]: typeof TypeId;
-  readonly state: SynchronizedRef.SynchronizedRef<State>;
+  readonly isUnlimited: Effect.Effect<boolean>;
+  readonly isStopped: Effect.Effect<boolean>;
+  readonly isExhausted: Effect.Effect<boolean>;
+  readonly getReadCounts: Effect.Effect<ReadCounts>;
+  /**
+   * Returns a stream that records reads against this budget and stops
+   * requesting further batches once exhausted. Apply directly to the document
+   * source before buffering, filtering, or combining its output.
+   */
+  readonly accountFor: (
+    encodedDocuments: Stream.Stream<unknown>,
+  ) => Stream.Stream<unknown>;
 }
 
 /**
- * Input at the pagination boundary; limits are parsed before allocation.
+ * @experimental
  */
 export interface Limits {
   readonly maximumRowsRead: Option.Option<number>;
   readonly maximumBytesRead: Option.Option<number>;
 }
 
-const ReadLimit = Schema.Natural.pipe(Schema.brand("QueryStream/ReadLimit"));
+const ReadLimit = Schema.Natural.pipe(
+  Schema.brand("~@confect/server/QueryStreamReadBudget/ReadLimit"),
+);
 type ReadLimit = typeof ReadLimit.Type;
+
+interface ParsedLimits {
+  readonly maximumRowsRead: Option.Option<ReadLimit>;
+  readonly maximumBytesRead: Option.Option<ReadLimit>;
+}
 
 export class InvalidReadLimitError extends Data.TaggedError(
   "InvalidReadLimitError",
@@ -55,34 +60,9 @@ export class InvalidReadLimitError extends Data.TaggedError(
   }
 }
 
-interface ByteCount {
-  readonly limit: ReadLimit;
-  readonly read: number;
-}
-
-// Each active or stopped budget owns at least one limit, and byte counts exist
-// exactly when byte accounting is enabled.
-type Accounting = Data.TaggedEnum<{
-  Rows: { readonly rows: number; readonly maximumRowsRead: ReadLimit };
-  Bytes: { readonly rows: number; readonly bytes: ByteCount };
-  RowsAndBytes: {
-    readonly rows: number;
-    readonly maximumRowsRead: ReadLimit;
-    readonly bytes: ByteCount;
-  };
-}>;
-const Accounting = Data.taggedEnum<Accounting>();
-
-type State = Data.TaggedEnum<{
-  Unlimited: {};
-  Active: { readonly accounting: Accounting };
-  Stopped: { readonly accounting: Accounting };
-}>;
-const State = Data.taggedEnum<State>();
-
-const initial = (
+const parseLimits = (
   limits: Limits,
-): Result.Result<State, InvalidReadLimitError> => {
+): Result.Result<ParsedLimits, InvalidReadLimitError> => {
   const parse = (field: keyof Limits) =>
     Option.match(limits[field], {
       onNone: () => Result.succeed(Option.none<ReadLimit>()),
@@ -93,202 +73,111 @@ const initial = (
         ),
     });
   return Result.gen(function* () {
-    const rows = yield* parse("maximumRowsRead");
-    const bytes = yield* parse("maximumBytesRead");
-    return Option.match(rows, {
-      onNone: () =>
-        Option.match(bytes, {
-          onNone: State.Unlimited,
-          onSome: (limit) =>
-            State.Active({
-              accounting: Accounting.Bytes({
-                rows: 0,
-                bytes: { limit, read: 0 },
-              }),
-            }),
-        }),
-      onSome: (maximumRowsRead) =>
-        State.Active({
-          accounting: Option.match(bytes, {
-            onNone: () => Accounting.Rows({ rows: 0, maximumRowsRead }),
-            onSome: (limit) =>
-              Accounting.RowsAndBytes({
-                rows: 0,
-                maximumRowsRead,
-                bytes: { limit, read: 0 },
-              }),
-          }),
-        }),
-    });
+    return {
+      maximumRowsRead: yield* parse("maximumRowsRead"),
+      maximumBytesRead: yield* parse("maximumBytesRead"),
+    };
   });
 };
 
-const exhausted = (state: State): boolean =>
-  State.$match(state, {
-    Unlimited: () => false,
-    Stopped: () => true,
-    Active: ({ accounting }) =>
-      Accounting.$match(accounting, {
-        Rows: ({ rows, maximumRowsRead }) => rows >= maximumRowsRead,
-        Bytes: ({ bytes }) => bytes.read >= bytes.limit,
-        RowsAndBytes: ({ rows, maximumRowsRead, bytes }) =>
-          rows >= maximumRowsRead || bytes.read >= bytes.limit,
-      }),
-  });
+export interface ReadCounts {
+  readonly rowsRead: number;
+  readonly bytesRead: number;
+}
 
-/**
- * Pure accounting; document sizing and pulling belong to the shell.
- */
-const record = (
-  accounting: Accounting,
-  rows: number,
-  bytes: number,
-): Accounting =>
-  Accounting.$match(accounting, {
-    Rows: (current) =>
-      Accounting.Rows({ ...current, rows: current.rows + rows }),
-    Bytes: (current) =>
-      Accounting.Bytes({
-        rows: current.rows + rows,
-        bytes: { limit: current.bytes.limit, read: current.bytes.read + bytes },
-      }),
-    RowsAndBytes: (current) =>
-      Accounting.RowsAndBytes({
-        maximumRowsRead: current.maximumRowsRead,
-        rows: current.rows + rows,
-        bytes: { limit: current.bytes.limit, read: current.bytes.read + bytes },
-      }),
-  });
+type State = Data.TaggedEnum<{
+  Active: ReadCounts;
+  Stopped: ReadCounts;
+}>;
 
-const errorCounts = Accounting.$match({
-  Rows: ({ rows }) => ({ rowsRead: rows }),
-  Bytes: ({ rows, bytes }) => ({ rowsRead: rows, bytesRead: bytes.read }),
-  RowsAndBytes: ({ rows, bytes }) => ({
-    rowsRead: rows,
-    bytesRead: bytes.read,
-  }),
-});
+const State = Data.taggedEnum<State>();
 
-const toError = (state: State): ReadBudgetExceededError =>
-  new ReadBudgetExceededError(
-    State.$match(state, {
-      Unlimited: () => ({ rowsRead: 0 }),
-      Active: ({ accounting }) => errorCounts(accounting),
-      Stopped: ({ accounting }) => errorCounts(accounting),
-    }),
-  );
-
-const Status = Context.Reference<Option.Option<QueryStreamReadBudget>>(
-  "@confect/server/QueryStream/ReadBudgetStatus",
-  { defaultValue: Option.none },
+export const QueryStreamReadBudget = Context.Service<QueryStreamReadBudget>(
+  "@confect/server/QueryStreamReadBudget",
 );
 
-// Budget allocation is internal to the existing QueryStream.paginate span.
-export const make = Effect.fnUntraced(function* (limits: Limits) {
-  const state = yield* Effect.fromResult(initial(limits));
-  return {
-    [TypeId]: TypeId,
-    state: yield* SynchronizedRef.make(state),
-  } satisfies QueryStreamReadBudget;
-});
-
-export const current: Effect.Effect<Option.Option<QueryStreamReadBudget>> =
-  Status;
-
-export const provide =
-  (budget: QueryStreamReadBudget) =>
-  <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-    Effect.flatMap(SynchronizedRef.get(budget.state), (state) =>
-      Effect.provideService(
-        effect,
-        Status,
-        State.$match(state, {
-          Unlimited: () => Option.none(),
-          Active: () => Option.some(budget),
-          Stopped: () => Option.some(budget),
-        }),
-      ),
-    );
-
-export const isExhausted = (
-  budget: QueryStreamReadBudget,
-): Effect.Effect<boolean> =>
-  Effect.map(SynchronizedRef.get(budget.state), exhausted);
-
-export const exceeded = (
-  budget: QueryStreamReadBudget,
-): Effect.Effect<ReadBudgetExceededError> =>
-  Effect.map(SynchronizedRef.get(budget.state), toError);
-
-export const isStopped = (
-  status: Option.Option<QueryStreamReadBudget>,
-): Effect.Effect<boolean> =>
-  Option.match(status, {
-    onNone: () => Effect.succeed(false),
-    onSome: (budget) =>
-      Effect.map(SynchronizedRef.get(budget.state), State.$is("Stopped")),
+const isExhausted = (state: State, limits: ParsedLimits): boolean =>
+  State.$match(state, {
+    Stopped: () => true,
+    Active: ({ rowsRead, bytesRead }) =>
+      Option.exists(limits.maximumRowsRead, (limit) => rowsRead >= limit) ||
+      Option.exists(limits.maximumBytesRead, (limit) => bytesRead >= limit),
   });
 
-const chargePull = (
-  budget: QueryStreamReadBudget,
-  pull: Effect.Effect<Array.NonEmptyReadonlyArray<unknown>, Cause.Done>,
-) =>
-  SynchronizedRef.modifyEffect(budget.state, (state) =>
-    State.$match(state, {
-      Unlimited: () =>
-        Effect.map(pull, (documents) =>
-          Tuple.make(Option.some(documents), state),
-        ),
-      Stopped: () =>
-        Effect.succeed(
-          Tuple.make(
-            Option.none<Array.NonEmptyReadonlyArray<unknown>>(),
-            state,
-          ),
-        ),
-      Active: (active) =>
-        Effect.gen(function* () {
-          if (exhausted(active))
-            return Tuple.make(
-              Option.none<Array.NonEmptyReadonlyArray<unknown>>(),
-              State.Stopped({ accounting: active.accounting }),
-            );
-          // Hold the lock across the actual pull: concurrent leaves share one budget.
-          const documents = yield* pull;
-          const measureBytes = () =>
-            Array.reduce(
-              documents,
-              0,
-              (total, document) =>
-                total + getDocumentSize(document as GenericDocument),
-            );
-          const bytes = Accounting.$match(active.accounting, {
-            Rows: () => 0,
-            Bytes: measureBytes,
-            RowsAndBytes: measureBytes,
-          });
-          return Tuple.make(
-            Option.some(documents),
-            State.Active({
-              accounting: record(active.accounting, documents.length, bytes),
-            }),
-          );
-        }),
-    }),
-  ).pipe(
-    Effect.flatMap(
-      Option.match({ onNone: () => Cause.done(), onSome: Effect.succeed }),
-    ),
-  );
+const readCounts = ({ rowsRead, bytesRead }: ReadCounts): ReadCounts => ({
+  rowsRead,
+  bytesRead,
+});
 
-export const charge = (encodedDocuments: Stream.Stream<unknown>) =>
-  Stream.fromPull(
-    Effect.gen(function* () {
-      const budget = yield* Status;
-      const pull = yield* Stream.toPull(encodedDocuments);
-      return Option.match(budget, {
-        onNone: () => pull,
-        onSome: (value) => chargePull(value, pull),
-      });
-    }),
-  ).pipe(Stream.scoped);
+const record = (
+  counts: ReadCounts,
+  documents: Array.NonEmptyReadonlyArray<unknown>,
+): ReadCounts => ({
+  rowsRead: counts.rowsRead + documents.length,
+  bytesRead: Array.reduce(
+    documents,
+    counts.bytesRead,
+    (bytes, document) => bytes + getDocumentSize(document as GenericDocument),
+  ),
+});
+
+/**
+ * @experimental
+ */
+export const make = Effect.fnUntraced(function* (
+  input: Limits,
+): Effect.fn.Return<QueryStreamReadBudget, InvalidReadLimitError> {
+  const limits = yield* Effect.fromResult(parseLimits(input));
+  const unlimited =
+    Option.isNone(limits.maximumRowsRead) &&
+    Option.isNone(limits.maximumBytesRead);
+  const stateRef = yield* SynchronizedRef.make<State>(
+    State.Active({ rowsRead: 0, bytesRead: 0 }),
+  );
+  const accountForPull: (
+    pull: Pull.Pull<Array.NonEmptyReadonlyArray<unknown>>,
+  ) => Pull.Pull<Array.NonEmptyReadonlyArray<unknown>> = unlimited
+    ? (pull) =>
+        Effect.uninterruptibleMask((restore) =>
+          Effect.tap(restore(pull), (documents) =>
+            SynchronizedRef.update(stateRef, (state) =>
+              State.Active(record(state, documents)),
+            ),
+          ),
+        )
+    : (pull) =>
+        SynchronizedRef.modifyEffect(stateRef, (state) =>
+          Effect.gen(function* () {
+            if (isExhausted(state, limits)) {
+              return Tuple.make(
+                Option.none(),
+                State.Stopped(readCounts(state)),
+              );
+            }
+            const documents = yield* pull;
+            return Tuple.make(
+              Option.some(documents),
+              State.Active(record(state, documents)),
+            );
+          }),
+        ).pipe(
+          Effect.flatMap(
+            Option.match({
+              onNone: () => Cause.done(),
+              onSome: Effect.succeed,
+            }),
+          ),
+        );
+  return QueryStreamReadBudget.of({
+    isUnlimited: Effect.succeed(unlimited),
+    isStopped: Effect.map(SynchronizedRef.get(stateRef), State.$is("Stopped")),
+    isExhausted: Effect.map(SynchronizedRef.get(stateRef), (state) =>
+      isExhausted(state, limits),
+    ),
+    getReadCounts: Effect.map(SynchronizedRef.get(stateRef), readCounts),
+    accountFor: (encodedDocuments) =>
+      Stream.transformPull(encodedDocuments, (pull) =>
+        Effect.succeed(accountForPull(pull)),
+      ).pipe(Stream.scoped),
+  });
+});

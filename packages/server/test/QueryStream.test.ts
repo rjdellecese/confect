@@ -1,3 +1,4 @@
+import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import { identity } from "effect/Function";
 import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
@@ -23,6 +24,13 @@ describe("QueryStream type parameters", () => {
 
     expect(source.order).toBe("desc");
     expectTypeOf(source.toStream()).toEqualTypeOf<Stream.Stream<number>>();
+    expectTypeOf(source.annotated).toEqualTypeOf<
+      Stream.Stream<
+        QueryStream.Element<number>,
+        never,
+        QueryStreamReadBudget.QueryStreamReadBudget
+      >
+    >();
     expectTypeOf<QueryStream.QueryStream<number, ["_id"]>>().toEqualTypeOf<
       QueryStream.QueryStream<
         number,
@@ -504,7 +512,15 @@ describe("QueryStream", () => {
           QueryStream.filter((doc) => doc > 1),
           QueryStream.map((doc) => doc.toString()),
         );
-        const result = yield* Stream.runCollect(transformed.annotated);
+        const result = yield* Stream.runCollect(transformed.annotated).pipe(
+          Effect.provideServiceEffect(
+            QueryStreamReadBudget.QueryStreamReadBudget,
+            QueryStreamReadBudget.make({
+              maximumRowsRead: Option.none(),
+              maximumBytesRead: Option.none(),
+            }),
+          ),
+        );
 
         expect(result).toEqual([
           new QueryStream.Element({ doc: Option.none(), orderKey: [1] }),
@@ -530,7 +546,15 @@ describe("QueryStream", () => {
             }),
           ),
         );
-        const result = yield* Stream.runCollect(transformed.annotated);
+        const result = yield* Stream.runCollect(transformed.annotated).pipe(
+          Effect.provideServiceEffect(
+            QueryStreamReadBudget.QueryStreamReadBudget,
+            QueryStreamReadBudget.make({
+              maximumRowsRead: Option.none(),
+              maximumBytesRead: Option.none(),
+            }),
+          ),
+        );
 
         expect(visited).toEqual([1, 3]);
         expect(result).toEqual([
@@ -596,4 +620,50 @@ describe("QueryStream boundary errors", () => {
       expect(defect).toBeInstanceOf(QueryStream.EmptyInitialPageError);
     }),
   );
+});
+
+describe("QueryStream.ReadBudgetExceededError", () => {
+  it.each(["rowsRead", "bytesRead"] as const)(
+    "rejects invalid %s counts",
+    (field) => {
+      for (const value of [
+        -1,
+        0.5,
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+        Number.NEGATIVE_INFINITY,
+      ]) {
+        expect(
+          Option.isNone(
+            QueryStream.ReadBudgetExceededError.makeOption({
+              rowsRead: 0,
+              bytesRead: 0,
+              [field]: value,
+            }),
+          ),
+        ).toBe(true);
+      }
+    },
+  );
+
+  it("accepts zero row and byte counts", () => {
+    expect(
+      new QueryStream.ReadBudgetExceededError({
+        rowsRead: 0,
+        bytesRead: 0,
+      }),
+    ).toMatchObject({ rowsRead: 0, bytesRead: 0 });
+  });
+
+  it("preserves the pagination error tag and details", () => {
+    const error = new QueryStream.ReadBudgetExceededError({
+      rowsRead: 2,
+      bytesRead: 20,
+    });
+    expect(error._tag).toBe("ReadBudgetExceededError");
+    expect(error.rowsRead).toBe(2);
+    expect(error.bytesRead).toBe(20);
+    expect(error.message).toContain("before a safe page boundary");
+    expect(error.message).not.toContain("QueryStream.paginate");
+  });
 });

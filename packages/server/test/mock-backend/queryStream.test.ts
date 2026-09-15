@@ -44,7 +44,7 @@ const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
   numItems: number,
 ): Effect.Effect<
   ReadonlyArray<ReadonlyArray<Doc>>,
-  E | QueryStreamReadBudget.ReadBudgetExceededError,
+  E | QueryStream.ReadBudgetExceededError,
   R
 > => {
   const go = (
@@ -52,7 +52,7 @@ const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
     pages: ReadonlyArray<ReadonlyArray<Doc>>,
   ): Effect.Effect<
     ReadonlyArray<ReadonlyArray<Doc>>,
-    E | QueryStreamReadBudget.ReadBudgetExceededError,
+    E | QueryStream.ReadBudgetExceededError,
     R
   > =>
     QueryStream.paginate(stream, { numItems, cursor }).pipe(
@@ -487,7 +487,7 @@ describe("QueryStream", () => {
 
             assert(Result.isFailure(result));
             expect(result.failure).toBeInstanceOf(
-              QueryStreamReadBudget.ReadBudgetExceededError,
+              QueryStream.ReadBudgetExceededError,
             );
           }),
         );
@@ -551,8 +551,7 @@ describe("QueryStream", () => {
             pages: ReadonlyArray<ReadonlyArray<string>>,
           ): Effect.Effect<
             ReadonlyArray<ReadonlyArray<string>>,
-            | Document.DocumentDecodeError
-            | QueryStreamReadBudget.ReadBudgetExceededError
+            Document.DocumentDecodeError | QueryStream.ReadBudgetExceededError
           > =>
             QueryStream.paginate(merged, {
               numItems: 10,
@@ -677,7 +676,15 @@ describe("QueryStream", () => {
               yield* insertNotes(["a", "b", "b", "c", "d", "d", "e"]);
               const reader = yield* DatabaseReader;
               const leaf = reader.table("notes").stream("by_text", order);
-              const elements = yield* Stream.runCollect(leaf.annotated);
+              const elements = yield* Stream.runCollect(leaf.annotated).pipe(
+                Effect.provideServiceEffect(
+                  QueryStreamReadBudget.QueryStreamReadBudget,
+                  QueryStreamReadBudget.make({
+                    maximumRowsRead: Option.none(),
+                    maximumBytesRead: Option.none(),
+                  }),
+                ),
+              );
               const texts = yield* collectTexts(leaf);
               const start = {
                 orderKey: Array.getUnsafe(elements, 1).orderKey,
@@ -706,11 +713,12 @@ describe("QueryStream", () => {
                 upper: order === "asc" ? end : start,
               });
 
-              const fallback: typeof leaf = new QueryStream.QueryStream(
-                leaf.order,
-                leaf.keyLayout,
-                leaf.annotated,
-              );
+              const fallback: typeof leaf = new QueryStream.QueryStream<
+                Stream.Success<typeof leaf>,
+                ["text", "_creationTime"],
+                typeof order,
+                Stream.Error<typeof leaf>
+              >(leaf.order, leaf.keyLayout, leaf.annotated);
               const composed = QueryStream.merge([
                 reader
                   .table("notes")
@@ -887,7 +895,15 @@ describe("QueryStream", () => {
                     },
                   ),
                 );
-              const elements = yield* Stream.runCollect(joined.annotated);
+              const elements = yield* Stream.runCollect(joined.annotated).pipe(
+                Effect.provideServiceEffect(
+                  QueryStreamReadBudget.QueryStreamReadBudget,
+                  QueryStreamReadBudget.make({
+                    maximumRowsRead: Option.none(),
+                    maximumBytesRead: Option.none(),
+                  }),
+                ),
+              );
               // Exercise endpoints within one outer row and across two rows.
               for (const endIndex of [1, 3]) {
                 const result = yield* Stream.runCollect(
@@ -901,6 +917,14 @@ describe("QueryStream", () => {
                       inclusive: endInclusive,
                     },
                   }).annotated,
+                ).pipe(
+                  Effect.provideServiceEffect(
+                    QueryStreamReadBudget.QueryStreamReadBudget,
+                    QueryStreamReadBudget.make({
+                      maximumRowsRead: Option.none(),
+                      maximumBytesRead: Option.none(),
+                    }),
+                  ),
                 );
                 expect(result).toEqual(
                   elements.slice(
@@ -1674,7 +1698,17 @@ describe("QueryStream", () => {
               () => compositeEmpty,
               { innerLayout, onEmpty: (doc) => doc },
             );
-            const annotated = yield* Stream.runCollect(placeholders.annotated);
+            const annotated = yield* Stream.runCollect(
+              placeholders.annotated,
+            ).pipe(
+              Effect.provideServiceEffect(
+                QueryStreamReadBudget.QueryStreamReadBudget,
+                QueryStreamReadBudget.make({
+                  maximumRowsRead: Option.none(),
+                  maximumBytesRead: Option.none(),
+                }),
+              ),
+            );
             expect(annotated[0].orderKey.slice(-4)).toEqual([
               null,
               null,
