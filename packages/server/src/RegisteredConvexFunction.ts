@@ -199,7 +199,7 @@ const queryFunction = <
       const decodedArgs = yield* pipe(
         actualArgs,
         Schema.decodeUnknownEffect(args),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* RegisteredFunction.applyMiddleware(
@@ -231,7 +231,7 @@ const queryFunction = <
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
     }).pipe(
       Effect.provideService(Clock.Clock, queryClock),
@@ -317,7 +317,7 @@ const mutationFunction = <
       const decodedArgs = yield* pipe(
         actualArgs,
         Schema.decodeUnknownEffect(args),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* RegisteredFunction.applyMiddleware(
@@ -333,7 +333,7 @@ const mutationFunction = <
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
     }).pipe(
       RegisteredFunction.runHandlerPromise(

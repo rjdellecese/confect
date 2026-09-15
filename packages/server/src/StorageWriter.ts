@@ -12,7 +12,11 @@ const make = (storageWriter: ConvexStorageWriter) => ({
     storageWriter.generateUploadUrl(),
   ).pipe(
     Effect.andThen((url) =>
-      pipe(url, Schema.decodeEffect(Schema.URLFromString), Effect.orDie),
+      pipe(
+        url,
+        Schema.decodeEffect(Schema.URLFromString),
+        Effect.catchTag("SchemaError", Effect.die),
+      ),
     ),
   ),
   delete: (storageId: GenericId<"_storage">) =>
