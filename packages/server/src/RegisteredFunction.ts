@@ -225,7 +225,7 @@ export const runHandlerPromise =
             Effect.catch((typedError) =>
               pipe(
                 Schema.encodeEffect(errorSchema)(typedError),
-                Effect.orDie,
+                Effect.catchTag("SchemaError", Effect.die),
                 Effect.andThen((encodedError) =>
                   Effect.fail(new ConvexError(encodedError)),
                 ),
@@ -284,7 +284,7 @@ export const actionFunctionBase = <
       const decodedArgs = yield* pipe(
         actualArgs,
         Schema.decodeUnknownEffect(args),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* applyMiddleware(
@@ -300,7 +300,7 @@ export const actionFunctionBase = <
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
     }).pipe(runHandlerPromise(combineErrorSchemas(error, resolvedMiddlewares))),
 });

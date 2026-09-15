@@ -20,7 +20,7 @@ const make = (storageReader: ConvexStorageReader) => ({
               pipe(
                 doc,
                 Schema.decodeEffect(Schema.URLFromString),
-                Effect.orDie,
+                Effect.catchTag("SchemaError", Effect.die),
               ),
           }),
         ),
