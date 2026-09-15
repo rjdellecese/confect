@@ -229,7 +229,6 @@ describe("QueryStream iterator lifecycle", () => {
         const enclosing = yield* QueryStreamReadBudget.make(
           yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)({
             maximumRowsRead: 10,
-            maximumBytesRead: undefined,
           }),
         );
         const reader = makeReader();

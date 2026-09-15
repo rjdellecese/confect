@@ -35,8 +35,8 @@ const ReadLimit = Schema.Natural.pipe(
 );
 
 export const Limits = Schema.Struct({
-  maximumRowsRead: Schema.OptionFromOptional(ReadLimit),
-  maximumBytesRead: Schema.OptionFromOptional(ReadLimit),
+  maximumRowsRead: Schema.OptionFromOptionalKey(ReadLimit),
+  maximumBytesRead: Schema.OptionFromOptionalKey(ReadLimit),
 });
 export type Limits = typeof Limits.Type;
 
