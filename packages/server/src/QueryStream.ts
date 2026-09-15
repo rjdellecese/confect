@@ -78,6 +78,20 @@ import * as QueryStreamPagination from "./QueryStreamPagination";
 import * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 
 /**
+ * A page exhausted its read budget without a safe logical continuation.
+ *
+ * @experimental
+ */
+export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceededError>()(
+  "ReadBudgetExceededError",
+  { rowsRead: Schema.Natural, bytesRead: Schema.Natural },
+) {
+  override get message() {
+    return "The read budget was exhausted before a safe page boundary; increase the budget or simplify the query";
+  }
+}
+
+/**
  * Thrown by `merge` when inputs have different directions, visible ordering
  * labels, or implicit-ID positions. The payload identifies the expected and
  * actual direction and layout; map and relabel compatible inputs before
@@ -255,7 +269,11 @@ export class QueryStream<
      * Values paired with stored keys, including filtered markers that advance
      * cursors without emitting a value.
      */
-    readonly annotated: Stream.Stream<Element<Doc>, E, R>,
+    readonly annotated: Stream.Stream<
+      Element<Doc>,
+      E,
+      R | QueryStreamReadBudget.QueryStreamReadBudget
+    >,
     /**
      * Query recipe retained by direct index streams and rebuilt on each run.
      * Includes the effective index bounds. Composed streams instead delegate
@@ -285,9 +303,32 @@ export class QueryStream<
   ) {}
 
   toStream(): Stream.Stream<Doc, E, R> {
-    return Stream.filterMap(
-      this.annotated,
-      Filter.fromPredicateOption(({ doc }) => doc),
+    return Stream.unwrap(
+      Effect.gen({ self: this }, function* () {
+        const budget = yield* Effect.serviceOption(
+          QueryStreamReadBudget.QueryStreamReadBudget,
+        ).pipe(
+          Effect.flatMap(
+            Option.match({
+              onNone: () =>
+                QueryStreamReadBudget.make({
+                  maximumRowsRead: Option.none(),
+                  maximumBytesRead: Option.none(),
+                }),
+              onSome: Effect.succeed,
+            }),
+          ),
+        );
+        return Stream.filterMap(
+          this.annotated,
+          Filter.fromPredicateOption(({ doc }) => doc),
+        ).pipe(
+          Stream.provideService(
+            QueryStreamReadBudget.QueryStreamReadBudget,
+            budget,
+          ),
+        );
+      }),
     );
   }
 }
@@ -533,9 +574,13 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
     Stream.orDie,
   );
 
-  const charged = QueryStreamReadBudget.charge(encodedDocuments);
+  const budgetedDocuments = Stream.unwrap(
+    Effect.map(QueryStreamReadBudget.QueryStreamReadBudget, (budget) =>
+      budget.accountFor(encodedDocuments),
+    ),
+  );
 
-  const annotated = charged.pipe(
+  const annotated = budgetedDocuments.pipe(
     Stream.mapEffect((encoded) =>
       Effect.map(
         Document.decode(reflection.tableName, reflection.tableSchema)(encoded),
@@ -635,7 +680,11 @@ class MergeCandidate<Doc> extends Data.Class<{
 
 const fillMergeSource = <Doc, E>(
   source: MergeSource<Doc, E>,
-): Effect.Effect<MergeSource<Doc, E>, E> =>
+): Effect.Effect<
+  MergeSource<Doc, E>,
+  E,
+  QueryStreamReadBudget.QueryStreamReadBudget
+> =>
   MergeSource.$match(source, {
     NeedsPull: ({ pull }) =>
       pull.pipe(
@@ -648,8 +697,8 @@ const fillMergeSource = <Doc, E>(
         ),
         Pull.catchDone(() =>
           Effect.gen(function* () {
-            const budget = yield* QueryStreamReadBudget.current;
-            return (yield* QueryStreamReadBudget.isStopped(budget))
+            const budget = yield* QueryStreamReadBudget.QueryStreamReadBudget;
+            return (yield* budget.isStopped)
               ? MergeSource.BudgetLimited()
               : MergeSource.Exhausted();
           }),
@@ -674,15 +723,13 @@ const mergeStep =
     sources: ReadonlyArray<MergeSource<Doc, E>>,
   ): Effect.Effect<
     readonly [Element<Doc>, ReadonlyArray<MergeSource<Doc, E>>] | undefined,
-    E
+    E,
+    QueryStreamReadBudget.QueryStreamReadBudget
   > =>
     Effect.gen(function* () {
-      const budgetStatus = yield* QueryStreamReadBudget.current;
+      const budget = yield* QueryStreamReadBudget.QueryStreamReadBudget;
       const filled = yield* Effect.forEach(sources, fillMergeSource, {
-        concurrency: Option.match(budgetStatus, {
-          onNone: () => "unbounded" as const,
-          onSome: () => 1,
-        }),
+        concurrency: (yield* budget.isUnlimited) ? "unbounded" : 1,
       });
       if (filled.some((source) => MergeSource.$is("BudgetLimited")(source)))
         return undefined;
@@ -799,7 +846,11 @@ const mergeUnchecked = <
   ],
 ): QueryStream<Doc, Labels, Direction, E, R> => {
   const head = Array.headNonEmpty(streams);
-  const annotated: Stream.Stream<Element<Doc>, E, R> = Stream.unwrap(
+  const annotated: Stream.Stream<
+    Element<Doc>,
+    E,
+    R | QueryStreamReadBudget.QueryStreamReadBudget
+  > = Stream.unwrap(
     Effect.map(
       Effect.forEach(streams, (stream) => Stream.toPull(stream.annotated)),
       (pulls) =>
@@ -1344,7 +1395,7 @@ const makeFlatMap = <
   const annotated: Stream.Stream<
     Element<Doc2 | Doc3>,
     E | E2,
-    R | R2
+    R | R2 | QueryStreamReadBudget.QueryStreamReadBudget
   > = self.annotated.pipe(
     Stream.flatMap(({ doc: outerDoc, orderKey: outerKey }) => {
       const innerBounds = innerBoundsFor(outerKey);
@@ -1363,9 +1414,9 @@ const makeFlatMap = <
             Stream.orElseIfEmpty(() =>
               Stream.unwrap(
                 Effect.gen(function* () {
-                  const budgetStatus = yield* QueryStreamReadBudget.current;
-                  if (yield* QueryStreamReadBudget.isStopped(budgetStatus))
-                    return Stream.empty;
+                  const budget =
+                    yield* QueryStreamReadBudget.QueryStreamReadBudget;
+                  if (yield* budget.isStopped) return Stream.empty;
                   const original = yield* Option.match(
                     Option.gen(function* () {
                       yield* onEmpty;
@@ -1380,8 +1431,7 @@ const makeFlatMap = <
                       onSome: () => Stream.runHead(inner.annotated),
                     },
                   );
-                  const isStopped =
-                    yield* QueryStreamReadBudget.isStopped(budgetStatus);
+                  const isStopped = yield* budget.isStopped;
                   return Option.match(original, {
                     onSome: () => Stream.empty,
                     onNone: () =>
@@ -1632,7 +1682,7 @@ const makeDistinct = <
   const isAdmitted = (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
     aboveLower(orderKey) && belowUpper(orderKey);
   const annotated = Stream.unwrap(
-    Effect.map(QueryStreamReadBudget.current, (budgetStatus) =>
+    Effect.map(QueryStreamReadBudget.QueryStreamReadBudget, (budget) =>
       Stream.paginate(
         narrowByKeyBounds(order === self.order ? self : reverse(self), {
           lower: groupBound(bounds.lower),
@@ -1643,11 +1693,10 @@ const makeDistinct = <
         ): Effect.Effect<
           readonly [ReadonlyArray<Element<Doc>>, Option.Option<typeof current>],
           E,
-          R
+          R | QueryStreamReadBudget.QueryStreamReadBudget
         > =>
           Effect.gen(function* () {
-            if (yield* QueryStreamReadBudget.isStopped(budgetStatus))
-              return Tuple.make([], Option.none());
+            if (yield* budget.isStopped) return Tuple.make([], Option.none());
             const discovered = yield* Stream.runHead(current.annotated);
             if (Option.isNone(discovered)) return Tuple.make([], Option.none());
             const element = discovered.value;
@@ -1695,8 +1744,7 @@ const makeDistinct = <
                 next,
               );
             }
-            if (yield* QueryStreamReadBudget.isStopped(budgetStatus))
-              return Tuple.make([], Option.none());
+            if (yield* budget.isStopped) return Tuple.make([], Option.none());
             const checkpoint = Option.getOrElse(firstKey, () => orderKey);
             return Tuple.make(
               isAdmitted(checkpoint)
@@ -1897,8 +1945,16 @@ const narrowInMemory = <
   bounds: KeyBounds,
 ): QueryStream<Doc, Labels, Direction, E, R> => {
   type Narrower = (
-    annotated: Stream.Stream<Element<Doc>, E, R>,
-  ) => Stream.Stream<Element<Doc>, E, R>;
+    annotated: Stream.Stream<
+      Element<Doc>,
+      E,
+      R | QueryStreamReadBudget.QueryStreamReadBudget
+    >,
+  ) => Stream.Stream<
+    Element<Doc>,
+    E,
+    R | QueryStreamReadBudget.QueryStreamReadBudget
+  >;
 
   const { aboveLower, belowUpper } = keyPredicates(self.keyLayout, bounds);
 
@@ -2061,104 +2117,96 @@ export const paginate: {
     options: PaginateOptions,
   ): <Doc, Labels extends ReadonlyArray<string>, E, R>(
     self: QueryStream<Doc, Labels, OrderDirection, E, R>,
-  ) => Effect.Effect<
-    PaginationResult<Doc>,
-    E | QueryStreamReadBudget.ReadBudgetExceededError,
-    R
-  >;
+  ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
   <Doc, Labels extends ReadonlyArray<string>, E, R>(
     self: QueryStream<Doc, Labels, OrderDirection, E, R>,
     options: PaginateOptions,
-  ): Effect.Effect<
-    PaginationResult<Doc>,
-    E | QueryStreamReadBudget.ReadBudgetExceededError,
-    R
-  >;
+  ): Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
 } = dual(
   2,
-  Effect.fn("QueryStream.paginate")(function* <
-    Doc,
-    Labels extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(self: QueryStream<Doc, Labels, Direction, E, R>, options: PaginateOptions) {
-    const cursorSchema = QueryStreamCursor.codecForLayout(self.keyLayout);
-    const encodeCursor = Schema.encodeEffect(cursorSchema);
-    const decodeCursor = Schema.decodeEffect(cursorSchema);
-    const complete = (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
-      Result.getOrThrowWith(
-        QueryStreamKey.complete(self.keyLayout, orderKey),
-        identity,
+  Effect.fn("QueryStream.paginate")(
+    function* <
+      Doc,
+      Labels extends ReadonlyArray<string>,
+      E,
+      R,
+      Direction extends OrderDirection,
+    >(
+      self: QueryStream<Doc, Labels, Direction, E, R>,
+      options: PaginateOptions,
+    ) {
+      const cursorSchema = QueryStreamCursor.codecForLayout(self.keyLayout);
+      const encodeCursor = Schema.encodeEffect(cursorSchema);
+      const decodeCursor = Schema.decodeEffect(cursorSchema);
+      const complete = (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
+        Result.getOrThrowWith(
+          QueryStreamKey.complete(self.keyLayout, orderKey),
+          identity,
+        );
+      const decoded = yield* Effect.all({
+        start: Option.match(Option.fromNullOr(options.cursor), {
+          onNone: () => Effect.succeed(QueryStreamPagination.Start.Beginning()),
+          onSome: (cursor) =>
+            Effect.map(decodeCursor(cursor), (orderKey) =>
+              QueryStreamPagination.Start.After({
+                cursor,
+                orderKey: complete(orderKey),
+              }),
+            ),
+        }),
+        range: Option.match(Option.fromNullishOr(options.endCursor), {
+          onNone: () => Effect.succeed(QueryStreamPagination.Range.Unpinned()),
+          onSome: (cursor) =>
+            cursor === QueryStreamCursor.END_CURSOR
+              ? Effect.succeed(QueryStreamPagination.Range.ThroughEnd())
+              : Effect.map(decodeCursor(cursor), (orderKey) =>
+                  QueryStreamPagination.Range.ThroughKey({
+                    orderKey: complete(orderKey),
+                  }),
+                ),
+        }),
+      }).pipe(
+        Effect.mapError(
+          () => new ConvexError({ paginationError: "InvalidCursor" }),
+        ),
+        Effect.orDie,
       );
-    const decoded = yield* Effect.all({
-      start: Option.match(Option.fromNullOr(options.cursor), {
-        onNone: () => Effect.succeed(QueryStreamPagination.Start.Beginning()),
-        onSome: (cursor) =>
-          Effect.map(decodeCursor(cursor), (orderKey) =>
-            QueryStreamPagination.Start.After({
-              cursor,
-              orderKey: complete(orderKey),
-            }),
-          ),
-      }),
-      range: Option.match(Option.fromNullishOr(options.endCursor), {
-        onNone: () => Effect.succeed(QueryStreamPagination.Range.Unpinned()),
-        onSome: (cursor) =>
-          cursor === QueryStreamCursor.END_CURSOR
-            ? Effect.succeed(QueryStreamPagination.Range.ThroughEnd())
-            : Effect.map(decodeCursor(cursor), (orderKey) =>
-                QueryStreamPagination.Range.ThroughKey({
-                  orderKey: complete(orderKey),
-                }),
-              ),
-      }),
-    }).pipe(
-      Effect.mapError(
-        () => new ConvexError({ paginationError: "InvalidCursor" }),
-      ),
-      Effect.orDie,
-    );
-    const request = yield* QueryStreamPagination.parseRequest(
-      options.numItems,
-      decoded.start,
-      decoded.range,
-    ).pipe(Effect.fromResult, Effect.orDie);
-    if (request._tag === "Unchanged") {
-      return {
-        page: [],
-        isDone: false,
-        continueCursor: request.cursor,
-      } satisfies PaginationResult<Doc>;
-    }
-    const start = Option.map(request.after, (orderKey) => ({
-      orderKey: orderKey.values,
-      inclusive: false,
-    }));
-    const end = QueryStreamPagination.Range.$match(request.range, {
-      Unpinned: () => Option.none<KeyBound>(),
-      ThroughEnd: () => Option.none<KeyBound>(),
-      ThroughKey: ({ orderKey }) =>
-        Option.some({ orderKey: orderKey.values, inclusive: true }),
-    });
-    const narrowed = narrowByKeyBounds(
-      self,
-      self.order === "asc"
-        ? { lower: start, upper: end }
-        : { lower: end, upper: start },
-    );
-    const budget = yield* QueryStreamReadBudget.make({
-      maximumRowsRead: Option.fromUndefinedOr(options.maximumRowsRead),
-      maximumBytesRead: Option.fromUndefinedOr(options.maximumBytesRead),
-    });
-    const collected = yield* pipe(
-      Stream.run(
+      const request = yield* QueryStreamPagination.parseRequest(
+        options.numItems,
+        decoded.start,
+        decoded.range,
+      ).pipe(Effect.fromResult, Effect.orDie);
+      if (request._tag === "Unchanged") {
+        return {
+          page: [],
+          isDone: false,
+          continueCursor: request.cursor,
+        } satisfies PaginationResult<Doc>;
+      }
+      const start = Option.map(request.after, (orderKey) => ({
+        orderKey: orderKey.values,
+        inclusive: false,
+      }));
+      const end = QueryStreamPagination.Range.$match(request.range, {
+        Unpinned: () => Option.none<KeyBound>(),
+        ThroughEnd: () => Option.none<KeyBound>(),
+        ThroughKey: ({ orderKey }) =>
+          Option.some({ orderKey: orderKey.values, inclusive: true }),
+      });
+      const narrowed = narrowByKeyBounds(
+        self,
+        self.order === "asc"
+          ? { lower: start, upper: end }
+          : { lower: end, upper: start },
+      );
+      const budget = yield* QueryStreamReadBudget.QueryStreamReadBudget;
+      const collected = yield* Stream.run(
         narrowed.annotated,
         Sink.fold(
           () => QueryStreamPagination.initial<Doc>(),
           (state) => state._tag === "Reading",
           (state, { doc, orderKey }: Element<Doc>) =>
-            Effect.map(QueryStreamReadBudget.isExhausted(budget), (hitLimit) =>
+            Effect.map(budget.isExhausted, (hitLimit) =>
               QueryStreamPagination.record(
                 request,
                 state,
@@ -2168,58 +2216,67 @@ export const paginate: {
               ),
             ),
         ),
+      );
+      const stopped = yield* budget.isStopped;
+      const outcome = QueryStreamPagination.finish(request, collected, stopped);
+      if (Result.isFailure(outcome)) {
+        const counts = yield* budget.getReadCounts;
+        return yield* new ReadBudgetExceededError(counts);
+      }
+      const encode = (orderKey: QueryStreamKey.Complete) =>
+        encodeCursor(orderKey.values).pipe(Effect.orDie);
+      const encodeSplit = (
+        result: Extract<
+          QueryStreamPagination.Outcome<Doc>,
+          { readonly _tag: "SplitRequired" | "SplitRecommended" }
+        >,
+      ) =>
+        Effect.gen(function* () {
+          const continueCursor = yield* Match.value(result.continuation).pipe(
+            Match.tagsExhaustive({
+              End: () => Effect.succeed(QueryStreamCursor.END_CURSOR),
+              Key: ({ orderKey }) => encode(orderKey),
+            }),
+          );
+          return {
+            page: Array.fromIterable(result.page),
+            isDone: false,
+            continueCursor,
+            pageStatus: result._tag,
+            splitCursor: yield* encode(result.splitOrderKey),
+          } satisfies PaginationResult<Doc>;
+        });
+      return yield* Match.value(outcome.success).pipe(
+        Match.tagsExhaustive({
+          Done: ({ page }) =>
+            Effect.succeed({
+              page: Array.fromIterable(page),
+              isDone: true,
+              continueCursor: QueryStreamCursor.END_CURSOR,
+            } satisfies PaginationResult<Doc>),
+          Continue: ({ page, orderKey }) =>
+            Effect.map(
+              encode(orderKey),
+              (continueCursor) =>
+                ({
+                  page: Array.fromIterable(page),
+                  isDone: false,
+                  continueCursor,
+                }) satisfies PaginationResult<Doc>,
+            ),
+          SplitRequired: encodeSplit,
+          SplitRecommended: encodeSplit,
+        }),
+      );
+    },
+    (effect, _self, options) =>
+      Effect.provideServiceEffect(
+        effect,
+        QueryStreamReadBudget.QueryStreamReadBudget,
+        QueryStreamReadBudget.make({
+          maximumRowsRead: Option.fromUndefinedOr(options.maximumRowsRead),
+          maximumBytesRead: Option.fromUndefinedOr(options.maximumBytesRead),
+        }),
       ),
-      QueryStreamReadBudget.provide(budget),
-    );
-    const stopped = yield* QueryStreamReadBudget.isStopped(Option.some(budget));
-    const outcome = QueryStreamPagination.finish(request, collected, stopped);
-    if (Result.isFailure(outcome)) {
-      return yield* yield* QueryStreamReadBudget.exceeded(budget);
-    }
-    const encode = (orderKey: QueryStreamKey.Complete) =>
-      encodeCursor(orderKey.values).pipe(Effect.orDie);
-    const encodeSplit = (
-      result: Extract<
-        QueryStreamPagination.Outcome<Doc>,
-        { readonly _tag: "SplitRequired" | "SplitRecommended" }
-      >,
-    ) =>
-      Effect.gen(function* () {
-        const continueCursor = yield* Match.value(result.continuation).pipe(
-          Match.tagsExhaustive({
-            End: () => Effect.succeed(QueryStreamCursor.END_CURSOR),
-            Key: ({ orderKey }) => encode(orderKey),
-          }),
-        );
-        return {
-          page: Array.fromIterable(result.page),
-          isDone: false,
-          continueCursor,
-          pageStatus: result._tag,
-          splitCursor: yield* encode(result.splitOrderKey),
-        } satisfies PaginationResult<Doc>;
-      });
-    return yield* Match.value(outcome.success).pipe(
-      Match.tagsExhaustive({
-        Done: ({ page }) =>
-          Effect.succeed({
-            page: Array.fromIterable(page),
-            isDone: true,
-            continueCursor: QueryStreamCursor.END_CURSOR,
-          } satisfies PaginationResult<Doc>),
-        Continue: ({ page, orderKey }) =>
-          Effect.map(
-            encode(orderKey),
-            (continueCursor) =>
-              ({
-                page: Array.fromIterable(page),
-                isDone: false,
-                continueCursor,
-              }) satisfies PaginationResult<Doc>,
-          ),
-        SplitRequired: encodeSplit,
-        SplitRecommended: encodeSplit,
-      }),
-    );
-  }),
+  ),
 );
