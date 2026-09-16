@@ -28,8 +28,8 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
 ## TypeScript configuration
 
-Enable TypeScript's strict checks in the configuration that covers your Confect
-files. We also recommend `exactOptionalPropertyTypes`:
+Confect requires `strict: true` in the TypeScript configuration that covers your
+Confect files. `exactOptionalPropertyTypes: true` is optional but recommended:
 
 ```json tsconfig.json
 {
@@ -40,12 +40,8 @@ files. We also recommend `exactOptionalPropertyTypes`:
 }
 ```
 
-Confect supports error inference with `exactOptionalPropertyTypes` enabled or
-disabled: a function without an `error` schema has no declared error channel,
-and an explicit schema determines its error type. The flag is not included in
-`strict`; enable it separately to distinguish omitted properties from properties
-set to `undefined`. See [optional-property safety](/concepts/schema-restrictions#optional-property-safety)
-for the checks you lose when it is disabled.
+See [Effect Schema's explanation of `exactOptionalPropertyTypes`](https://effect.website/docs/v4/schema/introduction#the-exactoptionalpropertytypes-option)
+for how it affects optional properties and schema validation.
 
 ## Usage
 

@@ -36,28 +36,10 @@ For a function with no arguments, omit `args`; Confect defaults it to an empty f
 
 ### Optional-property safety
 
-We recommend `strict: true` and `exactOptionalPropertyTypes: true` in your
-TypeScript configuration. Confect's error inference works with either value of
-`exactOptionalPropertyTypes`, but disabling it changes which inputs TypeScript
-accepts. `strict: true` does not enable this flag automatically.
-
-With the flag enabled, an optional property such as `text?: string` allows you
-to omit `text` but not explicitly pass `text: undefined`. With it disabled,
-TypeScript accepts both. This affects schema-derived optional fields and APIs
-that make fields optional for other reasons:
-
-- A database patch lets you omit fields you are not changing. With exact
-  optional types enabled, TypeScript rejects `undefined` for a required field.
-  With them disabled, it accepts that input, but Confect still validates the
-  resulting document before writing it; removing a required field fails
-  validation.
-- Foldkit command configuration rejects an explicit `interrupt: undefined`
-  with exact optional types enabled. With them disabled, TypeScript accepts
-  it. Omit the option when you do not want interruption.
-
-Supporting both compiler settings does not change schema validation or make
-explicit `undefined` equivalent to an absent property at runtime. Keep the flag
-enabled to catch these mistakes before running your application.
+Confect requires `strict: true` in your TypeScript configuration.
+`exactOptionalPropertyTypes: true` is optional but recommended. See
+[Effect Schema's explanation of `exactOptionalPropertyTypes`](https://effect.website/docs/v4/schema/introduction#the-exactoptionalpropertytypes-option)
+for how it affects optional properties and schema validation.
 
 ### No-op returns from Convex functions
 
