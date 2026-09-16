@@ -37,6 +37,7 @@
   "scripts": {
     "build": "vp run --cache --filter \"@confect/*\" build",
     "check": "bun run scripts/syncSkillIgnore.ts --check && bun run scripts/streamDiagrams.ts --check && vp check",
+    "check:consumer-types": "pnpm --filter confect-consumer-type-tests typecheck",
     "check:pack-contents": "bun run scripts/checkPackContents.ts",
     "check:prerelease-sync": "bun run scripts/auditPrereleaseSync.ts",
     "circular": "dpdm --no-warning --no-tree --exit-code circular:1 -T \"packages/*/src/**/*.ts\"",
@@ -59,7 +60,7 @@
     "test:prerelease-sync": "bun test scripts/auditPrereleaseSync.test.ts",
     "test:server:local-backend": "pnpm --filter @confect/server test:local-backend",
     "test:server:mock-backend": "pnpm --filter @confect/server test:mock-backend",
-    "typecheck": "tsc -b tsconfig.packages.json tsconfig.json tools/oxlint-rules/tsconfig.json",
+    "typecheck": "tsc -b tsconfig.packages.json tsconfig.json tools/oxlint-rules/tsconfig.json && pnpm check:consumer-types",
     "version-packages": "changeset version && pnpm format"
   }
 }

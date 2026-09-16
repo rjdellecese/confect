@@ -82,6 +82,13 @@ Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.s
 - **Keep integration coverage separate.** Tests whose purpose is to verify how modules work together or interact across runtime boundaries belong in integration suites. Extend the relevant existing suite and reuse its harness and fixtures rather than adding a parallel setup in the unit-test directory.
 - **Make new integration conventions explicit.** If integration coverage needs a new layout, document its location and configure test discovery explicitly.
 
+Consumer declaration integration tests live in `tools/consumer-type-tests/test/`.
+They compile against built package exports with `exactOptionalPropertyTypes`
+both enabled and disabled, without the source aliases used by package tests.
+Run `pnpm build && pnpm check:consumer-types`, or `pnpm typecheck` to regenerate
+declarations and run both configurations. See the workspace's README for the
+layout; keep strict-only negative assertions in the package suites.
+
 ### Running tests
 
 Run `pnpm test` to run all suites at once, or target a single package with `vitest run --project @confect/<pkg>` (e.g. `vitest run --project @confect/core`). Run tests with `vitest run`, not `vp test`—the Vite+ test runner mishandles type-only test files. The server's Convex integration suites have dedicated scripts: `pnpm test:server:mock-backend` and `pnpm test:server:local-backend`.

@@ -689,6 +689,39 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  tools/consumer-type-tests:
+    devDependencies:
+      '@confect/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@confect/foldkit':
+        specifier: workspace:*
+        version: link:../../packages/foldkit
+      '@confect/js':
+        specifier: workspace:*
+        version: link:../../packages/js
+      '@confect/react':
+        specifier: workspace:*
+        version: link:../../packages/react
+      '@confect/server':
+        specifier: workspace:*
+        version: link:../../packages/server
+      '@confect/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      convex:
+        specifier: 1.45.0
+        version: 1.45.0(react@19.3.0)
+      effect:
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.0
+        version: 5.0.0(@types/node@24.13.3)(@vitest/browser-preview@4.1.11)(@vitest/coverage-v8@5.0.0)(happy-dom@20.14.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.13)(yaml@2.9.0))
+
   tools/oxlint-rules:
     devDependencies:
       '@effect/vitest':
