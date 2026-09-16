@@ -200,8 +200,7 @@ describe("QueryStream", () => {
 
           const reader = yield* DatabaseReader;
           const notes = reader.table("notes").stream("by_text");
-          type Note =
-            typeof notes extends Stream.Stream<infer A, any, any> ? A : never;
+          type Note = Stream.Success<typeof notes>;
           const nothing = QueryStream.empty<Note>()(
             Result.getOrThrowWith(
               QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
@@ -1161,8 +1160,7 @@ describe("QueryStream", () => {
             const outer = reader
               .table("notes")
               .stream("by_text", (q) => q.gte("text", "x"));
-            type Note =
-              typeof outer extends Stream.Stream<infer A, any, any> ? A : never;
+            type Note = Stream.Success<typeof outer>;
             const inner = (note: Note) =>
               reader
                 .table("notes")
@@ -2093,7 +2091,7 @@ describe("QueryStream types", () => {
         Effect.flatMap(SomeService, (service) => service.check(note.text)),
       );
       expectTypeOf<
-        typeof filtered extends Stream.Stream<any, any, infer R> ? R : never
+        Stream.Services<typeof filtered>
       >().toEqualTypeOf<SomeService>();
 
       // flatMap concatenates order keys at the type level.
@@ -2107,10 +2105,8 @@ describe("QueryStream types", () => {
         readonly ["text", "_creationTime", "_creationTime"]
       >();
       // Without onEmpty, the elements are exactly the inner documents.
-      expectTypeOf<
-        typeof joined extends Stream.Stream<infer A, any, any> ? A : never
-      >().toEqualTypeOf<
-        typeof pinned extends Stream.Stream<infer A, any, any> ? A : never
+      expectTypeOf<Stream.Success<typeof joined>>().toEqualTypeOf<
+        Stream.Success<typeof pinned>
       >();
 
       const joinedMismatched = QueryStream.flatMap(bounded, (_note) => pinned, {
@@ -2182,13 +2178,8 @@ describe("QueryStream types", () => {
       expectTypeOf<LabelsOf<typeof withPlaceholder>>().toEqualTypeOf<
         readonly ["text", "_creationTime", "_creationTime"]
       >();
-      expectTypeOf<
-        typeof withPlaceholder extends Stream.Stream<infer A, any, any>
-          ? A
-          : never
-      >().toEqualTypeOf<
-        | (typeof pinned extends Stream.Stream<infer A, any, any> ? A : never)
-        | { missingFor: string }
+      expectTypeOf<Stream.Success<typeof withPlaceholder>>().toEqualTypeOf<
+        Stream.Success<typeof pinned> | { missingFor: string }
       >();
 
       // A flatMap result relabels by its type-level (tiebreaker-free) key.
