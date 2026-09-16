@@ -29,7 +29,8 @@
     "clean": "shx rm -rf dist node_modules",
     "convex-codegen": "pnpm convex codegen",
     "dev": "concurrently --restart-tries=1 --prefix-colors=\"white.bold.bgCyan,white.bold.bgYellow,white.bold.bgGreen\" --prefix=\" {name} \" --names=\"VITE,CONVEX,CONFECT\" \"vite\" \"convex dev --tail-logs\" \"confect dev\"",
-    "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project convex/tsconfig.json"
+    "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project convex/tsconfig.json",
+    "typecheck:inexact": "tsc --noEmit --project tsconfig.json --exactOptionalPropertyTypes false --tsBuildInfoFile node_modules/.cache/tsc/tsconfig.inexact.tsbuildinfo && tsc --noEmit --project convex/tsconfig.json --exactOptionalPropertyTypes false"
   },
   "type": "module"
 }

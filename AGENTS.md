@@ -64,6 +64,8 @@ Build, lint, and format run through Vite+ (`vp`), which orders packages by their
 - `pnpm dev:example`/`pnpm dev:docs` - Run the example app/docs site
 - `pnpm test` - Run all package test suites via Vitest (`vitest run`)
 - `pnpm typecheck` - Typecheck the package graph and test suites via `tsc -b` (project references, incremental)
+- `pnpm typecheck:inexact` - Refresh normal package declarations, then typecheck every package's sources and tests with `exactOptionalPropertyTypes: false`
+- `pnpm --filter example typecheck:inexact` - Typecheck both example projects with `exactOptionalPropertyTypes: false` (run `pnpm build` first)
 - `pnpm lint`/`pnpm lint:fix` - Lint (Oxlint + Syncpack); `lint:fix` writes fixes
 - `pnpm format`/`pnpm format:check` - Format (Oxfmt + Syncpack); `format` writes, `format:check` only checks
 - `pnpm check` - Format, lint, and type checks together (`vp check`)
@@ -82,12 +84,13 @@ Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.s
 - **Keep integration coverage separate.** Tests whose purpose is to verify how modules work together or interact across runtime boundaries belong in integration suites. Extend the relevant existing suite and reuse its harness and fixtures rather than adding a parallel setup in the unit-test directory.
 - **Make new integration conventions explicit.** If integration coverage needs a new layout, document its location and configure test discovery explicitly.
 
-Consumer declaration integration tests live in `tools/consumer-type-tests/test/`.
-They compile against built package exports with `exactOptionalPropertyTypes`
-both enabled and disabled, without the source aliases used by package tests.
-Run `pnpm build && pnpm check:consumer-types`, or `pnpm typecheck` to regenerate
-declarations and run both configurations. See the workspace's README for the
-layout; keep strict-only negative assertions in the package suites.
+Normal development and builds use `exactOptionalPropertyTypes: true`. The
+separate `typecheck:inexact` scripts reuse each package's existing `tsconfig.json`
+(including its tests) and both example projects, overriding only that flag for
+typechecking. Inexact checks emit no declarations; the composite example
+project uses a separate incremental cache. CI runs both modes. Assertions about
+explicit `undefined` on optional properties must verify the compiler-specific
+behavior in both modes, while error-channel precision must hold in either mode.
 
 ### Running tests
 

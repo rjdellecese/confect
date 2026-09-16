@@ -204,12 +204,21 @@ describe("Command", () => {
       Command.mutation("SaveNote", insertMutationRef, saveNoteHandlers);
     });
 
-    it("rejects an explicitly undefined interrupt option", () => {
-      // @ts-expect-error—absence and `interrupt: undefined` are distinct
-      Command.mutation("SaveNote", insertMutationRef, {
-        ...saveNoteConfig,
-        interrupt: undefined,
-      });
+    it("checks an explicitly undefined interrupt option against compiler optionality", () => {
+      type AllowsExplicitUndefined = { value: undefined } extends {
+        value?: never;
+      }
+        ? true
+        : false;
+      type AcceptsUndefined = typeof Command.mutation extends (
+        name: "SaveNote",
+        ref: typeof insertMutationRef,
+        config: typeof saveNoteConfig & { interrupt: undefined },
+      ) => unknown
+        ? true
+        : false;
+
+      expectTypeOf<AcceptsUndefined>().toEqualTypeOf<AllowsExplicitUndefined>();
     });
 
     it("rejects a handler Message not declared in messages", () => {

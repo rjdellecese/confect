@@ -26,6 +26,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/example-setup
       - run: pnpm --filter example typecheck
+      - run: pnpm --filter example typecheck:inexact
 
   lint:
     name: Lint
