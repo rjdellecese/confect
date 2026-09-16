@@ -68,18 +68,23 @@ const GENERATED_DIRNAME = "_generated";
 const GENERATED_SPEC_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "spec.ts"),
 );
+
 const GENERATED_SCHEMA_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "schema.ts"),
 );
+
 const GENERATED_CONVEX_SCHEMA_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "convexSchema.ts"),
 );
+
 const GENERATED_ID_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "id.ts"),
 );
+
 const GENERATED_COMPONENTS_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "components.ts"),
 );
+
 const GENERATED_TABLES_DIRNAME = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "tables"),
 );
@@ -125,6 +130,7 @@ export const codegenHandler = Effect.gen(function* () {
   );
 
   const anyWritesHappened = yield* Ref.get(tracker);
+
   return { functionPaths, anyWritesHappened };
 }).pipe(Effect.withSpan("Cli.codegen"));
 
@@ -149,8 +155,10 @@ const runCodegen = Effect.gen(function* () {
   yield* generateTableWrappers(tableModules);
   yield* removeObsoleteTableWrappers(tableModules);
   yield* generateRuntimeSchema(tableModules);
+
   const { leaves, groupSpecsByPosixRelativePath } =
     yield* loadAndValidateLeafModules;
+
   yield* removeLegacyFiles;
   yield* validateNoParentChildNameCollisions(
     leaves,
@@ -178,6 +186,7 @@ const runCodegen = Effect.gen(function* () {
   yield* validateImplModules(leaves);
   yield* generateGroupRegisteredFunctions(leaves);
   yield* removeObsoleteRegisteredFunctions(leaves);
+
   const [functionPaths] = yield* Effect.all(
     [
       generateFunctionModules,
@@ -188,7 +197,9 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
+
   yield* touchConvexSchema;
+
   return functionPaths;
 });
 
@@ -216,6 +227,7 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
     Effect.fnUntraced(function* (specRelativePath: string) {
       const discovered = yield* toLeafModule(specRelativePath);
       const groupSpec = yield* validateSpec(discovered);
+
       // Fill in the runtime now that the spec is bundled; discovery left it `None`.
       const leaf = {
         ...discovered,
@@ -224,6 +236,7 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
 
       const implRelativePath = yield* implPathForSpec(specRelativePath);
       const implAbsolutePath = path.join(confectDirectory, implRelativePath);
+
       if (!(yield* fs.exists(implAbsolutePath))) {
         return yield* new MissingImplFileError({
           specPath: specRelativePath,
@@ -238,6 +251,7 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
   yield* validateOrphanImpls(specFiles);
 
   const leaves = Array.map(results, ({ leaf }) => leaf);
+
   const groupSpecsByPosixRelativePath = new Map(
     Array.map(results, ({ leaf, groupSpec }) => [
       toPosixPath(path, leaf.relativePath),
@@ -278,11 +292,14 @@ const checkAssemblyNodeForCollisions = Effect.fnUntraced(function* (
     onSome: (binding) =>
       Effect.gen(function* () {
         if (node.children.length === 0) return;
+
         const parentRelativePath = bindingToRelativeSpecPath(
           binding.importPath,
         );
+
         const parentGroupSpec =
           groupSpecsByPosixRelativePath.get(parentRelativePath);
+
         if (parentGroupSpec === undefined) return;
         yield* Effect.forEach(node.children, (child) => {
           if (
@@ -300,6 +317,7 @@ const checkAssemblyNodeForCollisions = Effect.fnUntraced(function* (
               }),
             );
           }
+
           if (
             Object.prototype.hasOwnProperty.call(
               parentGroupSpec.groups,
@@ -315,6 +333,7 @@ const checkAssemblyNodeForCollisions = Effect.fnUntraced(function* (
               }),
             );
           }
+
           return Effect.void;
         });
       }),
@@ -334,6 +353,7 @@ const bindingToRelativeSpecPath = (importPath: string): string => {
   const withoutDotDot = importPath.startsWith("../")
     ? importPath.slice(3)
     : importPath;
+
   return `${withoutDotDot}.ts`;
 };
 
@@ -347,9 +367,11 @@ const childRepresentativeSpecPath = (node: SpecAssemblyNode): string => {
   if (Option.isSome(node.importBinding)) {
     return bindingToRelativeSpecPath(node.importBinding.value.importPath);
   }
+
   for (const child of node.children) {
     return childRepresentativeSpecPath(child);
   }
+
   return node.segment;
 };
 
@@ -366,11 +388,13 @@ const validateOrphanImpls = Effect.fnUntraced(function* (
     implFiles,
     Effect.fnUntraced(function* (implRelativePath: string) {
       const specRelativePath = yield* specPathForImpl(implRelativePath);
+
       if (specPaths.has(specRelativePath)) {
         return;
       }
 
       const specAbsolutePath = path.join(confectDirectory, specRelativePath);
+
       if (!(yield* fs.exists(specAbsolutePath))) {
         return yield* new MissingSpecFileError({
           implPath: implRelativePath,
@@ -391,6 +415,7 @@ const removeLegacyFiles = Effect.gen(function* () {
     legacyPaths,
     Effect.fnUntraced(function* (relativePath: string) {
       const absolutePath = path.join(confectDirectory, relativePath);
+
       if (yield* fs.exists(absolutePath)) {
         yield* removePathIfExists(absolutePath);
         yield* logFileRemoved(absolutePath);
@@ -431,24 +456,29 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
     leaves,
     Effect.fnUntraced(function* (leaf: LeafModule) {
       const registryRelativePath = yield* registeredFunctionsRelativePath(leaf);
+
       const registryPath = path.join(
         confectDirectory,
         "_generated",
         registryRelativePath,
       );
+
       const registryDir = path.dirname(registryPath);
       const fs = yield* FileSystem.FileSystem;
+
       if (!(yield* fs.exists(registryDir))) {
         yield* fs.makeDirectory(registryDir, { recursive: true });
       }
 
       const implRelativePath = yield* implPathForSpec(leaf.relativePath);
+
       const schemaImportPath = yield* toModuleImportPath(
         path.relative(
           path.dirname(registryPath),
           path.join(confectDirectory, "_generated", "schema.ts"),
         ),
       );
+
       // The group's own leaf spec (sibling of its impl), referenced
       // type-only by the registry to shape its returned record.
       const specImportPath = yield* toModuleImportPath(
@@ -457,6 +487,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
           path.join(confectDirectory, leaf.relativePath),
         ),
       );
+
       const implImportPath = yield* toModuleImportPath(
         path.relative(
           path.dirname(registryPath),
@@ -496,6 +527,7 @@ const removeObsoleteRegisteredFunctions = Effect.fnUntraced(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
+
   const registryRoot = path.join(
     confectDirectory,
     "_generated",
@@ -517,16 +549,20 @@ const removeObsoleteRegisteredFunctions = Effect.fnUntraced(function* (
     if (path.extname(relativePath) !== ".ts") {
       return Effect.void;
     }
+
     const normalized = path.join("registeredFunctions", relativePath);
+
     if (!expected.has(normalized)) {
       return Effect.gen(function* () {
         const absolutePath = path.join(registryRoot, relativePath);
+
         if (yield* fs.exists(absolutePath)) {
           yield* removePathIfExists(absolutePath);
           yield* logFileRemoved(absolutePath);
         }
       });
     }
+
     return Effect.void;
   });
 });
@@ -535,6 +571,7 @@ const getGeneratedSpecPath = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
   const generatedSpecPath = yield* GENERATED_SPEC_PATH;
+
   return path.join(confectDirectory, generatedSpecPath);
 });
 
@@ -598,6 +635,7 @@ const removeGeneratedNodeApi = removeObsoleteGeneratedFile("nodeApi.ts");
 
 const generateFunctionModules = Effect.gen(function* () {
   const spec = yield* loadGeneratedSpec;
+
   return yield* generateFunctions(spec);
 });
 
@@ -657,9 +695,11 @@ const tableModuleBindings = Effect.fnUntraced(function* (
         generatedTablesDirname,
         `${tableModule.tableName}.ts`,
       );
+
       const importPath = yield* toModuleImportPath(
         path.relative(generatedDir, wrapperAbsolutePath),
       );
+
       return {
         importPath,
         tableName: tableModule.tableName,
@@ -680,6 +720,7 @@ const generateIdConstructor = Effect.fnUntraced(function* (
     tableModules,
     (tableModule) => tableModule.tableName,
   );
+
   const contents = yield* templates.id({ tableNames });
 
   yield* writeFileStringAndLog(idPath, contents);
@@ -706,17 +747,21 @@ const generateTableWrappers = Effect.fnUntraced(function* (
         generatedTablesDirname,
         `${tableModule.tableName}.ts`,
       );
+
       const unnamedAbsolutePath = path.join(
         confectDirectory,
         tableModule.relativePath,
       );
+
       const unnamedImportPath = yield* toModuleImportPath(
         path.relative(path.dirname(wrapperPath), unnamedAbsolutePath),
       );
+
       const contents = yield* templates.tableWrapper({
         tableName: tableModule.tableName,
         unnamedImportPath,
       });
+
       yield* writeFileStringAndLog(wrapperPath, contents);
     }),
     { concurrency: "unbounded" },
@@ -744,20 +789,24 @@ const removeObsoleteTableWrappers = Effect.fnUntraced(function* (
   const expected = new Set(
     Array.map(tableModules, (tableModule) => `${tableModule.tableName}.ts`),
   );
+
   const existing = yield* fs.readDirectory(wrappersDir, { recursive: true });
   yield* Effect.forEach(existing, (entry) => {
     if (path.extname(entry) !== ".ts") {
       return Effect.void;
     }
+
     if (!expected.has(entry)) {
       return Effect.gen(function* () {
         const absolutePath = path.join(wrappersDir, entry);
+
         if (yield* fs.exists(absolutePath)) {
           yield* removePathIfExists(absolutePath);
           yield* logFileRemoved(absolutePath);
         }
       });
     }
+
     return Effect.void;
   });
 });
@@ -782,6 +831,7 @@ const generateConvexSchema = Effect.fnUntraced(function* (
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
   const generatedConvexSchemaPath = yield* GENERATED_CONVEX_SCHEMA_PATH;
+
   const convexSchemaPath = path.join(
     confectDirectory,
     generatedConvexSchemaPath,
@@ -800,6 +850,7 @@ const generateConvexSchemaReexport = Effect.gen(function* () {
   const generatedConvexSchemaRelativePath = yield* GENERATED_CONVEX_SCHEMA_PATH;
 
   const convexSchemaPath = path.join(convexDirectory, "schema.ts");
+
   const generatedConvexSchemaPath = path.join(
     confectDirectory,
     generatedConvexSchemaRelativePath,
@@ -824,6 +875,7 @@ const generateServices = Effect.gen(function* () {
 
   const servicesPath = path.join(confectGeneratedDirectory, "services.ts");
   const generatedSchemaPath = yield* GENERATED_SCHEMA_PATH;
+
   const schemaImportPath = yield* toModuleImportPath(
     path.relative(
       path.dirname(servicesPath),
@@ -875,6 +927,7 @@ const generateDocs = Effect.fnUntraced(function* (
 
   const docsPath = path.join(confectGeneratedDirectory, "docs.ts");
   const generatedSchemaPath = yield* GENERATED_SCHEMA_PATH;
+
   const schemaImportPath = yield* toModuleImportPath(
     path.relative(
       path.dirname(docsPath),
@@ -929,6 +982,7 @@ export const generateComponents = Effect.gen(function* () {
     confectDirectory,
     GENERATED_DIRNAME,
   );
+
   const generatedComponentsPath = yield* GENERATED_COMPONENTS_PATH;
   const componentsPath = path.join(confectDirectory, generatedComponentsPath);
 

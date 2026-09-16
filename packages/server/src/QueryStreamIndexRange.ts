@@ -51,6 +51,7 @@ type Interval = Data.TaggedEnum<{
   Upper: { readonly upper: Endpoint };
   Between: { readonly lower: Endpoint; readonly upper: Endpoint };
 }>;
+
 const Interval = Data.taggedEnum<Interval>();
 
 interface Constraints {
@@ -130,37 +131,46 @@ export interface LowerBoundedBuilder<
   ) => QueryStreamIndexRange<FieldPaths>;
 }
 
-const make = (constraints: Constraints): QueryStreamIndexRange => ({
+const make = <
+  RemainingFieldPaths extends ReadonlyArray<string> = ReadonlyArray<string>,
+>(
+  constraints: Constraints,
+): QueryStreamIndexRange<RemainingFieldPaths> => ({
   [TypeId]: {
     ...constraints,
-    _Remaining: identity as Types.Covariant<ReadonlyArray<string>>,
+    _Remaining: identity,
   },
 });
 
-const makeBuilder = (
+const makeBuilder = <
+  ConvexDoc extends GenericDocument,
+  FieldPaths extends ReadonlyArray<string>,
+>(
   equalities: ReadonlyArray<Equality>,
-): Builder<GenericDocument, ReadonlyArray<string>> => {
+): Builder<ConvexDoc, FieldPaths> => {
   const upper =
     (inclusive: boolean) =>
     (fieldPath: string, value: QueryStreamOrderKey.KeyValue) =>
-      make({
+      make<FieldPaths>({
         equalities,
         bounded: Option.some({
           fieldPath,
           interval: Interval.Upper({ upper: { value, inclusive } }),
         }),
       });
+
   const lower =
     (inclusive: boolean) =>
     (
       fieldPath: string,
       value: QueryStreamOrderKey.KeyValue,
-    ): LowerBoundedBuilder<GenericDocument, ReadonlyArray<string>> => {
+    ): LowerBoundedBuilder<ConvexDoc, FieldPaths> => {
       const endpoint = { value, inclusive };
+
       const finish =
         (upperInclusive: boolean) =>
         (_fieldPath: string, upperValue: QueryStreamOrderKey.KeyValue) =>
-          make({
+          make<FieldPaths>({
             equalities,
             bounded: Option.some({
               fieldPath,
@@ -170,8 +180,9 @@ const makeBuilder = (
               }),
             }),
           });
+
       return {
-        ...make({
+        ...make<FieldPaths>({
           equalities,
           bounded: Option.some({
             fieldPath,
@@ -182,10 +193,13 @@ const makeBuilder = (
         lte: finish(true),
       };
     };
+
   return {
-    ...make({ equalities, bounded: Option.none() }),
+    ...make<FieldPaths>({ equalities, bounded: Option.none() }),
     eq: (fieldPath, value) =>
-      makeBuilder(Array.append(equalities, { fieldPath, value })),
+      makeBuilder<ConvexDoc, Tail<FieldPaths>>(
+        Array.append(equalities, { fieldPath, value }),
+      ),
     gt: lower(false),
     gte: lower(true),
     lt: upper(false),
@@ -201,8 +215,7 @@ const makeBuilder = (
 export const builder = <
   ConvexDoc extends GenericDocument,
   FieldPaths extends ReadonlyArray<string>,
->(): Builder<ConvexDoc, FieldPaths> =>
-  makeBuilder([]) as unknown as Builder<ConvexDoc, FieldPaths>;
+>(): Builder<ConvexDoc, FieldPaths> => makeBuilder<ConvexDoc, FieldPaths>([]);
 
 /**
  * Number of index fields pinned by equality constraints.
@@ -244,7 +257,8 @@ export const apply = (
   q: ConvexIndexRangeBuilder<GenericDocument, string[]>,
 ): ConvexIndexRange => {
   const { equalities, bounded } = self[TypeId];
-  // Convex tracks equality progress through a static field tuple. These paths
+
+  // SAFETY: Convex tracks equality progress through a static field tuple. These paths
   // are runtime data; the range model owns their ordering. Its runtime builder
   // supports further equality calls, even when the SDK type has lost the tuple.
   const prefix = Array.reduce(
@@ -252,6 +266,7 @@ export const apply = (
     q as ConvexRangeBuilder,
     (target, { fieldPath, value }) => target.eq(fieldPath, value),
   );
+
   return Option.match(bounded, {
     onNone: () => prefix,
     onSome: ({ fieldPath, interval }) => {
@@ -260,11 +275,13 @@ export const apply = (
         endpoint: Endpoint,
       ): ConvexUpperBoundBuilder =>
         target[endpoint.inclusive ? "gte" : "gt"](fieldPath, endpoint.value);
+
       const upper = (
         target: ConvexUpperBoundBuilder,
         endpoint: Endpoint,
       ): ConvexIndexRange =>
         target[endpoint.inclusive ? "lte" : "lt"](fieldPath, endpoint.value);
+
       return Interval.$match(interval, {
         Lower: ({ lower: endpoint }) => lower(prefix, endpoint),
         Upper: ({ upper: endpoint }) => upper(prefix, endpoint),
@@ -371,9 +388,11 @@ export const fromBounds = (
     const lowerIndexEntries = QueryStreamIndexPrefix.entries(
       yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.lower.orderKey),
     );
+
     const upperIndexEntries = QueryStreamIndexPrefix.entries(
       yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.upper.orderKey),
     );
+
     // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
     // upper inclusive at `k`—the half-open (k, k]—both cut at
     // successor(k).
@@ -389,6 +408,7 @@ export const fromBounds = (
       ),
       Array.length,
     );
+
     const equalities = pipe(
       Array.take(lowerIndexEntries, commonLength),
       Array.map(([fieldPath, value]) => ({ fieldPath, value })),
@@ -398,6 +418,7 @@ export const fromBounds = (
       Array.drop(lowerIndexEntries, commonLength),
       bounds.lower.inclusive ? "gte" : "gt",
     );
+
     const upper = peelBound(
       Array.drop(upperIndexEntries, commonLength),
       bounds.upper.inclusive ? "lte" : "lt",
@@ -406,6 +427,7 @@ export const fromBounds = (
     const startRanges = Array.map(lower.peeled, ({ indexEntries, tag }) =>
       rangeFor(equalities, indexEntries, tag),
     );
+
     const endRanges = Array.reverse(
       Array.map(upper.peeled, ({ indexEntries, tag }) =>
         rangeFor(equalities, indexEntries, tag),
@@ -414,8 +436,10 @@ export const fromBounds = (
 
     const { indexEntries: lowerFinalIndexEntries, tag: lowerFinalTag } =
       lower.final;
+
     const { indexEntries: upperFinalIndexEntries, tag: upperFinalTag } =
       upper.final;
+
     const middleRange =
       Array.isReadonlyArrayNonEmpty(lowerFinalIndexEntries) &&
       Array.isReadonlyArrayNonEmpty(upperFinalIndexEntries)
@@ -443,6 +467,7 @@ export const fromBounds = (
       Array.appendAll(startRanges, Array.of(middleRange)),
       endRanges,
     );
+
     return order === "desc" ? Array.reverse(ranges) : ranges;
   });
 
@@ -453,10 +478,12 @@ export const toBounds = (self: QueryStreamIndexRange): IndexBounds => {
   const { equalities, bounded } = self[TypeId];
   const orderKey = Array.map(equalities, (equality) => equality.value);
   const unbounded = { orderKey, inclusive: true };
+
   const endpoint = ({ value, inclusive }: Endpoint) => ({
     orderKey: Array.append(orderKey, value),
     inclusive,
   });
+
   return Option.match(bounded, {
     onNone: () => ({ lower: unbounded, upper: unbounded }),
     onSome: ({ interval }) =>

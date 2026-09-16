@@ -86,21 +86,29 @@ export const decideChangesetAction = Effect.fn(
         "A changeset cannot be pending, released, and retracted on main at the same time.",
     });
   }
+
   if (publicSurfaceChanged && !effectiveContentChanged) {
     return yield* new InvalidChangesetState({
       reason:
         "A public-surface change must also be an effective content change.",
     });
   }
+
   if (retractedOnMain && prereleasedOnTarget)
     return "review-prereleased-retraction" as const;
+
   if (prereleasedOnTarget) return "already-prereleased" as const;
+
   if (pendingOnMain) return "carry-pending" as const;
+
   if (retractedOnMain) return "remove-retracted-pending" as const;
+
   if (releasedOnMain && effectiveContentChanged)
     return "document-released-change" as const;
+
   if (!pendingOnMain && !releasedOnMain && publicSurfaceChanged)
     return "review-unversioned-public-change" as const;
+
   return "no-changeset" as const;
 });
 
@@ -109,13 +117,17 @@ const changesetIds = Effect.fn("PrereleaseSync.changesetIds")(function* (
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+
   if (!(yield* fs.exists(directory))) return new Set<string>();
   const ids = new Set<string>();
+
   for (const name of yield* fs.readDirectory(directory)) {
     if (!name.endsWith(".md")) continue;
     const info = yield* fs.stat(path.join(directory, name));
+
     if (info.type === "File") ids.add(name.slice(0, -3));
   }
+
   return ids;
 });
 
@@ -126,6 +138,7 @@ export const findDuplicateChangesets = Effect.fn(
   const directory = path.resolve(repository, ".changeset");
   const pending = yield* changesetIds(directory);
   const prereleased = yield* changesetIds(path.join(directory, "pre"));
+
   return [...pending]
     .filter((id) => prereleased.has(id))
     .sort((left, right) => left.localeCompare(right));
@@ -136,9 +149,11 @@ const inspectGit = Effect.fn("PrereleaseSync.inspectGit")(function* (
   args: ReadonlyArray<string>,
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+
   const handle = yield* spawner.spawn(
     ChildProcess.make("git", args, { cwd: repository, stdin: "ignore" }),
   );
+
   return yield* Effect.all(
     {
       exitCode: handle.exitCode,
@@ -156,8 +171,11 @@ export const isAncestor = Effect.fn("PrereleaseSync.isAncestor")(function* (
 ) {
   const args = ["merge-base", "--is-ancestor", ancestor, descendant];
   const result = yield* inspectGit(repository, args);
+
   if (result.exitCode === 0) return true;
+
   if (result.exitCode === 1) return false;
+
   return yield* new GitInspectionError({
     repository,
     args,
@@ -179,8 +197,10 @@ export const auditPrereleaseSync = Effect.fn("PrereleaseSync.audit")(
     repository = ".",
   }: AuditOptions = {}) {
     const duplicates = yield* findDuplicateChangesets(repository);
+
     if (duplicates.length > 0)
       return yield* new DuplicateChangesets({ repository, ids: duplicates });
+
     if (!(yield* isAncestor(mainRef, headRef, repository)))
       return yield* new MissingMainAncestry({ repository, mainRef, headRef });
   },
@@ -191,10 +211,13 @@ const readArgument = Effect.fn("PrereleaseSync.readArgument")(function* (
   name: string,
 ) {
   const index = args.indexOf(name);
+
   if (index === -1) return undefined;
   const value = args[index + 1];
+
   if (!value || value.startsWith("--"))
     return yield* new MissingArgumentValue({ argument: name });
+
   return value;
 });
 
@@ -205,6 +228,7 @@ export const auditPrereleaseSyncMain = Effect.fn("PrereleaseSync.main")(
     yield* auditPrereleaseSync({ mainRef, headRef });
     const gitArgs = ["rev-parse", "--short", mainRef];
     const result = yield* inspectGit(".", gitArgs);
+
     if (result.exitCode !== 0)
       return yield* new GitInspectionError({
         repository: ".",

@@ -10,6 +10,7 @@ import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
  * items as needed.
  */
 export interface RegistryItems {
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- This registry stores heterogeneous function and middleware entries that are refined at their consumption boundary.
   readonly [key: string]: unknown;
 }
 

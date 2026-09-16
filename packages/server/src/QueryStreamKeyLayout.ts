@@ -27,6 +27,7 @@ export type Segment = Data.TaggedEnum<{
 }>;
 
 const Segment = Data.taggedEnum<Segment>();
+
 const TypeId = "@confect/server/QueryStreamKeyLayout";
 
 /**
@@ -172,7 +173,9 @@ export function fromIndex(
   ) {
     return Result.fail(new InvalidEqualityPrefixError({ fieldPaths, eqCount }));
   }
+
   const labels = Array.drop(fieldPaths, eqCount);
+
   const componentSegments: ReadonlyArray<Segment> = Option.exists(
     Array.last(fieldPaths),
     (fieldPath) => fieldPath === "_id",
@@ -186,6 +189,7 @@ export function fromIndex(
         ],
       })
     : [Segment.WithImplicitId({ labels: QueryStreamKeyLabels.make(labels) })];
+
   return Result.succeed(make(componentSegments));
 }
 
@@ -213,6 +217,7 @@ export const format = (self: QueryStreamKeyLayout): string => {
     Array.map(QueryStreamKeyLabels.toArray(labels), (label) =>
       JSON.stringify(label),
     );
+
   const tokens = Array.flatMap(
     segments(self),
     Segment.$match({
@@ -221,6 +226,7 @@ export const format = (self: QueryStreamKeyLayout): string => {
       Explicit: ({ labels }) => quoteLabels(labels),
     }),
   );
+
   return `[${Array.join(tokens, ", ")}]`;
 };
 
@@ -271,6 +277,7 @@ const visiblePositions = (
       (_, index) => offset + index,
     ),
   ]);
+
   return Array.flatten(groups);
 };
 
@@ -300,6 +307,7 @@ export const resolvePrefix = (
   prefixLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
 ): Result.Result<number, InvalidLabelPrefixError> => {
   const labels = visibleLabels(self);
+
   return Option.match(QueryStreamKeyLabels.stripPrefix(labels, prefixLabels), {
     onNone: () =>
       Result.fail(new InvalidLabelPrefixError({ labels, prefixLabels })),
@@ -308,6 +316,7 @@ export const resolvePrefix = (
         visiblePositions(self),
         QueryStreamKeyLabels.size(labels) - QueryStreamKeyLabels.size(rest),
       );
+
       return Result.succeed(
         Option.match(Array.last(prefix), {
           onNone: () => 0,
@@ -369,12 +378,14 @@ export const rename = <ReplacementLabels extends ReadonlyArray<string>>(
         })),
       ),
   );
+
   const parsed = consumed.pipe(
     Option.filter(({ rest }) => QueryStreamKeyLabels.size(rest) === 0),
     Option.map(({ segments: componentSegments }) =>
       make<Types.Mutable<ReplacementLabels>>(componentSegments),
     ),
   );
+
   return Result.fromOption(
     parsed,
     () =>

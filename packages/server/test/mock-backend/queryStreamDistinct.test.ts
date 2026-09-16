@@ -29,6 +29,7 @@ const insert = Effect.fnUntraced(function* (
   rows: ReadonlyArray<readonly [text: string, tag: string]>,
 ) {
   const writer = yield* DatabaseWriter;
+
   for (const [text, tag] of rows) {
     yield* writer.table("notes").insert({ text, tag });
   }
@@ -46,6 +47,7 @@ const fixture = Effect.gen(function* () {
   const reader = yield* DatabaseReader;
   const source = reader.table("notes").stream("by_text");
   const rows = yield* Stream.runCollect(source);
+
   return { reader, source, rows };
 });
 
@@ -92,16 +94,20 @@ const pageTags = Effect.fnUntraced(function* <
 ) {
   const pages: Array<Array<string | undefined>> = [];
   let cursor: string | null = null;
+
   for (let index = 0; index < 20; index++) {
     const result: QueryStream.PaginationResult<Doc> =
       yield* QueryStream.paginate(stream, { numItems, cursor });
+
     if (result.page.length > 0) {
       pages.push(result.page.map((row) => row.tag));
     }
+
     if (result.isDone) return pages;
     expect(result.continueCursor).not.toBe(cursor);
     cursor = result.continueCursor;
   }
+
   return expect.unreachable("Pagination did not finish within 20 pages");
 });
 
@@ -152,6 +158,7 @@ describe("QueryStream distinct representatives", () => {
             .table("notes")
             .stream("by_text", (q) => q.gt("text", "z"))
             .pipe(QueryStream.distinct([]));
+
           expect(yield* tags(empty)).toEqual([]);
           expect(yield* pageTags(QueryStream.reverse(empty))).toEqual([]);
         }),
@@ -164,9 +171,11 @@ describe("QueryStream distinct representatives", () => {
         const { source } = yield* fixture;
         const distinct = source.pipe(QueryStream.distinct(["text"]));
         const forward = yield* Stream.runCollect(distinct);
+
         const backward = yield* Stream.runCollect(
           QueryStream.reverse(distinct),
         );
+
         const twice = yield* Stream.runCollect(
           distinct.pipe(QueryStream.reverse, QueryStream.reverse),
         );
@@ -187,10 +196,12 @@ describe("QueryStream distinct representatives", () => {
       run(
         Effect.gen(function* () {
           const { source } = yield* fixture;
+
           const last = source.pipe(
             QueryStream.reverse,
             QueryStream.distinct(["text"]),
           );
+
           expect(yield* tags(last)).toEqual(["c1", "b2", "a3"]);
           expect(yield* tags(QueryStream.reverse(last))).toEqual([
             "a3",
@@ -223,13 +234,16 @@ describe("QueryStream distinct representatives", () => {
       run(
         Effect.gen(function* () {
           const { source } = yield* fixture;
+
           const plain = source.pipe(
             QueryStream.filter((row) => row.tag === "a1"),
           );
+
           const distinct = source.pipe(
             QueryStream.filter((row) => row.tag !== "a1"),
             QueryStream.distinct(["text"]),
           );
+
           const merged = QueryStream.merge([plain, distinct]);
 
           expect(yield* pageTags(merged)).toEqual([
@@ -348,6 +362,7 @@ describe("QueryStream distinct representatives", () => {
           const { reader, rows } = yield* fixture;
           const a2 = rows.find((row) => row.tag === "a2");
           assert(a2 !== undefined);
+
           const distinct = reader
             .table("notes")
             .stream("by_text", (q) => q.gte("text", "a").lte("text", "b"))
@@ -380,10 +395,12 @@ describe("QueryStream distinct representatives", () => {
       run(
         Effect.gen(function* () {
           const { source } = yield* fixture;
+
           const selected = source.pipe(
             QueryStream.filterEffect((row) => Effect.succeed(row.tag !== "a1")),
             QueryStream.distinct(["text"]),
           );
+
           const filtered = selected.pipe(
             QueryStream.filter((row) => row.tag !== "b1"),
           );
@@ -408,12 +425,14 @@ describe("QueryStream distinct representatives", () => {
       run(
         Effect.gen(function* () {
           const { source } = yield* fixture;
+
           const nested = source.pipe(
             QueryStream.distinct(["text", "_creationTime"]),
             QueryStream.distinct(["text"]),
             QueryStream.renameKey(["label", "created"]),
             QueryStream.distinct(["label"]),
           );
+
           expect(yield* tags(nested)).toEqual(["a1", "b1", "c1"]);
           expect(yield* pageTags(QueryStream.reverse(nested))).toEqual([
             ["c1"],
@@ -436,6 +455,7 @@ describe("QueryStream distinct representatives", () => {
             ["x2", "none"],
             ["x2", "b"],
           ]);
+
           const joined = reader
             .table("notes")
             .stream("by_text", (q) => q.gte("text", "x"))
@@ -482,6 +502,7 @@ describe("QueryStream distinct representatives", () => {
             ["x2", "b"],
             ["x3", "none"],
           ]);
+
           const joined = reader
             .table("notes")
             .stream("by_text", (q) => q.gte("text", "x"))
@@ -521,14 +542,17 @@ describe("QueryStream distinct representatives", () => {
           const { source, rows } = yield* fixture;
           const writer = yield* DatabaseWriter;
           const distinct = source.pipe(QueryStream.distinct(["text"]));
+
           const first = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: null,
           });
+
           const second = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: first.continueCursor,
           });
+
           const a1 = rows.find((row) => row.tag === "a1");
           assert(a1 !== undefined);
           yield* writer.table("notes").delete(a1._id);
@@ -538,11 +562,13 @@ describe("QueryStream distinct representatives", () => {
             cursor: null,
             endCursor: first.continueCursor,
           });
+
           const secondReplay = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: first.continueCursor,
             endCursor: second.continueCursor,
           });
+
           expect(firstReplay.page.map((row) => row.tag)).toEqual([]);
           expect(secondReplay.page.map((row) => row.tag)).toEqual(["a2", "b1"]);
           expect(firstReplay.continueCursor).toBe(first.continueCursor);
@@ -557,22 +583,28 @@ describe("QueryStream distinct representatives", () => {
       run(
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
+
           const earlier = yield* writer
             .table("notes")
             .insert({ text: "0", tag: "earlier" });
+
           const { reader } = yield* fixture;
+
           const distinct = reader
             .table("notes")
             .stream("by_text", (q) => q.gte("text", "a"))
             .pipe(QueryStream.distinct(["text"]));
+
           const first = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: null,
           });
+
           const second = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: first.continueCursor,
           });
+
           yield* writer.table("notes").patch(earlier, { text: "a" });
 
           const firstReplay = yield* QueryStream.paginate(distinct, {
@@ -580,11 +612,13 @@ describe("QueryStream distinct representatives", () => {
             cursor: null,
             endCursor: first.continueCursor,
           });
+
           const secondReplay = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: first.continueCursor,
             endCursor: second.continueCursor,
           });
+
           expect(firstReplay.page.map((row) => row.tag)).toEqual(["earlier"]);
           expect(secondReplay.page.map((row) => row.tag)).toEqual(["b1"]);
           expect(firstReplay.continueCursor).toBe(first.continueCursor);
@@ -600,18 +634,22 @@ describe("QueryStream distinct representatives", () => {
         Effect.gen(function* () {
           const { reader } = yield* fixture;
           const writer = yield* DatabaseWriter;
+
           const distinct = reader
             .table("notes")
             .stream("by_text", "desc")
             .pipe(QueryStream.distinct(["text"]));
+
           const first = yield* QueryStream.paginate(distinct, {
             numItems: 2,
             cursor: null,
           });
+
           const second = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: first.continueCursor,
           });
+
           expect(first.page.map((row) => row.tag)).toEqual(["c1", "b2"]);
           expect(second.page.map((row) => row.tag)).toEqual(["a3"]);
           yield* writer.table("notes").insert({ text: "b", tag: "b3" });
@@ -621,11 +659,13 @@ describe("QueryStream distinct representatives", () => {
             cursor: null,
             endCursor: first.continueCursor,
           });
+
           const secondReplay = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: first.continueCursor,
             endCursor: second.continueCursor,
           });
+
           expect(firstReplay.page.map((row) => row.tag)).toEqual(["c1", "b3"]);
           expect(secondReplay.page.map((row) => row.tag)).toEqual(["a3"]);
           expect(firstReplay.continueCursor).toBe(first.continueCursor);
@@ -642,14 +682,17 @@ describe("QueryStream distinct read budgets", () => {
       run(
         Effect.gen(function* () {
           const { source } = yield* fixture;
+
           const distinct = source.pipe(
             QueryStream.distinct(["text"]),
             QueryStream.reverse,
           );
+
           const first = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: null,
           });
+
           expect(first.page.map((row) => row.tag)).toEqual(["c1"]);
 
           const exhausted = yield* QueryStream.paginate(distinct, {
@@ -658,6 +701,7 @@ describe("QueryStream distinct read budgets", () => {
             endCursor: first.continueCursor,
             maximumRowsRead: 2,
           }).pipe(Effect.result);
+
           assert(Result.isFailure(exhausted));
           assert(
             Schema.is(QueryStream.ReadBudgetExceededError)(exhausted.failure),
@@ -670,6 +714,7 @@ describe("QueryStream distinct read budgets", () => {
             endCursor: first.continueCursor,
             maximumRowsRead: 3,
           });
+
           expect(enough.page.map((row) => row.tag)).toEqual(["c1"]);
           expect(enough.continueCursor).toBe(first.continueCursor);
           expect(enough.isDone).toBe(false);
@@ -689,6 +734,7 @@ describe("QueryStream distinct read budgets", () => {
             Effect.gen(function* () {
               const { source, rows } = yield* fixture;
               expect(rows.length).toBeGreaterThan(1);
+
               for (const placement of [
                 "mapped",
                 "mappedThenDistinct",
@@ -698,6 +744,7 @@ describe("QueryStream distinct read budgets", () => {
                 const releaseMapper = yield* Deferred.make<void>();
                 const upstreamDone = yield* Deferred.make<void>();
                 const observations = yield* Ref.make<ReadonlyArray<string>>([]);
+
                 const upstream = observeUpstreamEnd(
                   placement === "distinctThenMapped"
                     ? source.pipe(QueryStream.distinct(["text"]))
@@ -710,6 +757,7 @@ describe("QueryStream distinct read budgets", () => {
                     yield* Deferred.succeed(upstreamDone, undefined);
                   }),
                 );
+
                 const mapped = upstream.pipe(
                   QueryStream.mapEffect(
                     (row) =>
@@ -720,20 +768,24 @@ describe("QueryStream distinct read budgets", () => {
                           ...events,
                           "mapped-complete",
                         ]);
+
                         return row;
                       }),
                     { concurrency },
                   ),
                 );
+
                 const stream =
                   placement === "mappedThenDistinct"
                     ? mapped.pipe(QueryStream.distinct(["text"]))
                     : mapped;
+
                 const pagination = yield* QueryStream.paginate(stream, {
                   numItems: 1,
                   cursor: null,
                   maximumRowsRead: 1,
                 }).pipe(Effect.forkScoped);
+
                 yield* Deferred.await(mapperStarted);
                 yield* Deferred.await(upstreamDone);
                 expect(yield* Ref.get(observations)).toEqual(["source-limit"]);
@@ -762,10 +814,12 @@ describe("QueryStream distinct read budgets", () => {
               const releaseMapper = yield* Deferred.make<void>();
               const upstreamDone = yield* Deferred.make<void>();
               const observations = yield* Ref.make<ReadonlyArray<string>>([]);
+
               const upstream = source.pipe(
                 QueryStream.distinct(["text"]),
                 QueryStream.reverse,
               );
+
               const stream = observeUpstreamEnd(
                 upstream,
                 Effect.gen(function* () {
@@ -785,16 +839,19 @@ describe("QueryStream distinct read budgets", () => {
                         ...events,
                         "mapped-complete",
                       ]);
+
                       return row;
                     }),
                   { concurrency },
                 ),
               );
+
               const pagination = yield* QueryStream.paginate(stream, {
                 numItems: 1,
                 cursor: null,
                 maximumRowsRead: 2,
               }).pipe(Effect.forkScoped);
+
               yield* Deferred.await(mapperStarted);
               yield* Deferred.await(upstreamDone);
               expect(yield* Ref.get(observations)).toEqual(["source-limit"]);
@@ -819,15 +876,18 @@ describe("QueryStream distinct read budgets", () => {
       run(
         Effect.gen(function* () {
           const { source } = yield* fixture;
+
           const distinct = source.pipe(
             QueryStream.distinct(["text"]),
             QueryStream.reverse,
           );
+
           const result = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: null,
             maximumRowsRead: 1,
           }).pipe(Effect.result);
+
           assert(Result.isFailure(result));
           expect(result.failure).toBeInstanceOf(
             QueryStream.ReadBudgetExceededError,
@@ -848,10 +908,12 @@ describe("QueryStream distinct read budgets", () => {
           const { source, rows } = yield* fixture;
           const c1 = rows.find((row) => row.tag === "c1");
           assert(c1 !== undefined && c1.tag !== undefined);
+
           const result = yield* QueryStream.paginate(
             source.pipe(QueryStream.distinct(["text"]), QueryStream.reverse),
             { numItems: 1, cursor: null, maximumBytesRead: 1 },
           ).pipe(Effect.result);
+
           assert(Result.isFailure(result));
           assert(
             Schema.is(QueryStream.ReadBudgetExceededError)(result.failure),
@@ -875,6 +937,7 @@ describe("QueryStream distinct read budgets", () => {
       run(
         Effect.gen(function* () {
           const { reader } = yield* fixture;
+
           const distinct = reader
             .table("notes")
             .stream("by_text", (q) => q.gte("text", "a").lte("text", "a"))
@@ -883,11 +946,13 @@ describe("QueryStream distinct read budgets", () => {
               QueryStream.distinct(["text"]),
               QueryStream.reverse,
             );
+
           const result = yield* QueryStream.paginate(distinct, {
             numItems: 1,
             cursor: null,
             maximumRowsRead: 3,
           }).pipe(Effect.result);
+
           assert(Result.isFailure(result));
           assert(
             Schema.is(QueryStream.ReadBudgetExceededError)(result.failure),
@@ -899,6 +964,7 @@ describe("QueryStream distinct read budgets", () => {
             cursor: null,
             maximumRowsRead: 4,
           });
+
           expect(enough.page.map((row) => row.tag)).toEqual(["a3"]);
         }),
       ),
@@ -910,23 +976,28 @@ describe("QueryStream distinct read budgets", () => {
       run(
         Effect.gen(function* () {
           const { source } = yield* fixture;
+
           const distinct = source.pipe(
             QueryStream.distinct(["text"]),
             QueryStream.reverse,
           );
+
           const partial = yield* QueryStream.paginate(distinct, {
             numItems: 3,
             cursor: null,
             maximumRowsRead: 3,
           });
+
           expect(partial.page.map((row) => row.tag)).toEqual(["c1"]);
           expect(partial.isDone).toBe(false);
           expect(partial.pageStatus).toBe("SplitRequired");
           expect(partial.splitCursor).toBeDefined();
+
           const rest = yield* QueryStream.paginate(distinct, {
             numItems: 3,
             cursor: partial.continueCursor,
           });
+
           expect(rest.page.map((row) => row.tag)).toEqual(["b1", "a1"]);
           expect(rest.isDone).toBe(true);
         }),
@@ -937,14 +1008,17 @@ describe("QueryStream distinct read budgets", () => {
     run(
       Effect.gen(function* () {
         const { reader } = yield* fixture;
+
         const first = reader
           .table("notes")
           .stream("by_text", (q) => q.gte("text", "a").lte("text", "a"))
           .pipe(QueryStream.distinct(["text"]));
+
         const second = reader
           .table("notes")
           .stream("by_text", (q) => q.gte("text", "b").lte("text", "b"))
           .pipe(QueryStream.distinct(["text"]));
+
         const result = yield* QueryStream.paginate(
           QueryStream.merge([first, second]),
           {
@@ -953,6 +1027,7 @@ describe("QueryStream distinct read budgets", () => {
             maximumRowsRead: 1,
           },
         ).pipe(Effect.result);
+
         assert(Result.isFailure(result));
         assert(Schema.is(QueryStream.ReadBudgetExceededError)(result.failure));
         expect(result.failure.rowsRead).toBe(1);
@@ -967,6 +1042,7 @@ describe("QueryStream distinct read budgets", () => {
         Effect.gen(function* () {
           const { reader } = yield* fixture;
           yield* insert([["x", "a"]]);
+
           const joined = reader
             .table("notes")
             .stream("by_text", (q) => q.gte("text", "x"))
@@ -989,11 +1065,13 @@ describe("QueryStream distinct read budgets", () => {
                 },
               ),
             );
+
           const result = yield* QueryStream.paginate(joined, {
             numItems: 1,
             cursor: null,
             maximumRowsRead: 1,
           }).pipe(Effect.result);
+
           assert(Result.isFailure(result));
           assert(
             Schema.is(QueryStream.ReadBudgetExceededError)(result.failure),
@@ -1005,6 +1083,7 @@ describe("QueryStream distinct read budgets", () => {
             cursor: null,
             maximumRowsRead: 2,
           });
+
           expect(enough.page.map((row) => row.tag)).toEqual(["a1"]);
         }),
       ),

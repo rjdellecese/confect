@@ -31,8 +31,7 @@ const queryOnce = <R extends Ref.AnyPublicQuery>(
   ...args: Ref.OptionalArgs<R>
 ): Effect.Effect<Ref.Returns<R>, ConvexQueryError> =>
   Effect.tryPromise({
-    try: () =>
-      client.query(Ref.getFunctionReference(ref), (args[0] ?? {}) as never),
+    try: () => client.query(Ref.getFunctionReference(ref), args[0] ?? {}),
     catch: (error) =>
       new ConvexQueryError({ message: `query failed: ${String(error)}` }),
   });
@@ -50,6 +49,7 @@ const captureAcrossEvictionWindow = Effect.fnUntraced(function* <
   const initial = yield* queryOnce(client, ref, ...args);
   yield* Effect.sleep(SLEEP_PAST_CACHE);
   const afterMaxCacheAge = yield* queryOnce(client, ref, ...args);
+
   return { initial, afterMaxCacheAge };
 });
 
@@ -67,6 +67,7 @@ layer(LocalBackend.layer, {
           yield* captureAcrossEvictionWindow(
             refs.public.groups.cacheControl.control,
           );
+
         expect(initial).not.toBe(afterMaxCacheAge);
       }),
     30_000,
@@ -77,6 +78,7 @@ layer(LocalBackend.layer, {
       const { initial, afterMaxCacheAge } = yield* captureAcrossEvictionWindow(
         refs.public.groups.cacheStubbed.confectNoTime,
       );
+
       expect(initial).toBe(afterMaxCacheAge);
     }),
   );
@@ -89,6 +91,7 @@ layer(LocalBackend.layer, {
           yield* captureAcrossEvictionWindow(
             refs.public.groups.cacheStubbed.confectWithRawDateNow,
           );
+
         expect(initial).not.toBe(afterMaxCacheAge);
       }),
   );
@@ -101,6 +104,7 @@ layer(LocalBackend.layer, {
           yield* captureAcrossEvictionWindow(
             refs.public.groups.cacheStubbed.confectWithClock,
           );
+
         expect(initial).not.toBe(afterMaxCacheAge);
       }),
   );
@@ -110,6 +114,7 @@ layer(LocalBackend.layer, {
       const { initial, afterMaxCacheAge } = yield* captureAcrossEvictionWindow(
         refs.public.groups.cacheStubbed.confectWithSpan,
       );
+
       expect(initial).toBe(afterMaxCacheAge);
     }),
   );
@@ -119,6 +124,7 @@ layer(LocalBackend.layer, {
       const { initial, afterMaxCacheAge } = yield* captureAcrossEvictionWindow(
         refs.public.groups.cacheStubbed.confectWithLog,
       );
+
       expect(initial).toBe(afterMaxCacheAge);
     }),
   );

@@ -168,10 +168,7 @@ export const make = <
     Object.fromEntries(
       MiddlewareSpec.allFunctionTypes
         .filter((functionType) => middlewareSpec.functionTypes[functionType])
-        .map((functionType) => [
-          functionType,
-          impl as MiddlewareSpec.AnyMiddlewareImpl,
-        ]),
+        .map((functionType) => [functionType, impl]),
     ),
   );
 
@@ -200,10 +197,7 @@ export const makeByFunctionType = <
     >;
   },
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
-  layerFromImpls(
-    middlewareSpec,
-    impls as MiddlewareRegistryItem.MiddlewareRegistryItem["impls"],
-  );
+  layerFromImpls(middlewareSpec, impls);
 
 /**
  * Sugar over {@link make} for the flagship "run something, provide a service"
@@ -214,13 +208,13 @@ export const makeByFunctionType = <
 export const provides = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
-  Shape,
+  Service,
 >(
   databaseSchema: DatabaseSchema_,
   middlewareSpec: MiddlewareSpec_,
-  tag: Context.Key<MiddlewareSpec.Provides<MiddlewareSpec_>, Shape>,
+  tag: Context.Key<MiddlewareSpec.Provides<MiddlewareSpec_>, Service>,
   effect: Effect.Effect<
-    Shape,
+    Service,
     MiddlewareSpec.Error<MiddlewareSpec_>,
     | CommonServices<
         DatabaseSchema_,
@@ -229,5 +223,6 @@ export const provides = <
     | MiddlewareSpec.Requires<MiddlewareSpec_>
   >,
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
-  make(databaseSchema, middlewareSpec, ((handlerEffect: Effect.Effect<any>) =>
-    Effect.provideServiceEffect(handlerEffect, tag, effect)) as any);
+  make(databaseSchema, middlewareSpec, (handlerEffect) =>
+    Effect.provideServiceEffect(handlerEffect, tag, effect),
+  );

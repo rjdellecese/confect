@@ -21,6 +21,7 @@ describe("Table", () => {
       const unnamedWithIndex = Table.make(lazyFields).index("by_text", [
         "text",
       ]);
+
       expect(Table.isUnnamedTable(unnamedWithIndex)).toBe(true);
       expect(Table.isTable(unnamedWithIndex)).toBe(false);
     });
@@ -35,9 +36,7 @@ describe("Table", () => {
 
     it("the unnamed callable still has Function.prototype.name and that does not confuse the predicate", () => {
       const unnamed = Table.make(lazyFields);
-      expect(typeof (unnamed as unknown as { name: unknown }).name).toBe(
-        "string",
-      );
+      expect(unnamed.name).toEqual(expect.any(String));
       expect(Table.isUnnamedTable(unnamed)).toBe(true);
     });
 
@@ -56,10 +55,13 @@ describe("Table", () => {
     // Each test gets its own counter + thunk so the call count is isolated.
     const makeInstrumented = () => {
       const calls = { count: 0 };
+
       const lazyFields = () => {
         calls.count += 1;
+
         return Schema.Struct({ text: Schema.String });
       };
+
       return { calls, lazyFields };
     };
 

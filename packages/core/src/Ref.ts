@@ -10,8 +10,10 @@ import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
+import * as Data from "effect/Data";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
@@ -146,6 +148,7 @@ export type AnyPaginatedQuery = AnyQuery &
   Base<
     RuntimeAndFunctionType.AnyQuery,
     FunctionVisibility,
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- This erased paginated-ref constraint permits arbitrary user args; each concrete ref retains its own argument contract.
     {
       [key: string]: any;
       paginationOpts: PaginationOptions;
@@ -334,12 +337,13 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
 ): FromFunctionSpec<FunctionSpec_> => {
   const convexFunctionName = `${convexFunctionNamespace}:${functionSpec.name}`;
 
+  // SAFETY: Both branches preserve the spec's provenance and runtime schemas; the remaining Ref fields are type-only witnesses derived from that same spec.
   return Match.value(functionSpec.functionProvenance).pipe(
     Match.tag(
       "Convex",
       (): Any =>
-        ({
-          _tag: "Convex",
+        // SAFETY: A native Convex ref stores only its tag and name; its argument, return, runtime, and visibility fields are phantom witnesses.
+        Object.assign(Data.taggedEnum<{ readonly _tag: "Convex" }>().Convex(), {
           convexFunctionName,
         }) as Any,
     ),
@@ -359,10 +363,13 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
 
       Lazy.defineProperty(ref, "args", () => provenance.args);
       Lazy.defineProperty(ref, "returns", () => provenance.returns);
+
       if ("error" in provenance) {
         Lazy.defineProperty(ref, "error", () => provenance.error);
       }
 
+      // SAFETY: args, returns, and optional error have been installed as lazy getters above; all other missing Confect fields are type-only witnesses.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Lazy.defineProperty installed the schema getters above; TypeScript cannot track them or the remaining phantom witnesses.
       return ref as unknown as Any;
     }),
     Match.exhaustive,
@@ -380,13 +387,16 @@ export const getFunctionReference = <Ref_ extends Any>(
   const convexFunctionName = getConvexFunctionName(ref);
 
   const cached = functionReferenceCache.get(convexFunctionName);
+
   if (cached !== undefined) {
+    // SAFETY: Convex references contain only the function name at runtime; the cache is keyed by that exact name from ref.
     return cached as FunctionReference<Ref_>;
   }
 
   const functionReference = makeFunctionReference(convexFunctionName);
   functionReferenceCache.set(convexFunctionName, functionReference);
 
+  // SAFETY: makeFunctionReference used this ref's name; its generic argument and return fields are phantom witnesses supplied by Ref_.
   return functionReference as FunctionReference<Ref_>;
 };
 
@@ -418,19 +428,21 @@ export const encodeArgs = <Ref_ extends Any>(
 
 export const decodeReturns = <Ref_ extends Any>(
   ref: Ref_,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Confect refs decode this raw value with their schema; native Convex refs retain their transport contract.
   returns: unknown,
 ): Effect.Effect<Returns<Ref_>, Schema.SchemaError> =>
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
       Schema.decodeUnknownEffect(confectRef.returns)(returns),
     ),
-    Match.tag("Convex", () => Effect.succeed(returns as Returns<Ref_>)),
+    Match.tag("Convex", () => Effect.succeed(returns)),
     Match.exhaustive,
   );
 
 export const encodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The encoded representation depends on the selected ref codec and may differ from decoded Args.
 ): unknown =>
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
@@ -442,8 +454,10 @@ export const encodeArgsSync = <Ref_ extends Any>(
 
 export const decodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Confect refs decode these raw args with their schema; native Convex refs retain their transport contract.
   encodedArgs: unknown,
 ): Args<Ref_> =>
+  // SAFETY: Confect args are decoded by their own schema; native Convex args are already validated by Convex. Match erases the association between Ref_ and the branch's args type.
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
       Schema.decodeUnknownSync(confectRef.args)(encodedArgs),
@@ -455,6 +469,7 @@ export const decodeArgsSync = <Ref_ extends Any>(
 export const encodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   returns: Returns<Ref_>,
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The selected ref codec determines the wire representation, which need not resemble the decoded returns.
 ): unknown =>
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
@@ -466,8 +481,10 @@ export const encodeReturnsSync = <Ref_ extends Any>(
 
 export const decodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Confect refs decode these raw returns with their schema; native Convex refs retain their transport contract.
   encodedReturns: unknown,
 ): Returns<Ref_> =>
+  // SAFETY: Confect returns are decoded by their own schema; native Convex returns retain their transport contract. Match erases the association between Ref_ and its result type.
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
       Schema.decodeUnknownSync(confectRef.returns)(encodedReturns),
@@ -480,9 +497,7 @@ const ConvexErrorIdentifier = Symbol.for("ConvexError");
 
 export const isConvexError = (error: unknown): error is ConvexError<Value> =>
   error instanceof ConvexError ||
-  (typeof error === "object" &&
-    error !== null &&
-    ConvexErrorIdentifier in error);
+  (Predicate.isObjectOrArray(error) && ConvexErrorIdentifier in error);
 
 /**
  * Build a callback-style handler that decodes the ref's typed error from a
@@ -494,16 +509,20 @@ export const isConvexError = (error: unknown): error is ConvexError<Value> =>
  * `runWithCodec` provides.
  */
 export const decodeErrorOrElse =
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The fallback must receive any rejection the typed error decoder does not recognize, without narrowing it prematurely.
   <Ref_ extends Any, E>(ref: Ref_, mapUnknownError: (error: unknown) => E) =>
-  (error: unknown): Error<Ref_> | E => {
-    if (isConvexError(error)) {
-      const decoded = decodeErrorOption(ref, error.data);
-      if (Option.isSome(decoded)) {
-        return decoded.value;
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Transport rejections are untrusted until the Convex-error guard and ref error decoder classify them.
+    (error: unknown): Error<Ref_> | E => {
+      if (isConvexError(error)) {
+        const decoded = decodeErrorOption(ref, error.data);
+
+        if (Option.isSome(decoded)) {
+          return decoded.value;
+        }
       }
-    }
-    return mapUnknownError(error);
-  };
+
+      return mapUnknownError(error);
+    };
 
 const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
   Match.value(ref).pipe(
@@ -514,6 +533,7 @@ const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
           : []),
         ...MiddlewareSpec.errorSchemas(confectRef.middlewareSpecs),
       ];
+
       return schemas.length === 0
         ? Option.none<Schema.Codec<any, any>>()
         : Option.some(
@@ -535,14 +555,13 @@ const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
  */
 export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The ref's optional error schema validates this untrusted error payload.
   encodedError: unknown,
 ): Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError> =>
   Option.match(errorSchemaOf(ref), {
     onNone: () => Effect.succeed(Option.none<Error<Ref_>>()),
     onSome: (schema) =>
-      Effect.asSome(
-        Schema.decodeUnknownEffect(schema)(encodedError),
-      ) as Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError>,
+      Effect.asSome(Schema.decodeUnknownEffect(schema)(encodedError)),
   });
 
 /**
@@ -561,14 +580,11 @@ export const decodeError = <Ref_ extends Any>(
  */
 export const decodeErrorOption = <Ref_ extends Any>(
   ref: Ref_,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The ref's optional error schema validates this untrusted error payload.
   encodedError: unknown,
 ): Option.Option<Error<Ref_>> =>
-  Option.flatMap(
-    errorSchemaOf(ref),
-    (schema) =>
-      Schema.decodeUnknownOption(schema)(encodedError) as Option.Option<
-        Error<Ref_>
-      >,
+  Option.flatMap(errorSchemaOf(ref), (schema) =>
+    Schema.decodeUnknownOption(schema)(encodedError),
   );
 
 const missingPaginatedProvenanceError = (ref: Any) =>
@@ -605,6 +621,7 @@ export const encodePaginatedQueryArgsSync = <
 >(
   ref: Ref_,
   args: Omit<Args<Ref_>, "paginationOpts">,
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The paginated ref codec determines the encoded user-args representation.
 ): unknown =>
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
@@ -621,6 +638,7 @@ export const encodePaginatedQueryArgsSync = <
  */
 export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
   ref: Ref_,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Confect refs decode this raw page with their item schema; native Convex refs retain their transport contract.
   encodedPage: unknown,
 ): Returns<Ref_>["page"] =>
   Match.value<Any>(ref).pipe(
@@ -629,7 +647,7 @@ export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
     ),
     Match.tag("Convex", () => encodedPage),
     Match.exhaustive,
-  ) as Returns<Ref_>["page"];
+  );
 
 /**
  * Encode args via the ref's args schema, invoke `call`, decode returns via the
@@ -647,12 +665,17 @@ export const runWithCodec = Effect.fnUntraced(function* <
   args: Args<Ref_>,
   call: (
     functionReference: FunctionReference<Ref_>,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This raw transport callback receives the selected ref codec's encoded representation, not decoded Args.
     encodedArgs: unknown,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- The transport cannot promise decoded returns; decodeReturns applies the selected ref's decoding policy afterward.
   ) => PromiseLike<unknown>,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The adapter must preserve arbitrary transport rejections that do not match the ref's typed error schema.
   mapUnknownError?: (error: unknown) => E,
 ): Effect.fn.Return<Returns<Ref_>, E | Error<Ref_> | Schema.SchemaError> {
   const functionReference = getFunctionReference(ref);
+
   const invoke = (
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This transport boundary receives encoded args from the ref codec immediately below.
     encodedArgs: unknown,
   ): Effect.Effect<unknown, Error<Ref_> | E> =>
     Effect.tryPromise({
@@ -660,18 +683,22 @@ export const runWithCodec = Effect.fnUntraced(function* <
       catch: (error): Error<Ref_> | E => {
         if (isConvexError(error)) {
           const decoded = decodeErrorOption(ref, error.data);
+
           if (Option.isSome(decoded)) {
             return decoded.value;
           }
         }
+
         if (mapUnknownError !== undefined) {
           return mapUnknownError(error);
         }
+
         throw error;
       },
     });
 
   const encodedArgs = yield* encodeArgs(ref, args);
   const encodedReturns = yield* invoke(encodedArgs);
+
   return yield* decodeReturns(ref, encodedReturns);
 });

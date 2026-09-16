@@ -38,14 +38,17 @@ export const resolve = (
     ),
     (error) => new Error(MiddlewareAttachment.formatValidationError(error)),
   );
+
   return functionRegistryItem.middlewareAttachments.map(
     ({ spec: middlewareSpec, options }) => {
       const registered = middlewareRegistryItems.get(middlewareSpec.key);
+
       if (registered === undefined) {
         throw new Error(
           `Middleware "${middlewareSpec.key}" is attached to this group's spec, but no implementation was provided—pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,
         );
       }
+
       if (registered.middlewareSpec !== middlewareSpec) {
         throw new Error(
           `Middleware "${middlewareSpec.key}" attached to function "${functionRegistryItem.name}" has an implementation registered for a different spec with the same key. Register the implementation using the attached middleware spec.`,
@@ -54,6 +57,7 @@ export const resolve = (
 
       const middlewareImpl =
         registered.impls[functionRegistryItem.functionType];
+
       if (middlewareImpl === undefined) {
         throw new Error(
           `Middleware "${middlewareSpec.key}" has no implementation for function type "${functionRegistryItem.functionType}", the type of function "${functionRegistryItem.name}". Declare the function type in the middleware's \`functionTypes\` and cover it in \`MiddlewareImpl.makeByFunctionType\`.`,

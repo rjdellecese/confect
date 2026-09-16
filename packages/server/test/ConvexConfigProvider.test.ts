@@ -7,11 +7,13 @@ import * as ConvexConfigProvider from "@confect/server/ConvexConfigProvider";
 // oxlint-disable effecttsgo/process-env -- This harness must manipulate the real environment to test Convex's non-enumerable process.env provider.
 const replaceEnv = (key: string, value: string | undefined): (() => void) => {
   const previous = process.env[key];
+
   if (value === undefined) {
     delete process.env[key];
   } else {
     process.env[key] = value;
   }
+
   return () => {
     if (previous === undefined) {
       delete process.env[key];
@@ -53,6 +55,7 @@ layer(ConvexConfigProvider.layer)("ConvexConfigProvider", (it) => {
         const value = yield* Config.String("NESTED").pipe(
           Config.nested("CONFECT_TEST"),
         );
+
         expect(value).toBe("value");
       }),
     ),
@@ -68,11 +71,13 @@ layer(ConvexConfigProvider.layer)("ConvexConfigProvider", (it) => {
           const option = yield* Config.option(
             Config.String("CONFECT_TEST_EMPTY"),
           );
+
           expect(Option.isNone(option)).toBe(true);
 
           const value = yield* Config.String("CONFECT_TEST_EMPTY").pipe(
             Config.withDefault("fallback"),
           );
+
           expect(value).toBe("fallback");
         }),
       ),
@@ -86,6 +91,7 @@ layer(ConvexConfigProvider.layer)("ConvexConfigProvider", (it) => {
         const option = yield* Config.option(
           Config.String("CONFECT_TEST_UNSET"),
         );
+
         expect(Option.isNone(option)).toBe(true);
       }),
     ),

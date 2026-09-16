@@ -33,10 +33,11 @@ const functionsEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(
     `import registeredFunctions from "${registeredFunctionsImportPath}";`,
   );
-  yield* cbw.newLine();
-  yield* Effect.forEach(functionNames, (name) =>
-    cbw.writeLine(`export const ${name} = registeredFunctions.${name};`),
-  );
+
+  for (const name of functionNames) {
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export const ${name} = registeredFunctions.${name};`);
+  }
 
   return yield* cbw.toString();
 });
@@ -234,6 +235,7 @@ const idEffect = Effect.fnUntraced(function* ({
     tableNames.length === 0
       ? "never"
       : tableNames.map((n) => `"${n}"`).join(" | ");
+
   yield* cbw.writeLine(`export type TableNames = ${union};`);
   yield* cbw.blankLine();
 
@@ -373,6 +375,7 @@ const componentsEffect = Effect.fnUntraced(function* ({
     );
     yield* cbw.writeLine(`};`);
   }
+
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(
@@ -435,6 +438,7 @@ const docsEffect = Effect.fnUntraced(function* ({
   // would trip `noUnusedLocals`.
   if (tables.length === 0) {
     yield* cbw.writeLine(`export interface Docs {}`);
+
     return yield* cbw.toString();
   }
 
@@ -449,6 +453,7 @@ const docsEffect = Effect.fnUntraced(function* ({
       `export type ${docName} = Document.Document<typeof schemaDefinition, "${tableName}">;`,
     );
   }
+
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(`export interface Docs {`);
@@ -516,9 +521,11 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   // imports. Typing from the leaf spec (not the project-wide assembled spec)
   // keeps the registry's type dependent solely on its own group.
   const specType = `typeof import("${specImportPath}")["default"]`;
+
   const makeFn = useNode
     ? "RegisteredNodeFunction.make"
     : "RegisteredConvexFunction.make";
+
   yield* cbw.writeLine(
     `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
   );
@@ -836,6 +843,7 @@ const assembledSpecEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   yield* cbw.write(`const spec: `);
+
   if (nodes.length === 0) {
     yield* cbw.write(`Spec.Spec`);
   } else {
@@ -852,6 +860,7 @@ const assembledSpecEffect = Effect.fnUntraced(function* ({
     );
     yield* cbw.write(`}>`);
   }
+
   // The assembled spec is runtime-agnostic: a Node group's `makeNode()` is
   // already baked into its imported leaf spec, so the root is always
   // `Spec.make()` and binding-less container groups always use

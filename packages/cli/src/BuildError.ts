@@ -1,13 +1,41 @@
 import * as Schema from "effect/Schema";
-import type * as esbuild from "esbuild";
 
 // --- Variants ---
+
+const EsbuildLocation = Schema.NullOr(
+  Schema.Struct({
+    file: Schema.String,
+    namespace: Schema.String,
+    line: Schema.Finite,
+    column: Schema.Finite,
+    length: Schema.Finite,
+    lineText: Schema.String,
+    suggestion: Schema.String,
+  }),
+);
+
+const EsbuildMessages = Schema.mutable(
+  Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      pluginName: Schema.String,
+      text: Schema.String,
+      location: EsbuildLocation,
+      notes: Schema.mutable(
+        Schema.Array(
+          Schema.Struct({ text: Schema.String, location: EsbuildLocation }),
+        ),
+      ),
+      detail: Schema.Unknown,
+    }),
+  ),
+);
 
 export class BundleFailedError extends Schema.TaggedError<BundleFailedError>()(
   "BundleFailedError",
   {
     file: Schema.String,
-    errors: Schema.Array(Schema.Unknown),
+    errors: Schema.declare(Schema.is(EsbuildMessages)),
   },
 ) {}
 
@@ -20,6 +48,7 @@ export class ImportFailedError extends Schema.TaggedError<ImportFailedError>()(
 ) {}
 
 export const BuildError = Schema.Union([BundleFailedError, ImportFailedError]);
+
 export type BuildError = typeof BuildError.Type;
 
 export const isBuildError = (error: unknown): error is BuildError =>
@@ -39,11 +68,9 @@ export class BundlerError extends Schema.TaggedError<BundlerError>()(
   },
 ) {}
 
-const isEsbuildBuildFailure = (error: unknown): error is esbuild.BuildFailure =>
-  typeof error === "object" &&
-  error !== null &&
-  "errors" in error &&
-  globalThis.Array.isArray((error as esbuild.BuildFailure).errors);
+const isEsbuildBuildFailure = Schema.is(
+  Schema.Struct({ errors: EsbuildMessages }),
+);
 
 export const fromBundlerError = (
   file: string,

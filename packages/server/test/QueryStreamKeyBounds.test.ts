@@ -13,23 +13,29 @@ const admits =
     const layout = Result.getOrThrow(
       Layout.fromIndex(Array.from({ length: values.length }, () => "_id")),
     );
+
     // An empty explicit layout has no implicit ID.
     const actualLayout =
       values.length === 0
         ? Result.getOrThrow(Layout.fromIndex(["_id"], 1))
         : layout;
+
     const key = Result.getOrThrow(Key.complete(actualLayout, values));
+
     const bounds = Result.getOrThrow(
       QueryStreamKeyBounds.parse(actualLayout, {
         lower: side === "lower" ? bound : Option.none(),
         upper: side === "upper" ? bound : Option.none(),
       }),
     );
+
     return side === "lower"
       ? QueryStreamKeyBounds.admittedByLower(bounds.lower)(key)
       : QueryStreamKeyBounds.admittedByUpper(bounds.upper)(key);
   };
+
 const admittedByLower = admits("lower");
+
 const admittedByUpper = admits("upper");
 
 describe("QueryStreamKeyBounds", () => {
@@ -55,6 +61,7 @@ describe("QueryStreamKeyBounds", () => {
       { orderKey: ["b"], inclusive: true },
       { orderKey: [], inclusive: false },
     ];
+
     for (const [leftIndex, lower] of lowerBounds.entries()) {
       for (const [rightIndex, right] of lowerBounds.entries()) {
         const upper = { orderKey: right.orderKey, inclusive: !right.inclusive };
@@ -62,7 +69,9 @@ describe("QueryStreamKeyBounds", () => {
           leftIndex >= rightIndex,
         );
       }
+
       const upper = { orderKey: lower.orderKey, inclusive: !lower.inclusive };
+
       for (const [orderKey, position] of [
         [["a", 1], 2.5],
         [["a", 2], 4.5],
@@ -81,6 +90,7 @@ describe("QueryStreamKeyBounds", () => {
     "detects empty equal-key ranges with inclusive=%s lower bounds",
     (inclusive) => {
       const lower = { orderKey: ["a"], inclusive };
+
       for (const upperInclusive of [true, false]) {
         const upper = { orderKey: ["a"], inclusive: upperInclusive };
         expect(QueryStreamKeyBounds.isEmpty({ lower, upper })).toBe(
@@ -96,10 +106,12 @@ describe("QueryStreamKeyBounds", () => {
       const bound = Option.some({ orderKey: ["b"], inclusive });
       const lower = admittedByLower(bound);
       const upper = admittedByUpper(bound);
+
       for (const orderKey of [["b"], ["b", 0], ["b", 99, "id"]]) {
         expect(lower(orderKey)).toBe(inclusive);
         expect(upper(orderKey)).toBe(inclusive);
       }
+
       expect(lower(["a", 99])).toBe(false);
       expect(lower(["c", 0])).toBe(true);
       expect(upper(["a", 99])).toBe(true);
@@ -117,6 +129,7 @@ describe("QueryStreamKeyBounds", () => {
         expect(admittedByUpper(bound)(orderKey)).toBe(true);
       }
     }
+
     const excluded = Option.some({ orderKey: [], inclusive: false });
     expect(admittedByLower(excluded)(["a"])).toBe(false);
     expect(admittedByUpper(excluded)(["a"])).toBe(false);
@@ -127,6 +140,7 @@ describe("QueryStreamKeyBounds", () => {
     const exclusive = { orderKey: ["a"], inclusive: false };
     const extension = { orderKey: ["a", 1], inclusive: true };
     const later = { orderKey: ["b"], inclusive: true };
+
     for (const [first, second, lower, upper] of [
       [inclusive, exclusive, exclusive, exclusive],
       [inclusive, extension, extension, extension],
@@ -138,6 +152,7 @@ describe("QueryStreamKeyBounds", () => {
       expect(QueryStreamKeyBounds.tightestUpper(first, second)).toBe(upper);
       expect(QueryStreamKeyBounds.tightestUpper(second, first)).toBe(upper);
     }
+
     const equal = { ...inclusive };
     expect(QueryStreamKeyBounds.tightestLower(inclusive, equal)).toBe(
       inclusive,
@@ -157,6 +172,7 @@ describe("QueryStreamKeyBounds", () => {
         { lower: none, upper: none },
       ),
     ).toEqual({ lower: none, upper: none });
+
     for (const [left, right] of [
       [none, first],
       [first, none],
@@ -165,12 +181,15 @@ describe("QueryStreamKeyBounds", () => {
         { lower: left, upper: left },
         { lower: right, upper: right },
       );
+
       expect(result).toEqual({ lower: first, upper: first });
+
       if (Option.isNone(left)) {
         expect(result.lower).toBe(first);
         expect(result.upper).toBe(first);
       }
     }
+
     for (const [left, right] of [
       [first, second],
       [second, first],
@@ -182,6 +201,7 @@ describe("QueryStreamKeyBounds", () => {
         ),
       ).toEqual({ lower: second, upper: first });
     }
+
     expect(
       QueryStreamKeyBounds.intersect(
         { lower: first, upper: none },
@@ -195,10 +215,12 @@ describe("QueryStreamKeyBounds", () => {
       lower: Option.some({ orderKey: [1], inclusive: true }),
       upper: Option.some({ orderKey: [5], inclusive: true }),
     });
+
     const second = Object.freeze({
       lower: Option.some({ orderKey: [2], inclusive: false }),
       upper: Option.some({ orderKey: [4], inclusive: false }),
     });
+
     expect(QueryStreamKeyBounds.intersect(first, second)).toEqual(second);
     expect(QueryStreamKeyBounds.intersect(second, first)).toEqual(second);
   });
@@ -208,20 +230,24 @@ describe("QueryStreamKeyBounds", () => {
       lower: { orderKey: [1], inclusive: true },
       upper: { orderKey: [5], inclusive: true },
     });
+
     const second = Object.freeze({
       lower: { orderKey: [2], inclusive: false },
       upper: { orderKey: [4], inclusive: false },
     });
+
     expect(QueryStreamKeyBounds.intersectIndexBounds(first, second)).toEqual(
       second,
     );
     expect(QueryStreamKeyBounds.intersectIndexBounds(second, first)).toEqual(
       second,
     );
+
     const disjoint = {
       lower: { orderKey: [6], inclusive: true },
       upper: { orderKey: [7], inclusive: true },
     };
+
     expect(QueryStreamKeyBounds.intersectIndexBounds(first, disjoint)).toEqual({
       lower: disjoint.lower,
       upper: first.upper,
@@ -237,7 +263,9 @@ describe("QueryStreamKeyBounds", () => {
 
   it("requires at least one NarrowBounds endpoint", () => {
     type Bound = QueryStreamKeyBounds.KeyBound;
+
     type Narrow = QueryStreamKeyBounds.NarrowBounds;
+
     expectTypeOf<{ start: Bound }>().toExtend<Narrow>();
     expectTypeOf<{ end: Bound }>().toExtend<Narrow>();
     expectTypeOf<{ start: Bound; end: Bound }>().toExtend<Narrow>();

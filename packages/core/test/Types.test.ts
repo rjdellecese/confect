@@ -160,6 +160,7 @@ describe("DeepMutable", () => {
     type BrandedString = number & Brand.Brand<"BrandedString">;
 
     type Actual = DeepMutable<BrandedString>;
+
     type Expected = BrandedString;
 
     expectTypeOf<Actual>().toEqualTypeOf<Expected>();
@@ -219,10 +220,12 @@ describe("IsRecord", () => {
     });
 
     test("Record<string, any>", () => {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The broad dictionary is the IsRecord input under test, not a production value contract.
       expectTypeOf<IsRecord<Record<string, any>>>().toEqualTypeOf<true>();
     });
 
     test("Record<string, unknown>", () => {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The broad dictionary is the IsRecord input under test, not a production value contract.
       expectTypeOf<IsRecord<Record<string, unknown>>>().toEqualTypeOf<true>();
     });
 
@@ -342,11 +345,13 @@ describe("IsRecord", () => {
   describe("false for mixed value types", () => {
     test("Record with mixed values should be false", () => {
       type MixedRecord = { [key: string]: string } & { foo: number };
+
       expectTypeOf<IsRecord<MixedRecord>>().toEqualTypeOf<false>();
     });
 
     test("intersection with specific key", () => {
       type IntersectionType = Record<string, string> & { specificKey: boolean };
+
       expectTypeOf<IsRecord<IntersectionType>>().toEqualTypeOf<false>();
     });
   });
@@ -358,11 +363,13 @@ describe("IsRecord", () => {
 
     test("Record<string, string> & { extraProp: number }", () => {
       type IntersectedRecord = Record<string, string> & { extraProp: number };
+
       expectTypeOf<IsRecord<IntersectedRecord>>().toEqualTypeOf<false>();
     });
 
     test("union of Records", () => {
       type UnionRecord = Record<string, string> | Record<string, number>;
+
       expectTypeOf<IsRecord<UnionRecord>>().toEqualTypeOf<false>();
     });
 
@@ -376,11 +383,13 @@ describe("IsRecursive", () => {
   describe("recursive types", () => {
     test("union", () => {
       type RecursiveUnion = number | { next: RecursiveUnion };
+
       expectTypeOf<IsRecursive<RecursiveUnion>>().toEqualTypeOf<true>();
     });
 
     test("array union", () => {
       type RecursiveArrayUnion = number | RecursiveArrayUnion[];
+
       expectTypeOf<IsRecursive<RecursiveArrayUnion>>().toEqualTypeOf<true>();
     });
 
@@ -390,11 +399,13 @@ describe("IsRecursive", () => {
 
     test("map", () => {
       type RecursiveMap = Map<string, RecursiveMap>;
+
       expectTypeOf<IsRecursive<RecursiveMap>>().toEqualTypeOf<true>();
     });
 
     test("set", () => {
       type RecursiveSet = Set<number | RecursiveSet>;
+
       expectTypeOf<IsRecursive<RecursiveSet>>().toEqualTypeOf<true>();
     });
 
@@ -406,6 +417,7 @@ describe("IsRecursive", () => {
         | null
         | JSONValue[]
         | { [key: string]: JSONValue };
+
       expectTypeOf<IsRecursive<JSONValue>>().toEqualTypeOf<true>();
     });
 
@@ -415,6 +427,7 @@ describe("IsRecursive", () => {
         | string
         | NestedUnionArray[]
         | { data: NestedUnionArray };
+
       expectTypeOf<IsRecursive<NestedUnionArray>>().toEqualTypeOf<true>();
     });
 
@@ -422,7 +435,9 @@ describe("IsRecursive", () => {
       type TreeNode = {
         children: TreeChildren;
       };
+
       type TreeChildren = TreeNode[];
+
       expectTypeOf<IsRecursive<TreeNode>>().toEqualTypeOf<true>();
     });
 
@@ -434,11 +449,13 @@ describe("IsRecursive", () => {
           };
         };
       };
+
       expectTypeOf<IsRecursive<DeepNest>>().toEqualTypeOf<true>();
     });
 
     test("recursive tuple type", () => {
       type RecursiveTuple = [string, RecursiveTuple?];
+
       expectTypeOf<IsRecursive<RecursiveTuple>>().toEqualTypeOf<true>();
     });
 
@@ -446,7 +463,9 @@ describe("IsRecursive", () => {
       type Recursive<T> = {
         [K in keyof T]: T[K] | Recursive<T>;
       };
+
       type Test = Recursive<{ a: string; b: number }>;
+
       expectTypeOf<IsRecursive<Test>>().toEqualTypeOf<true>();
     });
   });
@@ -454,11 +473,13 @@ describe("IsRecursive", () => {
   describe("non-recursive types", () => {
     test("simple union", () => {
       type SimpleUnion = number | string;
+
       expectTypeOf<IsRecursive<SimpleUnion>>().toEqualTypeOf<false>();
     });
 
     test("array union", () => {
       type ArrayUnion = number | string[];
+
       expectTypeOf<IsRecursive<ArrayUnion>>().toEqualTypeOf<false>();
     });
 
@@ -472,6 +493,7 @@ describe("IsRecursive", () => {
 
     test("branded string", () => {
       type BrandedString = string & Brand.Brand<"BrandedString">;
+
       expectTypeOf<IsRecursive<BrandedString>>().toEqualTypeOf<false>();
     });
 
@@ -481,11 +503,13 @@ describe("IsRecursive", () => {
 
     test("empty object", () => {
       type EmptyObject = {};
+
       expectTypeOf<IsRecursive<EmptyObject>>().toEqualTypeOf<false>();
     });
 
     test("empty array", () => {
       type EmptyArray = [];
+
       expectTypeOf<IsRecursive<EmptyArray>>().toEqualTypeOf<false>();
     });
 
@@ -496,6 +520,7 @@ describe("IsRecursive", () => {
     test("recursive with any", () => {
       // oxlint-disable-next-line typescript/no-redundant-type-constituents -- Exercises TypeScript's union normalization.
       type RecursiveWithAny = any | { next: RecursiveWithAny };
+
       expectTypeOf<IsRecursive<RecursiveWithAny>>().toEqualTypeOf<false>();
     });
 
@@ -523,6 +548,7 @@ describe("IsRecursive", () => {
         e: readonly [string, number];
         f: Map<string, Set<number>>;
       };
+
       expectTypeOf<IsRecursive<Complex>>().toEqualTypeOf<false>();
     });
 
@@ -531,25 +557,31 @@ describe("IsRecursive", () => {
         value: T;
         wrapped: { inner: T };
       };
+
       expectTypeOf<IsRecursive<Generic<string>>>().toEqualTypeOf<false>();
     });
 
     test("recursive with unknown", () => {
       // oxlint-disable-next-line typescript/no-redundant-type-constituents -- Exercises TypeScript's intersection normalization.
       type RecursiveWithUnknown = unknown & { next: RecursiveWithUnknown };
+
       expectTypeOf<IsRecursive<RecursiveWithUnknown>>().toEqualTypeOf<true>();
     });
 
     test("recursive with never", () => {
       // oxlint-disable-next-line typescript/no-redundant-type-constituents -- Exercises TypeScript's union normalization.
       type RecursiveWithNever = never | { next: RecursiveWithNever };
+
       expectTypeOf<IsRecursive<RecursiveWithNever>>().toEqualTypeOf<true>();
     });
 
     test("indirect recursion through multiple types", () => {
       type A = { b: B };
+
       type B = { c: C };
+
       type C = { a: A };
+
       expectTypeOf<IsRecursive<A>>().toEqualTypeOf<true>();
     });
   });

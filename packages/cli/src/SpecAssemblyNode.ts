@@ -36,10 +36,12 @@ const assemblyNodesAtDepth = (
         groupLeaves,
         (leaf) => leaf.pathSegments.length === depth + 1,
       );
+
       const descendants = Array.filter(
         groupLeaves,
         (leaf) => leaf.pathSegments.length > depth + 1,
       );
+
       return {
         segment,
         importBinding: Option.map(terminal, importBindingFromLeaf),

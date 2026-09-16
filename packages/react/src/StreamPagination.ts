@@ -25,11 +25,13 @@ import * as Array from "effect/Array";
 import * as Option from "effect/Option";
 import { pipe } from "effect/Function";
 import * as Record from "effect/Record";
+import * as Data from "effect/Data";
+import * as Predicate from "effect/Predicate";
 
 /**
  * The `paginationOpts` one subscribed page queries with.
  */
-export interface PageRequest {
+export type PageRequest = {
   readonly numItems: number;
   readonly cursor: string | null;
   /**
@@ -42,7 +44,7 @@ export interface PageRequest {
    */
   readonly maximumRowsRead?: number;
   readonly maximumBytesRead?: number;
-}
+};
 
 /**
  * The per-page read budgets every growing page is requested with.
@@ -59,16 +61,17 @@ const growingRequest = (
   numItems: number,
   cursor: string | null,
   budget: ReadBudget,
-): PageRequest => ({
-  numItems,
-  cursor,
-  ...(budget.maximumRowsRead === undefined
-    ? {}
-    : { maximumRowsRead: budget.maximumRowsRead }),
-  ...(budget.maximumBytesRead === undefined
-    ? {}
-    : { maximumBytesRead: budget.maximumBytesRead }),
-});
+): PageRequest => {
+  const request = { numItems, cursor };
+
+  if (budget.maximumRowsRead !== undefined)
+    Object.assign(request, { maximumRowsRead: budget.maximumRowsRead });
+
+  if (budget.maximumBytesRead !== undefined)
+    Object.assign(request, { maximumBytesRead: budget.maximumBytesRead });
+
+  return request;
+};
 
 export interface State {
   readonly nextPageKey: number;
@@ -130,7 +133,9 @@ export const pin =
         ) {
           return state;
         }
+
         const pinnedKey = String(state.nextPageKey);
+
         return {
           nextPageKey: state.nextPageKey + 1,
           pageKeys: state.pageKeys,
@@ -165,6 +170,7 @@ export const loadMore =
             // The last page is already pinned (the usual case, since pages
             // pin themselves on first load): just append a new growing page.
             const nextKey = String(state.nextPageKey);
+
             return {
               nextPageKey: state.nextPageKey + 1,
               pageKeys: Array.append(state.pageKeys, nextKey),
@@ -176,8 +182,10 @@ export const loadMore =
               ongoingSplits: state.ongoingSplits,
             };
           }
+
           const pinnedKey = String(state.nextPageKey);
           const nextKey = String(state.nextPageKey + 1);
+
           return {
             nextPageKey: state.nextPageKey + 2,
             pageKeys: state.pageKeys,
@@ -212,6 +220,7 @@ export const split =
       onSome: (page) => {
         const firstKey = String(state.nextPageKey);
         const secondKey = String(state.nextPageKey + 1);
+
         return {
           nextPageKey: state.nextPageKey + 2,
           pageKeys: state.pageKeys,
@@ -312,11 +321,14 @@ export type Interpretation =
       readonly transitions: ReadonlyArray<(state: State) => State>;
     };
 
+const Interpretation = Data.taggedEnum<Interpretation>();
+
 const interpreted = (
   items: ReadonlyArray<unknown>,
   lastResult: Option.Option<PageResult>,
   transitions: ReadonlyArray<(state: State) => State>,
-): Interpretation => ({ _tag: "Interpreted", items, lastResult, transitions });
+): Interpretation =>
+  Interpretation.Interpreted({ items, lastResult, transitions });
 
 /**
  * Walk the pages in display order, concatenating their items and collecting the
@@ -347,14 +359,16 @@ export const interpret = (
           Option.flatMap(Option.fromNullishOr),
           Option.getOrUndefined,
         );
+
         if (result === undefined) {
           // The trailing pages are still loading.
           return interpreted(items, Option.none(), transitions);
         }
+
         if (result instanceof Error) {
           return options.isInvalidCursorError(result)
-            ? { _tag: "ResetRequired" }
-            : { _tag: "Failed", error: result, items };
+            ? Interpretation.ResetRequired()
+            : Interpretation.Failed({ error: result, items });
         }
 
         const hasResult = (key: string) =>
@@ -362,7 +376,9 @@ export const interpret = (
             Option.flatMap(Option.fromNullishOr),
             Option.isSome,
           );
+
         const ongoingSplit = Record.get(state.ongoingSplits, pageKey);
+
         const nextTransitions = Option.match(ongoingSplit, {
           onSome: (replacements) =>
             // Swap the replacements in once all of them have results.
@@ -370,7 +386,7 @@ export const interpret = (
               ? Array.append(transitions, completeSplit(pageKey))
               : transitions,
           onNone: () =>
-            typeof result.splitCursor === "string" &&
+            Predicate.isString(result.splitCursor) &&
             (result.pageStatus === "SplitRecommended" ||
               result.pageStatus === "SplitRequired" ||
               result.page.length > options.initialNumItems)

@@ -4,6 +4,9 @@ import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Result from "effect/Result";
+import * as Data from "effect/Data";
+
+const Segment = Data.taggedEnum<QueryStreamKeyLayout.Segment>();
 
 describe("QueryStreamKeyLayout", () => {
   it("exports the layout constructors through the public namespace", () => {
@@ -18,7 +21,7 @@ describe("QueryStreamKeyLayout", () => {
       visible: [],
       width: 1,
       segments: [
-        { _tag: "WithImplicitId", labels: QueryStreamKeyLabels.make([]) },
+        Segment.WithImplicitId({ labels: QueryStreamKeyLabels.make([]) }),
       ],
     },
     {
@@ -27,10 +30,9 @@ describe("QueryStreamKeyLayout", () => {
       visible: ["text", "_creationTime"],
       width: 3,
       segments: [
-        {
-          _tag: "WithImplicitId",
+        Segment.WithImplicitId({
           labels: QueryStreamKeyLabels.make(["text", "_creationTime"]),
-        },
+        }),
       ],
     },
     {
@@ -39,7 +41,7 @@ describe("QueryStreamKeyLayout", () => {
       visible: [],
       width: 1,
       segments: [
-        { _tag: "WithImplicitId", labels: QueryStreamKeyLabels.make([]) },
+        Segment.WithImplicitId({ labels: QueryStreamKeyLabels.make([]) }),
       ],
     },
     {
@@ -48,7 +50,7 @@ describe("QueryStreamKeyLayout", () => {
       visible: ["_id"],
       width: 1,
       segments: [
-        { _tag: "Explicit", labels: QueryStreamKeyLabels.make(["_id"]) },
+        Segment.Explicit({ labels: QueryStreamKeyLabels.make(["_id"]) }),
       ],
     },
     { fieldPaths: ["_id"], count: 1, visible: [], width: 0, segments: [] },
@@ -58,10 +60,9 @@ describe("QueryStreamKeyLayout", () => {
       visible: ["_id", "text"],
       width: 3,
       segments: [
-        {
-          _tag: "WithImplicitId",
+        Segment.WithImplicitId({
           labels: QueryStreamKeyLabels.make(["_id", "text"]),
-        },
+        }),
       ],
     },
   ])(
@@ -71,6 +72,7 @@ describe("QueryStreamKeyLayout", () => {
         QueryStreamKeyLayout.fromIndex(fieldPaths, count),
         identity,
       );
+
       expect(QueryStreamKeyLayout.segments(layout)).toEqual(segments);
       expect(
         QueryStreamKeyLabels.toArray(
@@ -95,11 +97,13 @@ describe("QueryStreamKeyLayout", () => {
       expect(error).toBeInstanceOf(
         QueryStreamKeyLayout.InvalidEqualityPrefixError,
       );
-      expect(error).toMatchObject({
-        _tag: "InvalidEqualityPrefixError",
-        fieldPaths: ["_id"],
-        eqCount: count,
-      });
+      expect(error._tag).toBe("InvalidEqualityPrefixError");
+      expect(error).toMatchObject(
+        new QueryStreamKeyLayout.InvalidEqualityPrefixError({
+          fieldPaths: ["_id"],
+          eqCount: count,
+        }),
+      );
     },
   );
 
@@ -108,23 +112,28 @@ describe("QueryStreamKeyLayout", () => {
       QueryStreamKeyLayout.fromIndex(["text", "_creationTime"], 1),
       identity,
     );
+
     expectTypeOf(pinned).toEqualTypeOf<
       QueryStreamKeyLayout.QueryStreamKeyLayout<["_creationTime"]>
     >();
     expectTypeOf<
       QueryStreamKeyLayout.RemainingFieldPaths<["_id"], 0 | 1>
     >().toEqualTypeOf<["_id"] | []>();
+
     const zero = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex(["_id"], 1),
       identity,
     );
+
     expectTypeOf(zero).toEqualTypeOf<
       QueryStreamKeyLayout.QueryStreamKeyLayout<[]>
     >();
+
     const joined = QueryStreamKeyLayout.concat(
       pinned,
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["_id"]), identity),
     );
+
     expectTypeOf(joined).toEqualTypeOf<
       QueryStreamKeyLayout.QueryStreamKeyLayout<
         readonly ["_creationTime", "_id"]
@@ -141,12 +150,14 @@ describe("QueryStreamKeyLayout", () => {
     expectTypeOf<ReadonlyArray<string>>().not.toExtend<
       Parameters<typeof QueryStreamKeyLayout.resolvePrefix>[1]
     >();
+
     const renamed = Result.getOrThrow(
       QueryStreamKeyLayout.rename(
         joined,
         QueryStreamKeyLabels.make(["created", "id"]),
       ),
     );
+
     expectTypeOf(renamed).toEqualTypeOf<
       QueryStreamKeyLayout.QueryStreamKeyLayout<["created", "id"]>
     >();
@@ -166,13 +177,15 @@ describe("QueryStreamKeyLayout", () => {
         QueryStreamKeyLabels.make(["hello"]),
       ),
     );
+
     const joined = QueryStreamKeyLayout.concat(
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
       explicit,
     );
+
     expect(QueryStreamKeyLayout.segments(joined)).toEqual([
-      { _tag: "WithImplicitId", labels: QueryStreamKeyLabels.make([]) },
-      { _tag: "Explicit", labels: QueryStreamKeyLabels.make(["hello"]) },
+      Segment.WithImplicitId({ labels: QueryStreamKeyLabels.make([]) }),
+      Segment.Explicit({ labels: QueryStreamKeyLabels.make(["hello"]) }),
     ]);
     expect(
       Result.getOrThrow(
@@ -192,6 +205,7 @@ describe("QueryStreamKeyLayout", () => {
         identity,
       ),
     );
+
     expect(
       Result.getOrThrow(
         QueryStreamKeyLayout.resolvePrefix(
@@ -216,6 +230,7 @@ describe("QueryStreamKeyLayout", () => {
         ),
       ),
     ).toBe(3);
+
     for (const invalid of [
       ["created"],
       ["text", "_id"],
@@ -230,16 +245,20 @@ describe("QueryStreamKeyLayout", () => {
       expect(error).toBeInstanceOf(
         QueryStreamKeyLayout.InvalidLabelPrefixError,
       );
-      expect(error).toMatchObject({
-        _tag: "InvalidLabelPrefixError",
-        labels: QueryStreamKeyLayout.visibleLabels(layout),
-        prefixLabels,
-      });
+      expect(error._tag).toBe("InvalidLabelPrefixError");
+      expect(error).toMatchObject(
+        new QueryStreamKeyLayout.InvalidLabelPrefixError({
+          labels: QueryStreamKeyLayout.visibleLabels(layout),
+          prefixLabels,
+        }),
+      );
     }
+
     const zero = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex(["_id"], 1),
       identity,
     );
+
     expect(
       Result.getOrThrow(
         QueryStreamKeyLayout.resolvePrefix(zero, QueryStreamKeyLabels.make([])),
@@ -265,10 +284,12 @@ describe("QueryStreamKeyLayout", () => {
         QueryStreamKeyLabels.make(["_id"]),
       ),
     );
+
     const implicitFirst = QueryStreamKeyLayout.concat(
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["_id"]), identity),
     );
+
     expect(
       QueryStreamKeyLabels.toArray(
         QueryStreamKeyLayout.visibleLabels(explicitFirst),
@@ -297,6 +318,7 @@ describe("QueryStreamKeyLayout", () => {
         QueryStreamKeyLabels.make(["text"]),
       ),
     );
+
     const composed = QueryStreamKeyLayout.concat(
       explicit,
       Result.getOrThrowWith(
@@ -304,10 +326,12 @@ describe("QueryStreamKeyLayout", () => {
         identity,
       ),
     );
+
     const single = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex(["text", "created"]),
       identity,
     );
+
     expect(QueryStreamKeyLayout.compatible(composed, single)).toBe(true);
     expect(QueryStreamKeyLayout.compatible(single, composed)).toBe(true);
     expect(QueryStreamKeyLayout.compatible(single, explicit)).toBe(false);
@@ -327,10 +351,12 @@ describe("QueryStreamKeyLayout", () => {
       QueryStreamKeyLayout.fromIndex(["_id"], 1),
       identity,
     );
+
     const one = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex([]),
       identity,
     );
+
     const two = QueryStreamKeyLayout.concat(one, one);
     expect(QueryStreamKeyLayout.compatible(zero, one)).toBe(false);
     expect(QueryStreamKeyLayout.compatible(one, two)).toBe(false);
@@ -340,10 +366,12 @@ describe("QueryStreamKeyLayout", () => {
         QueryStreamKeyLayout.concat(one, one),
       ),
     ).toBe(true);
+
     const withLabel = QueryStreamKeyLayout.concat(
       two,
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["text"]), identity),
     );
+
     expect(
       Result.getOrThrow(
         QueryStreamKeyLayout.resolvePrefix(
@@ -371,16 +399,19 @@ describe("QueryStreamKeyLayout", () => {
         ),
       ),
     );
+
     const renamed = Result.getOrThrow(
       QueryStreamKeyLayout.rename(
         layout,
         QueryStreamKeyLabels.make(["same", "same", ""]),
       ),
     );
+
     expect(QueryStreamKeyLayout.format(renamed)).toBe(
       '[<implicit _id>, "same", <implicit _id>, "same", ""]',
     );
     expect(QueryStreamKeyLayout.runtimeWidth(renamed)).toBe(5);
+
     for (const incomplete of [[], ["a"], ["a", "b"], ["a", "b", "c", "d"]]) {
       const replacementLabels = QueryStreamKeyLabels.make(incomplete);
       const result = QueryStreamKeyLayout.rename(layout, replacementLabels);
@@ -394,20 +425,24 @@ describe("QueryStreamKeyLayout", () => {
       expect(error).toBeInstanceOf(
         QueryStreamKeyLayout.LabelCountMismatchError,
       );
-      expect(error).toMatchObject({
-        _tag: "LabelCountMismatchError",
-        labels: QueryStreamKeyLayout.visibleLabels(layout),
-        replacementLabels,
-      });
+      expect(error._tag).toBe("LabelCountMismatchError");
+      expect(error).toMatchObject(
+        new QueryStreamKeyLayout.LabelCountMismatchError({
+          labels: QueryStreamKeyLayout.visibleLabels(layout),
+          replacementLabels,
+        }),
+      );
     }
   });
 
   it("preserves inputs through composition and renaming", () => {
     const fieldPaths = ["text"] as const;
+
     const outer = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex(fieldPaths),
       identity,
     );
+
     const joined = QueryStreamKeyLayout.concat(
       outer,
       Result.getOrThrowWith(
@@ -415,10 +450,13 @@ describe("QueryStreamKeyLayout", () => {
         identity,
       ),
     );
+
     const aliases = ["body", "time"] as const;
+
     const renamed = Result.getOrThrow(
       QueryStreamKeyLayout.rename(joined, QueryStreamKeyLabels.make(aliases)),
     );
+
     expect(
       QueryStreamKeyLabels.toArray(QueryStreamKeyLayout.visibleLabels(renamed)),
     ).toEqual(["body", "time"]);
@@ -438,10 +476,12 @@ describe("QueryStreamKeyLayout", () => {
         ),
       ),
     ).toBe(true);
+
     const zero = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex(["_id"], 1),
       identity,
     );
+
     expect(
       QueryStreamKeyLabels.toArray(
         QueryStreamKeyLayout.visibleLabels(

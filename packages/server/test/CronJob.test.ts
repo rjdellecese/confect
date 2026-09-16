@@ -27,6 +27,7 @@ const makeMutationRefWithArgs = (functionNamespace: string, name: string) =>
 describe("CronJob.make", () => {
   test("creates a CronJob with a Cron schedule", () => {
     const ref = makeMutationRef("tasks", "cleanup");
+
     const cron = Cron.make({
       minutes: [0],
       hours: [4],

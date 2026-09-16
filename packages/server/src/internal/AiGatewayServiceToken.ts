@@ -2,6 +2,7 @@ import { getServiceToken as getConvexServiceToken } from "convex/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 
 /**
@@ -46,6 +47,7 @@ export const AiGatewayError = Schema.Union([
 export type AiGatewayError = typeof AiGatewayError.Type;
 
 type GetServiceToken = typeof getConvexServiceToken;
+
 type AiGatewayErrorCode = "AiGatewayDisabled" | "AiGatewayUnavailable";
 
 const nodeRuntimeErrorCodeFragments: Record<AiGatewayErrorCode, string> = {
@@ -68,24 +70,27 @@ export interface Service {
 }
 
 const matchesErrorCode = (
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The rejection classifier inspects arbitrary SDK failures and preserves those it cannot recognize.
   rejection: unknown,
   code: AiGatewayErrorCode,
 ): boolean =>
-  (typeof rejection === "object" &&
-    rejection !== null &&
-    "code" in rejection &&
+  (Predicate.isObjectOrArray(rejection) &&
+    Predicate.hasProperty(rejection, "code") &&
     rejection.code === code) ||
   (rejection instanceof Error &&
     (rejection.message.includes(nodeRuntimeErrorCodeFragments[code]) ||
       rejection.message.includes(defaultRuntimeErrorMessagePrefixes[code])));
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The SDK may reject with any value; recognized codes become typed errors and the fallback retains the original cause.
 const classifyError = (rejection: unknown): AiGatewayError => {
   if (matchesErrorCode(rejection, "AiGatewayDisabled")) {
     return new AiGatewayDisabled();
   }
+
   if (matchesErrorCode(rejection, "AiGatewayUnavailable")) {
     return new AiGatewayUnavailable();
   }
+
   throw rejection;
 };
 

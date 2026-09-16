@@ -23,14 +23,19 @@ const notesLayout = Result.getOrThrowWith(
   QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
   identity,
 );
+
 const messagesLayout = Result.getOrThrowWith(
   QueryStreamKeyLayout.fromIndex(["_creationTime"]),
   identity,
 );
+
 const notes = QueryStream.empty<Note>()(notesLayout);
+
 const moreNotes = QueryStream.empty<Note>()(notesLayout);
+
 const messagesOf = (_note: Note) =>
   QueryStream.empty<Message>()(messagesLayout);
+
 const paginationOpts: QueryStream.PaginateOptions = {
   numItems: 10,
   cursor: null,

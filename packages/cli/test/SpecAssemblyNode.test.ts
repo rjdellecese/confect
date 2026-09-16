@@ -30,6 +30,7 @@ describe("SpecAssemblyNode", () => {
         leaf("notesAndRandom/random.spec.ts", ["notesAndRandom", "random"]),
         leaf("env.spec.ts", ["env"]),
       ]);
+
       const contents = yield* templates.assembledSpec({ nodes });
 
       expect(contents).toContain('import env from "../env.spec";');
@@ -57,6 +58,7 @@ describe("SpecAssemblyNode", () => {
           leaf("notes.spec.ts", ["notes"]),
           leaf("notes/archived.spec.ts", ["notes", "archived"]),
         ]);
+
         const contents = yield* templates.assembledSpec({ nodes });
 
         expect(contents).toContain('import notes from "../notes.spec";');
@@ -78,6 +80,7 @@ describe("SpecAssemblyNode", () => {
           leaf("notes.spec.ts", ["notes"]),
           leaf("notes/archived.spec.ts", ["notes", "archived"]),
         ]);
+
         const contents = yield* templates.assembledSpec({ nodes });
 
         expect(contents).toContain(
@@ -116,6 +119,7 @@ describe("SpecAssemblyNode", () => {
             "legacy",
           ]),
         ]);
+
         const contents = yield* templates.assembledSpec({ nodes });
 
         expect(contents).toContain(
@@ -163,6 +167,7 @@ describe("SpecAssemblyNode", () => {
             "queries",
           ]),
         ];
+
         const nodes = assemblyNodesFromLeaves(leaves);
         const contents = yield* templates.assembledSpec({ nodes });
 
@@ -187,6 +192,7 @@ describe("SpecAssemblyNode", () => {
           .filter(
             (line) => line.startsWith("import ") && line.includes(".spec"),
           );
+
         expect(importLines).toHaveLength(leaves.length);
 
         expect(contents).toContain(
@@ -246,6 +252,7 @@ describe("SpecAssemblyNode", () => {
             "details",
           ]),
         ]);
+
         const contents = yield* templates.assembledSpec({ nodes });
 
         // Tree-assembly shape is preserved; the addGroupAt-wrapped parent leaf
@@ -291,6 +298,7 @@ for (const { name, pathLayer, sep } of [
           ),
           yield* discovered("env.spec.ts", ["env"]),
         ]);
+
         const contents = yield* templates.assembledSpec({ nodes });
 
         expect(contents).toContain(

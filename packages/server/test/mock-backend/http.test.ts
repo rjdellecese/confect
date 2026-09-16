@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { HttpRouter as ConfectHttpRouter } from "@confect/server";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { DatabaseWriter } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
@@ -29,9 +30,14 @@ describe("HttpRouter", () => {
         const response = yield* c.fetch("/api/notes");
         assertEquals(response.status, 200);
 
-        const body = (yield* Effect.promise(() => response.json())) as Array<{
-          text: string;
-        }>;
+        const body = yield* Effect.promise(() => response.json()).pipe(
+          Effect.flatMap(
+            Schema.decodeUnknownEffect(
+              Schema.Array(Schema.Struct({ text: Schema.String })),
+            ),
+          ),
+        );
+
         assertEquals(body.length, 1);
         assertEquals(body[0]?.text, text);
       }).pipe(Effect.provide(TestConfect.layer)),

@@ -41,12 +41,15 @@ const systemFieldNames: ReadonlyArray<string> = Record.keys(
 const isSystemFieldKey = (key: string | symbol): key is string =>
   Predicate.isString(key) && Array.contains(systemFieldNames, key);
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The generic splitter preserves arbitrary string and symbol fields; it does not interpret table-specific values.
 const splitSystemFields = (input: { [key: PropertyKey]: unknown }) => {
   const keys = Reflect.ownKeys(input);
+
   const pick = (pickedKeys: ReadonlyArray<string | symbol>) =>
     Record.fromEntries(
       Array.map(pickedKeys, (key) => [key, input[key]] as const),
     );
+
   return {
     system: pick(Array.filter(keys, isSystemFieldKey)),
     rest: pick(Array.filter(keys, Predicate.not(isSystemFieldKey))),
@@ -66,7 +69,9 @@ const wrapGetter = <R>(
     if (Option.isNone(input) || !Predicate.isObject(input.value)) {
       return getter.run(input, options);
     }
+
     const { system, rest } = splitSystemFields(input.value);
+
     return getter
       .run(Option.some(rest), options)
       .pipe(
@@ -86,6 +91,7 @@ const wrapTransformation = (
       "Cannot extend a table schema that uses decoding/encoding middleware with system fields",
     );
   }
+
   return new SchemaTransformation.Transformation(
     wrapGetter(transformation.decode),
     wrapGetter(transformation.encode),
@@ -122,6 +128,7 @@ const makeExtendAst = (
         ast.encodingChecks,
       );
     }
+
     if (SchemaAST.isSuspend(ast)) {
       return new SchemaAST.Suspend(
         () => extendAst(ast.thunk()),
@@ -131,6 +138,7 @@ const makeExtendAst = (
         ast.context,
       );
     }
+
     if (SchemaAST.isObjects(ast)) {
       return new SchemaAST.Objects(
         Array.appendAll(ast.propertySignatures, systemPropertySignatures),
@@ -142,8 +150,9 @@ const makeExtendAst = (
         ast.encodingChecks,
       );
     }
+
     throw new Error(
-      ast._tag === "Declaration"
+      SchemaAST.isDeclaration(ast)
         ? "Cannot extend a `Declaration` schema (such as a `Schema.Class`) with system fields: its decoded values are constructed instances, which cannot gain extra fields. Use a plain `Schema.Struct`, or transform to one with `Schema.decodeTo`."
         : `Cannot extend a \`${ast._tag}\` schema node with system fields: a table schema must resolve to an object shape at every step of its encoding.`,
     );
@@ -192,31 +201,35 @@ export const extendWithSystemFields = <
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isUnion(s.ast) &&
-      Array.isArray((s as { readonly members?: unknown }).members)
+      "members" in s &&
+      Array.isArray(s.members)
     ) {
       return Schema.Union(
         Array.map(
+          // SAFETY: The unencoded Union AST and members array identify the Schema.Union wrapper whose members mirror its AST types.
           (s as Schema.Union<ReadonlyArray<Schema.Top>>).members,
           extend,
         ),
       );
     }
+
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isObjects(s.ast) &&
-      typeof (s as { readonly mapFields?: unknown }).mapFields === "function"
+      "mapFields" in s &&
+      Predicate.isFunction(s.mapFields)
     ) {
       return Schema.fieldsAssign(system)(
+        // SAFETY: The unencoded Objects AST and mapFields method identify a Struct, rather than a transformed object codec.
         s as Schema.Struct<Schema.Struct.Fields>,
       );
     }
+
     return Schema.make(extendAst(s.ast));
   };
 
-  return extend(schema) as unknown as ExtendWithSystemFields<
-    TableName,
-    TableSchema
-  >;
+  // SAFETY: extend preserves Union and Struct wrappers and adds the system fields to every other object codec's AST, matching ExtendWithSystemFields.
+  return extend(schema) as ExtendWithSystemFields<TableName, TableSchema>;
 };
 
 /**

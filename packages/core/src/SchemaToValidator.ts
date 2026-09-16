@@ -86,19 +86,19 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
 ): TableSchemaToTableValidator<TableSchema> => {
   const ast = Schema.toEncoded(schema).ast;
 
+  // SAFETY: compileAst compiles the encoded Objects or Union AST checked below; its dynamic validator has the shape derived from TableSchema.
   return pipe(
     ast,
     Match.value,
     Match.tag("Objects", ({ indexSignatures }) =>
       Array.isReadonlyArrayEmpty(indexSignatures)
-        ? // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- The return type is derived from the input schema and cannot be recovered from the runtime AST.
-          (compileAst(ast) as Effect.Effect<any>)
+        ? compileAst(ast)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.tag("Union", (unionAst) => compileAst(unionAst)),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
     Effect.runSync,
-  );
+  ) as TableSchemaToTableValidator<TableSchema>;
 };
 
 // Compiler
@@ -251,7 +251,10 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
 export const compileSchema = <T, E>(
   schema: Schema.Codec<T, E>,
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
-  Effect.runSync(compileAst(schema.ast)) as any;
+  // SAFETY: compileAst maps this schema's encoded AST to the same Convex validator modeled by ValueToValidator, or fails for unsupported nodes.
+  Effect.runSync(compileAst(schema.ast)) as ValueToValidator<
+    (typeof schema)["Encoded"]
+  >;
 
 export const isRecursive = (ast: SchemaAST.AST): boolean =>
   pipe(
@@ -346,6 +349,7 @@ export const compileAst = (
         Match.tag("Unknown", "Any", () => Effect.succeed(v.any())),
         Match.tag("Declaration", (declaration) =>
           Effect.mapBoth(
+            // SAFETY: The input codec is context-free; DeclarationRun erases that requirement. A successful probe is used only to recognize ArrayBuffer, never as a returned value.
             // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Codec inputs are context-free, but Effect's SchemaAST.DeclarationRun erases their requirements to `any`.
             declaration.run(declaration.typeParameters)(
               new ArrayBuffer(0),
@@ -475,6 +479,7 @@ const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
     objectsAst.propertySignatures,
     Effect.forEach(({ type, name }) => {
       const isOptional = SchemaAST.isOptional(type);
+
       if (String.isString(name)) {
         // Somehow, somewhere, keys of type number are being coerced to strings…
         return Option.match(Number.parse(name), {
@@ -500,17 +505,12 @@ const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
         );
       }
     }),
-    Effect.andThen((propertyNamesWithValidators) =>
-      pipe(
-        propertyNamesWithValidators,
-        Array.reduce(
-          {} as Record<string, Validator<any, any, any>>,
-          (acc, { propertyName, validator }) => ({
-            [propertyName]: validator,
-            ...acc,
-          }),
+    Effect.map((propertyNamesWithValidators) =>
+      Object.fromEntries(
+        Array.map(
+          Array.reverse(propertyNamesWithValidators),
+          ({ propertyName, validator }) => [propertyName, validator],
         ),
-        Effect.succeed,
       ),
     ),
   );
@@ -544,7 +544,7 @@ export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
 }> {
   /* v8 ignore start */
   override get message() {
-    return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this.propertyKey}' but only 'string' properties are supported.`;
+    return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${Predicate.isNumber(this.propertyKey) ? "number" : "symbol"}' but only 'string' properties are supported.`;
   }
   /* v8 ignore stop */
 }

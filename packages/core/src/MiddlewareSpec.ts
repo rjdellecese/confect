@@ -9,6 +9,7 @@ import * as Lazy from "./Lazy";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "~@confect/core/MiddlewareSpec";
+
 export type TypeId = typeof TypeId;
 
 export const isMiddlewareSpec = (u: unknown): u is AnyMiddlewareSpec =>
@@ -204,6 +205,7 @@ export const MiddlewareSpec =
     OptionsSchema_
   > => {
     const { query, mutation, action } = options.functionTypes;
+
     if (!query && !mutation && !action) {
       throw new Error(
         `Middleware "${key}" must declare at least one function type`,
@@ -211,6 +213,8 @@ export const MiddlewareSpec =
     }
 
     function MiddlewareSpecClass() {}
+
+    // SAFETY: This locally created function receives all static metadata and lazy schema getters below before escaping; its construct signature and ~ fields are type-only witnesses.
     const class_ = MiddlewareSpecClass as any;
     class_[TypeId] = TypeId;
     class_.key = key;
@@ -219,12 +223,15 @@ export const MiddlewareSpec =
       mutation,
       action,
     } satisfies SupportedFunctionTypes;
+
     if (options.error !== undefined) {
       Lazy.defineProperty(class_, "error", options.error);
     }
+
     if (options.options !== undefined) {
       Lazy.defineProperty(class_, "options", options.options);
     }
+
     return class_;
   };
 

@@ -5,6 +5,7 @@ import * as GroupSpec from "@confect/core/GroupSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Ref from "@confect/core/Ref";
 import * as Context from "effect/Context";
+import * as Data from "effect/Data";
 import * as MutableRef from "effect/MutableRef";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -123,6 +124,7 @@ describe("MiddlewareSpec", () => {
       functionTypes: { query: true, mutation: true, action: true },
       error: () => {
         MutableRef.set(errorBuilt, true);
+
         return NotSignedIn;
       },
     }) {}
@@ -309,6 +311,7 @@ describe("requires", () => {
     const satisfied = GroupSpec.make()
       .middleware(ProvideUser)
       .addFunction(covered);
+
     const unsatisfied = GroupSpec.make().addFunction(covered);
 
     expectTypeOf<
@@ -415,16 +418,25 @@ describe("Ref error union", () => {
       { spec: RequireUser, options: undefined },
     ]);
 
-    const notFound = Ref.decodeErrorOption(ref, {
-      _tag: "NotFound",
-      id: "123",
-    });
+    const notFound = Ref.decodeErrorOption(
+      ref,
+      Schema.encodeSync(NotFound)(new NotFound({ id: "123" })),
+    );
+
     expect(Option.isSome(notFound)).toBe(true);
 
-    const notSignedIn = Ref.decodeErrorOption(ref, { _tag: "NotSignedIn" });
+    const notSignedIn = Ref.decodeErrorOption(
+      ref,
+      Schema.encodeSync(NotSignedIn)(new NotSignedIn({})),
+    );
+
     expect(Option.isSome(notSignedIn)).toBe(true);
 
-    const unknown = Ref.decodeErrorOption(ref, { _tag: "SomethingElse" });
+    const unknown = Ref.decodeErrorOption(
+      ref,
+      Data.taggedEnum<{ readonly _tag: "SomethingElse" }>().SomethingElse(),
+    );
+
     expect(Option.isNone(unknown)).toBe(true);
   });
 
@@ -434,7 +446,12 @@ describe("Ref error union", () => {
     ]);
 
     expect(Ref.hasErrorSchema(ref)).toBe(true);
-    const notSignedIn = Ref.decodeErrorOption(ref, { _tag: "NotSignedIn" });
+
+    const notSignedIn = Ref.decodeErrorOption(
+      ref,
+      Schema.encodeSync(NotSignedIn)(new NotSignedIn({})),
+    );
+
     expect(Option.isSome(notSignedIn)).toBe(true);
   });
 
@@ -453,6 +470,7 @@ describe("Ref error union", () => {
       functionTypes: { query: true, mutation: true, action: true },
       error: () => {
         MutableRef.set(errorBuilt, true);
+
         return NotSignedIn;
       },
     }) {}

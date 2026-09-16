@@ -35,6 +35,7 @@ const tableNameFromRelativePath = Effect.fnUntraced(function* (
 ) {
   const path = yield* Path.Path;
   const { name } = path.parse(relativePath);
+
   return name;
 });
 
@@ -45,7 +46,7 @@ const listTableFiles = Effect.gen(function* () {
   const tablesDirectory = path.join(confectDirectory, TABLES_DIRNAME);
 
   if (!(yield* fs.exists(tablesDirectory))) {
-    return [] as ReadonlyArray<string>;
+    return Array.empty<string>();
   }
 
   const allPaths = yield* fs.readDirectory(tablesDirectory, {
@@ -99,6 +100,7 @@ export const discover = Effect.gen(function* () {
             reason: e instanceof Error ? e.message : String(e),
           }),
       });
+
       return { relativePath, tableName } satisfies TableModule;
     }),
     { concurrency: "unbounded" },
@@ -142,6 +144,7 @@ export const validate = Effect.fnUntraced(function* (
     relativePath: string,
   ) {
     const absolutePath = path.resolve(confectDirectory, relativePath);
+
     const { module } = yield* Bundler.bundle(absolutePath).pipe(
       Effect.mapError((error) => fromBundlerError(relativePath, error)),
     );

@@ -1,13 +1,22 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { describe, expect, expectTypeOf, it, test } from "@effect/vitest";
+import {
+  assert,
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+  test,
+} from "@effect/vitest";
 import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Equal from "effect/Equal";
 import * as Fiber from "effect/Fiber";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as FoldkitCommand from "foldkit/command";
 import { m } from "foldkit/message";
+import { vi } from "vitest";
 import * as Command from "@confect/foldkit/Command";
 import * as Client from "@confect/foldkit/Client";
 import * as TestClient from "./TestClient";
@@ -54,12 +63,16 @@ const deleteMutationRef = Ref.make(
 );
 
 const SucceededSaveNote = m("SucceededSaveNote", { note: Schema.Unknown });
+
 const FailedSaveNote = m("FailedSaveNote", { error: Schema.Unknown });
+
 type Message = typeof SucceededSaveNote.Type | typeof FailedSaveNote.Type;
 
 const saveNoteHandlers = {
-  onSuccess: (note: unknown) => SucceededSaveNote({ note }),
-  onError: (error: unknown) => FailedSaveNote({ error }),
+  onSuccess: (note: Ref.Returns<typeof insertMutationRef>) =>
+    SucceededSaveNote({ note }),
+  onError: (error: Command.Error<typeof insertMutationRef>) =>
+    FailedSaveNote({ error }),
 };
 
 const saveNoteConfig = {
@@ -83,6 +96,7 @@ describe("Command", () => {
     it.effect("constructing a Command performs no client call", () =>
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
+
         const SaveNote = Command.mutation(
           "SaveNote",
           insertMutationRef,
@@ -99,13 +113,17 @@ describe("Command", () => {
     it.effect("mutation success produces the onSuccess Message", () =>
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
+
         const SaveNote = Command.mutation(
           "SaveNote",
           insertMutationRef,
           saveNoteConfig,
         );
 
-        const message = yield* SaveNote({ text: "hello" }).effect;
+        const args = { text: "hello" };
+        const command = SaveNote(args);
+        expect(command.args).toBe(args);
+        const message = yield* command.effect;
 
         expect(message).toEqual(SucceededSaveNote({ note: {} }));
         expect(yield* testClient.calls()).toEqual([
@@ -117,15 +135,31 @@ describe("Command", () => {
     it.effect("no-args query is callable without args", () =>
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
+
         const FetchNotes = Command.query("FetchNotes", listQueryRef, {
           messages: [SucceededSaveNote, FailedSaveNote],
           onSuccess: (notes) => SucceededSaveNote({ note: notes }),
           onError: (error) => FailedSaveNote({ error }),
         });
 
-        const message = yield* FetchNotes().effect;
+        const command = FetchNotes();
+        expect(command.args).toEqual({});
+        expect(FetchNotes({}).args).toEqual(command.args);
+        const query = vi.fn();
+
+        const message = yield* command.effect.pipe(
+          Effect.provideService(Client.Client, {
+            ...testClient,
+            query: (ref, ...args) => {
+              query(ref, ...args);
+
+              return testClient.query(ref, ...args);
+            },
+          }),
+        );
 
         expect(message._tag).toBe("SucceededSaveNote");
+        expect(query).toHaveBeenCalledExactlyOnceWith(listQueryRef);
         expect(yield* testClient.calls()).toEqual([
           { method: "query", name: "notes:list", args: {} },
         ]);
@@ -135,6 +169,7 @@ describe("Command", () => {
     it.effect("action success produces the onSuccess Message", () =>
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
+
         const SendEmail = Command.action("SendEmail", sendActionRef, {
           messages: [SucceededSaveNote, FailedSaveNote],
           onSuccess: () => SucceededSaveNote({ note: null }),
@@ -170,9 +205,8 @@ describe("Command", () => {
         const message = yield* DeleteNote({ id: "abc", scope: "notes" }).effect;
 
         expect(message._tag).toBe("FailedSaveNote");
-        expect((message as typeof FailedSaveNote.Type).error).toBeInstanceOf(
-          NotFound,
-        );
+        assert(Schema.is(FailedSaveNote)(message));
+        expect(message.error).toBeInstanceOf(NotFound);
       }).pipe(Effect.provide(TestClient.layer)),
     );
 
@@ -194,9 +228,8 @@ describe("Command", () => {
         const message = yield* SaveNote({ text: "hello" }).effect;
 
         expect(message._tag).toBe("FailedSaveNote");
-        expect((message as typeof FailedSaveNote.Type).error).toBeInstanceOf(
-          Client.WebSocketClientError,
-        );
+        assert(Schema.is(FailedSaveNote)(message));
+        expect(message.error).toBeInstanceOf(Client.WebSocketClientError);
       }).pipe(Effect.provide(TestClient.layer)),
     );
 
@@ -206,11 +239,17 @@ describe("Command", () => {
     });
 
     it("checks an explicitly undefined interrupt option against compiler optionality", () => {
-      type AcceptsUndefined = typeof Command.mutation extends (
-        name: "SaveNote",
-        ref: typeof insertMutationRef,
-        config: typeof saveNoteConfig & { interrupt: undefined },
-      ) => unknown
+      type AcceptsUndefined = typeof saveNoteConfig & {
+        interrupt: undefined;
+      } extends Parameters<
+        typeof Command.mutation<
+          "SaveNote",
+          typeof insertMutationRef,
+          typeof saveNoteConfig.messages,
+          typeof SucceededSaveNote.Type,
+          typeof FailedSaveNote.Type
+        >
+      >[2]
         ? true
         : false;
 
@@ -221,8 +260,10 @@ describe("Command", () => {
       Command.mutation("SaveNote", insertMutationRef, {
         messages: [FailedSaveNote],
         // @ts-expect-error—onSuccess must produce a declared Message
-        onSuccess: (note: unknown) => SucceededSaveNote({ note }),
-        onError: (error: unknown) => FailedSaveNote({ error }),
+        onSuccess: (note: Ref.Returns<typeof insertMutationRef>) =>
+          SucceededSaveNote({ note }),
+        onError: (error: Command.Error<typeof insertMutationRef>) =>
+          FailedSaveNote({ error }),
       });
     });
 
@@ -246,6 +287,7 @@ describe("Command", () => {
     it.effect("mutationEffect folds success and failure into Messages", () =>
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
+
         const saveNote = Command.mutationEffect(
           insertMutationRef,
           saveNoteHandlers,
@@ -298,6 +340,7 @@ describe("Command", () => {
         { id: "abc" },
         (outcome) => outcome,
       );
+
       expect(interrupt.name).toBe("DeleteNote.Interrupt");
       expect(interrupt.interruptsKey).toBe("DeleteNote:abc");
 
@@ -330,6 +373,7 @@ describe("Command", () => {
         const fiber = yield* Effect.forkChild(
           SaveDraft({ text: "hello" }).effect,
         );
+
         yield* Deferred.await(started);
 
         const outcome = yield* SaveDraft.Interrupt((o) => o).effect;
@@ -337,6 +381,64 @@ describe("Command", () => {
         yield* Fiber.await(fiber);
 
         const secondOutcome = yield* SaveDraft.Interrupt((o) => o).effect;
+        expect(secondOutcome._tag).toBe("NotFound");
+      }).pipe(Effect.provide(TestClient.layer)),
+    );
+
+    it.effect("no-args Commands retain name-keyed interruption", () =>
+      Effect.gen(function* () {
+        const testClient = yield* TestClient.TestClient;
+        const started = yield* Deferred.make<void>();
+        yield* testClient.setNextResultEffect(
+          Deferred.succeed(started, undefined).pipe(
+            Effect.andThen(() => Effect.never),
+          ),
+        );
+
+        const FetchNotes = Command.query("FetchNotes", listQueryRef, {
+          ...saveNoteConfig,
+          interrupt: true,
+        });
+
+        const command = FetchNotes();
+        expect(command.args).toEqual({});
+        expect(command.key).toBe("FetchNotes");
+        expect(FoldkitCommand.CommandDefinitionTypeId in FetchNotes).toBe(true);
+        expect(
+          Object.getOwnPropertyDescriptor(FetchNotes, "Interrupt"),
+        ).toMatchObject({
+          enumerable: false,
+          writable: false,
+          configurable: false,
+        });
+
+        const query = vi.fn();
+
+        const fiber = yield* Effect.forkChild(
+          command.effect.pipe(
+            Effect.provideService(Client.Client, {
+              ...testClient,
+              query: (ref, ...args) => {
+                query(ref, ...args);
+
+                return testClient.query(ref, ...args);
+              },
+            }),
+          ),
+        );
+
+        yield* Deferred.await(started);
+        expect(query).toHaveBeenCalledExactlyOnceWith(listQueryRef);
+
+        const interrupt = FetchNotes.Interrupt((outcome) => outcome);
+        expect(interrupt.interruptsKey).toBe("FetchNotes");
+        const outcome = yield* interrupt.effect;
+        expect(outcome._tag).toBe("Interrupted");
+        yield* Fiber.await(fiber);
+
+        const secondOutcome = yield* FetchNotes.Interrupt((result) => result)
+          .effect;
+
         expect(secondOutcome._tag).toBe("NotFound");
       }).pipe(Effect.provide(TestClient.layer)),
     );
@@ -368,7 +470,7 @@ describe("Command", () => {
       });
 
       expect(SaveDraft.name).toBe("SaveDraft");
-      expect(typeof SaveDraft.Interrupt).toBe("function");
+      expect(SaveDraft.Interrupt).toBeTypeOf("function");
     });
   });
 });
@@ -400,22 +502,54 @@ describe("Foldkit test-tooling compatibility", () => {
     definition: ResolvableCommandDefinition<Name, ResultMessage>,
   ): ResolvableCommandDefinition<Name, ResultMessage> => definition;
 
+  test("no-args instances carry structurally equal matching args", () => {
+    const FetchNotes = Command.query(
+      "FetchNotes",
+      listQueryRef,
+      saveNoteConfig,
+    );
+
+    const omitted = FetchNotes();
+    const explicit = FetchNotes({});
+
+    expect(FetchNotes.name).toBe("FetchNotes");
+    expect(omitted.name).toBe(explicit.name);
+    expect(Equal.equals(omitted.args, explicit.args)).toBe(true);
+    expect(
+      Object.getOwnPropertyDescriptor(omitted, "messageMappers")?.value,
+    ).toEqual([]);
+    expect(
+      Object.getOwnPropertyDescriptor(
+        FetchNotes,
+        FoldkitCommand.CommandDefinitionTypeId,
+      ),
+    ).toMatchObject({
+      value: FoldkitCommand.CommandDefinitionTypeId,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+  });
+
   test("factory definitions satisfy the Story/Scene resolve constraint", () => {
     const SaveNote = Command.mutation(
       "SaveNote",
       insertMutationRef,
       saveNoteConfig,
     );
+
     const SaveDraft = Command.mutation("SaveDraft", insertMutationRef, {
       ...saveNoteConfig,
       interrupt: true,
     });
+
     const DeleteNote = Command.mutation("DeleteNote", deleteMutationRef, {
       messages: [SucceededSaveNote, FailedSaveNote],
       onSuccess: () => SucceededSaveNote({ note: null }),
       onError: (error) => FailedSaveNote({ error }),
       interrupt: { keyFields: ["id"], toKey: ({ id }) => id },
     });
+
     const FetchNotes = Command.query("FetchNotes", listQueryRef, {
       messages: [SucceededSaveNote, FailedSaveNote],
       onSuccess: (notes) => SucceededSaveNote({ note: notes }),

@@ -21,6 +21,7 @@ const make =
     run(
       Ref.runWithCodec(
         action,
+        // SAFETY: OptionalArgs permits omission only when Args has no keys; otherwise args[0] is the required Args value.
         (args[0] ?? {}) as Ref.Args<Action>,
         (functionReference, encodedArgs) =>
           runAction(functionReference, encodedArgs),
@@ -30,6 +31,7 @@ const make =
 export const ActionRunner = Context.Service<ReturnType<typeof make>>(
   "@confect/server/ActionRunner",
 );
+
 export type ActionRunner = typeof ActionRunner.Identifier;
 
 export const layer = (runAction: GenericActionCtx<any>["runAction"]) =>

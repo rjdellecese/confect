@@ -3,6 +3,8 @@ import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
 import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import { GenericId as GenericIdSchema } from "@confect/core/GenericId";
 import type {
   IndexRange as ConvexIndexRange,
   IndexRangeBuilder as ConvexIndexRangeBuilder,
@@ -26,14 +28,18 @@ type Doc = {
   nested: { active: boolean };
 };
 
+const itemId = Schema.decodeUnknownSync(GenericIdSchema("items"));
+
 const builder = () =>
   QueryStreamIndexRange.builder<Doc, ["category", "score", "_id"]>();
 
 describe("QueryStreamIndexRange.builder", () => {
   it("preserves field tuple inference", () => {
     type Fields = readonly ["category", "_id"];
+
     type Builder<F extends ReadonlyArray<string>> =
       QueryStreamIndexRange.Builder<Doc, F>;
+
     expectTypeOf<
       Parameters<Builder<Fields>["eq"]>[0]
     >().toEqualTypeOf<"category">();
@@ -75,6 +81,7 @@ describe("QueryStreamIndexRange.builder", () => {
       lower: { orderKey: ["a"], inclusive: true },
       upper: { orderKey: ["a", 5], inclusive: true },
     });
+
     for (const [range, length] of [
       [root, 0],
       [pinned, 1],
@@ -87,6 +94,7 @@ describe("QueryStreamIndexRange.builder", () => {
       expect(QueryStreamIndexRange.equalityPrefixLength(copied)).toBe(length);
       expect(range).not.toHaveProperty("eqCount");
     }
+
     expect(
       QueryStreamIndexRange.toBounds(root.eq("category", "b")).lower.orderKey,
     ).toEqual(["b"]);
@@ -100,9 +108,9 @@ describe("QueryStreamIndexRange.builder", () => {
     expect(lower).not.toHaveProperty("eq");
     expect(lower).not.toHaveProperty("gt");
     expect(bounded).not.toHaveProperty("lt");
-    const allPinned = pinned
-      .eq("score", 2)
-      .eq("_id", "item" as GenericId<"items">);
+
+    const allPinned = pinned.eq("score", 2).eq("_id", itemId("item"));
+
     expectTypeOf<QueryStreamIndexRange.Remaining<typeof root>>().toEqualTypeOf<
       ["category", "score", "_id"]
     >();
@@ -175,7 +183,7 @@ describe("QueryStreamIndexRange.apply", () => {
     }
   }
 
-  // Convex exports IndexRange only as a type; the recording fixture supplies
+  // SAFETY: Convex exports IndexRange only as a type; the recording fixture supplies
   // its behavior without access to the SDK's private nominal marker.
   const recordingBuilder = () =>
     new RecordingBuilder() as RecordingBuilder &
@@ -186,10 +194,12 @@ describe("QueryStreamIndexRange.apply", () => {
     (tag) => {
       for (const value of ["hello", undefined]) {
         const receiver = recordingBuilder();
+
         const range = QueryStreamIndexRange.builder<
           Doc & { text?: string },
           ["text"]
         >()[tag]("text", value);
+
         const result = QueryStreamIndexRange.apply(range, receiver);
         expectTypeOf(result).toEqualTypeOf<ConvexIndexRange>();
         expectTypeOf(QueryStreamIndexRange.apply)
@@ -206,14 +216,16 @@ describe("QueryStreamIndexRange.apply", () => {
     const target = recordingBuilder();
     expect(QueryStreamIndexRange.apply(builder(), target)).toBe(target);
     expect(target.calls).toEqual([]);
+
     const result = QueryStreamIndexRange.apply(
       builder()
         .eq("category", "a")
         .eq("score", 1)
-        .gt("_id", "first" as GenericId<"items">)
-        .lte("_id", "last" as GenericId<"items">),
+        .gt("_id", itemId("first"))
+        .lte("_id", itemId("last")),
       target,
     );
+
     expect(result).toEqual(
       new RecordedRange([
         ["eq", "category", "a"],
@@ -250,6 +262,7 @@ describe("QueryStreamIndexRange.toBounds", () => {
         lower: { orderKey: ["a", 1], inclusive: lowerTag === "gte" },
         upper: { orderKey: ["a"], inclusive: true },
       });
+
       for (const upperTag of ["lt", "lte"] as const) {
         expect(
           QueryStreamIndexRange.toBounds(lower[upperTag]("score", 5)),
@@ -280,6 +293,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
         lower: { orderKey: lower, inclusive: true },
         upper: { orderKey: upper, inclusive: true },
       });
+
       expect(split).toEqual(
         Result.fail(
           new QueryStreamIndexPrefix.IndexPrefixWidthMismatchError({
@@ -298,6 +312,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
         lower: { orderKey: [1, 2, 3], inclusive: false },
         upper: { orderKey: [1, 3, 2], inclusive: true },
       };
+
       const expected = [
         {
           lower: { orderKey: [1, 2, 3], inclusive: false },
@@ -312,6 +327,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
           upper: { orderKey: [1, 3, 2], inclusive: true },
         },
       ];
+
       const ranges = fromBounds(["f1", "f2", "f3"], order, bounds);
       expectTypeOf(ranges).toEqualTypeOf<
         ReadonlyArray<QueryStreamIndexRange.QueryStreamIndexRange>
@@ -327,6 +343,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
 
   it("preserves unconstrained, equality-only, and one-sided ranges", () => {
     const pinned = builder().eq("category", "a");
+
     for (const range of [
       builder(),
       pinned,
@@ -353,11 +370,15 @@ describe("QueryStreamIndexRange.fromBounds", () => {
         [1, 0],
         [1, 1],
       ];
+
       const ordered = order === "asc" ? keys : keys.toReversed();
+
       const endpoints = [[], [0], [1], ...keys].flatMap((orderKey) =>
         [true, false].map((inclusive) => ({ orderKey, inclusive })),
       );
+
       const layout = Result.getOrThrow(Layout.fromIndex(["a", "_id"]));
+
       const admits = (bounds: QueryStreamKeyBounds.IndexBounds) => {
         const parsed = Result.getOrThrow(
           QueryStreamKeyBounds.parse(layout, {
@@ -365,14 +386,17 @@ describe("QueryStreamIndexRange.fromBounds", () => {
             upper: Option.some(bounds.upper),
           }),
         );
+
         return (values: ReadonlyArray<number>) => {
           const key = Result.getOrThrow(Key.complete(layout, values));
+
           return (
             QueryStreamKeyBounds.admittedByLower(parsed.lower)(key) &&
             QueryStreamKeyBounds.admittedByUpper(parsed.upper)(key)
           );
         };
       };
+
       for (const lower of endpoints)
         for (const upper of endpoints) {
           const bounds = { lower, upper };
@@ -419,6 +443,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
           upper: { orderKey: [], inclusive: true },
         },
       ];
+
       for (const bounds of cases) {
         expect(fromBounds(["score", "_id"], order, bounds)).toEqual([]);
       }

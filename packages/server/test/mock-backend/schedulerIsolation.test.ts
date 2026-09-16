@@ -42,13 +42,20 @@ const expectedSum = (5000 * 5001) / 2;
 const withConvexIsolateTimers = <A>(run: () => Promise<A>): Promise<A> => {
   const originalSetTimeout = globalThis.setTimeout;
   const originalSetImmediate = globalThis.setImmediate;
+
   const ban = (name: string) => () => {
     throw new Error(
       `Can't use ${name} in queries and mutations. Please consider using an action.`,
     );
   };
-  globalThis.setTimeout = ban("setTimeout") as never;
-  globalThis.setImmediate = ban("setImmediate") as never;
+
+  globalThis.setTimeout = Object.assign(ban("setTimeout"), {
+    __promisify__: ban("setTimeout"),
+  });
+  globalThis.setImmediate = Object.assign(ban("setImmediate"), {
+    __promisify__: ban("setImmediate"),
+  });
+
   return run().finally(() => {
     globalThis.setTimeout = originalSetTimeout;
     globalThis.setImmediate = originalSetImmediate;
@@ -58,6 +65,7 @@ const withConvexIsolateTimers = <A>(run: () => Promise<A>): Promise<A> => {
 describe("Effect scheduler inside the Convex isolate", () => {
   it("runs a query handler exceeding the fiber op budget without timers", () => {
     const t = convexTest(convexSchema, modules);
+
     return withConvexIsolateTimers(() =>
       t.query(
         Ref.getFunctionReference(refs.public.groups.scheduling.manyOpsQuery),
@@ -68,6 +76,7 @@ describe("Effect scheduler inside the Convex isolate", () => {
 
   it("runs a mutation handler exceeding the fiber op budget without timers", () => {
     const t = convexTest(convexSchema, modules);
+
     return withConvexIsolateTimers(() =>
       t.mutation(
         Ref.getFunctionReference(refs.public.groups.scheduling.manyOpsMutation),

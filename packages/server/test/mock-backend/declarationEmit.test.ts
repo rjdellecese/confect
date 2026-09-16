@@ -62,6 +62,7 @@ const emitDeclarations = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner;
 
   const packageRoot = path.resolve(import.meta.dirname, "../..");
+
   const generated = path.resolve(
     import.meta.dirname,
     "fixtures/confect/_generated",

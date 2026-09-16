@@ -40,6 +40,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
 ): DatabaseReaderService<DatabaseSchema_> => {
+  // SAFETY: make has no document overrides, so each accessor returns its table's decoded document; TypeScript does not reduce the generic conditional over the empty Docs registry.
   return {
     table: <
       const TableName extends Table.Name<IncludedTables<DatabaseSchema_>>,
@@ -62,6 +63,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
             query: convexDatabaseReader.query.bind(convexDatabaseReader),
           };
 
+      // SAFETY: isSystem checks the system-table registry; otherwise TableName belongs to databaseSchema. Each branch selects the table with that exact name.
       const table = (
         isSystem
           ? (Table.systemTables as Record<string, Table.AnyWithProps>)[

@@ -44,7 +44,9 @@ const absolutizeMetafile = (
 ): esbuild.Metafile => {
   const absolutize = (p: string) =>
     path.isAbsolute(p) ? p : path.resolve(cwd, p);
+
   const inputs: esbuild.Metafile["inputs"] = {};
+
   for (const [key, value] of Object.entries(metafile.inputs)) {
     inputs[absolutize(key)] = {
       ...value,
@@ -56,10 +58,13 @@ const absolutizeMetafile = (
       ),
     };
   }
+
   const outputs: esbuild.Metafile["outputs"] = {};
+
   for (const [key, value] of Object.entries(metafile.outputs)) {
     outputs[absolutize(key)] = value;
   }
+
   return { inputs, outputs };
 };
 
@@ -101,7 +106,9 @@ export const bundleWorkspacePlugin = (
   setup(build) {
     build.onResolve({ filter: /^[^./]/ }, (args) => {
       if (args.namespace !== "file" && args.namespace !== "") return undefined;
+
       if (isBuiltin(args.path) || path.isAbsolute(args.path)) return undefined;
+
       if (Array.some(skipPatterns, (pattern) => pattern.test(args.path))) {
         return undefined;
       }
@@ -189,9 +196,11 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
   });
 
   const cwd = path.dirname(entryPoint);
+
   const skipPatterns = tsconfigPathsToRegExp(
     loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
   );
+
   const result = yield* Effect.tryPromise({
     try: () =>
       bundleRequire({
@@ -217,6 +226,7 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
   );
 
   const { metafile } = yield* Ref.get(buildResultRef);
+
   if (!metafile) {
     return yield* Effect.die(new Error("esbuild metafile missing"));
   }
@@ -233,6 +243,7 @@ const findMetafileInputKey = Effect.fnUntraced(function* (
 ) {
   const path = yield* Path.Path;
   const resolved = path.resolve(absolutePath);
+
   return Array.findFirst(
     Object.keys(metafile.inputs),
     (key) => path.resolve(key) === resolved,
@@ -250,10 +261,12 @@ export const directlyImports = Effect.fnUntraced(function* (
   targetAbsolutePath: string,
 ) {
   const path = yield* Path.Path;
+
   const sourceKey = yield* findMetafileInputKey(
     bundled.metafile,
     sourceAbsolutePath,
   );
+
   const targetKey = yield* findMetafileInputKey(
     bundled.metafile,
     targetAbsolutePath,
@@ -265,6 +278,7 @@ export const directlyImports = Effect.fnUntraced(function* (
       Option.fromNullishOr(bundled.metafile.inputs[sourceKey_]).pipe(
         Option.map((sourceInput) => {
           const targetResolved = path.resolve(targetKey_);
+
           return sourceInput.imports.some(
             (importedFile) =>
               path.resolve(importedFile.path) === targetResolved,

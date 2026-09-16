@@ -29,8 +29,10 @@ export const formatPath = (relativePath: string): string => {
     relativePath.lastIndexOf("/"),
     relativePath.lastIndexOf("\\"),
   );
+
   const dir = lastSep < 0 ? "" : relativePath.slice(0, lastSep + 1);
   const leaf = lastSep < 0 ? relativePath : relativePath.slice(lastSep + 1);
+
   return Ansi.blackBright(dir) + leaf;
 };
 
@@ -42,6 +44,7 @@ const logFile = (char: string, color: Ansi.Style) =>
     const path = yield* Path.Path;
 
     const prefix = projectRoot + path.sep;
+
     const suffix = pipe(fullPath, String.startsWith(prefix))
       ? pipe(fullPath, String.slice(prefix.length))
       : fullPath;
@@ -115,11 +118,13 @@ const formatBuildMessage = (
 ): string => {
   const lines = String.split(formattedMessage, "\n");
   const redErrorText = Ansi.red(error?.text ?? "");
+
   const replaced = pipe(
     Array.findFirstIndex(lines, (l) => pipe(l, String.trim, String.isNonEmpty)),
     Option.flatMap((index) => Array.modify(lines, index, () => redErrorText)),
     Option.getOrElse(() => lines),
   );
+
   return pipe(replaced, Array.join("\n"));
 };
 
@@ -144,12 +149,14 @@ const renderImportFailedError = (error: ImportFailedError): string => {
     : Predicate.isString(error.cause)
       ? error.cause
       : globalThis.String(error.cause);
+
   const oneLineCause = pipe(
     String.split(causeMessage, "\n"),
     Array.findFirst((line) => pipe(line, String.trim, String.isNonEmpty)),
     Option.map(String.trim),
     Option.getOrElse(() => "unknown error"),
   );
+
   return `${cross} Failed to load bundled module ${formatPath(
     error.file,
   )}: ${oneLineCause}; check the file's top-level imports and side effects.`;
@@ -162,13 +169,16 @@ const renderImportFailedError = (error: ImportFailedError): string => {
  * `BundleFailedError` carries an array of distinct esbuild messages.
  */
 const renderBundleFailedError = (error: BundleFailedError): string => {
-  const messages = error.errors as readonly esbuild.Message[];
-  const formatted = esbuild.formatMessagesSync(messages as esbuild.Message[], {
+  const messages = error.errors;
+
+  const formatted = esbuild.formatMessagesSync(messages, {
     kind: "error",
     color: true,
     terminalWidth: 80,
   });
+
   const header = `${cross} ${formatPath(error.file)}: build errors`;
+
   return `${header}\n${formatEsbuildMessages(messages, formatted)}`;
 };
 
@@ -194,12 +204,15 @@ export const logBuildError = (error: BuildError) =>
 const renderCoalescedBuildErrors = (
   messages: readonly esbuild.Message[],
 ): string => {
+  // SAFETY: esbuild's formatMessagesSync serializes messages through sanitizeMessages without mutating the input array or its entries.
   const formatted = esbuild.formatMessagesSync(messages as esbuild.Message[], {
     kind: "error",
     color: true,
     terminalWidth: 80,
   });
+
   const header = `${cross} Build errors`;
+
   return `${header}\n${formatEsbuildMessages(messages, formatted)}`;
 };
 
@@ -213,18 +226,22 @@ export const logCoalescedBuildErrors = (
 const renderCoalescedBuildWarnings = (
   messages: readonly esbuild.Message[],
 ): string => {
+  // SAFETY: esbuild's formatMessagesSync serializes messages through sanitizeMessages without mutating the input array or its entries.
   const formatted = esbuild.formatMessagesSync(messages as esbuild.Message[], {
     kind: "warning",
     color: true,
     terminalWidth: 80,
   });
+
   const header = `${warningSign} Build warnings`;
+
   const body = pipe(
     formatted,
     Array.join(""),
     String.trimEnd,
     withGutterBlock(gutter(Ansi.yellow)),
   );
+
   return `${header}\n${body}`;
 };
 

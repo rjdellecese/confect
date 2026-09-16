@@ -175,10 +175,12 @@ export const CodegenError = Schema.Union([
   ConflictingDocNameError,
   InvalidConvexConfigError,
 ]);
+
 export type CodegenError = typeof CodegenError.Type;
 
 export const isCodegenError = (error: unknown): error is CodegenError => {
   if (isBuildError(error)) return true;
+
   return Schema.is(CodegenError)(error);
 };
 
@@ -191,7 +193,9 @@ const stemFromSpecPath = (specPath: string): string => {
     specPath.lastIndexOf("/"),
     specPath.lastIndexOf("\\"),
   );
+
   const basename = lastSep < 0 ? specPath : specPath.slice(lastSep + 1);
+
   return basename.endsWith(".spec.ts")
     ? basename.slice(0, -".spec.ts".length)
     : basename;
@@ -231,6 +235,7 @@ const renderSpecImportsServerError = (
   error: SpecImportsServerError,
 ): string => {
   const importers = error.importerPaths.join(", ");
+
   return singleLine(
     "Spec ",
     formatPath(error.specPath),
@@ -242,6 +247,7 @@ const renderImplMissingSpecImportError = (
   error: ImplMissingSpecImportError,
 ): string => {
   const stem = stemFromSpecPath(error.expectedSpecPath);
+
   return singleLine(
     "Impl ",
     formatPath(error.implPath),
@@ -269,6 +275,7 @@ const renderImplMissingFunctionsError = (
   error: ImplMissingFunctionsError,
 ): string => {
   const names = error.missingFunctionNames.join(", ");
+
   return singleLine(
     "Impl ",
     formatPath(error.implPath),
@@ -280,6 +287,7 @@ const renderImplMissingMiddlewareError = (
   error: ImplMissingMiddlewareError,
 ): string => {
   const keys = error.missingMiddlewareKeys.join(", ");
+
   return singleLine(
     "Impl ",
     formatPath(error.implPath),
@@ -314,6 +322,7 @@ const renderDuplicateTableNameError = (
         `\`${tableName}\` (${tablePaths.join(", ")})`,
     )
     .join("; ");
+
   return singleLine(
     `Multiple files under \`confect/tables/\` resolve to the same table name. Table names are derived from filenames, so each must be unique across the directory (including subdirectories); rename or remove all but one. Conflicts: ${conflicts}.`,
   );
@@ -330,6 +339,7 @@ const renderConflictingDocNameError = (
     ),
     Array.join("; "),
   );
+
   return singleLine(
     `Multiple tables fold to the same generated document type name. Table names are converted to PascalCase (so \`user_profiles\` and \`userProfiles\` both become \`UserProfilesDoc\`); rename all but one of each colliding group. Conflicts: ${conflicts}.`,
   );
@@ -370,6 +380,7 @@ const renderParentChildNameCollisionError = (
  */
 export const renderCodegenError = (error: CodegenError): string => {
   if (isBuildError(error)) return renderBuildError(error);
+
   return Match.value(error).pipe(
     Match.tag("MissingImplFileError", renderMissingImplFileError),
     Match.tag("MissingSpecFileError", renderMissingSpecFileError),
@@ -433,6 +444,7 @@ export const tapAndLog = <A, E, R>(
  * `Option.none()`. Success resolves to `Option.some(value)`.
  */
 // oxlint-disable effecttsgo/unsafe-effect-type-assertion -- catchIf removes the error variant selected by this refinement.
+// SAFETY: catchIf handles exactly the CodegenError variants selected by the schema refinement, leaving Exclude<E, CodegenError>.
 export const catchAndLog = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<Option.Option<A>, Exclude<E, CodegenError>, R> =>

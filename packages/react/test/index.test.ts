@@ -5,6 +5,9 @@ import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as Data from "effect/Data";
+import { createHooks } from "../src/internal/hooks";
+import { convexHooks } from "../src/internal/convex";
 import {
   assert,
   beforeEach,
@@ -15,30 +18,26 @@ import {
 } from "@effect/vitest";
 import { vi } from "vitest";
 import type { InvokeReturn, UsePaginatedQueryArgs } from "@confect/react";
-import {
-  PaginatedQueryResult,
-  QueryResult,
-  useAction,
-  useMutation,
-  usePaginatedQuery,
-  useQuery,
-} from "@confect/react";
+import { PaginatedQueryResult, QueryResult } from "@confect/react";
 
 const useConvexQueryMock = vi.fn();
+
 const useConvexMutationMock = vi.fn();
+
 const useConvexActionMock = vi.fn();
+
 const useConvexPaginatedQueryInternalMock = vi.fn();
 
-vi.mock("convex/react", () => ({
-  useQuery: (...args: unknown[]) => useConvexQueryMock(...args),
-  useMutation: (...args: unknown[]) => useConvexMutationMock(...args),
-  useAction: (...args: unknown[]) => useConvexActionMock(...args),
-  usePaginatedQuery: () => {
-    throw new Error("unexpected call to the public usePaginatedQuery");
-  },
-  usePaginatedQueryInternal: (...args: unknown[]) =>
-    useConvexPaginatedQueryInternalMock(...args),
-}));
+const { useAction, useMutation, usePaginatedQuery, useQuery } = createHooks({
+  ...convexHooks,
+  useQuery: useConvexQueryMock,
+  useMutation: useConvexMutationMock,
+  useAction: useConvexActionMock,
+  usePaginatedQueryInternal: useConvexPaginatedQueryInternalMock,
+});
+
+const { Anything } =
+  Data.taggedEnum<Data.TaggedEnum<{ Anything: { id: string } }>>();
 
 class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
   id: Schema.String,
@@ -127,7 +126,9 @@ describe("useQuery", () => {
 
   test("Failure carries decoded typed error for a matching ConvexError", () => {
     useConvexQueryMock.mockImplementation(() => {
-      throw new ConvexError({ _tag: "NotFound", id: "abc" });
+      throw new ConvexError(
+        Schema.encodeSync(NotFound)(new NotFound({ id: "abc" })),
+      );
     });
 
     const { result } = renderHook(() =>
@@ -151,7 +152,7 @@ describe("useQuery", () => {
   });
 
   test("rethrows a ConvexError from a ref without an error schema", () => {
-    const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
+    const convexError = new ConvexError(Anything({ id: "abc" }));
     useConvexQueryMock.mockImplementation(() => {
       throw convexError;
     });
@@ -225,7 +226,10 @@ describe("useQuery", () => {
   });
 
   test("preserves Failure identity across rerenders for an unchanged ConvexError", () => {
-    const convexError = new ConvexError({ _tag: "NotFound", id: "abc" });
+    const convexError = new ConvexError(
+      Schema.encodeSync(NotFound)(new NotFound({ id: "abc" })),
+    );
+
     useConvexQueryMock.mockImplementation(() => {
       throw convexError;
     });
@@ -233,6 +237,7 @@ describe("useQuery", () => {
     const { result, rerender } = renderHook(() =>
       useQuery(queryWithError, { id: "abc" }),
     );
+
     const first = result.current;
     assert(QueryResult.isFailure(first));
 
@@ -244,10 +249,13 @@ describe("useQuery", () => {
   test("produces a new Loading when `skipped` changes while convex returns undefined", () => {
     useConvexQueryMock.mockReturnValue(undefined);
 
-    const { result, rerender } = renderHook(
-      ({ args }: { args: {} | "skip" }) => useQuery(queryNoError, args),
-      { initialProps: { args: {} as {} | "skip" } },
-    );
+    const { result, rerender } = renderHook<
+      QueryResult.QueryResult<Ref.Returns<typeof queryNoError>>,
+      { args: {} | "skip" }
+    >(({ args }: { args: {} | "skip" }) => useQuery(queryNoError, args), {
+      initialProps: { args: {} },
+    });
+
     const first = result.current;
     assert(QueryResult.isLoading(first));
     expect(first.skipped).toBe(false);
@@ -290,6 +298,7 @@ describe("useMutation", () => {
         useConvexMutationMock.mockReturnValue(inner);
 
         const { result } = renderHook(() => useMutation(mutationWithError));
+
         const result_ = yield* Effect.promise(() =>
           result.current({ id: "abc" }),
         );
@@ -305,10 +314,16 @@ describe("useMutation", () => {
       Effect.gen(function* () {
         const inner = vi
           .fn()
-          .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
+          .mockRejectedValue(
+            new ConvexError(
+              yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+            ),
+          );
+
         useConvexMutationMock.mockReturnValue(inner);
 
         const { result } = renderHook(() => useMutation(mutationWithError));
+
         const result_ = yield* Effect.promise(() =>
           result.current({ id: "abc" }),
         );
@@ -337,7 +352,7 @@ describe("useMutation", () => {
     "rejects with the original ConvexError for a ref without an error schema",
     () =>
       Effect.gen(function* () {
-        const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
+        const convexError = new ConvexError(Anything({ id: "abc" }));
         const inner = vi.fn().mockRejectedValue(convexError);
         useConvexMutationMock.mockReturnValue(inner);
 
@@ -392,6 +407,7 @@ describe("useAction", () => {
         useConvexActionMock.mockReturnValue(inner);
 
         const { result } = renderHook(() => useAction(actionWithError));
+
         const result_ = yield* Effect.promise(() =>
           result.current({ id: "abc" }),
         );
@@ -407,10 +423,16 @@ describe("useAction", () => {
       Effect.gen(function* () {
         const inner = vi
           .fn()
-          .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
+          .mockRejectedValue(
+            new ConvexError(
+              yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+            ),
+          );
+
         useConvexActionMock.mockReturnValue(inner);
 
         const { result } = renderHook(() => useAction(actionWithError));
+
         const result_ = yield* Effect.promise(() =>
           result.current({ id: "abc" }),
         );
@@ -583,7 +605,11 @@ describe("usePaginatedQuery", () => {
           status,
           results: [{ value: "1" }],
           loadMore,
-          error: new ConvexError({ _tag: "PaginationFailed", reason: "oops" }),
+          error: new ConvexError(
+            Schema.encodeSync(PaginationFailed)(
+              new PaginationFailed({ reason: "oops" }),
+            ),
+          ),
         }),
       );
 
@@ -592,6 +618,7 @@ describe("usePaginatedQuery", () => {
       );
 
       expect("loadMore" in result.current).toBe(carriesLoadMore);
+
       if (PaginatedQueryResult.isCanLoadMore(result.current)) {
         expect(result.current.loadMore).toBe(loadMore);
       }
@@ -606,6 +633,7 @@ describe("usePaginatedQuery", () => {
     const { result, rerender } = renderHook(() =>
       usePaginatedQuery(paginatedQueryNoExtraArgs, {}, { initialNumItems: 10 }),
     );
+
     const first = result.current;
 
     rerender();
@@ -624,6 +652,7 @@ describe("usePaginatedQuery", () => {
     const { result, rerender } = renderHook(() =>
       usePaginatedQuery(paginatedQueryNoExtraArgs, {}, { initialNumItems: 10 }),
     );
+
     const first = result.current;
 
     useConvexPaginatedQueryInternalMock.mockReturnValue(
@@ -640,7 +669,11 @@ describe("usePaginatedQuery", () => {
     useConvexPaginatedQueryInternalMock.mockReturnValue(
       user({
         status: "Error",
-        error: new ConvexError({ _tag: "PaginationFailed", reason: "oops" }),
+        error: new ConvexError(
+          Schema.encodeSync(PaginationFailed)(
+            new PaginationFailed({ reason: "oops" }),
+          ),
+        ),
       }),
     );
 
@@ -658,7 +691,11 @@ describe("usePaginatedQuery", () => {
       user({
         status: "Error",
         results: [{ value: "1" }, { value: "2" }],
-        error: new ConvexError({ _tag: "PaginationFailed", reason: "oops" }),
+        error: new ConvexError(
+          Schema.encodeSync(PaginationFailed)(
+            new PaginationFailed({ reason: "oops" }),
+          ),
+        ),
       }),
     );
 
@@ -708,6 +745,7 @@ describe("usePaginatedQuery", () => {
       isConvexSystemError: true,
       paginationError: "InvalidCursor",
     });
+
     useConvexPaginatedQueryInternalMock.mockReturnValue(
       user({ status: "Error", error: systemError }),
     );
