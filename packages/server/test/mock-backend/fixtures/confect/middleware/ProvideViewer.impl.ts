@@ -25,7 +25,6 @@ const viewerFromDatabase = Effect.gen(function* () {
 const viewerViaRunQuery = Effect.gen(function* () {
   const runQuery = yield* QueryRunner;
 
-  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Generated runner constraints erase the ref's error; this ref declares no domain error, so its SchemaError is defected here.
   const username = yield* runQuery(
     refs.internal.groups.middlewareHelpers.firstUsername,
   ).pipe(Effect.orDie);

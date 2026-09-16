@@ -26,6 +26,23 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
 </CodeGroup>
 
+## TypeScript configuration
+
+Confect requires `strict: true` in the TypeScript configuration that covers your
+Confect files. `exactOptionalPropertyTypes: true` is optional but recommended:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "strict": true,
+    "exactOptionalPropertyTypes": true
+  }
+}
+```
+
+See [Effect Schema's explanation of `exactOptionalPropertyTypes`](https://effect.website/docs/v4/schema/introduction#the-exactoptionalpropertytypes-option)
+for how it affects optional properties and schema validation.
+
 ## Usage
 
 <Steps>

@@ -1,0 +1,21 @@
+{
+  "name": "confect-test-types",
+  "description": "Internal type-only helpers for Confect's test suites.",
+  "version": "0.0.0",
+  "devDependencies": {
+    "@effect/vitest": "4.0.0-rc.115",
+    "effect": "4.0.0-rc.115",
+    "typescript": "7.0.2",
+    "vitest": "5.0.0"
+  },
+  "exports": {
+    "./CompilerOptions": "./src/CompilerOptions.ts"
+  },
+  "private": true,
+  "scripts": {
+    "clean": "shx rm -rf node_modules",
+    "typecheck": "tsc --project tsconfig.json",
+    "typecheck:inexact": "tsc --project test/inexact/tsconfig.json"
+  },
+  "type": "module"
+}

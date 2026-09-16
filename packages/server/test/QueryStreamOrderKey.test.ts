@@ -31,7 +31,7 @@ describe("QueryStreamOrderKey", () => {
     >();
   });
 
-  it.each([
+  it.each<Record<string, boolean | number | string>>([
     { $undefined: false },
     { $undefined: true, extra: 1 },
     { $integer: "invalid" },

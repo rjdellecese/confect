@@ -1,5 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { describe, expect, expectTypeOf, it, test } from "@effect/vitest";
+import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -204,12 +205,16 @@ describe("Command", () => {
       Command.mutation("SaveNote", insertMutationRef, saveNoteHandlers);
     });
 
-    it("rejects an explicitly undefined interrupt option", () => {
-      // @ts-expect-error—absence and `interrupt: undefined` are distinct
-      Command.mutation("SaveNote", insertMutationRef, {
-        ...saveNoteConfig,
-        interrupt: undefined,
-      });
+    it("checks an explicitly undefined interrupt option against compiler optionality", () => {
+      type AcceptsUndefined = typeof Command.mutation extends (
+        name: "SaveNote",
+        ref: typeof insertMutationRef,
+        config: typeof saveNoteConfig & { interrupt: undefined },
+      ) => unknown
+        ? true
+        : false;
+
+      expectTypeOf<AcceptsUndefined>().toEqualTypeOf<CompilerOptions.AllowsExplicitUndefined>();
     });
 
     it("rejects a handler Message not declared in messages", () => {
