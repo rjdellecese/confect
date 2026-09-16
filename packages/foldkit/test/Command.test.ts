@@ -1,5 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { describe, expect, expectTypeOf, it, test } from "@effect/vitest";
+import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -205,11 +206,6 @@ describe("Command", () => {
     });
 
     it("checks an explicitly undefined interrupt option against compiler optionality", () => {
-      type AllowsExplicitUndefined = { value: undefined } extends {
-        value?: never;
-      }
-        ? true
-        : false;
       type AcceptsUndefined = typeof Command.mutation extends (
         name: "SaveNote",
         ref: typeof insertMutationRef,
@@ -218,7 +214,7 @@ describe("Command", () => {
         ? true
         : false;
 
-      expectTypeOf<AcceptsUndefined>().toEqualTypeOf<AllowsExplicitUndefined>();
+      expectTypeOf<AcceptsUndefined>().toEqualTypeOf<CompilerOptions.AllowsExplicitUndefined>();
     });
 
     it("rejects a handler Message not declared in messages", () => {

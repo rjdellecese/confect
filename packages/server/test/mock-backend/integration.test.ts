@@ -1,5 +1,6 @@
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
+import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
@@ -101,17 +102,12 @@ describe("DatabaseWriter", () => {
   it("patch accepts undefined according to field types and compiler optionality", () => {
     const patchNote = (writer: DatabaseWriter) => writer.table("notes").patch;
     type Patch = Parameters<ReturnType<typeof patchNote>>[1];
-    type AllowsExplicitUndefined = { value: undefined } extends {
-      value?: never;
-    }
-      ? true
-      : false;
 
     expectTypeOf<{ tag: undefined }>().toExtend<Patch>();
     expectTypeOf<{ author: undefined }>().toExtend<Patch>();
     expectTypeOf<
       { text: undefined } extends Patch ? true : false
-    >().toEqualTypeOf<AllowsExplicitUndefined>();
+    >().toEqualTypeOf<CompilerOptions.AllowsExplicitUndefined>();
     expectTypeOf<{ text: string }>().toExtend<Patch>();
   });
 });

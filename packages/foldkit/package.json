@@ -9,6 +9,7 @@
   "devDependencies": {
     "@effect/vitest": "4.0.0-rc.115",
     "@types/node": "24.13.3",
+    "confect-test-types": "workspace:*",
     "convex": "1.45.0",
     "effect": "4.0.0-rc.115",
     "foldkit": "0.148.1",

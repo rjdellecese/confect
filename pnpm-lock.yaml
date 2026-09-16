@@ -439,6 +439,9 @@ importers:
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
+      confect-test-types:
+        specifier: workspace:*
+        version: link:../../tools/test-types
       convex:
         specifier: 1.45.0
         version: 1.45.0(react@19.3.0)
@@ -574,6 +577,9 @@ importers:
       confect-bench-harness:
         specifier: workspace:*
         version: link:../../tools/bench-harness
+      confect-test-types:
+        specifier: workspace:*
+        version: link:../../tools/test-types
       convex-test:
         specifier: 0.0.57
         version: 0.0.57(convex@1.45.0(react@19.3.0))
@@ -706,6 +712,21 @@ importers:
       vitest:
         specifier: 5.0.0
         version: 5.0.0(@types/node@24.13.3)(@vitest/browser-preview@4.1.11)(@vitest/coverage-v8@5.0.0)(happy-dom@20.12.0)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.13)(yaml@2.9.0))
+
+  tools/test-types:
+    devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(vitest@5.0.0)
+      effect:
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.0
+        version: 5.0.0(@types/node@24.13.3)(@vitest/browser-preview@4.1.11)(@vitest/coverage-v8@5.0.0)(happy-dom@20.14.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.13)(yaml@2.9.0))
 
 packages:
 
