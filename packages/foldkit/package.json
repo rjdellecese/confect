@@ -9,6 +9,7 @@
   "devDependencies": {
     "@effect/vitest": "4.0.0-rc.115",
     "@types/node": "24.13.3",
+    "confect-test-types": "workspace:*",
     "convex": "1.45.0",
     "effect": "4.0.0-rc.115",
     "foldkit": "0.148.1",
@@ -65,7 +66,8 @@
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",
-    "typecheck": "tsc -b tsconfig.src.json"
+    "typecheck": "tsc -b tsconfig.src.json",
+    "typecheck:inexact": "tsc --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
   },
   "sideEffects": false,
   "type": "module",

@@ -59,7 +59,8 @@
     "test:prerelease-sync": "bun test scripts/auditPrereleaseSync.test.ts",
     "test:server:local-backend": "pnpm --filter @confect/server test:local-backend",
     "test:server:mock-backend": "pnpm --filter @confect/server test:mock-backend",
-    "typecheck": "tsc -b tsconfig.packages.json tsconfig.json tools/oxlint-rules/tsconfig.json",
+    "typecheck": "tsc -b tsconfig.packages.json tsconfig.json tools/oxlint-rules/tsconfig.json && pnpm --filter confect-test-types typecheck",
+    "typecheck:inexact": "tsc -b tsconfig.packages.json && vp run --filter \"@confect/*\" --filter confect-test-types typecheck:inexact",
     "version-packages": "changeset version && pnpm format"
   }
 }

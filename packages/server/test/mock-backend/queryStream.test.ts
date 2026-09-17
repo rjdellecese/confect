@@ -1,4 +1,4 @@
-import * as Key from "@confect/server/QueryStreamKey";
+import * as QueryStreamKey from "@confect/server/QueryStreamKey";
 import { identity } from "effect/Function";
 import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
@@ -45,7 +45,7 @@ const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
   numItems: number,
 ): Effect.Effect<
   ReadonlyArray<ReadonlyArray<Doc>>,
-  E | QueryStreamReadBudget.ReadBudgetExceededError,
+  E | QueryStream.ReadBudgetExceededError,
   R
 > => {
   const go = (
@@ -53,7 +53,7 @@ const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
     pages: ReadonlyArray<ReadonlyArray<Doc>>,
   ): Effect.Effect<
     ReadonlyArray<ReadonlyArray<Doc>>,
-    E | QueryStreamReadBudget.ReadBudgetExceededError,
+    E | QueryStream.ReadBudgetExceededError,
     R
   > =>
     QueryStream.paginate(stream, { numItems, cursor }).pipe(
@@ -201,8 +201,7 @@ describe("QueryStream", () => {
 
           const reader = yield* DatabaseReader;
           const notes = reader.table("notes").stream("by_text");
-          type Note =
-            typeof notes extends Stream.Stream<infer A, any, any> ? A : never;
+          type Note = Stream.Success<typeof notes>;
           const nothing = QueryStream.empty<Note>()(
             Result.getOrThrowWith(
               QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
@@ -488,7 +487,7 @@ describe("QueryStream", () => {
 
             assert(Result.isFailure(result));
             expect(result.failure).toBeInstanceOf(
-              QueryStreamReadBudget.ReadBudgetExceededError,
+              QueryStream.ReadBudgetExceededError,
             );
           }),
         );
@@ -552,8 +551,7 @@ describe("QueryStream", () => {
             pages: ReadonlyArray<ReadonlyArray<string>>,
           ): Effect.Effect<
             ReadonlyArray<ReadonlyArray<string>>,
-            | Document.DocumentDecodeError
-            | QueryStreamReadBudget.ReadBudgetExceededError
+            Document.DocumentDecodeError | QueryStream.ReadBudgetExceededError
           > =>
             QueryStream.paginate(merged, {
               numItems: 10,
@@ -678,7 +676,15 @@ describe("QueryStream", () => {
               yield* insertNotes(["a", "b", "b", "c", "d", "d", "e"]);
               const reader = yield* DatabaseReader;
               const leaf = reader.table("notes").stream("by_text", order);
-              const elements = yield* Stream.runCollect(leaf.annotated);
+              const elements = yield* Stream.runCollect(leaf.annotated).pipe(
+                Effect.provideServiceEffect(
+                  QueryStreamReadBudget.QueryStreamReadBudget,
+                  QueryStreamReadBudget.make({
+                    maximumRowsRead: Option.none(),
+                    maximumBytesRead: Option.none(),
+                  }),
+                ),
+              );
               const texts = yield* collectTexts(leaf);
               const start = {
                 orderKey: Array.getUnsafe(elements, 1).orderKey,
@@ -707,11 +713,12 @@ describe("QueryStream", () => {
                 upper: order === "asc" ? end : start,
               });
 
-              const fallback: typeof leaf = new QueryStream.QueryStream(
-                leaf.order,
-                leaf.keyLayout,
-                leaf.annotated,
-              );
+              const fallback: typeof leaf = new QueryStream.QueryStream<
+                Stream.Success<typeof leaf>,
+                ["text", "_creationTime"],
+                typeof order,
+                Stream.Error<typeof leaf>
+              >(leaf.order, leaf.keyLayout, leaf.annotated);
               const composed = QueryStream.merge([
                 reader
                   .table("notes")
@@ -888,7 +895,15 @@ describe("QueryStream", () => {
                     },
                   ),
                 );
-              const elements = yield* Stream.runCollect(joined.annotated);
+              const elements = yield* Stream.runCollect(joined.annotated).pipe(
+                Effect.provideServiceEffect(
+                  QueryStreamReadBudget.QueryStreamReadBudget,
+                  QueryStreamReadBudget.make({
+                    maximumRowsRead: Option.none(),
+                    maximumBytesRead: Option.none(),
+                  }),
+                ),
+              );
               // Exercise endpoints within one outer row and across two rows.
               for (const endIndex of [1, 3]) {
                 const result = yield* Stream.runCollect(
@@ -902,6 +917,14 @@ describe("QueryStream", () => {
                       inclusive: endInclusive,
                     },
                   }).annotated,
+                ).pipe(
+                  Effect.provideServiceEffect(
+                    QueryStreamReadBudget.QueryStreamReadBudget,
+                    QueryStreamReadBudget.make({
+                      maximumRowsRead: Option.none(),
+                      maximumBytesRead: Option.none(),
+                    }),
+                  ),
                 );
                 expect(result).toEqual(
                   elements.slice(
@@ -1138,8 +1161,7 @@ describe("QueryStream", () => {
             const outer = reader
               .table("notes")
               .stream("by_text", (q) => q.gte("text", "x"));
-            type Note =
-              typeof outer extends Stream.Stream<infer A, any, any> ? A : never;
+            type Note = Stream.Success<typeof outer>;
             const inner = (note: Note) =>
               reader
                 .table("notes")
@@ -1675,7 +1697,17 @@ describe("QueryStream", () => {
               () => compositeEmpty,
               { innerLayout, onEmpty: (doc) => doc },
             );
-            const annotated = yield* Stream.runCollect(placeholders.annotated);
+            const annotated = yield* Stream.runCollect(
+              placeholders.annotated,
+            ).pipe(
+              Effect.provideServiceEffect(
+                QueryStreamReadBudget.QueryStreamReadBudget,
+                QueryStreamReadBudget.make({
+                  maximumRowsRead: Option.none(),
+                  maximumBytesRead: Option.none(),
+                }),
+              ),
+            );
             expect(annotated[0].orderKey.slice(-4)).toEqual([
               null,
               null,
@@ -1813,7 +1845,7 @@ describe("QueryStream", () => {
               const orderKey = yield* Schema.decodeEffect(
                 QueryStreamCursor.codecForLayout(source.keyLayout),
               )(cursor);
-              expect(Key.values(orderKey)).toHaveLength(3);
+              expect(QueryStreamKey.values(orderKey)).toHaveLength(3);
 
               for (const bound of ["cursor", "endCursor"] as const) {
                 const result = yield* QueryStream.paginate(relabeled, {
@@ -2060,7 +2092,7 @@ describe("QueryStream types", () => {
         Effect.flatMap(SomeService, (service) => service.check(note.text)),
       );
       expectTypeOf<
-        typeof filtered extends Stream.Stream<any, any, infer R> ? R : never
+        Stream.Services<typeof filtered>
       >().toEqualTypeOf<SomeService>();
 
       // flatMap concatenates order keys at the type level.
@@ -2074,10 +2106,8 @@ describe("QueryStream types", () => {
         readonly ["text", "_creationTime", "_creationTime"]
       >();
       // Without onEmpty, the elements are exactly the inner documents.
-      expectTypeOf<
-        typeof joined extends Stream.Stream<infer A, any, any> ? A : never
-      >().toEqualTypeOf<
-        typeof pinned extends Stream.Stream<infer A, any, any> ? A : never
+      expectTypeOf<Stream.Success<typeof joined>>().toEqualTypeOf<
+        Stream.Success<typeof pinned>
       >();
 
       const joinedMismatched = QueryStream.flatMap(bounded, (_note) => pinned, {
@@ -2149,13 +2179,8 @@ describe("QueryStream types", () => {
       expectTypeOf<LabelsOf<typeof withPlaceholder>>().toEqualTypeOf<
         readonly ["text", "_creationTime", "_creationTime"]
       >();
-      expectTypeOf<
-        typeof withPlaceholder extends Stream.Stream<infer A, any, any>
-          ? A
-          : never
-      >().toEqualTypeOf<
-        | (typeof pinned extends Stream.Stream<infer A, any, any> ? A : never)
-        | { missingFor: string }
+      expectTypeOf<Stream.Success<typeof withPlaceholder>>().toEqualTypeOf<
+        Stream.Success<typeof pinned> | { missingFor: string }
       >();
 
       // A flatMap result relabels by its type-level (tiebreaker-free) key.

@@ -64,6 +64,8 @@ Build, lint, and format run through Vite+ (`vp`), which orders packages by their
 - `pnpm dev:example`/`pnpm dev:docs` - Run the example app/docs site
 - `pnpm test` - Run all package test suites via Vitest (`vitest run`)
 - `pnpm typecheck` - Typecheck the package graph and test suites via `tsc -b` (project references, incremental)
+- `pnpm typecheck:inexact` - Refresh normal package declarations, then typecheck every package's sources and tests with `exactOptionalPropertyTypes: false`
+- `pnpm --filter example typecheck:inexact` - Typecheck both example projects with `exactOptionalPropertyTypes: false` (run `pnpm build` first)
 - `pnpm lint`/`pnpm lint:fix` - Lint (Oxlint + Syncpack); `lint:fix` writes fixes
 - `pnpm format`/`pnpm format:check` - Format (Oxfmt + Syncpack); `format` writes, `format:check` only checks
 - `pnpm check` - Format, lint, and type checks together (`vp check`)

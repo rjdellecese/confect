@@ -10,7 +10,6 @@ import type * as DatabaseWriterModule from "@confect/server/DatabaseWriter";
 import type * as Handler from "@confect/server/Handler";
 import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import type { Effect as EffectNamespace } from "effect";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -37,12 +36,6 @@ type HandlerFor<Group extends GroupSpec.AnyWithProps> = Handler.WithName<
   "viewerName",
   MiddlewareSpec.Provides<GroupSpec.MiddlewareSpecs<Group>>
 >;
-
-type EnvironmentOf<H> = H extends (
-  args: never,
-) => EffectNamespace.Effect<any, any, infer R>
-  ? R
-  : never;
 
 describe("implementation options", () => {
   class GroupPolicy extends MiddlewareSpec.MiddlewareSpec<GroupPolicy>()(
@@ -195,10 +188,13 @@ describe("handler environment widening", () => {
 
   it("widens the handler environment with middleware provides exactly when attached", () => {
     expectTypeOf<
-      Extract<EnvironmentOf<HandlerFor<typeof coveredGroup>>, Viewer>
+      Extract<
+        Effect.Services<ReturnType<HandlerFor<typeof coveredGroup>>>,
+        Viewer
+      >
     >().toEqualTypeOf<Viewer>();
     expectTypeOf<
-      Extract<EnvironmentOf<HandlerFor<typeof bareGroup>>, Viewer>
+      Extract<Effect.Services<ReturnType<HandlerFor<typeof bareGroup>>>, Viewer>
     >().toBeNever();
   });
 
@@ -317,10 +313,7 @@ describe("implementation service bounds", () => {
     // provides it cannot eliminate the requirement—its output environment
     // would keep `Viewer`, which `CommonServices` excludes.
     type Impl = MiddlewareSpec.MiddlewareImpl<Viewer, NoViewer, never>;
-    type IncomingEnvironment =
-      Parameters<Impl>[0] extends EffectNamespace.Effect<any, any, infer R>
-        ? R
-        : never;
+    type IncomingEnvironment = Effect.Services<Parameters<Impl>[0]>;
 
     expectTypeOf<IncomingEnvironment>().toEqualTypeOf<Viewer>();
   });
@@ -353,10 +346,7 @@ describe("group assembly enforcement", () => {
       Layer.provide(viewerNameImpl),
     );
 
-    type Requirements =
-      typeof missingMiddleware extends Layer.Layer<any, any, infer RIn>
-        ? RIn
-        : never;
+    type Requirements = Layer.Services<typeof missingMiddleware>;
 
     // `GroupImpl.finalize` demands `RIn = never`, so this leftover
     // requirement is exactly what rejects an unprovided middleware at the

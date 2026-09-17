@@ -7,7 +7,9 @@ import * as Schema from "effect/Schema";
 import type * as QueryStreamKey from "./QueryStreamKey";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 
-const PageSize = Schema.Natural.pipe(Schema.brand("QueryStream/PageSize"));
+const PageSize = Schema.Natural.pipe(
+  Schema.brand("~@confect/server/QueryStreamPagination/PageSize"),
+);
 type PageSize = typeof PageSize.Type;
 
 export class InvalidPageSizeError extends Data.TaggedError(
