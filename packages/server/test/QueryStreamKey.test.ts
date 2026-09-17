@@ -1,3 +1,4 @@
+import * as QueryStreamIndexPrefix from "@confect/server/QueryStreamIndexPrefix";
 import * as Key from "@confect/server/QueryStreamKey";
 import * as Layout from "@confect/server/QueryStreamKeyLayout";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -63,6 +64,22 @@ describe("QueryStreamKey", () => {
     ];
     expect(Array.map(keys, Key.values)).toEqual([[3, "id"], [3]]);
     expect(Array.map(keys, Key.layout)).toEqual([layout, layout]);
+  });
+
+  it("recognizes the complete guarantee rather than the key width", () => {
+    const complete = Result.getOrThrow(Key.complete(layout, [3, "id"]));
+    const prefix = Result.getOrThrow(Key.prefix(layout, [3, "id"]));
+    expect(Key.isComplete(complete)).toBe(true);
+    expect(Key.isComplete(prefix)).toBe(false);
+    expect(
+      Key.isComplete({ _tag: "Complete", layout, values: [3, "id"] }),
+    ).toBe(false);
+    expect(
+      Key.isComplete(
+        Result.getOrThrow(QueryStreamIndexPrefix.make(["score"], [3])),
+      ),
+    ).toBe(false);
+    expect(Key.isComplete(undefined)).toBe(false);
   });
 
   it("accepts complete zero-width keys", () => {

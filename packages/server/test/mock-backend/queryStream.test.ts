@@ -1,3 +1,4 @@
+import * as QueryStreamKey from "@confect/server/QueryStreamKey";
 import { identity } from "effect/Function";
 import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
@@ -1844,7 +1845,7 @@ describe("QueryStream", () => {
               const orderKey = yield* Schema.decodeEffect(
                 QueryStreamCursor.codecForLayout(source.keyLayout),
               )(cursor);
-              expect(orderKey).toHaveLength(3);
+              expect(QueryStreamKey.values(orderKey)).toHaveLength(3);
 
               for (const bound of ["cursor", "endCursor"] as const) {
                 const result = yield* QueryStream.paginate(relabeled, {

@@ -14,6 +14,14 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
+const encodeCursor =
+  (layout: QueryStreamKeyLayout.QueryStreamKeyLayout) =>
+  (values: QueryStreamOrderKey.QueryStreamOrderKey) =>
+    Effect.flatMap(
+      Effect.fromResult(QueryStreamKey.complete(layout, values)),
+      Schema.encodeEffect(QueryStreamCursor.codecForLayout(layout)),
+    );
+
 describe("QueryStream type parameters", () => {
   it("accepts direction third and defaults errors and requirements to never", () => {
     const source = new QueryStream.QueryStream<number, ["_id"], "desc">(
@@ -322,15 +330,11 @@ describe.each(["asc", "desc"] as const)(
           );
           const result = yield* QueryStream.paginate(source, {
             cursor: start
-              ? yield* Schema.encodeEffect(
-                  QueryStreamCursor.codecForLayout(source.keyLayout),
-                )([values[1]])
+              ? yield* encodeCursor(source.keyLayout)([values[1]])
               : null,
             ...(end
               ? {
-                  endCursor: yield* Schema.encodeEffect(
-                    QueryStreamCursor.codecForLayout(source.keyLayout),
-                  )([values[3]]),
+                  endCursor: yield* encodeCursor(source.keyLayout)([values[3]]),
                 }
               : {}),
             numItems: 10,
@@ -340,9 +344,7 @@ describe.each(["asc", "desc"] as const)(
           expect(result.isDone).toBe(!end);
           expect(result.continueCursor).toBe(
             end
-              ? yield* Schema.encodeEffect(
-                  QueryStreamCursor.codecForLayout(source.keyLayout),
-                )([values[3]])
+              ? yield* encodeCursor(source.keyLayout)([values[3]])
               : QueryStreamCursor.END_CURSOR,
           );
         }),
@@ -372,36 +374,34 @@ describe.each(["asc", "desc"] as const)(
 
           for (const cursor of [
             '["apple",1,"id"]',
-            yield* Schema.encodeEffect(
-              QueryStreamCursor.codecForLayout(
-                Result.getOrThrowWith(
-                  QueryStreamKeyLayout.fromIndex([
-                    "body",
-                    "_creationTime",
-                    "_id",
-                  ]),
-                  identity,
-                ),
+            yield* encodeCursor(
+              Result.getOrThrowWith(
+                QueryStreamKeyLayout.fromIndex([
+                  "body",
+                  "_creationTime",
+                  "_id",
+                ]),
+                identity,
               ),
             )(["apple", 1, "id"]),
-            yield* Schema.encodeEffect(
-              QueryStreamCursor.codecForLayout(
-                Result.getOrThrowWith(
-                  QueryStreamKeyLayout.fromIndex([
-                    "_creationTime",
-                    "text",
-                    "_id",
-                  ]),
-                  identity,
-                ),
+            yield* encodeCursor(
+              Result.getOrThrowWith(
+                QueryStreamKeyLayout.fromIndex([
+                  "_creationTime",
+                  "text",
+                  "_id",
+                ]),
+                identity,
               ),
             )(["apple", 1, "id"]),
           ]) {
             for (const numItems of [0, 1]) {
               const result = yield* QueryStream.paginate(source, {
-                cursor: yield* Schema.encodeEffect(
-                  QueryStreamCursor.codecForLayout(source.keyLayout),
-                )(["apple", 0, "before"]),
+                cursor: yield* encodeCursor(source.keyLayout)([
+                  "apple",
+                  0,
+                  "before",
+                ]),
                 numItems,
                 [bound]: cursor,
               }).pipe(Effect.catchDefect(Effect.succeed));
@@ -450,9 +450,11 @@ describe.each(["asc", "desc"] as const)(
 
         expect([...first.page, ...second.page]).toEqual(ids);
         expect(
-          yield* Schema.decodeEffect(
-            QueryStreamCursor.codecForLayout(source.keyLayout),
-          )(first.continueCursor),
+          QueryStreamKey.values(
+            yield* Schema.decodeEffect(
+              QueryStreamCursor.codecForLayout(source.keyLayout),
+            )(first.continueCursor),
+          ),
         ).toEqual(["apple", 1, ids[0]]);
         expect(end).toMatchObject({
           page: [],

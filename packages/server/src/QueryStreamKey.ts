@@ -1,4 +1,5 @@
 import * as Data from "effect/Data";
+import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
 import type * as QueryStreamOrderKey from "./QueryStreamOrderKey";
@@ -74,3 +75,6 @@ export const values = (
 export const layout = (
   self: QueryStreamKey,
 ): QueryStreamKeyLayout.QueryStreamKeyLayout => self.layout;
+
+export const isComplete = (value: unknown): value is Complete =>
+  Predicate.hasProperty(value, TypeId) && QueryStreamKey.$is("Complete")(value);
