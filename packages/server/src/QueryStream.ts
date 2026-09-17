@@ -176,6 +176,11 @@ export {
 } from "./QueryStreamPagination";
 
 /**
+ * Invalid numeric read limits. @experimental.
+ */
+export { InvalidReadLimitError } from "./QueryStreamReadBudget";
+
+/**
  * Runtime identifier used to distinguish query streams from plain streams.
  *
  * @experimental
@@ -568,10 +573,9 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
             )
             .order(reflection.order),
           identity,
-        ),
+        ).pipe(Stream.orDie),
       ),
     ),
-    Stream.orDie,
   );
 
   const budgetedDocuments = Stream.unwrap(
@@ -2166,16 +2170,21 @@ export const paginate: {
                 ),
         }),
       }).pipe(
-        Effect.mapError(
-          () => new ConvexError({ paginationError: "InvalidCursor" }),
+        Effect.catchTag("SchemaError", () =>
+          Effect.die(new ConvexError({ paginationError: "InvalidCursor" })),
         ),
-        Effect.orDie,
       );
       const request = yield* QueryStreamPagination.parseRequest(
         options.numItems,
         decoded.start,
         decoded.range,
-      ).pipe(Effect.fromResult, Effect.orDie);
+      ).pipe(
+        Effect.fromResult,
+        Effect.catchTags({
+          InvalidPageSizeError: Effect.die,
+          EmptyInitialPageError: Effect.die,
+        }),
+      );
       if (request._tag === "Unchanged") {
         return {
           page: [],
@@ -2224,7 +2233,9 @@ export const paginate: {
         return yield* new ReadBudgetExceededError(counts);
       }
       const encode = (orderKey: QueryStreamKey.Complete) =>
-        encodeCursor(orderKey.values).pipe(Effect.orDie);
+        encodeCursor(orderKey.values).pipe(
+          Effect.catchTag("SchemaError", Effect.die),
+        );
       const encodeSplit = (
         result: Extract<
           QueryStreamPagination.Outcome<Doc>,
@@ -2273,10 +2284,14 @@ export const paginate: {
       Effect.provideServiceEffect(
         effect,
         QueryStreamReadBudget.QueryStreamReadBudget,
-        QueryStreamReadBudget.make({
-          maximumRowsRead: Option.fromUndefinedOr(options.maximumRowsRead),
-          maximumBytesRead: Option.fromUndefinedOr(options.maximumBytesRead),
-        }),
+        Schema.decodeEffect(QueryStreamReadBudget.Limits)(options).pipe(
+          Effect.catchTag("SchemaError", (cause) =>
+            Effect.die(
+              new QueryStreamReadBudget.InvalidReadLimitError({ cause }),
+            ),
+          ),
+          Effect.flatMap(QueryStreamReadBudget.make),
+        ),
       ),
   ),
 );
