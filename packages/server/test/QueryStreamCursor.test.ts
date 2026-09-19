@@ -2,7 +2,7 @@ import { identity } from "effect/Function";
 import * as QueryStreamKey from "@confect/server/QueryStreamKey";
 import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
-import * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
+import * as QueryStreamKeyValues from "@confect/server/QueryStreamKeyValues";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -12,11 +12,11 @@ import * as SchemaIssue from "effect/SchemaIssue";
 
 const complete = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  values: QueryStreamOrderKey.QueryStreamOrderKey,
+  values: QueryStreamKeyValues.QueryStreamKeyValues,
 ) => Result.getOrThrowWith(QueryStreamKey.complete(layout, values), identity);
 const encodeCursor =
   (layout: QueryStreamKeyLayout.QueryStreamKeyLayout) =>
-  (values: QueryStreamOrderKey.QueryStreamOrderKey) =>
+  (values: QueryStreamKeyValues.QueryStreamKeyValues) =>
     Schema.encodeSync(QueryStreamCursor.codecForLayout(layout))(
       complete(layout, values),
     );
@@ -25,21 +25,27 @@ describe("QueryStreamCursor schema", () => {
   it("defines the cursor envelope and its JSON codec", () => {
     const cursor = Schema.decodeSync(QueryStreamCursor.QueryStreamCursor)({
       version: 1,
-      keyFields: ["text", "_creationTime", "_id"],
-      orderKey: ["apple", 1, "id"],
+      runtimeLabels: ["text", "_creationTime", "_id"],
+      keyValues: ["apple", 1, "id"],
     });
     const serialized = Schema.encodeSync(QueryStreamCursor.Json)(cursor);
+    const legacyCursor =
+      '{"version":1,"keyFields":["text","_creationTime","_id"],"orderKey":["apple",1,"id"]}';
+    expect(serialized).toBe(legacyCursor);
+    expect(Schema.decodeSync(QueryStreamCursor.Json)(legacyCursor)).toEqual(
+      cursor,
+    );
 
     expect(cursor).toEqual({
       version: 1,
-      keyFields: ["text", "_creationTime", "_id"],
-      orderKey: ["apple", 1, "id"],
+      runtimeLabels: ["text", "_creationTime", "_id"],
+      keyValues: ["apple", 1, "id"],
     });
     expectTypeOf(cursor).toEqualTypeOf<QueryStreamCursor.QueryStreamCursor>();
     expectTypeOf<QueryStreamCursor.QueryStreamCursor>().toEqualTypeOf<{
       readonly version: 1;
-      readonly keyFields: ReadonlyArray<string>;
-      readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey;
+      readonly runtimeLabels: ReadonlyArray<string>;
+      readonly keyValues: QueryStreamKeyValues.QueryStreamKeyValues;
     }>();
     expect(Schema.decodeSync(QueryStreamCursor.Json)(serialized)).toEqual(
       cursor,
@@ -54,12 +60,12 @@ describe("QueryStreamCursor schema", () => {
     );
   });
 
-  it.effect("checks field and value counts during construction", () =>
+  it.effect("checks runtime label and value counts during construction", () =>
     Effect.gen(function* () {
       const error = yield* QueryStreamCursor.QueryStreamCursor.makeEffect({
         version: 1,
-        keyFields: ["text"],
-        orderKey: [],
+        runtimeLabels: ["text"],
+        keyValues: [],
       }).pipe(Effect.flip);
       expect(SchemaIssue.isIssue(error)).toBe(true);
     }),
@@ -68,16 +74,20 @@ describe("QueryStreamCursor schema", () => {
   it.each([
     null,
     [],
-    { version: 2, keyFields: ["text"], orderKey: ["apple"] },
-    { version: 1, keyFields: [1], orderKey: ["apple"] },
-    { version: 1, keyFields: ["text"], orderKey: [] },
-    { version: 1, keyFields: ["text"], orderKey: [undefined] },
-    { version: 1, keyFields: ["text"], orderKey: [{ $integer: "invalid" }] },
-    { version: 1, keyFields: ["text"], orderKey: [{ $undefined: false }] },
+    { version: 2, runtimeLabels: ["text"], keyValues: ["apple"] },
+    { version: 1, runtimeLabels: [1], keyValues: ["apple"] },
+    { version: 1, runtimeLabels: ["text"], keyValues: [] },
+    { version: 1, runtimeLabels: ["text"], keyValues: [undefined] },
     {
       version: 1,
-      keyFields: ["text"],
-      orderKey: [{ $undefined: true, extra: 1 }],
+      runtimeLabels: ["text"],
+      keyValues: [{ $integer: "invalid" }],
+    },
+    { version: 1, runtimeLabels: ["text"], keyValues: [{ $undefined: false }] },
+    {
+      version: 1,
+      runtimeLabels: ["text"],
+      keyValues: [{ $undefined: true, extra: 1 }],
     },
   ])("rejects an invalid envelope through the schema: %j", (input) => {
     expect(
@@ -92,7 +102,7 @@ describe("QueryStreamCursor schema", () => {
 
 describe("QueryStreamCursor serialization", () => {
   it("round-trips Convex values and missing fields with their layout", () => {
-    const orderKey: QueryStreamOrderKey.QueryStreamOrderKey = [
+    const keyValues: QueryStreamKeyValues.QueryStreamKeyValues = [
       undefined,
       null,
       true,
@@ -106,30 +116,30 @@ describe("QueryStreamCursor serialization", () => {
       ["nested"],
       { nested: "value" },
     ];
-    const fieldPaths = orderKey.map((_, index) =>
-      index === orderKey.length - 1 ? "_id" : `field${index}`,
+    const fieldPaths = keyValues.map((_, index) =>
+      index === keyValues.length - 1 ? "_id" : `field${index}`,
     );
     const layout = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex(fieldPaths),
       identity,
     );
-    const cursor = encodeCursor(layout)(orderKey);
+    const cursor = encodeCursor(layout)(keyValues);
 
-    expect(Schema.is(QueryStreamOrderKey.QueryStreamOrderKey)(orderKey)).toBe(
-      true,
-    );
+    expect(
+      Schema.is(QueryStreamKeyValues.QueryStreamKeyValues)(keyValues),
+    ).toBe(true);
     expect(JSON.parse(cursor)).toMatchObject({
       version: 1,
       keyFields: fieldPaths,
     });
-    expect(Schema.decodeSync(QueryStreamCursor.Json)(cursor).orderKey).toEqual(
-      orderKey,
+    expect(Schema.decodeSync(QueryStreamCursor.Json)(cursor).keyValues).toEqual(
+      keyValues,
     );
     expect(
       QueryStreamKey.values(
         Schema.decodeSync(QueryStreamCursor.codecForLayout(layout))(cursor),
       ),
-    ).toEqual(orderKey);
+    ).toEqual(keyValues);
   });
 
   it("serializes aliases and every implicit ID without changing the cursor envelope", () => {
@@ -149,15 +159,15 @@ describe("QueryStreamCursor serialization", () => {
       ),
     );
     const codec = QueryStreamCursor.codecForLayout(layout);
-    const orderKey = [123, "outer-id", "hello", "inner-id"];
-    const encoded = Schema.encodeSync(codec)(complete(layout, orderKey));
+    const keyValues = [123, "outer-id", "hello", "inner-id"];
+    const encoded = Schema.encodeSync(codec)(complete(layout, keyValues));
     expect(JSON.parse(encoded)).toEqual({
       version: 1,
       keyFields: ["created", "_id", "body", "_id"],
-      orderKey,
+      orderKey: keyValues,
     });
     expect(QueryStreamKey.values(Schema.decodeSync(codec)(encoded))).toEqual(
-      orderKey,
+      keyValues,
     );
   });
 
@@ -208,11 +218,11 @@ describe("QueryStreamCursor serialization", () => {
     '{"version":1,"keyFields":["text"],"orderKey":[{"$integer":"invalid"}]}',
   ])("rejects malformed or unsupported cursor %s", (cursor) => {
     expect(
-      () => Schema.decodeSync(QueryStreamCursor.Json)(cursor).orderKey,
+      () => Schema.decodeSync(QueryStreamCursor.Json)(cursor).keyValues,
     ).toThrow(Schema.SchemaError);
   });
 
-  it("validates field names and their order, not just their count", () => {
+  it("validates runtime labels and their order, not just their count", () => {
     const cursor = encodeCursor(
       Result.getOrThrowWith(
         QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
@@ -239,7 +249,7 @@ describe("QueryStreamCursor serialization", () => {
     }
   });
 
-  it("distinguishes an empty order key from the end sentinel", () => {
+  it("distinguishes an empty key from the end sentinel", () => {
     const cursor = encodeCursor(
       Result.getOrThrowWith(
         QueryStreamKeyLayout.fromIndex(["_id"], 1),
@@ -268,8 +278,8 @@ describe("QueryStreamCursor serialization", () => {
       Effect.gen(function* () {
         const value = yield* QueryStreamCursor.QueryStreamCursor.makeEffect({
           version: 1,
-          keyFields: ["optional", "integer", "bytes"],
-          orderKey: [undefined, 42n, new Uint8Array([1, 2]).buffer],
+          runtimeLabels: ["optional", "integer", "bytes"],
+          keyValues: [undefined, 42n, new Uint8Array([1, 2]).buffer],
         });
         const encoded = yield* Schema.encodeEffect(QueryStreamCursor.Json)(
           value,
@@ -283,7 +293,7 @@ describe("QueryStreamCursor serialization", () => {
         )(encoded);
         expect(wire).toEqual({
           version: 1,
-          keyFields: value.keyFields,
+          keyFields: value.runtimeLabels,
           orderKey: [
             { $undefined: true },
             { $integer: "KgAAAAAAAAA=" },
@@ -307,9 +317,9 @@ describe("QueryStreamCursor serialization", () => {
         expectTypeOf<typeof bound.Encoded>().toEqualTypeOf<string>();
         expect(
           QueryStreamKey.values(yield* Schema.decodeEffect(bound)(encoded)),
-        ).toEqual(value.orderKey);
+        ).toEqual(value.keyValues);
         expect(
-          yield* Schema.encodeEffect(bound)(complete(layout, value.orderKey)),
+          yield* Schema.encodeEffect(bound)(complete(layout, value.keyValues)),
         ).toBe(encoded);
       }),
   );

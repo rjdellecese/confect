@@ -132,18 +132,18 @@ describe("QueryStream distinct representatives", () => {
 
           const a2 = rows.find((row) => row.tag === "a2");
           assert(a2 !== undefined);
-          const orderKey = [a2.text, a2._creationTime, a2._id];
+          const keyValues = [a2.text, a2._creationTime, a2._id];
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                start: { orderKey: orderKey, inclusive: true },
+                start: { keyValues: keyValues, inclusive: true },
               }),
             ),
           ).toEqual([]);
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                end: { orderKey: orderKey, inclusive: true },
+                end: { keyValues: keyValues, inclusive: true },
               }),
             ),
           ).toEqual(["a1"]);
@@ -265,30 +265,30 @@ describe("QueryStream distinct representatives", () => {
             expect(
               yield* tags(
                 QueryStream.narrow(distinct, {
-                  start: { orderKey: key2, inclusive },
+                  start: { keyValues: key2, inclusive },
                 }),
               ),
             ).toEqual(["b1", "c1"]);
             expect(
               yield* tags(
                 QueryStream.narrow(distinct, {
-                  end: { orderKey: key2, inclusive },
+                  end: { keyValues: key2, inclusive },
                 }),
               ),
             ).toEqual(["a1"]);
             expect(
               yield* tags(
                 QueryStream.narrow(distinct, {
-                  start: { orderKey: key2, inclusive },
-                  end: { orderKey: key3, inclusive },
+                  start: { keyValues: key2, inclusive },
+                  end: { keyValues: key3, inclusive },
                 }),
               ),
             ).toEqual([]);
             expect(
               yield* tags(
                 QueryStream.narrow(QueryStream.reverse(distinct), {
-                  start: { orderKey: key3, inclusive },
-                  end: { orderKey: key2, inclusive },
+                  start: { keyValues: key3, inclusive },
+                  end: { keyValues: key2, inclusive },
                 }),
               ),
             ).toEqual([]);
@@ -305,34 +305,34 @@ describe("QueryStream distinct representatives", () => {
           const { source, rows } = yield* fixture;
           const a1 = rows.find((row) => row.tag === "a1");
           assert(a1 !== undefined);
-          const orderKey = [a1.text, a1._creationTime, a1._id];
+          const keyValues = [a1.text, a1._creationTime, a1._id];
           const distinct = source.pipe(QueryStream.distinct(["text"]));
 
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                start: { orderKey: orderKey, inclusive: true },
+                start: { keyValues: keyValues, inclusive: true },
               }),
             ),
           ).toEqual(["a1", "b1", "c1"]);
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                start: { orderKey: orderKey, inclusive: false },
+                start: { keyValues: keyValues, inclusive: false },
               }),
             ),
           ).toEqual(["b1", "c1"]);
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                end: { orderKey: orderKey, inclusive: true },
+                end: { keyValues: keyValues, inclusive: true },
               }),
             ),
           ).toEqual(["a1"]);
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                end: { orderKey: orderKey, inclusive: false },
+                end: { keyValues: keyValues, inclusive: false },
               }),
             ),
           ).toEqual([]);
@@ -354,7 +354,7 @@ describe("QueryStream distinct representatives", () => {
             .pipe(
               QueryStream.narrow({
                 start: {
-                  orderKey: [a2.text, a2._creationTime, a2._id],
+                  keyValues: [a2.text, a2._creationTime, a2._id],
                   inclusive: true,
                 },
               }),

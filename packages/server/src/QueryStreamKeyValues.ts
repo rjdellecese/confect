@@ -38,7 +38,7 @@ const KeyValue = Schema.declare<Value | undefined>(
               ),
             catch: () =>
               new SchemaIssue.InvalidValue(
-                { message: "Invalid Convex order-key value" },
+                { message: "Invalid Convex key value" },
                 value,
                 options,
               ),
@@ -59,12 +59,12 @@ export type KeyValue = typeof KeyValue.Type;
 /**
  * @experimental
  */
-export const QueryStreamOrderKey = Schema.Array(KeyValue);
+export const QueryStreamKeyValues = Schema.Array(KeyValue);
 
 /**
  * @experimental
  */
-export type QueryStreamOrderKey = typeof QueryStreamOrderKey.Type;
+export type QueryStreamKeyValues = typeof QueryStreamKeyValues.Type;
 
 /**
  * `Order` over Convex values, matching Convex's index ordering—a wrapper around
@@ -77,24 +77,20 @@ export const ValueOrder: Order_.Order<KeyValue> = Order_.make(
   (self, that) => Math.sign(compareValues(self, that)) as -1 | 0 | 1,
 );
 
-/**
- * `Order` over order keys: lexicographic by `ValueOrder`, then by length—also
- * the ordering of Convex array values.
- *
- * @experimental
- */
-export const Order: Order_.Order<QueryStreamOrderKey> =
-  Order_.Array(ValueOrder);
+const AscendingOrder = Order_.Array(ValueOrder);
+const DescendingOrder = Order_.flip(AscendingOrder);
 
 /**
- * Order of positions in stream order: for `desc`, later keys are smaller.
+ * Compare key values in the requested direction. Ascending order is
+ * lexicographic by `ValueOrder`, then by length, matching Convex array values;
+ * descending order reverses it.
  *
  * @experimental
  */
-export const PositionOrder = (
-  order: OrderDirection,
-): Order_.Order<QueryStreamOrderKey> =>
-  order === "asc" ? Order : Order_.flip(Order);
+export const Order = (
+  orderDirection: OrderDirection,
+): Order_.Order<QueryStreamKeyValues> =>
+  orderDirection === "asc" ? AscendingOrder : DescendingOrder;
 
 /**
  * @experimental
@@ -102,7 +98,7 @@ export const PositionOrder = (
 export const extract = (
   encoded: Record.ReadonlyRecord<string, unknown>,
   keyPaths: ReadonlyArray<ReadonlyArray<string>>,
-): QueryStreamOrderKey =>
+): QueryStreamKeyValues =>
   Array.map(keyPaths, (path) =>
     Array.reduce(
       path,
@@ -112,4 +108,4 @@ export const extract = (
           segment
         ],
     ),
-  ) as QueryStreamOrderKey;
+  ) as QueryStreamKeyValues;
