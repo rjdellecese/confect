@@ -5,19 +5,17 @@ import * as SchemaIssue from "effect/SchemaIssue";
 import * as Match from "effect/Match";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
-import * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 
 // Serialized labels are a cursor boundary representation. They include every
-// runtime position but do not preserve segment boundaries or implicitness.
+// runtime position but do not preserve implicitness.
 const RuntimeLabels = Schema.Array(Schema.String);
 const RuntimeLabelsEquivalence = Schema.toEquivalence(RuntimeLabels);
-const segmentRuntimeLabels = Match.type<QueryStreamKeyLayout.Segment>().pipe(
+const positionRuntimeLabel = Match.type<QueryStreamKeyLayout.Position>().pipe(
   Match.tagsExhaustive({
-    WithImplicitId: ({ labels }) =>
-      Array.append(QueryStreamKeyLabels.toArray(labels), "_id"),
-    Explicit: ({ labels }) => QueryStreamKeyLabels.toArray(labels),
+    Visible: ({ label }) => label,
+    ImplicitId: () => "_id",
   }),
 );
 
@@ -60,9 +58,9 @@ export const END_CURSOR = "[]";
 export const codecForLayout = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
 ) => {
-  const runtimeLabels = Array.flatMap(
-    QueryStreamKeyLayout.segments(layout),
-    segmentRuntimeLabels,
+  const runtimeLabels = Array.map(
+    QueryStreamKeyLayout.positions(layout),
+    positionRuntimeLabel,
   );
   return Json.check(
     Schema.makeFilter(

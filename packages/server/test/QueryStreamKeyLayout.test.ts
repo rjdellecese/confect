@@ -17,20 +17,17 @@ describe("QueryStreamKeyLayout", () => {
       count: 0,
       visible: [],
       width: 1,
-      segments: [
-        { _tag: "WithImplicitId", labels: QueryStreamKeyLabels.make([]) },
-      ],
+      positions: [{ _tag: "ImplicitId" }],
     },
     {
       fieldPaths: ["text", "_creationTime"],
       count: 0,
       visible: ["text", "_creationTime"],
       width: 3,
-      segments: [
-        {
-          _tag: "WithImplicitId",
-          labels: QueryStreamKeyLabels.make(["text", "_creationTime"]),
-        },
+      positions: [
+        { _tag: "Visible", label: "text" },
+        { _tag: "Visible", label: "_creationTime" },
+        { _tag: "ImplicitId" },
       ],
     },
     {
@@ -38,40 +35,35 @@ describe("QueryStreamKeyLayout", () => {
       count: 2,
       visible: [],
       width: 1,
-      segments: [
-        { _tag: "WithImplicitId", labels: QueryStreamKeyLabels.make([]) },
-      ],
+      positions: [{ _tag: "ImplicitId" }],
     },
     {
       fieldPaths: ["_id"],
       count: 0,
       visible: ["_id"],
       width: 1,
-      segments: [
-        { _tag: "Explicit", labels: QueryStreamKeyLabels.make(["_id"]) },
-      ],
+      positions: [{ _tag: "Visible", label: "_id" }],
     },
-    { fieldPaths: ["_id"], count: 1, visible: [], width: 0, segments: [] },
+    { fieldPaths: ["_id"], count: 1, visible: [], width: 0, positions: [] },
     {
       fieldPaths: ["_id", "text"],
       count: 0,
       visible: ["_id", "text"],
       width: 3,
-      segments: [
-        {
-          _tag: "WithImplicitId",
-          labels: QueryStreamKeyLabels.make(["_id", "text"]),
-        },
+      positions: [
+        { _tag: "Visible", label: "_id" },
+        { _tag: "Visible", label: "text" },
+        { _tag: "ImplicitId" },
       ],
     },
   ])(
     "constructs the remaining scan key for $fieldPaths pinned by $count",
-    ({ fieldPaths, count, visible, width, segments }) => {
+    ({ fieldPaths, count, visible, width, positions }) => {
       const layout = Result.getOrThrowWith(
         QueryStreamKeyLayout.fromIndex(fieldPaths, count),
         identity,
       );
-      expect(QueryStreamKeyLayout.segments(layout)).toEqual(segments);
+      expect(QueryStreamKeyLayout.positions(layout)).toEqual(positions);
       expect(
         QueryStreamKeyLabels.toArray(
           QueryStreamKeyLayout.visibleLabels(layout),
@@ -150,10 +142,6 @@ describe("QueryStreamKeyLayout", () => {
     expectTypeOf(renamed).toEqualTypeOf<
       QueryStreamKeyLayout.QueryStreamKeyLayout<["created", "id"]>
     >();
-    expectTypeOf<{
-      readonly _tag: "Explicit";
-      readonly labels: QueryStreamKeyLabels.QueryStreamKeyLabels<[]>;
-    }>().not.toExtend<QueryStreamKeyLayout.Segment>();
   });
 
   it("keeps a hidden ID before a renamed explicit component", () => {
@@ -170,9 +158,9 @@ describe("QueryStreamKeyLayout", () => {
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
       explicit,
     );
-    expect(QueryStreamKeyLayout.segments(joined)).toEqual([
-      { _tag: "WithImplicitId", labels: QueryStreamKeyLabels.make([]) },
-      { _tag: "Explicit", labels: QueryStreamKeyLabels.make(["hello"]) },
+    expect(QueryStreamKeyLayout.positions(joined)).toEqual([
+      { _tag: "ImplicitId" },
+      { _tag: "Visible", label: "hello" },
     ]);
     expect(
       Result.getOrThrow(
@@ -255,7 +243,7 @@ describe("QueryStreamKeyLayout", () => {
     ).toBe(true);
   });
 
-  it("compares visible labels and implicit positions without requiring identical segments", () => {
+  it("compares visible labels and implicit positions independently of composition", () => {
     const explicitFirst = Result.getOrThrow(
       QueryStreamKeyLayout.rename(
         Result.getOrThrowWith(
@@ -354,7 +342,7 @@ describe("QueryStreamKeyLayout", () => {
     ).toBe(3);
   });
 
-  it("parses replacements across explicit and implicit-only segments without losing positions", () => {
+  it("renames visible labels without losing implicit positions", () => {
     const layout = QueryStreamKeyLayout.concat(
       QueryStreamKeyLayout.concat(
         Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),

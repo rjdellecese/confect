@@ -85,31 +85,3 @@ export const stripPrefix = (
   ArrayEquivalence(Array.take(toArray(self), size(prefix)), toArray(prefix))
     ? Option.some(make(Array.drop(toArray(self), size(prefix))))
     : Option.none();
-
-/**
- * Consume one replacement chunk with the template's tuple shape. The names may
- * differ, but a nonempty template produces a nonempty chunk. Failure means
- * there are too few labels; success also returns the unconsumed labels.
- *
- * @experimental
- */
-export function consume<Template extends ReadonlyArray<string>>(
-  self: QueryStreamKeyLabels,
-  template: QueryStreamKeyLabels<Template>,
-): Option.Option<{
-  readonly prefix: QueryStreamKeyLabels<{
-    readonly [K in keyof Template]: string;
-  }>;
-  readonly rest: QueryStreamKeyLabels;
-}>;
-export function consume(
-  self: QueryStreamKeyLabels,
-  template: QueryStreamKeyLabels,
-): Option.Option<{
-  readonly prefix: QueryStreamKeyLabels;
-  readonly rest: QueryStreamKeyLabels;
-}> {
-  if (size(self) < size(template)) return Option.none();
-  const [prefix, rest] = Array.splitAt(toArray(self), size(template));
-  return Option.some({ prefix: make(prefix), rest: make(rest) });
-}

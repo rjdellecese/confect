@@ -1,6 +1,5 @@
 import * as QueryStreamKey from "@confect/server/QueryStreamKey";
 import { identity } from "effect/Function";
-import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
@@ -1536,15 +1535,12 @@ describe("QueryStream", () => {
                 },
               ),
             );
-          expect(QueryStreamKeyLayout.segments(joined.keyLayout)).toEqual([
-            {
-              _tag: "WithImplicitId",
-              labels: QueryStreamKeyLabels.make(["text", "_creationTime"]),
-            },
-            {
-              _tag: "WithImplicitId",
-              labels: QueryStreamKeyLabels.make(["_creationTime"]),
-            },
+          expect(QueryStreamKeyLayout.positions(joined.keyLayout)).toEqual([
+            { _tag: "Visible", label: "text" },
+            { _tag: "Visible", label: "_creationTime" },
+            { _tag: "ImplicitId" },
+            { _tag: "Visible", label: "_creationTime" },
+            { _tag: "ImplicitId" },
           ]);
 
           // Relabeling names only the type-visible positions.
@@ -1555,15 +1551,12 @@ describe("QueryStream", () => {
               "innerCreated",
             ]),
           );
-          expect(QueryStreamKeyLayout.segments(relabeled.keyLayout)).toEqual([
-            {
-              _tag: "WithImplicitId",
-              labels: QueryStreamKeyLabels.make(["outerText", "outerCreated"]),
-            },
-            {
-              _tag: "WithImplicitId",
-              labels: QueryStreamKeyLabels.make(["innerCreated"]),
-            },
+          expect(QueryStreamKeyLayout.positions(relabeled.keyLayout)).toEqual([
+            { _tag: "Visible", label: "outerText" },
+            { _tag: "Visible", label: "outerCreated" },
+            { _tag: "ImplicitId" },
+            { _tag: "Visible", label: "innerCreated" },
+            { _tag: "ImplicitId" },
           ]);
           const pages = yield* paginateAll(relabeled, 1);
           expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
@@ -1617,19 +1610,13 @@ describe("QueryStream", () => {
           const joined = QueryStream.flatMap(scan("outer"), () => inner, {
             innerLayout: inner.keyLayout,
           });
-          expect(QueryStreamKeyLayout.segments(joined.keyLayout)).toEqual([
-            {
-              _tag: "WithImplicitId",
-              labels: QueryStreamKeyLabels.make(["_creationTime"]),
-            },
-            {
-              _tag: "WithImplicitId",
-              labels: QueryStreamKeyLabels.make(["_creationTime"]),
-            },
-            {
-              _tag: "WithImplicitId",
-              labels: QueryStreamKeyLabels.make(["_creationTime"]),
-            },
+          expect(QueryStreamKeyLayout.positions(joined.keyLayout)).toEqual([
+            { _tag: "Visible", label: "_creationTime" },
+            { _tag: "ImplicitId" },
+            { _tag: "Visible", label: "_creationTime" },
+            { _tag: "ImplicitId" },
+            { _tag: "Visible", label: "_creationTime" },
+            { _tag: "ImplicitId" },
           ]);
           const renamed = QueryStream.renameKey(joined, [
             "outer",
@@ -1672,8 +1659,8 @@ describe("QueryStream", () => {
             const joined = QueryStream.flatMap(outer, () => pinned, {
               innerLayout: pinned.keyLayout,
             });
-            expect(QueryStreamKeyLayout.segments(joined.keyLayout)).toEqual(
-              QueryStreamKeyLayout.segments(outer.keyLayout),
+            expect(QueryStreamKeyLayout.positions(joined.keyLayout)).toEqual(
+              QueryStreamKeyLayout.positions(outer.keyLayout),
             );
             expect(
               (yield* paginateAll(joined, 1)).flat().map((doc) => doc.text),
@@ -1682,7 +1669,7 @@ describe("QueryStream", () => {
               Stream.Success<typeof pinned>
             >()(pinned.keyLayout);
             expect(
-              QueryStreamKeyLayout.segments(
+              QueryStreamKeyLayout.positions(
                 QueryStream.merge([pinned, zeroEmpty]).keyLayout,
               ),
             ).toEqual([]);

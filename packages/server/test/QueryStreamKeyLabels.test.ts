@@ -1,7 +1,6 @@
 import { QueryStreamKeyLabels as PublicKeyLabels } from "@confect/server";
 import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import type * as Array from "effect/Array";
 import * as Option from "effect/Option";
 
 describe("QueryStreamKeyLabels", () => {
@@ -111,56 +110,4 @@ describe("QueryStreamKeyLabels", () => {
       ).toBe(true);
     },
   );
-
-  it("consumes replacements into a chunk retaining the template's nonempty shape", () => {
-    const parsed = Option.getOrThrow(
-      QueryStreamKeyLabels.consume(
-        QueryStreamKeyLabels.make(["author", "time", "next"]),
-        QueryStreamKeyLabels.make(["authorId", "_creationTime"]),
-      ),
-    );
-    expectTypeOf(parsed.prefix).toEqualTypeOf<
-      QueryStreamKeyLabels.QueryStreamKeyLabels<readonly [string, string]>
-    >();
-    expectTypeOf(parsed.prefix).toExtend<
-      QueryStreamKeyLabels.QueryStreamKeyLabels<
-        Array.NonEmptyReadonlyArray<string>
-      >
-    >();
-    expect(QueryStreamKeyLabels.toArray(parsed.prefix)).toEqual([
-      "author",
-      "time",
-    ]);
-    expect(QueryStreamKeyLabels.toArray(parsed.rest)).toEqual(["next"]);
-  });
-
-  it("consumes zero or all labels and rejects an incomplete replacement chunk", () => {
-    const labels = QueryStreamKeyLabels.make(["a"]);
-    const empty = Option.getOrThrow(
-      QueryStreamKeyLabels.consume(labels, QueryStreamKeyLabels.make([])),
-    );
-    expectTypeOf(empty.prefix).toEqualTypeOf<
-      QueryStreamKeyLabels.QueryStreamKeyLabels<readonly []>
-    >();
-    expect(QueryStreamKeyLabels.size(empty.prefix)).toBe(0);
-    expect(QueryStreamKeyLabels.Equivalence(empty.rest, labels)).toBe(true);
-    const full = Option.getOrThrow(
-      QueryStreamKeyLabels.consume(labels, labels),
-    );
-    expect(QueryStreamKeyLabels.Equivalence(full.prefix, labels)).toBe(true);
-    expect(QueryStreamKeyLabels.size(full.rest)).toBe(0);
-    expect(
-      Option.isNone(
-        QueryStreamKeyLabels.consume(
-          labels,
-          QueryStreamKeyLabels.make(["x", "y"]),
-        ),
-      ),
-    ).toBe(true);
-    expect(
-      Option.isNone(
-        QueryStreamKeyLabels.consume(QueryStreamKeyLabels.make([]), labels),
-      ),
-    ).toBe(true);
-  });
 });
