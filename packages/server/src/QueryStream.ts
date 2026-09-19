@@ -729,9 +729,7 @@ const fillMergeSource = <Doc, E>(
  * exhausted or an input stopped before its next key was known.
  */
 const mergeStep =
-  <Doc, E>(
-    PositionOrder: Order.Order<QueryStreamKeyValues.QueryStreamKeyValues>,
-  ) =>
+  <Doc, E>(keyOrder: Order.Order<QueryStreamKeyValues.QueryStreamKeyValues>) =>
   (
     sources: ReadonlyArray<MergeSource<Doc, E>>,
   ): Effect.Effect<
@@ -746,7 +744,7 @@ const mergeStep =
       });
       if (filled.some((source) => MergeSource.$is("BudgetLimited")(source)))
         return undefined;
-      const isEarlier = Order.isLessThan(PositionOrder);
+      const isEarlier = Order.isLessThan(keyOrder);
 
       const earliest = Array.reduce(
         filled,
@@ -869,7 +867,7 @@ const mergeUnchecked = <
       (pulls) =>
         Stream.unfold(
           Array.map(pulls, (pull) => MergeSource.NeedsPull({ pull })),
-          mergeStep<Doc, E>(QueryStreamKeyValues.PositionOrder(head.order)),
+          mergeStep<Doc, E>(QueryStreamKeyValues.Order(head.order)),
         ),
     ),
   );
@@ -1273,7 +1271,7 @@ const combineLowerRefinements = (
 ): Option.Option<InnerRefinement> =>
   Option.orElse(
     Option.zipWith(existing, incoming, (left, right) => {
-      const ordering = QueryStreamKeyValues.Order(
+      const ordering = QueryStreamKeyValues.Order("asc")(
         left.outerKeyValues,
         right.outerKeyValues,
       );
@@ -1301,7 +1299,7 @@ const combineUpperRefinements = (
 ): Option.Option<InnerRefinement> =>
   Option.orElse(
     Option.zipWith(existing, incoming, (left, right) => {
-      const ordering = QueryStreamKeyValues.Order(
+      const ordering = QueryStreamKeyValues.Order("asc")(
         left.outerKeyValues,
         right.outerKeyValues,
       );
@@ -1388,7 +1386,7 @@ const makeFlatMap = <
           Option.filter(
             refinements.lower,
             (refinement) =>
-              QueryStreamKeyValues.Order(
+              QueryStreamKeyValues.Order("asc")(
                 outerKeyValues,
                 refinement.outerKeyValues,
               ) === 0,
@@ -1399,7 +1397,7 @@ const makeFlatMap = <
           Option.filter(
             refinements.upper,
             (refinement) =>
-              QueryStreamKeyValues.Order(
+              QueryStreamKeyValues.Order("asc")(
                 outerKeyValues,
                 refinement.outerKeyValues,
               ) === 0,

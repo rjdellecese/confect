@@ -70,13 +70,16 @@ describe("QueryStreamKeyValues", () => {
     }
   });
 
-  it("compares keys lexicographically and reverses position order", () => {
-    expect(QueryStreamKeyValues.Order(["a", 1], ["a", 2])).toBe(-1);
-    expect(QueryStreamKeyValues.Order(["a"], ["a", 1])).toBe(-1);
-    expect(QueryStreamKeyValues.Order(["b"], ["a", 2])).toBe(1);
-    expect(QueryStreamKeyValues.Order([], [])).toBe(0);
-    expect(QueryStreamKeyValues.PositionOrder("asc")(["a"], ["b"])).toBe(-1);
-    expect(QueryStreamKeyValues.PositionOrder("desc")(["a"], ["b"])).toBe(1);
+  it("requires a direction and compares keys lexicographically", () => {
+    expectTypeOf(QueryStreamKeyValues.Order).parameters.toEqualTypeOf<
+      [orderDirection: "asc" | "desc"]
+    >();
+    expect(QueryStreamKeyValues.Order("asc")(["a", 1], ["a", 2])).toBe(-1);
+    expect(QueryStreamKeyValues.Order("asc")(["a"], ["a", 1])).toBe(-1);
+    expect(QueryStreamKeyValues.Order("asc")(["b"], ["a", 2])).toBe(1);
+    expect(QueryStreamKeyValues.Order("asc")([], [])).toBe(0);
+    expect(QueryStreamKeyValues.Order("asc")(["a"], ["b"])).toBe(-1);
+    expect(QueryStreamKeyValues.Order("desc")(["a"], ["b"])).toBe(1);
   });
 
   it("extracts nested values and retains missing fields", () => {

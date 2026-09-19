@@ -232,7 +232,8 @@ export const finish = <Doc>(
           Unpinned: () => false,
           ThroughEnd: () => false,
           ThroughKey: ({ key }) =>
-            QueryStreamKeyValues.Order(splitKey.values, key.values) === 0,
+            QueryStreamKeyValues.Order("asc")(splitKey.values, key.values) ===
+            0,
         });
         if (readLimit && atEnd) {
           return Result.fail(

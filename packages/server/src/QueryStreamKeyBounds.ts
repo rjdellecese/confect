@@ -72,7 +72,7 @@ const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
   const selfValues = cutValues(self);
   const thatValues = cutValues(that);
   const minLength = Math.min(selfValues.length, thatValues.length);
-  const prefixOrdering = QueryStreamKeyValues.Order(
+  const prefixOrdering = QueryStreamKeyValues.Order("asc")(
     Array.take(selfValues, minLength),
     Array.take(thatValues, minLength),
   );

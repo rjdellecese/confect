@@ -77,24 +77,20 @@ export const ValueOrder: Order_.Order<KeyValue> = Order_.make(
   (self, that) => Math.sign(compareValues(self, that)) as -1 | 0 | 1,
 );
 
-/**
- * `Order` over key values: lexicographic by `ValueOrder`, then by length—also
- * the ordering of Convex array values.
- *
- * @experimental
- */
-export const Order: Order_.Order<QueryStreamKeyValues> =
-  Order_.Array(ValueOrder);
+const AscendingOrder = Order_.Array(ValueOrder);
+const DescendingOrder = Order_.flip(AscendingOrder);
 
 /**
- * Order of positions in stream order: for `desc`, later keys are smaller.
+ * Compare key values in the requested direction. Ascending order is
+ * lexicographic by `ValueOrder`, then by length, matching Convex array values;
+ * descending order reverses it.
  *
  * @experimental
  */
-export const PositionOrder = (
-  order: OrderDirection,
+export const Order = (
+  orderDirection: OrderDirection,
 ): Order_.Order<QueryStreamKeyValues> =>
-  order === "asc" ? Order : Order_.flip(Order);
+  orderDirection === "asc" ? AscendingOrder : DescendingOrder;
 
 /**
  * @experimental
