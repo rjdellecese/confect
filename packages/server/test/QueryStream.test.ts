@@ -3,7 +3,7 @@ import { identity } from "effect/Function";
 import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
-import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
+import type * as QueryStreamKeyValues from "@confect/server/QueryStreamKeyValues";
 import * as QueryStreamKey from "@confect/server/QueryStreamKey";
 import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
@@ -17,7 +17,7 @@ import * as Stream from "effect/Stream";
 
 const encodeCursor =
   (layout: QueryStreamKeyLayout.QueryStreamKeyLayout) =>
-  (values: QueryStreamOrderKey.QueryStreamOrderKey) =>
+  (values: QueryStreamKeyValues.QueryStreamKeyValues) =>
     Effect.flatMap(
       Effect.fromResult(QueryStreamKey.complete(layout, values)),
       Schema.encodeEffect(QueryStreamCursor.codecForLayout(layout)),
@@ -274,7 +274,7 @@ describe("QueryStream key layouts", () => {
 describe("QueryStream.Element", () => {
   it("constructs an element with an inferred document type and readonly fields", () => {
     const doc = Option.some({ text: "hello" });
-    const orderKey: QueryStreamOrderKey.QueryStreamOrderKey = [
+    const orderKey: QueryStreamKeyValues.QueryStreamKeyValues = [
       "hello",
       1,
       "id",
@@ -286,7 +286,7 @@ describe("QueryStream.Element", () => {
     >();
     expectTypeOf(element).toExtend<{
       readonly doc: Option.Option<{ text: string }>;
-      readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey;
+      readonly orderKey: QueryStreamKeyValues.QueryStreamKeyValues;
     }>();
     expect(element.doc).toBe(doc);
     expect(element.orderKey).toBe(orderKey);
@@ -294,7 +294,10 @@ describe("QueryStream.Element", () => {
   });
 
   it("constructs a filtered-out element without losing its order key", () => {
-    const orderKey: QueryStreamOrderKey.QueryStreamOrderKey = [undefined, "id"];
+    const orderKey: QueryStreamKeyValues.QueryStreamKeyValues = [
+      undefined,
+      "id",
+    ];
     const element = new QueryStream.Element({ doc: Option.none(), orderKey });
 
     expectTypeOf(element).toEqualTypeOf<QueryStream.Element<never>>();

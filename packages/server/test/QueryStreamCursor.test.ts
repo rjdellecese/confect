@@ -2,7 +2,7 @@ import { identity } from "effect/Function";
 import * as QueryStreamKey from "@confect/server/QueryStreamKey";
 import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
-import * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
+import * as QueryStreamKeyValues from "@confect/server/QueryStreamKeyValues";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -12,11 +12,11 @@ import * as SchemaIssue from "effect/SchemaIssue";
 
 const complete = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  values: QueryStreamOrderKey.QueryStreamOrderKey,
+  values: QueryStreamKeyValues.QueryStreamKeyValues,
 ) => Result.getOrThrowWith(QueryStreamKey.complete(layout, values), identity);
 const encodeCursor =
   (layout: QueryStreamKeyLayout.QueryStreamKeyLayout) =>
-  (values: QueryStreamOrderKey.QueryStreamOrderKey) =>
+  (values: QueryStreamKeyValues.QueryStreamKeyValues) =>
     Schema.encodeSync(QueryStreamCursor.codecForLayout(layout))(
       complete(layout, values),
     );
@@ -39,7 +39,7 @@ describe("QueryStreamCursor schema", () => {
     expectTypeOf<QueryStreamCursor.QueryStreamCursor>().toEqualTypeOf<{
       readonly version: 1;
       readonly keyFields: ReadonlyArray<string>;
-      readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey;
+      readonly orderKey: QueryStreamKeyValues.QueryStreamKeyValues;
     }>();
     expect(Schema.decodeSync(QueryStreamCursor.Json)(serialized)).toEqual(
       cursor,
@@ -92,7 +92,7 @@ describe("QueryStreamCursor schema", () => {
 
 describe("QueryStreamCursor serialization", () => {
   it("round-trips Convex values and missing fields with their layout", () => {
-    const orderKey: QueryStreamOrderKey.QueryStreamOrderKey = [
+    const orderKey: QueryStreamKeyValues.QueryStreamKeyValues = [
       undefined,
       null,
       true,
@@ -115,7 +115,7 @@ describe("QueryStreamCursor serialization", () => {
     );
     const cursor = encodeCursor(layout)(orderKey);
 
-    expect(Schema.is(QueryStreamOrderKey.QueryStreamOrderKey)(orderKey)).toBe(
+    expect(Schema.is(QueryStreamKeyValues.QueryStreamKeyValues)(orderKey)).toBe(
       true,
     );
     expect(JSON.parse(cursor)).toMatchObject({

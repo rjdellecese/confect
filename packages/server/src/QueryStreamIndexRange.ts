@@ -14,7 +14,7 @@ import type * as Types from "effect/Types";
 import * as QueryStreamIndexPrefix from "./QueryStreamIndexPrefix";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
 import type { IndexBounds } from "./QueryStreamKeyBounds";
-import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 
 type Head<FieldPaths extends ReadonlyArray<string>> =
@@ -38,11 +38,11 @@ const TypeId = "~@confect/server/QueryStreamIndexRange";
 
 interface Equality {
   readonly fieldPath: string;
-  readonly value: QueryStreamOrderKey.KeyValue;
+  readonly value: QueryStreamKeyValues.KeyValue;
 }
 
 interface Endpoint {
-  readonly value: QueryStreamOrderKey.KeyValue;
+  readonly value: QueryStreamKeyValues.KeyValue;
   readonly inclusive: boolean;
 }
 
@@ -142,7 +142,7 @@ const makeBuilder = (
 ): Builder<GenericDocument, ReadonlyArray<string>> => {
   const upper =
     (inclusive: boolean) =>
-    (fieldPath: string, value: QueryStreamOrderKey.KeyValue) =>
+    (fieldPath: string, value: QueryStreamKeyValues.KeyValue) =>
       make({
         equalities,
         bounded: Option.some({
@@ -154,12 +154,12 @@ const makeBuilder = (
     (inclusive: boolean) =>
     (
       fieldPath: string,
-      value: QueryStreamOrderKey.KeyValue,
+      value: QueryStreamKeyValues.KeyValue,
     ): LowerBoundedBuilder<GenericDocument, ReadonlyArray<string>> => {
       const endpoint = { value, inclusive };
       const finish =
         (upperInclusive: boolean) =>
-        (_fieldPath: string, upperValue: QueryStreamOrderKey.KeyValue) =>
+        (_fieldPath: string, upperValue: QueryStreamKeyValues.KeyValue) =>
           make({
             equalities,
             bounded: Option.some({
@@ -213,26 +213,26 @@ export const equalityPrefixLength = (self: QueryStreamIndexRange): number =>
 interface ConvexUpperBoundBuilder extends ConvexIndexRange {
   readonly lt: (
     fieldPath: string,
-    value: QueryStreamOrderKey.KeyValue,
+    value: QueryStreamKeyValues.KeyValue,
   ) => ConvexIndexRange;
   readonly lte: (
     fieldPath: string,
-    value: QueryStreamOrderKey.KeyValue,
+    value: QueryStreamKeyValues.KeyValue,
   ) => ConvexIndexRange;
 }
 
 interface ConvexRangeBuilder extends ConvexUpperBoundBuilder {
   readonly eq: (
     fieldPath: string,
-    value: QueryStreamOrderKey.KeyValue,
+    value: QueryStreamKeyValues.KeyValue,
   ) => ConvexRangeBuilder;
   readonly gt: (
     fieldPath: string,
-    value: QueryStreamOrderKey.KeyValue,
+    value: QueryStreamKeyValues.KeyValue,
   ) => ConvexUpperBoundBuilder;
   readonly gte: (
     fieldPath: string,
-    value: QueryStreamOrderKey.KeyValue,
+    value: QueryStreamKeyValues.KeyValue,
   ) => ConvexUpperBoundBuilder;
 }
 
@@ -385,7 +385,7 @@ export const fromBounds = (
       Array.zip(bounds.lower.orderKey, bounds.upper.orderKey),
       Array.takeWhile(
         ([lowerValue, upperValue]) =>
-          QueryStreamOrderKey.ValueOrder(lowerValue, upperValue) === 0,
+          QueryStreamKeyValues.ValueOrder(lowerValue, upperValue) === 0,
       ),
       Array.length,
     );

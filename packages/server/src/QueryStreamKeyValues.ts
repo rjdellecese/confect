@@ -59,12 +59,12 @@ export type KeyValue = typeof KeyValue.Type;
 /**
  * @experimental
  */
-export const QueryStreamOrderKey = Schema.Array(KeyValue);
+export const QueryStreamKeyValues = Schema.Array(KeyValue);
 
 /**
  * @experimental
  */
-export type QueryStreamOrderKey = typeof QueryStreamOrderKey.Type;
+export type QueryStreamKeyValues = typeof QueryStreamKeyValues.Type;
 
 /**
  * `Order` over Convex values, matching Convex's index ordering—a wrapper around
@@ -83,7 +83,7 @@ export const ValueOrder: Order_.Order<KeyValue> = Order_.make(
  *
  * @experimental
  */
-export const Order: Order_.Order<QueryStreamOrderKey> =
+export const Order: Order_.Order<QueryStreamKeyValues> =
   Order_.Array(ValueOrder);
 
 /**
@@ -93,7 +93,7 @@ export const Order: Order_.Order<QueryStreamOrderKey> =
  */
 export const PositionOrder = (
   order: OrderDirection,
-): Order_.Order<QueryStreamOrderKey> =>
+): Order_.Order<QueryStreamKeyValues> =>
   order === "asc" ? Order : Order_.flip(Order);
 
 /**
@@ -102,7 +102,7 @@ export const PositionOrder = (
 export const extract = (
   encoded: Record.ReadonlyRecord<string, unknown>,
   keyPaths: ReadonlyArray<ReadonlyArray<string>>,
-): QueryStreamOrderKey =>
+): QueryStreamKeyValues =>
   Array.map(keyPaths, (path) =>
     Array.reduce(
       path,
@@ -112,4 +112,4 @@ export const extract = (
           segment
         ],
     ),
-  ) as QueryStreamOrderKey;
+  ) as QueryStreamKeyValues;

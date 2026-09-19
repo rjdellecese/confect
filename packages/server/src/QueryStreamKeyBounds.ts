@@ -5,7 +5,7 @@ import * as Order from "effect/Order";
 import * as Result from "effect/Result";
 import * as QueryStreamKey from "./QueryStreamKey";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
-import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 
 // A bound's key may be a *prefix* of the full key: bounding by `["a"]` means
 // bounding by the whole family of keys that start with `"a"`. To compare
@@ -20,7 +20,7 @@ import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
  * @experimental
  */
 export interface KeyBound {
-  readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey;
+  readonly orderKey: QueryStreamKeyValues.QueryStreamKeyValues;
   readonly inclusive: boolean;
 }
 
@@ -48,9 +48,9 @@ export interface IndexBounds {
 }
 
 type KeyCut = Data.TaggedEnum<{
-  Predecessor: { readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey };
+  Predecessor: { readonly orderKey: QueryStreamKeyValues.QueryStreamKeyValues };
   Exact: { readonly orderKey: QueryStreamKey.Complete };
-  Successor: { readonly orderKey: QueryStreamOrderKey.QueryStreamOrderKey };
+  Successor: { readonly orderKey: QueryStreamKeyValues.QueryStreamKeyValues };
 }>;
 const KeyCut = Data.taggedEnum<KeyCut>();
 
@@ -70,7 +70,7 @@ const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
   const selfValues = cutValues(self);
   const thatValues = cutValues(that);
   const minLength = Math.min(selfValues.length, thatValues.length);
-  const prefixOrdering = QueryStreamOrderKey.Order(
+  const prefixOrdering = QueryStreamKeyValues.Order(
     Array.take(selfValues, minLength),
     Array.take(thatValues, minLength),
   );

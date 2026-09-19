@@ -8,7 +8,7 @@ import type {
   IndexRangeBuilder as ConvexIndexRangeBuilder,
   GenericDocument,
 } from "convex/server";
-import type { KeyValue } from "@confect/server/QueryStreamOrderKey";
+import type { KeyValue } from "@confect/server/QueryStreamKeyValues";
 import * as Result from "effect/Result";
 import * as Key from "@confect/server/QueryStreamKey";
 import * as Layout from "@confect/server/QueryStreamKeyLayout";

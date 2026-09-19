@@ -3,14 +3,14 @@ import * as Key from "@confect/server/QueryStreamKey";
 import * as Layout from "@confect/server/QueryStreamKeyLayout";
 import * as Labels from "@confect/server/QueryStreamKeyLabels";
 import * as Result from "effect/Result";
-import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
+import type * as QueryStreamKeyValues from "@confect/server/QueryStreamKeyValues";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Option from "effect/Option";
 
 const admits =
   (side: "lower" | "upper") =>
   (bound: Option.Option<QueryStreamKeyBounds.KeyBound>) =>
-  (values: QueryStreamOrderKey.QueryStreamOrderKey) => {
+  (values: QueryStreamKeyValues.QueryStreamKeyValues) => {
     const layout = Result.getOrThrow(
       Layout.fromIndex(Array.from({ length: values.length }, () => "_id")),
     );

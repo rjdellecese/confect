@@ -2,12 +2,12 @@ import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import * as Result from "effect/Result";
 import type * as QueryStreamKey from "./QueryStreamKey";
-import type * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import type * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 
 const TypeId = "~@confect/server/QueryStreamIndexPrefix";
 
 export type IndexEntries = ReadonlyArray<
-  readonly [string, QueryStreamOrderKey.QueryStreamOrderKey[number]]
+  readonly [string, QueryStreamKeyValues.QueryStreamKeyValues[number]]
 >;
 
 /**
@@ -30,7 +30,7 @@ export class IndexPrefixWidthMismatchError extends Data.TaggedError(
 
 export const make = (
   fieldPaths: ReadonlyArray<string>,
-  orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
+  orderKey: QueryStreamKeyValues.QueryStreamKeyValues,
 ): Result.Result<QueryStreamIndexPrefix, IndexPrefixWidthMismatchError> =>
   orderKey.length <= fieldPaths.length
     ? Result.succeed({ [TypeId]: Array.zip(fieldPaths, orderKey) })
@@ -46,7 +46,7 @@ export const entries = (self: QueryStreamIndexPrefix): IndexEntries =>
 
 export const values = (
   self: QueryStreamIndexPrefix,
-): QueryStreamOrderKey.QueryStreamOrderKey =>
+): QueryStreamKeyValues.QueryStreamKeyValues =>
   Array.map(entries(self), ([, value]) => value);
 
 /**
@@ -54,7 +54,7 @@ export const values = (
  */
 export const fromStreamKey = (
   fieldPaths: ReadonlyArray<string>,
-  equalities: QueryStreamOrderKey.QueryStreamOrderKey,
+  equalities: QueryStreamKeyValues.QueryStreamKeyValues,
   self: QueryStreamKey.QueryStreamKey,
 ): Result.Result<QueryStreamIndexPrefix, IndexPrefixWidthMismatchError> =>
   make(fieldPaths, Array.appendAll(equalities, self.values));

@@ -6,7 +6,7 @@ import * as Match from "effect/Match";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
-import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 
 // Serialized labels are a cursor boundary representation. They include every
 // runtime position but do not preserve implicitness.
@@ -25,7 +25,7 @@ const positionRuntimeLabel = Match.type<QueryStreamKeyLayout.Position>().pipe(
 export const QueryStreamCursor = Schema.Struct({
   version: Schema.Literal(1),
   keyFields: RuntimeLabels,
-  orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
+  orderKey: QueryStreamKeyValues.QueryStreamKeyValues,
 }).check(
   Schema.makeFilter(
     (cursor) => cursor.orderKey.length === cursor.keyFields.length,

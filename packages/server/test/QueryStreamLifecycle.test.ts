@@ -1,5 +1,5 @@
 import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
-import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
+import type * as QueryStreamKeyValues from "@confect/server/QueryStreamKeyValues";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import { assert, describe, expect, it } from "@effect/vitest";
@@ -28,7 +28,7 @@ const documents = [
 interface RecordedConstraint {
   readonly _tag: "eq" | "gt" | "gte" | "lt" | "lte";
   readonly field: string;
-  readonly value: QueryStreamOrderKey.KeyValue;
+  readonly value: QueryStreamKeyValues.KeyValue;
 }
 
 type Document = (typeof documents)[number];

@@ -33,7 +33,7 @@ export * as QueryStreamCursor from "./QueryStreamCursor";
 export * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 export * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
 export * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
-export * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+export * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 export * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
 export * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 export * as QueryStreamReadBudget from "./QueryStreamReadBudget";
