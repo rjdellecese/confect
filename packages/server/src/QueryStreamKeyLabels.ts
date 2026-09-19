@@ -1,5 +1,5 @@
 import * as Array from "effect/Array";
-import * as Equivalence_ from "effect/Equivalence";
+import * as Equivalence from "effect/Equivalence";
 import * as Option from "effect/Option";
 
 const TypeId = "@confect/server/QueryStreamKeyLabels";
@@ -43,34 +43,7 @@ export const toArray = <Labels extends ReadonlyArray<string>>(
 export const size = (self: QueryStreamKeyLabels): number =>
   toArray(self).length;
 
-const ArrayEquivalence = Equivalence_.Array(Equivalence_.String);
-
-/**
- * Equality includes both label order and multiplicity.
- *
- * @experimental
- */
-export const Equivalence: Equivalence_.Equivalence<QueryStreamKeyLabels> =
-  Equivalence_.mapInput(ArrayEquivalence, toArray);
-
-/**
- * Concatenate labels, preserving their literal tuple types.
- *
- * @experimental
- */
-export function concat<
-  Left extends ReadonlyArray<string>,
-  Right extends ReadonlyArray<string>,
->(
-  self: QueryStreamKeyLabels<Left>,
-  that: QueryStreamKeyLabels<Right>,
-): QueryStreamKeyLabels<readonly [...Left, ...Right]>;
-export function concat(
-  self: QueryStreamKeyLabels,
-  that: QueryStreamKeyLabels,
-): QueryStreamKeyLabels {
-  return make(Array.appendAll(toArray(self), toArray(that)));
-}
+const ArrayEquivalence = Equivalence.Array(Equivalence.String);
 
 /**
  * Parse a matching prefix, returning the labels left after it. A reordered,

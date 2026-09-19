@@ -35,48 +35,6 @@ describe("QueryStreamKeyLabels", () => {
     expect(QueryStreamKeyLabels.size(QueryStreamKeyLabels.make([]))).toBe(0);
   });
 
-  it("compares sequences by name, order, and multiplicity", () => {
-    const labels = QueryStreamKeyLabels.make(["a", "b", "a"]);
-    expect(
-      QueryStreamKeyLabels.Equivalence(
-        labels,
-        QueryStreamKeyLabels.make(["a", "b", "a"]),
-      ),
-    ).toBe(true);
-    for (const other of [["a", "a", "b"], ["a", "b"], ["a", "b", "c"], []]) {
-      expect(
-        QueryStreamKeyLabels.Equivalence(
-          labels,
-          QueryStreamKeyLabels.make(other),
-        ),
-      ).toBe(false);
-    }
-  });
-
-  it("concatenates without losing tuple information or changing either input", () => {
-    const left = QueryStreamKeyLabels.make(["created"]);
-    const right = QueryStreamKeyLabels.make(["created", "id"]);
-    const joined = QueryStreamKeyLabels.concat(left, right);
-    expectTypeOf(joined).toEqualTypeOf<
-      QueryStreamKeyLabels.QueryStreamKeyLabels<
-        readonly ["created", "created", "id"]
-      >
-    >();
-    expect(QueryStreamKeyLabels.toArray(joined)).toEqual([
-      "created",
-      "created",
-      "id",
-    ]);
-    expect(QueryStreamKeyLabels.toArray(left)).toEqual(["created"]);
-    expect(QueryStreamKeyLabels.toArray(right)).toEqual(["created", "id"]);
-    expect(
-      QueryStreamKeyLabels.Equivalence(
-        QueryStreamKeyLabels.concat(QueryStreamKeyLabels.make([]), left),
-        left,
-      ),
-    ).toBe(true);
-  });
-
   it.each([
     { prefix: [], rest: ["a", "a", "b"] },
     { prefix: ["a"], rest: ["a", "b"] },
@@ -89,12 +47,10 @@ describe("QueryStreamKeyLabels", () => {
       QueryStreamKeyLabels.stripPrefix(labels, selected),
     );
     expect(QueryStreamKeyLabels.toArray(remaining)).toEqual(rest);
-    expect(
-      QueryStreamKeyLabels.Equivalence(
-        QueryStreamKeyLabels.concat(selected, remaining),
-        labels,
-      ),
-    ).toBe(true);
+    expect([
+      ...QueryStreamKeyLabels.toArray(selected),
+      ...QueryStreamKeyLabels.toArray(remaining),
+    ]).toEqual(QueryStreamKeyLabels.toArray(labels));
   });
 
   it.each([["b"], ["a", "b"], ["a", "a", "b", "c"]])(
