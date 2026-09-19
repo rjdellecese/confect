@@ -20,13 +20,13 @@ import * as QueryStreamKeyValues from "./QueryStreamKeyValues";
  * @experimental
  */
 export interface KeyBound {
-  readonly orderKey: QueryStreamKeyValues.QueryStreamKeyValues;
+  readonly keyValues: QueryStreamKeyValues.QueryStreamKeyValues;
   readonly inclusive: boolean;
 }
 
 /**
- * Bounds over a stream's order key, in _ascending key space_ (`narrow` converts
- * from stream space, where `desc` reverses which end is which).
+ * Bounds over a stream's key, in _ascending key space_ (`narrow` converts from
+ * stream space, where `desc` reverses which end is which).
  *
  * @experimental
  */
@@ -48,9 +48,11 @@ export interface IndexBounds {
 }
 
 type KeyCut = Data.TaggedEnum<{
-  Predecessor: { readonly orderKey: QueryStreamKeyValues.QueryStreamKeyValues };
-  Exact: { readonly orderKey: QueryStreamKey.Complete };
-  Successor: { readonly orderKey: QueryStreamKeyValues.QueryStreamKeyValues };
+  Predecessor: {
+    readonly keyValues: QueryStreamKeyValues.QueryStreamKeyValues;
+  };
+  Exact: { readonly key: QueryStreamKey.Complete };
+  Successor: { readonly keyValues: QueryStreamKeyValues.QueryStreamKeyValues };
 }>;
 const KeyCut = Data.taggedEnum<KeyCut>();
 
@@ -61,9 +63,9 @@ const cutRank = KeyCut.$match({
 });
 
 const cutValues = KeyCut.$match({
-  Predecessor: ({ orderKey }) => orderKey,
-  Exact: ({ orderKey }) => QueryStreamKey.values(orderKey),
-  Successor: ({ orderKey }) => orderKey,
+  Predecessor: ({ keyValues }) => keyValues,
+  Exact: ({ key }) => QueryStreamKey.values(key),
+  Successor: ({ keyValues }) => keyValues,
 });
 
 const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
@@ -96,13 +98,13 @@ const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
 
 const lowerCut = (bound: KeyBound): KeyCut =>
   bound.inclusive
-    ? KeyCut.Predecessor({ orderKey: bound.orderKey })
-    : KeyCut.Successor({ orderKey: bound.orderKey });
+    ? KeyCut.Predecessor({ keyValues: bound.keyValues })
+    : KeyCut.Successor({ keyValues: bound.keyValues });
 
 const upperCut = (bound: KeyBound): KeyCut =>
   bound.inclusive
-    ? KeyCut.Successor({ orderKey: bound.orderKey })
-    : KeyCut.Predecessor({ orderKey: bound.orderKey });
+    ? KeyCut.Successor({ keyValues: bound.keyValues })
+    : KeyCut.Predecessor({ keyValues: bound.keyValues });
 
 /**
  * The stricter (later) of two lower bounds.
@@ -177,16 +179,15 @@ export const intersectIndexBounds = (
 export const admittedByLower =
   (bounds: ParsedBounds) =>
   (
-    orderKey: QueryStreamKey.Complete,
+    key: QueryStreamKey.Complete,
   ): Result.Result<boolean, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
     Result.map(
-      QueryStreamKeyLayout.checkCompatible(bounds.layout, orderKey.layout),
+      QueryStreamKeyLayout.checkCompatible(bounds.layout, key.layout),
       () =>
         Option.match(bounds.lower, {
           onNone: () => true,
           onSome: (bound) =>
-            KeyCutOrder(KeyCut.Exact({ orderKey }), lowerCut(rawBound(bound))) >
-            0,
+            KeyCutOrder(KeyCut.Exact({ key }), lowerCut(rawBound(bound))) > 0,
         }),
     );
 
@@ -199,16 +200,15 @@ export const admittedByLower =
 export const admittedByUpper =
   (bounds: ParsedBounds) =>
   (
-    orderKey: QueryStreamKey.Complete,
+    key: QueryStreamKey.Complete,
   ): Result.Result<boolean, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
     Result.map(
-      QueryStreamKeyLayout.checkCompatible(bounds.layout, orderKey.layout),
+      QueryStreamKeyLayout.checkCompatible(bounds.layout, key.layout),
       () =>
         Option.match(bounds.upper, {
           onNone: () => true,
           onSome: (bound) =>
-            KeyCutOrder(KeyCut.Exact({ orderKey }), upperCut(rawBound(bound))) <
-            0,
+            KeyCutOrder(KeyCut.Exact({ key }), upperCut(rawBound(bound))) < 0,
         }),
     );
 
@@ -229,7 +229,7 @@ export type NarrowBounds =
     };
 
 export interface ParsedBound {
-  readonly orderKey: QueryStreamKey.Prefix;
+  readonly key: QueryStreamKey.Prefix;
   readonly inclusive: boolean;
 }
 
@@ -276,8 +276,8 @@ export const fromParsed = (
   const checkEndpoint = (endpoint: Option.Option<ParsedBound>) =>
     Option.match(endpoint, {
       onNone: () => Result.succeed(undefined),
-      onSome: ({ orderKey }) =>
-        QueryStreamKeyLayout.checkCompatible(layout, orderKey.layout),
+      onSome: ({ key }) =>
+        QueryStreamKeyLayout.checkCompatible(layout, key.layout),
     });
   return Result.gen(function* () {
     yield* checkEndpoint(endpoints.lower);
@@ -287,7 +287,7 @@ export const fromParsed = (
 };
 
 const rawBound = (bound: ParsedBound): KeyBound => ({
-  orderKey: QueryStreamKey.values(bound.orderKey),
+  keyValues: QueryStreamKey.values(bound.key),
   inclusive: bound.inclusive,
 });
 
@@ -307,10 +307,7 @@ export const tightestParsedLower = (
   that: ParsedBound,
 ): Result.Result<ParsedBound, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
   Result.map(
-    QueryStreamKeyLayout.checkCompatible(
-      self.orderKey.layout,
-      that.orderKey.layout,
-    ),
+    QueryStreamKeyLayout.checkCompatible(self.key.layout, that.key.layout),
     () => tighterLower(self, that),
   );
 
@@ -319,19 +316,16 @@ export const tightestParsedUpper = (
   that: ParsedBound,
 ): Result.Result<ParsedBound, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
   Result.map(
-    QueryStreamKeyLayout.checkCompatible(
-      self.orderKey.layout,
-      that.orderKey.layout,
-    ),
+    QueryStreamKeyLayout.checkCompatible(self.key.layout, that.key.layout),
     () => tighterUpper(self, that),
   );
 
 export const parseBound = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  { orderKey, inclusive }: KeyBound,
+  { keyValues, inclusive }: KeyBound,
 ): Result.Result<ParsedBound, QueryStreamKey.KeyWidthMismatchError> =>
-  Result.map(QueryStreamKey.prefix(layout, orderKey), (prefix) => ({
-    orderKey: prefix,
+  Result.map(QueryStreamKey.prefix(layout, keyValues), (prefix) => ({
+    key: prefix,
     inclusive,
   }));
 

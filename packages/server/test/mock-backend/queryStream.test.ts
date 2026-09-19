@@ -265,7 +265,7 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
-  it.effect("merge interleaves streams in order-key order", () =>
+  it.effect("merge interleaves streams in key order", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -591,23 +591,23 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
-          const afterKey = (yield* Schema.decodeEffect(QueryStreamCursor.Json)(
-            page1.continueCursor,
-          )).orderKey;
+          const afterKeyValues = (yield* Schema.decodeEffect(
+            QueryStreamCursor.Json,
+          )(page1.continueCursor)).keyValues;
 
           const narrowed = QueryStream.narrow(leaf, {
-            start: { orderKey: afterKey, inclusive: false },
+            start: { keyValues: afterKeyValues, inclusive: false },
           });
 
           // The narrowed stream is a rebuilt *leaf*—not an in-memory
           // fallback—whose lower bound is the pinned prefix plus the
           // cursor key, exclusive.
           expect(narrowed.reflection?.bounds?.lower).toEqual({
-            orderKey: ["b", ...afterKey],
+            keyValues: ["b", ...afterKeyValues],
             inclusive: false,
           });
           expect(narrowed.reflection?.bounds?.upper).toEqual({
-            orderKey: ["b"],
+            keyValues: ["b"],
             inclusive: true,
           });
 
@@ -639,16 +639,16 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
-          const afterKey = (yield* Schema.decodeEffect(QueryStreamCursor.Json)(
-            page1.continueCursor,
-          )).orderKey;
+          const afterKeyValues = (yield* Schema.decodeEffect(
+            QueryStreamCursor.Json,
+          )(page1.continueCursor)).keyValues;
 
           // Pure transforms narrow by narrowing their input, so the bounds
           // still reach the leaf rather than falling back to in-memory
           // key filtering.
           expect(derived.narrowWith).toBeDefined();
           const narrowed = QueryStream.narrow(derived, {
-            start: { orderKey: afterKey, inclusive: false },
+            start: { keyValues: afterKeyValues, inclusive: false },
           });
 
           expect(yield* collectTexts(narrowed)).toEqual(["B", "D"]);
@@ -686,17 +686,17 @@ describe("QueryStream", () => {
               );
               const texts = yield* collectTexts(leaf);
               const start = {
-                orderKey: Array.getUnsafe(elements, 1).orderKey,
+                keyValues: Array.getUnsafe(elements, 1).keyValues,
                 inclusive: startInclusive,
               };
               const end = {
-                orderKey: Array.getUnsafe(elements, 5).orderKey,
+                keyValues: Array.getUnsafe(elements, 5).keyValues,
                 inclusive: endInclusive,
               };
               const bounds = { start, end };
               const prefixBounds = {
-                start: { ...start, orderKey: [Array.getUnsafe(texts, 1)] },
-                end: { ...end, orderKey: [Array.getUnsafe(texts, 5)] },
+                start: { ...start, keyValues: [Array.getUnsafe(texts, 1)] },
+                end: { ...end, keyValues: [Array.getUnsafe(texts, 5)] },
               };
               const expected = texts.slice(
                 startInclusive ? 1 : 2,
@@ -743,7 +743,7 @@ describe("QueryStream", () => {
                     QueryStream.narrow(stream, {
                       start,
                       end: {
-                        orderKey: start.orderKey,
+                        keyValues: start.keyValues,
                         inclusive: endInclusive,
                       },
                     }),
@@ -802,11 +802,11 @@ describe("QueryStream", () => {
               const leaf = reader.table("notes").stream("by_text", order);
               const texts = yield* collectTexts(leaf);
               const start = {
-                orderKey: [Array.getUnsafe(texts, 1)],
+                keyValues: [Array.getUnsafe(texts, 1)],
                 inclusive: true,
               };
               const end = {
-                orderKey: [Array.getUnsafe(texts, 3)],
+                keyValues: [Array.getUnsafe(texts, 3)],
                 inclusive: false,
               };
               expect(
@@ -824,11 +824,11 @@ describe("QueryStream", () => {
                 yield* collectTexts(
                   QueryStream.narrow(bounded, {
                     start: {
-                      orderKey: [Array.getUnsafe(texts, 0)],
+                      keyValues: [Array.getUnsafe(texts, 0)],
                       inclusive: true,
                     },
                     end: {
-                      orderKey: [Array.getUnsafe(texts, 4)],
+                      keyValues: [Array.getUnsafe(texts, 4)],
                       inclusive: true,
                     },
                   }),
@@ -908,11 +908,11 @@ describe("QueryStream", () => {
                 const result = yield* Stream.runCollect(
                   QueryStream.narrow(joined, {
                     start: {
-                      orderKey: Array.getUnsafe(elements, 0).orderKey,
+                      keyValues: Array.getUnsafe(elements, 0).keyValues,
                       inclusive: startInclusive,
                     },
                     end: {
-                      orderKey: Array.getUnsafe(elements, endIndex).orderKey,
+                      keyValues: Array.getUnsafe(elements, endIndex).keyValues,
                       inclusive: endInclusive,
                     },
                   }).annotated,
@@ -945,7 +945,7 @@ describe("QueryStream", () => {
       yield* c.run(
         Effect.gen(function* () {
           // Duplicate "banana"s make cursors land *between* rows that share
-          // the first order-key component, so resuming exercises the
+          // the first key position, so resuming exercises the
           // composite-key range decomposition (text, then `_creationTime`,
           // then `_id`).
           yield* insertNotes(["banana", "apple", "banana"]);
@@ -1430,63 +1430,65 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
-  it.effect("renameKey relabels order keys so foreign streams merge", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
+  it.effect(
+    "renameKey relabels ordering positions so foreign streams merge",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
 
-      yield* c.run(
-        Effect.gen(function* () {
-          const writer = yield* DatabaseWriter;
-          const reader = yield* DatabaseReader;
+        yield* c.run(
+          Effect.gen(function* () {
+            const writer = yield* DatabaseWriter;
+            const reader = yield* DatabaseReader;
 
-          yield* writer.table("notes").insert({ text: "a", tag: "ta1" });
-          yield* writer.table("notes").insert({
-            author: { name: "A", role: "admin" },
-            tag: "tr1",
-            text: "x1",
-          });
-          yield* writer.table("notes").insert({ text: "m", tag: "ta2" });
-          yield* writer.table("notes").insert({
-            author: { name: "U", role: "user" },
-            tag: "tr2",
-            text: "x2",
-          });
+            yield* writer.table("notes").insert({ text: "a", tag: "ta1" });
+            yield* writer.table("notes").insert({
+              author: { name: "A", role: "admin" },
+              tag: "tr1",
+              text: "x1",
+            });
+            yield* writer.table("notes").insert({ text: "m", tag: "ta2" });
+            yield* writer.table("notes").insert({
+              author: { name: "U", role: "user" },
+              tag: "tr2",
+              text: "x2",
+            });
 
-          // Two different indexes over the same table: the range bounds
-          // keep their document sets disjoint.
-          const byText = reader
-            .table("notes")
-            .stream("by_text", (q) => q.lt("text", "x"));
-          const byRole = reader
-            .table("notes")
-            .stream("by_role", (q) => q.gte("author.role", "admin"));
+            // Two different indexes over the same table: the range bounds
+            // keep their document sets disjoint.
+            const byText = reader
+              .table("notes")
+              .stream("by_text", (q) => q.lt("text", "x"));
+            const byRole = reader
+              .table("notes")
+              .stream("by_role", (q) => q.gte("author.role", "admin"));
 
-          // `by_role`'s key is ["author.role", "_creationTime"]; relabel
-          // it to merge positionally with `by_text`. Convex's string order
-          // interleaves the values: "a" < "admin" < "m" < "user".
-          const merged = QueryStream.merge([
-            byText,
-            byRole.pipe(QueryStream.renameKey(["text", "_creationTime"])),
-          ]);
+            // `by_role`'s key is ["author.role", "_creationTime"]; relabel
+            // it to merge positionally with `by_text`. Convex's string order
+            // interleaves the values: "a" < "admin" < "m" < "user".
+            const merged = QueryStream.merge([
+              byText,
+              byRole.pipe(QueryStream.renameKey(["text", "_creationTime"])),
+            ]);
 
-          const tags = yield* Stream.runCollect(merged).pipe(
-            Effect.map((docs) => docs.map((doc) => doc.tag)),
-          );
-          expect(tags).toEqual(["ta1", "tr1", "ta2", "tr2"]);
+            const tags = yield* Stream.runCollect(merged).pipe(
+              Effect.map((docs) => docs.map((doc) => doc.tag)),
+            );
+            expect(tags).toEqual(["ta1", "tr1", "ta2", "tr2"]);
 
-          // Pagination narrows through the relabeling into both leaves:
-          // bounds are positional values, so the relabeled branch's leaf
-          // receives them against its own fields.
-          const pages = yield* paginateAll(merged, 1);
-          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
-            ["ta1"],
-            ["tr1"],
-            ["ta2"],
-            ["tr2"],
-          ]);
-        }),
-      );
-    }).pipe(Effect.provide(TestConfect.layer)),
+            // Pagination narrows through the relabeling into both leaves:
+            // bounds are positional values, so the relabeled branch's leaf
+            // receives them against its own fields.
+            const pages = yield* paginateAll(merged, 1);
+            expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+              ["ta1"],
+              ["tr1"],
+              ["ta2"],
+              ["tr2"],
+            ]);
+          }),
+        );
+      }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("renameKey and distinct see through flatMap tiebreakers", () =>
@@ -1695,7 +1697,7 @@ describe("QueryStream", () => {
                 }),
               ),
             );
-            expect(annotated[0].orderKey.slice(-4)).toEqual([
+            expect(annotated[0].keyValues.slice(-4)).toEqual([
               null,
               null,
               null,
@@ -1722,7 +1724,7 @@ describe("QueryStream", () => {
           yield* writer.table("notes").insert({ text: "other" });
 
           const reader = yield* DatabaseReader;
-          // Pinning the whole `by_id` key leaves an *empty* order key; the
+          // Pinning the whole `by_id` key leaves an *empty* key; the
           // cursor round-trip must not rebuild ranges past the index's
           // fields.
           const pinned = reader
@@ -1829,10 +1831,10 @@ describe("QueryStream", () => {
             );
 
             for (const cursor of [page.continueCursor, page.splitCursor]) {
-              const orderKey = yield* Schema.decodeEffect(
+              const key = yield* Schema.decodeEffect(
                 QueryStreamCursor.codecForLayout(source.keyLayout),
               )(cursor);
-              expect(QueryStreamKey.values(orderKey)).toHaveLength(3);
+              expect(QueryStreamKey.values(key)).toHaveLength(3);
 
               for (const bound of ["cursor", "endCursor"] as const) {
                 const result = yield* QueryStream.paginate(relabeled, {
@@ -1953,7 +1955,7 @@ describe("QueryStream types", () => {
     { readonly check: (text: string) => Effect.Effect<boolean> }
   >()("@confect/server/test/mock-backend/queryStream.test/SomeService") {}
 
-  it("infers the remaining order key from eq pinning", () => {
+  it("infers the remaining visible labels from eq pinning", () => {
     const _typeChecks = Effect.gen(function* () {
       const reader = yield* DatabaseReader;
 
@@ -1996,8 +1998,8 @@ describe("QueryStream types", () => {
       >();
 
       // Narrowing requires at least one defined endpoint in either call form.
-      const start = { orderKey: ["a"], inclusive: true };
-      const end = { orderKey: ["z"], inclusive: false };
+      const start = { keyValues: ["a"], inclusive: true };
+      const end = { keyValues: ["z"], inclusive: false };
       const startOnly = QueryStream.narrow(full, { start });
       const endOnly = full.pipe(QueryStream.narrow({ end }));
       const between = QueryStream.narrow(full, { start, end });
@@ -2030,7 +2032,7 @@ describe("QueryStream types", () => {
       const mergedAcrossIndexes = QueryStream.merge([pinned, byCreationTime]);
       void mergedAcrossIndexes;
 
-      // @ts-expect-error—order keys differ: ["text", "_creationTime"]
+      // @ts-expect-error—visible labels differ: ["text", "_creationTime"]
       const mergedMismatched = QueryStream.merge([pinned, full]);
       void mergedMismatched;
 
@@ -2054,7 +2056,7 @@ describe("QueryStream types", () => {
       });
       void afterBound;
 
-      // Pure `filter`/`map` keep the order key and leave E/R untouched.
+      // Pure `filter`/`map` keep the visible labels and leave E/R untouched.
       const pureFiltered = QueryStream.filter(
         pinned,
         (note) => note.text !== "",
@@ -2082,7 +2084,7 @@ describe("QueryStream types", () => {
         Stream.Services<typeof filtered>
       >().toEqualTypeOf<SomeService>();
 
-      // flatMap concatenates order keys at the type level.
+      // flatMap concatenates visible labels at the type level.
       const joined = QueryStream.flatMap(bounded, (_note) => pinned, {
         innerLayout: Result.getOrThrowWith(
           QueryStreamKeyLayout.fromIndex(["_creationTime"]),
@@ -2098,7 +2100,7 @@ describe("QueryStream types", () => {
       >();
 
       const joinedMismatched = QueryStream.flatMap(bounded, (_note) => pinned, {
-        // @ts-expect-error—innerLayout must match the inner stream's order key.
+        // @ts-expect-error—innerLayout must match the inner stream's visible labels.
         innerLayout: Result.getOrThrowWith(
           QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
           identity,
@@ -2106,13 +2108,13 @@ describe("QueryStream types", () => {
       });
       void joinedMismatched;
 
-      // distinct preserves the order key and requires a prefix of it.
+      // distinct preserves the visible labels and requires a prefix of them.
       const distinctTexts = QueryStream.distinct(full, ["text"]);
       expectTypeOf<LabelsOf<typeof distinctTexts>>().toEqualTypeOf<
         ["text", "_creationTime"]
       >();
 
-      // @ts-expect-error—fields must be a prefix of the order key.
+      // @ts-expect-error—labels must be a prefix of the visible labels.
       const distinctNonPrefix = QueryStream.distinct(full, ["_creationTime"]);
       void distinctNonPrefix;
 
@@ -2120,7 +2122,7 @@ describe("QueryStream types", () => {
       const distinctPinnedAway = QueryStream.distinct(pinned, ["text"]);
       void distinctPinnedAway;
 
-      // renameKey relabels the order key position-for-position.
+      // renameKey relabels visible positions one-for-one.
       const relabeled = QueryStream.renameKey(full, [
         "renamed",
         "_creationTime",

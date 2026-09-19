@@ -30,14 +30,14 @@ export class IndexPrefixWidthMismatchError extends Data.TaggedError(
 
 export const make = (
   fieldPaths: ReadonlyArray<string>,
-  orderKey: QueryStreamKeyValues.QueryStreamKeyValues,
+  keyValues: QueryStreamKeyValues.QueryStreamKeyValues,
 ): Result.Result<QueryStreamIndexPrefix, IndexPrefixWidthMismatchError> =>
-  orderKey.length <= fieldPaths.length
-    ? Result.succeed({ [TypeId]: Array.zip(fieldPaths, orderKey) })
+  keyValues.length <= fieldPaths.length
+    ? Result.succeed({ [TypeId]: Array.zip(fieldPaths, keyValues) })
     : Result.fail(
         new IndexPrefixWidthMismatchError({
           width: fieldPaths.length,
-          actual: orderKey.length,
+          actual: keyValues.length,
         }),
       );
 

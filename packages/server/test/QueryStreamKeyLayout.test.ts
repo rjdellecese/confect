@@ -95,7 +95,7 @@ describe("QueryStreamKeyLayout", () => {
     },
   );
 
-  it("tracks logical tuples through pinning, composition, and renaming", () => {
+  it("tracks visible label tuples through pinning, composition, and renaming", () => {
     const pinned = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex(["text", "_creationTime"], 1),
       identity,
@@ -172,7 +172,7 @@ describe("QueryStreamKeyLayout", () => {
     ).toBe(2);
   });
 
-  it("resolves logical prefixes including only intervening hidden IDs", () => {
+  it("resolves label prefixes including only intervening implicit IDs", () => {
     const layout = QueryStreamKeyLayout.concat(
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["text"]), identity),
       Result.getOrThrowWith(

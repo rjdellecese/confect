@@ -39,7 +39,7 @@ export interface QueryStreamKeyLayout<
   };
 }
 
-// Private construction keeps the logical key witness with the operations
+// Private construction keeps the visible label witness with the operations
 // that derive it from index fields, concatenation, or renaming.
 const make = <Labels extends ReadonlyArray<string>>(
   positions: ReadonlyArray<Position>,
@@ -239,7 +239,7 @@ export function visibleLabels(
 export const runtimeWidth = (self: QueryStreamKeyLayout): number =>
   positions(self).length;
 
-// Runtime offsets of visible labels, used to resolve logical prefixes.
+// Runtime offsets of visible labels, used to resolve label prefixes.
 const visiblePositions = (self: QueryStreamKeyLayout): ReadonlyArray<number> =>
   Array.filterMap(positions(self), (position, index) =>
     Position.$is("Visible")(position) ? Result.succeed(index) : Result.failVoid,
@@ -283,8 +283,8 @@ export const checkCompatible = (
     : Result.fail(new KeyLayoutMismatchError({ expected, actual }));
 
 /**
- * Parse a logical prefix and resolve its runtime width. Hidden IDs before the
- * last selected label are included; hidden IDs after it are not.
+ * Parse a visible label prefix and resolve its runtime width. Implicit IDs
+ * before the last selected label are included; implicit IDs after it are not.
  *
  * @experimental
  */

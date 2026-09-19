@@ -60,20 +60,20 @@ describe("QueryStreamIndexRange.builder", () => {
     const lower = pinned.gt("score", 1);
     const upper = pinned.lte("score", 5);
     expect(QueryStreamIndexRange.toBounds(root)).toEqual({
-      lower: { orderKey: [], inclusive: true },
-      upper: { orderKey: [], inclusive: true },
+      lower: { keyValues: [], inclusive: true },
+      upper: { keyValues: [], inclusive: true },
     });
     expect(QueryStreamIndexRange.toBounds(pinned)).toEqual({
-      lower: { orderKey: ["a"], inclusive: true },
-      upper: { orderKey: ["a"], inclusive: true },
+      lower: { keyValues: ["a"], inclusive: true },
+      upper: { keyValues: ["a"], inclusive: true },
     });
     expect(QueryStreamIndexRange.toBounds(lower)).toEqual({
-      lower: { orderKey: ["a", 1], inclusive: false },
-      upper: { orderKey: ["a"], inclusive: true },
+      lower: { keyValues: ["a", 1], inclusive: false },
+      upper: { keyValues: ["a"], inclusive: true },
     });
     expect(QueryStreamIndexRange.toBounds(upper)).toEqual({
-      lower: { orderKey: ["a"], inclusive: true },
-      upper: { orderKey: ["a", 5], inclusive: true },
+      lower: { keyValues: ["a"], inclusive: true },
+      upper: { keyValues: ["a", 5], inclusive: true },
     });
     for (const [range, length] of [
       [root, 0],
@@ -88,7 +88,7 @@ describe("QueryStreamIndexRange.builder", () => {
       expect(range).not.toHaveProperty("eqCount");
     }
     expect(
-      QueryStreamIndexRange.toBounds(root.eq("category", "b")).lower.orderKey,
+      QueryStreamIndexRange.toBounds(root.eq("category", "b")).lower.keyValues,
     ).toEqual(["b"]);
   });
 
@@ -229,16 +229,16 @@ describe("QueryStreamIndexRange.apply", () => {
 describe("QueryStreamIndexRange.toBounds", () => {
   it("keeps an unconstrained range unbounded and pins equalities on both endpoints", () => {
     expect(QueryStreamIndexRange.toBounds(builder())).toEqual({
-      lower: { orderKey: [], inclusive: true },
-      upper: { orderKey: [], inclusive: true },
+      lower: { keyValues: [], inclusive: true },
+      upper: { keyValues: [], inclusive: true },
     });
     expect(
       QueryStreamIndexRange.toBounds(
         builder().eq("category", "a").eq("score", 2),
       ),
     ).toEqual({
-      lower: { orderKey: ["a", 2], inclusive: true },
-      upper: { orderKey: ["a", 2], inclusive: true },
+      lower: { keyValues: ["a", 2], inclusive: true },
+      upper: { keyValues: ["a", 2], inclusive: true },
     });
   });
 
@@ -247,23 +247,23 @@ describe("QueryStreamIndexRange.toBounds", () => {
     (lowerTag) => {
       const lower = builder().eq("category", "a")[lowerTag]("score", 1);
       expect(QueryStreamIndexRange.toBounds(lower)).toEqual({
-        lower: { orderKey: ["a", 1], inclusive: lowerTag === "gte" },
-        upper: { orderKey: ["a"], inclusive: true },
+        lower: { keyValues: ["a", 1], inclusive: lowerTag === "gte" },
+        upper: { keyValues: ["a"], inclusive: true },
       });
       for (const upperTag of ["lt", "lte"] as const) {
         expect(
           QueryStreamIndexRange.toBounds(lower[upperTag]("score", 5)),
         ).toEqual({
-          lower: { orderKey: ["a", 1], inclusive: lowerTag === "gte" },
-          upper: { orderKey: ["a", 5], inclusive: upperTag === "lte" },
+          lower: { keyValues: ["a", 1], inclusive: lowerTag === "gte" },
+          upper: { keyValues: ["a", 5], inclusive: upperTag === "lte" },
         });
         expect(
           QueryStreamIndexRange.toBounds(
             builder().eq("category", "a")[upperTag]("score", 5),
           ),
         ).toEqual({
-          lower: { orderKey: ["a"], inclusive: true },
-          upper: { orderKey: ["a", 5], inclusive: upperTag === "lte" },
+          lower: { keyValues: ["a"], inclusive: true },
+          upper: { keyValues: ["a", 5], inclusive: upperTag === "lte" },
         });
       }
     },
@@ -277,8 +277,8 @@ describe("QueryStreamIndexRange.fromBounds", () => {
       [[], [3, "id"]],
     ] as const) {
       const split = QueryStreamIndexRange.fromBounds(["score"], "asc", {
-        lower: { orderKey: lower, inclusive: true },
-        upper: { orderKey: upper, inclusive: true },
+        lower: { keyValues: lower, inclusive: true },
+        upper: { keyValues: upper, inclusive: true },
       });
       expect(split).toEqual(
         Result.fail(
@@ -295,21 +295,21 @@ describe("QueryStreamIndexRange.fromBounds", () => {
     "decomposes a compound interval in %s order",
     (order) => {
       const bounds = {
-        lower: { orderKey: [1, 2, 3], inclusive: false },
-        upper: { orderKey: [1, 3, 2], inclusive: true },
+        lower: { keyValues: [1, 2, 3], inclusive: false },
+        upper: { keyValues: [1, 3, 2], inclusive: true },
       };
       const expected = [
         {
-          lower: { orderKey: [1, 2, 3], inclusive: false },
-          upper: { orderKey: [1, 2], inclusive: true },
+          lower: { keyValues: [1, 2, 3], inclusive: false },
+          upper: { keyValues: [1, 2], inclusive: true },
         },
         {
-          lower: { orderKey: [1, 2], inclusive: false },
-          upper: { orderKey: [1, 3], inclusive: false },
+          lower: { keyValues: [1, 2], inclusive: false },
+          upper: { keyValues: [1, 3], inclusive: false },
         },
         {
-          lower: { orderKey: [1, 3], inclusive: true },
-          upper: { orderKey: [1, 3, 2], inclusive: true },
+          lower: { keyValues: [1, 3], inclusive: true },
+          upper: { keyValues: [1, 3, 2], inclusive: true },
         },
       ];
       const ranges = fromBounds(["f1", "f2", "f3"], order, bounds);
@@ -354,8 +354,8 @@ describe("QueryStreamIndexRange.fromBounds", () => {
         [1, 1],
       ];
       const ordered = order === "asc" ? keys : keys.toReversed();
-      const endpoints = [[], [0], [1], ...keys].flatMap((orderKey) =>
-        [true, false].map((inclusive) => ({ orderKey, inclusive })),
+      const endpoints = [[], [0], [1], ...keys].flatMap((keyValues) =>
+        [true, false].map((inclusive) => ({ keyValues, inclusive })),
       );
       const layout = Result.getOrThrow(Layout.fromIndex(["a", "_id"]));
       const admits = (bounds: QueryStreamKeyBounds.IndexBounds) => {
@@ -393,32 +393,32 @@ describe("QueryStreamIndexRange.fromBounds", () => {
     (order) => {
       const cases: ReadonlyArray<QueryStreamKeyBounds.IndexBounds> = [
         {
-          lower: { orderKey: [2], inclusive: true },
-          upper: { orderKey: [1], inclusive: true },
+          lower: { keyValues: [2], inclusive: true },
+          upper: { keyValues: [1], inclusive: true },
         },
         {
-          lower: { orderKey: [1], inclusive: false },
-          upper: { orderKey: [1], inclusive: true },
+          lower: { keyValues: [1], inclusive: false },
+          upper: { keyValues: [1], inclusive: true },
         },
         {
-          lower: { orderKey: [1], inclusive: true },
-          upper: { orderKey: [1], inclusive: false },
+          lower: { keyValues: [1], inclusive: true },
+          upper: { keyValues: [1], inclusive: false },
         },
         {
-          lower: { orderKey: [1], inclusive: false },
-          upper: { orderKey: [1], inclusive: false },
+          lower: { keyValues: [1], inclusive: false },
+          upper: { keyValues: [1], inclusive: false },
         },
         {
-          lower: { orderKey: [1], inclusive: false },
-          upper: { orderKey: [1, 2], inclusive: true },
+          lower: { keyValues: [1], inclusive: false },
+          upper: { keyValues: [1, 2], inclusive: true },
         },
         {
-          lower: { orderKey: [1, 2], inclusive: true },
-          upper: { orderKey: [1], inclusive: false },
+          lower: { keyValues: [1, 2], inclusive: true },
+          upper: { keyValues: [1], inclusive: false },
         },
         {
-          lower: { orderKey: [], inclusive: false },
-          upper: { orderKey: [], inclusive: true },
+          lower: { keyValues: [], inclusive: false },
+          upper: { keyValues: [], inclusive: true },
         },
       ];
       for (const bounds of cases) {

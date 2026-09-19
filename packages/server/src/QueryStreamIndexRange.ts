@@ -369,10 +369,10 @@ export const fromBounds = (
 > =>
   Result.gen(function* () {
     const lowerIndexEntries = QueryStreamIndexPrefix.entries(
-      yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.lower.orderKey),
+      yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.lower.keyValues),
     );
     const upperIndexEntries = QueryStreamIndexPrefix.entries(
-      yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.upper.orderKey),
+      yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.upper.keyValues),
     );
     // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
     // upper inclusive at `k`—the half-open (k, k]—both cut at
@@ -382,7 +382,7 @@ export const fromBounds = (
     }
 
     const commonLength = pipe(
-      Array.zip(bounds.lower.orderKey, bounds.upper.orderKey),
+      Array.zip(bounds.lower.keyValues, bounds.upper.keyValues),
       Array.takeWhile(
         ([lowerValue, upperValue]) =>
           QueryStreamKeyValues.ValueOrder(lowerValue, upperValue) === 0,
@@ -451,10 +451,10 @@ export const fromBounds = (
  */
 export const toBounds = (self: QueryStreamIndexRange): IndexBounds => {
   const { equalities, bounded } = self[TypeId];
-  const orderKey = Array.map(equalities, (equality) => equality.value);
-  const unbounded = { orderKey, inclusive: true };
+  const keyValues = Array.map(equalities, (equality) => equality.value);
+  const unbounded = { keyValues, inclusive: true };
   const endpoint = ({ value, inclusive }: Endpoint) => ({
-    orderKey: Array.append(orderKey, value),
+    keyValues: Array.append(keyValues, value),
     inclusive,
   });
   return Option.match(bounded, {

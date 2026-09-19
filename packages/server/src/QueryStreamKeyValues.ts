@@ -38,7 +38,7 @@ const KeyValue = Schema.declare<Value | undefined>(
               ),
             catch: () =>
               new SchemaIssue.InvalidValue(
-                { message: "Invalid Convex order-key value" },
+                { message: "Invalid Convex key value" },
                 value,
                 options,
               ),
@@ -78,7 +78,7 @@ export const ValueOrder: Order_.Order<KeyValue> = Order_.make(
 );
 
 /**
- * `Order` over order keys: lexicographic by `ValueOrder`, then by length—also
+ * `Order` over key values: lexicographic by `ValueOrder`, then by length—also
  * the ordering of Convex array values.
  *
  * @experimental
