@@ -368,8 +368,10 @@ describe("QueryStreamIndexRange.fromBounds", () => {
         return (values: ReadonlyArray<number>) => {
           const key = Result.getOrThrow(Key.complete(layout, values));
           return (
-            QueryStreamKeyBounds.admittedByLower(parsed.lower)(key) &&
-            QueryStreamKeyBounds.admittedByUpper(parsed.upper)(key)
+            Result.getOrThrow(
+              QueryStreamKeyBounds.admittedByLower(parsed)(key),
+            ) &&
+            Result.getOrThrow(QueryStreamKeyBounds.admittedByUpper(parsed)(key))
           );
         };
       };

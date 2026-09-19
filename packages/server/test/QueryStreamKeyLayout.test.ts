@@ -297,8 +297,21 @@ describe("QueryStreamKeyLayout", () => {
       identity,
     );
     expect(QueryStreamKeyLayout.compatible(composed, single)).toBe(true);
+    expect(
+      Result.isSuccess(QueryStreamKeyLayout.checkCompatible(composed, single)),
+    ).toBe(true);
     expect(QueryStreamKeyLayout.compatible(single, composed)).toBe(true);
     expect(QueryStreamKeyLayout.compatible(single, explicit)).toBe(false);
+    const mismatch = Result.getOrThrow(
+      Result.flip(QueryStreamKeyLayout.checkCompatible(single, explicit)),
+    );
+    expect(mismatch).toBeInstanceOf(
+      QueryStreamKeyLayout.KeyLayoutMismatchError,
+    );
+    expect(mismatch.expected).toBe(single);
+    expect(mismatch.actual).toBe(explicit);
+    expect(mismatch.message).toContain(QueryStreamKeyLayout.format(single));
+    expect(mismatch.message).toContain(QueryStreamKeyLayout.format(explicit));
     expect(
       QueryStreamKeyLayout.compatible(
         single,

@@ -263,6 +263,25 @@ export const compatible = (
   that: QueryStreamKeyLayout,
 ): boolean => PositionsEquivalence(positions(self), positions(that));
 
+export class KeyLayoutMismatchError extends Data.TaggedError(
+  "KeyLayoutMismatchError",
+)<{
+  readonly expected: QueryStreamKeyLayout;
+  readonly actual: QueryStreamKeyLayout;
+}> {
+  override get message(): string {
+    return `Key layout (${format(this.actual)}) does not match the expected layout (${format(this.expected)})`;
+  }
+}
+
+export const checkCompatible = (
+  expected: QueryStreamKeyLayout,
+  actual: QueryStreamKeyLayout,
+): Result.Result<void, KeyLayoutMismatchError> =>
+  expected === actual || compatible(expected, actual)
+    ? Result.succeed(undefined)
+    : Result.fail(new KeyLayoutMismatchError({ expected, actual }));
+
 /**
  * Parse a logical prefix and resolve its runtime width. Hidden IDs before the
  * last selected label are included; hidden IDs after it are not.

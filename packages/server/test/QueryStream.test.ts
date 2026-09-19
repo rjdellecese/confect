@@ -5,7 +5,7 @@ import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
 import * as QueryStreamKey from "@confect/server/QueryStreamKey";
-import type * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
+import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import * as QueryStream from "@confect/server/QueryStream";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -573,6 +573,45 @@ describe("QueryStream", () => {
 });
 
 describe("QueryStream.narrow", () => {
+  it("checks layout compatibility before invoking a narrowing recipe", () => {
+    const layout = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["score"]));
+    const other = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["rank"]));
+    const received: Array<QueryStreamKeyBounds.ParsedBounds> = [];
+    const source = new QueryStream.QueryStream<number, ["score"], "asc">(
+      "asc",
+      layout,
+      Stream.empty,
+      undefined,
+      (bounds) => {
+        received.push(bounds);
+        return QueryStream.empty<number>()(layout);
+      },
+    );
+    const narrow = Option.getOrThrow(Option.fromUndefinedOr(source.narrowWith));
+    for (const bounds of [
+      QueryStreamKeyBounds.unbounded(other),
+      Result.getOrThrow(
+        QueryStreamKeyBounds.parse(other, {
+          lower: Option.some({ orderKey: [3], inclusive: true }),
+          upper: Option.none(),
+        }),
+      ),
+    ]) {
+      expect(() => narrow(bounds)).toThrow(
+        QueryStreamKeyLayout.KeyLayoutMismatchError,
+      );
+    }
+    expect(received).toEqual([]);
+    const equivalent = Result.getOrThrow(
+      QueryStreamKeyLayout.fromIndex(["score"]),
+    );
+    const accepted = QueryStreamKeyBounds.unbounded(equivalent);
+    const result = narrow(accepted);
+    expect(result.keyLayout).toBe(layout);
+    expect(received).toEqual([accepted]);
+    expect(received[0]).toBe(accepted);
+  });
+
   it.each(["asc", "desc"] as const)(
     "preserves parsed bounds through transforms and merge in %s order",
     (order) => {

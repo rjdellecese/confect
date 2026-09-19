@@ -1,6 +1,7 @@
 import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
 import * as Key from "@confect/server/QueryStreamKey";
 import * as Layout from "@confect/server/QueryStreamKeyLayout";
+import * as Labels from "@confect/server/QueryStreamKeyLabels";
 import * as Result from "effect/Result";
 import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -25,21 +26,161 @@ const admits =
         upper: side === "upper" ? bound : Option.none(),
       }),
     );
-    return side === "lower"
-      ? QueryStreamKeyBounds.admittedByLower(bounds.lower)(key)
-      : QueryStreamKeyBounds.admittedByUpper(bounds.upper)(key);
+    return Result.getOrThrow(
+      side === "lower"
+        ? QueryStreamKeyBounds.admittedByLower(bounds)(key)
+        : QueryStreamKeyBounds.admittedByUpper(bounds)(key),
+    );
   };
 const admittedByLower = admits("lower");
 const admittedByUpper = admits("upper");
+const boundLayout = Result.getOrThrow(Layout.fromIndex(["_id"]));
 const parseBound = (bound: QueryStreamKeyBounds.KeyBound) =>
+  Result.getOrThrow(QueryStreamKeyBounds.parseBound(boundLayout, bound));
+const parsedBounds = (
+  lower: Option.Option<QueryStreamKeyBounds.ParsedBound>,
+  upper: Option.Option<QueryStreamKeyBounds.ParsedBound>,
+) =>
   Result.getOrThrow(
-    QueryStreamKeyBounds.parseBound(
-      Result.getOrThrow(Layout.fromIndex(["_id"])),
-      bound,
-    ),
+    QueryStreamKeyBounds.fromParsed(boundLayout, { lower, upper }),
   );
+const intersect = (
+  self: QueryStreamKeyBounds.ParsedBounds,
+  that: QueryStreamKeyBounds.ParsedBounds,
+) => Result.getOrThrow(QueryStreamKeyBounds.intersect(self, that));
 
 describe("QueryStreamKeyBounds", () => {
+  const layout = Result.getOrThrow(Layout.fromIndex(["score"]));
+  const bounded = Result.getOrThrow(
+    QueryStreamKeyBounds.parse(layout, {
+      lower: Option.some({ orderKey: [1, 1], inclusive: true }),
+      upper: Option.some({ orderKey: [3, 3], inclusive: true }),
+    }),
+  );
+
+  it("retains a layout even when both endpoints are absent", () => {
+    const empty = QueryStreamKeyBounds.unbounded(layout);
+    expect(empty.layout).toBe(layout);
+    expect(empty.lower).toEqual(Option.none());
+    expect(empty.upper).toEqual(Option.none());
+    expectTypeOf<{
+      readonly layout: Layout.QueryStreamKeyLayout;
+      readonly lower: Option.Option<QueryStreamKeyBounds.ParsedBound>;
+      readonly upper: Option.Option<QueryStreamKeyBounds.ParsedBound>;
+    }>().not.toExtend<QueryStreamKeyBounds.ParsedBounds>();
+  });
+
+  it.each([
+    {
+      name: "different labels",
+      actual: Result.getOrThrow(Layout.fromIndex(["rank"])),
+    },
+    {
+      name: "different implicit ID positions",
+      actual: Layout.concat(
+        Result.getOrThrow(Layout.fromIndex([])),
+        Result.getOrThrow(
+          Layout.rename(
+            Result.getOrThrow(Layout.fromIndex(["_id"])),
+            Labels.make(["score"]),
+          ),
+        ),
+      ),
+    },
+    {
+      name: "different runtime widths",
+      actual: Result.getOrThrow(Layout.fromIndex([])),
+    },
+  ])("rejects $name before combining or comparing keys", ({ actual }) => {
+    const mismatch = (
+      result: Result.Result<unknown, Layout.KeyLayoutMismatchError>,
+    ) => {
+      const error = Result.getOrThrow(Result.flip(result));
+      expect(error).toBeInstanceOf(Layout.KeyLayoutMismatchError);
+      expect(error.expected).toBe(layout);
+      expect(error.actual).toBe(actual);
+    };
+    const key = Result.getOrThrow(
+      Key.complete(
+        actual,
+        Array.from({ length: Layout.runtimeWidth(actual) }, () => 2),
+      ),
+    );
+    const other = QueryStreamKeyBounds.unbounded(actual);
+    mismatch(QueryStreamKeyBounds.forLayout(layout, other));
+    for (const bounds of [bounded, QueryStreamKeyBounds.unbounded(layout)]) {
+      mismatch(QueryStreamKeyBounds.admittedByLower(bounds)(key));
+      mismatch(QueryStreamKeyBounds.admittedByUpper(bounds)(key));
+      mismatch(QueryStreamKeyBounds.intersect(bounds, other));
+    }
+    const endpoint = { orderKey: Key.toPrefix(key), inclusive: true };
+    for (const endpoints of [
+      { lower: Option.some(endpoint), upper: Option.none() },
+      { lower: Option.none(), upper: Option.some(endpoint) },
+    ]) {
+      mismatch(QueryStreamKeyBounds.fromParsed(layout, endpoints));
+    }
+    mismatch(
+      QueryStreamKeyBounds.tightestParsedLower(
+        Option.getOrThrow(bounded.lower),
+        endpoint,
+      ),
+    );
+    mismatch(
+      QueryStreamKeyBounds.tightestParsedUpper(
+        Option.getOrThrow(bounded.upper),
+        endpoint,
+      ),
+    );
+  });
+
+  it("accepts equivalent layouts constructed separately and preserves parsed endpoints", () => {
+    const equivalent = Result.getOrThrow(Layout.fromIndex(["score"]));
+    expect(equivalent).not.toBe(layout);
+    const key = Result.getOrThrow(Key.complete(equivalent, [2, 2]));
+    const endpoint = { orderKey: Key.toPrefix(key), inclusive: true };
+    const other = Result.getOrThrow(
+      QueryStreamKeyBounds.fromParsed(layout, {
+        lower: Option.some(endpoint),
+        upper: Option.none(),
+      }),
+    );
+    expect(Option.getOrThrow(other.lower)).toBe(endpoint);
+    expect(
+      Result.getOrThrow(QueryStreamKeyBounds.forLayout(equivalent, other)),
+    ).toBe(other);
+    expect(
+      Result.getOrThrow(QueryStreamKeyBounds.admittedByLower(bounded)(key)),
+    ).toBe(true);
+    expect(
+      Result.getOrThrow(QueryStreamKeyBounds.admittedByUpper(bounded)(key)),
+    ).toBe(true);
+    const combined = Result.getOrThrow(
+      QueryStreamKeyBounds.intersect(
+        QueryStreamKeyBounds.unbounded(equivalent),
+        other,
+      ),
+    );
+    expect(combined.layout).toBe(equivalent);
+    expect(Option.getOrThrow(combined.lower)).toBe(endpoint);
+    expect(
+      Result.getOrThrow(
+        QueryStreamKeyBounds.tightestParsedLower(
+          Option.getOrThrow(bounded.lower),
+          endpoint,
+        ),
+      ),
+    ).toBe(endpoint);
+    expect(
+      Result.getOrThrow(
+        QueryStreamKeyBounds.tightestParsedUpper(
+          Option.getOrThrow(bounded.upper),
+          endpoint,
+        ),
+      ),
+    ).toBe(endpoint);
+  });
+
   it.each([true, false])(
     "admits the endpoint only for inclusive=%s bounds",
     (inclusive) => {
@@ -159,20 +300,17 @@ describe("QueryStreamKeyBounds", () => {
     const second = Option.some(parseBound({ orderKey: [2], inclusive: false }));
     const none = Option.none<QueryStreamKeyBounds.ParsedBound>();
     expect(
-      QueryStreamKeyBounds.intersect(
-        { lower: none, upper: none },
-        { lower: none, upper: none },
-      ),
-    ).toEqual({ lower: none, upper: none });
+      intersect(parsedBounds(none, none), parsedBounds(none, none)),
+    ).toEqual(parsedBounds(none, none));
     for (const [left, right] of [
       [none, first],
       [first, none],
     ]) {
-      const result = QueryStreamKeyBounds.intersect(
-        { lower: left, upper: left },
-        { lower: right, upper: right },
+      const result = intersect(
+        parsedBounds(left, left),
+        parsedBounds(right, right),
       );
-      expect(result).toEqual({ lower: first, upper: first });
+      expect(result).toEqual(parsedBounds(first, first));
       if (Option.isNone(left)) {
         expect(result.lower).toBe(first);
         expect(result.upper).toBe(first);
@@ -183,32 +321,30 @@ describe("QueryStreamKeyBounds", () => {
       [second, first],
     ]) {
       expect(
-        QueryStreamKeyBounds.intersect(
-          { lower: left, upper: left },
-          { lower: right, upper: right },
-        ),
-      ).toEqual({ lower: second, upper: first });
+        intersect(parsedBounds(left, left), parsedBounds(right, right)),
+      ).toEqual(parsedBounds(second, first));
     }
     expect(
-      QueryStreamKeyBounds.intersect(
-        { lower: first, upper: none },
-        { lower: none, upper: second },
-      ),
-    ).toEqual({ lower: first, upper: second });
+      intersect(parsedBounds(first, none), parsedBounds(none, second)),
+    ).toEqual(parsedBounds(first, second));
   });
 
   it("intersects optional endpoints without mutating either range", () => {
-    const first = Object.freeze({
-      lower: Option.some(parseBound({ orderKey: [1], inclusive: true })),
-      upper: Option.some(parseBound({ orderKey: [5], inclusive: true })),
-    });
-    const second = Object.freeze({
-      lower: Option.some(parseBound({ orderKey: [2], inclusive: false })),
-      upper: Option.some(parseBound({ orderKey: [4], inclusive: false })),
-    });
-    expect(QueryStreamKeyBounds.intersect(first, second)).toEqual(second);
-    expect(QueryStreamKeyBounds.intersect(second, first)).toEqual(second);
-    const intersection = QueryStreamKeyBounds.intersect(first, second);
+    const first = Object.freeze(
+      parsedBounds(
+        Option.some(parseBound({ orderKey: [1], inclusive: true })),
+        Option.some(parseBound({ orderKey: [5], inclusive: true })),
+      ),
+    );
+    const second = Object.freeze(
+      parsedBounds(
+        Option.some(parseBound({ orderKey: [2], inclusive: false })),
+        Option.some(parseBound({ orderKey: [4], inclusive: false })),
+      ),
+    );
+    expect(intersect(first, second)).toEqual(second);
+    expect(intersect(second, first)).toEqual(second);
+    const intersection = intersect(first, second);
     expect(Option.getOrThrow(intersection.lower)).toBe(
       Option.getOrThrow(second.lower),
     );
