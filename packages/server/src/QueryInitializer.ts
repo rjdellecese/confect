@@ -31,6 +31,7 @@ import type * as DataModel from "./DataModel";
 import * as Document from "./Document";
 import * as OrderedQuery from "./OrderedQuery";
 import * as QueryStream from "./QueryStream";
+import type * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 import type * as Table from "./Table";
@@ -141,7 +142,9 @@ export interface QueryInitializer<
       ) => Range,
     ): QueryStream.QueryStream<
       Doc,
-      QueryStreamIndexRange.Remaining<Range>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        QueryStreamIndexRange.Remaining<Range>
+      >,
       "asc",
       Document.DocumentDecodeError,
       never
@@ -164,7 +167,9 @@ export interface QueryInitializer<
       order: Direction,
     ): QueryStream.QueryStream<
       Doc,
-      QueryStreamIndexRange.Remaining<Range>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        QueryStreamIndexRange.Remaining<Range>
+      >,
       Direction,
       Document.DocumentDecodeError,
       never
@@ -178,7 +183,9 @@ export interface QueryInitializer<
       indexName: IndexName,
     ): QueryStream.QueryStream<
       Doc,
-      NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
+      >,
       "asc",
       Document.DocumentDecodeError,
       never
@@ -194,7 +201,9 @@ export interface QueryInitializer<
       order: Direction,
     ): QueryStream.QueryStream<
       Doc,
-      NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
+      >,
       Direction,
       Document.DocumentDecodeError,
       never

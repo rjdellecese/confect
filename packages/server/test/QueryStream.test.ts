@@ -1,3 +1,4 @@
+import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import { identity } from "effect/Function";
 import * as Result from "effect/Result";
@@ -25,7 +26,11 @@ const encodeCursor =
 
 describe("QueryStream type parameters", () => {
   it("accepts direction third and defaults errors and requirements to never", () => {
-    const source = new QueryStream.QueryStream<number, ["_id"], "desc">(
+    const source = new QueryStream.QueryStream<
+      number,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<["_id"]>,
+      "desc"
+    >(
       "desc",
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["_id"]), identity),
       Stream.empty,
@@ -40,24 +45,40 @@ describe("QueryStream type parameters", () => {
         QueryStreamReadBudget.QueryStreamReadBudget
       >
     >();
-    expectTypeOf<QueryStream.QueryStream<number, ["_id"]>>().toEqualTypeOf<
+    expectTypeOf<
       QueryStream.QueryStream<
         number,
-        ["_id"],
+        QueryStreamKeyLabels.QueryStreamKeyLabels<["_id"]>
+      >
+    >().toEqualTypeOf<
+      QueryStream.QueryStream<
+        number,
+        QueryStreamKeyLabels.QueryStreamKeyLabels<["_id"]>,
         QueryStreamOrderDirection.QueryStreamOrderDirection
       >
     >();
     expectTypeOf<
-      QueryStream.QueryStream<number, ["_id"], "desc", Error>
+      QueryStream.QueryStream<
+        number,
+        QueryStreamKeyLabels.QueryStreamKeyLabels<["_id"]>,
+        "desc",
+        Error
+      >
     >().toEqualTypeOf<
-      QueryStream.QueryStream<number, ["_id"], "desc", Error, never>
+      QueryStream.QueryStream<
+        number,
+        QueryStreamKeyLabels.QueryStreamKeyLabels<["_id"]>,
+        "desc",
+        Error,
+        never
+      >
     >();
   });
 
   it("carries the fourth and fifth parameters into the Effect stream channels", () => {
     type Source = QueryStream.QueryStream<
       number,
-      ["_id"],
+      QueryStreamKeyLabels.QueryStreamKeyLabels<["_id"]>,
       "asc",
       Error,
       { readonly service: "query" }
@@ -75,7 +96,11 @@ describe("QueryStream.merge", () => {
     it.effect(`drains buffered chunks stably in ${direction} order`, () =>
       Effect.gen(function* () {
         const source = (label: string, ranks: ReadonlyArray<number>) =>
-          new QueryStream.QueryStream<string, [], typeof direction>(
+          new QueryStream.QueryStream<
+            string,
+            QueryStreamKeyLabels.QueryStreamKeyLabels<[]>,
+            typeof direction
+          >(
             direction,
             Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
             Stream.fromIterable(
@@ -226,7 +251,7 @@ describe("QueryStream key layouts", () => {
       Effect.gen(function* () {
         const outer = new QueryStream.QueryStream<
           string,
-          [],
+          QueryStreamKeyLabels.QueryStreamKeyLabels<[]>,
           QueryStreamOrderDirection.QueryStreamOrderDirection
         >(
           "asc",
@@ -264,7 +289,11 @@ describe("QueryStream key layouts", () => {
   );
 
   it("requires the constructor layout to witness its declared visible labels", () => {
-    const invalid = new QueryStream.QueryStream<string, ["_id"], "asc">(
+    const invalid = new QueryStream.QueryStream<
+      string,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<["_id"]>,
+      "asc"
+    >(
       "asc",
       // @ts-expect-error An implicit ID is absent from the visible labels.
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
@@ -583,16 +612,14 @@ describe("QueryStream.narrow", () => {
     const layout = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["score"]));
     const other = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["rank"]));
     const received: Array<QueryStreamKeyBounds.ParsedBounds> = [];
-    const source = new QueryStream.QueryStream<number, ["score"], "asc">(
-      "asc",
-      layout,
-      Stream.empty,
-      undefined,
-      (bounds) => {
-        received.push(bounds);
-        return QueryStream.empty<number>()(layout);
-      },
-    );
+    const source = new QueryStream.QueryStream<
+      number,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<["score"]>,
+      "asc"
+    >("asc", layout, Stream.empty, undefined, (bounds) => {
+      received.push(bounds);
+      return QueryStream.empty<number>()(layout);
+    });
     const narrow = Option.getOrThrow(Option.fromUndefinedOr(source.narrowWith));
     for (const bounds of [
       QueryStreamKeyBounds.unbounded(other),
@@ -626,16 +653,14 @@ describe("QueryStream.narrow", () => {
       );
       const received: Array<QueryStreamKeyBounds.ParsedBounds> = [];
       const source = () =>
-        new QueryStream.QueryStream<number, ["score"], typeof order>(
-          order,
-          layout,
-          Stream.empty,
-          undefined,
-          (bounds) => {
-            received.push(bounds);
-            return QueryStream.empty<number>()(layout, order);
-          },
-        );
+        new QueryStream.QueryStream<
+          number,
+          QueryStreamKeyLabels.QueryStreamKeyLabels<["score"]>,
+          typeof order
+        >(order, layout, Stream.empty, undefined, (bounds) => {
+          received.push(bounds);
+          return QueryStream.empty<number>()(layout, order);
+        });
       const transformed = source().pipe(
         QueryStream.map((value) => value + 1),
         QueryStream.filter((value) => value > 0),
@@ -675,16 +700,14 @@ describe("QueryStream.narrow", () => {
   it("rebinds renamed bounds to the underlying stream's layout", () => {
     const layout = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["score"]));
     const received: Array<QueryStreamKeyBounds.ParsedBounds> = [];
-    const source = new QueryStream.QueryStream<number, ["score"], "asc">(
-      "asc",
-      layout,
-      Stream.empty,
-      undefined,
-      (bounds) => {
-        received.push(bounds);
-        return QueryStream.empty<number>()(layout);
-      },
-    );
+    const source = new QueryStream.QueryStream<
+      number,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<["score"]>,
+      "asc"
+    >("asc", layout, Stream.empty, undefined, (bounds) => {
+      received.push(bounds);
+      return QueryStream.empty<number>()(layout);
+    });
     const values = [3];
     const renamed = QueryStream.renameKey(source, ["rank"]);
     const narrowed = QueryStream.narrow(renamed, {

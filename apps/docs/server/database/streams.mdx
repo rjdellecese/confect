@@ -786,14 +786,14 @@ TypeScript normally infers these parameters from `stream` and its composition:
 QueryStream<Doc, Labels, Direction, Error, Requirements>
 ```
 
-| Parameter            | Meaning                                                                                                                                                                     |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Doc`                | Each emitted value: initially a decoded document, or a mapped/joined result. `never` means no values, as with an empty stream.                                              |
-| `Labels`             | Visible ordering labels, such as `["text", "_creationTime"]`. Inferred from the index and updated by `eq`, `flatMap`, and `renameKey`; implicit ID tiebreakers are omitted. |
-| `Direction`          | `"asc"` or `"desc"`. The type parameter defaults to their union; the `stream(...)` method defaults to `"asc"`.                                                              |
-| `Error` (`E`)        | Typed failures while reading or transforming values. `never` means no typed failures, not no defects.                                                                       |
-| `Requirements` (`R`) | Effect services needed to run the stream. `never` means no outstanding service requirements.                                                                                |
+| Parameter            | Meaning                                                                                                                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Doc`                | Each emitted value: initially a decoded document, or a mapped/joined result. `never` means no values, as with an empty stream.                                                                          |
+| `Labels`             | A branded readonly tuple of visible ordering labels, such as `["text", "_creationTime"]`. Inferred from the index and updated by `eq`, `flatMap`, and `renameKey`; implicit ID tiebreakers are omitted. |
+| `Direction`          | `"asc"` or `"desc"`. The type parameter defaults to their union; the `stream(...)` method defaults to `"asc"`.                                                                                          |
+| `Error` (`E`)        | Typed failures while reading or transforming values. `never` means no typed failures, not no defects.                                                                                                   |
+| `Requirements` (`R`) | Effect services needed to run the stream. `never` means no outstanding service requirements.                                                                                                            |
 
-For example, the notes `by_text` query has type `QueryStream<Note, ["text", "_creationTime"], "asc", DocumentDecodeError, never>`. It retains the database access supplied when it was created, so consuming it doesn't require providing `DatabaseReader` again. `mapEffect` and other effectful operations can add errors and service requirements.
+For example, the notes `by_text` query carries branded labels for `["text", "_creationTime"]`, emits decoded notes in `"asc"` order, and can fail with `DocumentDecodeError`. For a type alias, prefer `typeof notes` from an existing stream rather than manually supplying its parameters. The `Labels` parameter requires the brand; a plain string tuple is not a labels type. It retains the database access supplied when it was created, so consuming it doesn't require providing `DatabaseReader` again. `mapEffect` and other effectful operations can add errors and service requirements.
 
 A `QueryStream<Doc, Labels, Direction, E, R>` is also a `Stream<Doc, E, R>`; only `QueryStream` carries the key and direction types.

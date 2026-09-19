@@ -190,20 +190,13 @@ export function fromIndex(
  * @experimental
  */
 export const concat = <
-  LeftNames extends ReadonlyArray<string>,
-  RightNames extends ReadonlyArray<string>,
+  LeftLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  RightLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
 >(
-  self: QueryStreamKeyLayout<
-    QueryStreamKeyLabels.QueryStreamKeyLabels<LeftNames>
-  >,
-  that: QueryStreamKeyLayout<
-    QueryStreamKeyLabels.QueryStreamKeyLabels<RightNames>
-  >,
-): QueryStreamKeyLayout<
-  QueryStreamKeyLabels.QueryStreamKeyLabels<
-    readonly [...LeftNames, ...RightNames]
-  >
-> => make(Array.appendAll(positions(self), positions(that)));
+  self: QueryStreamKeyLayout<LeftLabels>,
+  that: QueryStreamKeyLayout<RightLabels>,
+): QueryStreamKeyLayout<QueryStreamKeyLabels.Concat<LeftLabels, RightLabels>> =>
+  make(Array.appendAll(positions(self), positions(that)));
 
 /**
  * Format visible labels and implicit IDs for diagnostics.

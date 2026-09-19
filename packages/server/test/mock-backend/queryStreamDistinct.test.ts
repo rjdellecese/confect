@@ -1,3 +1,4 @@
+import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import { identity } from "effect/Function";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
@@ -56,14 +57,14 @@ const tags = <E, R>(stream: Stream.Stream<{ tag?: string }, E, R>) =>
 
 const observeUpstreamEnd = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Direction extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  stream: QueryStream.QueryStream<Doc, Key, Direction, E, R>,
+  stream: QueryStream.QueryStream<Doc, Labels, Direction, E, R>,
   onEnd: Effect.Effect<void>,
-): QueryStream.QueryStream<Doc, Key, Direction, E, R> =>
+): QueryStream.QueryStream<Doc, Labels, Direction, E, R> =>
   new QueryStream.QueryStream(
     stream.order,
     stream.keyLayout,
@@ -77,13 +78,13 @@ const observeUpstreamEnd = <
 
 const pageTags = Effect.fnUntraced(function* <
   Doc extends { tag?: string },
-  Key extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
 >(
   stream: QueryStream.QueryStream<
     Doc,
-    Key,
+    Labels,
     QueryStreamOrderDirection.QueryStreamOrderDirection,
     E,
     R

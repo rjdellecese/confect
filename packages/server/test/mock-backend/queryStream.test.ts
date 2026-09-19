@@ -1,3 +1,4 @@
+import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKey from "@confect/server/QueryStreamKey";
 import { identity } from "effect/Function";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
@@ -33,10 +34,15 @@ const collectTexts = <E, R>(
 /**
  * Walk a stream page by page until exhausted, returning the pages.
  */
-const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
+const paginateAll = <
+  Doc,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  E,
+  R,
+>(
   stream: QueryStream.QueryStream<
     Doc,
-    Key,
+    Labels,
     QueryStreamOrderDirection.QueryStreamOrderDirection,
     E,
     R
@@ -714,7 +720,9 @@ describe("QueryStream", () => {
 
               const fallback: typeof leaf = new QueryStream.QueryStream<
                 Stream.Success<typeof leaf>,
-                ["text", "_creationTime"],
+                QueryStreamKeyLabels.QueryStreamKeyLabels<
+                  ["text", "_creationTime"]
+                >,
                 typeof order,
                 Stream.Error<typeof leaf>
               >(leaf.order, leaf.keyLayout, leaf.annotated);
@@ -1961,14 +1969,16 @@ describe("QueryStream types", () => {
 
       const full = reader.table("notes").stream("by_text");
       expectTypeOf<LabelsOf<typeof full>>().toEqualTypeOf<
-        readonly ["text", "_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<
+          readonly ["text", "_creationTime"]
+        >
       >();
 
       const pinned = reader
         .table("notes")
         .stream("by_text", (q) => q.eq("text", "x"));
       expectTypeOf<LabelsOf<typeof pinned>>().toEqualTypeOf<
-        readonly ["_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<readonly ["_creationTime"]>
       >();
 
       // Bounded fields still vary, so they are not consumed.
@@ -1976,12 +1986,14 @@ describe("QueryStream types", () => {
         .table("notes")
         .stream("by_text", (q) => q.gte("text", "a"));
       expectTypeOf<LabelsOf<typeof bounded>>().toEqualTypeOf<
-        readonly ["text", "_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<
+          readonly ["text", "_creationTime"]
+        >
       >();
 
       const byCreationTime = reader.table("notes").stream("by_creation_time");
       expectTypeOf<LabelsOf<typeof byCreationTime>>().toEqualTypeOf<
-        readonly ["_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<readonly ["_creationTime"]>
       >();
 
       // A QueryStream is a genuine Stream…
@@ -2062,13 +2074,13 @@ describe("QueryStream types", () => {
         (note) => note.text !== "",
       );
       expectTypeOf<LabelsOf<typeof pureFiltered>>().toEqualTypeOf<
-        readonly ["_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<readonly ["_creationTime"]>
       >();
       const pureMapped = QueryStream.map(pinned, (note) => note.text);
       expectTypeOf<typeof pureMapped>().toEqualTypeOf<
         QueryStream.QueryStream<
           string,
-          ["_creationTime"],
+          QueryStreamKeyLabels.QueryStreamKeyLabels<["_creationTime"]>,
           "asc",
           Document.DocumentDecodeError,
           never
@@ -2092,7 +2104,9 @@ describe("QueryStream types", () => {
         ),
       });
       expectTypeOf<LabelsOf<typeof joined>>().toEqualTypeOf<
-        readonly ["text", "_creationTime", "_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<
+          readonly ["text", "_creationTime", "_creationTime"]
+        >
       >();
       // Without onEmpty, the elements are exactly the inner documents.
       expectTypeOf<Stream.Success<typeof joined>>().toEqualTypeOf<
@@ -2111,7 +2125,9 @@ describe("QueryStream types", () => {
       // distinct preserves the visible labels and requires a prefix of them.
       const distinctTexts = QueryStream.distinct(full, ["text"]);
       expectTypeOf<LabelsOf<typeof distinctTexts>>().toEqualTypeOf<
-        readonly ["text", "_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<
+          readonly ["text", "_creationTime"]
+        >
       >();
 
       // @ts-expect-error—labels must be a prefix of the visible labels.
@@ -2128,7 +2144,9 @@ describe("QueryStream types", () => {
         "_creationTime",
       ]);
       expectTypeOf<LabelsOf<typeof relabeled>>().toEqualTypeOf<
-        readonly ["renamed", "_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<
+          readonly ["renamed", "_creationTime"]
+        >
       >();
 
       // @ts-expect-error—the new key must have as many fields as the old.
@@ -2143,7 +2161,9 @@ describe("QueryStream types", () => {
         ),
       );
       expectTypeOf<LabelsOf<typeof nothing>>().toEqualTypeOf<
-        readonly ["text", "_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<
+          readonly ["text", "_creationTime"]
+        >
       >();
       expectTypeOf<DirectionOf<typeof nothing>>().toEqualTypeOf<"asc">();
       const nothingDescending = QueryStream.empty<{ readonly text: string }>()(
@@ -2166,7 +2186,9 @@ describe("QueryStream types", () => {
         onEmpty: (note) => ({ missingFor: note.text }),
       });
       expectTypeOf<LabelsOf<typeof withPlaceholder>>().toEqualTypeOf<
-        readonly ["text", "_creationTime", "_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<
+          readonly ["text", "_creationTime", "_creationTime"]
+        >
       >();
       expectTypeOf<Stream.Success<typeof withPlaceholder>>().toEqualTypeOf<
         Stream.Success<typeof pinned> | { missingFor: string }
@@ -2175,7 +2197,7 @@ describe("QueryStream types", () => {
       // A flatMap result relabels by its type-level (tiebreaker-free) key.
       const relabeledJoin = QueryStream.renameKey(joined, ["a", "b", "c"]);
       expectTypeOf<LabelsOf<typeof relabeledJoin>>().toEqualTypeOf<
-        readonly ["a", "b", "c"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<readonly ["a", "b", "c"]>
       >();
 
       // The order direction is tracked in the type: "asc" when omitted, a
@@ -2199,7 +2221,7 @@ describe("QueryStream types", () => {
       // The direction is covariant: a known direction is also "either".
       const widened: QueryStream.QueryStream<
         unknown,
-        ["text", "_creationTime"],
+        QueryStreamKeyLabels.QueryStreamKeyLabels<["text", "_creationTime"]>,
         QueryStreamOrderDirection.QueryStreamOrderDirection,
         unknown,
         unknown
@@ -2257,7 +2279,9 @@ describe("QueryStream types", () => {
       const reversed = QueryStream.reverse(full);
       expectTypeOf<DirectionOf<typeof reversed>>().toEqualTypeOf<"desc">();
       expectTypeOf<LabelsOf<typeof reversed>>().toEqualTypeOf<
-        readonly ["text", "_creationTime"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<
+          readonly ["text", "_creationTime"]
+        >
       >();
       const reversedDynamic = QueryStream.reverse(dynamic);
       expectTypeOf<

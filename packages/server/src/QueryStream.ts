@@ -219,10 +219,10 @@ export class Element<Doc> extends Data.Class<{
  * method and subsequent composition:
  *
  * - `Doc` is the emitted value: a decoded document or a mapped or joined result.
- * - `Labels` names the visible ordering positions, initially the index fields not
- *   pinned by `eq`. `flatMap` appends labels and `renameKey` replaces them.
- *   Implicit ID tiebreakers are omitted from labels but retained in
- *   `keyLayout`.
+ * - `Labels` is the branded readonly tuple of visible ordering names, initially
+ *   the index fields not pinned by `eq`. `flatMap` appends labels and
+ *   `renameKey` replaces them. Implicit ID tiebreakers are omitted from labels
+ *   but retained in `keyLayout`.
  * - `Direction` is `"asc"` or `"desc"`; the type defaults to their union.
  * - `E` contains typed failures while reading or transforming values. `never`
  *   means no typed failures, not no defects.
@@ -243,14 +243,14 @@ export class Element<Doc> extends Data.Class<{
  */
 export class QueryStream<
   out Doc,
-  Labels extends ReadonlyArray<string> = ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels =
+    QueryStreamKeyLabels.QueryStreamKeyLabels,
   out Direction extends OrderDirection = OrderDirection,
   out E = never,
   out R = never,
 > implements Stream.Stream<Doc, E, R> {
   declare readonly [TypeId]: TypeId;
-  // Label identity depends on names and positions, not tuple mutability.
-  declare readonly "~labels": Types.Invariant<Readonly<Labels>>;
+  declare readonly "~labels": Types.Invariant<Labels>;
   declare readonly "~direction": Types.Covariant<Direction>;
 
   // The `Stream` protocol (the variance marker, `pipe`, and the `channel`
@@ -272,9 +272,7 @@ export class QueryStream<
 
   constructor(
     readonly order: Direction,
-    readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-      QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>
-    >,
+    readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
     /**
      * Values paired with stored keys, including filtered markers that advance
      * cursors without emitting a value.
@@ -412,25 +410,19 @@ export const isQueryStream = (u: unknown): u is Any =>
  */
 export const empty =
   <Doc>(): {
-    <const Labels extends ReadonlyArray<string>>(
-      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-        QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>
-      >,
+    <const Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
+      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
     ): QueryStream<Doc, Labels, "asc", never, never>;
     <
-      const Labels extends ReadonlyArray<string>,
+      const Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
       Direction extends OrderDirection,
     >(
-      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-        QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>
-      >,
+      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
       order: Direction,
     ): QueryStream<Doc, Labels, Direction, never, never>;
   } =>
-  <Labels extends ReadonlyArray<string>>(
-    keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-      QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>
-    >,
+  <Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
+    keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
     order: OrderDirection = "asc",
   ) => {
     // The overloads preserve the supplied direction or its ascending default.
@@ -521,7 +513,7 @@ export const fromReflection = <
   reflection: Reflection<Direction>,
 ): QueryStream<
   Doc,
-  ReadonlyArray<string>,
+  QueryStreamKeyLabels.QueryStreamKeyLabels,
   Direction,
   Document.DocumentDecodeError,
   never
@@ -552,7 +544,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   bounds: IndexBounds,
 ): QueryStream<
   Doc,
-  ReadonlyArray<string>,
+  QueryStreamKeyLabels.QueryStreamKeyLabels,
   Direction,
   Document.DocumentDecodeError,
   never
@@ -819,7 +811,7 @@ const mergeStep =
  */
 export const merge = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Direction extends OrderDirection,
@@ -854,7 +846,7 @@ export const merge = <
  */
 const mergeUnchecked = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Direction extends OrderDirection,
@@ -912,7 +904,7 @@ const mergeUnchecked = <
  */
 const transform = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Doc2,
@@ -939,7 +931,7 @@ const transform = <
  */
 const transformEffect = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Doc2,
@@ -1008,7 +1000,7 @@ export const filter = dual<
   <Doc>(
     predicate: (doc: Doc) => boolean,
   ) => <
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Direction extends OrderDirection,
@@ -1017,7 +1009,7 @@ export const filter = dual<
   ) => QueryStream<Doc, Labels, Direction, E, R>,
   <
     Doc,
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Direction extends OrderDirection,
@@ -1047,7 +1039,7 @@ export const filterEffect = dual<
     predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
     options?: EffectOptions,
   ) => <
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Direction extends OrderDirection,
@@ -1056,7 +1048,7 @@ export const filterEffect = dual<
   ) => QueryStream<Doc, Labels, Direction, E | E2, R | R2>,
   <
     Doc,
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     E2,
@@ -1097,7 +1089,7 @@ export const map = dual<
   <Doc, Doc2>(
     f: (doc: Doc) => Doc2,
   ) => <
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Direction extends OrderDirection,
@@ -1106,7 +1098,7 @@ export const map = dual<
   ) => QueryStream<Doc2, Labels, Direction, E, R>,
   <
     Doc,
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Doc2,
@@ -1134,7 +1126,7 @@ export const mapEffect = dual<
     f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
     options?: EffectOptions,
   ) => <
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Direction extends OrderDirection,
@@ -1143,7 +1135,7 @@ export const mapEffect = dual<
   ) => QueryStream<Doc2, Labels, Direction, E | E2, R | R2>,
   <
     Doc,
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Doc2,
@@ -1193,7 +1185,7 @@ export const flatMap = dual<
   <
     Doc,
     Doc2,
-    InnerLabels extends ReadonlyArray<string>,
+    InnerLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E2,
     R2,
     Direction extends OrderDirection,
@@ -1202,26 +1194,26 @@ export const flatMap = dual<
     f: (doc: Doc) => QueryStream<Doc2, InnerLabels, Direction, E2, R2>,
     options: {
       readonly innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-        QueryStreamKeyLabels.QueryStreamKeyLabels<NoInfer<InnerLabels>>
+        NoInfer<InnerLabels>
       >;
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
-  ) => <Labels extends ReadonlyArray<string>, E, R>(
+  ) => <Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
     self: QueryStream<Doc, Labels, Direction, E, R>,
   ) => QueryStream<
     Doc2 | Doc3,
-    readonly [...Labels, ...InnerLabels],
+    QueryStreamKeyLabels.Concat<Labels, InnerLabels>,
     Direction,
     E | E2,
     R | R2
   >,
   <
     Doc,
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Doc2,
-    InnerLabels extends ReadonlyArray<string>,
+    InnerLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E2,
     R2,
     Direction extends OrderDirection,
@@ -1231,13 +1223,13 @@ export const flatMap = dual<
     f: (doc: Doc) => QueryStream<Doc2, InnerLabels, NoInfer<Direction>, E2, R2>,
     options: {
       readonly innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-        QueryStreamKeyLabels.QueryStreamKeyLabels<NoInfer<InnerLabels>>
+        NoInfer<InnerLabels>
       >;
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
   ) => QueryStream<
     Doc2 | Doc3,
-    readonly [...Labels, ...InnerLabels],
+    QueryStreamKeyLabels.Concat<Labels, InnerLabels>,
     Direction,
     E | E2,
     R | R2
@@ -1331,11 +1323,11 @@ const combineUpperRefinements = (
 
 const makeFlatMap = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Doc2,
-  InnerLabels extends ReadonlyArray<string>,
+  InnerLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E2,
   R2,
   Direction extends OrderDirection,
@@ -1343,9 +1335,7 @@ const makeFlatMap = <
 >(
   self: QueryStream<Doc, Labels, Direction, E, R>,
   f: (doc: Doc) => QueryStream<Doc2, InnerLabels, Direction, E2, R2>,
-  innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-    QueryStreamKeyLabels.QueryStreamKeyLabels<InnerLabels>
-  >,
+  innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<InnerLabels>,
   /**
    * What an outer document with no inner rows emits, if it is kept.
    */
@@ -1353,7 +1343,7 @@ const makeFlatMap = <
   refinements: InnerRefinements,
 ): QueryStream<
   Doc2 | Doc3,
-  readonly [...Labels, ...InnerLabels],
+  QueryStreamKeyLabels.Concat<Labels, InnerLabels>,
   Direction,
   E | E2,
   R | R2
@@ -1588,11 +1578,13 @@ const makeFlatMap = <
  * @experimental
  */
 export const distinct = dual<
-  <const PrefixLabels extends ReadonlyArray<string>>(
-    prefixLabels: PrefixLabels,
+  <const PrefixNames extends ReadonlyArray<string>>(
+    prefixNames: PrefixNames,
   ) => <
     Doc,
-    Labels extends readonly [...PrefixLabels, ...ReadonlyArray<string>],
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels<
+      readonly [...PrefixNames, ...ReadonlyArray<string>]
+    >,
     E,
     R,
     Direction extends OrderDirection,
@@ -1600,17 +1592,19 @@ export const distinct = dual<
     self: QueryStream<Doc, Labels, Direction, E, R>,
   ) => QueryStream<Doc, Labels, Direction, E, R>,
   <
-    const PrefixLabels extends ReadonlyArray<string>,
+    const PrefixNames extends ReadonlyArray<string>,
     Doc,
-    Labels extends readonly [...PrefixLabels, ...ReadonlyArray<string>],
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels<
+      readonly [...PrefixNames, ...ReadonlyArray<string>]
+    >,
     E,
     R,
     Direction extends OrderDirection,
   >(
     self: QueryStream<Doc, Labels, Direction, E, R>,
-    prefixLabels: PrefixLabels,
+    prefixNames: PrefixNames,
   ) => QueryStream<Doc, Labels, Direction, E, R>
->(2, (self, prefixLabels) => {
+>(2, (self, prefixNames) => {
   // Groups are runs of equal *runtime* prefixes, so a prefix that reaches
   // past a tiebreaker (into a `flatMap` result's inner key) includes it.
   return makeDistinct(
@@ -1618,7 +1612,7 @@ export const distinct = dual<
     Result.getOrThrowWith(
       QueryStreamKeyLayout.resolvePrefix(
         self.keyLayout,
-        QueryStreamKeyLabels.make(prefixLabels),
+        QueryStreamKeyLabels.make(prefixNames),
       ),
       identity,
     ),
@@ -1645,47 +1639,59 @@ export const distinct = dual<
  * @experimental
  */
 export const renameKey = dual<
-  <const ReplacementLabels extends ReadonlyArray<string>>(
-    replacementLabels: ReplacementLabels,
+  <const ReplacementNames extends ReadonlyArray<string>>(
+    replacementNames: ReplacementNames,
   ) => <
     Doc,
-    Labels extends ReadonlyArray<string> & {
-      readonly length: ReplacementLabels["length"];
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels & {
+      readonly length: ReplacementNames["length"];
     },
     E,
     R,
     Direction extends OrderDirection,
   >(
     self: QueryStream<Doc, Labels, Direction, E, R>,
-  ) => QueryStream<Doc, Types.Mutable<ReplacementLabels>, Direction, E, R>,
-  <
-    const ReplacementLabels extends ReadonlyArray<string>,
+  ) => QueryStream<
     Doc,
-    Labels extends ReadonlyArray<string> & {
-      readonly length: ReplacementLabels["length"];
+    QueryStreamKeyLabels.QueryStreamKeyLabels<ReplacementNames>,
+    Direction,
+    E,
+    R
+  >,
+  <
+    const ReplacementNames extends ReadonlyArray<string>,
+    Doc,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels & {
+      readonly length: ReplacementNames["length"];
     },
     E,
     R,
     Direction extends OrderDirection,
   >(
     self: QueryStream<Doc, Labels, Direction, E, R>,
-    replacementLabels: ReplacementLabels,
-  ) => QueryStream<Doc, Types.Mutable<ReplacementLabels>, Direction, E, R>
->(2, (self, replacementLabels) =>
-  renameKeyImpl(self, QueryStreamKeyLabels.make(replacementLabels)),
+    replacementNames: ReplacementNames,
+  ) => QueryStream<
+    Doc,
+    QueryStreamKeyLabels.QueryStreamKeyLabels<ReplacementNames>,
+    Direction,
+    E,
+    R
+  >
+>(2, (self, replacementNames) =>
+  renameKeyImpl(self, QueryStreamKeyLabels.make(replacementNames)),
 );
 
 const renameKeyImpl = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
-  ReplacementLabels extends ReadonlyArray<string>,
+  ReplacementLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   Direction extends OrderDirection,
 >(
   self: QueryStream<Doc, Labels, Direction, E, R>,
-  replacementLabels: QueryStreamKeyLabels.QueryStreamKeyLabels<ReplacementLabels>,
-): QueryStream<Doc, Types.Mutable<ReplacementLabels>, Direction, E, R> => {
+  replacementLabels: ReplacementLabels,
+): QueryStream<Doc, ReplacementLabels, Direction, E, R> => {
   const keyLayout = Result.getOrThrowWith(
     QueryStreamKeyLayout.rename(self.keyLayout, replacementLabels),
     identity,
@@ -1708,7 +1714,7 @@ const renameKeyImpl = <
 
 const makeDistinct = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Direction extends OrderDirection,
@@ -1875,7 +1881,7 @@ const makeDistinct = <
  */
 export const reverse = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Direction extends OrderDirection,
@@ -1921,7 +1927,7 @@ export const narrow = dual<
     bounds: NarrowBounds,
   ) => <
     Doc,
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Direction extends OrderDirection,
@@ -1930,7 +1936,7 @@ export const narrow = dual<
   ) => QueryStream<Doc, Labels, Direction, E, R>,
   <
     Doc,
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Direction extends OrderDirection,
@@ -1942,7 +1948,7 @@ export const narrow = dual<
   2,
   <
     Doc,
-    Labels extends ReadonlyArray<string>,
+    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Direction extends OrderDirection,
@@ -1964,7 +1970,7 @@ export const narrow = dual<
 
 const narrowByKeyBounds = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Direction extends OrderDirection,
@@ -1982,7 +1988,7 @@ const narrowByKeyBounds = <
 // Internal recipes share parsed bounds until their layout or coordinates change.
 const narrowByParsedBounds = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Direction extends OrderDirection,
@@ -2027,7 +2033,7 @@ const keyPredicates = (bounds: ParsedBounds) => {
 
 const narrowInMemory = <
   Doc,
-  Labels extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Direction extends OrderDirection,
@@ -2099,7 +2105,7 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
  * @experimental
  */
 export const unique = Effect.fn("QueryStream.unique")(
-  <Doc, Labels extends ReadonlyArray<string>, E, R>(
+  <Doc, Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
     self: QueryStream<Doc, Labels, OrderDirection, E, R>,
   ): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
     self.pipe(
@@ -2206,10 +2212,10 @@ export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
 export const paginate: {
   (
     options: PaginateOptions,
-  ): <Doc, Labels extends ReadonlyArray<string>, E, R>(
+  ): <Doc, Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
     self: QueryStream<Doc, Labels, OrderDirection, E, R>,
   ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
-  <Doc, Labels extends ReadonlyArray<string>, E, R>(
+  <Doc, Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
     self: QueryStream<Doc, Labels, OrderDirection, E, R>,
     options: PaginateOptions,
   ): Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
@@ -2218,7 +2224,7 @@ export const paginate: {
   Effect.fn("QueryStream.paginate")(
     function* <
       Doc,
-      Labels extends ReadonlyArray<string>,
+      Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
       E,
       R,
       Direction extends OrderDirection,

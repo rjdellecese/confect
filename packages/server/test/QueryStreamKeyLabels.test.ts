@@ -43,6 +43,20 @@ describe("QueryStreamKeyLabels", () => {
     expectTypeOf(labels).not.toExtend<string[]>();
   });
 
+  it("preserves tuple positions when concatenating branded label types", () => {
+    type Labels<Names extends ReadonlyArray<string>> =
+      QueryStreamKeyLabels.QueryStreamKeyLabels<Names>;
+    expectTypeOf<
+      QueryStreamKeyLabels.Concat<Labels<["a", "a"]>, Labels<["b"]>>
+    >().toEqualTypeOf<Labels<readonly ["a", "a", "b"]>>();
+    expectTypeOf<
+      QueryStreamKeyLabels.Concat<Labels<[]>, Labels<["b"]>>
+    >().toEqualTypeOf<Labels<readonly ["b"]>>();
+    expectTypeOf<
+      QueryStreamKeyLabels.Concat<Labels<["a"] | ["b"]>, Labels<["c"]>>
+    >().toEqualTypeOf<Labels<readonly ["a", "c"] | readonly ["b", "c"]>>();
+  });
+
   it.each([[], ["a"], ["a", "a"], ["a", "a", "b"]])(
     "accepts matching prefixes: %j",
     (...prefix) => {
