@@ -1,5 +1,88 @@
 # @confect/server
 
+## 10.0.0-next.23
+
+### Major Changes
+
+- e25b6f6: Preserve ID tiebreakers through `QueryStream` joins, empty streams, and renaming. `QueryStream.merge` and `QueryStream.flatMap` reject incompatible orderings, including inner streams produced on later rows or later runs.
+
+  ### Breaking Changes
+  - `QueryStream.empty` accepts a compatible stream's `keyLayout` instead of field names.
+  - `QueryStream.flatMap` replaces `innerKey` with `innerLayout`.
+
+  To migrate, reuse the `keyLayout` of a stream with the required ordering. Creating a stream does not read documents. `QueryStream.distinct` and `QueryStream.renameKey` continue to accept label tuples directly, and existing pagination cursors remain compatible.
+
+  **Before:**
+
+  ```ts
+  QueryStream.empty<NotesDoc>()(["_creationTime"]);
+  QueryStream.flatMap(notes, commentsOn, { innerKey: ["_creationTime"] });
+  ```
+
+  **After:**
+
+  ```ts
+  import { QueryStream } from "@confect/server";
+
+  const byTime = reader.table("notes").stream("by_creation_time");
+  QueryStream.empty<NotesDoc>()(byTime.keyLayout);
+
+  const commentsByTime = reader.table("comments").stream("by_creation_time");
+  QueryStream.flatMap(notes, commentsOn, {
+    innerLayout: commentsByTime.keyLayout,
+  });
+  ```
+
+- 09f9f55: Use `Spec.groups(spec)` and `DatabaseSchema.tables(schema)` to inspect assembled group and table records. Adding a group at an existing spec name now replaces its inferred type as well as its runtime value.
+
+  ### Breaking Changes
+  - The `Spec.groups` and `DatabaseSchema.tables` accessors replace the corresponding instance properties.
+  - `Spec.Spec`, `DatabaseSchema.DatabaseSchema`, and `DataModel.DataModel` take a record type instead of a union of its members. The separate `~Groups` and `~Tables` phantom properties on these containers are removed; the `Groups` and `Tables` type helpers remain available.
+
+  Run `confect codegen` to update generated spec and schema annotations. Ordinary `Spec.make().add(...)`, `Spec.make().addAt(...)`, and `DatabaseSchema.make({ ... })` calls keep their existing syntax. `DataModel.FromTables` continues to accept a table union.
+
+  For handwritten annotations, use `Spec.Spec<{ readonly notes: typeof notesGroup }>` or `DatabaseSchema.DatabaseSchema<{ readonly notes: typeof notesTable }>` in place of the corresponding member-union parameter.
+
+- a80ae52: Rename the endpoint field in `QueryStream.narrow` from `key` to `orderKey`. Preserve index constraints across reused and narrowed streams.
+
+  Before:
+
+  ```ts
+  QueryStream.narrow(stream, { start: { key: [startTime], inclusive: true } });
+  ```
+
+  After:
+
+  ```ts
+  QueryStream.narrow(stream, {
+    start: { orderKey: [startTime], inclusive: true },
+  });
+  ```
+
+  Apply the same rename to `end` endpoints.
+
+- b3ee3bf: Use `orderKey` instead of `key` when constructing or reading annotated `QueryStream` elements.
+
+  Before:
+
+  ```ts
+  const element = { doc, key };
+  ```
+
+  After:
+
+  ```ts
+  const element = { doc, orderKey };
+  ```
+
+  Reject `QueryStream.narrow` bounds wider than the stream’s ordering key before executing a query.
+
+### Patch Changes
+
+- 87904d2: Preserve cursor compatibility when paginating composed `QueryStream` queries.
+- 7db812a: Reject negative, fractional, or non-finite `numItems` in `QueryStream.paginate` before reading documents.
+- 6798e79: Reject negative, fractional, or non-finite read limits in `QueryStream.paginate` before reading documents.
+
 ## 10.0.0-next.22
 
 ### Major Changes
