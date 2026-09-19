@@ -7,11 +7,11 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-rc.115",
+    "@effect/vitest": "4.0.0-rc.116",
     "@types/node": "24.13.3",
     "confect-test-types": "workspace:*",
     "convex": "1.45.0",
-    "effect": "4.0.0-rc.115",
+    "effect": "4.0.0-rc.116",
     "foldkit": "0.148.1",
     "tsdown": "0.23.0",
     "typescript": "7.0.2",
@@ -53,7 +53,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/js": "workspace:^",
-    "effect": "^4.0.0-rc.115",
+    "effect": "^4.0.0-rc.116",
     "foldkit": "^0.148.0"
   },
   "repository": {
