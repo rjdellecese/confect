@@ -69,6 +69,14 @@ export const prefix = (
       );
 };
 
+// A complete key already satisfies the prefix width guarantee.
+export const toPrefix = (self: Complete): Prefix =>
+  QueryStreamKey.Prefix({
+    [TypeId]: TypeId,
+    layout: self.layout,
+    values: self.values,
+  });
+
 export const values = (
   self: QueryStreamKey,
 ): QueryStreamOrderKey.QueryStreamOrderKey => self.values;

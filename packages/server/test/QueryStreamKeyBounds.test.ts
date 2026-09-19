@@ -31,6 +31,13 @@ const admits =
   };
 const admittedByLower = admits("lower");
 const admittedByUpper = admits("upper");
+const parseBound = (bound: QueryStreamKeyBounds.KeyBound) =>
+  Result.getOrThrow(
+    QueryStreamKeyBounds.parseBound(
+      Result.getOrThrow(Layout.fromIndex(["_id"])),
+      bound,
+    ),
+  );
 
 describe("QueryStreamKeyBounds", () => {
   it.each([true, false])(
@@ -148,9 +155,9 @@ describe("QueryStreamKeyBounds", () => {
   });
 
   it("combines absent bounds and intersects present bounds with the tightest endpoints", () => {
-    const first = Option.some({ orderKey: [1], inclusive: true });
-    const second = Option.some({ orderKey: [2], inclusive: false });
-    const none = Option.none<QueryStreamKeyBounds.KeyBound>();
+    const first = Option.some(parseBound({ orderKey: [1], inclusive: true }));
+    const second = Option.some(parseBound({ orderKey: [2], inclusive: false }));
+    const none = Option.none<QueryStreamKeyBounds.ParsedBound>();
     expect(
       QueryStreamKeyBounds.intersect(
         { lower: none, upper: none },
@@ -192,15 +199,22 @@ describe("QueryStreamKeyBounds", () => {
 
   it("intersects optional endpoints without mutating either range", () => {
     const first = Object.freeze({
-      lower: Option.some({ orderKey: [1], inclusive: true }),
-      upper: Option.some({ orderKey: [5], inclusive: true }),
+      lower: Option.some(parseBound({ orderKey: [1], inclusive: true })),
+      upper: Option.some(parseBound({ orderKey: [5], inclusive: true })),
     });
     const second = Object.freeze({
-      lower: Option.some({ orderKey: [2], inclusive: false }),
-      upper: Option.some({ orderKey: [4], inclusive: false }),
+      lower: Option.some(parseBound({ orderKey: [2], inclusive: false })),
+      upper: Option.some(parseBound({ orderKey: [4], inclusive: false })),
     });
     expect(QueryStreamKeyBounds.intersect(first, second)).toEqual(second);
     expect(QueryStreamKeyBounds.intersect(second, first)).toEqual(second);
+    const intersection = QueryStreamKeyBounds.intersect(first, second);
+    expect(Option.getOrThrow(intersection.lower)).toBe(
+      Option.getOrThrow(second.lower),
+    );
+    expect(Option.getOrThrow(intersection.upper)).toBe(
+      Option.getOrThrow(second.upper),
+    );
   });
 
   it("intersects both endpoints without mutating either range", () => {

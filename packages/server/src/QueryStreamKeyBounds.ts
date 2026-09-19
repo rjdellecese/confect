@@ -123,10 +123,10 @@ export const tightestUpper = (self: KeyBound, that: KeyBound): KeyBound =>
   Order.isLessThan(KeyCutOrder)(upperCut(that), upperCut(self)) ? that : self;
 
 const combineKeyBound = (
-  self: Option.Option<KeyBound>,
-  that: Option.Option<KeyBound>,
-  combine: (self: KeyBound, that: KeyBound) => KeyBound,
-): Option.Option<KeyBound> =>
+  self: Option.Option<ParsedBound>,
+  that: Option.Option<ParsedBound>,
+  combine: (self: ParsedBound, that: ParsedBound) => ParsedBound,
+): Option.Option<ParsedBound> =>
   Option.match(self, {
     onNone: () => that,
     onSome: (first) =>
@@ -141,9 +141,12 @@ const combineKeyBound = (
 /**
  * @experimental
  */
-export const intersect = (self: KeyBounds, that: KeyBounds): KeyBounds => ({
-  lower: combineKeyBound(self.lower, that.lower, tightestLower),
-  upper: combineKeyBound(self.upper, that.upper, tightestUpper),
+export const intersect = (
+  self: ParsedBounds,
+  that: ParsedBounds,
+): ParsedBounds => ({
+  lower: combineKeyBound(self.lower, that.lower, tightestParsedLower),
+  upper: combineKeyBound(self.upper, that.upper, tightestParsedUpper),
 });
 
 /**
@@ -207,11 +210,13 @@ export type NarrowBounds =
       readonly end: KeyBound;
     };
 
-interface ParsedBound {
+export interface ParsedBound {
   readonly orderKey: QueryStreamKey.Prefix;
   readonly inclusive: boolean;
 }
 
+// Endpoints validated against a stream layout. Operations that preserve the
+// key space retain these values; coordinate changes construct new endpoints.
 export interface ParsedBounds {
   readonly lower: Option.Option<ParsedBound>;
   readonly upper: Option.Option<ParsedBound>;
@@ -222,6 +227,32 @@ const rawBound = (bound: ParsedBound): KeyBound => ({
   inclusive: bound.inclusive,
 });
 
+// Select existing endpoints so intersection retains their parsed keys.
+export const tightestParsedLower = (
+  self: ParsedBound,
+  that: ParsedBound,
+): ParsedBound =>
+  KeyCutOrder(lowerCut(rawBound(that)), lowerCut(rawBound(self))) > 0
+    ? that
+    : self;
+
+export const tightestParsedUpper = (
+  self: ParsedBound,
+  that: ParsedBound,
+): ParsedBound =>
+  KeyCutOrder(upperCut(rawBound(that)), upperCut(rawBound(self))) < 0
+    ? that
+    : self;
+
+export const parseBound = (
+  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  { orderKey, inclusive }: KeyBound,
+): Result.Result<ParsedBound, QueryStreamKey.KeyWidthMismatchError> =>
+  Result.map(QueryStreamKey.prefix(layout, orderKey), (prefix) => ({
+    orderKey: prefix,
+    inclusive,
+  }));
+
 export const parse = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   bounds: KeyBounds,
@@ -229,10 +260,7 @@ export const parse = (
   const endpoint = (bound: Option.Option<KeyBound>) =>
     Option.match(bound, {
       onNone: () => Result.succeed(Option.none<ParsedBound>()),
-      onSome: ({ orderKey, inclusive }) =>
-        Result.map(QueryStreamKey.prefix(layout, orderKey), (prefix) =>
-          Option.some({ orderKey: prefix, inclusive }),
-        ),
+      onSome: (value) => Result.map(parseBound(layout, value), Option.some),
     });
   return Result.gen(function* () {
     const lower = yield* endpoint(bounds.lower);

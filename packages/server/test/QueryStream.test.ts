@@ -5,6 +5,7 @@ import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import type * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
 import * as QueryStreamKey from "@confect/server/QueryStreamKey";
+import type * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import * as QueryStream from "@confect/server/QueryStream";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -569,6 +570,91 @@ describe("QueryStream", () => {
         }
       }),
   );
+});
+
+describe("QueryStream.narrow", () => {
+  it.each(["asc", "desc"] as const)(
+    "preserves parsed bounds through transforms and merge in %s order",
+    (order) => {
+      const layout = Result.getOrThrow(
+        QueryStreamKeyLayout.fromIndex(["score"]),
+      );
+      const received: Array<QueryStreamKeyBounds.ParsedBounds> = [];
+      const source = () =>
+        new QueryStream.QueryStream<number, ["score"], typeof order>(
+          order,
+          layout,
+          Stream.empty,
+          undefined,
+          (bounds) => {
+            received.push(bounds);
+            return QueryStream.empty<number>()(layout, order);
+          },
+        );
+      const transformed = source().pipe(
+        QueryStream.map((value) => value + 1),
+        QueryStream.filter((value) => value > 0),
+        QueryStream.mapEffect(Effect.succeed),
+        QueryStream.filterEffect(() => Effect.succeed(true)),
+      );
+      const merged = QueryStream.merge([transformed, source()]);
+      const lower = { orderKey: [3], inclusive: false };
+      const upper = { orderKey: [5, "id"], inclusive: true };
+      const start = order === "asc" ? lower : upper;
+      const end = order === "asc" ? upper : lower;
+      const narrowed = QueryStream.narrow(merged, { start, end });
+
+      expect(narrowed.keyLayout).toBe(layout);
+      expect(narrowed.order).toBe(order);
+      expect(received).toHaveLength(2);
+      const [first, second] = received;
+      expect(first).toBe(second);
+      for (const bounds of received) {
+        for (const [endpoint, raw] of [
+          [bounds.lower, order === "asc" ? start : end],
+          [bounds.upper, order === "asc" ? end : start],
+        ] as const) {
+          const bound = Option.getOrThrow(endpoint);
+          expect(bound.orderKey._tag).toBe("Prefix");
+          expect(QueryStreamKey.layout(bound.orderKey)).toBe(layout);
+          expect(QueryStreamKey.values(bound.orderKey)).toBe(raw.orderKey);
+          expect(bound.inclusive).toBe(raw.inclusive);
+        }
+      }
+      expectTypeOf<QueryStreamKeyBounds.KeyBounds>().not.toExtend<
+        Parameters<NonNullable<typeof merged.narrowWith>>[0]
+      >();
+    },
+  );
+
+  it("rebinds renamed bounds to the underlying stream's layout", () => {
+    const layout = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["score"]));
+    const received: Array<QueryStreamKeyBounds.ParsedBounds> = [];
+    const source = new QueryStream.QueryStream<number, ["score"], "asc">(
+      "asc",
+      layout,
+      Stream.empty,
+      undefined,
+      (bounds) => {
+        received.push(bounds);
+        return QueryStream.empty<number>()(layout);
+      },
+    );
+    const values = [3];
+    const renamed = QueryStream.renameKey(source, ["rank"]);
+    const narrowed = QueryStream.narrow(renamed, {
+      start: { orderKey: values, inclusive: true },
+    });
+    expect(
+      QueryStreamKeyLayout.compatible(narrowed.keyLayout, renamed.keyLayout),
+    ).toBe(true);
+    expect(received).toHaveLength(1);
+    for (const bounds of received) {
+      const bound = Option.getOrThrow(bounds.lower);
+      expect(QueryStreamKey.layout(bound.orderKey)).toBe(layout);
+      expect(QueryStreamKey.values(bound.orderKey)).toBe(values);
+    }
+  });
 });
 
 describe("QueryStream boundary errors", () => {

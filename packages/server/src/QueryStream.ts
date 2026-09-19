@@ -72,6 +72,8 @@ import type {
   KeyBounds,
   IndexBounds,
   NarrowBounds,
+  ParsedBound,
+  ParsedBounds,
 } from "./QueryStreamKeyBounds";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 import * as QueryStreamPagination from "./QueryStreamPagination";
@@ -286,12 +288,12 @@ export class QueryStream<
      */
     readonly reflection?: Reflection,
     /**
-     * Rebuilds the stream with tighter key bounds, pushing them into index
+     * Rebuilds the stream with validated key bounds, pushing them into index
      * ranges where that preserves the composition's results. Without this
      * recipe, `narrow` filters the annotated stream in memory.
      */
     readonly narrowWith?: (
-      bounds: KeyBounds,
+      bounds: ParsedBounds,
     ) => QueryStream<Doc, Labels, Direction, E, R>,
     /**
      * Rebuilds the stream in the opposite direction using index scans and
@@ -600,17 +602,13 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
     ),
   );
 
-  const toFullKeySpace = (bound: KeyBound): KeyBound => ({
+  const toFullKeySpace = (bound: ParsedBound): KeyBound => ({
     orderKey: QueryStreamIndexPrefix.values(
       Result.getOrThrowWith(
-        Result.flatMap(
-          QueryStreamKey.prefix(keyLayout, bound.orderKey),
-          (prefix) =>
-            QueryStreamIndexPrefix.fromStreamKey(
-              fullFieldPaths,
-              eqValues,
-              prefix,
-            ),
+        QueryStreamIndexPrefix.fromStreamKey(
+          fullFieldPaths,
+          eqValues,
+          bound.orderKey,
         ),
         identity,
       ),
@@ -875,9 +873,9 @@ const mergeUnchecked = <
     // space itself.
     (keyBounds) =>
       mergeUnchecked([
-        narrowByKeyBounds(head, keyBounds),
+        narrowByParsedBounds(head, keyBounds),
         ...Array.map(Array.tailNonEmpty(streams), (stream) =>
-          narrowByKeyBounds(stream, keyBounds),
+          narrowByParsedBounds(stream, keyBounds),
         ),
       ]),
     () =>
@@ -915,7 +913,7 @@ const transform = <
         new Element({ doc: Option.flatMap(doc, f), orderKey }),
     ),
     undefined,
-    (keyBounds) => transform(narrowByKeyBounds(self, keyBounds), f),
+    (keyBounds) => transform(narrowByParsedBounds(self, keyBounds), f),
     () => transform(reverse(self), f),
   );
 
@@ -957,7 +955,7 @@ const transformEffect = <
     ),
     undefined,
     (keyBounds) =>
-      transformEffect(narrowByKeyBounds(self, keyBounds), f, options),
+      transformEffect(narrowByParsedBounds(self, keyBounds), f, options),
     () => transformEffect(reverse(self), f, options),
   );
 
@@ -1240,7 +1238,7 @@ export const flatMap = dual<
  */
 interface InnerRefinement {
   readonly outer: QueryStreamOrderKey.QueryStreamOrderKey;
-  readonly inner: KeyBound;
+  readonly inner: ParsedBound;
 }
 
 interface InnerRefinements {
@@ -1268,7 +1266,7 @@ const combineLowerRefinements = (
           ? right
           : {
               outer: left.outer,
-              inner: QueryStreamKeyBounds.tightestLower(
+              inner: QueryStreamKeyBounds.tightestParsedLower(
                 left.inner,
                 right.inner,
               ),
@@ -1290,7 +1288,7 @@ const combineUpperRefinements = (
           ? right
           : {
               outer: left.outer,
-              inner: QueryStreamKeyBounds.tightestUpper(
+              inner: QueryStreamKeyBounds.tightestParsedUpper(
                 left.inner,
                 right.inner,
               ),
@@ -1357,7 +1355,7 @@ const makeFlatMap = <
 
   const innerBoundsFor = (
     outerKey: QueryStreamOrderKey.QueryStreamOrderKey,
-  ): KeyBounds => ({
+  ): ParsedBounds => ({
     lower: Option.map(
       Option.filter(
         refinements.lower,
@@ -1382,7 +1380,7 @@ const makeFlatMap = <
   // and is emitted only if that position is within the inner bounds.
   const markerStream = (
     outerKey: QueryStreamOrderKey.QueryStreamOrderKey,
-    innerBounds: KeyBounds,
+    innerBounds: ParsedBounds,
     doc: Option.Option<Doc2 | Doc3>,
   ): Stream.Stream<Element<Doc2 | Doc3>> => {
     const { aboveLower, belowUpper } = keyPredicates(innerLayout, innerBounds);
@@ -1407,7 +1405,7 @@ const makeFlatMap = <
         onNone: () => markerStream(outerKey, innerBounds, Option.none()),
         onSome: (doc) => {
           const inner = validated(f(doc));
-          return narrowByKeyBounds(inner, innerBounds).annotated.pipe(
+          return narrowByParsedBounds(inner, innerBounds).annotated.pipe(
             Stream.map(
               ({ doc: innerDoc, orderKey: innerKey }) =>
                 new Element({
@@ -1456,13 +1454,22 @@ const makeFlatMap = <
     }),
   );
 
-  const split = ({ orderKey, inclusive }: KeyBound): FlatMapBound =>
-    orderKey.length <= outerLength
+  const split = (bound: ParsedBound): FlatMapBound => {
+    const orderKey = QueryStreamKey.values(bound.orderKey);
+    const { inclusive } = bound;
+    return orderKey.length <= outerLength
       ? FlatMapBound.Outer({ orderKey, inclusive })
       : FlatMapBound.Inner({
           outer: Array.take(orderKey, outerLength),
-          inner: { orderKey: Array.drop(orderKey, outerLength), inclusive },
+          inner: Result.getOrThrowWith(
+            QueryStreamKeyBounds.parseBound(innerLayout, {
+              orderKey: Array.drop(orderKey, outerLength),
+              inclusive,
+            }),
+            identity,
+          ),
         });
+  };
 
   const outerBound = (bound: FlatMapBound): KeyBound =>
     FlatMapBound.$match(bound, {
@@ -1644,10 +1651,13 @@ const renameKeyImpl = <
     keyLayout,
     self.annotated,
     undefined,
-    // Bounds are positional values, so they apply to the underlying
-    // stream as-is.
+    // Values keep their positions, but the parsed keys must be rebound to
+    // the underlying layout's labels.
     (bounds) =>
-      renameKeyImpl(narrowByKeyBounds(self, bounds), replacementLabels),
+      renameKeyImpl(
+        narrowByKeyBounds(self, QueryStreamKeyBounds.toBounds(bounds)),
+        replacementLabels,
+      ),
     () => renameKeyImpl(reverse(self), replacementLabels),
   );
 };
@@ -1662,7 +1672,7 @@ const makeDistinct = <
   self: QueryStream<Doc, Labels, OrderDirection, E, R>,
   distinctLength: number,
   order: Direction,
-  bounds: KeyBounds,
+  bounds: ParsedBounds,
 ): QueryStream<Doc, Labels, Direction, E, R> => {
   const afterKey = (
     orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
@@ -1676,11 +1686,12 @@ const makeDistinct = <
       : { lower: Option.none(), upper: Option.some(pastGroup) };
   };
   const groupBound = (
-    bound: Option.Option<KeyBound>,
+    bound: Option.Option<ParsedBound>,
   ): Option.Option<KeyBound> =>
     Option.map(bound, ({ inclusive, orderKey }) => ({
-      orderKey: Array.take(orderKey, distinctLength),
-      inclusive: orderKey.length > distinctLength || inclusive,
+      orderKey: Array.take(QueryStreamKey.values(orderKey), distinctLength),
+      inclusive:
+        QueryStreamKey.values(orderKey).length > distinctLength || inclusive,
     }));
   const { aboveLower, belowUpper } = keyPredicates(self.keyLayout, bounds);
   const isAdmitted = (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
@@ -1910,31 +1921,40 @@ const narrowByKeyBounds = <
     QueryStreamKeyBounds.parse(self.keyLayout, bounds),
     identity,
   );
-  return Option.isNone(parsed.lower) && Option.isNone(parsed.upper)
+  return narrowByParsedBounds(self, parsed);
+};
+
+// Internal recipes share parsed bounds until their layout or coordinates change.
+const narrowByParsedBounds = <
+  Doc,
+  Labels extends ReadonlyArray<string>,
+  E,
+  R,
+  Direction extends OrderDirection,
+>(
+  self: QueryStream<Doc, Labels, Direction, E, R>,
+  bounds: ParsedBounds,
+): QueryStream<Doc, Labels, Direction, E, R> =>
+  Option.isNone(bounds.lower) && Option.isNone(bounds.upper)
     ? self
     : self.narrowWith !== undefined
-      ? self.narrowWith(QueryStreamKeyBounds.toBounds(parsed))
+      ? self.narrowWith(bounds)
       : narrowInMemory(self, bounds);
-};
 
 /**
  * The fallback for streams that don't know how to rebuild themselves.
  */
 const keyPredicates = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  bounds: KeyBounds,
+  bounds: ParsedBounds,
 ) => {
-  const parsed = Result.getOrThrowWith(
-    QueryStreamKeyBounds.parse(layout, bounds),
-    identity,
-  );
   const complete = (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
     Result.getOrThrowWith(QueryStreamKey.complete(layout, orderKey), identity);
   return {
     aboveLower: (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
-      QueryStreamKeyBounds.admittedByLower(parsed.lower)(complete(orderKey)),
+      QueryStreamKeyBounds.admittedByLower(bounds.lower)(complete(orderKey)),
     belowUpper: (orderKey: QueryStreamOrderKey.QueryStreamOrderKey) =>
-      QueryStreamKeyBounds.admittedByUpper(parsed.upper)(complete(orderKey)),
+      QueryStreamKeyBounds.admittedByUpper(bounds.upper)(complete(orderKey)),
   };
 };
 
@@ -1946,7 +1966,7 @@ const narrowInMemory = <
   Direction extends OrderDirection,
 >(
   self: QueryStream<Doc, Labels, Direction, E, R>,
-  bounds: KeyBounds,
+  bounds: ParsedBounds,
 ): QueryStream<Doc, Labels, Direction, E, R> => {
   type Narrower = (
     annotated: Stream.Stream<
@@ -2193,16 +2213,19 @@ export const paginate: {
         } satisfies PaginationResult<Doc>;
       }
       const start = Option.map(request.after, (orderKey) => ({
-        orderKey: orderKey.values,
+        orderKey: QueryStreamKey.toPrefix(orderKey),
         inclusive: false,
       }));
       const end = QueryStreamPagination.Range.$match(request.range, {
-        Unpinned: () => Option.none<KeyBound>(),
-        ThroughEnd: () => Option.none<KeyBound>(),
+        Unpinned: () => Option.none<ParsedBound>(),
+        ThroughEnd: () => Option.none<ParsedBound>(),
         ThroughKey: ({ orderKey }) =>
-          Option.some({ orderKey: orderKey.values, inclusive: true }),
+          Option.some({
+            orderKey: QueryStreamKey.toPrefix(orderKey),
+            inclusive: true,
+          }),
       });
-      const narrowed = narrowByKeyBounds(
+      const narrowed = narrowByParsedBounds(
         self,
         self.order === "asc"
           ? { lower: start, upper: end }
