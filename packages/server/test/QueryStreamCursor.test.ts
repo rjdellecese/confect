@@ -180,7 +180,7 @@ describe("QueryStreamCursor serialization", () => {
       QueryStreamKeyLayout.fromIndex([]),
       identity,
     );
-    expect(QueryStreamKeyLayout.compatible(explicit, implicit)).toBe(false);
+    expect(QueryStreamKeyLayout.Equivalence(explicit, implicit)).toBe(false);
     const serialized = encodeCursor(explicit)(["id"]);
     expect(encodeCursor(implicit)(["id"])).toBe(serialized);
   });

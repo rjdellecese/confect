@@ -714,7 +714,7 @@ describe("QueryStream.narrow", () => {
       start: { keyValues: values, inclusive: true },
     });
     expect(
-      QueryStreamKeyLayout.compatible(narrowed.keyLayout, renamed.keyLayout),
+      QueryStreamKeyLayout.Equivalence(narrowed.keyLayout, renamed.keyLayout),
     ).toBe(true);
     expect(received).toHaveLength(1);
     for (const bounds of received) {

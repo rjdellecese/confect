@@ -1,6 +1,6 @@
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
-import * as Equivalence from "effect/Equivalence";
+import * as Equivalence_ from "effect/Equivalence";
 import { identity } from "effect/Function";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
@@ -250,7 +250,7 @@ const visiblePositions = (self: QueryStreamKeyLayout): ReadonlyArray<number> =>
     Position.$is("Visible")(position) ? Result.succeed(index) : Result.failVoid,
   );
 
-const PositionsEquivalence = Equivalence.Array<Position>((self, that) =>
+const PositionsEquivalence = Equivalence_.Array<Position>((self, that) =>
   Position.$match(self, {
     Visible: ({ label }) =>
       Position.$is("Visible")(that) && label === that.label,
@@ -259,14 +259,10 @@ const PositionsEquivalence = Equivalence.Array<Position>((self, that) =>
 );
 
 /**
- * Compare visible labels and implicit positions.
- *
  * @experimental
  */
-export const compatible = (
-  self: QueryStreamKeyLayout,
-  that: QueryStreamKeyLayout,
-): boolean => PositionsEquivalence(positions(self), positions(that));
+export const Equivalence: Equivalence_.Equivalence<QueryStreamKeyLayout> =
+  Equivalence_.mapInput(PositionsEquivalence, positions);
 
 export class KeyLayoutMismatchError extends Data.TaggedError(
   "KeyLayoutMismatchError",
@@ -279,11 +275,11 @@ export class KeyLayoutMismatchError extends Data.TaggedError(
   }
 }
 
-export const checkCompatible = (
+export const validateEquivalence = (
   expected: QueryStreamKeyLayout,
   actual: QueryStreamKeyLayout,
 ): Result.Result<void, KeyLayoutMismatchError> =>
-  expected === actual || compatible(expected, actual)
+  Equivalence(expected, actual)
     ? Result.succeed(undefined)
     : Result.fail(new KeyLayoutMismatchError({ expected, actual }));
 

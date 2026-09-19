@@ -181,15 +181,17 @@ export const admittedByLower =
   (
     key: QueryStreamKey.Complete,
   ): Result.Result<boolean, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
-    Result.map(
-      QueryStreamKeyLayout.checkCompatible(bounds.layout, key.layout),
-      () =>
-        Option.match(bounds.lower, {
-          onNone: () => true,
-          onSome: (bound) =>
-            KeyCutOrder(KeyCut.Exact({ key }), lowerCut(rawBound(bound))) > 0,
-        }),
-    );
+    Result.gen(function* () {
+      yield* QueryStreamKeyLayout.validateEquivalence(
+        bounds.layout,
+        key.layout,
+      );
+      return Option.match(bounds.lower, {
+        onNone: () => true,
+        onSome: (bound) =>
+          KeyCutOrder(KeyCut.Exact({ key }), lowerCut(rawBound(bound))) > 0,
+      });
+    });
 
 /**
  * Whether a compatible key sits before the upper bound (always, when
@@ -202,15 +204,17 @@ export const admittedByUpper =
   (
     key: QueryStreamKey.Complete,
   ): Result.Result<boolean, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
-    Result.map(
-      QueryStreamKeyLayout.checkCompatible(bounds.layout, key.layout),
-      () =>
-        Option.match(bounds.upper, {
-          onNone: () => true,
-          onSome: (bound) =>
-            KeyCutOrder(KeyCut.Exact({ key }), upperCut(rawBound(bound))) < 0,
-        }),
-    );
+    Result.gen(function* () {
+      yield* QueryStreamKeyLayout.validateEquivalence(
+        bounds.layout,
+        key.layout,
+      );
+      return Option.match(bounds.upper, {
+        onNone: () => true,
+        onSome: (bound) =>
+          KeyCutOrder(KeyCut.Exact({ key }), upperCut(rawBound(bound))) < 0,
+      });
+    });
 
 /**
  * At least one endpoint in stream order. Omit the other to leave that side
@@ -262,10 +266,10 @@ export const forLayout = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   bounds: ParsedBounds,
 ): Result.Result<ParsedBounds, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
-  Result.map(
-    QueryStreamKeyLayout.checkCompatible(layout, bounds.layout),
-    () => bounds,
-  );
+  Result.gen(function* () {
+    yield* QueryStreamKeyLayout.validateEquivalence(layout, bounds.layout);
+    return bounds;
+  });
 
 // Combining existing parsed endpoints still needs a shared layout, including
 // when one or both endpoints are absent.
@@ -273,15 +277,15 @@ export const fromParsed = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   endpoints: Pick<ParsedBounds, "lower" | "upper">,
 ): Result.Result<ParsedBounds, QueryStreamKeyLayout.KeyLayoutMismatchError> => {
-  const checkEndpoint = (endpoint: Option.Option<ParsedBound>) =>
+  const validateEndpoint = (endpoint: Option.Option<ParsedBound>) =>
     Option.match(endpoint, {
       onNone: () => Result.succeed(undefined),
       onSome: ({ key }) =>
-        QueryStreamKeyLayout.checkCompatible(layout, key.layout),
+        QueryStreamKeyLayout.validateEquivalence(layout, key.layout),
     });
   return Result.gen(function* () {
-    yield* checkEndpoint(endpoints.lower);
-    yield* checkEndpoint(endpoints.upper);
+    yield* validateEndpoint(endpoints.lower);
+    yield* validateEndpoint(endpoints.upper);
     return make(layout, endpoints);
   });
 };
@@ -306,19 +310,25 @@ export const tightestParsedLower = (
   self: ParsedBound,
   that: ParsedBound,
 ): Result.Result<ParsedBound, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
-  Result.map(
-    QueryStreamKeyLayout.checkCompatible(self.key.layout, that.key.layout),
-    () => tighterLower(self, that),
-  );
+  Result.gen(function* () {
+    yield* QueryStreamKeyLayout.validateEquivalence(
+      self.key.layout,
+      that.key.layout,
+    );
+    return tighterLower(self, that);
+  });
 
 export const tightestParsedUpper = (
   self: ParsedBound,
   that: ParsedBound,
 ): Result.Result<ParsedBound, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
-  Result.map(
-    QueryStreamKeyLayout.checkCompatible(self.key.layout, that.key.layout),
-    () => tighterUpper(self, that),
-  );
+  Result.gen(function* () {
+    yield* QueryStreamKeyLayout.validateEquivalence(
+      self.key.layout,
+      that.key.layout,
+    );
+    return tighterUpper(self, that);
+  });
 
 export const parseBound = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,

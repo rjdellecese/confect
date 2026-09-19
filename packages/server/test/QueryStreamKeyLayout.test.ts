@@ -266,7 +266,7 @@ describe("QueryStreamKeyLayout", () => {
     expect(QueryStreamKeyLayout.visibleLabels(explicitFirst)).toEqual(
       QueryStreamKeyLayout.visibleLabels(implicitFirst),
     );
-    expect(QueryStreamKeyLayout.compatible(explicitFirst, implicitFirst)).toBe(
+    expect(QueryStreamKeyLayout.Equivalence(explicitFirst, implicitFirst)).toBe(
       false,
     );
     expect(QueryStreamKeyLayout.format(explicitFirst)).toBe(
@@ -296,14 +296,16 @@ describe("QueryStreamKeyLayout", () => {
       QueryStreamKeyLayout.fromIndex(["text", "created"]),
       identity,
     );
-    expect(QueryStreamKeyLayout.compatible(composed, single)).toBe(true);
+    expect(QueryStreamKeyLayout.Equivalence(composed, single)).toBe(true);
     expect(
-      Result.isSuccess(QueryStreamKeyLayout.checkCompatible(composed, single)),
+      Result.isSuccess(
+        QueryStreamKeyLayout.validateEquivalence(composed, single),
+      ),
     ).toBe(true);
-    expect(QueryStreamKeyLayout.compatible(single, composed)).toBe(true);
-    expect(QueryStreamKeyLayout.compatible(single, explicit)).toBe(false);
+    expect(QueryStreamKeyLayout.Equivalence(single, composed)).toBe(true);
+    expect(QueryStreamKeyLayout.Equivalence(single, explicit)).toBe(false);
     const mismatch = Result.getOrThrow(
-      Result.flip(QueryStreamKeyLayout.checkCompatible(single, explicit)),
+      Result.flip(QueryStreamKeyLayout.validateEquivalence(single, explicit)),
     );
     expect(mismatch).toBeInstanceOf(
       QueryStreamKeyLayout.KeyLayoutMismatchError,
@@ -313,7 +315,7 @@ describe("QueryStreamKeyLayout", () => {
     expect(mismatch.message).toContain(QueryStreamKeyLayout.format(single));
     expect(mismatch.message).toContain(QueryStreamKeyLayout.format(explicit));
     expect(
-      QueryStreamKeyLayout.compatible(
+      QueryStreamKeyLayout.Equivalence(
         single,
         Result.getOrThrowWith(
           QueryStreamKeyLayout.fromIndex(["other", "created"]),
@@ -333,10 +335,10 @@ describe("QueryStreamKeyLayout", () => {
       identity,
     );
     const two = QueryStreamKeyLayout.concat(one, one);
-    expect(QueryStreamKeyLayout.compatible(zero, one)).toBe(false);
-    expect(QueryStreamKeyLayout.compatible(one, two)).toBe(false);
+    expect(QueryStreamKeyLayout.Equivalence(zero, one)).toBe(false);
+    expect(QueryStreamKeyLayout.Equivalence(one, two)).toBe(false);
     expect(
-      QueryStreamKeyLayout.compatible(
+      QueryStreamKeyLayout.Equivalence(
         two,
         QueryStreamKeyLayout.concat(one, one),
       ),

@@ -826,7 +826,7 @@ export const merge = <
     Array.tailNonEmpty(streams),
     (stream) =>
       stream.order !== head.order ||
-      !QueryStreamKeyLayout.compatible(stream.keyLayout, head.keyLayout),
+      !QueryStreamKeyLayout.Equivalence(stream.keyLayout, head.keyLayout),
   );
   if (Option.isSome(incompatible)) {
     throw new IncompatibleStreamsError({
@@ -1368,7 +1368,7 @@ const makeFlatMap = <
         actual: inner.order,
       });
     }
-    if (!QueryStreamKeyLayout.compatible(inner.keyLayout, innerLayout)) {
+    if (!QueryStreamKeyLayout.Equivalence(inner.keyLayout, innerLayout)) {
       throw new InnerStreamLayoutMismatchError({
         expected: innerLayout,
         actual: inner.keyLayout,

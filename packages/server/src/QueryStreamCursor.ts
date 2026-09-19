@@ -79,7 +79,7 @@ export const codecForLayout = (
     Schema.decodeTo(
       Schema.declare(QueryStreamKey.isComplete).check(
         Schema.makeFilter(
-          (key) => QueryStreamKeyLayout.compatible(key.layout, layout),
+          (key) => QueryStreamKeyLayout.Equivalence(key.layout, layout),
           { message: "Cursor key does not belong to the stream layout" },
         ),
       ),
