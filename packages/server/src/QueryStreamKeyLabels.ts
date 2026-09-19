@@ -1,7 +1,3 @@
-import * as Array from "effect/Array";
-import * as Equivalence from "effect/Equivalence";
-import * as Option from "effect/Option";
-
 const TypeId = "@confect/server/QueryStreamKeyLabels";
 
 /**
@@ -43,18 +39,20 @@ export const toArray = <Labels extends ReadonlyArray<string>>(
 export const size = (self: QueryStreamKeyLabels): number =>
   toArray(self).length;
 
-const ArrayEquivalence = Equivalence.Array(Equivalence.String);
-
 /**
- * Parse a matching prefix, returning the labels left after it. A reordered,
- * skipped, or overlong prefix has no result.
+ * Check whether the labels start with the given prefix, including order and
+ * multiplicity. The empty prefix always matches.
  *
  * @experimental
  */
-export const stripPrefix = (
+export const hasPrefix = (
   self: QueryStreamKeyLabels,
   prefix: QueryStreamKeyLabels,
-): Option.Option<QueryStreamKeyLabels> =>
-  ArrayEquivalence(Array.take(toArray(self), size(prefix)), toArray(prefix))
-    ? Option.some(make(Array.drop(toArray(self), size(prefix))))
-    : Option.none();
+): boolean => {
+  const labels = toArray(self);
+  const prefixLabels = toArray(prefix);
+  return (
+    prefixLabels.length <= labels.length &&
+    prefixLabels.every((label, index) => label === labels[index])
+  );
+};

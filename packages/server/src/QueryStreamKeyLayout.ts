@@ -293,22 +293,21 @@ export const resolvePrefix = (
   prefixLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
 ): Result.Result<number, InvalidLabelPrefixError> => {
   const labels = visibleLabels(self);
-  return Option.match(QueryStreamKeyLabels.stripPrefix(labels, prefixLabels), {
-    onNone: () =>
-      Result.fail(new InvalidLabelPrefixError({ labels, prefixLabels })),
-    onSome: (rest) => {
-      const prefix = Array.take(
+  if (!QueryStreamKeyLabels.hasPrefix(labels, prefixLabels)) {
+    return Result.fail(new InvalidLabelPrefixError({ labels, prefixLabels }));
+  }
+  return Result.succeed(
+    Option.match(
+      Array.get(
         visiblePositions(self),
-        QueryStreamKeyLabels.size(labels) - QueryStreamKeyLabels.size(rest),
-      );
-      return Result.succeed(
-        Option.match(Array.last(prefix), {
-          onNone: () => 0,
-          onSome: (position) => position + 1,
-        }),
-      );
-    },
-  });
+        QueryStreamKeyLabels.size(prefixLabels) - 1,
+      ),
+      {
+        onNone: () => 0,
+        onSome: (position) => position + 1,
+      },
+    ),
+  );
 };
 
 /**
