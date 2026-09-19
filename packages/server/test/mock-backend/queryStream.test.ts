@@ -1961,14 +1961,14 @@ describe("QueryStream types", () => {
 
       const full = reader.table("notes").stream("by_text");
       expectTypeOf<LabelsOf<typeof full>>().toEqualTypeOf<
-        ["text", "_creationTime"]
+        readonly ["text", "_creationTime"]
       >();
 
       const pinned = reader
         .table("notes")
         .stream("by_text", (q) => q.eq("text", "x"));
       expectTypeOf<LabelsOf<typeof pinned>>().toEqualTypeOf<
-        ["_creationTime"]
+        readonly ["_creationTime"]
       >();
 
       // Bounded fields still vary, so they are not consumed.
@@ -1976,12 +1976,12 @@ describe("QueryStream types", () => {
         .table("notes")
         .stream("by_text", (q) => q.gte("text", "a"));
       expectTypeOf<LabelsOf<typeof bounded>>().toEqualTypeOf<
-        ["text", "_creationTime"]
+        readonly ["text", "_creationTime"]
       >();
 
       const byCreationTime = reader.table("notes").stream("by_creation_time");
       expectTypeOf<LabelsOf<typeof byCreationTime>>().toEqualTypeOf<
-        ["_creationTime"]
+        readonly ["_creationTime"]
       >();
 
       // A QueryStream is a genuine Stream…
@@ -2062,7 +2062,7 @@ describe("QueryStream types", () => {
         (note) => note.text !== "",
       );
       expectTypeOf<LabelsOf<typeof pureFiltered>>().toEqualTypeOf<
-        ["_creationTime"]
+        readonly ["_creationTime"]
       >();
       const pureMapped = QueryStream.map(pinned, (note) => note.text);
       expectTypeOf<typeof pureMapped>().toEqualTypeOf<
@@ -2111,7 +2111,7 @@ describe("QueryStream types", () => {
       // distinct preserves the visible labels and requires a prefix of them.
       const distinctTexts = QueryStream.distinct(full, ["text"]);
       expectTypeOf<LabelsOf<typeof distinctTexts>>().toEqualTypeOf<
-        ["text", "_creationTime"]
+        readonly ["text", "_creationTime"]
       >();
 
       // @ts-expect-error—labels must be a prefix of the visible labels.
@@ -2128,7 +2128,7 @@ describe("QueryStream types", () => {
         "_creationTime",
       ]);
       expectTypeOf<LabelsOf<typeof relabeled>>().toEqualTypeOf<
-        ["renamed", "_creationTime"]
+        readonly ["renamed", "_creationTime"]
       >();
 
       // @ts-expect-error—the new key must have as many fields as the old.
@@ -2143,7 +2143,7 @@ describe("QueryStream types", () => {
         ),
       );
       expectTypeOf<LabelsOf<typeof nothing>>().toEqualTypeOf<
-        ["text", "_creationTime"]
+        readonly ["text", "_creationTime"]
       >();
       expectTypeOf<DirectionOf<typeof nothing>>().toEqualTypeOf<"asc">();
       const nothingDescending = QueryStream.empty<{ readonly text: string }>()(
@@ -2175,7 +2175,7 @@ describe("QueryStream types", () => {
       // A flatMap result relabels by its type-level (tiebreaker-free) key.
       const relabeledJoin = QueryStream.renameKey(joined, ["a", "b", "c"]);
       expectTypeOf<LabelsOf<typeof relabeledJoin>>().toEqualTypeOf<
-        ["a", "b", "c"]
+        readonly ["a", "b", "c"]
       >();
 
       // The order direction is tracked in the type: "asc" when omitted, a
@@ -2257,7 +2257,7 @@ describe("QueryStream types", () => {
       const reversed = QueryStream.reverse(full);
       expectTypeOf<DirectionOf<typeof reversed>>().toEqualTypeOf<"desc">();
       expectTypeOf<LabelsOf<typeof reversed>>().toEqualTypeOf<
-        ["text", "_creationTime"]
+        readonly ["text", "_creationTime"]
       >();
       const reversedDynamic = QueryStream.reverse(dynamic);
       expectTypeOf<

@@ -64,11 +64,7 @@ describe("QueryStreamKeyLayout", () => {
         identity,
       );
       expect(QueryStreamKeyLayout.positions(layout)).toEqual(positions);
-      expect(
-        QueryStreamKeyLabels.toArray(
-          QueryStreamKeyLayout.visibleLabels(layout),
-        ),
-      ).toEqual(visible);
+      expect(QueryStreamKeyLayout.visibleLabels(layout)).toEqual(visible);
       expect(QueryStreamKeyLayout.runtimeWidth(layout)).toBe(width);
     },
   );
@@ -79,7 +75,9 @@ describe("QueryStreamKeyLayout", () => {
       const result = QueryStreamKeyLayout.fromIndex(["_id"], count);
       expectTypeOf(result).toEqualTypeOf<
         Result.Result<
-          QueryStreamKeyLayout.QueryStreamKeyLayout<ReadonlyArray<string>>,
+          QueryStreamKeyLayout.QueryStreamKeyLayout<
+            QueryStreamKeyLabels.QueryStreamKeyLabels<ReadonlyArray<string>>
+          >,
           QueryStreamKeyLayout.InvalidEqualityPrefixError
         >
       >();
@@ -101,7 +99,9 @@ describe("QueryStreamKeyLayout", () => {
       identity,
     );
     expectTypeOf(pinned).toEqualTypeOf<
-      QueryStreamKeyLayout.QueryStreamKeyLayout<["_creationTime"]>
+      QueryStreamKeyLayout.QueryStreamKeyLayout<
+        QueryStreamKeyLabels.QueryStreamKeyLabels<["_creationTime"]>
+      >
     >();
     expectTypeOf<
       QueryStreamKeyLayout.RemainingFieldPaths<["_id"], 0 | 1>
@@ -111,7 +111,9 @@ describe("QueryStreamKeyLayout", () => {
       identity,
     );
     expectTypeOf(zero).toEqualTypeOf<
-      QueryStreamKeyLayout.QueryStreamKeyLayout<[]>
+      QueryStreamKeyLayout.QueryStreamKeyLayout<
+        QueryStreamKeyLabels.QueryStreamKeyLabels<[]>
+      >
     >();
     const joined = QueryStreamKeyLayout.concat(
       pinned,
@@ -119,7 +121,9 @@ describe("QueryStreamKeyLayout", () => {
     );
     expectTypeOf(joined).toEqualTypeOf<
       QueryStreamKeyLayout.QueryStreamKeyLayout<
-        readonly ["_creationTime", "_id"]
+        QueryStreamKeyLabels.QueryStreamKeyLabels<
+          readonly ["_creationTime", "_id"]
+        >
       >
     >();
     expectTypeOf(QueryStreamKeyLayout.visibleLabels(joined)).toEqualTypeOf<
@@ -140,7 +144,9 @@ describe("QueryStreamKeyLayout", () => {
       ),
     );
     expectTypeOf(renamed).toEqualTypeOf<
-      QueryStreamKeyLayout.QueryStreamKeyLayout<["created", "id"]>
+      QueryStreamKeyLayout.QueryStreamKeyLayout<
+        QueryStreamKeyLabels.QueryStreamKeyLabels<["created", "id"]>
+      >
     >();
   });
 
@@ -257,14 +263,8 @@ describe("QueryStreamKeyLayout", () => {
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["_id"]), identity),
     );
-    expect(
-      QueryStreamKeyLabels.toArray(
-        QueryStreamKeyLayout.visibleLabels(explicitFirst),
-      ),
-    ).toEqual(
-      QueryStreamKeyLabels.toArray(
-        QueryStreamKeyLayout.visibleLabels(implicitFirst),
-      ),
+    expect(QueryStreamKeyLayout.visibleLabels(explicitFirst)).toEqual(
+      QueryStreamKeyLayout.visibleLabels(implicitFirst),
     );
     expect(QueryStreamKeyLayout.compatible(explicitFirst, implicitFirst)).toBe(
       false,
@@ -387,7 +387,9 @@ describe("QueryStreamKeyLayout", () => {
       const result = QueryStreamKeyLayout.rename(layout, replacementLabels);
       expectTypeOf(result).toEqualTypeOf<
         Result.Result<
-          QueryStreamKeyLayout.QueryStreamKeyLayout<Array<string>>,
+          QueryStreamKeyLayout.QueryStreamKeyLayout<
+            QueryStreamKeyLabels.QueryStreamKeyLabels<Array<string>>
+          >,
           QueryStreamKeyLayout.LabelCountMismatchError
         >
       >();
@@ -420,17 +422,17 @@ describe("QueryStreamKeyLayout", () => {
     const renamed = Result.getOrThrow(
       QueryStreamKeyLayout.rename(joined, QueryStreamKeyLabels.make(aliases)),
     );
-    expect(
-      QueryStreamKeyLabels.toArray(QueryStreamKeyLayout.visibleLabels(renamed)),
-    ).toEqual(["body", "time"]);
-    expect(
-      QueryStreamKeyLabels.toArray(QueryStreamKeyLayout.visibleLabels(joined)),
-    ).toEqual(["text", "created"]);
+    expect(QueryStreamKeyLayout.visibleLabels(renamed)).toEqual([
+      "body",
+      "time",
+    ]);
+    expect(QueryStreamKeyLayout.visibleLabels(joined)).toEqual([
+      "text",
+      "created",
+    ]);
     expect(renamed).not.toBe(joined);
     expect(joined).not.toBe(outer);
-    expect(
-      QueryStreamKeyLabels.toArray(QueryStreamKeyLayout.visibleLabels(outer)),
-    ).toEqual(["text"]);
+    expect(QueryStreamKeyLayout.visibleLabels(outer)).toEqual(["text"]);
     expect(
       Result.isFailure(
         QueryStreamKeyLayout.rename(
@@ -444,11 +446,9 @@ describe("QueryStreamKeyLayout", () => {
       identity,
     );
     expect(
-      QueryStreamKeyLabels.toArray(
-        QueryStreamKeyLayout.visibleLabels(
-          Result.getOrThrow(
-            QueryStreamKeyLayout.rename(zero, QueryStreamKeyLabels.make([])),
-          ),
+      QueryStreamKeyLayout.visibleLabels(
+        Result.getOrThrow(
+          QueryStreamKeyLayout.rename(zero, QueryStreamKeyLabels.make([])),
         ),
       ),
     ).toEqual([]);

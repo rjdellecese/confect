@@ -249,7 +249,8 @@ export class QueryStream<
   out R = never,
 > implements Stream.Stream<Doc, E, R> {
   declare readonly [TypeId]: TypeId;
-  declare readonly "~labels": Types.Invariant<Labels>;
+  // Label identity depends on names and positions, not tuple mutability.
+  declare readonly "~labels": Types.Invariant<Readonly<Labels>>;
   declare readonly "~direction": Types.Covariant<Direction>;
 
   // The `Stream` protocol (the variance marker, `pipe`, and the `channel`
@@ -271,7 +272,9 @@ export class QueryStream<
 
   constructor(
     readonly order: Direction,
-    readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
+    readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
+      QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>
+    >,
     /**
      * Values paired with stored keys, including filtered markers that advance
      * cursors without emitting a value.
@@ -410,25 +413,30 @@ export const isQueryStream = (u: unknown): u is Any =>
 export const empty =
   <Doc>(): {
     <const Labels extends ReadonlyArray<string>>(
-      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
+      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
+        QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>
+      >,
     ): QueryStream<Doc, Labels, "asc", never, never>;
     <
       const Labels extends ReadonlyArray<string>,
       Direction extends OrderDirection,
     >(
-      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
+      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
+        QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>
+      >,
       order: Direction,
     ): QueryStream<Doc, Labels, Direction, never, never>;
   } =>
-  (
-    keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  <Labels extends ReadonlyArray<string>>(
+    keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
+      QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>
+    >,
     order: OrderDirection = "asc",
   ) => {
-    // `any` in the key and direction slots: the overloads above assign the
-    // literal types the caller supplied.
+    // The overloads preserve the supplied direction or its ascending default.
     const make = (
       direction: OrderDirection,
-    ): QueryStream<Doc, any, any, never, never> =>
+    ): QueryStream<Doc, Labels, any, never, never> =>
       new QueryStream(
         direction,
         keyLayout,
@@ -1194,7 +1202,7 @@ export const flatMap = dual<
     f: (doc: Doc) => QueryStream<Doc2, InnerLabels, Direction, E2, R2>,
     options: {
       readonly innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-        NoInfer<InnerLabels>
+        QueryStreamKeyLabels.QueryStreamKeyLabels<NoInfer<InnerLabels>>
       >;
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
@@ -1223,7 +1231,7 @@ export const flatMap = dual<
     f: (doc: Doc) => QueryStream<Doc2, InnerLabels, NoInfer<Direction>, E2, R2>,
     options: {
       readonly innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-        NoInfer<InnerLabels>
+        QueryStreamKeyLabels.QueryStreamKeyLabels<NoInfer<InnerLabels>>
       >;
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
@@ -1335,7 +1343,9 @@ const makeFlatMap = <
 >(
   self: QueryStream<Doc, Labels, Direction, E, R>,
   f: (doc: Doc) => QueryStream<Doc2, InnerLabels, Direction, E2, R2>,
-  innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<InnerLabels>,
+  innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
+    QueryStreamKeyLabels.QueryStreamKeyLabels<InnerLabels>
+  >,
   /**
    * What an outer document with no inner rows emits, if it is kept.
    */

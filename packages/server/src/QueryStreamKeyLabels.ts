@@ -1,4 +1,4 @@
-const TypeId = "@confect/server/QueryStreamKeyLabels";
+import * as Brand from "effect/Brand";
 
 /**
  * Ordered names for the visible components of a stream's ordering key. Names
@@ -7,37 +7,23 @@ const TypeId = "@confect/server/QueryStreamKeyLabels";
  *
  * @experimental
  */
-export interface QueryStreamKeyLabels<
-  out Labels extends ReadonlyArray<string> = ReadonlyArray<string>,
-> {
-  readonly [TypeId]: Readonly<Labels>;
+export type QueryStreamKeyLabels<
+  Names extends ReadonlyArray<string> = ReadonlyArray<string>,
+> = Readonly<Names> & Brand.Brand<"@confect/server/QueryStreamKeyLabels">;
+
+const LabelsBrand = Brand.nominal<QueryStreamKeyLabels>();
+
+/**
+ * Mark a tuple of names as labels without changing its runtime representation.
+ *
+ * @experimental
+ */
+export function make<const Names extends ReadonlyArray<string>>(
+  names: Names,
+): QueryStreamKeyLabels<Names>;
+export function make(names: ReadonlyArray<string>): QueryStreamKeyLabels {
+  return LabelsBrand(names);
 }
-
-/**
- * Wrap a tuple of names as a labels value.
- *
- * @experimental
- */
-export const make = <const Labels extends ReadonlyArray<string>>(
-  labels: Labels,
-): QueryStreamKeyLabels<Labels> => ({ [TypeId]: labels });
-
-/**
- * Inspect the names in visible key order.
- *
- * @experimental
- */
-export const toArray = <Labels extends ReadonlyArray<string>>(
-  self: QueryStreamKeyLabels<Labels>,
-): Readonly<Labels> => self[TypeId];
-
-/**
- * Number of visible ordering components.
- *
- * @experimental
- */
-export const size = (self: QueryStreamKeyLabels): number =>
-  toArray(self).length;
 
 /**
  * Check whether the labels start with the given prefix, including order and
@@ -48,11 +34,6 @@ export const size = (self: QueryStreamKeyLabels): number =>
 export const hasPrefix = (
   self: QueryStreamKeyLabels,
   prefix: QueryStreamKeyLabels,
-): boolean => {
-  const labels = toArray(self);
-  const prefixLabels = toArray(prefix);
-  return (
-    prefixLabels.length <= labels.length &&
-    prefixLabels.every((label, index) => label === labels[index])
-  );
-};
+): boolean =>
+  prefix.length <= self.length &&
+  prefix.every((label, index) => label === self[index]);

@@ -12,26 +12,35 @@ describe("QueryStreamKeyLabels", () => {
     expectTypeOf(labels).toEqualTypeOf<
       QueryStreamKeyLabels.QueryStreamKeyLabels<readonly ["author", "created"]>
     >();
-    expectTypeOf(QueryStreamKeyLabels.toArray(labels)).toEqualTypeOf<
-      readonly ["author", "created"]
-    >();
+    expectTypeOf(labels).toExtend<readonly ["author", "created"]>();
     expectTypeOf<
       ReadonlyArray<string>
     >().not.toExtend<QueryStreamKeyLabels.QueryStreamKeyLabels>();
-    expectTypeOf(labels).not.toExtend<ReadonlyArray<string>>();
-    expectTypeOf(QueryStreamKeyLabels.toArray(labels)).not.toExtend<string[]>();
+    expectTypeOf(labels).toExtend<ReadonlyArray<string>>();
+    expectTypeOf(labels).not.toExtend<string[]>();
+    expectTypeOf(labels[0]).toEqualTypeOf<"author">();
+    expectTypeOf(labels.length).toEqualTypeOf<2>();
+    expectTypeOf(
+      labels.map((name) => name),
+    ).not.toExtend<QueryStreamKeyLabels.QueryStreamKeyLabels>();
   });
 
   it("retains empty and repeated names", () => {
     const input = ["", "created", "created"] as const;
     const labels = QueryStreamKeyLabels.make(input);
-    expect(QueryStreamKeyLabels.toArray(labels)).toEqual([
-      "",
-      "created",
-      "created",
-    ]);
-    expect(QueryStreamKeyLabels.size(labels)).toBe(3);
-    expect(QueryStreamKeyLabels.size(QueryStreamKeyLabels.make([]))).toBe(0);
+    expect(labels).toBe(input);
+    expect(labels).toEqual(["", "created", "created"]);
+    expect(labels.length).toBe(3);
+    expect(QueryStreamKeyLabels.make([]).length).toBe(0);
+  });
+
+  it("brands mutable inputs as readonly without copying or changing them", () => {
+    const input: ["author", "created"] = ["author", "created"];
+    const labels = QueryStreamKeyLabels.make(input);
+    expect(labels).toBe(input);
+    expect(input).toEqual(["author", "created"]);
+    expectTypeOf(labels).toExtend<readonly ["author", "created"]>();
+    expectTypeOf(labels).not.toExtend<string[]>();
   });
 
   it.each([[], ["a"], ["a", "a"], ["a", "a", "b"]])(

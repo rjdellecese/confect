@@ -31,7 +31,8 @@ const TypeId = "@confect/server/QueryStreamKeyLayout";
  * @experimental
  */
 export interface QueryStreamKeyLayout<
-  out Labels extends ReadonlyArray<string> = ReadonlyArray<string>,
+  out Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels =
+    QueryStreamKeyLabels.QueryStreamKeyLabels,
 > {
   readonly [TypeId]: {
     readonly _Labels: Types.Covariant<Labels>;
@@ -41,7 +42,7 @@ export interface QueryStreamKeyLayout<
 
 // Private construction keeps the visible label witness with the operations
 // that derive it from index fields, concatenation, or renaming.
-const make = <Labels extends ReadonlyArray<string>>(
+const make = <Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
   positions: ReadonlyArray<Position>,
 ): QueryStreamKeyLayout<Labels> => ({
   [TypeId]: { _Labels: identity, positions },
@@ -111,7 +112,7 @@ export class InvalidLabelPrefixError extends Data.TaggedError(
   readonly prefixLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
 }> {
   override get message(): string {
-    return `Labels ([${Array.join(QueryStreamKeyLabels.toArray(this.prefixLabels), ", ")}]) must be a prefix of the ordering labels ([${Array.join(QueryStreamKeyLabels.toArray(this.labels), ", ")}])`;
+    return `Labels ([${Array.join(this.prefixLabels, ", ")}]) must be a prefix of the ordering labels ([${Array.join(this.labels, ", ")}])`;
   }
 }
 
@@ -127,7 +128,7 @@ export class LabelCountMismatchError extends Data.TaggedError(
   readonly replacementLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
 }> {
   override get message(): string {
-    return `Replacement labels ([${Array.join(QueryStreamKeyLabels.toArray(this.replacementLabels), ", ")}]) must have as many labels as the ordering labels ([${Array.join(QueryStreamKeyLabels.toArray(this.labels), ", ")}])`;
+    return `Replacement labels ([${Array.join(this.replacementLabels, ", ")}]) must have as many labels as the ordering labels ([${Array.join(this.labels, ", ")}])`;
   }
 }
 
@@ -143,7 +144,7 @@ export class LabelCountMismatchError extends Data.TaggedError(
 export function fromIndex<const FieldPaths extends ReadonlyArray<string>>(
   fieldPaths: FieldPaths,
 ): Result.Result<
-  QueryStreamKeyLayout<Types.Mutable<FieldPaths>>,
+  QueryStreamKeyLayout<QueryStreamKeyLabels.QueryStreamKeyLabels<FieldPaths>>,
   InvalidEqualityPrefixError
 >;
 export function fromIndex<
@@ -153,7 +154,11 @@ export function fromIndex<
   fieldPaths: FieldPaths,
   eqCount: Count,
 ): Result.Result<
-  QueryStreamKeyLayout<RemainingFieldPaths<FieldPaths, Count>>,
+  QueryStreamKeyLayout<
+    QueryStreamKeyLabels.QueryStreamKeyLabels<
+      RemainingFieldPaths<FieldPaths, Count>
+    >
+  >,
   InvalidEqualityPrefixError
 >;
 export function fromIndex(
@@ -185,13 +190,20 @@ export function fromIndex(
  * @experimental
  */
 export const concat = <
-  LeftLabels extends ReadonlyArray<string>,
-  RightLabels extends ReadonlyArray<string>,
+  LeftNames extends ReadonlyArray<string>,
+  RightNames extends ReadonlyArray<string>,
 >(
-  self: QueryStreamKeyLayout<LeftLabels>,
-  that: QueryStreamKeyLayout<RightLabels>,
-): QueryStreamKeyLayout<readonly [...LeftLabels, ...RightLabels]> =>
-  make(Array.appendAll(positions(self), positions(that)));
+  self: QueryStreamKeyLayout<
+    QueryStreamKeyLabels.QueryStreamKeyLabels<LeftNames>
+  >,
+  that: QueryStreamKeyLayout<
+    QueryStreamKeyLabels.QueryStreamKeyLabels<RightNames>
+  >,
+): QueryStreamKeyLayout<
+  QueryStreamKeyLabels.QueryStreamKeyLabels<
+    readonly [...LeftNames, ...RightNames]
+  >
+> => make(Array.appendAll(positions(self), positions(that)));
 
 /**
  * Format visible labels and implicit IDs for diagnostics.
@@ -214,9 +226,9 @@ export const format = (self: QueryStreamKeyLayout): string => {
  *
  * @experimental
  */
-export function visibleLabels<Labels extends ReadonlyArray<string>>(
-  self: QueryStreamKeyLayout<Labels>,
-): QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>;
+export function visibleLabels<
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+>(self: QueryStreamKeyLayout<Labels>): Labels;
 export function visibleLabels(
   self: QueryStreamKeyLayout,
 ): QueryStreamKeyLabels.QueryStreamKeyLabels {
@@ -297,16 +309,10 @@ export const resolvePrefix = (
     return Result.fail(new InvalidLabelPrefixError({ labels, prefixLabels }));
   }
   return Result.succeed(
-    Option.match(
-      Array.get(
-        visiblePositions(self),
-        QueryStreamKeyLabels.size(prefixLabels) - 1,
-      ),
-      {
-        onNone: () => 0,
-        onSome: (position) => position + 1,
-      },
-    ),
+    Option.match(Array.get(visiblePositions(self), prefixLabels.length - 1), {
+      onNone: () => 0,
+      onSome: (position) => position + 1,
+    }),
   );
 };
 
@@ -315,14 +321,15 @@ export const resolvePrefix = (
  *
  * @experimental
  */
-export const rename = <ReplacementLabels extends ReadonlyArray<string>>(
+export const rename = <
+  ReplacementLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+>(
   self: QueryStreamKeyLayout,
-  replacementLabels: QueryStreamKeyLabels.QueryStreamKeyLabels<ReplacementLabels>,
+  replacementLabels: ReplacementLabels,
 ): Result.Result<
-  QueryStreamKeyLayout<Types.Mutable<ReplacementLabels>>,
+  QueryStreamKeyLayout<ReplacementLabels>,
   LabelCountMismatchError
 > => {
-  const replacements = QueryStreamKeyLabels.toArray(replacementLabels);
   const [consumed, renamed] = Array.mapAccum(
     positions(self),
     0,
@@ -332,16 +339,16 @@ export const rename = <ReplacementLabels extends ReadonlyArray<string>>(
         Visible: () =>
           [
             index + 1,
-            Option.map(Array.get(replacements, index), (label) =>
+            Option.map(Array.get(replacementLabels, index), (label) =>
               Position.Visible({ label }),
             ),
           ] as const,
       }),
   );
   const parsed =
-    consumed === replacements.length ? Option.all(renamed) : Option.none();
+    consumed === replacementLabels.length ? Option.all(renamed) : Option.none();
   return Result.fromOption(
-    Option.map(parsed, make<Types.Mutable<ReplacementLabels>>),
+    Option.map(parsed, make<ReplacementLabels>),
     () =>
       new LabelCountMismatchError({
         labels: visibleLabels(self),
