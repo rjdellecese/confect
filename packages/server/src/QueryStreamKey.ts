@@ -2,14 +2,14 @@ import * as Data from "effect/Data";
 import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
-import type * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import type * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 
 const TypeId = "~@confect/server/QueryStreamKey";
 
 interface Payload {
   readonly [TypeId]: typeof TypeId;
   readonly layout: QueryStreamKeyLayout.QueryStreamKeyLayout;
-  readonly values: QueryStreamOrderKey.QueryStreamOrderKey;
+  readonly values: QueryStreamKeyValues.QueryStreamKeyValues;
 }
 
 export type QueryStreamKey = Data.TaggedEnum<{
@@ -35,7 +35,7 @@ export class KeyWidthMismatchError extends Data.TaggedError(
 
 export const complete = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  values: QueryStreamOrderKey.QueryStreamOrderKey,
+  values: QueryStreamKeyValues.QueryStreamKeyValues,
 ): Result.Result<Complete, KeyWidthMismatchError> => {
   const width = QueryStreamKeyLayout.runtimeWidth(layout);
   return values.length === width
@@ -53,7 +53,7 @@ export const complete = (
 
 export const prefix = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  values: QueryStreamOrderKey.QueryStreamOrderKey,
+  values: QueryStreamKeyValues.QueryStreamKeyValues,
 ): Result.Result<Prefix, KeyWidthMismatchError> => {
   const width = QueryStreamKeyLayout.runtimeWidth(layout);
   return values.length <= width
@@ -69,9 +69,17 @@ export const prefix = (
       );
 };
 
+// A complete key already satisfies the prefix width guarantee.
+export const toPrefix = (self: Complete): Prefix =>
+  QueryStreamKey.Prefix({
+    [TypeId]: TypeId,
+    layout: self.layout,
+    values: self.values,
+  });
+
 export const values = (
   self: QueryStreamKey,
-): QueryStreamOrderKey.QueryStreamOrderKey => self.values;
+): QueryStreamKeyValues.QueryStreamKeyValues => self.values;
 export const layout = (
   self: QueryStreamKey,
 ): QueryStreamKeyLayout.QueryStreamKeyLayout => self.layout;

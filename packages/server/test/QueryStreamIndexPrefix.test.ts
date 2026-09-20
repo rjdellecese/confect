@@ -16,7 +16,7 @@ describe("QueryStreamIndexPrefix", () => {
   });
 
   it("pairs values with the supplied field paths in order", () => {
-    for (const [orderKey, indexEntries] of [
+    for (const [keyValues, indexEntries] of [
       [[], []],
       [["a"], [["category", "a"]]],
       [
@@ -36,10 +36,10 @@ describe("QueryStreamIndexPrefix", () => {
       ],
     ] as const) {
       const prefix = Result.getOrThrow(
-        QueryStreamIndexPrefix.make(fieldPaths, orderKey),
+        QueryStreamIndexPrefix.make(fieldPaths, keyValues),
       );
       expect(QueryStreamIndexPrefix.entries(prefix)).toEqual(indexEntries);
-      expect(QueryStreamIndexPrefix.values(prefix)).toEqual(orderKey);
+      expect(QueryStreamIndexPrefix.values(prefix)).toEqual(keyValues);
     }
     expect(
       QueryStreamIndexPrefix.entries(

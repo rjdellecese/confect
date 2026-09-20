@@ -55,7 +55,7 @@ describe("QueryStreamPagination", () => {
     }>().not.toExtend<Pagination.Start>();
     expectTypeOf<{
       readonly _tag: "After";
-      readonly orderKey: Key.Complete;
+      readonly key: Key.Complete;
     }>().not.toExtend<Pagination.Start>();
   });
 
@@ -78,7 +78,7 @@ describe("QueryStreamPagination", () => {
       Result.getOrThrow(
         Pagination.parseRequest(
           0,
-          Pagination.Start.After({ cursor: "original", orderKey: key(1) }),
+          Pagination.Start.After({ cursor: "original", key: key(1) }),
           Pagination.Range.Unpinned(),
         ),
       ),
@@ -103,13 +103,13 @@ describe("QueryStreamPagination", () => {
     expect(Result.getOrThrow(Pagination.finish(req, stopped, false))).toEqual({
       _tag: "Continue",
       page: [1, 2],
-      orderKey: key(2),
+      key: key(2),
     });
   });
 
   it("reads pinned ranges past the requested item count", () => {
     for (const range of [
-      Pagination.Range.ThroughKey({ orderKey: key(9) }),
+      Pagination.Range.ThroughKey({ key: key(9) }),
       Pagination.Range.ThroughEnd(),
     ]) {
       const req = request(2, range);
@@ -118,10 +118,10 @@ describe("QueryStreamPagination", () => {
       expect(Result.getOrThrow(Pagination.finish(req, state, false))).toEqual({
         _tag: "SplitRecommended",
         page: [1, 2, 3, 4],
-        splitOrderKey: key(2),
+        splitKey: key(2),
         continuation:
           range._tag === "ThroughKey"
-            ? { _tag: "Key", orderKey: key(9) }
+            ? { _tag: "Key", key: key(9) }
             : { _tag: "End" },
       });
     }
@@ -133,10 +133,7 @@ describe("QueryStreamPagination", () => {
     expect(Result.isFailure(empty)).toBe(true);
     if (Result.isFailure(empty))
       expect(empty.failure.reason).toBe("NoProgress");
-    const pinned = request(
-      2,
-      Pagination.Range.ThroughKey({ orderKey: key(1) }),
-    );
+    const pinned = request(2, Pagination.Range.ThroughKey({ key: key(1) }));
     const boundary = Pagination.finish(pinned, scan(pinned, 1), true);
     expect(Result.isFailure(boundary)).toBe(true);
     if (Result.isFailure(boundary))
@@ -146,8 +143,8 @@ describe("QueryStreamPagination", () => {
     ).toEqual({
       _tag: "SplitRequired",
       page: [],
-      continuation: { _tag: "Key", orderKey: key(1) },
-      splitOrderKey: key(1),
+      continuation: { _tag: "Key", key: key(1) },
+      splitKey: key(1),
     });
   });
 

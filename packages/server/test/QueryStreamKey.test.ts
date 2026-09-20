@@ -19,6 +19,11 @@ describe("QueryStreamKey", () => {
     const key = Result.getOrThrow(Key.complete(layout, values));
     expect(Key.values(key)).toBe(values);
     expect(Key.layout(key)).toBe(layout);
+    const converted = Key.toPrefix(key);
+    expectTypeOf(converted).toEqualTypeOf<Key.Prefix>();
+    expect(Key.values(converted)).toBe(values);
+    expect(Key.layout(converted)).toBe(layout);
+    expect(Key.isComplete(converted)).toBe(false);
     for (const prefix of [[], [3], values]) {
       const parsed = Result.getOrThrow(Key.prefix(layout, prefix));
       expect(Key.values(parsed)).toBe(prefix);
@@ -85,6 +90,9 @@ describe("QueryStreamKey", () => {
   it("accepts complete zero-width keys", () => {
     const zero = Result.getOrThrow(Layout.fromIndex(["_id"], 1));
     expect(Key.values(Result.getOrThrow(Key.complete(zero, [])))).toEqual([]);
+    expect(
+      Key.values(Key.toPrefix(Result.getOrThrow(Key.complete(zero, [])))),
+    ).toEqual([]);
     expect(Result.isFailure(Key.prefix(zero, [undefined]))).toBe(true);
   });
 });

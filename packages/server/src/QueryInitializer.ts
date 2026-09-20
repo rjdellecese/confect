@@ -31,6 +31,7 @@ import type * as DataModel from "./DataModel";
 import * as Document from "./Document";
 import * as OrderedQuery from "./OrderedQuery";
 import * as QueryStream from "./QueryStream";
+import type * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 import type * as Table from "./Table";
@@ -117,12 +118,12 @@ export interface QueryInitializer<
    * bound calls are the range predicates. The value is a reusable description
    * of a query: each run re-runs the index query. * The typed range builder
    * consumes `eq`-pinned fields from the index's field tuple at the type level,
-   * so the stream's order-key type is exactly the fields that still vary (the
-   * `ORDER BY` columns left after the equality predicates). The order direction
-   * is part of the type too: omitted, it is `"asc"`; a literal is tracked as
-   * that literal, and a value known only at runtime as the union. The order
-   * parameter is either absent or a direction—never `undefined`—so the type
-   * can't claim a literal the runtime default would contradict.
+   * so the stream's visible label type is exactly the fields that still vary
+   * (the `ORDER BY` columns left after the equality predicates). The order
+   * direction is part of the type too: omitted, it is `"asc"`; a literal is
+   * tracked as that literal, and a value known only at runtime as the union.
+   * The order parameter is either absent or a direction—never `undefined`—so
+   * the type can't claim a literal the runtime default would contradict.
    */
   readonly stream: {
     <
@@ -141,7 +142,9 @@ export interface QueryInitializer<
       ) => Range,
     ): QueryStream.QueryStream<
       Doc,
-      QueryStreamIndexRange.Remaining<Range>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        QueryStreamIndexRange.Remaining<Range>
+      >,
       "asc",
       Document.DocumentDecodeError,
       never
@@ -164,7 +167,9 @@ export interface QueryInitializer<
       order: Direction,
     ): QueryStream.QueryStream<
       Doc,
-      QueryStreamIndexRange.Remaining<Range>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        QueryStreamIndexRange.Remaining<Range>
+      >,
       Direction,
       Document.DocumentDecodeError,
       never
@@ -178,7 +183,9 @@ export interface QueryInitializer<
       indexName: IndexName,
     ): QueryStream.QueryStream<
       Doc,
-      NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
+      >,
       "asc",
       Document.DocumentDecodeError,
       never
@@ -194,7 +201,9 @@ export interface QueryInitializer<
       order: Direction,
     ): QueryStream.QueryStream<
       Doc,
-      NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
+      >,
       Direction,
       Document.DocumentDecodeError,
       never
