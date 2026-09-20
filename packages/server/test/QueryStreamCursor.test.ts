@@ -17,7 +17,7 @@ const complete = (
 const encodeCursor =
   (layout: QueryStreamKeyLayout.QueryStreamKeyLayout) =>
   (values: QueryStreamKeyValues.QueryStreamKeyValues) =>
-    Schema.encodeSync(QueryStreamCursor.codecForLayout(layout))(
+    Schema.encodeSync(QueryStreamCursor.fromKeyLayout(layout))(
       complete(layout, values),
     );
 
@@ -137,7 +137,7 @@ describe("QueryStreamCursor serialization", () => {
     );
     expect(
       QueryStreamKey.values(
-        Schema.decodeSync(QueryStreamCursor.codecForLayout(layout))(cursor),
+        Schema.decodeSync(QueryStreamCursor.fromKeyLayout(layout))(cursor),
       ),
     ).toEqual(keyValues);
   });
@@ -158,7 +158,7 @@ describe("QueryStreamCursor serialization", () => {
         QueryStreamKeyLabels.make(["created", "body"]),
       ),
     );
-    const codec = QueryStreamCursor.codecForLayout(layout);
+    const codec = QueryStreamCursor.fromKeyLayout(layout);
     const keyValues = [123, "outer-id", "hello", "inner-id"];
     const encoded = Schema.encodeSync(codec)(complete(layout, keyValues));
     expect(JSON.parse(encoded)).toEqual({
@@ -188,7 +188,7 @@ describe("QueryStreamCursor serialization", () => {
   it("requires a complete key belonging to the encoder's layout", () => {
     const layout = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["text"]));
     const other = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["body"]));
-    const codec = QueryStreamCursor.codecForLayout(layout);
+    const codec = QueryStreamCursor.fromKeyLayout(layout);
     const encode = Schema.encodeSync(codec);
     expectTypeOf(encode).parameter(0).toEqualTypeOf<QueryStreamKey.Complete>();
     expect(() => encode(complete(other, ["hello", "id"]))).toThrow(
@@ -243,7 +243,7 @@ describe("QueryStreamCursor serialization", () => {
     ]) {
       expect(() =>
         QueryStreamKey.values(
-          Schema.decodeSync(QueryStreamCursor.codecForLayout(layout))(cursor),
+          Schema.decodeSync(QueryStreamCursor.fromKeyLayout(layout))(cursor),
         ),
       ).toThrow(Schema.SchemaError);
     }
@@ -261,7 +261,7 @@ describe("QueryStreamCursor serialization", () => {
     expect(
       QueryStreamKey.values(
         Schema.decodeSync(
-          QueryStreamCursor.codecForLayout(
+          QueryStreamCursor.fromKeyLayout(
             Result.getOrThrowWith(
               QueryStreamKeyLayout.fromIndex(["_id"], 1),
               identity,
@@ -310,7 +310,7 @@ describe("QueryStreamCursor serialization", () => {
             QueryStreamKeyLabels.make(["optional", "integer", "bytes"]),
           ),
         );
-        const bound = QueryStreamCursor.codecForLayout(layout);
+        const bound = QueryStreamCursor.fromKeyLayout(layout);
         expectTypeOf<
           typeof bound.Type
         >().toEqualTypeOf<QueryStreamKey.Complete>();

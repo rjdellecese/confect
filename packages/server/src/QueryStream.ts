@@ -2232,7 +2232,7 @@ export const paginate: {
       self: QueryStream<Doc, Labels, Direction, E, R>,
       options: PaginateOptions,
     ) {
-      const cursorSchema = QueryStreamCursor.codecForLayout(self.keyLayout);
+      const cursorSchema = QueryStreamCursor.fromKeyLayout(self.keyLayout);
       const encodeCursor = Schema.encodeEffect(cursorSchema);
       const decodeCursor = Schema.decodeEffect(cursorSchema);
       const complete = (keyValues: QueryStreamKeyValues.QueryStreamKeyValues) =>

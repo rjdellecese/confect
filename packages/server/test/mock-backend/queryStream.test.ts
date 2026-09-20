@@ -1840,7 +1840,7 @@ describe("QueryStream", () => {
 
             for (const cursor of [page.continueCursor, page.splitCursor]) {
               const key = yield* Schema.decodeEffect(
-                QueryStreamCursor.codecForLayout(source.keyLayout),
+                QueryStreamCursor.fromKeyLayout(source.keyLayout),
               )(cursor);
               expect(QueryStreamKey.values(key)).toHaveLength(3);
 

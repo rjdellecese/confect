@@ -63,7 +63,7 @@ export const END_CURSOR = "[]";
  *
  * @experimental
  */
-export const codecForLayout = (
+export const fromKeyLayout = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
 ) => {
   const runtimeLabels = Array.map(

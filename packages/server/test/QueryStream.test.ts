@@ -21,7 +21,7 @@ const encodeCursor =
   (values: QueryStreamKeyValues.QueryStreamKeyValues) =>
     Effect.flatMap(
       Effect.fromResult(QueryStreamKey.complete(layout, values)),
-      Schema.encodeEffect(QueryStreamCursor.codecForLayout(layout)),
+      Schema.encodeEffect(QueryStreamCursor.fromKeyLayout(layout)),
     );
 
 describe("QueryStream type parameters", () => {
@@ -488,7 +488,7 @@ describe.each(["asc", "desc"] as const)(
         expect(
           QueryStreamKey.values(
             yield* Schema.decodeEffect(
-              QueryStreamCursor.codecForLayout(source.keyLayout),
+              QueryStreamCursor.fromKeyLayout(source.keyLayout),
             )(first.continueCursor),
           ),
         ).toEqual(["apple", 1, ids[0]]);
