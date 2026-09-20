@@ -15,40 +15,41 @@ import * as SchemaIssue from "effect/SchemaIssue";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 
 const UNDEFINED_SENTINEL = { $undefined: true } as const;
-const KeyValue = Schema.declare<Value | undefined>(
-  (value): value is Value | undefined =>
-    value === undefined ||
-    Result.isSuccess(Result.try(() => convexToJson(value as Value))),
-  {
-    toCodecJson: () =>
-      Schema.link<Value | undefined>()(Schema.Json, {
-        decode: SchemaGetter.transformEffect((value, options) =>
-          Effect.try({
-            try: () =>
-              Result.match(
-                Schema.decodeUnknownResult(
-                  Schema.Struct({ $undefined: Schema.Literal(true) }),
-                  { onExcessProperty: "error" },
-                )(value),
-                {
-                  onSuccess: () => undefined,
-                  onFailure: () =>
-                    jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
-                },
-              ),
-            catch: () =>
-              new SchemaIssue.InvalidValue(
-                { message: "Invalid Convex key value" },
-                value,
-                options,
-              ),
-          }),
-        ),
-        encode: SchemaGetter.transform((value) =>
-          value === undefined ? UNDEFINED_SENTINEL : convexToJson(value),
-        ),
-      }),
-  },
+const KeyValue = Schema.Json.pipe(
+  Schema.decodeTo(
+    Schema.declare<Value | undefined>(
+      (value): value is Value | undefined =>
+        value === undefined ||
+        Result.isSuccess(Result.try(() => convexToJson(value as Value))),
+    ),
+    {
+      decode: SchemaGetter.transformEffect((value, options) =>
+        Effect.try({
+          try: () =>
+            Result.match(
+              Schema.decodeUnknownResult(
+                Schema.Struct({ $undefined: Schema.Literal(true) }),
+                { onExcessProperty: "error" },
+              )(value),
+              {
+                onSuccess: () => undefined,
+                onFailure: () =>
+                  jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
+              },
+            ),
+          catch: () =>
+            new SchemaIssue.InvalidValue(
+              { message: "Invalid Convex key value" },
+              value,
+              options,
+            ),
+        }),
+      ),
+      encode: SchemaGetter.transform((value) =>
+        value === undefined ? UNDEFINED_SENTINEL : convexToJson(value),
+      ),
+    },
+  ),
 );
 
 /**

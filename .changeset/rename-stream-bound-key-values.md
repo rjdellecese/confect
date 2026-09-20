@@ -2,7 +2,9 @@
 "@confect/server": major
 ---
 
-Rename `QueryStream.narrow` endpoint values from `orderKey` to `keyValues` and require branded ordering labels in explicit `QueryStream` type annotations. Existing pagination cursors remain compatible.
+Rename `QueryStream.narrow` endpoint values from `orderKey` to `keyValues` and require branded ordering labels in explicit `QueryStream` type annotations.
+
+Change the cursor format returned by `QueryStream.paginate`. Restart pagination with `cursor: null` after upgrading; cursors from earlier prereleases are no longer accepted.
 
 Replace `orderKey` with `keyValues` in each `start` and `end` endpoint.
 

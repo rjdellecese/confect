@@ -21,7 +21,7 @@ describe("QueryStreamKeyValues", () => {
       { nested: "value" },
     ];
     const Json = Schema.fromJsonString(
-      Schema.toCodecJson(QueryStreamKeyValues.QueryStreamKeyValues),
+      QueryStreamKeyValues.QueryStreamKeyValues,
     );
     const encoded = Schema.encodeSync(Json)(values);
     expect(Schema.decodeSync(Json)(encoded)).toEqual(values);
@@ -38,9 +38,7 @@ describe("QueryStreamKeyValues", () => {
   ])("rejects malformed JSON key values: %j", (value) => {
     expect(
       Result.isFailure(
-        Schema.decodeResult(
-          Schema.toCodecJson(QueryStreamKeyValues.QueryStreamKeyValues),
-        )([value]),
+        Schema.decodeResult(QueryStreamKeyValues.QueryStreamKeyValues)([value]),
       ),
     ).toBe(true);
   });

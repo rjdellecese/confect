@@ -598,7 +598,7 @@ describe("QueryStream", () => {
             cursor: null,
           });
           const afterKeyValues = (yield* Schema.decodeEffect(
-            QueryStreamCursor.Json,
+            Schema.fromJsonString(QueryStreamCursor.QueryStreamCursor),
           )(page1.continueCursor)).keyValues;
 
           const narrowed = QueryStream.narrow(leaf, {
@@ -646,7 +646,7 @@ describe("QueryStream", () => {
             cursor: null,
           });
           const afterKeyValues = (yield* Schema.decodeEffect(
-            QueryStreamCursor.Json,
+            Schema.fromJsonString(QueryStreamCursor.QueryStreamCursor),
           )(page1.continueCursor)).keyValues;
 
           // Pure transforms narrow by narrowing their input, so the bounds
