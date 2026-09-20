@@ -13,15 +13,17 @@ export type QueryStreamKeyLabels<
 
 // Tuple operations must use the underlying names: spreading a branded tuple
 // directly can widen its fixed positions into an array of element unions.
-type UnbrandedNames<Labels extends QueryStreamKeyLabels> =
-  Labels extends QueryStreamKeyLabels<infer LabelNames> ? LabelNames : never;
-
+// Defer extraction and concatenation until both label types are known to avoid
+// expanding unresolved tuple types while checking generic stream operations.
 export type Concat<
   Left extends QueryStreamKeyLabels,
   Right extends QueryStreamKeyLabels,
-> = QueryStreamKeyLabels<
-  readonly [...UnbrandedNames<Left>, ...UnbrandedNames<Right>]
->;
+> =
+  Left extends QueryStreamKeyLabels<infer LeftNames>
+    ? Right extends QueryStreamKeyLabels<infer RightNames>
+      ? QueryStreamKeyLabels<readonly [...LeftNames, ...RightNames]>
+      : never
+    : never;
 
 const LabelsBrand = Brand.nominal<QueryStreamKeyLabels>();
 
