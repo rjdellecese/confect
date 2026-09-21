@@ -1,5 +1,4 @@
 import type { ReadonlyValue } from "@confect/core/SchemaToValidator";
-import * as SystemFields from "@confect/core/SystemFields";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Function from "effect/Function";
@@ -21,43 +20,17 @@ export type WithoutSystemFields<Doc> = Doc extends unknown
 export type Any = any;
 export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 
-type Decode = (doc: unknown) => Effect.Effect<unknown, Schema.SchemaError>;
-
-const decoderCache = new WeakMap<Schema.Codec<any, any>, Map<string, Decode>>();
-
-const getDecoder = (
-  tableName: string,
-  tableSchema: Schema.Codec<any, any>,
-): Decode => {
-  const byTable =
-    decoderCache.get(tableSchema) ??
-    (() => {
-      const map = new Map<string, Decode>();
-      decoderCache.set(tableSchema, map);
-      return map;
-    })();
-
-  return (
-    byTable.get(tableName) ??
-    (() => {
-      const decoder = Schema.decodeUnknownEffect(
-        SystemFields.extendWithSystemFields(tableName, tableSchema),
-      ) as Decode;
-      byTable.set(tableName, decoder);
-      return decoder;
-    })()
-  );
-};
-
 export const decode = Function.dual<
   <
     DataModel_ extends DataModel.AnyWithProps,
     TableName extends DataModel.TableNames<DataModel_>,
   >(
     tableName: TableName,
-    tableSchema: TableInfo.TableSchema<
-      DataModel.TableInfoWithName_<DataModel_, TableName>
-    >,
+    table: {
+      readonly Doc: TableInfo.TableSchema<
+        DataModel.TableInfoWithName_<DataModel_, TableName>
+      >;
+    },
   ) => (
     self: DataModel.TableInfoWithName_<DataModel_, TableName>["convexDocument"],
   ) => Effect.Effect<
@@ -70,9 +43,11 @@ export const decode = Function.dual<
   >(
     self: DataModel.TableInfoWithName_<DataModel_, TableName>["convexDocument"],
     tableName: TableName,
-    tableSchema: TableInfo.TableSchema<
-      DataModel.TableInfoWithName_<DataModel_, TableName>
-    >,
+    table: {
+      readonly Doc: TableInfo.TableSchema<
+        DataModel.TableInfoWithName_<DataModel_, TableName>
+      >;
+    },
   ) => Effect.Effect<
     DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
     DocumentDecodeError
@@ -85,16 +60,18 @@ export const decode = Function.dual<
   >(
     self: DataModel.TableInfoWithName_<DataModel_, TableName>["convexDocument"],
     tableName: TableName,
-    tableSchema: TableInfo.TableSchema<
-      DataModel.TableInfoWithName_<DataModel_, TableName>
-    >,
+    table: {
+      readonly Doc: TableInfo.TableSchema<
+        DataModel.TableInfoWithName_<DataModel_, TableName>
+      >;
+    },
   ): Effect.Effect<
     DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
     DocumentDecodeError
   > =>
     pipe(
       self,
-      getDecoder(tableName, tableSchema),
+      Schema.decodeUnknownEffect(table.Doc),
       Effect.catchIf(Schema.isSchemaError, (schemaError) =>
         Effect.fail(
           new DocumentDecodeError({
@@ -113,18 +90,6 @@ export const decode = Function.dual<
       ),
     ),
 );
-
-type Encode = (doc: unknown) => Effect.Effect<unknown, Schema.SchemaError>;
-
-const encoderCache = new WeakMap<Schema.Codec<any, any>, Encode>();
-
-const getEncoder = (tableSchema: Schema.Codec<any, any>): Encode =>
-  encoderCache.get(tableSchema) ??
-  (() => {
-    const encoder = Schema.encodeEffect(tableSchema) as Encode;
-    encoderCache.set(tableSchema, encoder);
-    return encoder;
-  })();
 
 export const encode = Function.dual<
   <
@@ -171,7 +136,7 @@ export const encode = Function.dual<
   > =>
     pipe(
       self,
-      getEncoder(tableSchema),
+      Schema.encodeEffect(tableSchema),
       Effect.catchIf(Schema.isSchemaError, (schemaError) =>
         Effect.fail(
           new DocumentEncodeError({

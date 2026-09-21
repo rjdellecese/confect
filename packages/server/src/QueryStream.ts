@@ -477,7 +477,7 @@ export interface Reflection<
 > {
   readonly reader: ReflectionReader;
   readonly tableName: string;
-  readonly tableSchema: Schema.Codec<any, any>;
+  readonly table: { readonly Doc: Schema.Codec<any, any> };
   readonly indexName: string;
   /**
    * Index fields in declared order, including `_creationTime` where applicable.
@@ -614,7 +614,7 @@ const makeLeaf = <
   const annotated = budgetedDocuments.pipe(
     Stream.mapEffect((encoded) =>
       Effect.map(
-        Document.decode(reflection.tableName, reflection.tableSchema)(encoded),
+        Document.decode(reflection.tableName, reflection.table)(encoded),
         (doc) =>
           new Element({
             doc: Option.some(doc as Doc),

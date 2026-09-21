@@ -42,7 +42,7 @@ export const make = <
 >(
   query: ConvexOrderedQuery<TableInfo.ConvexTableInfo<TableInfo_>>,
   tableName: TableName,
-  tableSchema: TableInfo.TableSchema<TableInfo_>,
+  table: { readonly Doc: TableInfo.TableSchema<TableInfo_> },
 ): OrderedQuery<TableInfo_> => {
   type OrderedQueryFunction<
     FunctionName extends keyof OrderedQuery<TableInfo_>,
@@ -53,10 +53,7 @@ export const make = <
   );
 
   const stream: OrderedQueryFunction<"stream"> = () =>
-    pipe(
-      streamEncoded,
-      Stream.mapEffect(Document.decode(tableName, tableSchema)),
-    );
+    pipe(streamEncoded, Stream.mapEffect(Document.decode(tableName, table)));
 
   const first: OrderedQueryFunction<"first"> = () =>
     pipe(stream(), Stream.take(1), Stream.runHead);
@@ -78,7 +75,7 @@ export const make = <
 
     const parsedPage = yield* Effect.forEach(
       paginationResult.page,
-      Document.decode(tableName, tableSchema),
+      Document.decode(tableName, table),
     );
 
     return {

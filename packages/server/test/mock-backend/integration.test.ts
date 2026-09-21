@@ -5,8 +5,20 @@ import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as SchemaParser from "effect/SchemaParser";
+import * as SchemaCompiler from "effect/unstable/schema/SchemaCompiler";
+import * as Stream from "effect/Stream";
+import * as Option from "effect/Option";
+import * as DatabaseReader_ from "@confect/server/DatabaseReader";
+import * as DatabaseWriter_ from "@confect/server/DatabaseWriter";
+import * as DatabaseSchema from "@confect/server/DatabaseSchema";
+import * as QueryStream from "@confect/server/QueryStream";
+import * as Table from "@confect/server/Table";
 import refs from "./fixtures/confect/_generated/refs";
-import { DatabaseWriter } from "./fixtures/confect/_generated/services";
+import {
+  DatabaseWriter,
+  MutationCtx,
+} from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
 import type notes from "./fixtures/confect/_generated/tables/notes";
 import { PaginationDenied } from "./fixtures/confect/databaseReader.spec";
@@ -18,6 +30,88 @@ import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
 
 describe("DatabaseReader", () => {
+  it.effect("uses the canonical Doc decoder across database read paths", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const ctx = yield* MutationCtx;
+          const id = yield* Effect.promise(() =>
+            ctx.db.insert("notes", { text: "hello" }),
+          );
+          let evaluations = 0;
+          const table = Table.make(() => {
+            evaluations++;
+            return Schema.Struct({ text: Schema.String });
+          })
+            .index("by_text", ["text"])
+            .searchIndex("text", { searchField: "text" })("notes");
+          const schema = DatabaseSchema.make({ notes: table });
+          const reader = DatabaseReader_.make<typeof schema>(
+            schema,
+            ctx.db,
+          ).table("notes");
+          const writer = DatabaseWriter_.make<typeof schema>(
+            schema,
+            ctx.db,
+          ).table("notes");
+          const get = reader.get(id);
+          const getByIndex = reader.get("by_text", "hello");
+          const first = reader.index("by_text").first();
+          const take = reader.index("by_text").take(1);
+          const collect = reader.index("by_text").collect();
+          const orderedStream = reader.index("by_text").stream();
+          const paginate = reader
+            .index("by_text")
+            .paginate({ numItems: 1, cursor: null });
+          const search = reader.search("text", (q) =>
+            q.search("text", "hello"),
+          );
+          const stream = reader.stream("by_text");
+
+          expect(evaluations).toBe(0);
+
+          const encoded = yield* Effect.promise(() => ctx.db.get(id));
+          const doc = table.Doc;
+          const interpreted = SchemaParser.decodeUnknownEffect(doc);
+          yield* interpreted(encoded);
+          let calls = 0;
+          SchemaCompiler.set(doc.ast, {
+            decodeEffect: (input, options) => {
+              calls++;
+              return interpreted(input, options);
+            },
+          });
+
+          expect(yield* get).toEqual(encoded);
+          expect(yield* getByIndex).toEqual(encoded);
+          expect(yield* first).toEqual(Option.some(encoded));
+          expect(yield* take).toEqual([encoded]);
+          expect(yield* collect).toEqual([encoded]);
+          expect(yield* Stream.runCollect(orderedStream)).toEqual([encoded]);
+          expect((yield* paginate).page).toEqual([encoded]);
+          expect(yield* search.collect()).toEqual([encoded]);
+          expect(yield* Stream.runCollect(stream)).toEqual([encoded]);
+          expect(
+            (yield* QueryStream.paginate(stream, { numItems: 1, cursor: null }))
+              .page,
+          ).toEqual([encoded]);
+          expect(calls).toBe(10);
+
+          yield* writer.patch(id, { text: "patched" });
+          expect(calls).toBe(11);
+          expect(evaluations).toBe(1);
+          expect(table.Doc).toBe(doc);
+          expect(encoded?.text).toBe("hello");
+          expect((yield* Effect.promise(() => ctx.db.get(id)))?.text).toBe(
+            "patched",
+          );
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("get", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;

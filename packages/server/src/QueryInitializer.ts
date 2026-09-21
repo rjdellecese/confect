@@ -35,7 +35,6 @@ import type * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 import type * as Table from "./Table";
-import type * as TableInfo from "./TableInfo";
 
 type ConvexTableInfoFor<
   DataModel_ extends DataModel.AnyWithProps,
@@ -273,7 +272,7 @@ export const make = <
           ),
         ),
       ),
-      Effect.andThen(Document.decode(tableName, table.Fields)),
+      Effect.andThen(Document.decode(tableName, table)),
     );
   };
 
@@ -362,13 +361,7 @@ export const make = <
     return OrderedQuery.make<
       DataModel.TableInfoWithName_<DataModel_, TableName>,
       TableName
-    >(
-      orderedQuery,
-      tableName,
-      table.Fields as TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >,
-    );
+    >(orderedQuery, tableName, table);
   };
 
   const stream: QueryInitializerFunction<"stream"> = ((
@@ -417,7 +410,7 @@ export const make = <
     return QueryStream.fromReflection({
       reader: convexDatabaseReader as QueryStream.ReflectionReader,
       tableName,
-      tableSchema: table.Fields,
+      table,
       indexName,
       indexFieldPaths,
       indexRange,
@@ -437,9 +430,7 @@ export const make = <
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),
       tableName,
-      table.Fields as TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >,
+      table,
     );
 
   return {
@@ -469,7 +460,7 @@ export const getById =
           ),
         ),
       ),
-      Effect.andThen(Document.decode(tableName, table.Fields)),
+      Effect.andThen(Document.decode(tableName, table)),
     );
 
 export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>()(
