@@ -1,5 +1,85 @@
 # @confect/server
 
+## 10.0.0-next.23
+
+### Major Changes
+
+- 09f9f55: Use `Spec.groups(spec)` and `DatabaseSchema.tables(schema)` to inspect assembled group and table records. Adding a group at an existing spec name now replaces its inferred type as well as its runtime value.
+
+  ### Breaking Changes
+  - The `Spec.groups` and `DatabaseSchema.tables` accessors replace the corresponding instance properties.
+  - `Spec.Spec`, `DatabaseSchema.DatabaseSchema`, and `DataModel.DataModel` take a record type instead of a union of its members. The separate `~Groups` and `~Tables` phantom properties on these containers are removed; the `Groups` and `Tables` type helpers remain available.
+
+  Run `confect codegen` to update generated spec and schema annotations. Ordinary `Spec.make().add(...)`, `Spec.make().addAt(...)`, and `DatabaseSchema.make({ ... })` calls keep their existing syntax. `DataModel.FromTables` continues to accept a table union.
+
+  For handwritten annotations, use `Spec.Spec<{ readonly notes: typeof notesGroup }>` or `DatabaseSchema.DatabaseSchema<{ readonly notes: typeof notesTable }>` in place of the corresponding member-union parameter.
+
+- e291835: Preserve ID tiebreakers through `QueryStream` joins, empty streams, and renaming, and use `keyValues` for bounds and annotated elements. `QueryStream.merge` and `QueryStream.flatMap` reject incompatible orderings, including inner streams produced on later rows or later runs. Reused and narrowed streams preserve their index constraints, and `QueryStream.narrow` rejects bounds wider than the stream's ordering key before executing a query.
+
+  Ordering mismatch errors expose `expectedKeyLayout`, `actualKeyLayout`, `expectedOrderDirection`, and `actualOrderDirection`, as applicable.
+
+  ### Breaking Changes
+  - `QueryStream.narrow` endpoints and annotated elements replace `key` with `keyValues`.
+  - `QueryStream.empty` accepts a compatible stream's `keyLayout` instead of field names.
+  - `QueryStream.flatMap` replaces `innerKey` with `innerKeyLayout`.
+  - A query stream's `order` property is renamed to `orderDirection`.
+  - Explicit `QueryStream` type annotations require branded ordering labels instead of plain label tuples. Inferred stream types need no changes.
+  - `QueryStream.paginate` uses a new cursor format. Restart pagination with `cursor: null` after upgrading; continuation cursors from earlier prereleases are no longer accepted.
+
+  To migrate from the previous prerelease, replace `key` with `keyValues` in each `start` and `end` endpoint and when constructing or reading annotated elements.
+
+  **Before:**
+
+  ```ts
+  QueryStream.narrow(stream, {
+    start: { key: [startTime], inclusive: true },
+    end: { key: [endTime], inclusive: false },
+  });
+  const element = { doc, key };
+  ```
+
+  **After:**
+
+  ```ts
+  QueryStream.narrow(stream, {
+    start: { keyValues: [startTime], inclusive: true },
+    end: { keyValues: [endTime], inclusive: false },
+  });
+  const element = { doc, keyValues: key };
+  ```
+
+  For empty streams and joins, reuse the `keyLayout` of a stream with the required ordering. Creating a stream does not read documents. `QueryStream.distinct` and `QueryStream.renameKey` continue to accept label tuples directly.
+
+  **Before:**
+
+  ```ts
+  QueryStream.empty<NotesDoc>()(["_creationTime"]);
+  QueryStream.flatMap(notes, commentsOn, { innerKey: ["_creationTime"] });
+  notes.order;
+  ```
+
+  **After:**
+
+  ```ts
+  import { QueryStream } from "@confect/server";
+
+  const byTime = reader.table("notes").stream("by_creation_time");
+  QueryStream.empty<NotesDoc>()(byTime.keyLayout);
+
+  const commentsByTime = reader.table("comments").stream("by_creation_time");
+  QueryStream.flatMap(notes, commentsOn, {
+    innerKeyLayout: commentsByTime.keyLayout,
+  });
+  notes.orderDirection;
+  ```
+
+  Prefer deriving stream type aliases from an inferred stream, such as `type NoteStream = typeof byTime`, rather than spelling out the ordering-label type parameter.
+
+### Patch Changes
+
+- 7db812a: Reject negative, fractional, or non-finite `numItems` in `QueryStream.paginate` before reading documents.
+- 6798e79: Reject negative, fractional, or non-finite read limits in `QueryStream.paginate` before reading documents.
+
 ## 10.0.0-next.22
 
 ### Major Changes
