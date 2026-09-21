@@ -1,12 +1,12 @@
 /**
  * Compose, merge, join, and paginate index queries as Effect streams.
  *
- * A query stream is an Effect `Stream` of decoded documents with a key and
- * direction. Create one with `reader.table(...).stream(index, range?, order?)`
- * for a standard index. The order defaults to `"asc"`; search indexes use
- * `reader.table(...).search(...)` instead. Unlike
- * `reader.table(...).index(...).stream()`, this returns a composable query
- * stream rather than a plain `Stream` over one query.
+ * A query stream is an Effect `Stream` of decoded documents with stored keys, a
+ * shared key layout, and a direction. Create one with
+ * `reader.table(...).stream(index, range?, order?)` for a standard index. The
+ * order defaults to `"asc"`; search indexes use `reader.table(...).search(...)`
+ * instead. Unlike `reader.table(...).index(...).stream()`, this returns a
+ * composable query stream rather than a plain `Stream` over one query.
  *
  * Creating or composing a stream does not read documents. Reads begin when you
  * run a consuming effect, such as `Stream.runCollect` or `paginate`, and each
@@ -17,7 +17,9 @@
  * with `eq` removes it from the key; range bounds keep it. Keys retain creation
  * time and document-ID tiebreakers where applicable. `QueryStream` combinators
  * preserve the ordering information needed to merge and paginate; plain
- * `Stream` transforms return ordinary streams without that information.
+ * `Stream` transforms return ordinary streams without that information. A key
+ * layout describes the key positions, their visible labels, and implicit ID
+ * positions. Reuse a stream's `keyLayout` with `empty` or `flatMap`.
  *
  * Return the whole `paginate` result from a paginated query handler. In React,
  * use `useStreamPaginatedQuery`, not `usePaginatedQuery`: stream pages aren't
@@ -59,22 +61,10 @@ import * as QueryStreamCursor from "./QueryStreamCursor";
 import * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
 import * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
-import type {
-  QueryStreamOrderDirection as OrderDirection,
-  Flip,
-} from "./QueryStreamOrderDirection";
 import * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 import * as QueryStreamIndexPrefix from "./QueryStreamIndexPrefix";
 import * as QueryStreamKey from "./QueryStreamKey";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
-import type {
-  KeyBound,
-  KeyBounds,
-  IndexBounds,
-  NarrowBounds,
-  ParsedBound,
-  ParsedBounds,
-} from "./QueryStreamKeyBounds";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 import * as QueryStreamPagination from "./QueryStreamPagination";
 import * as QueryStreamReadBudget from "./QueryStreamReadBudget";
@@ -104,49 +94,49 @@ export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceed
 export class IncompatibleStreamsError extends Data.TaggedError(
   "IncompatibleStreamsError",
 )<{
-  readonly expectedOrder: OrderDirection;
-  readonly actualOrder: OrderDirection;
-  readonly expectedLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
-  readonly actualLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
+  readonly expectedOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection;
+  readonly actualOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection;
+  readonly expectedKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
+  readonly actualKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
 }> {
   override get message(): string {
-    return `QueryStream.merge: all streams must share an order and key layout (got ${this.expectedOrder} ${QueryStreamKeyLayout.format(this.expectedLayout)} and ${this.actualOrder} ${QueryStreamKeyLayout.format(this.actualLayout)})`;
+    return `QueryStream.merge: all streams must share an order and key layout (got ${this.expectedOrderDirection} ${QueryStreamKeyLayout.format(this.expectedKeyLayout)} and ${this.actualOrderDirection} ${QueryStreamKeyLayout.format(this.actualKeyLayout)})`;
   }
 }
 
 /**
  * A `flatMap` inner stream runs in a different direction from its outer stream.
- * The join dies with this error when it runs; `expected` is the outer direction
- * and `actual` is the inner direction.
+ * The join dies with this error when it runs; `expectedOrderDirection` is the
+ * outer direction and `actualOrderDirection` is the inner direction.
  *
  * @experimental
  */
 export class InnerStreamOrderMismatchError extends Data.TaggedError(
   "InnerStreamOrderMismatchError",
 )<{
-  readonly expected: OrderDirection;
-  readonly actual: OrderDirection;
+  readonly expectedOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection;
+  readonly actualOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection;
 }> {
   override get message(): string {
-    return `QueryStream.flatMap: inner stream order (${this.actual}) differs from the outer stream's (${this.expected})`;
+    return `QueryStream.flatMap: inner stream order (${this.actualOrderDirection}) differs from the outer stream's (${this.expectedOrderDirection})`;
   }
 }
 
 /**
- * A `flatMap` inner stream does not match the supplied `innerLayout`, including
- * visible labels and implicit-ID positions. The join dies with this error when
- * it runs; the payload contains the expected and actual layouts.
+ * A `flatMap` inner stream does not match the supplied `innerKeyLayout`,
+ * including visible labels and implicit-ID positions. The join dies with this
+ * error when it runs; the payload contains the expected and actual layouts.
  *
  * @experimental
  */
 export class InnerStreamLayoutMismatchError extends Data.TaggedError(
   "InnerStreamLayoutMismatchError",
 )<{
-  readonly expected: QueryStreamKeyLayout.QueryStreamKeyLayout;
-  readonly actual: QueryStreamKeyLayout.QueryStreamKeyLayout;
+  readonly expectedKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
+  readonly actualKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
 }> {
   override get message(): string {
-    return `QueryStream.flatMap: inner stream key layout (${QueryStreamKeyLayout.format(this.actual)}) differs from innerLayout (${QueryStreamKeyLayout.format(this.expected)})`;
+    return `QueryStream.flatMap: inner stream key layout (${QueryStreamKeyLayout.format(this.actualKeyLayout)}) differs from innerKeyLayout (${QueryStreamKeyLayout.format(this.expectedKeyLayout)})`;
   }
 }
 
@@ -219,11 +209,11 @@ export class Element<Doc> extends Data.Class<{
  * method and subsequent composition:
  *
  * - `Doc` is the emitted value: a decoded document or a mapped or joined result.
- * - `Labels` is the branded readonly tuple of visible ordering names, initially
- *   the index fields not pinned by `eq`. `flatMap` appends labels and
+ * - `KeyLabels` is the branded readonly tuple of visible ordering names,
+ *   initially the index fields not pinned by `eq`. `flatMap` appends labels and
  *   `renameKey` replaces them. Implicit ID tiebreakers are omitted from labels
  *   but retained in `keyLayout`.
- * - `Direction` is `"asc"` or `"desc"`; the type defaults to their union.
+ * - `OrderDirection` is `"asc"` or `"desc"`; the type defaults to their union.
  * - `E` contains typed failures while reading or transforming values. `never`
  *   means no typed failures, not no defects.
  * - `R` contains Effect services required to run the stream. The stream retains
@@ -232,7 +222,7 @@ export class Element<Doc> extends Data.Class<{
  *
  * Known label or direction mismatches prevent merging at compile time. Runtime
  * checks also compare implicit-ID positions. Reuse a compatible stream's
- * `keyLayout` for `empty` or `flatMap`'s `innerLayout`.
+ * `keyLayout` for `empty` or `flatMap`'s `innerKeyLayout`.
  *
  * Consume with Effect's `Stream.runCollect` or `Stream.runHead`, or use
  * `unique` or `paginate`. A plain `Stream` transform such as `Stream.take`
@@ -243,15 +233,17 @@ export class Element<Doc> extends Data.Class<{
  */
 export class QueryStream<
   out Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels =
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels =
     QueryStreamKeyLabels.QueryStreamKeyLabels,
-  out Direction extends OrderDirection = OrderDirection,
+  out OrderDirection extends
+    QueryStreamOrderDirection.QueryStreamOrderDirection =
+    QueryStreamOrderDirection.QueryStreamOrderDirection,
   out E = never,
   out R = never,
 > implements Stream.Stream<Doc, E, R> {
   declare readonly [TypeId]: TypeId;
-  declare readonly "~labels": Types.Invariant<Labels>;
-  declare readonly "~direction": Types.Covariant<Direction>;
+  declare readonly "~labels": Types.Invariant<KeyLabels>;
+  declare readonly "~direction": Types.Covariant<OrderDirection>;
 
   // The `Stream` protocol (the variance marker, `pipe`, and the `channel`
   // the Stream runtime consumes) is implemented directly: the members are
@@ -271,8 +263,13 @@ export class QueryStream<
   >;
 
   constructor(
-    readonly order: Direction,
-    readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
+    readonly orderDirection: OrderDirection,
+    /**
+     * Shared description of the key positions, including visible labels and
+     * implicit IDs. Reuse with `empty` or `flatMap`'s `innerKeyLayout`. Reading
+     * this property does not read documents. Direction is in `orderDirection`.
+     */
+    readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
     /**
      * Values paired with stored keys, including filtered markers that advance
      * cursors without emitting a value.
@@ -295,8 +292,8 @@ export class QueryStream<
      * guards recipe calls against bounds from incompatible layouts.
      */
     readonly narrowWith?: (
-      bounds: ParsedBounds,
-    ) => QueryStream<Doc, Labels, Direction, E, R>,
+      parsedBounds: QueryStreamKeyBounds.ParsedBounds,
+    ) => QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
     /**
      * Rebuilds the stream in the opposite direction using index scans and
      * seeks. Distinct streams keep their original representatives. Without this
@@ -304,17 +301,17 @@ export class QueryStream<
      */
     readonly reverseWith?: () => QueryStream<
       Doc,
-      Labels,
-      Flip<Direction>,
+      KeyLabels,
+      QueryStreamOrderDirection.Flip<OrderDirection>,
       E,
       R
     >,
   ) {
     if (narrowWith !== undefined) {
-      this.narrowWith = (bounds) =>
+      this.narrowWith = (parsedBounds) =>
         narrowWith(
           Result.getOrThrowWith(
-            QueryStreamKeyBounds.forLayout(keyLayout, bounds),
+            QueryStreamKeyBounds.forLayout(keyLayout, parsedBounds),
             identity,
           ),
         );
@@ -324,7 +321,7 @@ export class QueryStream<
   toStream(): Stream.Stream<Doc, E, R> {
     return Stream.unwrap(
       Effect.gen({ self: this }, function* () {
-        const budget = yield* Effect.serviceOption(
+        const readBudget = yield* Effect.serviceOption(
           QueryStreamReadBudget.QueryStreamReadBudget,
         ).pipe(
           Effect.flatMap(
@@ -344,7 +341,7 @@ export class QueryStream<
         ).pipe(
           Stream.provideService(
             QueryStreamReadBudget.QueryStreamReadBudget,
-            budget,
+            readBudget,
           ),
         );
       }),
@@ -410,35 +407,36 @@ export const isQueryStream = (u: unknown): u is Any =>
  */
 export const empty =
   <Doc>(): {
-    <const Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
-      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
-    ): QueryStream<Doc, Labels, "asc", never, never>;
+    <const KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
+      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
+    ): QueryStream<Doc, KeyLabels, "asc", never, never>;
     <
-      const Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
-      Direction extends OrderDirection,
+      const KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+      OrderDirection extends
+        QueryStreamOrderDirection.QueryStreamOrderDirection,
     >(
-      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
-      order: Direction,
-    ): QueryStream<Doc, Labels, Direction, never, never>;
+      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
+      orderDirection: OrderDirection,
+    ): QueryStream<Doc, KeyLabels, OrderDirection, never, never>;
   } =>
-  <Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
-    keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
-    order: OrderDirection = "asc",
+  <KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
+    keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
+    orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection = "asc",
   ) => {
     // The overloads preserve the supplied direction or its ascending default.
     const make = (
-      direction: OrderDirection,
-    ): QueryStream<Doc, Labels, any, never, never> =>
+      currentOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
+    ): QueryStream<Doc, KeyLabels, any, never, never> =>
       new QueryStream(
-        direction,
+        currentOrderDirection,
         keyLayout,
         Stream.empty,
         undefined,
         // Narrowing nothing is nothing, and so is reversing it.
-        () => make(direction),
-        () => make(QueryStreamOrderDirection.flip(direction)),
+        () => make(currentOrderDirection),
+        () => make(QueryStreamOrderDirection.flip(currentOrderDirection)),
       );
-    return make(order);
+    return make(orderDirection);
   };
 
 // -----------------------------------------------------------------------------
@@ -458,7 +456,9 @@ export interface ReflectionReader {
       indexName: string,
       indexRange?: (q: any) => any,
     ): {
-      order(order: OrderDirection): AsyncIterable<unknown>;
+      order(
+        orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
+      ): AsyncIterable<unknown>;
     };
   };
 }
@@ -471,7 +471,10 @@ export interface ReflectionReader {
  *
  * @experimental
  */
-export interface Reflection<Direction extends OrderDirection = OrderDirection> {
+export interface Reflection<
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection =
+    QueryStreamOrderDirection.QueryStreamOrderDirection,
+> {
   readonly reader: ReflectionReader;
   readonly tableName: string;
   readonly tableSchema: Schema.Codec<any, any>;
@@ -485,14 +488,14 @@ export interface Reflection<Direction extends OrderDirection = OrderDirection> {
    * Index constraints. Equality constraints pin leading fields, removing them
    * from the stream's key; range bounds do not.
    */
-  readonly range: QueryStreamIndexRange.QueryStreamIndexRange;
-  readonly order: Direction;
+  readonly indexRange: QueryStreamIndexRange.QueryStreamIndexRange;
+  readonly orderDirection: OrderDirection;
   /**
    * Effective bounds in full index-key values, including pinned fields and ID
-   * tiebreakers. If absent, bounds come from `range`; supplied bounds intersect
-   * those constraints rather than replacing them.
+   * tiebreakers. If absent, bounds come from `indexRange`; supplied bounds
+   * intersect those constraints rather than replacing them.
    */
-  readonly bounds?: IndexBounds;
+  readonly indexBounds?: QueryStreamKeyBounds.IndexBounds;
 }
 
 /**
@@ -508,23 +511,24 @@ export interface Reflection<Direction extends OrderDirection = OrderDirection> {
  */
 export const fromReflection = <
   Doc,
-  Direction extends OrderDirection = OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection =
+    QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  reflection: Reflection<Direction>,
+  reflection: Reflection<OrderDirection>,
 ): QueryStream<
   Doc,
   QueryStreamKeyLabels.QueryStreamKeyLabels,
-  Direction,
+  OrderDirection,
   Document.DocumentDecodeError,
   never
 > =>
   makeLeaf(
     reflection,
-    reflection.bounds === undefined
-      ? QueryStreamIndexRange.toBounds(reflection.range)
+    reflection.indexBounds === undefined
+      ? QueryStreamIndexRange.toBounds(reflection.indexRange)
       : QueryStreamKeyBounds.intersectIndexBounds(
-          QueryStreamIndexRange.toBounds(reflection.range),
-          reflection.bounds,
+          QueryStreamIndexRange.toBounds(reflection.indexRange),
+          reflection.indexBounds,
         ),
   );
 
@@ -539,13 +543,16 @@ const completeFieldPaths = (
     ? fieldPaths
     : Array.append(fieldPaths, "_id");
 
-const makeLeaf = <Doc, Direction extends OrderDirection>(
-  reflection: Reflection<Direction>,
-  bounds: IndexBounds,
+const makeLeaf = <
+  Doc,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
+>(
+  reflection: Reflection<OrderDirection>,
+  indexBounds: QueryStreamKeyBounds.IndexBounds,
 ): QueryStream<
   Doc,
   QueryStreamKeyLabels.QueryStreamKeyLabels,
-  Direction,
+  OrderDirection,
   Document.DocumentDecodeError,
   never
 > => {
@@ -555,7 +562,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   // `_id` even though its index types don't advertise them.
   const fullFieldPaths = completeFieldPaths(reflection.indexFieldPaths);
   const equalityPrefixLength = QueryStreamIndexRange.equalityPrefixLength(
-    reflection.range,
+    reflection.indexRange,
   );
   const keyLayout = Result.getOrThrowWith(
     QueryStreamKeyLayout.fromIndex(
@@ -569,22 +576,29 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
     (fieldPath) => String.split(fieldPath, "."),
   );
   // `eq`-pinned values form a shared prefix of both bound keys.
-  const eqValues = Array.take(bounds.lower.keyValues, equalityPrefixLength);
-  const ranges = Result.getOrThrowWith(
-    QueryStreamIndexRange.fromBounds(fullFieldPaths, reflection.order, bounds),
+  const equalityKeyValues = Array.take(
+    indexBounds.lower.keyValues,
+    equalityPrefixLength,
+  );
+  const indexRanges = Result.getOrThrowWith(
+    QueryStreamIndexRange.fromBounds(
+      fullFieldPaths,
+      reflection.orderDirection,
+      indexBounds,
+    ),
     identity,
   );
 
-  const encodedDocuments = Stream.fromIterable(ranges).pipe(
-    Stream.flatMap((range) =>
+  const encodedDocuments = Stream.fromIterable(indexRanges).pipe(
+    Stream.flatMap((indexRange) =>
       Stream.suspend(() =>
         Stream.fromAsyncIterable(
           reflection.reader
             .query(reflection.tableName)
             .withIndex(reflection.indexName, (q) =>
-              QueryStreamIndexRange.apply(range, q),
+              QueryStreamIndexRange.apply(indexRange, q),
             )
-            .order(reflection.order),
+            .order(reflection.orderDirection),
           identity,
         ).pipe(Stream.orDie),
       ),
@@ -592,8 +606,8 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   );
 
   const budgetedDocuments = Stream.unwrap(
-    Effect.map(QueryStreamReadBudget.QueryStreamReadBudget, (budget) =>
-      budget.accountFor(encodedDocuments),
+    Effect.map(QueryStreamReadBudget.QueryStreamReadBudget, (readBudget) =>
+      readBudget.accountFor(encodedDocuments),
     ),
   );
 
@@ -613,12 +627,14 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
     ),
   );
 
-  const toFullKeySpace = (bound: ParsedBound): KeyBound => ({
-    keyValues: QueryStreamIndexPrefix.values(
+  const toFullKeySpace = (
+    bound: QueryStreamKeyBounds.ParsedBound,
+  ): QueryStreamKeyBounds.KeyBound => ({
+    keyValues: QueryStreamIndexPrefix.keyValues(
       Result.getOrThrowWith(
         QueryStreamIndexPrefix.fromStreamKey(
           fullFieldPaths,
-          eqValues,
+          equalityKeyValues,
           bound.key,
         ),
         identity,
@@ -628,25 +644,25 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   });
 
   return new QueryStream(
-    reflection.order,
+    reflection.orderDirection,
     keyLayout,
     annotated,
-    { ...reflection, bounds },
-    (keyBounds) =>
+    { ...reflection, indexBounds },
+    (parsedBounds) =>
       makeLeaf(reflection, {
-        lower: Option.match(keyBounds.lower, {
-          onNone: () => bounds.lower,
+        lower: Option.match(parsedBounds.lower, {
+          onNone: () => indexBounds.lower,
           onSome: (bound) =>
             QueryStreamKeyBounds.tightestLower(
-              bounds.lower,
+              indexBounds.lower,
               toFullKeySpace(bound),
             ),
         }),
-        upper: Option.match(keyBounds.upper, {
-          onNone: () => bounds.upper,
+        upper: Option.match(parsedBounds.upper, {
+          onNone: () => indexBounds.upper,
           onSome: (bound) =>
             QueryStreamKeyBounds.tightestUpper(
-              bounds.upper,
+              indexBounds.upper,
               toFullKeySpace(bound),
             ),
         }),
@@ -656,9 +672,11 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
       makeLeaf(
         {
           ...reflection,
-          order: QueryStreamOrderDirection.flip(reflection.order),
+          orderDirection: QueryStreamOrderDirection.flip(
+            reflection.orderDirection,
+          ),
         },
-        bounds,
+        indexBounds,
       ),
   );
 };
@@ -710,8 +728,9 @@ const fillMergeSource = <Doc, E>(
         ),
         Pull.catchDone(() =>
           Effect.gen(function* () {
-            const budget = yield* QueryStreamReadBudget.QueryStreamReadBudget;
-            return (yield* budget.isStopped)
+            const readBudget =
+              yield* QueryStreamReadBudget.QueryStreamReadBudget;
+            return (yield* readBudget.isStopped)
               ? MergeSource.BudgetLimited()
               : MergeSource.Exhausted();
           }),
@@ -738,9 +757,9 @@ const mergeStep =
     QueryStreamReadBudget.QueryStreamReadBudget
   > =>
     Effect.gen(function* () {
-      const budget = yield* QueryStreamReadBudget.QueryStreamReadBudget;
+      const readBudget = yield* QueryStreamReadBudget.QueryStreamReadBudget;
       const filled = yield* Effect.forEach(sources, fillMergeSource, {
-        concurrency: (yield* budget.isUnlimited) ? "unbounded" : 1,
+        concurrency: (yield* readBudget.isUnlimited) ? "unbounded" : 1,
       });
       if (filled.some((source) => MergeSource.$is("BudgetLimited")(source)))
         return undefined;
@@ -811,29 +830,31 @@ const mergeStep =
  */
 export const merge = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
-  Direction extends OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
   streams: readonly [
-    QueryStream<Doc, Labels, Direction, E, R>,
-    ...ReadonlyArray<QueryStream<Doc, Labels, NoInfer<Direction>, E, R>>,
+    QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+    ...ReadonlyArray<
+      QueryStream<Doc, KeyLabels, NoInfer<OrderDirection>, E, R>
+    >,
   ],
-): QueryStream<Doc, Labels, Direction, E, R> => {
+): QueryStream<Doc, KeyLabels, OrderDirection, E, R> => {
   const head = Array.headNonEmpty(streams);
   const incompatible = Array.findFirst(
     Array.tailNonEmpty(streams),
     (stream) =>
-      stream.order !== head.order ||
+      stream.orderDirection !== head.orderDirection ||
       !QueryStreamKeyLayout.Equivalence(stream.keyLayout, head.keyLayout),
   );
   if (Option.isSome(incompatible)) {
     throw new IncompatibleStreamsError({
-      expectedOrder: head.order,
-      actualOrder: incompatible.value.order,
-      expectedLayout: head.keyLayout,
-      actualLayout: incompatible.value.keyLayout,
+      expectedOrderDirection: head.orderDirection,
+      actualOrderDirection: incompatible.value.orderDirection,
+      expectedKeyLayout: head.keyLayout,
+      actualKeyLayout: incompatible.value.keyLayout,
     });
   }
   return mergeUnchecked(streams);
@@ -846,16 +867,16 @@ export const merge = <
  */
 const mergeUnchecked = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
-  Direction extends OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
   streams: readonly [
-    QueryStream<Doc, Labels, Direction, E, R>,
-    ...ReadonlyArray<QueryStream<Doc, Labels, Direction, E, R>>,
+    QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+    ...ReadonlyArray<QueryStream<Doc, KeyLabels, OrderDirection, E, R>>,
   ],
-): QueryStream<Doc, Labels, Direction, E, R> => {
+): QueryStream<Doc, KeyLabels, OrderDirection, E, R> => {
   const head = Array.headNonEmpty(streams);
   const annotated: Stream.Stream<
     Element<Doc>,
@@ -867,24 +888,24 @@ const mergeUnchecked = <
       (pulls) =>
         Stream.unfold(
           Array.map(pulls, (pull) => MergeSource.NeedsPull({ pull })),
-          mergeStep<Doc, E>(QueryStreamKeyValues.Order(head.order)),
+          mergeStep<Doc, E>(QueryStreamKeyValues.Order(head.orderDirection)),
         ),
     ),
   );
 
   return new QueryStream(
-    head.order,
+    head.orderDirection,
     head.keyLayout,
     annotated,
     undefined,
     // Narrowing a merge narrows every branch; the bounds are in the shared
     // key space, so each branch converts them to its own index-key
     // space itself.
-    (keyBounds) =>
+    (parsedBounds) =>
       mergeUnchecked([
-        narrowByParsedBounds(head, keyBounds),
+        narrowByParsedBounds(head, parsedBounds),
         ...Array.map(Array.tailNonEmpty(streams), (stream) =>
-          narrowByParsedBounds(stream, keyBounds),
+          narrowByParsedBounds(stream, parsedBounds),
         ),
       ]),
     () =>
@@ -904,17 +925,17 @@ const mergeUnchecked = <
  */
 const transform = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Doc2,
-  Direction extends OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  self: QueryStream<Doc, Labels, Direction, E, R>,
+  self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
   f: (doc: Doc) => Option.Option<Doc2>,
-): QueryStream<Doc2, Labels, Direction, E, R> =>
+): QueryStream<Doc2, KeyLabels, OrderDirection, E, R> =>
   new QueryStream(
-    self.order,
+    self.orderDirection,
     self.keyLayout,
     Stream.map(
       self.annotated,
@@ -922,7 +943,7 @@ const transform = <
         new Element({ doc: Option.flatMap(doc, f), keyValues }),
     ),
     undefined,
-    (keyBounds) => transform(narrowByParsedBounds(self, keyBounds), f),
+    (parsedBounds) => transform(narrowByParsedBounds(self, parsedBounds), f),
     () => transform(reverse(self), f),
   );
 
@@ -931,20 +952,20 @@ const transform = <
  */
 const transformEffect = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Doc2,
   E2,
   R2,
-  Direction extends OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  self: QueryStream<Doc, Labels, Direction, E, R>,
+  self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
   f: (doc: Doc) => Effect.Effect<Option.Option<Doc2>, E2, R2>,
   options: EffectOptions | undefined,
-): QueryStream<Doc2, Labels, Direction, E | E2, R | R2> =>
+): QueryStream<Doc2, KeyLabels, OrderDirection, E | E2, R | R2> =>
   new QueryStream(
-    self.order,
+    self.orderDirection,
     self.keyLayout,
     Stream.mapEffect(
       self.annotated,
@@ -965,8 +986,8 @@ const transformEffect = <
       { concurrency: options?.concurrency },
     ),
     undefined,
-    (keyBounds) =>
-      transformEffect(narrowByParsedBounds(self, keyBounds), f, options),
+    (parsedBounds) =>
+      transformEffect(narrowByParsedBounds(self, parsedBounds), f, options),
     () => transformEffect(reverse(self), f, options),
   );
 
@@ -1000,23 +1021,23 @@ export const filter = dual<
   <Doc>(
     predicate: (doc: Doc) => boolean,
   ) => <
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
-  ) => QueryStream<Doc, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  ) => QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
   <
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
     predicate: (doc: Doc) => boolean,
-  ) => QueryStream<Doc, Labels, Direction, E, R>
+  ) => QueryStream<Doc, KeyLabels, OrderDirection, E, R>
 >(2, (self, predicate) =>
   transform(self, (doc) => (predicate(doc) ? Option.some(doc) : Option.none())),
 );
@@ -1039,26 +1060,26 @@ export const filterEffect = dual<
     predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
     options?: EffectOptions,
   ) => <
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
-  ) => QueryStream<Doc, Labels, Direction, E | E2, R | R2>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  ) => QueryStream<Doc, KeyLabels, OrderDirection, E | E2, R | R2>,
   <
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     E2,
     R2,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
     predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
     options?: EffectOptions,
-  ) => QueryStream<Doc, Labels, Direction, E | E2, R | R2>
+  ) => QueryStream<Doc, KeyLabels, OrderDirection, E | E2, R | R2>
 >(
   (args) => isQueryStream(args[0]),
   (self, predicate, options) =>
@@ -1089,24 +1110,24 @@ export const map = dual<
   <Doc, Doc2>(
     f: (doc: Doc) => Doc2,
   ) => <
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
-  ) => QueryStream<Doc2, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  ) => QueryStream<Doc2, KeyLabels, OrderDirection, E, R>,
   <
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Doc2,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
     f: (doc: Doc) => Doc2,
-  ) => QueryStream<Doc2, Labels, Direction, E, R>
+  ) => QueryStream<Doc2, KeyLabels, OrderDirection, E, R>
 >(2, (self, f) => transform(self, (doc) => Option.some(f(doc))));
 
 /**
@@ -1126,27 +1147,27 @@ export const mapEffect = dual<
     f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
     options?: EffectOptions,
   ) => <
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
-  ) => QueryStream<Doc2, Labels, Direction, E | E2, R | R2>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  ) => QueryStream<Doc2, KeyLabels, OrderDirection, E | E2, R | R2>,
   <
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Doc2,
     E2,
     R2,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
     f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
     options?: EffectOptions,
-  ) => QueryStream<Doc2, Labels, Direction, E | E2, R | R2>
+  ) => QueryStream<Doc2, KeyLabels, OrderDirection, E | E2, R | R2>
 >(
   (args) => isQueryStream(args[0]),
   (self, f, options) =>
@@ -1159,10 +1180,17 @@ export const mapEffect = dual<
  * the next begins. The joined key is the outer key followed by the inner key,
  * retaining both document IDs so equal timestamps remain distinguishable.
  *
- * Supply `options.innerLayout` from a compatible stream's `keyLayout`. For
+ * Supply `options.innerKeyLayout` from a compatible stream's `keyLayout`. For
  * example, comments indexed by `noteId` and pinned to a note have the same
- * layout as comments ordered by creation time. For nested joins or renamed
- * streams, reuse a compatible composed layout instead.
+ * layout as comments ordered by creation time: one visible creation-time
+ * position followed by an implicit ID. Creating the template reads no
+ * documents. For nested joins or renamed streams, apply the same composition or
+ * renaming to the template before reusing its layout.
+ *
+ * The layout is required when constructing the joined stream, before any outer
+ * document is available to pass to `f`, including when the outer stream is
+ * empty. It determines the joined key positions and the width of empty-inner
+ * markers. It contains no query results or direction.
  *
  * Every inner stream must match that layout and the outer direction. TypeScript
  * rejects known mismatches; others die with `InnerStreamOrderMismatchError` or
@@ -1185,52 +1213,54 @@ export const flatMap = dual<
   <
     Doc,
     Doc2,
-    InnerLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    InnerKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E2,
     R2,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
     Doc3 = never,
   >(
-    f: (doc: Doc) => QueryStream<Doc2, InnerLabels, Direction, E2, R2>,
+    f: (doc: Doc) => QueryStream<Doc2, InnerKeyLabels, OrderDirection, E2, R2>,
     options: {
-      readonly innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-        NoInfer<InnerLabels>
+      readonly innerKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
+        NoInfer<InnerKeyLabels>
       >;
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
-  ) => <Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
+  ) => <KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
   ) => QueryStream<
     Doc2 | Doc3,
-    QueryStreamKeyLabels.Concat<Labels, InnerLabels>,
-    Direction,
+    QueryStreamKeyLabels.Concat<KeyLabels, InnerKeyLabels>,
+    OrderDirection,
     E | E2,
     R | R2
   >,
   <
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
     Doc2,
-    InnerLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    InnerKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E2,
     R2,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
     Doc3 = never,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
-    f: (doc: Doc) => QueryStream<Doc2, InnerLabels, NoInfer<Direction>, E2, R2>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+    f: (
+      doc: Doc,
+    ) => QueryStream<Doc2, InnerKeyLabels, NoInfer<OrderDirection>, E2, R2>,
     options: {
-      readonly innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-        NoInfer<InnerLabels>
+      readonly innerKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
+        NoInfer<InnerKeyLabels>
       >;
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
   ) => QueryStream<
     Doc2 | Doc3,
-    QueryStreamKeyLabels.Concat<Labels, InnerLabels>,
-    Direction,
+    QueryStreamKeyLabels.Concat<KeyLabels, InnerKeyLabels>,
+    OrderDirection,
     E | E2,
     R | R2
   >
@@ -1238,7 +1268,7 @@ export const flatMap = dual<
   return makeFlatMap(
     self,
     f,
-    options.innerLayout,
+    options.innerKeyLayout,
     Option.fromUndefinedOr(options.onEmpty),
     { lower: Option.none(), upper: Option.none() },
   );
@@ -1250,7 +1280,7 @@ export const flatMap = dual<
  */
 interface InnerRefinement {
   readonly outerKeyValues: QueryStreamKeyValues.QueryStreamKeyValues;
-  readonly inner: ParsedBound;
+  readonly innerParsedBound: QueryStreamKeyBounds.ParsedBound;
 }
 
 interface InnerRefinements {
@@ -1259,7 +1289,7 @@ interface InnerRefinements {
 }
 
 type FlatMapBound = Data.TaggedEnum<{
-  Outer: KeyBound;
+  Outer: QueryStreamKeyBounds.KeyBound;
   Inner: InnerRefinement;
 }>;
 
@@ -1281,10 +1311,10 @@ const combineLowerRefinements = (
           ? right
           : {
               outerKeyValues: left.outerKeyValues,
-              inner: Result.getOrThrowWith(
+              innerParsedBound: Result.getOrThrowWith(
                 QueryStreamKeyBounds.tightestParsedLower(
-                  left.inner,
-                  right.inner,
+                  left.innerParsedBound,
+                  right.innerParsedBound,
                 ),
                 identity,
               ),
@@ -1309,10 +1339,10 @@ const combineUpperRefinements = (
           ? right
           : {
               outerKeyValues: left.outerKeyValues,
-              inner: Result.getOrThrowWith(
+              innerParsedBound: Result.getOrThrowWith(
                 QueryStreamKeyBounds.tightestParsedUpper(
-                  left.inner,
-                  right.inner,
+                  left.innerParsedBound,
+                  right.innerParsedBound,
                 ),
                 identity,
               ),
@@ -1323,19 +1353,19 @@ const combineUpperRefinements = (
 
 const makeFlatMap = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Doc2,
-  InnerLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  InnerKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E2,
   R2,
-  Direction extends OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   Doc3 = never,
 >(
-  self: QueryStream<Doc, Labels, Direction, E, R>,
-  f: (doc: Doc) => QueryStream<Doc2, InnerLabels, Direction, E2, R2>,
-  innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<InnerLabels>,
+  self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  f: (doc: Doc) => QueryStream<Doc2, InnerKeyLabels, OrderDirection, E2, R2>,
+  innerKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<InnerKeyLabels>,
   /**
    * What an outer document with no inner rows emits, if it is kept.
    */
@@ -1343,45 +1373,43 @@ const makeFlatMap = <
   refinements: InnerRefinements,
 ): QueryStream<
   Doc2 | Doc3,
-  QueryStreamKeyLabels.Concat<Labels, InnerLabels>,
-  Direction,
+  QueryStreamKeyLabels.Concat<KeyLabels, InnerKeyLabels>,
+  OrderDirection,
   E | E2,
   R | R2
 > => {
   const outerLength = QueryStreamKeyLayout.runtimeWidth(self.keyLayout);
-  const keyLayout = QueryStreamKeyLayout.concat(self.keyLayout, innerLayout);
+  const keyLayout = QueryStreamKeyLayout.concat(self.keyLayout, innerKeyLayout);
   // The inner key of an outer document that contributes no inner elements
   // (filtered out, or an empty inner stream).
-  const nullPadding: QueryStreamKeyValues.QueryStreamKeyValues = Array.makeBy(
-    QueryStreamKeyLayout.runtimeWidth(innerLayout),
-    () => null,
-  );
+  const emptyInnerKeyValues: QueryStreamKeyValues.QueryStreamKeyValues =
+    Array.makeBy(QueryStreamKeyLayout.runtimeWidth(innerKeyLayout), () => null);
 
   // Visible label types omit implicit IDs, and directions may be unions.
   // Validate every returned stream, including later rows and later runs.
   const validated = (
-    inner: QueryStream<Doc2, InnerLabels, Direction, E2, R2>,
-  ): QueryStream<Doc2, InnerLabels, Direction, E2, R2> => {
-    if (inner.order !== self.order) {
+    inner: QueryStream<Doc2, InnerKeyLabels, OrderDirection, E2, R2>,
+  ): QueryStream<Doc2, InnerKeyLabels, OrderDirection, E2, R2> => {
+    if (inner.orderDirection !== self.orderDirection) {
       throw new InnerStreamOrderMismatchError({
-        expected: self.order,
-        actual: inner.order,
+        expectedOrderDirection: self.orderDirection,
+        actualOrderDirection: inner.orderDirection,
       });
     }
-    if (!QueryStreamKeyLayout.Equivalence(inner.keyLayout, innerLayout)) {
+    if (!QueryStreamKeyLayout.Equivalence(inner.keyLayout, innerKeyLayout)) {
       throw new InnerStreamLayoutMismatchError({
-        expected: innerLayout,
-        actual: inner.keyLayout,
+        expectedKeyLayout: innerKeyLayout,
+        actualKeyLayout: inner.keyLayout,
       });
     }
     return inner;
   };
 
-  const innerBoundsFor = (
+  const innerParsedBoundsFor = (
     outerKeyValues: QueryStreamKeyValues.QueryStreamKeyValues,
-  ): ParsedBounds =>
+  ): QueryStreamKeyBounds.ParsedBounds =>
     Result.getOrThrowWith(
-      QueryStreamKeyBounds.fromParsed(innerLayout, {
+      QueryStreamKeyBounds.fromParsed(innerKeyLayout, {
         lower: Option.map(
           Option.filter(
             refinements.lower,
@@ -1391,7 +1419,7 @@ const makeFlatMap = <
                 refinement.outerKeyValues,
               ) === 0,
           ),
-          (refinement) => refinement.inner,
+          (refinement) => refinement.innerParsedBound,
         ),
         upper: Option.map(
           Option.filter(
@@ -1402,7 +1430,7 @@ const makeFlatMap = <
                 refinement.outerKeyValues,
               ) === 0,
           ),
-          (refinement) => refinement.inner,
+          (refinement) => refinement.innerParsedBound,
         ),
       }),
       identity,
@@ -1414,15 +1442,15 @@ const makeFlatMap = <
   // and is emitted only if that position is within the inner bounds.
   const markerStream = (
     outerKeyValues: QueryStreamKeyValues.QueryStreamKeyValues,
-    innerBounds: ParsedBounds,
+    innerParsedBounds: QueryStreamKeyBounds.ParsedBounds,
     doc: Option.Option<Doc2 | Doc3>,
   ): Stream.Stream<Element<Doc2 | Doc3>> => {
-    const { aboveLower, belowUpper } = keyPredicates(innerBounds);
-    return aboveLower(nullPadding) && belowUpper(nullPadding)
+    const { aboveLower, belowUpper } = keyPredicates(innerParsedBounds);
+    return aboveLower(emptyInnerKeyValues) && belowUpper(emptyInnerKeyValues)
       ? Stream.succeed(
           new Element({
             doc,
-            keyValues: Array.appendAll(outerKeyValues, nullPadding),
+            keyValues: Array.appendAll(outerKeyValues, emptyInnerKeyValues),
           }),
         )
       : Stream.empty;
@@ -1434,12 +1462,13 @@ const makeFlatMap = <
     R | R2 | QueryStreamReadBudget.QueryStreamReadBudget
   > = self.annotated.pipe(
     Stream.flatMap(({ doc: outerDoc, keyValues: outerKeyValues }) => {
-      const innerBounds = innerBoundsFor(outerKeyValues);
+      const innerParsedBounds = innerParsedBoundsFor(outerKeyValues);
       return Option.match(outerDoc, {
-        onNone: () => markerStream(outerKeyValues, innerBounds, Option.none()),
+        onNone: () =>
+          markerStream(outerKeyValues, innerParsedBounds, Option.none()),
         onSome: (doc) => {
           const inner = validated(f(doc));
-          return narrowByParsedBounds(inner, innerBounds).annotated.pipe(
+          return narrowByParsedBounds(inner, innerParsedBounds).annotated.pipe(
             Stream.map(
               ({ doc: innerDoc, keyValues: innerKeyValues }) =>
                 new Element({
@@ -1450,15 +1479,15 @@ const makeFlatMap = <
             Stream.orElseIfEmpty(() =>
               Stream.unwrap(
                 Effect.gen(function* () {
-                  const budget =
+                  const readBudget =
                     yield* QueryStreamReadBudget.QueryStreamReadBudget;
-                  if (yield* budget.isStopped) return Stream.empty;
+                  if (yield* readBudget.isStopped) return Stream.empty;
                   const original = yield* Option.match(
                     Option.gen(function* () {
                       yield* onEmpty;
                       return yield* Option.orElse(
-                        innerBounds.lower,
-                        () => innerBounds.upper,
+                        innerParsedBounds.lower,
+                        () => innerParsedBounds.upper,
                       );
                     }),
                     {
@@ -1467,7 +1496,7 @@ const makeFlatMap = <
                       onSome: () => Stream.runHead(inner.annotated),
                     },
                   );
-                  const isStopped = yield* budget.isStopped;
+                  const isStopped = yield* readBudget.isStopped;
                   return Option.match(original, {
                     onSome: () => Stream.empty,
                     onNone: () =>
@@ -1475,7 +1504,7 @@ const makeFlatMap = <
                         ? Stream.empty
                         : markerStream(
                             outerKeyValues,
-                            innerBounds,
+                            innerParsedBounds,
                             Option.map(onEmpty, (makeEmpty) => makeEmpty(doc)),
                           ),
                   });
@@ -1488,15 +1517,15 @@ const makeFlatMap = <
     }),
   );
 
-  const split = (bound: ParsedBound): FlatMapBound => {
+  const split = (bound: QueryStreamKeyBounds.ParsedBound): FlatMapBound => {
     const keyValues = QueryStreamKey.values(bound.key);
     const { inclusive } = bound;
     return keyValues.length <= outerLength
       ? FlatMapBound.Outer({ keyValues, inclusive })
       : FlatMapBound.Inner({
           outerKeyValues: Array.take(keyValues, outerLength),
-          inner: Result.getOrThrowWith(
-            QueryStreamKeyBounds.parseBound(innerLayout, {
+          innerParsedBound: Result.getOrThrowWith(
+            QueryStreamKeyBounds.parseBound(innerKeyLayout, {
               keyValues: Array.drop(keyValues, outerLength),
               inclusive,
             }),
@@ -1505,7 +1534,7 @@ const makeFlatMap = <
         });
   };
 
-  const outerBound = (bound: FlatMapBound): KeyBound =>
+  const outerBound = (bound: FlatMapBound): QueryStreamKeyBounds.KeyBound =>
     FlatMapBound.$match(bound, {
       Outer: ({ keyValues, inclusive }) => ({ keyValues, inclusive }),
       Inner: ({ outerKeyValues }) => ({
@@ -1515,20 +1544,20 @@ const makeFlatMap = <
     });
 
   return new QueryStream(
-    self.order,
+    self.orderDirection,
     keyLayout,
     annotated,
     undefined,
-    (bounds) => {
-      const lower = Option.map(bounds.lower, split);
-      const upper = Option.map(bounds.upper, split);
+    (parsedBounds) => {
+      const lower = Option.map(parsedBounds.lower, split);
+      const upper = Option.map(parsedBounds.upper, split);
       return makeFlatMap(
         narrowByKeyBounds(self, {
           lower: Option.map(lower, outerBound),
           upper: Option.map(upper, outerBound),
         }),
         f,
-        innerLayout,
+        innerKeyLayout,
         onEmpty,
         {
           lower: combineLowerRefinements(
@@ -1548,7 +1577,7 @@ const makeFlatMap = <
       makeFlatMap(
         reverse(self),
         (doc) => reverse(f(doc)),
-        innerLayout,
+        innerKeyLayout,
         onEmpty,
         refinements,
       ),
@@ -1582,28 +1611,28 @@ export const distinct = dual<
     prefixNames: PrefixNames,
   ) => <
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels<
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels<
       readonly [...PrefixNames, ...ReadonlyArray<string>]
     >,
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
-  ) => QueryStream<Doc, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  ) => QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
   <
     const PrefixNames extends ReadonlyArray<string>,
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels<
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels<
       readonly [...PrefixNames, ...ReadonlyArray<string>]
     >,
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
     prefixNames: PrefixNames,
-  ) => QueryStream<Doc, Labels, Direction, E, R>
+  ) => QueryStream<Doc, KeyLabels, OrderDirection, E, R>
 >(2, (self, prefixNames) => {
   // Groups are runs of equal *runtime* prefixes, so a prefix that reaches
   // past a tiebreaker (into a `flatMap` result's inner key) includes it.
@@ -1616,7 +1645,7 @@ export const distinct = dual<
       ),
       identity,
     ),
-    self.order,
+    self.orderDirection,
     QueryStreamKeyBounds.unbounded(self.keyLayout),
   );
 });
@@ -1643,37 +1672,37 @@ export const renameKey = dual<
     replacementNames: ReplacementNames,
   ) => <
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels & {
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels & {
       readonly length: ReplacementNames["length"];
     },
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
   ) => QueryStream<
     Doc,
     QueryStreamKeyLabels.QueryStreamKeyLabels<ReplacementNames>,
-    Direction,
+    OrderDirection,
     E,
     R
   >,
   <
     const ReplacementNames extends ReadonlyArray<string>,
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels & {
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels & {
       readonly length: ReplacementNames["length"];
     },
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
     replacementNames: ReplacementNames,
   ) => QueryStream<
     Doc,
     QueryStreamKeyLabels.QueryStreamKeyLabels<ReplacementNames>,
-    Direction,
+    OrderDirection,
     E,
     R
   >
@@ -1683,94 +1712,110 @@ export const renameKey = dual<
 
 const renameKeyImpl = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
-  ReplacementLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
-  Direction extends OrderDirection,
+  ReplacementKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  self: QueryStream<Doc, Labels, Direction, E, R>,
-  replacementLabels: ReplacementLabels,
-): QueryStream<Doc, ReplacementLabels, Direction, E, R> => {
+  self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  replacementKeyLabels: ReplacementKeyLabels,
+): QueryStream<Doc, ReplacementKeyLabels, OrderDirection, E, R> => {
   const keyLayout = Result.getOrThrowWith(
-    QueryStreamKeyLayout.rename(self.keyLayout, replacementLabels),
+    QueryStreamKeyLayout.rename(self.keyLayout, replacementKeyLabels),
     identity,
   );
   return new QueryStream(
-    self.order,
+    self.orderDirection,
     keyLayout,
     self.annotated,
     undefined,
     // Values keep their positions, but the parsed keys must be rebound to
     // the underlying layout's labels.
-    (bounds) =>
+    (parsedBounds) =>
       renameKeyImpl(
-        narrowByKeyBounds(self, QueryStreamKeyBounds.toBounds(bounds)),
-        replacementLabels,
+        narrowByKeyBounds(self, QueryStreamKeyBounds.toBounds(parsedBounds)),
+        replacementKeyLabels,
       ),
-    () => renameKeyImpl(reverse(self), replacementLabels),
+    () => renameKeyImpl(reverse(self), replacementKeyLabels),
   );
 };
 
 const makeDistinct = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
-  Direction extends OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  self: QueryStream<Doc, Labels, OrderDirection, E, R>,
+  self: QueryStream<
+    Doc,
+    KeyLabels,
+    QueryStreamOrderDirection.QueryStreamOrderDirection,
+    E,
+    R
+  >,
   distinctLength: number,
-  order: Direction,
-  bounds: ParsedBounds,
-): QueryStream<Doc, Labels, Direction, E, R> => {
+  orderDirection: OrderDirection,
+  parsedBounds: QueryStreamKeyBounds.ParsedBounds,
+): QueryStream<Doc, KeyLabels, OrderDirection, E, R> => {
   const afterKeyValues = (
     keyValues: QueryStreamKeyValues.QueryStreamKeyValues,
-  ): KeyBounds => {
-    const pastGroup: KeyBound = {
+  ): QueryStreamKeyBounds.KeyBounds => {
+    const pastGroup: QueryStreamKeyBounds.KeyBound = {
       keyValues,
       inclusive: false,
     };
-    return order === "asc"
+    return orderDirection === "asc"
       ? { lower: Option.some(pastGroup), upper: Option.none() }
       : { lower: Option.none(), upper: Option.some(pastGroup) };
   };
   const groupBound = (
-    bound: Option.Option<ParsedBound>,
-  ): Option.Option<KeyBound> =>
+    bound: Option.Option<QueryStreamKeyBounds.ParsedBound>,
+  ): Option.Option<QueryStreamKeyBounds.KeyBound> =>
     Option.map(bound, ({ inclusive, key }) => ({
       keyValues: Array.take(QueryStreamKey.values(key), distinctLength),
       inclusive:
         QueryStreamKey.values(key).length > distinctLength || inclusive,
     }));
-  const { aboveLower, belowUpper } = keyPredicates(bounds);
+  const { aboveLower, belowUpper } = keyPredicates(parsedBounds);
   const isAdmitted = (keyValues: QueryStreamKeyValues.QueryStreamKeyValues) =>
     aboveLower(keyValues) && belowUpper(keyValues);
   const annotated = Stream.unwrap(
-    Effect.map(QueryStreamReadBudget.QueryStreamReadBudget, (budget) =>
+    Effect.map(QueryStreamReadBudget.QueryStreamReadBudget, (readBudget) =>
       Stream.paginate(
-        narrowByKeyBounds(order === self.order ? self : reverse(self), {
-          lower: groupBound(bounds.lower),
-          upper: groupBound(bounds.upper),
-        }),
+        narrowByKeyBounds(
+          orderDirection === self.orderDirection ? self : reverse(self),
+          {
+            lower: groupBound(parsedBounds.lower),
+            upper: groupBound(parsedBounds.upper),
+          },
+        ),
         (
-          current: QueryStream<Doc, Labels, OrderDirection, E, R>,
+          current: QueryStream<
+            Doc,
+            KeyLabels,
+            QueryStreamOrderDirection.QueryStreamOrderDirection,
+            E,
+            R
+          >,
         ): Effect.Effect<
           readonly [ReadonlyArray<Element<Doc>>, Option.Option<typeof current>],
           E,
           R | QueryStreamReadBudget.QueryStreamReadBudget
         > =>
           Effect.gen(function* () {
-            if (yield* budget.isStopped) return Tuple.make([], Option.none());
+            if (yield* readBudget.isStopped)
+              return Tuple.make([], Option.none());
             const discovered = yield* Stream.runHead(current.annotated);
             if (Option.isNone(discovered)) return Tuple.make([], Option.none());
             const element = discovered.value;
             const { doc, keyValues } = element;
-            const prefix = Array.take(keyValues, distinctLength);
-            if (order === self.order) {
+            const prefixKeyValues = Array.take(keyValues, distinctLength);
+            if (orderDirection === self.orderDirection) {
               const nextKeyValues = Option.match(doc, {
                 onNone: () => keyValues,
-                onSome: () => prefix,
+                onSome: () => prefixKeyValues,
               });
               return Tuple.make(
                 isAdmitted(keyValues) ? [element] : [],
@@ -1780,13 +1825,19 @@ const makeDistinct = <
               );
             }
             const next = Option.some(
-              narrowByKeyBounds(current, afterKeyValues(prefix)),
+              narrowByKeyBounds(current, afterKeyValues(prefixKeyValues)),
             );
             const { firstKeyValues, selected } = yield* narrowByKeyBounds(
               self,
               {
-                lower: Option.some({ keyValues: prefix, inclusive: true }),
-                upper: Option.some({ keyValues: prefix, inclusive: true }),
+                lower: Option.some({
+                  keyValues: prefixKeyValues,
+                  inclusive: true,
+                }),
+                upper: Option.some({
+                  keyValues: prefixKeyValues,
+                  inclusive: true,
+                }),
               },
             ).annotated.pipe(
               Stream.run(
@@ -1814,17 +1865,18 @@ const makeDistinct = <
                 next,
               );
             }
-            if (yield* budget.isStopped) return Tuple.make([], Option.none());
-            const checkpoint = Option.getOrElse(
+            if (yield* readBudget.isStopped)
+              return Tuple.make([], Option.none());
+            const checkpointKeyValues = Option.getOrElse(
               firstKeyValues,
               () => keyValues,
             );
             return Tuple.make(
-              isAdmitted(checkpoint)
+              isAdmitted(checkpointKeyValues)
                 ? [
                     new Element({
                       doc: Option.none<Doc>(),
-                      keyValues: checkpoint,
+                      keyValues: checkpointKeyValues,
                     }),
                   ]
                 : [],
@@ -1836,17 +1888,17 @@ const makeDistinct = <
   );
 
   return new QueryStream(
-    order,
+    orderDirection,
     self.keyLayout,
     annotated,
     undefined,
-    (keyBounds) =>
+    (incomingParsedBounds) =>
       makeDistinct(
         self,
         distinctLength,
-        order,
+        orderDirection,
         Result.getOrThrowWith(
-          QueryStreamKeyBounds.intersect(bounds, keyBounds),
+          QueryStreamKeyBounds.intersect(parsedBounds, incomingParsedBounds),
           identity,
         ),
       ),
@@ -1854,8 +1906,8 @@ const makeDistinct = <
       makeDistinct(
         self,
         distinctLength,
-        QueryStreamOrderDirection.flip(order),
-        bounds,
+        QueryStreamOrderDirection.flip(orderDirection),
+        parsedBounds,
       ),
   );
 };
@@ -1881,13 +1933,19 @@ const makeDistinct = <
  */
 export const reverse = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
-  Direction extends OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  self: QueryStream<Doc, Labels, Direction, E, R>,
-): QueryStream<Doc, Labels, Flip<Direction>, E, R> => {
+  self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+): QueryStream<
+  Doc,
+  KeyLabels,
+  QueryStreamOrderDirection.Flip<OrderDirection>,
+  E,
+  R
+> => {
   if (self.reverseWith === undefined) {
     throw new MissingReversalRecipeError();
   }
@@ -1924,44 +1982,44 @@ export const reverse = <
  */
 export const narrow = dual<
   (
-    bounds: NarrowBounds,
+    narrowBounds: QueryStreamKeyBounds.NarrowBounds,
   ) => <
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
-  ) => QueryStream<Doc, Labels, Direction, E, R>,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  ) => QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
   <
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
-    bounds: NarrowBounds,
-  ) => QueryStream<Doc, Labels, Direction, E, R>
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+    narrowBounds: QueryStreamKeyBounds.NarrowBounds,
+  ) => QueryStream<Doc, KeyLabels, OrderDirection, E, R>
 >(
   2,
   <
     Doc,
-    Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
     E,
     R,
-    Direction extends OrderDirection,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
-    self: QueryStream<Doc, Labels, Direction, E, R>,
-    bounds: NarrowBounds,
+    self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+    narrowBounds: QueryStreamKeyBounds.NarrowBounds,
   ) => {
-    const start = Option.fromUndefinedOr(bounds.start);
-    const end = Option.fromUndefinedOr(bounds.end);
+    const start = Option.fromUndefinedOr(narrowBounds.start);
+    const end = Option.fromUndefinedOr(narrowBounds.end);
     // Stream space → ascending key space: for `desc`, "start" bounds from
     // above and "end" from below. Inclusion stays attached to its key.
-    const keyBounds: KeyBounds =
-      self.order === "asc"
+    const keyBounds: QueryStreamKeyBounds.KeyBounds =
+      self.orderDirection === "asc"
         ? { lower: start, upper: end }
         : { lower: end, upper: start };
     return narrowByKeyBounds(self, keyBounds);
@@ -1970,62 +2028,63 @@ export const narrow = dual<
 
 const narrowByKeyBounds = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
-  Direction extends OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  self: QueryStream<Doc, Labels, Direction, E, R>,
-  bounds: KeyBounds,
-): QueryStream<Doc, Labels, Direction, E, R> => {
-  const parsed = Result.getOrThrowWith(
-    QueryStreamKeyBounds.parse(self.keyLayout, bounds),
+  self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  keyBounds: QueryStreamKeyBounds.KeyBounds,
+): QueryStream<Doc, KeyLabels, OrderDirection, E, R> => {
+  const parsedBounds = Result.getOrThrowWith(
+    QueryStreamKeyBounds.parse(self.keyLayout, keyBounds),
     identity,
   );
-  return narrowByParsedBounds(self, parsed);
+  return narrowByParsedBounds(self, parsedBounds);
 };
 
 // Internal recipes share parsed bounds until their layout or coordinates change.
 const narrowByParsedBounds = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
-  Direction extends OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  self: QueryStream<Doc, Labels, Direction, E, R>,
-  bounds: ParsedBounds,
-): QueryStream<Doc, Labels, Direction, E, R> => {
-  const unbounded = Option.isNone(bounds.lower) && Option.isNone(bounds.upper);
+  self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  parsedBounds: QueryStreamKeyBounds.ParsedBounds,
+): QueryStream<Doc, KeyLabels, OrderDirection, E, R> => {
+  const unbounded =
+    Option.isNone(parsedBounds.lower) && Option.isNone(parsedBounds.upper);
   if (!unbounded && self.narrowWith !== undefined)
-    return self.narrowWith(bounds);
+    return self.narrowWith(parsedBounds);
   // Recipe calls check their layout in the constructor's wrapper. No-op and
   // in-memory narrowing need the same check even without a recipe call.
   Result.getOrThrowWith(
-    QueryStreamKeyBounds.forLayout(self.keyLayout, bounds),
+    QueryStreamKeyBounds.forLayout(self.keyLayout, parsedBounds),
     identity,
   );
-  return unbounded ? self : narrowInMemory(self, bounds);
+  return unbounded ? self : narrowInMemory(self, parsedBounds);
 };
 
 /**
  * The fallback for streams that don't know how to rebuild themselves.
  */
-const keyPredicates = (bounds: ParsedBounds) => {
+const keyPredicates = (parsedBounds: QueryStreamKeyBounds.ParsedBounds) => {
   const complete = (keyValues: QueryStreamKeyValues.QueryStreamKeyValues) =>
     Result.getOrThrowWith(
-      QueryStreamKey.complete(bounds.layout, keyValues),
+      QueryStreamKey.complete(parsedBounds.keyLayout, keyValues),
       identity,
     );
   return {
     aboveLower: (keyValues: QueryStreamKeyValues.QueryStreamKeyValues) =>
       Result.getOrThrowWith(
-        QueryStreamKeyBounds.admittedByLower(bounds)(complete(keyValues)),
+        QueryStreamKeyBounds.admittedByLower(parsedBounds)(complete(keyValues)),
         identity,
       ),
     belowUpper: (keyValues: QueryStreamKeyValues.QueryStreamKeyValues) =>
       Result.getOrThrowWith(
-        QueryStreamKeyBounds.admittedByUpper(bounds)(complete(keyValues)),
+        QueryStreamKeyBounds.admittedByUpper(parsedBounds)(complete(keyValues)),
         identity,
       ),
   };
@@ -2033,14 +2092,14 @@ const keyPredicates = (bounds: ParsedBounds) => {
 
 const narrowInMemory = <
   Doc,
-  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
-  Direction extends OrderDirection,
+  OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  self: QueryStream<Doc, Labels, Direction, E, R>,
-  bounds: ParsedBounds,
-): QueryStream<Doc, Labels, Direction, E, R> => {
+  self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
+  parsedBounds: QueryStreamKeyBounds.ParsedBounds,
+): QueryStream<Doc, KeyLabels, OrderDirection, E, R> => {
   type Narrower = (
     annotated: Stream.Stream<
       Element<Doc>,
@@ -2053,26 +2112,26 @@ const narrowInMemory = <
     R | QueryStreamReadBudget.QueryStreamReadBudget
   >;
 
-  const { aboveLower, belowUpper } = keyPredicates(bounds);
+  const { aboveLower, belowUpper } = keyPredicates(parsedBounds);
 
   const dropOutOfRange: Narrower =
-    self.order === "asc"
+    self.orderDirection === "asc"
       ? Stream.dropWhile(({ keyValues }) => !aboveLower(keyValues))
       : Stream.dropWhile(({ keyValues }) => !belowUpper(keyValues));
   const takeInRange: Narrower =
-    self.order === "asc"
+    self.orderDirection === "asc"
       ? Stream.takeWhile(({ keyValues }) => belowUpper(keyValues))
       : Stream.takeWhile(({ keyValues }) => aboveLower(keyValues));
 
   return new QueryStream(
-    self.order,
+    self.orderDirection,
     self.keyLayout,
     pipe(self.annotated, dropOutOfRange, takeInRange),
     undefined,
     undefined,
     self.reverseWith === undefined
       ? undefined
-      : () => narrowInMemory(reverse(self), bounds),
+      : () => narrowInMemory(reverse(self), parsedBounds),
   );
 };
 
@@ -2105,8 +2164,14 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
  * @experimental
  */
 export const unique = Effect.fn("QueryStream.unique")(
-  <Doc, Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
-    self: QueryStream<Doc, Labels, OrderDirection, E, R>,
+  <Doc, KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
+    self: QueryStream<
+      Doc,
+      KeyLabels,
+      QueryStreamOrderDirection.QueryStreamOrderDirection,
+      E,
+      R
+    >,
   ): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
     self.pipe(
       Stream.take(2),
@@ -2212,11 +2277,23 @@ export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
 export const paginate: {
   (
     options: PaginateOptions,
-  ): <Doc, Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
-    self: QueryStream<Doc, Labels, OrderDirection, E, R>,
+  ): <Doc, KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
+    self: QueryStream<
+      Doc,
+      KeyLabels,
+      QueryStreamOrderDirection.QueryStreamOrderDirection,
+      E,
+      R
+    >,
   ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
-  <Doc, Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
-    self: QueryStream<Doc, Labels, OrderDirection, E, R>,
+  <Doc, KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
+    self: QueryStream<
+      Doc,
+      KeyLabels,
+      QueryStreamOrderDirection.QueryStreamOrderDirection,
+      E,
+      R
+    >,
     options: PaginateOptions,
   ): Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
 } = dual(
@@ -2224,12 +2301,13 @@ export const paginate: {
   Effect.fn("QueryStream.paginate")(
     function* <
       Doc,
-      Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+      KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
       E,
       R,
-      Direction extends OrderDirection,
+      OrderDirection extends
+        QueryStreamOrderDirection.QueryStreamOrderDirection,
     >(
-      self: QueryStream<Doc, Labels, Direction, E, R>,
+      self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
       options: PaginateOptions,
     ) {
       const cursorSchema = QueryStreamCursor.fromKeyLayout(self.keyLayout);
@@ -2290,8 +2368,8 @@ export const paginate: {
         inclusive: false,
       }));
       const end = QueryStreamPagination.Range.$match(request.range, {
-        Unpinned: () => Option.none<ParsedBound>(),
-        ThroughEnd: () => Option.none<ParsedBound>(),
+        Unpinned: () => Option.none<QueryStreamKeyBounds.ParsedBound>(),
+        ThroughEnd: () => Option.none<QueryStreamKeyBounds.ParsedBound>(),
         ThroughKey: ({ key }) =>
           Option.some({
             key: QueryStreamKey.toPrefix(key),
@@ -2303,21 +2381,21 @@ export const paginate: {
         Result.getOrThrowWith(
           QueryStreamKeyBounds.fromParsed(
             self.keyLayout,
-            self.order === "asc"
+            self.orderDirection === "asc"
               ? { lower: start, upper: end }
               : { lower: end, upper: start },
           ),
           identity,
         ),
       );
-      const budget = yield* QueryStreamReadBudget.QueryStreamReadBudget;
+      const readBudget = yield* QueryStreamReadBudget.QueryStreamReadBudget;
       const collected = yield* Stream.run(
         narrowed.annotated,
         Sink.fold(
           () => QueryStreamPagination.initial<Doc>(),
           (state) => state._tag === "Reading",
           (state, { doc, keyValues }: Element<Doc>) =>
-            Effect.map(budget.isExhausted, (hitLimit) =>
+            Effect.map(readBudget.isExhausted, (hitLimit) =>
               QueryStreamPagination.record(
                 request,
                 state,
@@ -2328,10 +2406,10 @@ export const paginate: {
             ),
         ),
       );
-      const stopped = yield* budget.isStopped;
+      const stopped = yield* readBudget.isStopped;
       const outcome = QueryStreamPagination.finish(request, collected, stopped);
       if (Result.isFailure(outcome)) {
-        const counts = yield* budget.getReadCounts;
+        const counts = yield* readBudget.getReadCounts;
         return yield* new ReadBudgetExceededError(counts);
       }
       const encode = (key: QueryStreamKey.Complete) =>

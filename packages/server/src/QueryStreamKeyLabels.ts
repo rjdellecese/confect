@@ -16,11 +16,11 @@ export type QueryStreamKeyLabels<
 // Defer extraction and concatenation until both label types are known to avoid
 // expanding unresolved tuple types while checking generic stream operations.
 export type Concat<
-  Left extends QueryStreamKeyLabels,
-  Right extends QueryStreamKeyLabels,
+  LeftKeyLabels extends QueryStreamKeyLabels,
+  RightKeyLabels extends QueryStreamKeyLabels,
 > =
-  Left extends QueryStreamKeyLabels<infer LeftNames>
-    ? Right extends QueryStreamKeyLabels<infer RightNames>
+  LeftKeyLabels extends QueryStreamKeyLabels<infer LeftNames>
+    ? RightKeyLabels extends QueryStreamKeyLabels<infer RightNames>
       ? QueryStreamKeyLabels<readonly [...LeftNames, ...RightNames]>
       : never
     : never;
@@ -47,7 +47,7 @@ export function make(names: ReadonlyArray<string>): QueryStreamKeyLabels {
  */
 export const hasPrefix = (
   self: QueryStreamKeyLabels,
-  prefix: QueryStreamKeyLabels,
+  prefixKeyLabels: QueryStreamKeyLabels,
 ): boolean =>
-  prefix.length <= self.length &&
-  prefix.every((label, index) => label === self[index]);
+  prefixKeyLabels.length <= self.length &&
+  prefixKeyLabels.every((label, index) => label === self[index]);

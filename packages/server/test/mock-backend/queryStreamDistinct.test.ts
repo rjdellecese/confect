@@ -66,7 +66,7 @@ const observeUpstreamEnd = <
   onEnd: Effect.Effect<void>,
 ): QueryStream.QueryStream<Doc, Labels, Direction, E, R> =>
   new QueryStream.QueryStream(
-    stream.order,
+    stream.orderDirection,
     stream.keyLayout,
     stream.annotated.pipe(
       Stream.concat(Stream.fromEffect(onEnd).pipe(Stream.drain)),
@@ -451,7 +451,7 @@ describe("QueryStream distinct representatives", () => {
                     )
                     .pipe(QueryStream.distinct(["text"])),
                 {
-                  innerLayout: Result.getOrThrowWith(
+                  innerKeyLayout: Result.getOrThrowWith(
                     QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
                     identity,
                   ),
@@ -493,7 +493,7 @@ describe("QueryStream distinct representatives", () => {
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", row.tag ?? "")),
                 {
-                  innerLayout: Result.getOrThrowWith(
+                  innerKeyLayout: Result.getOrThrowWith(
                     QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                     identity,
                   ),
@@ -982,7 +982,7 @@ describe("QueryStream distinct read budgets", () => {
                     )
                     .pipe(QueryStream.distinct(["text"])),
                 {
-                  innerLayout: Result.getOrThrowWith(
+                  innerKeyLayout: Result.getOrThrowWith(
                     QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
                     identity,
                   ),

@@ -47,10 +47,10 @@ export const END_CURSOR = "[]";
  * @experimental
  */
 export const fromKeyLayout = (
-  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
 ) => {
   const runtimeLabels = Array.map(
-    QueryStreamKeyLayout.positions(layout),
+    QueryStreamKeyLayout.positions(keyLayout),
     positionRuntimeLabel,
   );
   return Schema.fromJsonString(QueryStreamCursor)
@@ -65,14 +65,14 @@ export const fromKeyLayout = (
       Schema.decodeTo(
         Schema.declare(QueryStreamKey.isComplete).check(
           Schema.makeFilter(
-            (key) => QueryStreamKeyLayout.Equivalence(key.layout, layout),
+            (key) => QueryStreamKeyLayout.Equivalence(key.layout, keyLayout),
             { message: "Cursor key does not belong to the stream layout" },
           ),
         ),
         {
           decode: SchemaGetter.transformEffect((cursor, options) =>
             Effect.fromResult(
-              QueryStreamKey.complete(layout, cursor.keyValues),
+              QueryStreamKey.complete(keyLayout, cursor.keyValues),
             ).pipe(
               Effect.mapError(
                 (error) =>

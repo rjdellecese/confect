@@ -12,7 +12,7 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
-import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
+import type * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
 
 const UNDEFINED_SENTINEL = { $undefined: true } as const;
 const KeyValue = Schema.Json.pipe(
@@ -89,7 +89,7 @@ const DescendingOrder = Order_.flip(AscendingOrder);
  * @experimental
  */
 export const Order = (
-  orderDirection: OrderDirection,
+  orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
 ): Order_.Order<QueryStreamKeyValues> =>
   orderDirection === "asc" ? AscendingOrder : DescendingOrder;
 

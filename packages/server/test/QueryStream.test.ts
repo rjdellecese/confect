@@ -36,7 +36,7 @@ describe("QueryStream type parameters", () => {
       Stream.empty,
     );
 
-    expect(source.order).toBe("desc");
+    expect(source.orderDirection).toBe("desc");
     expectTypeOf(source.toStream()).toEqualTypeOf<Stream.Stream<number>>();
     expectTypeOf(source.annotated).toEqualTypeOf<
       Stream.Stream<
@@ -84,7 +84,7 @@ describe("QueryStream type parameters", () => {
       { readonly service: "query" }
     >;
 
-    expectTypeOf<Source["order"]>().toEqualTypeOf<"asc">();
+    expectTypeOf<Source["orderDirection"]>().toEqualTypeOf<"asc">();
     expectTypeOf<ReturnType<Source["toStream"]>>().toEqualTypeOf<
       Stream.Stream<number, Error, { readonly service: "query" }>
     >();
@@ -201,7 +201,7 @@ describe("QueryStream key layouts", () => {
             QueryStream.empty<string>()(
               row === 1 ? explicitFirst : implicitFirst,
             ),
-          { innerLayout: explicitFirst },
+          { innerKeyLayout: explicitFirst },
         );
         const defect = yield* Stream.runCollect(joined).pipe(
           Effect.catchDefect(Effect.succeed),
@@ -211,8 +211,8 @@ describe("QueryStream key layouts", () => {
         );
         expect(defect).toMatchObject({
           _tag: "InnerStreamLayoutMismatchError",
-          expected: explicitFirst,
-          actual: implicitFirst,
+          expectedKeyLayout: explicitFirst,
+          actualKeyLayout: implicitFirst,
         });
       }),
   );
@@ -230,7 +230,7 @@ describe("QueryStream key layouts", () => {
       const joined = QueryStream.flatMap(
         outer,
         () => QueryStream.empty<string>()(layout),
-        { innerLayout: explicitFirst },
+        { innerKeyLayout: explicitFirst },
       );
       expect(yield* Stream.runCollect(joined)).toEqual([]);
       layout = implicitFirst;
@@ -239,8 +239,8 @@ describe("QueryStream key layouts", () => {
       );
       expect(defect).toMatchObject({
         _tag: "InnerStreamLayoutMismatchError",
-        expected: explicitFirst,
-        actual: implicitFirst,
+        expectedKeyLayout: explicitFirst,
+        actualKeyLayout: implicitFirst,
       });
     }),
   );
@@ -275,15 +275,15 @@ describe("QueryStream key layouts", () => {
           outer,
           (row) =>
             QueryStream.empty<string>()(layout, row === "asc" ? "asc" : "desc"),
-          { innerLayout: layout },
+          { innerKeyLayout: layout },
         );
         const defect = yield* Stream.runCollect(joined).pipe(
           Effect.catchDefect(Effect.succeed),
         );
         expect(defect).toMatchObject({
           _tag: "InnerStreamOrderMismatchError",
-          expected: "asc",
-          actual: "desc",
+          expectedOrderDirection: "asc",
+          actualOrderDirection: "desc",
         });
       }),
   );
@@ -675,7 +675,7 @@ describe("QueryStream.narrow", () => {
       const narrowed = QueryStream.narrow(merged, { start, end });
 
       expect(narrowed.keyLayout).toBe(layout);
-      expect(narrowed.order).toBe(order);
+      expect(narrowed.orderDirection).toBe(order);
       expect(received).toHaveLength(2);
       const [first, second] = received;
       expect(first).toBe(second);

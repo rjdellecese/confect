@@ -608,11 +608,11 @@ describe("QueryStream", () => {
           // The narrowed stream is a rebuilt *leaf*—not an in-memory
           // fallback—whose lower bound is the pinned prefix plus the
           // cursor key, exclusive.
-          expect(narrowed.reflection?.bounds?.lower).toEqual({
+          expect(narrowed.reflection?.indexBounds?.lower).toEqual({
             keyValues: ["b", ...afterKeyValues],
             inclusive: false,
           });
-          expect(narrowed.reflection?.bounds?.upper).toEqual({
+          expect(narrowed.reflection?.indexBounds?.upper).toEqual({
             keyValues: ["b"],
             inclusive: true,
           });
@@ -713,7 +713,7 @@ describe("QueryStream", () => {
                 endInclusive ? 6 : 4,
               );
               const narrowed = QueryStream.narrow(leaf, bounds);
-              expect(narrowed.reflection?.bounds).toEqual({
+              expect(narrowed.reflection?.indexBounds).toEqual({
                 lower: order === "asc" ? start : end,
                 upper: order === "asc" ? end : start,
               });
@@ -725,7 +725,7 @@ describe("QueryStream", () => {
                 >,
                 typeof order,
                 Stream.Error<typeof leaf>
-              >(leaf.order, leaf.keyLayout, leaf.annotated);
+              >(leaf.orderDirection, leaf.keyLayout, leaf.annotated);
               const composed = QueryStream.merge([
                 reader
                   .table("notes")
@@ -895,7 +895,7 @@ describe("QueryStream", () => {
                           order,
                         ),
                     {
-                      innerLayout: Result.getOrThrowWith(
+                      innerKeyLayout: Result.getOrThrowWith(
                         QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                         identity,
                       ),
@@ -1048,7 +1048,7 @@ describe("QueryStream", () => {
                   .table("notes")
                   .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
               {
-                innerLayout: Result.getOrThrowWith(
+                innerKeyLayout: Result.getOrThrowWith(
                   QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                   identity,
                 ),
@@ -1074,7 +1074,7 @@ describe("QueryStream", () => {
                   .table("notes")
                   .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
               {
-                innerLayout: Result.getOrThrowWith(
+                innerKeyLayout: Result.getOrThrowWith(
                   QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                   identity,
                 ),
@@ -1124,7 +1124,7 @@ describe("QueryStream", () => {
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
                 {
-                  innerLayout: Result.getOrThrowWith(
+                  innerKeyLayout: Result.getOrThrowWith(
                     QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                     identity,
                   ),
@@ -1179,7 +1179,7 @@ describe("QueryStream", () => {
             // steps past it like any element.
             const joined = outer.pipe(
               QueryStream.flatMap(inner, {
-                innerLayout: Result.getOrThrowWith(
+                innerKeyLayout: Result.getOrThrowWith(
                   QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                   identity,
                 ),
@@ -1199,7 +1199,7 @@ describe("QueryStream", () => {
             const withoutX0 = outer.pipe(
               QueryStream.filter((note) => note.text !== "x0"),
               QueryStream.flatMap(inner, {
-                innerLayout: Result.getOrThrowWith(
+                innerKeyLayout: Result.getOrThrowWith(
                   QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                   identity,
                 ),
@@ -1321,7 +1321,7 @@ describe("QueryStream", () => {
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
                 {
-                  innerLayout: Result.getOrThrowWith(
+                  innerKeyLayout: Result.getOrThrowWith(
                     QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                     identity,
                   ),
@@ -1538,7 +1538,7 @@ describe("QueryStream", () => {
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
                 {
-                  innerLayout: Result.getOrThrowWith(
+                  innerKeyLayout: Result.getOrThrowWith(
                     QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                     identity,
                   ),
@@ -1615,10 +1615,10 @@ describe("QueryStream", () => {
             reader.table("notes").stream("by_text", (q) => q.eq("text", text));
           const leaf = scan("leaf");
           const inner = QueryStream.flatMap(scan("middle"), () => leaf, {
-            innerLayout: leaf.keyLayout,
+            innerKeyLayout: leaf.keyLayout,
           });
           const joined = QueryStream.flatMap(scan("outer"), () => inner, {
-            innerLayout: inner.keyLayout,
+            innerKeyLayout: inner.keyLayout,
           });
           expect(QueryStreamKeyLayout.positions(joined.keyLayout)).toEqual([
             { _tag: "Visible", label: "_creationTime" },
@@ -1667,7 +1667,7 @@ describe("QueryStream", () => {
               .stream("by_id", (q) => q.eq("_id", id));
             const outer = reader.table("notes").stream("by_creation_time");
             const joined = QueryStream.flatMap(outer, () => pinned, {
-              innerLayout: pinned.keyLayout,
+              innerKeyLayout: pinned.keyLayout,
             });
             expect(QueryStreamKeyLayout.positions(joined.keyLayout)).toEqual(
               QueryStreamKeyLayout.positions(outer.keyLayout),
@@ -1683,16 +1683,16 @@ describe("QueryStream", () => {
                 QueryStream.merge([pinned, zeroEmpty]).keyLayout,
               ),
             ).toEqual([]);
-            const innerLayout = QueryStreamKeyLayout.concat(
+            const innerKeyLayout = QueryStreamKeyLayout.concat(
               outer.keyLayout,
               outer.keyLayout,
             );
             const compositeEmpty =
-              QueryStream.empty<Stream.Success<typeof outer>>()(innerLayout);
+              QueryStream.empty<Stream.Success<typeof outer>>()(innerKeyLayout);
             const placeholders = QueryStream.flatMap(
               outer,
               () => compositeEmpty,
-              { innerLayout, onEmpty: (doc) => doc },
+              { innerKeyLayout, onEmpty: (doc) => doc },
             );
             const annotated = yield* Stream.runCollect(
               placeholders.annotated,
@@ -2098,7 +2098,7 @@ describe("QueryStream types", () => {
 
       // flatMap concatenates visible labels at the type level.
       const joined = QueryStream.flatMap(bounded, (_note) => pinned, {
-        innerLayout: Result.getOrThrowWith(
+        innerKeyLayout: Result.getOrThrowWith(
           QueryStreamKeyLayout.fromIndex(["_creationTime"]),
           identity,
         ),
@@ -2114,8 +2114,8 @@ describe("QueryStream types", () => {
       >();
 
       const joinedMismatched = QueryStream.flatMap(bounded, (_note) => pinned, {
-        // @ts-expect-error—innerLayout must match the inner stream's visible labels.
-        innerLayout: Result.getOrThrowWith(
+        // @ts-expect-error—innerKeyLayout must match the inner stream's visible labels.
+        innerKeyLayout: Result.getOrThrowWith(
           QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
           identity,
         ),
@@ -2179,7 +2179,7 @@ describe("QueryStream types", () => {
 
       // With onEmpty, the elements are the inner documents or the placeholder.
       const withPlaceholder = QueryStream.flatMap(bounded, (_note) => pinned, {
-        innerLayout: Result.getOrThrowWith(
+        innerKeyLayout: Result.getOrThrowWith(
           QueryStreamKeyLayout.fromIndex(["_creationTime"]),
           identity,
         ),
@@ -2253,7 +2253,7 @@ describe("QueryStream types", () => {
         // @ts-expect-error—inner streams must run in the outer direction.
         (_note) => descending,
         {
-          innerLayout: Result.getOrThrowWith(
+          innerKeyLayout: Result.getOrThrowWith(
             QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
             identity,
           ),
@@ -2264,7 +2264,7 @@ describe("QueryStream types", () => {
       // runtime-chosen inner direction widens the join's.
       const dynamicInnerJoin = bounded.pipe(
         QueryStream.flatMap((_note) => dynamic, {
-          innerLayout: Result.getOrThrowWith(
+          innerKeyLayout: Result.getOrThrowWith(
             QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
             identity,
           ),

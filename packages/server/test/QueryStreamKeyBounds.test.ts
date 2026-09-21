@@ -60,7 +60,7 @@ describe("QueryStreamKeyBounds", () => {
 
   it("retains a layout even when both endpoints are absent", () => {
     const empty = QueryStreamKeyBounds.unbounded(layout);
-    expect(empty.layout).toBe(layout);
+    expect(empty.keyLayout).toBe(layout);
     expect(empty.lower).toEqual(Option.none());
     expect(empty.upper).toEqual(Option.none());
     expectTypeOf<{
@@ -97,8 +97,8 @@ describe("QueryStreamKeyBounds", () => {
     ) => {
       const error = Result.getOrThrow(Result.flip(result));
       expect(error).toBeInstanceOf(Layout.KeyLayoutMismatchError);
-      expect(error.expected).toBe(layout);
-      expect(error.actual).toBe(actual);
+      expect(error.expectedKeyLayout).toBe(layout);
+      expect(error.actualKeyLayout).toBe(actual);
     };
     const key = Result.getOrThrow(
       Key.complete(
@@ -161,7 +161,7 @@ describe("QueryStreamKeyBounds", () => {
         other,
       ),
     );
-    expect(combined.layout).toBe(equivalent);
+    expect(combined.keyLayout).toBe(equivalent);
     expect(Option.getOrThrow(combined.lower)).toBe(endpoint);
     expect(
       Result.getOrThrow(

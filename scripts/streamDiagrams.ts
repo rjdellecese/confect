@@ -187,7 +187,7 @@ export const diagrams: Readonly<Record<string, string>> = {
     track("of n4", ["c3"], "┤", 2),
     track("of n5", [], "┤", 3),
     "",
-    op("flatMap((note) => commentsOn(note), { innerLayout })"),
+    op("flatMap((note) => commentsOn(note), { innerKeyLayout })"),
     "",
     track("joined", ["c1", "c2", "c3", "(n5)"]),
     keys(["[1,7]", "[1,8]", "[4,9]", "[5,null]"]),
@@ -200,7 +200,7 @@ export const diagrams: Readonly<Record<string, string>> = {
     track("of n4", ["c3"], "┤", 2),
     track("of n5", [], "┤", 3),
     "",
-    op("flatMap((note) => commentsOn(note), { innerLayout, onEmpty })"),
+    op("flatMap((note) => commentsOn(note), { innerKeyLayout, onEmpty })"),
     "",
     track("joined", ["c1", "c2", "c3", "∅n5"]),
     keys(["[1,7]", "[1,8]", "[4,9]", "[5,null]"]),
@@ -225,12 +225,12 @@ export const diagrams: Readonly<Record<string, string>> = {
 
   "rename-key": lines(
     track("by_body", ["c1", "c2", "c3"]),
-    `${keys(["[great,7]", "[meh,8]", "[nice,9]"])}   key: [body, _creationTime]`,
+    `${keys(["[great,7]", "[meh,8]", "[nice,9]"])}   labels: [body, _creationTime]`,
     "",
     op('renameKey(["text", "_creationTime"])'),
     "",
     track("relabeled", ["c1", "c2", "c3"]),
-    `${keys(["[great,7]", "[meh,8]", "[nice,9]"])}   key: [text, _creationTime]`,
+    `${keys(["[great,7]", "[meh,8]", "[nice,9]"])}   labels: [text, _creationTime]`,
   ),
 
   "rename-key-merge": lines(

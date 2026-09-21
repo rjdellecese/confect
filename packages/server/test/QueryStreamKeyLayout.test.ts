@@ -215,8 +215,11 @@ describe("QueryStreamKeyLayout", () => {
       ["text", "_id"],
       ["text", "created", "extra"],
     ]) {
-      const prefixLabels = QueryStreamKeyLabels.make(invalid);
-      const result = QueryStreamKeyLayout.resolvePrefix(layout, prefixLabels);
+      const prefixKeyLabels = QueryStreamKeyLabels.make(invalid);
+      const result = QueryStreamKeyLayout.resolvePrefix(
+        layout,
+        prefixKeyLabels,
+      );
       expectTypeOf(result).toEqualTypeOf<
         Result.Result<number, QueryStreamKeyLayout.InvalidLabelPrefixError>
       >();
@@ -226,8 +229,8 @@ describe("QueryStreamKeyLayout", () => {
       );
       expect(error).toMatchObject({
         _tag: "InvalidLabelPrefixError",
-        labels: QueryStreamKeyLayout.visibleLabels(layout),
-        prefixLabels,
+        keyLabels: QueryStreamKeyLayout.visibleLabels(layout),
+        prefixKeyLabels,
       });
     }
     const zero = Result.getOrThrowWith(
@@ -310,8 +313,8 @@ describe("QueryStreamKeyLayout", () => {
     expect(mismatch).toBeInstanceOf(
       QueryStreamKeyLayout.KeyLayoutMismatchError,
     );
-    expect(mismatch.expected).toBe(single);
-    expect(mismatch.actual).toBe(explicit);
+    expect(mismatch.expectedKeyLayout).toBe(single);
+    expect(mismatch.actualKeyLayout).toBe(explicit);
     expect(mismatch.message).toContain(QueryStreamKeyLayout.format(single));
     expect(mismatch.message).toContain(QueryStreamKeyLayout.format(explicit));
     expect(
@@ -385,8 +388,8 @@ describe("QueryStreamKeyLayout", () => {
     );
     expect(QueryStreamKeyLayout.runtimeWidth(renamed)).toBe(5);
     for (const incomplete of [[], ["a"], ["a", "b"], ["a", "b", "c", "d"]]) {
-      const replacementLabels = QueryStreamKeyLabels.make(incomplete);
-      const result = QueryStreamKeyLayout.rename(layout, replacementLabels);
+      const replacementKeyLabels = QueryStreamKeyLabels.make(incomplete);
+      const result = QueryStreamKeyLayout.rename(layout, replacementKeyLabels);
       expectTypeOf(result).toEqualTypeOf<
         Result.Result<
           QueryStreamKeyLayout.QueryStreamKeyLayout<
@@ -401,8 +404,8 @@ describe("QueryStreamKeyLayout", () => {
       );
       expect(error).toMatchObject({
         _tag: "LabelCountMismatchError",
-        labels: QueryStreamKeyLayout.visibleLabels(layout),
-        replacementLabels,
+        keyLabels: QueryStreamKeyLayout.visibleLabels(layout),
+        replacementKeyLabels,
       });
     }
   });

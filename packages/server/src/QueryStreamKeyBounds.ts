@@ -62,31 +62,31 @@ const cutRank = KeyCut.$match({
   Successor: () => 2,
 });
 
-const cutValues = KeyCut.$match({
+const cutKeyValues = KeyCut.$match({
   Predecessor: ({ keyValues }) => keyValues,
   Exact: ({ key }) => QueryStreamKey.values(key),
   Successor: ({ keyValues }) => keyValues,
 });
 
 const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
-  const selfValues = cutValues(self);
-  const thatValues = cutValues(that);
-  const minLength = Math.min(selfValues.length, thatValues.length);
+  const selfKeyValues = cutKeyValues(self);
+  const thatKeyValues = cutKeyValues(that);
+  const minLength = Math.min(selfKeyValues.length, thatKeyValues.length);
   const prefixOrdering = QueryStreamKeyValues.Order("asc")(
-    Array.take(selfValues, minLength),
-    Array.take(thatValues, minLength),
+    Array.take(selfKeyValues, minLength),
+    Array.take(thatKeyValues, minLength),
   );
   if (prefixOrdering !== 0) {
     return prefixOrdering;
   }
-  if (selfValues.length === thatValues.length) {
+  if (selfKeyValues.length === thatKeyValues.length) {
     return Order.Number(cutRank(self), cutRank(that));
   }
   // One key is a proper prefix of the other. The shorter cut sits just
   // before (`predecessor`) or just after (`successor`) *every* key
   // extending its prefix—the longer one included. (`exact` cuts are
   // always full keys, so an `exact` cut is never the shorter one here.)
-  const selfIsShorter = selfValues.length < thatValues.length;
+  const selfIsShorter = selfKeyValues.length < thatKeyValues.length;
   const shorter = selfIsShorter ? self : that;
   const shorterOrdering = KeyCut.$match(shorter, {
     Predecessor: () => -1 as const,
@@ -147,8 +147,8 @@ export const intersect = (
   self: ParsedBounds,
   that: ParsedBounds,
 ): Result.Result<ParsedBounds, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
-  Result.map(forLayout(self.layout, that), () =>
-    make(self.layout, {
+  Result.map(forLayout(self.keyLayout, that), () =>
+    make(self.keyLayout, {
       lower: combineKeyBound(self.lower, that.lower, tighterLower),
       upper: combineKeyBound(self.upper, that.upper, tighterUpper),
     }),
@@ -157,8 +157,8 @@ export const intersect = (
 /**
  * @experimental
  */
-export const isEmpty = (bounds: IndexBounds): boolean =>
-  KeyCutOrder(lowerCut(bounds.lower), upperCut(bounds.upper)) >= 0;
+export const isEmpty = (indexBounds: IndexBounds): boolean =>
+  KeyCutOrder(lowerCut(indexBounds.lower), upperCut(indexBounds.upper)) >= 0;
 
 /**
  * @experimental
@@ -177,16 +177,16 @@ export const intersectIndexBounds = (
  * @experimental
  */
 export const admittedByLower =
-  (bounds: ParsedBounds) =>
+  (parsedBounds: ParsedBounds) =>
   (
     key: QueryStreamKey.Complete,
   ): Result.Result<boolean, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
     Result.gen(function* () {
       yield* QueryStreamKeyLayout.validateEquivalence(
-        bounds.layout,
+        parsedBounds.keyLayout,
         key.layout,
       );
-      return Option.match(bounds.lower, {
+      return Option.match(parsedBounds.lower, {
         onNone: () => true,
         onSome: (bound) =>
           KeyCutOrder(KeyCut.Exact({ key }), lowerCut(rawBound(bound))) > 0,
@@ -200,16 +200,16 @@ export const admittedByLower =
  * @experimental
  */
 export const admittedByUpper =
-  (bounds: ParsedBounds) =>
+  (parsedBounds: ParsedBounds) =>
   (
     key: QueryStreamKey.Complete,
   ): Result.Result<boolean, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
     Result.gen(function* () {
       yield* QueryStreamKeyLayout.validateEquivalence(
-        bounds.layout,
+        parsedBounds.keyLayout,
         key.layout,
       );
-      return Option.match(bounds.upper, {
+      return Option.match(parsedBounds.upper, {
         onNone: () => true,
         onSome: (bound) =>
           KeyCutOrder(KeyCut.Exact({ key }), upperCut(rawBound(bound))) < 0,
@@ -243,50 +243,54 @@ const TypeId = "~@confect/server/QueryStreamKeyBounds";
 
 export interface ParsedBounds {
   readonly [TypeId]: typeof TypeId;
-  readonly layout: QueryStreamKeyLayout.QueryStreamKeyLayout;
+  readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
   readonly lower: Option.Option<ParsedBound>;
   readonly upper: Option.Option<ParsedBound>;
 }
 
 const make = (
-  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   endpoints: Pick<ParsedBounds, "lower" | "upper">,
 ): ParsedBounds => ({
   [TypeId]: TypeId,
-  layout,
+  keyLayout,
   lower: endpoints.lower,
   upper: endpoints.upper,
 });
 
 export const unbounded = (
-  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-): ParsedBounds => make(layout, { lower: Option.none(), upper: Option.none() });
+  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+): ParsedBounds =>
+  make(keyLayout, { lower: Option.none(), upper: Option.none() });
 
 export const forLayout = (
-  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  bounds: ParsedBounds,
+  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  parsedBounds: ParsedBounds,
 ): Result.Result<ParsedBounds, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
   Result.gen(function* () {
-    yield* QueryStreamKeyLayout.validateEquivalence(layout, bounds.layout);
-    return bounds;
+    yield* QueryStreamKeyLayout.validateEquivalence(
+      keyLayout,
+      parsedBounds.keyLayout,
+    );
+    return parsedBounds;
   });
 
 // Combining existing parsed endpoints still needs a shared layout, including
 // when one or both endpoints are absent.
 export const fromParsed = (
-  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   endpoints: Pick<ParsedBounds, "lower" | "upper">,
 ): Result.Result<ParsedBounds, QueryStreamKeyLayout.KeyLayoutMismatchError> => {
   const validateEndpoint = (endpoint: Option.Option<ParsedBound>) =>
     Option.match(endpoint, {
       onNone: () => Result.succeed(undefined),
       onSome: ({ key }) =>
-        QueryStreamKeyLayout.validateEquivalence(layout, key.layout),
+        QueryStreamKeyLayout.validateEquivalence(keyLayout, key.layout),
     });
   return Result.gen(function* () {
     yield* validateEndpoint(endpoints.lower);
     yield* validateEndpoint(endpoints.upper);
-    return make(layout, endpoints);
+    return make(keyLayout, endpoints);
   });
 };
 
@@ -331,31 +335,31 @@ export const tightestParsedUpper = (
   });
 
 export const parseBound = (
-  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   { keyValues, inclusive }: KeyBound,
 ): Result.Result<ParsedBound, QueryStreamKey.KeyWidthMismatchError> =>
-  Result.map(QueryStreamKey.prefix(layout, keyValues), (prefix) => ({
-    key: prefix,
+  Result.map(QueryStreamKey.prefix(keyLayout, keyValues), (key) => ({
+    key,
     inclusive,
   }));
 
 export const parse = (
-  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  bounds: KeyBounds,
+  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  keyBounds: KeyBounds,
 ): Result.Result<ParsedBounds, QueryStreamKey.KeyWidthMismatchError> => {
   const endpoint = (bound: Option.Option<KeyBound>) =>
     Option.match(bound, {
       onNone: () => Result.succeed(Option.none<ParsedBound>()),
-      onSome: (value) => Result.map(parseBound(layout, value), Option.some),
+      onSome: (value) => Result.map(parseBound(keyLayout, value), Option.some),
     });
   return Result.gen(function* () {
-    const lower = yield* endpoint(bounds.lower);
-    const upper = yield* endpoint(bounds.upper);
-    return make(layout, { lower, upper });
+    const lower = yield* endpoint(keyBounds.lower);
+    const upper = yield* endpoint(keyBounds.upper);
+    return make(keyLayout, { lower, upper });
   });
 };
 
-export const toBounds = (bounds: ParsedBounds): KeyBounds => ({
-  lower: Option.map(bounds.lower, rawBound),
-  upper: Option.map(bounds.upper, rawBound),
+export const toBounds = (parsedBounds: ParsedBounds): KeyBounds => ({
+  lower: Option.map(parsedBounds.lower, rawBound),
+  upper: Option.map(parsedBounds.upper, rawBound),
 });
