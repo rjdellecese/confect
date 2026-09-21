@@ -169,13 +169,20 @@ process.stdout.write("schema-aot-ok");
             include: ["confect/**/*.ts", "convex/**/*.ts"],
           }),
         );
+        const typescript = path.dirname(
+          yield* path.fromFileUrl(
+            new URL(import.meta.resolve("typescript/package.json")),
+          ),
+        );
         expect(
           yield* spawner.string(
-            ChildProcess.make(
-              "pnpm",
-              ["exec", "tsc", "--project", config, "--pretty", "false"],
-              { cwd: path.resolve(import.meta.dirname, "../../../..") },
-            ),
+            ChildProcess.make(process.execPath, [
+              path.join(typescript, "lib", "tsc.js"),
+              "--project",
+              config,
+              "--pretty",
+              "false",
+            ]),
           ),
         ).toBe("");
       }),
