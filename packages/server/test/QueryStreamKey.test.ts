@@ -17,11 +17,16 @@ describe("QueryStreamKey", () => {
     expectTypeOf<readonly [number, string]>().not.toExtend<Key.Complete>();
     const values = [3, "id"] as const;
     const key = Result.getOrThrow(Key.complete(layout, values));
-    expect(Key.orderKey(key)).toBe(values);
+    expect(Key.keyValues(key)).toBe(values);
     expect(Key.keyLayout(key)).toBe(layout);
+    const converted = Key.toPrefix(key);
+    expectTypeOf(converted).toEqualTypeOf<Key.Prefix>();
+    expect(Key.keyValues(converted)).toBe(values);
+    expect(Key.keyLayout(converted)).toBe(layout);
+    expect(Key.isComplete(converted)).toBe(false);
     for (const prefix of [[], [3], values]) {
       const parsed = Result.getOrThrow(Key.prefix(layout, prefix));
-      expect(Key.orderKey(parsed)).toBe(prefix);
+      expect(Key.keyValues(parsed)).toBe(prefix);
       expect(Key.keyLayout(parsed)).toBe(layout);
     }
     for (const invalid of [[], [3], [3, "id", 4]]) {
@@ -41,12 +46,12 @@ describe("QueryStreamKey", () => {
           Match.tag("Complete", (complete) => {
             expectTypeOf<typeof complete>().toEqualTypeOf<Key.Complete>();
             expect(complete.keyLayout).toBe(layout);
-            return ["complete", complete.orderKey] as const;
+            return ["complete", complete.keyValues] as const;
           }),
           Match.tag("Prefix", (prefix) => {
             expectTypeOf<typeof prefix>().toEqualTypeOf<Key.Prefix>();
             expect(prefix.keyLayout).toBe(layout);
-            return ["prefix", prefix.orderKey] as const;
+            return ["prefix", prefix.keyValues] as const;
           }),
           Match.exhaustive,
         ),
@@ -62,7 +67,7 @@ describe("QueryStreamKey", () => {
       Result.getOrThrow(Key.complete(layout, [3, "id"])),
       Result.getOrThrow(Key.prefix(layout, [3])),
     ];
-    expect(Array.map(keys, Key.orderKey)).toEqual([[3, "id"], [3]]);
+    expect(Array.map(keys, Key.keyValues)).toEqual([[3, "id"], [3]]);
     expect(Array.map(keys, Key.keyLayout)).toEqual([layout, layout]);
   });
 
@@ -84,7 +89,12 @@ describe("QueryStreamKey", () => {
 
   it("accepts complete zero-width keys", () => {
     const zero = Result.getOrThrow(Layout.fromIndex(["_id"], 1));
-    expect(Key.orderKey(Result.getOrThrow(Key.complete(zero, [])))).toEqual([]);
+    expect(Key.keyValues(Result.getOrThrow(Key.complete(zero, [])))).toEqual(
+      [],
+    );
+    expect(
+      Key.keyValues(Key.toPrefix(Result.getOrThrow(Key.complete(zero, [])))),
+    ).toEqual([]);
     expect(Result.isFailure(Key.prefix(zero, [undefined]))).toBe(true);
   });
 });

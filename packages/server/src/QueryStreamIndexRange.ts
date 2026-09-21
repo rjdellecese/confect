@@ -13,7 +13,7 @@ import * as Result from "effect/Result";
 import type * as Types from "effect/Types";
 import * as QueryStreamIndexPrefix from "./QueryStreamIndexPrefix";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
-import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 import type * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
 
 type Head<FieldPaths extends ReadonlyArray<string>> =
@@ -37,11 +37,11 @@ const TypeId = "~@confect/server/QueryStreamIndexRange";
 
 interface Equality {
   readonly fieldPath: string;
-  readonly value: QueryStreamOrderKey.KeyValue;
+  readonly value: QueryStreamKeyValues.KeyValue;
 }
 
 interface Endpoint {
-  readonly value: QueryStreamOrderKey.KeyValue;
+  readonly value: QueryStreamKeyValues.KeyValue;
   readonly inclusive: boolean;
 }
 
@@ -143,7 +143,7 @@ const makeBuilder = (
 ): Builder<GenericDocument, ReadonlyArray<string>> => {
   const upper =
     (inclusive: boolean) =>
-    (fieldPath: string, value: QueryStreamOrderKey.KeyValue) =>
+    (fieldPath: string, value: QueryStreamKeyValues.KeyValue) =>
       make({
         equalities,
         bounded: Option.some({
@@ -155,12 +155,12 @@ const makeBuilder = (
     (inclusive: boolean) =>
     (
       fieldPath: string,
-      value: QueryStreamOrderKey.KeyValue,
+      value: QueryStreamKeyValues.KeyValue,
     ): LowerBoundedBuilder<GenericDocument, ReadonlyArray<string>> => {
       const endpoint = { value, inclusive };
       const finish =
         (upperInclusive: boolean) =>
-        (_fieldPath: string, upperValue: QueryStreamOrderKey.KeyValue) =>
+        (_fieldPath: string, upperValue: QueryStreamKeyValues.KeyValue) =>
           make({
             equalities,
             bounded: Option.some({
@@ -214,26 +214,26 @@ export const equalityPrefixLength = (self: QueryStreamIndexRange): number =>
 interface ConvexUpperBoundBuilder extends ConvexIndexRange {
   readonly lt: (
     fieldPath: string,
-    value: QueryStreamOrderKey.KeyValue,
+    value: QueryStreamKeyValues.KeyValue,
   ) => ConvexIndexRange;
   readonly lte: (
     fieldPath: string,
-    value: QueryStreamOrderKey.KeyValue,
+    value: QueryStreamKeyValues.KeyValue,
   ) => ConvexIndexRange;
 }
 
 interface ConvexRangeBuilder extends ConvexUpperBoundBuilder {
   readonly eq: (
     fieldPath: string,
-    value: QueryStreamOrderKey.KeyValue,
+    value: QueryStreamKeyValues.KeyValue,
   ) => ConvexRangeBuilder;
   readonly gt: (
     fieldPath: string,
-    value: QueryStreamOrderKey.KeyValue,
+    value: QueryStreamKeyValues.KeyValue,
   ) => ConvexUpperBoundBuilder;
   readonly gte: (
     fieldPath: string,
-    value: QueryStreamOrderKey.KeyValue,
+    value: QueryStreamKeyValues.KeyValue,
   ) => ConvexUpperBoundBuilder;
 }
 
@@ -372,13 +372,13 @@ export const fromBounds = (
     const lowerIndexEntries = QueryStreamIndexPrefix.entries(
       yield* QueryStreamIndexPrefix.make(
         fieldPaths,
-        indexBounds.lower.orderKey,
+        indexBounds.lower.keyValues,
       ),
     );
     const upperIndexEntries = QueryStreamIndexPrefix.entries(
       yield* QueryStreamIndexPrefix.make(
         fieldPaths,
-        indexBounds.upper.orderKey,
+        indexBounds.upper.keyValues,
       ),
     );
     // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
@@ -389,10 +389,10 @@ export const fromBounds = (
     }
 
     const commonLength = pipe(
-      Array.zip(indexBounds.lower.orderKey, indexBounds.upper.orderKey),
+      Array.zip(indexBounds.lower.keyValues, indexBounds.upper.keyValues),
       Array.takeWhile(
         ([lowerValue, upperValue]) =>
-          QueryStreamOrderKey.ValueOrder(lowerValue, upperValue) === 0,
+          QueryStreamKeyValues.ValueOrder(lowerValue, upperValue) === 0,
       ),
       Array.length,
     );
@@ -460,10 +460,10 @@ export const toBounds = (
   self: QueryStreamIndexRange,
 ): QueryStreamKeyBounds.IndexBounds => {
   const { equalities, bounded } = self[TypeId];
-  const orderKey = Array.map(equalities, (equality) => equality.value);
-  const unbounded = { orderKey, inclusive: true };
+  const keyValues = Array.map(equalities, (equality) => equality.value);
+  const unbounded = { keyValues, inclusive: true };
   const endpoint = ({ value, inclusive }: Endpoint) => ({
-    orderKey: Array.append(orderKey, value),
+    keyValues: Array.append(keyValues, value),
     inclusive,
   });
   return Option.match(bounded, {

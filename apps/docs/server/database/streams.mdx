@@ -9,7 +9,7 @@ description: "Compose, merge, join, and paginate index queries as Effect streams
   prerelease line, but its surface may still change between prereleases.
 </Warning>
 
-Query streams let you merge, filter, join, and deduplicate index queries while retaining cursor pagination. A **query stream** is an Effect [`Stream`](https://effect.website/docs/stream/introduction) of decoded documents with stored order keys, a shared key layout, and a direction. Use `reader.table(...).stream(...)` for standard indexes; search indexes use [`search`](/server/database/reading#search-indexes).
+Query streams let you merge, filter, join, and deduplicate index queries while retaining cursor pagination. A **query stream** is an Effect [`Stream`](https://effect.website/docs/stream/introduction) of decoded documents with stored keys, a shared key layout, and a direction. Use `reader.table(...).stream(...)` for standard indexes; search indexes use [`search`](/server/database/reading#search-indexes).
 
 ## A first query
 
@@ -73,7 +73,7 @@ The last column compares each operation with Effect's `Stream` operations.
 | [`narrow`](#narrow-to-a-key-range)                                        | Preserves keys and layout                              | `dropWhile` and `takeUntil` on the key, pushed into the index    |
 | [`flatMap`](#flat-map)                                                    | Concatenates outer and inner keys and layouts          | Sequential `Stream.flatMap`                                      |
 | [`flatMap` with `onEmpty`](#keep-outer-documents-without-inner-documents) | Concatenates outer and inner keys and layouts          | `Stream.orElseIfEmpty` on each inner stream                      |
-| [`renameKey`](#rename-the-order-key)                                      | Visible labels replaced; key values kept               | No equivalent                                                    |
+| [`renameKey`](#rename-ordering-labels)                                    | Visible labels replaced; key values kept               | No equivalent                                                    |
 | [`reverse`](#reverse)                                                     | Preserves keys and layout; flips direction             | Reads the index backwards rather than reversing collected values |
 | [`Stream.runCollect`, `runHead`](#consuming-a-stream)                     | Consumed                                               | Effect's own consumers                                           |
 | [`Stream.take`](#consuming-a-stream)                                      | Not retained                                           | A transform returning a plain `Stream`                           |
@@ -82,9 +82,9 @@ The last column compares each operation with Effect's `Stream` operations.
 
 ## The ordering contract
 
-Every query stream visits its **order keys** in its **direction**. Keys are stored separately from emitted values, so mapping a document doesn't change its position. Compatible streams can be merged in key order, and pagination resumes after a saved key rather than an offset.
+Every query stream visits its **keys** in its **direction**. Keys are stored separately from emitted values, so mapping a document doesn't change its position. Compatible streams can be merged in key order, and pagination resumes after a saved key rather than an offset.
 
-The `KeyLabels` and `OrderDirection` type parameters enforce this contract: TypeScript rejects known label or direction mismatches in `merge`. Runtime checks also require matching directions and [key layouts](#order-keys-labels-and-layouts), including implicit-ID positions.
+The `KeyLabels` and `OrderDirection` type parameters enforce this contract: TypeScript rejects known label or direction mismatches in `merge`. Runtime checks also require matching directions and [key layouts](#keys-labels-and-layouts), including implicit-ID positions.
 
 `flatMap` appends the inner key to the outer key; `renameKey` replaces visible labels without changing key values. `reverse` changes the direction, not the key.
 
@@ -107,7 +107,7 @@ The examples use these two tables. `n1` and `c1` are readable stand-ins for real
 | `c2`       | `n1`     | `"meh"`   | 8               |
 | `c3`       | `n4`     | `"nice"`  | 9               |
 
-`notes` has the indexes `by_text` on `["text"]` and `by_role` on `["author.role"]`; `comments` has `by_note` on `["noteId"]` and `by_body` on `["body"]`. Runtime order keys include `_creationTime` and `_id` tiebreakers, so `by_text` orders by text, creation time, then ID.
+`notes` has the indexes `by_text` on `["text"]` and `by_role` on `["author.role"]`; `comments` has `by_note` on `["noteId"]` and `by_body` on `["body"]`. Runtime keys include `_creationTime` and `_id` tiebreakers, so `by_text` orders by text, creation time, then ID.
 
 ### Reading the diagrams
 
@@ -183,9 +183,9 @@ The range callback mirrors Convex's index range builder with one addition: it tr
 
 Fields must be used in the order the index declares them, and each method only offers the next unused field, so misuse is a type error.
 
-### Order keys, labels, and layouts
+### Keys, labels, and layouts
 
-An **order key** contains the values that determine an element's position. Every element has its own key values; the stream has one shared **key layout** describing the positions in those keys: their sequence, their labels, and where implicit document-ID tiebreakers occur.
+An **key** contains the values that determine an element's position. Every element has its own key values; the stream has one shared **key layout** describing the positions in those keys: their sequence, their labels, and where implicit document-ID tiebreakers occur.
 
 For a note ordered by text:
 
@@ -217,10 +217,11 @@ Layouts are **compatible** when they have the same total width, the same labels 
 Reuse a stream's `keyLayout` when calling `empty` or supplying `flatMap`'s `innerKeyLayout`. Creating a stream to obtain its layout reads no documents. The type is normally inferred, but you can import the layout module directly when you need an annotation:
 
 ```ts
+import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import type * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 
-const layout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-  ["text", "_creationTime"]
+const keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
+  QueryStreamKeyLabels.QueryStreamKeyLabels<["text", "_creationTime"]>
 > = reader.table("notes").stream("by_text").keyLayout;
 ```
 
@@ -342,11 +343,11 @@ merged
    [1]         [2]         [3]         [4]         [5]         [6]
 ```
 
-Inputs must have compatible document types and matching key layouts and directions. TypeScript rejects known mismatches; runtime mismatches throw when the streams are combined. For different document shapes or field names, [map and relabel](#rename-the-order-key) first. Overlapping inputs are not deduplicated: a document matched by two inputs appears twice.
+Inputs must have compatible document types and matching key layouts and directions. TypeScript rejects known mismatches; runtime mismatches throw when the streams are combined. For different document shapes or field names, [map and relabel](#rename-ordering-labels) first. Overlapping inputs are not deduplicated: a document matched by two inputs appears twice.
 
 ### Filter and map
 
-`QueryStream.filter` removes emitted values; `QueryStream.map` transforms them. Both preserve the original stored order keys. A rejected document still counts as _read_, so cursors can advance past it.
+`QueryStream.filter` removes emitted values; `QueryStream.map` transforms them. Both preserve the original stored keys. A rejected document still counts as _read_, so cursors can advance past it.
 
 ```ts
 reader
@@ -420,7 +421,7 @@ reader
 
 ### Distinct
 
-`QueryStream.distinct` keeps the first document for each distinct value of a prefix of the order key.
+`QueryStream.distinct` keeps the first document for each distinct value of a prefix of the key.
 
 After a group's first document, `distinct` seeks past the group with a fresh index read instead of scanning the rest of it.
 
@@ -454,14 +455,14 @@ Operation order determines which document represents each group. Apply `filter` 
 
 ### Narrow to a key range
 
-`QueryStream.narrow` restricts a stream to the order keys between `start` and `end`. Each endpoint has an `orderKey` and a required `inclusive` flag, so you can choose any combination of inclusive and exclusive bounds. Provide at least one endpoint; omit the other to leave that side unbounded.
+`QueryStream.narrow` restricts a stream to the keys between `start` and `end`. Each endpoint has `keyValues` and a required `inclusive` flag, so you can choose any combination of inclusive and exclusive bounds. Provide at least one endpoint; omit the other to leave that side unbounded.
 
 Endpoints follow **stream order**: on an ascending stream, `start` is the lower key; on a descending stream, it is the upper key. Narrowing intersects existing bounds, so repeated calls can only restrict the range further.
 
 ```ts
 const between = QueryStream.narrow(reader.table("notes").stream("by_text"), {
-  start: { orderKey: ["banana", 2, "n2"], inclusive: false },
-  end: { orderKey: ["cherry", 4, "n4"], inclusive: true },
+  start: { keyValues: ["banana", 2, "n2"], inclusive: false },
+  end: { keyValues: ["cherry", 4, "n4"], inclusive: true },
 });
 ```
 
@@ -484,7 +485,7 @@ narrowed
                                        [banana,5]  [cherry,4]
 ```
 
-A key can be a prefix of the full order key. An inclusive prefix includes all keys extending it; an exclusive prefix excludes that whole group. For example, an ascending creation-time stream can select a time window without supplying the trailing `_id`:
+A key can be a prefix of the full key. An inclusive prefix includes all keys extending it; an exclusive prefix excludes that whole group. For example, an ascending creation-time stream can select a time window without supplying the trailing `_id`:
 
 ```ts
 const startTime = Date.UTC(2026, 0, 1);
@@ -495,13 +496,13 @@ const duringDay = reader
   .stream("by_creation_time")
   .pipe(
     QueryStream.narrow({
-      start: { orderKey: [startTime], inclusive: true },
-      end: { orderKey: [endTime], inclusive: false },
+      start: { keyValues: [startTime], inclusive: true },
+      end: { keyValues: [endTime], inclusive: false },
     }),
   );
 ```
 
-This includes every note at `startTime` and excludes every note at `endTime`. Adjacent windows can share an endpoint without overlapping. Apply the same bounds to a merged stream when its leading order-key field is also creation time.
+This includes every note at `startTime` and excludes every note at `endTime`. Adjacent windows can share an endpoint without overlapping. Apply the same bounds to a merged stream when its leading key value is also a creation time.
 
 When both endpoints use the same key, the range is empty unless both are inclusive. Two inclusive endpoints select that key, or the entire group for a prefix key.
 
@@ -631,7 +632,7 @@ joined
 
 The elements are the inner stream's documents or the placeholders, so give both a common shape as above. Outer documents filtered out before the join stay absent. Everything else, including the `innerKeyLayout` check and the direction rules, is unchanged.
 
-### Rename the order key
+### Rename ordering labels
 
 `QueryStream.renameKey` replaces a stream's visible labels positionally. It does not sort: the elements and their order are untouched.
 
@@ -828,7 +829,7 @@ Save cursors returned by `QueryStream.paginate` and pass them back unchanged. Us
 Malformed or incompatible cursors fail with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }`; Confect's pagination clients restart from the first page. Restart pagination when changing the query's filters, ordering, or other semantics, even if an old cursor is still accepted.
 
 <Warning>
-  Stream cursors expose the boundary's field names and order-key **values**,
+  Stream cursors expose the boundary's runtime labels and key **values**,
   including document IDs. They are not opaque or signed: clients can read them
   and craft cursors for chosen keys within the stream's range. Don't paginate
   publicly over a sensitive indexed field without pinning it with `eq`.
@@ -846,14 +847,14 @@ TypeScript normally infers these parameters from `stream` and its composition:
 QueryStream<Doc, KeyLabels, OrderDirection, Error, Requirements>
 ```
 
-| Parameter            | Meaning                                                                                                                                                                     |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Doc`                | Each emitted value: initially a decoded document, or a mapped/joined result. `never` means no values, as with an empty stream.                                              |
-| `KeyLabels`          | Visible ordering labels, such as `["text", "_creationTime"]`. Inferred from the index and updated by `eq`, `flatMap`, and `renameKey`; implicit ID tiebreakers are omitted. |
-| `OrderDirection`     | `"asc"` or `"desc"`. The type parameter defaults to their union; the `stream(...)` method defaults to `"asc"`.                                                              |
-| `Error` (`E`)        | Typed failures while reading or transforming values. `never` means no typed failures, not no defects.                                                                       |
-| `Requirements` (`R`) | Effect services needed to run the stream. `never` means no outstanding service requirements.                                                                                |
+| Parameter            | Meaning                                                                                                                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Doc`                | Each emitted value: initially a decoded document, or a mapped/joined result. `never` means no values, as with an empty stream.                                                                          |
+| `KeyLabels`          | A branded readonly tuple of visible ordering labels, such as `["text", "_creationTime"]`. Inferred from the index and updated by `eq`, `flatMap`, and `renameKey`; implicit ID tiebreakers are omitted. |
+| `OrderDirection`     | `"asc"` or `"desc"`. The type parameter defaults to their union; the `stream(...)` method defaults to `"asc"`.                                                                                          |
+| `Error` (`E`)        | Typed failures while reading or transforming values. `never` means no typed failures, not no defects.                                                                                                   |
+| `Requirements` (`R`) | Effect services needed to run the stream. `never` means no outstanding service requirements.                                                                                                            |
 
-For example, the notes `by_text` query has type `QueryStream<Note, ["text", "_creationTime"], "asc", DocumentDecodeError, never>`. It retains the database access supplied when it was created, so consuming it doesn't require providing `DatabaseReader` again. `mapEffect` and other effectful operations can add errors and service requirements.
+For example, the notes `by_text` query carries branded labels for `["text", "_creationTime"]`, emits decoded notes in `"asc"` order, and can fail with `DocumentDecodeError`. For a type alias, prefer `typeof notes` from an existing stream rather than manually supplying its parameters. The `KeyLabels` parameter requires the brand; a plain string tuple is not a labels type. It retains the database access supplied when it was created, so consuming it doesn't require providing `DatabaseReader` again. `mapEffect` and other effectful operations can add errors and service requirements.
 
 A `QueryStream<Doc, KeyLabels, OrderDirection, E, R>` is also a `Stream<Doc, E, R>`; only `QueryStream` carries the visible-label and direction types and the runtime key layout.

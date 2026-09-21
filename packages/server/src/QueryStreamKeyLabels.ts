@@ -1,8 +1,4 @@
-import * as Array from "effect/Array";
-import * as Equivalence_ from "effect/Equivalence";
-import * as Option from "effect/Option";
-
-const TypeId = "@confect/server/QueryStreamKeyLabels";
+import * as Brand from "effect/Brand";
 
 /**
  * Ordered names for the visible components of a stream's ordering key. Names
@@ -11,114 +7,47 @@ const TypeId = "@confect/server/QueryStreamKeyLabels";
  *
  * @experimental
  */
-export interface QueryStreamKeyLabels<
-  out KeyLabels extends ReadonlyArray<string> = ReadonlyArray<string>,
-> {
-  readonly [TypeId]: Readonly<KeyLabels>;
+export type QueryStreamKeyLabels<
+  Names extends ReadonlyArray<string> = ReadonlyArray<string>,
+> = Readonly<Names> & Brand.Brand<"@confect/server/QueryStreamKeyLabels">;
+
+// Tuple operations must use the underlying names: spreading a branded tuple
+// directly can widen its fixed positions into an array of element unions.
+// Defer extraction and concatenation until both label types are known to avoid
+// expanding unresolved tuple types while checking generic stream operations.
+export type Concat<
+  LeftKeyLabels extends QueryStreamKeyLabels,
+  RightKeyLabels extends QueryStreamKeyLabels,
+> =
+  LeftKeyLabels extends QueryStreamKeyLabels<infer LeftNames>
+    ? RightKeyLabels extends QueryStreamKeyLabels<infer RightNames>
+      ? QueryStreamKeyLabels<readonly [...LeftNames, ...RightNames]>
+      : never
+    : never;
+
+const LabelsBrand = Brand.nominal<QueryStreamKeyLabels>();
+
+/**
+ * Mark a tuple of names as labels without changing its runtime representation.
+ *
+ * @experimental
+ */
+export function make<const Names extends ReadonlyArray<string>>(
+  names: Names,
+): QueryStreamKeyLabels<Names>;
+export function make(names: ReadonlyArray<string>): QueryStreamKeyLabels {
+  return LabelsBrand(names);
 }
 
 /**
- * Wrap a tuple of names as a labels value.
+ * Check whether the labels start with the given prefix, including order and
+ * multiplicity. The empty prefix always matches.
  *
  * @experimental
  */
-export const make = <const KeyLabels extends ReadonlyArray<string>>(
-  keyLabels: KeyLabels,
-): QueryStreamKeyLabels<KeyLabels> => ({ [TypeId]: keyLabels });
-
-/**
- * Inspect the names in visible key order.
- *
- * @experimental
- */
-export const toArray = <KeyLabels extends ReadonlyArray<string>>(
-  self: QueryStreamKeyLabels<KeyLabels>,
-): Readonly<KeyLabels> => self[TypeId];
-
-/**
- * Number of visible ordering components.
- *
- * @experimental
- */
-export const size = (self: QueryStreamKeyLabels): number =>
-  toArray(self).length;
-
-const ArrayEquivalence = Equivalence_.Array(Equivalence_.String);
-
-/**
- * Equality includes both label order and multiplicity.
- *
- * @experimental
- */
-export const Equivalence: Equivalence_.Equivalence<QueryStreamKeyLabels> =
-  Equivalence_.mapInput(ArrayEquivalence, toArray);
-
-/**
- * Concatenate labels, preserving their literal tuple types.
- *
- * @experimental
- */
-export function concat<
-  LeftKeyLabels extends ReadonlyArray<string>,
-  RightKeyLabels extends ReadonlyArray<string>,
->(
-  self: QueryStreamKeyLabels<LeftKeyLabels>,
-  that: QueryStreamKeyLabels<RightKeyLabels>,
-): QueryStreamKeyLabels<readonly [...LeftKeyLabels, ...RightKeyLabels]>;
-export function concat(
-  self: QueryStreamKeyLabels,
-  that: QueryStreamKeyLabels,
-): QueryStreamKeyLabels {
-  return make(Array.appendAll(toArray(self), toArray(that)));
-}
-
-/**
- * Parse a matching prefix, returning the labels left after it. A reordered,
- * skipped, or overlong prefix has no result.
- *
- * @experimental
- */
-export const stripPrefix = (
+export const hasPrefix = (
   self: QueryStreamKeyLabels,
   prefixKeyLabels: QueryStreamKeyLabels,
-): Option.Option<QueryStreamKeyLabels> =>
-  ArrayEquivalence(
-    Array.take(toArray(self), size(prefixKeyLabels)),
-    toArray(prefixKeyLabels),
-  )
-    ? Option.some(make(Array.drop(toArray(self), size(prefixKeyLabels))))
-    : Option.none();
-
-/**
- * Consume one replacement chunk with the template's tuple shape. The names may
- * differ, but a nonempty template produces a nonempty chunk. Failure means
- * there are too few labels; success also returns the unconsumed labels.
- *
- * @experimental
- */
-export function consume<TemplateKeyLabels extends ReadonlyArray<string>>(
-  self: QueryStreamKeyLabels,
-  templateKeyLabels: QueryStreamKeyLabels<TemplateKeyLabels>,
-): Option.Option<{
-  readonly prefixKeyLabels: QueryStreamKeyLabels<{
-    readonly [K in keyof TemplateKeyLabels]: string;
-  }>;
-  readonly remainingKeyLabels: QueryStreamKeyLabels;
-}>;
-export function consume(
-  self: QueryStreamKeyLabels,
-  templateKeyLabels: QueryStreamKeyLabels,
-): Option.Option<{
-  readonly prefixKeyLabels: QueryStreamKeyLabels;
-  readonly remainingKeyLabels: QueryStreamKeyLabels;
-}> {
-  if (size(self) < size(templateKeyLabels)) return Option.none();
-  const [prefixKeyLabels, remainingKeyLabels] = Array.splitAt(
-    toArray(self),
-    size(templateKeyLabels),
-  );
-  return Option.some({
-    prefixKeyLabels: make(prefixKeyLabels),
-    remainingKeyLabels: make(remainingKeyLabels),
-  });
-}
+): boolean =>
+  prefixKeyLabels.length <= self.length &&
+  prefixKeyLabels.every((label, index) => label === self[index]);

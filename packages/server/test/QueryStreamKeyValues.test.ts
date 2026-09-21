@@ -1,12 +1,12 @@
-import * as QueryStreamOrderKey from "@confect/server/QueryStreamOrderKey";
+import * as QueryStreamKeyValues from "@confect/server/QueryStreamKeyValues";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { compareValues } from "convex/values";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-describe("QueryStreamOrderKey", () => {
+describe("QueryStreamKeyValues", () => {
   it("round-trips native key values through its JSON codec", () => {
-    const values: QueryStreamOrderKey.QueryStreamOrderKey = [
+    const values: QueryStreamKeyValues.QueryStreamKeyValues = [
       undefined,
       null,
       true,
@@ -21,13 +21,13 @@ describe("QueryStreamOrderKey", () => {
       { nested: "value" },
     ];
     const Json = Schema.fromJsonString(
-      Schema.toCodecJson(QueryStreamOrderKey.QueryStreamOrderKey),
+      QueryStreamKeyValues.QueryStreamKeyValues,
     );
     const encoded = Schema.encodeSync(Json)(values);
     expect(Schema.decodeSync(Json)(encoded)).toEqual(values);
     expect(JSON.parse(encoded)[0]).toEqual({ $undefined: true });
-    expectTypeOf<QueryStreamOrderKey.QueryStreamOrderKey>().toEqualTypeOf<
-      ReadonlyArray<QueryStreamOrderKey.KeyValue>
+    expectTypeOf<QueryStreamKeyValues.QueryStreamKeyValues>().toEqualTypeOf<
+      ReadonlyArray<QueryStreamKeyValues.KeyValue>
     >();
   });
 
@@ -38,15 +38,13 @@ describe("QueryStreamOrderKey", () => {
   ])("rejects malformed JSON key values: %j", (value) => {
     expect(
       Result.isFailure(
-        Schema.decodeResult(
-          Schema.toCodecJson(QueryStreamOrderKey.QueryStreamOrderKey),
-        )([value]),
+        Schema.decodeResult(QueryStreamKeyValues.QueryStreamKeyValues)([value]),
       ),
     ).toBe(true);
   });
 
   it("uses Convex ordering for individual values", () => {
-    const values: QueryStreamOrderKey.QueryStreamOrderKey = [
+    const values: QueryStreamKeyValues.QueryStreamKeyValues = [
       undefined,
       null,
       -1,
@@ -63,30 +61,33 @@ describe("QueryStreamOrderKey", () => {
     ];
     for (const left of values) {
       for (const right of values) {
-        expect(QueryStreamOrderKey.ValueOrder(left, right)).toBe(
+        expect(QueryStreamKeyValues.ValueOrder(left, right)).toBe(
           Math.sign(compareValues(left, right)),
         );
       }
     }
   });
 
-  it("compares keys lexicographically and reverses position order", () => {
-    expect(QueryStreamOrderKey.Order(["a", 1], ["a", 2])).toBe(-1);
-    expect(QueryStreamOrderKey.Order(["a"], ["a", 1])).toBe(-1);
-    expect(QueryStreamOrderKey.Order(["b"], ["a", 2])).toBe(1);
-    expect(QueryStreamOrderKey.Order([], [])).toBe(0);
-    expect(QueryStreamOrderKey.PositionOrder("asc")(["a"], ["b"])).toBe(-1);
-    expect(QueryStreamOrderKey.PositionOrder("desc")(["a"], ["b"])).toBe(1);
+  it("requires a direction and compares keys lexicographically", () => {
+    expectTypeOf(QueryStreamKeyValues.Order).parameters.toEqualTypeOf<
+      [orderDirection: "asc" | "desc"]
+    >();
+    expect(QueryStreamKeyValues.Order("asc")(["a", 1], ["a", 2])).toBe(-1);
+    expect(QueryStreamKeyValues.Order("asc")(["a"], ["a", 1])).toBe(-1);
+    expect(QueryStreamKeyValues.Order("asc")(["b"], ["a", 2])).toBe(1);
+    expect(QueryStreamKeyValues.Order("asc")([], [])).toBe(0);
+    expect(QueryStreamKeyValues.Order("asc")(["a"], ["b"])).toBe(-1);
+    expect(QueryStreamKeyValues.Order("desc")(["a"], ["b"])).toBe(1);
   });
 
   it("extracts nested values and retains missing fields", () => {
     expect(
-      QueryStreamOrderKey.extract({ nested: { score: 2 }, _id: "n1" }, [
+      QueryStreamKeyValues.extract({ nested: { score: 2 }, _id: "n1" }, [
         ["nested", "score"],
         ["missing", "field"],
         ["_id"],
       ]),
     ).toEqual([2, undefined, "n1"]);
-    expect(QueryStreamOrderKey.extract({}, [])).toEqual([]);
+    expect(QueryStreamKeyValues.extract({}, [])).toEqual([]);
   });
 });

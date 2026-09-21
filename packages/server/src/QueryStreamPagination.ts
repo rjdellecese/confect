@@ -5,7 +5,7 @@ import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type * as QueryStreamKey from "./QueryStreamKey";
-import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 
 const PageSize = Schema.Natural.pipe(
   Schema.brand("~@confect/server/QueryStreamPagination/PageSize"),
@@ -232,7 +232,10 @@ export const finish = <Doc>(
           Unpinned: () => false,
           ThroughEnd: () => false,
           ThroughKey: ({ key }) =>
-            QueryStreamOrderKey.Order(splitKey.orderKey, key.orderKey) === 0,
+            QueryStreamKeyValues.Order("asc")(
+              splitKey.keyValues,
+              key.keyValues,
+            ) === 0,
         });
         if (readLimit && atEnd) {
           return Result.fail(

@@ -2,12 +2,12 @@ import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import * as Result from "effect/Result";
 import type * as QueryStreamKey from "./QueryStreamKey";
-import type * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import type * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 
 const TypeId = "~@confect/server/QueryStreamIndexPrefix";
 
 export type IndexEntries = ReadonlyArray<
-  readonly [string, QueryStreamOrderKey.QueryStreamOrderKey[number]]
+  readonly [string, QueryStreamKeyValues.QueryStreamKeyValues[number]]
 >;
 
 /**
@@ -30,23 +30,23 @@ export class IndexPrefixWidthMismatchError extends Data.TaggedError(
 
 export const make = (
   fieldPaths: ReadonlyArray<string>,
-  orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
+  keyValues: QueryStreamKeyValues.QueryStreamKeyValues,
 ): Result.Result<QueryStreamIndexPrefix, IndexPrefixWidthMismatchError> =>
-  orderKey.length <= fieldPaths.length
-    ? Result.succeed({ [TypeId]: Array.zip(fieldPaths, orderKey) })
+  keyValues.length <= fieldPaths.length
+    ? Result.succeed({ [TypeId]: Array.zip(fieldPaths, keyValues) })
     : Result.fail(
         new IndexPrefixWidthMismatchError({
           width: fieldPaths.length,
-          actual: orderKey.length,
+          actual: keyValues.length,
         }),
       );
 
 export const entries = (self: QueryStreamIndexPrefix): IndexEntries =>
   self[TypeId];
 
-export const orderKey = (
+export const keyValues = (
   self: QueryStreamIndexPrefix,
-): QueryStreamOrderKey.QueryStreamOrderKey =>
+): QueryStreamKeyValues.QueryStreamKeyValues =>
   Array.map(entries(self), ([, value]) => value);
 
 /**
@@ -54,7 +54,7 @@ export const orderKey = (
  */
 export const fromStreamKey = (
   fieldPaths: ReadonlyArray<string>,
-  equalityOrderKey: QueryStreamOrderKey.QueryStreamOrderKey,
+  equalityKeyValues: QueryStreamKeyValues.QueryStreamKeyValues,
   self: QueryStreamKey.QueryStreamKey,
 ): Result.Result<QueryStreamIndexPrefix, IndexPrefixWidthMismatchError> =>
-  make(fieldPaths, Array.appendAll(equalityOrderKey, self.orderKey));
+  make(fieldPaths, Array.appendAll(equalityKeyValues, self.keyValues));

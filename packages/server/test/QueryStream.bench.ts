@@ -48,7 +48,7 @@ bench("flatMap", () => {
   return QueryStream.flatMap(notes, messagesOf, {
     innerKeyLayout: messagesLayout,
   });
-}).types([156, "instantiations"]);
+}).types([335, "instantiations"]);
 
 bench("stream → filter → merge → flatMap → paginate", () => {
   return QueryStream.merge([
@@ -60,4 +60,4 @@ bench("stream → filter → merge → flatMap → paginate", () => {
     }),
     QueryStream.paginate(paginationOpts),
   );
-}).types([486, "instantiations"]);
+}).types([1292, "instantiations"]);

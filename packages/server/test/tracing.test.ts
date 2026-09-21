@@ -100,7 +100,7 @@ describe("server operation tracing", () => {
             return Stream.make(
               new QueryStream.Element({
                 doc: Option.some(7),
-                orderKey: ["note"],
+                keyValues: ["note"],
               }),
             );
           }),
@@ -178,8 +178,8 @@ describe("server operation tracing", () => {
           "asc",
           Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
           Stream.make(
-            new QueryStream.Element({ doc: Option.some(1), orderKey: [1] }),
-            new QueryStream.Element({ doc: Option.some(2), orderKey: [2] }),
+            new QueryStream.Element({ doc: Option.some(1), keyValues: [1] }),
+            new QueryStream.Element({ doc: Option.some(2), keyValues: [2] }),
           ),
         );
         const error = yield* QueryStream.unique(source).pipe(
