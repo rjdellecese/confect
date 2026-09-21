@@ -61,17 +61,10 @@ import * as QueryStreamCursor from "./QueryStreamCursor";
 import * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
 import * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
-import type { Flip } from "./QueryStreamOrderDirection";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
 import * as QueryStreamIndexPrefix from "./QueryStreamIndexPrefix";
 import * as QueryStreamKey from "./QueryStreamKey";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
-import type {
-  KeyBound,
-  KeyBounds,
-  IndexBounds,
-  NarrowBounds,
-} from "./QueryStreamKeyBounds";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 import * as QueryStreamPagination from "./QueryStreamPagination";
 import * as QueryStreamReadBudget from "./QueryStreamReadBudget";
@@ -298,7 +291,7 @@ export class QueryStream<
      * recipe, `narrow` filters the annotated stream in memory.
      */
     readonly narrowWith?: (
-      keyBounds: KeyBounds,
+      keyBounds: QueryStreamKeyBounds.KeyBounds,
     ) => QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
     /**
      * Rebuilds the stream in the opposite direction using index scans and
@@ -308,7 +301,7 @@ export class QueryStream<
     readonly reverseWith?: () => QueryStream<
       Doc,
       KeyLabels,
-      Flip<OrderDirection>,
+      QueryStreamOrderDirection.Flip<OrderDirection>,
       E,
       R
     >,
@@ -492,7 +485,7 @@ export interface Reflection<
    * tiebreakers. If absent, bounds come from `indexRange`; supplied bounds
    * intersect those constraints rather than replacing them.
    */
-  readonly indexBounds?: IndexBounds;
+  readonly indexBounds?: QueryStreamKeyBounds.IndexBounds;
 }
 
 /**
@@ -545,7 +538,7 @@ const makeLeaf = <
   OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
   reflection: Reflection<OrderDirection>,
-  indexBounds: IndexBounds,
+  indexBounds: QueryStreamKeyBounds.IndexBounds,
 ): QueryStream<
   Doc,
   ReadonlyArray<string>,
@@ -624,7 +617,9 @@ const makeLeaf = <
     ),
   );
 
-  const toFullKeySpace = (bound: KeyBound): KeyBound => ({
+  const toFullKeySpace = (
+    bound: QueryStreamKeyBounds.KeyBound,
+  ): QueryStreamKeyBounds.KeyBound => ({
     orderKey: QueryStreamIndexPrefix.orderKey(
       Result.getOrThrowWith(
         Result.flatMap(
@@ -1292,7 +1287,7 @@ export const flatMap = dual<
  */
 interface InnerRefinement {
   readonly outerOrderKey: QueryStreamOrderKey.QueryStreamOrderKey;
-  readonly innerKeyBound: KeyBound;
+  readonly innerKeyBound: QueryStreamKeyBounds.KeyBound;
 }
 
 interface InnerRefinements {
@@ -1301,7 +1296,7 @@ interface InnerRefinements {
 }
 
 type FlatMapBound = Data.TaggedEnum<{
-  Outer: KeyBound;
+  Outer: QueryStreamKeyBounds.KeyBound;
   Inner: InnerRefinement;
 }>;
 
@@ -1413,7 +1408,7 @@ const makeFlatMap = <
 
   const innerKeyBoundsFor = (
     outerOrderKey: QueryStreamOrderKey.QueryStreamOrderKey,
-  ): KeyBounds => ({
+  ): QueryStreamKeyBounds.KeyBounds => ({
     lower: Option.map(
       Option.filter(
         refinements.lower,
@@ -1440,7 +1435,7 @@ const makeFlatMap = <
   // and is emitted only if that position is within the inner bounds.
   const markerStream = (
     outerOrderKey: QueryStreamOrderKey.QueryStreamOrderKey,
-    innerKeyBounds: KeyBounds,
+    innerKeyBounds: QueryStreamKeyBounds.KeyBounds,
     doc: Option.Option<Doc2 | Doc3>,
   ): Stream.Stream<Element<Doc2 | Doc3>> => {
     const { aboveLower, belowUpper } = keyPredicates(
@@ -1518,7 +1513,10 @@ const makeFlatMap = <
     }),
   );
 
-  const split = ({ orderKey, inclusive }: KeyBound): FlatMapBound =>
+  const split = ({
+    orderKey,
+    inclusive,
+  }: QueryStreamKeyBounds.KeyBound): FlatMapBound =>
     orderKey.length <= outerLength
       ? FlatMapBound.Outer({ orderKey, inclusive })
       : FlatMapBound.Inner({
@@ -1529,7 +1527,7 @@ const makeFlatMap = <
           },
         });
 
-  const outerBound = (bound: FlatMapBound): KeyBound =>
+  const outerBound = (bound: FlatMapBound): QueryStreamKeyBounds.KeyBound =>
     FlatMapBound.$match(bound, {
       Outer: ({ orderKey, inclusive }) => ({ orderKey, inclusive }),
       Inner: ({ outerOrderKey }) => ({
@@ -1754,12 +1752,12 @@ const makeDistinct = <
   >,
   distinctLength: number,
   orderDirection: OrderDirection,
-  keyBounds: KeyBounds,
+  keyBounds: QueryStreamKeyBounds.KeyBounds,
 ): QueryStream<Doc, KeyLabels, OrderDirection, E, R> => {
   const afterKey = (
     orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
-  ): KeyBounds => {
-    const pastGroup: KeyBound = {
+  ): QueryStreamKeyBounds.KeyBounds => {
+    const pastGroup: QueryStreamKeyBounds.KeyBound = {
       orderKey,
       inclusive: false,
     };
@@ -1768,8 +1766,8 @@ const makeDistinct = <
       : { lower: Option.none(), upper: Option.some(pastGroup) };
   };
   const groupBound = (
-    bound: Option.Option<KeyBound>,
-  ): Option.Option<KeyBound> =>
+    bound: Option.Option<QueryStreamKeyBounds.KeyBound>,
+  ): Option.Option<QueryStreamKeyBounds.KeyBound> =>
     Option.map(bound, ({ inclusive, orderKey }) => ({
       orderKey: Array.take(orderKey, distinctLength),
       inclusive: orderKey.length > distinctLength || inclusive,
@@ -1921,7 +1919,13 @@ export const reverse = <
   OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
   self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
-): QueryStream<Doc, KeyLabels, Flip<OrderDirection>, E, R> => {
+): QueryStream<
+  Doc,
+  KeyLabels,
+  QueryStreamOrderDirection.Flip<OrderDirection>,
+  E,
+  R
+> => {
   if (self.reverseWith === undefined) {
     throw new MissingReversalRecipeError();
   }
@@ -1958,7 +1962,7 @@ export const reverse = <
  */
 export const narrow = dual<
   (
-    narrowBounds: NarrowBounds,
+    narrowBounds: QueryStreamKeyBounds.NarrowBounds,
   ) => <
     Doc,
     KeyLabels extends ReadonlyArray<string>,
@@ -1976,7 +1980,7 @@ export const narrow = dual<
     OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
     self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
-    narrowBounds: NarrowBounds,
+    narrowBounds: QueryStreamKeyBounds.NarrowBounds,
   ) => QueryStream<Doc, KeyLabels, OrderDirection, E, R>
 >(
   2,
@@ -1988,13 +1992,13 @@ export const narrow = dual<
     OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
   >(
     self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
-    narrowBounds: NarrowBounds,
+    narrowBounds: QueryStreamKeyBounds.NarrowBounds,
   ) => {
     const start = Option.fromUndefinedOr(narrowBounds.start);
     const end = Option.fromUndefinedOr(narrowBounds.end);
     // Stream space → ascending key space: for `desc`, "start" bounds from
     // above and "end" from below. Inclusion stays attached to its key.
-    const keyBounds: KeyBounds =
+    const keyBounds: QueryStreamKeyBounds.KeyBounds =
       self.orderDirection === "asc"
         ? { lower: start, upper: end }
         : { lower: end, upper: start };
@@ -2010,7 +2014,7 @@ const narrowByKeyBounds = <
   OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
   self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
-  keyBounds: KeyBounds,
+  keyBounds: QueryStreamKeyBounds.KeyBounds,
 ): QueryStream<Doc, KeyLabels, OrderDirection, E, R> => {
   const parsed = Result.getOrThrowWith(
     QueryStreamKeyBounds.parse(self.keyLayout, keyBounds),
@@ -2028,7 +2032,7 @@ const narrowByKeyBounds = <
  */
 const keyPredicates = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  keyBounds: KeyBounds,
+  keyBounds: QueryStreamKeyBounds.KeyBounds,
 ) => {
   const parsed = Result.getOrThrowWith(
     QueryStreamKeyBounds.parse(keyLayout, keyBounds),
@@ -2055,7 +2059,7 @@ const narrowInMemory = <
   OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
   self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
-  keyBounds: KeyBounds,
+  keyBounds: QueryStreamKeyBounds.KeyBounds,
 ): QueryStream<Doc, KeyLabels, OrderDirection, E, R> => {
   type Narrower = (
     annotated: Stream.Stream<
@@ -2325,8 +2329,8 @@ export const paginate: {
         inclusive: false,
       }));
       const end = QueryStreamPagination.Range.$match(request.range, {
-        Unpinned: () => Option.none<KeyBound>(),
-        ThroughEnd: () => Option.none<KeyBound>(),
+        Unpinned: () => Option.none<QueryStreamKeyBounds.KeyBound>(),
+        ThroughEnd: () => Option.none<QueryStreamKeyBounds.KeyBound>(),
         ThroughKey: ({ key }) =>
           Option.some({ orderKey: key.orderKey, inclusive: true }),
       });

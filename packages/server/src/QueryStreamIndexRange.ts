@@ -13,9 +13,8 @@ import * as Result from "effect/Result";
 import type * as Types from "effect/Types";
 import * as QueryStreamIndexPrefix from "./QueryStreamIndexPrefix";
 import * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
-import type { IndexBounds } from "./QueryStreamKeyBounds";
 import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
-import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
+import type * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
 
 type Head<FieldPaths extends ReadonlyArray<string>> =
   FieldPaths extends readonly [infer H extends string, ...ReadonlyArray<string>]
@@ -363,8 +362,8 @@ const rangeFor = (
  */
 export const fromBounds = (
   fieldPaths: ReadonlyArray<string>,
-  orderDirection: OrderDirection,
-  indexBounds: IndexBounds,
+  orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
+  indexBounds: QueryStreamKeyBounds.IndexBounds,
 ): Result.Result<
   ReadonlyArray<QueryStreamIndexRange>,
   QueryStreamIndexPrefix.IndexPrefixWidthMismatchError
@@ -457,7 +456,9 @@ export const fromBounds = (
 /**
  * Derive full-index bounds directly from the structural range.
  */
-export const toBounds = (self: QueryStreamIndexRange): IndexBounds => {
+export const toBounds = (
+  self: QueryStreamIndexRange,
+): QueryStreamKeyBounds.IndexBounds => {
   const { equalities, bounded } = self[TypeId];
   const orderKey = Array.map(equalities, (equality) => equality.value);
   const unbounded = { orderKey, inclusive: true };

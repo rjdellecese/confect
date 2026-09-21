@@ -12,7 +12,7 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
-import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
+import type * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
 
 const UNDEFINED_SENTINEL = { $undefined: true } as const;
 const KeyValue = Schema.declare<Value | undefined>(
@@ -92,7 +92,7 @@ export const Order: Order_.Order<QueryStreamOrderKey> =
  * @experimental
  */
 export const PositionOrder = (
-  orderDirection: OrderDirection,
+  orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
 ): Order_.Order<QueryStreamOrderKey> =>
   orderDirection === "asc" ? Order : Order_.flip(Order);
 
