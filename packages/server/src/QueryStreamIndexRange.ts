@@ -75,8 +75,10 @@ export interface QueryStreamIndexRange<
 /**
  * @experimental
  */
-export type Remaining<Range> =
-  Range extends QueryStreamIndexRange<infer R> ? R : never;
+export type Remaining<IndexRange> =
+  IndexRange extends QueryStreamIndexRange<infer RemainingFieldPaths>
+    ? RemainingFieldPaths
+    : never;
 
 /**
  * A typed index-range builder. `eq` must target the next unpinned index field,
@@ -353,36 +355,42 @@ const rangeFor = (
   });
 
 /**
- * Decompose the range between `bounds.lower` and `bounds.upper` (over the
- * complete index `fieldPaths`, `_id` tiebreaker included) into a sequence of
- * Convex-expressible ranges, ordered for the given direction.
+ * Decompose the range between `indexBounds.lower` and `indexBounds.upper` (over
+ * the complete index `fieldPaths`, `_id` tiebreaker included) into a sequence
+ * of Convex-expressible ranges, ordered for the given direction.
  *
  * @experimental
  */
 export const fromBounds = (
   fieldPaths: ReadonlyArray<string>,
-  order: OrderDirection,
-  bounds: IndexBounds,
+  orderDirection: OrderDirection,
+  indexBounds: IndexBounds,
 ): Result.Result<
   ReadonlyArray<QueryStreamIndexRange>,
   QueryStreamIndexPrefix.IndexPrefixWidthMismatchError
 > =>
   Result.gen(function* () {
     const lowerIndexEntries = QueryStreamIndexPrefix.entries(
-      yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.lower.orderKey),
+      yield* QueryStreamIndexPrefix.make(
+        fieldPaths,
+        indexBounds.lower.orderKey,
+      ),
     );
     const upperIndexEntries = QueryStreamIndexPrefix.entries(
-      yield* QueryStreamIndexPrefix.make(fieldPaths, bounds.upper.orderKey),
+      yield* QueryStreamIndexPrefix.make(
+        fieldPaths,
+        indexBounds.upper.orderKey,
+      ),
     );
     // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
     // upper inclusive at `k`—the half-open (k, k]—both cut at
     // successor(k).
-    if (QueryStreamKeyBounds.isEmpty(bounds)) {
+    if (QueryStreamKeyBounds.isEmpty(indexBounds)) {
       return [];
     }
 
     const commonLength = pipe(
-      Array.zip(bounds.lower.orderKey, bounds.upper.orderKey),
+      Array.zip(indexBounds.lower.orderKey, indexBounds.upper.orderKey),
       Array.takeWhile(
         ([lowerValue, upperValue]) =>
           QueryStreamOrderKey.ValueOrder(lowerValue, upperValue) === 0,
@@ -396,17 +404,17 @@ export const fromBounds = (
 
     const lower = peelBound(
       Array.drop(lowerIndexEntries, commonLength),
-      bounds.lower.inclusive ? "gte" : "gt",
+      indexBounds.lower.inclusive ? "gte" : "gt",
     );
     const upper = peelBound(
       Array.drop(upperIndexEntries, commonLength),
-      bounds.upper.inclusive ? "lte" : "lt",
+      indexBounds.upper.inclusive ? "lte" : "lt",
     );
 
-    const startRanges = Array.map(lower.peeled, ({ indexEntries, tag }) =>
+    const startIndexRanges = Array.map(lower.peeled, ({ indexEntries, tag }) =>
       rangeFor(equalities, indexEntries, tag),
     );
-    const endRanges = Array.reverse(
+    const endIndexRanges = Array.reverse(
       Array.map(upper.peeled, ({ indexEntries, tag }) =>
         rangeFor(equalities, indexEntries, tag),
       ),
@@ -416,7 +424,7 @@ export const fromBounds = (
       lower.final;
     const { indexEntries: upperFinalIndexEntries, tag: upperFinalTag } =
       upper.final;
-    const middleRange =
+    const middleIndexRange =
       Array.isReadonlyArrayNonEmpty(lowerFinalIndexEntries) &&
       Array.isReadonlyArrayNonEmpty(upperFinalIndexEntries)
         ? make({
@@ -439,11 +447,11 @@ export const fromBounds = (
           ? rangeFor(equalities, lowerFinalIndexEntries, lowerFinalTag)
           : rangeFor(equalities, upperFinalIndexEntries, upperFinalTag);
 
-    const ranges = Array.appendAll(
-      Array.appendAll(startRanges, Array.of(middleRange)),
-      endRanges,
+    const indexRanges = Array.appendAll(
+      Array.appendAll(startIndexRanges, Array.of(middleIndexRange)),
+      endIndexRanges,
     );
-    return order === "desc" ? Array.reverse(ranges) : ranges;
+    return orderDirection === "desc" ? Array.reverse(indexRanges) : indexRanges;
   });
 
 /**

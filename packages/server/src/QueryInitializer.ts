@@ -411,8 +411,8 @@ export const make = <
       tableSchema: table.Fields,
       indexName,
       indexFieldPaths,
-      range,
-      order,
+      indexRange: range,
+      orderDirection: order,
     });
   }) as QueryInitializerFunction<"stream">;
 

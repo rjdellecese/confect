@@ -126,7 +126,7 @@ describe("QueryStreamCursor serialization", () => {
       orderKey,
     );
     expect(
-      QueryStreamKey.values(
+      QueryStreamKey.orderKey(
         Schema.decodeSync(QueryStreamCursor.codecForLayout(layout))(cursor),
       ),
     ).toEqual(orderKey);
@@ -156,7 +156,7 @@ describe("QueryStreamCursor serialization", () => {
       keyFields: ["created", "_id", "body", "_id"],
       orderKey,
     });
-    expect(QueryStreamKey.values(Schema.decodeSync(codec)(encoded))).toEqual(
+    expect(QueryStreamKey.orderKey(Schema.decodeSync(codec)(encoded))).toEqual(
       orderKey,
     );
   });
@@ -190,8 +190,8 @@ describe("QueryStreamCursor serialization", () => {
     const decoded = Schema.decodeSync(codec)(
       encode(complete(layout, ["hello", "id"])),
     );
-    expect(QueryStreamKey.layout(decoded)).toBe(layout);
-    expect(QueryStreamKey.values(decoded)).toEqual(["hello", "id"]);
+    expect(QueryStreamKey.keyLayout(decoded)).toBe(layout);
+    expect(QueryStreamKey.orderKey(decoded)).toEqual(["hello", "id"]);
   });
 
   it.each([
@@ -232,7 +232,7 @@ describe("QueryStreamCursor serialization", () => {
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["text"]), identity),
     ]) {
       expect(() =>
-        QueryStreamKey.values(
+        QueryStreamKey.orderKey(
           Schema.decodeSync(QueryStreamCursor.codecForLayout(layout))(cursor),
         ),
       ).toThrow(Schema.SchemaError);
@@ -249,7 +249,7 @@ describe("QueryStreamCursor serialization", () => {
 
     expect(cursor).not.toBe(QueryStreamCursor.END_CURSOR);
     expect(
-      QueryStreamKey.values(
+      QueryStreamKey.orderKey(
         Schema.decodeSync(
           QueryStreamCursor.codecForLayout(
             Result.getOrThrowWith(
@@ -306,7 +306,7 @@ describe("QueryStreamCursor serialization", () => {
         >().toEqualTypeOf<QueryStreamKey.Complete>();
         expectTypeOf<typeof bound.Encoded>().toEqualTypeOf<string>();
         expect(
-          QueryStreamKey.values(yield* Schema.decodeEffect(bound)(encoded)),
+          QueryStreamKey.orderKey(yield* Schema.decodeEffect(bound)(encoded)),
         ).toEqual(value.orderKey);
         expect(
           yield* Schema.encodeEffect(bound)(complete(layout, value.orderKey)),

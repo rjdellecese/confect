@@ -84,7 +84,7 @@ The last column compares each operation with Effect's `Stream` operations.
 
 Every query stream visits its **order keys** in its **direction**. Keys are stored separately from emitted values, so mapping a document doesn't change its position. Compatible streams can be merged in key order, and pagination resumes after a saved key rather than an offset.
 
-The `Labels` and `Direction` type parameters enforce this contract: TypeScript rejects known label or direction mismatches in `merge`. Runtime checks also require matching directions and [key layouts](#order-keys-labels-and-layouts), including implicit-ID positions.
+The `KeyLabels` and `OrderDirection` type parameters enforce this contract: TypeScript rejects known label or direction mismatches in `merge`. Runtime checks also require matching directions and [key layouts](#order-keys-labels-and-layouts), including implicit-ID positions.
 
 `flatMap` appends the inner key to the outer key; `renameKey` replaces visible labels without changing key values. `reverse` changes the direction, not the key.
 
@@ -212,9 +212,9 @@ One joined key: [1,           "n1",               7,           "c1"]
 
 Labels alone cannot describe the joined layout: the outer ID sits between the two labeled positions. A `distinct` label prefix that reaches into the inner key also includes that intervening ID, so it groups within each outer document.
 
-Layouts are **compatible** when they have the same total width, the same labels in the same positions, and the same implicit-ID positions. Direction is checked separately. A layout contains no key values, value-type schema, table identity, or equality-pinned values, so different indexes or tables can have compatible layouts. When merging them, choose positions whose values have the same meaning; matching layouts alone does not establish that.
+Layouts are **compatible** when they have the same total width, the same labels in the same positions, and the same implicit-ID positions. Direction is stored in `stream.orderDirection` and checked separately. A layout contains no key values, value-type schema, table identity, or equality-pinned values, so different indexes or tables can have compatible layouts. When merging them, choose positions whose values have the same meaning; matching layouts alone does not establish that.
 
-Reuse a stream's `keyLayout` when calling `empty` or supplying `flatMap`'s `innerLayout`. Creating a stream to obtain its layout reads no documents. The type is normally inferred, but you can import the layout module directly when you need an annotation:
+Reuse a stream's `keyLayout` when calling `empty` or supplying `flatMap`'s `innerKeyLayout`. Creating a stream to obtain its layout reads no documents. The type is normally inferred, but you can import the layout module directly when you need an annotation:
 
 ```ts
 import type * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
@@ -515,7 +515,7 @@ To resume pagination, pass the previous page's `continueCursor` directly to `Que
 
 An outer document whose inner stream is empty contributes no elements. Use [`onEmpty`](#keep-outer-documents-without-inner-documents) to emit a placeholder for it.
 
-Supply `innerLayout` from a stream whose layout matches every stream returned by the callback. The joined stream needs its layout at construction, before any outer document is available to pass to the callback—even if the outer stream is empty. The layout determines the joined key positions and the width of markers for empty inner streams.
+Supply `innerKeyLayout` from a stream whose layout matches every stream returned by the callback. The joined stream needs its layout at construction, before any outer document is available to pass to the callback—even if the outer stream is empty. The layout determines the joined key positions and the width of markers for empty inner streams.
 
 Here, pinning `noteId` in `by_note` leaves creation time followed by an implicit ID. A `by_creation_time` stream has the same layout and supplies the template without needing a note ID. Creating that template reads no documents.
 
@@ -526,14 +526,14 @@ import { QueryStream } from "@confect/server";
 // creation time within each note.
 const commentsOn = (note: NotesDoc) =>
   reader.table("comments").stream("by_note", (q) => q.eq("noteId", note._id));
-const innerLayout = reader
+const innerKeyLayout = reader
   .table("comments")
   .stream("by_creation_time").keyLayout;
 
 reader
   .table("notes")
   .stream("by_role", (q) => q.eq("author.role", "admin"))
-  .pipe(QueryStream.flatMap(commentsOn, { innerLayout }));
+  .pipe(QueryStream.flatMap(commentsOn, { innerKeyLayout }));
 ```
 
 Each admin note's comment stream runs in turn. The result's key is the outer key followed by the inner key; `n5` has no comments, so it contributes only a filtered marker that keeps cursors moving:
@@ -551,14 +551,14 @@ of n1
                                     of n5
                                     ╰┤
 
-╞═ flatMap((note) => commentsOn(note), { innerLayout }) ═╡
+╞═ flatMap((note) => commentsOn(note), { innerKeyLayout }) ═╡
 
 joined
 ╰─ c1 ──────── c2 ──────── c3 ──────── (n5) ─────┤
    [1,7]       [1,8]       [4,9]       [5,null]
 ```
 
-Every returned inner stream must match `innerLayout` and run in the outer stream's direction. The template's direction is separate from its layout. TypeScript rejects known label or direction mismatches; runtime mismatches die with `InnerStreamLayoutMismatchError` or `InnerStreamOrderMismatchError` when the join runs.
+Every returned inner stream must match `innerKeyLayout` and run in the outer stream's direction. The template's direction is separate from its layout. TypeScript rejects known label or direction mismatches; runtime mismatches die with `InnerStreamLayoutMismatchError` or `InnerStreamOrderMismatchError` when the join runs.
 
 The joined key keeps both IDs: comment `c1` has key `[1, "n1", 7, "c1"]`.
 
@@ -566,7 +566,7 @@ For renamed inner streams, apply the same renaming to the template and the strea
 
 ```ts
 const labelCommentTime = QueryStream.renameKey(["commentTime"]);
-const renamedInnerLayout = reader
+const renamedInnerKeyLayout = reader
   .table("comments")
   .stream("by_creation_time")
   .pipe(labelCommentTime).keyLayout;
@@ -576,7 +576,7 @@ reader
   .stream("by_role", (q) => q.eq("author.role", "admin"))
   .pipe(
     QueryStream.flatMap((note) => commentsOn(note).pipe(labelCommentTime), {
-      innerLayout: renamedInnerLayout,
+      innerKeyLayout: renamedInnerKeyLayout,
     }),
   );
 ```
@@ -600,7 +600,7 @@ reader
           QueryStream.map((comment) => ({ note, comment })),
         ),
       {
-        innerLayout,
+        innerKeyLayout,
         onEmpty: (note) => ({ note, comment: undefined }),
       },
     ),
@@ -622,14 +622,14 @@ of n1
                                     of n5
                                     ╰┤
 
-╞═ flatMap((note) => commentsOn(note), { innerLayout, onEmpty }) ═╡
+╞═ flatMap((note) => commentsOn(note), { innerKeyLayout, onEmpty }) ═╡
 
 joined
 ╰─ c1 ──────── c2 ──────── c3 ──────── ∅n5 ──────┤
    [1,7]       [1,8]       [4,9]       [5,null]
 ```
 
-The elements are the inner stream's documents or the placeholders, so give both a common shape as above. Outer documents filtered out before the join stay absent. Everything else, including the `innerLayout` check and the direction rules, is unchanged.
+The elements are the inner stream's documents or the placeholders, so give both a common shape as above. Outer documents filtered out before the join stay absent. Everything else, including the `innerKeyLayout` check and the direction rules, is unchanged.
 
 ### Rename the order key
 
@@ -843,17 +843,17 @@ React's [`useStreamPaginatedQuery`](/clients/react#usestreampaginatedquery) hand
 TypeScript normally infers these parameters from `stream` and its composition:
 
 ```text
-QueryStream<Doc, Labels, Direction, Error, Requirements>
+QueryStream<Doc, KeyLabels, OrderDirection, Error, Requirements>
 ```
 
 | Parameter            | Meaning                                                                                                                                                                     |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Doc`                | Each emitted value: initially a decoded document, or a mapped/joined result. `never` means no values, as with an empty stream.                                              |
-| `Labels`             | Visible ordering labels, such as `["text", "_creationTime"]`. Inferred from the index and updated by `eq`, `flatMap`, and `renameKey`; implicit ID tiebreakers are omitted. |
-| `Direction`          | `"asc"` or `"desc"`. The type parameter defaults to their union; the `stream(...)` method defaults to `"asc"`.                                                              |
+| `KeyLabels`          | Visible ordering labels, such as `["text", "_creationTime"]`. Inferred from the index and updated by `eq`, `flatMap`, and `renameKey`; implicit ID tiebreakers are omitted. |
+| `OrderDirection`     | `"asc"` or `"desc"`. The type parameter defaults to their union; the `stream(...)` method defaults to `"asc"`.                                                              |
 | `Error` (`E`)        | Typed failures while reading or transforming values. `never` means no typed failures, not no defects.                                                                       |
 | `Requirements` (`R`) | Effect services needed to run the stream. `never` means no outstanding service requirements.                                                                                |
 
 For example, the notes `by_text` query has type `QueryStream<Note, ["text", "_creationTime"], "asc", DocumentDecodeError, never>`. It retains the database access supplied when it was created, so consuming it doesn't require providing `DatabaseReader` again. `mapEffect` and other effectful operations can add errors and service requirements.
 
-A `QueryStream<Doc, Labels, Direction, E, R>` is also a `Stream<Doc, E, R>`; only `QueryStream` carries the visible-label and direction types and the runtime key layout.
+A `QueryStream<Doc, KeyLabels, OrderDirection, E, R>` is also a `Stream<Doc, E, R>`; only `QueryStream` carries the visible-label and direction types and the runtime key layout.

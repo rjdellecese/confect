@@ -14,13 +14,13 @@ const admits =
       Layout.fromIndex(Array.from({ length: values.length }, () => "_id")),
     );
     // An empty explicit layout has no implicit ID.
-    const actualLayout =
+    const actualKeyLayout =
       values.length === 0
         ? Result.getOrThrow(Layout.fromIndex(["_id"], 1))
         : layout;
-    const key = Result.getOrThrow(Key.complete(actualLayout, values));
+    const key = Result.getOrThrow(Key.complete(actualKeyLayout, values));
     const bounds = Result.getOrThrow(
-      QueryStreamKeyBounds.parse(actualLayout, {
+      QueryStreamKeyBounds.parse(actualKeyLayout, {
         lower: side === "lower" ? bound : Option.none(),
         upper: side === "upper" ? bound : Option.none(),
       }),

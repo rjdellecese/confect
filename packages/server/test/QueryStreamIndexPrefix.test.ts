@@ -39,7 +39,7 @@ describe("QueryStreamIndexPrefix", () => {
         QueryStreamIndexPrefix.make(fieldPaths, orderKey),
       );
       expect(QueryStreamIndexPrefix.entries(prefix)).toEqual(indexEntries);
-      expect(QueryStreamIndexPrefix.values(prefix)).toEqual(orderKey);
+      expect(QueryStreamIndexPrefix.orderKey(prefix)).toEqual(orderKey);
     }
     expect(
       QueryStreamIndexPrefix.entries(
@@ -88,7 +88,7 @@ describe("QueryStreamIndexPrefix", () => {
         ["score", 3],
       ],
     ]);
-    expect(Array.map(prefixes, QueryStreamIndexPrefix.values)).toEqual([
+    expect(Array.map(prefixes, QueryStreamIndexPrefix.orderKey)).toEqual([
       ["a", 3, "id"],
       ["a", 3],
     ]);

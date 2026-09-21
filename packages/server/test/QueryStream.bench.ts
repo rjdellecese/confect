@@ -46,7 +46,7 @@ bench("merge", () => {
 
 bench("flatMap", () => {
   return QueryStream.flatMap(notes, messagesOf, {
-    innerLayout: messagesLayout,
+    innerKeyLayout: messagesLayout,
   });
 }).types([156, "instantiations"]);
 
@@ -56,7 +56,7 @@ bench("stream → filter → merge → flatMap → paginate", () => {
     moreNotes,
   ]).pipe(
     QueryStream.flatMap(messagesOf, {
-      innerLayout: messagesLayout,
+      innerKeyLayout: messagesLayout,
     }),
     QueryStream.paginate(paginationOpts),
   );

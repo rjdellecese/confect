@@ -150,11 +150,11 @@ const makeReader = (pending?: PendingRead) => {
     tableSchema,
     indexName: "by_group",
     indexFieldPaths: ["group", "_creationTime"],
-    range: QueryStreamIndexRange.builder<
+    indexRange: QueryStreamIndexRange.builder<
       Document,
       ["group", "_creationTime"]
     >(),
-    order: "asc",
+    orderDirection: "asc",
   });
   return { stream, runs, events };
 };

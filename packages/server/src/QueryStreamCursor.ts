@@ -15,9 +15,9 @@ const RuntimeLabels = Schema.Array(Schema.String);
 const RuntimeLabelsEquivalence = Schema.toEquivalence(RuntimeLabels);
 const segmentRuntimeLabels = Match.type<QueryStreamKeyLayout.Segment>().pipe(
   Match.tagsExhaustive({
-    WithImplicitId: ({ labels }) =>
-      Array.append(QueryStreamKeyLabels.toArray(labels), "_id"),
-    Explicit: ({ labels }) => QueryStreamKeyLabels.toArray(labels),
+    WithImplicitId: ({ keyLabels }) =>
+      Array.append(QueryStreamKeyLabels.toArray(keyLabels), "_id"),
+    Explicit: ({ keyLabels }) => QueryStreamKeyLabels.toArray(keyLabels),
   }),
 );
 
@@ -58,10 +58,10 @@ export const END_CURSOR = "[]";
  * @experimental
  */
 export const codecForLayout = (
-  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
 ) => {
   const runtimeLabels = Array.flatMap(
-    QueryStreamKeyLayout.segments(layout),
+    QueryStreamKeyLayout.segments(keyLayout),
     segmentRuntimeLabels,
   );
   return Json.check(
@@ -73,15 +73,14 @@ export const codecForLayout = (
     Schema.decodeTo(
       Schema.declare(QueryStreamKey.isComplete).check(
         Schema.makeFilter(
-          (orderKey) =>
-            QueryStreamKeyLayout.compatible(orderKey.layout, layout),
+          (key) => QueryStreamKeyLayout.compatible(key.keyLayout, keyLayout),
           { message: "Cursor key does not belong to the stream layout" },
         ),
       ),
       {
         decode: SchemaGetter.transformEffect((cursor, options) =>
           Effect.fromResult(
-            QueryStreamKey.complete(layout, cursor.orderKey),
+            QueryStreamKey.complete(keyLayout, cursor.orderKey),
           ).pipe(
             Effect.mapError(
               (error) =>
@@ -93,11 +92,11 @@ export const codecForLayout = (
             ),
           ),
         ),
-        encode: SchemaGetter.transformEffect((orderKey) =>
+        encode: SchemaGetter.transformEffect((key) =>
           QueryStreamCursor.makeEffect({
             version: 1,
             keyFields: runtimeLabels,
-            orderKey: orderKey.values,
+            orderKey: key.orderKey,
           }),
         ),
       },

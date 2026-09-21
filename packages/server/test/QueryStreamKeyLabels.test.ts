@@ -119,19 +119,21 @@ describe("QueryStreamKeyLabels", () => {
         QueryStreamKeyLabels.make(["authorId", "_creationTime"]),
       ),
     );
-    expectTypeOf(parsed.prefix).toEqualTypeOf<
+    expectTypeOf(parsed.prefixKeyLabels).toEqualTypeOf<
       QueryStreamKeyLabels.QueryStreamKeyLabels<readonly [string, string]>
     >();
-    expectTypeOf(parsed.prefix).toExtend<
+    expectTypeOf(parsed.prefixKeyLabels).toExtend<
       QueryStreamKeyLabels.QueryStreamKeyLabels<
         Array.NonEmptyReadonlyArray<string>
       >
     >();
-    expect(QueryStreamKeyLabels.toArray(parsed.prefix)).toEqual([
+    expect(QueryStreamKeyLabels.toArray(parsed.prefixKeyLabels)).toEqual([
       "author",
       "time",
     ]);
-    expect(QueryStreamKeyLabels.toArray(parsed.rest)).toEqual(["next"]);
+    expect(QueryStreamKeyLabels.toArray(parsed.remainingKeyLabels)).toEqual([
+      "next",
+    ]);
   });
 
   it("consumes zero or all labels and rejects an incomplete replacement chunk", () => {
@@ -139,16 +141,20 @@ describe("QueryStreamKeyLabels", () => {
     const empty = Option.getOrThrow(
       QueryStreamKeyLabels.consume(labels, QueryStreamKeyLabels.make([])),
     );
-    expectTypeOf(empty.prefix).toEqualTypeOf<
+    expectTypeOf(empty.prefixKeyLabels).toEqualTypeOf<
       QueryStreamKeyLabels.QueryStreamKeyLabels<readonly []>
     >();
-    expect(QueryStreamKeyLabels.size(empty.prefix)).toBe(0);
-    expect(QueryStreamKeyLabels.Equivalence(empty.rest, labels)).toBe(true);
+    expect(QueryStreamKeyLabels.size(empty.prefixKeyLabels)).toBe(0);
+    expect(
+      QueryStreamKeyLabels.Equivalence(empty.remainingKeyLabels, labels),
+    ).toBe(true);
     const full = Option.getOrThrow(
       QueryStreamKeyLabels.consume(labels, labels),
     );
-    expect(QueryStreamKeyLabels.Equivalence(full.prefix, labels)).toBe(true);
-    expect(QueryStreamKeyLabels.size(full.rest)).toBe(0);
+    expect(QueryStreamKeyLabels.Equivalence(full.prefixKeyLabels, labels)).toBe(
+      true,
+    );
+    expect(QueryStreamKeyLabels.size(full.remainingKeyLabels)).toBe(0);
     expect(
       Option.isNone(
         QueryStreamKeyLabels.consume(

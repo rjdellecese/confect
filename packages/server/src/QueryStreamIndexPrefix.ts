@@ -44,7 +44,7 @@ export const make = (
 export const entries = (self: QueryStreamIndexPrefix): IndexEntries =>
   self[TypeId];
 
-export const values = (
+export const orderKey = (
   self: QueryStreamIndexPrefix,
 ): QueryStreamOrderKey.QueryStreamOrderKey =>
   Array.map(entries(self), ([, value]) => value);
@@ -54,7 +54,7 @@ export const values = (
  */
 export const fromStreamKey = (
   fieldPaths: ReadonlyArray<string>,
-  equalities: QueryStreamOrderKey.QueryStreamOrderKey,
+  equalityOrderKey: QueryStreamOrderKey.QueryStreamOrderKey,
   self: QueryStreamKey.QueryStreamKey,
 ): Result.Result<QueryStreamIndexPrefix, IndexPrefixWidthMismatchError> =>
-  make(fieldPaths, Array.appendAll(equalities, self.values));
+  make(fieldPaths, Array.appendAll(equalityOrderKey, self.orderKey));

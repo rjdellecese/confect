@@ -12,9 +12,9 @@ const TypeId = "@confect/server/QueryStreamKeyLabels";
  * @experimental
  */
 export interface QueryStreamKeyLabels<
-  out Labels extends ReadonlyArray<string> = ReadonlyArray<string>,
+  out KeyLabels extends ReadonlyArray<string> = ReadonlyArray<string>,
 > {
-  readonly [TypeId]: Readonly<Labels>;
+  readonly [TypeId]: Readonly<KeyLabels>;
 }
 
 /**
@@ -22,18 +22,18 @@ export interface QueryStreamKeyLabels<
  *
  * @experimental
  */
-export const make = <const Labels extends ReadonlyArray<string>>(
-  labels: Labels,
-): QueryStreamKeyLabels<Labels> => ({ [TypeId]: labels });
+export const make = <const KeyLabels extends ReadonlyArray<string>>(
+  keyLabels: KeyLabels,
+): QueryStreamKeyLabels<KeyLabels> => ({ [TypeId]: keyLabels });
 
 /**
  * Inspect the names in visible key order.
  *
  * @experimental
  */
-export const toArray = <Labels extends ReadonlyArray<string>>(
-  self: QueryStreamKeyLabels<Labels>,
-): Readonly<Labels> => self[TypeId];
+export const toArray = <KeyLabels extends ReadonlyArray<string>>(
+  self: QueryStreamKeyLabels<KeyLabels>,
+): Readonly<KeyLabels> => self[TypeId];
 
 /**
  * Number of visible ordering components.
@@ -59,12 +59,12 @@ export const Equivalence: Equivalence_.Equivalence<QueryStreamKeyLabels> =
  * @experimental
  */
 export function concat<
-  Left extends ReadonlyArray<string>,
-  Right extends ReadonlyArray<string>,
+  LeftKeyLabels extends ReadonlyArray<string>,
+  RightKeyLabels extends ReadonlyArray<string>,
 >(
-  self: QueryStreamKeyLabels<Left>,
-  that: QueryStreamKeyLabels<Right>,
-): QueryStreamKeyLabels<readonly [...Left, ...Right]>;
+  self: QueryStreamKeyLabels<LeftKeyLabels>,
+  that: QueryStreamKeyLabels<RightKeyLabels>,
+): QueryStreamKeyLabels<readonly [...LeftKeyLabels, ...RightKeyLabels]>;
 export function concat(
   self: QueryStreamKeyLabels,
   that: QueryStreamKeyLabels,
@@ -80,10 +80,13 @@ export function concat(
  */
 export const stripPrefix = (
   self: QueryStreamKeyLabels,
-  prefix: QueryStreamKeyLabels,
+  prefixKeyLabels: QueryStreamKeyLabels,
 ): Option.Option<QueryStreamKeyLabels> =>
-  ArrayEquivalence(Array.take(toArray(self), size(prefix)), toArray(prefix))
-    ? Option.some(make(Array.drop(toArray(self), size(prefix))))
+  ArrayEquivalence(
+    Array.take(toArray(self), size(prefixKeyLabels)),
+    toArray(prefixKeyLabels),
+  )
+    ? Option.some(make(Array.drop(toArray(self), size(prefixKeyLabels))))
     : Option.none();
 
 /**
@@ -93,23 +96,29 @@ export const stripPrefix = (
  *
  * @experimental
  */
-export function consume<Template extends ReadonlyArray<string>>(
+export function consume<TemplateKeyLabels extends ReadonlyArray<string>>(
   self: QueryStreamKeyLabels,
-  template: QueryStreamKeyLabels<Template>,
+  templateKeyLabels: QueryStreamKeyLabels<TemplateKeyLabels>,
 ): Option.Option<{
-  readonly prefix: QueryStreamKeyLabels<{
-    readonly [K in keyof Template]: string;
+  readonly prefixKeyLabels: QueryStreamKeyLabels<{
+    readonly [K in keyof TemplateKeyLabels]: string;
   }>;
-  readonly rest: QueryStreamKeyLabels;
+  readonly remainingKeyLabels: QueryStreamKeyLabels;
 }>;
 export function consume(
   self: QueryStreamKeyLabels,
-  template: QueryStreamKeyLabels,
+  templateKeyLabels: QueryStreamKeyLabels,
 ): Option.Option<{
-  readonly prefix: QueryStreamKeyLabels;
-  readonly rest: QueryStreamKeyLabels;
+  readonly prefixKeyLabels: QueryStreamKeyLabels;
+  readonly remainingKeyLabels: QueryStreamKeyLabels;
 }> {
-  if (size(self) < size(template)) return Option.none();
-  const [prefix, rest] = Array.splitAt(toArray(self), size(template));
-  return Option.some({ prefix: make(prefix), rest: make(rest) });
+  if (size(self) < size(templateKeyLabels)) return Option.none();
+  const [prefixKeyLabels, remainingKeyLabels] = Array.splitAt(
+    toArray(self),
+    size(templateKeyLabels),
+  );
+  return Option.some({
+    prefixKeyLabels: make(prefixKeyLabels),
+    remainingKeyLabels: make(remainingKeyLabels),
+  });
 }

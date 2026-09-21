@@ -92,9 +92,9 @@ export const Order: Order_.Order<QueryStreamOrderKey> =
  * @experimental
  */
 export const PositionOrder = (
-  order: OrderDirection,
+  orderDirection: OrderDirection,
 ): Order_.Order<QueryStreamOrderKey> =>
-  order === "asc" ? Order : Order_.flip(Order);
+  orderDirection === "asc" ? Order : Order_.flip(Order);
 
 /**
  * @experimental

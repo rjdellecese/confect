@@ -17,10 +17,10 @@ import * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
  */
 export type Segment = Data.TaggedEnum<{
   WithImplicitId: {
-    readonly labels: QueryStreamKeyLabels.QueryStreamKeyLabels;
+    readonly keyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
   };
   Explicit: {
-    readonly labels: QueryStreamKeyLabels.QueryStreamKeyLabels<
+    readonly keyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels<
       Array.NonEmptyReadonlyArray<string>
     >;
   };
@@ -45,10 +45,10 @@ const TypeId = "@confect/server/QueryStreamKeyLayout";
  * values. Labels start as index field paths but may be renamed. An explicit ID,
  * such as in `by_id`, has a label.
  *
- * Reuse a stream's `keyLayout` with `empty` or `flatMap`'s `innerLayout`.
- * Creating a stream to obtain its layout does not read documents. The `Labels`
- * parameter tracks only labels; implicit-ID positions are checked at runtime.
- * Normally this type is inferred from the source stream.
+ * Reuse a stream's `keyLayout` with `empty` or `flatMap`'s `innerKeyLayout`.
+ * Creating a stream to obtain its layout does not read documents. The
+ * `KeyLabels` parameter tracks only labels; implicit-ID positions are checked
+ * at runtime. Normally this type is inferred from the source stream.
  *
  * Internally, segments preserve IDs during concatenation; compatibility depends
  * on positions and labels, independently of segment boundaries.
@@ -56,19 +56,19 @@ const TypeId = "@confect/server/QueryStreamKeyLayout";
  * @experimental
  */
 export interface QueryStreamKeyLayout<
-  out Labels extends ReadonlyArray<string> = ReadonlyArray<string>,
+  out KeyLabels extends ReadonlyArray<string> = ReadonlyArray<string>,
 > {
   readonly [TypeId]: {
-    readonly _Labels: Types.Covariant<Labels>;
+    readonly _Labels: Types.Covariant<KeyLabels>;
     readonly segments: ReadonlyArray<Segment>;
   };
 }
 
 // Private construction keeps the labels and runtime positions with the operations
 // that derive it from index fields, concatenation, or renaming.
-const make = <Labels extends ReadonlyArray<string>>(
+const make = <KeyLabels extends ReadonlyArray<string>>(
   segments: ReadonlyArray<Segment>,
-): QueryStreamKeyLayout<Labels> => ({
+): QueryStreamKeyLayout<KeyLabels> => ({
   [TypeId]: { _Labels: identity, segments },
 });
 
@@ -131,11 +131,11 @@ export class InvalidEqualityPrefixError extends Data.TaggedError(
 export class InvalidLabelPrefixError extends Data.TaggedError(
   "InvalidLabelPrefixError",
 )<{
-  readonly labels: QueryStreamKeyLabels.QueryStreamKeyLabels;
-  readonly prefixLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
+  readonly keyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
+  readonly prefixKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
 }> {
   override get message(): string {
-    return `Labels ([${Array.join(QueryStreamKeyLabels.toArray(this.prefixLabels), ", ")}]) must be a prefix of the ordering labels ([${Array.join(QueryStreamKeyLabels.toArray(this.labels), ", ")}])`;
+    return `Labels ([${Array.join(QueryStreamKeyLabels.toArray(this.prefixKeyLabels), ", ")}]) must be a prefix of the ordering labels ([${Array.join(QueryStreamKeyLabels.toArray(this.keyLabels), ", ")}])`;
   }
 }
 
@@ -147,11 +147,11 @@ export class InvalidLabelPrefixError extends Data.TaggedError(
 export class LabelCountMismatchError extends Data.TaggedError(
   "LabelCountMismatchError",
 )<{
-  readonly labels: QueryStreamKeyLabels.QueryStreamKeyLabels;
-  readonly replacementLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
+  readonly keyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
+  readonly replacementKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
 }> {
   override get message(): string {
-    return `Replacement labels ([${Array.join(QueryStreamKeyLabels.toArray(this.replacementLabels), ", ")}]) must have as many labels as the ordering labels ([${Array.join(QueryStreamKeyLabels.toArray(this.labels), ", ")}])`;
+    return `Replacement labels ([${Array.join(QueryStreamKeyLabels.toArray(this.replacementKeyLabels), ", ")}]) must have as many labels as the ordering labels ([${Array.join(QueryStreamKeyLabels.toArray(this.keyLabels), ", ")}])`;
   }
 }
 
@@ -191,20 +191,24 @@ export function fromIndex(
   ) {
     return Result.fail(new InvalidEqualityPrefixError({ fieldPaths, eqCount }));
   }
-  const labels = Array.drop(fieldPaths, eqCount);
+  const keyLabels = Array.drop(fieldPaths, eqCount);
   const componentSegments: ReadonlyArray<Segment> = Option.exists(
     Array.last(fieldPaths),
     (fieldPath) => fieldPath === "_id",
   )
-    ? Array.match(labels, {
+    ? Array.match(keyLabels, {
         onEmpty: () => [],
         onNonEmpty: (explicitLabels) => [
           Segment.Explicit({
-            labels: QueryStreamKeyLabels.make(explicitLabels),
+            keyLabels: QueryStreamKeyLabels.make(explicitLabels),
           }),
         ],
       })
-    : [Segment.WithImplicitId({ labels: QueryStreamKeyLabels.make(labels) })];
+    : [
+        Segment.WithImplicitId({
+          keyLabels: QueryStreamKeyLabels.make(keyLabels),
+        }),
+      ];
   return Result.succeed(make(componentSegments));
 }
 
@@ -214,12 +218,12 @@ export function fromIndex(
  * @experimental
  */
 export const concat = <
-  LeftLabels extends ReadonlyArray<string>,
-  RightLabels extends ReadonlyArray<string>,
+  LeftKeyLabels extends ReadonlyArray<string>,
+  RightKeyLabels extends ReadonlyArray<string>,
 >(
-  self: QueryStreamKeyLayout<LeftLabels>,
-  that: QueryStreamKeyLayout<RightLabels>,
-): QueryStreamKeyLayout<readonly [...LeftLabels, ...RightLabels]> =>
+  self: QueryStreamKeyLayout<LeftKeyLabels>,
+  that: QueryStreamKeyLayout<RightKeyLabels>,
+): QueryStreamKeyLayout<readonly [...LeftKeyLabels, ...RightKeyLabels]> =>
   make(Array.appendAll(segments(self), segments(that)));
 
 /**
@@ -228,16 +232,16 @@ export const concat = <
  * @experimental
  */
 export const format = (self: QueryStreamKeyLayout): string => {
-  const quoteLabels = (labels: QueryStreamKeyLabels.QueryStreamKeyLabels) =>
-    Array.map(QueryStreamKeyLabels.toArray(labels), (label) =>
+  const quoteLabels = (keyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels) =>
+    Array.map(QueryStreamKeyLabels.toArray(keyLabels), (label) =>
       JSON.stringify(label),
     );
   const tokens = Array.flatMap(
     segments(self),
     Segment.$match({
-      WithImplicitId: ({ labels }) =>
-        Array.append(quoteLabels(labels), "<implicit _id>"),
-      Explicit: ({ labels }) => quoteLabels(labels),
+      WithImplicitId: ({ keyLabels }) =>
+        Array.append(quoteLabels(keyLabels), "<implicit _id>"),
+      Explicit: ({ keyLabels }) => quoteLabels(keyLabels),
     }),
   );
   return `[${Array.join(tokens, ", ")}]`;
@@ -248,22 +252,23 @@ export const format = (self: QueryStreamKeyLayout): string => {
  *
  * @experimental
  */
-export function visibleLabels<Labels extends ReadonlyArray<string>>(
-  self: QueryStreamKeyLayout<Labels>,
-): QueryStreamKeyLabels.QueryStreamKeyLabels<Labels>;
+export function visibleLabels<KeyLabels extends ReadonlyArray<string>>(
+  self: QueryStreamKeyLayout<KeyLabels>,
+): QueryStreamKeyLabels.QueryStreamKeyLabels<KeyLabels>;
 export function visibleLabels(
   self: QueryStreamKeyLayout,
 ): QueryStreamKeyLabels.QueryStreamKeyLabels {
   return Array.reduce(
     segments(self),
     QueryStreamKeyLabels.make<ReadonlyArray<string>>([]),
-    (labels, segment) => QueryStreamKeyLabels.concat(labels, segment.labels),
+    (keyLabels, segment) =>
+      QueryStreamKeyLabels.concat(keyLabels, segment.keyLabels),
   );
 }
 
 const segmentWidth = Segment.$match({
-  WithImplicitId: ({ labels }) => QueryStreamKeyLabels.size(labels) + 1,
-  Explicit: ({ labels }) => QueryStreamKeyLabels.size(labels),
+  WithImplicitId: ({ keyLabels }) => QueryStreamKeyLabels.size(keyLabels) + 1,
+  Explicit: ({ keyLabels }) => QueryStreamKeyLabels.size(keyLabels),
 });
 
 /**
@@ -286,7 +291,7 @@ const visiblePositions = (
   const [, groups] = Array.mapAccum(segments(self), 0, (offset, segment) => [
     offset + segmentWidth(segment),
     Array.map(
-      QueryStreamKeyLabels.toArray(segment.labels),
+      QueryStreamKeyLabels.toArray(segment.keyLabels),
       (_, index) => offset + index,
     ),
   ]);
@@ -316,48 +321,54 @@ export const compatible = (
  */
 export const resolvePrefix = (
   self: QueryStreamKeyLayout,
-  prefixLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
+  prefixKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
 ): Result.Result<number, InvalidLabelPrefixError> => {
-  const labels = visibleLabels(self);
-  return Option.match(QueryStreamKeyLabels.stripPrefix(labels, prefixLabels), {
-    onNone: () =>
-      Result.fail(new InvalidLabelPrefixError({ labels, prefixLabels })),
-    onSome: (rest) => {
-      const prefix = Array.take(
-        visiblePositions(self),
-        QueryStreamKeyLabels.size(labels) - QueryStreamKeyLabels.size(rest),
-      );
-      return Result.succeed(
-        Option.match(Array.last(prefix), {
-          onNone: () => 0,
-          onSome: (position) => position + 1,
-        }),
-      );
+  const keyLabels = visibleLabels(self);
+  return Option.match(
+    QueryStreamKeyLabels.stripPrefix(keyLabels, prefixKeyLabels),
+    {
+      onNone: () =>
+        Result.fail(
+          new InvalidLabelPrefixError({ keyLabels, prefixKeyLabels }),
+        ),
+      onSome: (remainingKeyLabels) => {
+        const prefix = Array.take(
+          visiblePositions(self),
+          QueryStreamKeyLabels.size(keyLabels) -
+            QueryStreamKeyLabels.size(remainingKeyLabels),
+        );
+        return Result.succeed(
+          Option.match(Array.last(prefix), {
+            onNone: () => 0,
+            onSome: (position) => position + 1,
+          }),
+        );
+      },
     },
-  });
+  );
 };
 
 // Parsing returns the rebuilt segment, retaining the Explicit case's nonempty
 // labels. No later indexing or nonempty assertion is needed to rename it.
 const consumeSegment = (
-  remaining: QueryStreamKeyLabels.QueryStreamKeyLabels,
+  replacementKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
   segment: Segment,
 ) =>
   Segment.$match(segment, {
-    WithImplicitId: ({ labels }) =>
+    WithImplicitId: ({ keyLabels }) =>
       Option.map(
-        QueryStreamKeyLabels.consume(remaining, labels),
-        ({ prefix, rest }) => ({
-          segment: Segment.WithImplicitId({ labels: prefix }),
-          rest,
+        QueryStreamKeyLabels.consume(replacementKeyLabels, keyLabels),
+        ({ prefixKeyLabels, remainingKeyLabels }) => ({
+          segment: Segment.WithImplicitId({ keyLabels: prefixKeyLabels }),
+          remainingKeyLabels,
         }),
       ),
-    Explicit: ({ labels }) =>
+    Explicit: ({ keyLabels }) =>
       Option.map(
-        QueryStreamKeyLabels.consume(remaining, labels),
-        ({ prefix, rest }) => ({
-          segment: Segment.Explicit({ labels: prefix }),
-          rest,
+        QueryStreamKeyLabels.consume(replacementKeyLabels, keyLabels),
+        ({ prefixKeyLabels, remainingKeyLabels }) => ({
+          segment: Segment.Explicit({ keyLabels: prefixKeyLabels }),
+          remainingKeyLabels,
         }),
       ),
   });
@@ -367,39 +378,44 @@ const consumeSegment = (
  *
  * @experimental
  */
-export const rename = <ReplacementLabels extends ReadonlyArray<string>>(
+export const rename = <ReplacementKeyLabels extends ReadonlyArray<string>>(
   self: QueryStreamKeyLayout,
-  replacementLabels: QueryStreamKeyLabels.QueryStreamKeyLabels<ReplacementLabels>,
+  replacementKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels<ReplacementKeyLabels>,
 ): Result.Result<
-  QueryStreamKeyLayout<Types.Mutable<ReplacementLabels>>,
+  QueryStreamKeyLayout<Types.Mutable<ReplacementKeyLabels>>,
   LabelCountMismatchError
 > => {
   const consumed = Array.reduce(
     segments(self),
     Option.some<{
-      readonly rest: QueryStreamKeyLabels.QueryStreamKeyLabels;
+      readonly remainingKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels;
       readonly segments: ReadonlyArray<Segment>;
-    }>({ rest: replacementLabels, segments: [] }),
+    }>({ remainingKeyLabels: replacementKeyLabels, segments: [] }),
     (state, segment) =>
-      Option.flatMap(state, ({ rest, segments: componentSegments }) =>
-        Option.map(consumeSegment(rest, segment), (parsed) => ({
-          rest: parsed.rest,
-          segments: Array.append(componentSegments, parsed.segment),
-        })),
+      Option.flatMap(
+        state,
+        ({ remainingKeyLabels, segments: componentSegments }) =>
+          Option.map(consumeSegment(remainingKeyLabels, segment), (parsed) => ({
+            remainingKeyLabels: parsed.remainingKeyLabels,
+            segments: Array.append(componentSegments, parsed.segment),
+          })),
       ),
   );
   const parsed = consumed.pipe(
-    Option.filter(({ rest }) => QueryStreamKeyLabels.size(rest) === 0),
+    Option.filter(
+      ({ remainingKeyLabels }) =>
+        QueryStreamKeyLabels.size(remainingKeyLabels) === 0,
+    ),
     Option.map(({ segments: componentSegments }) =>
-      make<Types.Mutable<ReplacementLabels>>(componentSegments),
+      make<Types.Mutable<ReplacementKeyLabels>>(componentSegments),
     ),
   );
   return Result.fromOption(
     parsed,
     () =>
       new LabelCountMismatchError({
-        labels: visibleLabels(self),
-        replacementLabels,
+        keyLabels: visibleLabels(self),
+        replacementKeyLabels,
       }),
   );
 };

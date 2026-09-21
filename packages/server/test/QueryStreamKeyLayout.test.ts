@@ -18,7 +18,7 @@ describe("QueryStreamKeyLayout", () => {
       visible: [],
       width: 1,
       segments: [
-        { _tag: "WithImplicitId", labels: QueryStreamKeyLabels.make([]) },
+        { _tag: "WithImplicitId", keyLabels: QueryStreamKeyLabels.make([]) },
       ],
     },
     {
@@ -29,7 +29,7 @@ describe("QueryStreamKeyLayout", () => {
       segments: [
         {
           _tag: "WithImplicitId",
-          labels: QueryStreamKeyLabels.make(["text", "_creationTime"]),
+          keyLabels: QueryStreamKeyLabels.make(["text", "_creationTime"]),
         },
       ],
     },
@@ -39,7 +39,7 @@ describe("QueryStreamKeyLayout", () => {
       visible: [],
       width: 1,
       segments: [
-        { _tag: "WithImplicitId", labels: QueryStreamKeyLabels.make([]) },
+        { _tag: "WithImplicitId", keyLabels: QueryStreamKeyLabels.make([]) },
       ],
     },
     {
@@ -48,7 +48,7 @@ describe("QueryStreamKeyLayout", () => {
       visible: ["_id"],
       width: 1,
       segments: [
-        { _tag: "Explicit", labels: QueryStreamKeyLabels.make(["_id"]) },
+        { _tag: "Explicit", keyLabels: QueryStreamKeyLabels.make(["_id"]) },
       ],
     },
     { fieldPaths: ["_id"], count: 1, visible: [], width: 0, segments: [] },
@@ -60,7 +60,7 @@ describe("QueryStreamKeyLayout", () => {
       segments: [
         {
           _tag: "WithImplicitId",
-          labels: QueryStreamKeyLabels.make(["_id", "text"]),
+          keyLabels: QueryStreamKeyLabels.make(["_id", "text"]),
         },
       ],
     },
@@ -152,7 +152,7 @@ describe("QueryStreamKeyLayout", () => {
     >();
     expectTypeOf<{
       readonly _tag: "Explicit";
-      readonly labels: QueryStreamKeyLabels.QueryStreamKeyLabels<[]>;
+      readonly keyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels<[]>;
     }>().not.toExtend<QueryStreamKeyLayout.Segment>();
   });
 
@@ -171,8 +171,8 @@ describe("QueryStreamKeyLayout", () => {
       explicit,
     );
     expect(QueryStreamKeyLayout.segments(joined)).toEqual([
-      { _tag: "WithImplicitId", labels: QueryStreamKeyLabels.make([]) },
-      { _tag: "Explicit", labels: QueryStreamKeyLabels.make(["hello"]) },
+      { _tag: "WithImplicitId", keyLabels: QueryStreamKeyLabels.make([]) },
+      { _tag: "Explicit", keyLabels: QueryStreamKeyLabels.make(["hello"]) },
     ]);
     expect(
       Result.getOrThrow(
@@ -221,8 +221,11 @@ describe("QueryStreamKeyLayout", () => {
       ["text", "_id"],
       ["text", "created", "extra"],
     ]) {
-      const prefixLabels = QueryStreamKeyLabels.make(invalid);
-      const result = QueryStreamKeyLayout.resolvePrefix(layout, prefixLabels);
+      const prefixKeyLabels = QueryStreamKeyLabels.make(invalid);
+      const result = QueryStreamKeyLayout.resolvePrefix(
+        layout,
+        prefixKeyLabels,
+      );
       expectTypeOf(result).toEqualTypeOf<
         Result.Result<number, QueryStreamKeyLayout.InvalidLabelPrefixError>
       >();
@@ -232,8 +235,8 @@ describe("QueryStreamKeyLayout", () => {
       );
       expect(error).toMatchObject({
         _tag: "InvalidLabelPrefixError",
-        labels: QueryStreamKeyLayout.visibleLabels(layout),
-        prefixLabels,
+        keyLabels: QueryStreamKeyLayout.visibleLabels(layout),
+        prefixKeyLabels,
       });
     }
     const zero = Result.getOrThrowWith(
@@ -382,8 +385,8 @@ describe("QueryStreamKeyLayout", () => {
     );
     expect(QueryStreamKeyLayout.runtimeWidth(renamed)).toBe(5);
     for (const incomplete of [[], ["a"], ["a", "b"], ["a", "b", "c", "d"]]) {
-      const replacementLabels = QueryStreamKeyLabels.make(incomplete);
-      const result = QueryStreamKeyLayout.rename(layout, replacementLabels);
+      const replacementKeyLabels = QueryStreamKeyLabels.make(incomplete);
+      const result = QueryStreamKeyLayout.rename(layout, replacementKeyLabels);
       expectTypeOf(result).toEqualTypeOf<
         Result.Result<
           QueryStreamKeyLayout.QueryStreamKeyLayout<Array<string>>,
@@ -396,8 +399,8 @@ describe("QueryStreamKeyLayout", () => {
       );
       expect(error).toMatchObject({
         _tag: "LabelCountMismatchError",
-        labels: QueryStreamKeyLayout.visibleLabels(layout),
-        replacementLabels,
+        keyLabels: QueryStreamKeyLayout.visibleLabels(layout),
+        replacementKeyLabels,
       });
     }
   });
