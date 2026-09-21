@@ -9,9 +9,9 @@ import type * as Types from "effect/Types";
 import * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 
 /**
- * One component of a stream key. An implicit ID can only terminate a segment;
- * an explicit segment contains only visible positions, including an explicit ID
- * or its alias. Empty keys have no segments.
+ * A sequence of key positions. An implicit ID can only terminate a segment; an
+ * explicit segment contains only visible positions, including an explicit ID or
+ * its alias. Empty keys have no segments.
  *
  * @experimental
  */
@@ -30,9 +30,28 @@ const Segment = Data.taggedEnum<Segment>();
 const TypeId = "@confect/server/QueryStreamKeyLayout";
 
 /**
- * The runtime layout witnessing the visible ordering labels `Labels`. Construct
- * layouts with `fromIndex`, `concat`, and `rename`, or reuse a stream's
- * `keyLayout`.
+ * Describes the positions in a stream's order keys: their sequence, their
+ * labels, and where implicit document-ID tiebreakers occur. Every element has
+ * its own key values; the stream has one shared layout.
+ *
+ * For example, labels `["text", "_creationTime"]` describe the labeled
+ * positions in a key such as `["apple", 1, "n1"]`. Its layout also records the
+ * final implicit ID position. Joined layouts retain each component's ID, so
+ * their labels alone do not describe every key position.
+ *
+ * Layouts are compatible when they have the same total width, labels in the
+ * same positions, and implicit-ID positions. Direction is separate. Layouts
+ * contain no key values, value-type schemas, table identity, or equality-pinned
+ * values. Labels start as index field paths but may be renamed. An explicit ID,
+ * such as in `by_id`, has a label.
+ *
+ * Reuse a stream's `keyLayout` with `empty` or `flatMap`'s `innerLayout`.
+ * Creating a stream to obtain its layout does not read documents. The `Labels`
+ * parameter tracks only labels; implicit-ID positions are checked at runtime.
+ * Normally this type is inferred from the source stream.
+ *
+ * Internally, segments preserve IDs during concatenation; compatibility depends
+ * on positions and labels, independently of segment boundaries.
  *
  * @experimental
  */
@@ -45,7 +64,7 @@ export interface QueryStreamKeyLayout<
   };
 }
 
-// Private construction keeps the logical key witness with the operations
+// Private construction keeps the labels and runtime positions with the operations
 // that derive it from index fields, concatenation, or renaming.
 const make = <Labels extends ReadonlyArray<string>>(
   segments: ReadonlyArray<Segment>,
@@ -290,8 +309,8 @@ export const compatible = (
   PositionsEquivalence(visiblePositions(self), visiblePositions(that));
 
 /**
- * Parse a logical prefix and resolve its runtime width. Hidden IDs before the
- * last selected label are included; hidden IDs after it are not.
+ * Resolve a label prefix to the width of its key-value prefix. Implicit IDs
+ * before the last selected label are included; those after it are not.
  *
  * @experimental
  */

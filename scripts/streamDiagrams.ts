@@ -225,12 +225,12 @@ export const diagrams: Readonly<Record<string, string>> = {
 
   "rename-key": lines(
     track("by_body", ["c1", "c2", "c3"]),
-    `${keys(["[great,7]", "[meh,8]", "[nice,9]"])}   key: [body, _creationTime]`,
+    `${keys(["[great,7]", "[meh,8]", "[nice,9]"])}   labels: [body, _creationTime]`,
     "",
     op('renameKey(["text", "_creationTime"])'),
     "",
     track("relabeled", ["c1", "c2", "c3"]),
-    `${keys(["[great,7]", "[meh,8]", "[nice,9]"])}   key: [text, _creationTime]`,
+    `${keys(["[great,7]", "[meh,8]", "[nice,9]"])}   labels: [text, _creationTime]`,
   ),
 
   "rename-key-merge": lines(

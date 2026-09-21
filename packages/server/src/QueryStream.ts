@@ -1,12 +1,12 @@
 /**
  * Compose, merge, join, and paginate index queries as Effect streams.
  *
- * A query stream is an Effect `Stream` of decoded documents with an order key
- * and direction. Create one with `reader.table(...).stream(index, range?,
- * order?)` for a standard index. The order defaults to `"asc"`; search indexes
- * use `reader.table(...).search(...)` instead. Unlike
- * `reader.table(...).index(...).stream()`, this returns a composable query
- * stream rather than a plain `Stream` over one query.
+ * A query stream is an Effect `Stream` of decoded documents with stored order
+ * keys, a shared key layout, and a direction. Create one with
+ * `reader.table(...).stream(index, range?, order?)` for a standard index. The
+ * order defaults to `"asc"`; search indexes use `reader.table(...).search(...)`
+ * instead. Unlike `reader.table(...).index(...).stream()`, this returns a
+ * composable query stream rather than a plain `Stream` over one query.
  *
  * Creating or composing a stream does not read documents. Reads begin when you
  * run a consuming effect, such as `Stream.runCollect` or `paginate`, and each
@@ -17,7 +17,9 @@
  * with `eq` removes it from the key; range bounds keep it. Keys retain creation
  * time and document-ID tiebreakers where applicable. `QueryStream` combinators
  * preserve the ordering information needed to merge and paginate; plain
- * `Stream` transforms return ordinary streams without that information.
+ * `Stream` transforms return ordinary streams without that information. A key
+ * layout describes the key positions, their visible labels, and implicit ID
+ * positions. Reuse a stream's `keyLayout` with `empty` or `flatMap`.
  *
  * Return the whole `paginate` result from a paginated query handler. In React,
  * use `useStreamPaginatedQuery`, not `usePaginatedQuery`: stream pages aren't
@@ -269,6 +271,11 @@ export class QueryStream<
 
   constructor(
     readonly order: Direction,
+    /**
+     * Shared description of the order-key positions, including visible labels
+     * and implicit IDs. Reuse with `empty` or `flatMap`'s `innerLayout`.
+     * Reading this property does not read documents. Direction is in `order`.
+     */
     readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<Labels>,
     /**
      * Values paired with stored keys, including filtered markers that advance
@@ -787,15 +794,15 @@ const mergeStep =
     });
 
 /**
- * Combine streams sharing an order key into one stream in key order. Use this
- * to query several index ranges at once, such as notes by multiple roles.
+ * Combine streams with matching key layouts into one stream in key order. Use
+ * this to query several index ranges at once, such as notes by multiple roles.
  *
  * The merge emits the smallest next key when ascending and the largest when
  * descending. Unlike `Stream.merge`, it does not interleave by arrival time.
  * Overlapping inputs are not deduplicated: a document matched twice appears
  * twice. Supply at least one input; use `empty` for an empty dynamic list.
  *
- * Inputs need compatible document types and identical key layouts and
+ * Inputs need compatible document types and matching key layouts and
  * directions. TypeScript rejects known mismatches; runtime mismatches throw
  * `IncompatibleStreamsError` when combined. Map to a common value shape and use
  * `renameKey` when compatible indexes have different field names.
@@ -1152,8 +1159,15 @@ export const mapEffect = dual<
  *
  * Supply `options.innerLayout` from a compatible stream's `keyLayout`. For
  * example, comments indexed by `noteId` and pinned to a note have the same
- * layout as comments ordered by creation time. For nested joins or renamed
- * streams, reuse a compatible composed layout instead.
+ * layout as comments ordered by creation time: one visible creation-time
+ * position followed by an implicit ID. Creating the template reads no
+ * documents. For nested joins or renamed streams, apply the same composition or
+ * renaming to the template before reusing its layout.
+ *
+ * The layout is required when constructing the joined stream, before any outer
+ * document is available to pass to `f`, including when the outer stream is
+ * empty. It determines the joined key positions and the width of empty-inner
+ * markers. It contains no query results or direction.
  *
  * Every inner stream must match that layout and the outer direction. TypeScript
  * rejects known mismatches; others die with `InnerStreamOrderMismatchError` or
@@ -1184,6 +1198,12 @@ export const flatMap = dual<
   >(
     f: (doc: Doc) => QueryStream<Doc2, InnerLabels, Direction, E2, R2>,
     options: {
+      /**
+       * Expected layout of every stream returned by `f`. Reuse a compatible
+       * stream's `keyLayout`, after any renaming or nested joins. Obtaining the
+       * layout reads no documents; each returned stream is checked when run.
+       * Inner streams must also run in the outer stream's direction.
+       */
       readonly innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
         NoInfer<InnerLabels>
       >;
@@ -1213,6 +1233,12 @@ export const flatMap = dual<
     self: QueryStream<Doc, Labels, Direction, E, R>,
     f: (doc: Doc) => QueryStream<Doc2, InnerLabels, NoInfer<Direction>, E2, R2>,
     options: {
+      /**
+       * Expected layout of every stream returned by `f`. Reuse a compatible
+       * stream's `keyLayout`, after any renaming or nested joins. Obtaining the
+       * layout reads no documents; each returned stream is checked when run.
+       * Inner streams must also run in the outer stream's direction.
+       */
       readonly innerLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
         NoInfer<InnerLabels>
       >;
@@ -1335,7 +1361,7 @@ const makeFlatMap = <
     () => null,
   );
 
-  // Logical key types omit hidden IDs, and directions may be unions.
+  // Label types omit implicit IDs, and directions may be unions.
   // Validate every returned stream, including later rows and later runs.
   const validated = (
     inner: QueryStream<Doc2, InnerLabels, Direction, E2, R2>,
