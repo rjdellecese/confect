@@ -1,5 +1,9 @@
 # @confect/foldkit
 
+## 10.0.0-next.23
+
+No changes in this release.
+
 ## 10.0.0-next.22
 
 ### Minor Changes
