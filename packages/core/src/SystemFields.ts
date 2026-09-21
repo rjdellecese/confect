@@ -62,20 +62,18 @@ const splitSystemFields = (input: { [key: PropertyKey]: unknown }) => {
 const wrapGetter = <R>(
   getter: SchemaGetter.Getter<any, any, R>,
 ): SchemaGetter.Getter<any, any, R> =>
-  new SchemaGetter.Getter((input, options) => {
+  SchemaGetter.transformOptionalEffect((input, options) => {
     if (Option.isNone(input) || !Predicate.isObject(input.value)) {
-      return getter.run(input, options);
+      return SchemaGetter.run(getter, input, options);
     }
     const { system, rest } = splitSystemFields(input.value);
-    return getter
-      .run(Option.some(rest), options)
-      .pipe(
-        Effect.map(
-          Option.map((output) =>
-            Predicate.isObject(output) ? Struct.assign(output, system) : output,
-          ),
+    return SchemaGetter.run(getter, Option.some(rest), options).pipe(
+      Effect.map(
+        Option.map((output) =>
+          Predicate.isObject(output) ? Struct.assign(output, system) : output,
         ),
-      );
+      ),
+    );
   });
 
 const wrapTransformation = (

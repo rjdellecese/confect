@@ -22,19 +22,19 @@ allowBuilds:
 # they are safe to delete once the versions named here have aged past the
 # cutoff.
 minimumReleaseAgeExclude:
-  - "@effect/ai-openai-compat@4.0.0-rc.115"
-  - "@effect/platform-bun@4.0.0-rc.115"
-  - "@effect/platform-node-shared@4.0.0-rc.115"
-  - "@effect/platform-node@4.0.0-rc.115"
-  - "@effect/vitest@4.0.0-rc.115"
-  - effect@4.0.0-rc.115
+  - "@effect/ai-openai-compat@4.0.0-rc.116"
+  - "@effect/platform-bun@4.0.0-rc.116"
+  - "@effect/platform-node-shared@4.0.0-rc.116"
+  - "@effect/platform-node@4.0.0-rc.116"
+  - "@effect/vitest@4.0.0-rc.116"
+  - effect@4.0.0-rc.116
   - foldkit@0.148.1
   - effect-oxlint@0.3.4
   - eslint-plugin-jsdoc@64.3.10
 
 overrides:
   convex: 1.45.0
-  effect: 4.0.0-rc.115
+  effect: 4.0.0-rc.116
   react: 19.3.0
   react-dom: 19.3.0
 
