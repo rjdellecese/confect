@@ -4,11 +4,14 @@
 
 Preserve ID tiebreakers through `QueryStream` joins, empty streams, and renaming, and use `keyValues` for bounds and annotated elements. `QueryStream.merge` and `QueryStream.flatMap` reject incompatible orderings, including inner streams produced on later rows or later runs. Reused and narrowed streams preserve their index constraints, and `QueryStream.narrow` rejects bounds wider than the stream's ordering key before executing a query.
 
+Ordering mismatch errors expose `expectedKeyLayout`, `actualKeyLayout`, `expectedOrderDirection`, and `actualOrderDirection`, as applicable.
+
 ### Breaking Changes
 
 - `QueryStream.narrow` endpoints and annotated elements replace `key` with `keyValues`.
 - `QueryStream.empty` accepts a compatible stream's `keyLayout` instead of field names.
-- `QueryStream.flatMap` replaces `innerKey` with `innerLayout`.
+- `QueryStream.flatMap` replaces `innerKey` with `innerKeyLayout`.
+- A query stream's `order` property is renamed to `orderDirection`.
 - Explicit `QueryStream` type annotations require branded ordering labels instead of plain label tuples. Inferred stream types need no changes.
 - `QueryStream.paginate` uses a new cursor format. Restart pagination with `cursor: null` after upgrading; continuation cursors from earlier prereleases are no longer accepted.
 
@@ -41,6 +44,7 @@ For empty streams and joins, reuse the `keyLayout` of a stream with the required
 ```ts
 QueryStream.empty<NotesDoc>()(["_creationTime"]);
 QueryStream.flatMap(notes, commentsOn, { innerKey: ["_creationTime"] });
+notes.order;
 ```
 
 **After:**
@@ -53,8 +57,9 @@ QueryStream.empty<NotesDoc>()(byTime.keyLayout);
 
 const commentsByTime = reader.table("comments").stream("by_creation_time");
 QueryStream.flatMap(notes, commentsOn, {
-  innerLayout: commentsByTime.keyLayout,
+  innerKeyLayout: commentsByTime.keyLayout,
 });
+notes.orderDirection;
 ```
 
 Prefer deriving stream type aliases from an inferred stream, such as `type NoteStream = typeof byTime`, rather than spelling out the ordering-label type parameter.
