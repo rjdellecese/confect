@@ -201,6 +201,32 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
         esbuildOptions: {
           plugins: [
             ...(options?.plugins ?? []),
+            {
+              name: "confect:skip-schema-installation",
+              setup(build) {
+                build.onResolve({ filter: /schemaCompilers[/\\]/ }, (args) => {
+                  const resolved = path.resolve(args.resolveDir, args.path);
+                  if (
+                    !resolved.includes(
+                      `${path.sep}_generated${path.sep}schemaCompilers${path.sep}`,
+                    )
+                  )
+                    return;
+                  return {
+                    path: resolved,
+                    namespace: "confect-schema-compiler",
+                  };
+                });
+                build.onLoad(
+                  { filter: /.*/, namespace: "confect-schema-compiler" },
+                  () => ({
+                    contents:
+                      "export const install = () => {}; export const prepare = () => {};",
+                    loader: "js",
+                  }),
+                );
+              },
+            },
             bundleWorkspacePlugin(path, fs, skipPatterns),
             captureBuildResultPlugin(buildResultRef),
           ],

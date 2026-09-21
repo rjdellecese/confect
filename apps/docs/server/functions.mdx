@@ -148,3 +148,24 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
   barrel import pulls the whole `Schema` namespace into the module graph your
   function evaluates at cold start, even when you use only a small part of it.
 </Note>
+
+## Ahead-of-time schema parsing
+
+Confect can generate experimental ahead-of-time (AOT) schema parsers using Effect's schema compiler. Enable them for both one-off generation and development watching:
+
+```sh
+pnpm confect codegen --schema-aot
+pnpm confect dev --schema-aot
+```
+
+AOT prepares parsers for user-defined table reads and writes, server function arguments and returns, and declared function and middleware errors. The generated parsers use static JavaScript, so they work in the default Convex runtime, which does not allow the dynamic code generation required by Effect's JIT compiler. Unsupported schemas and operations retain Effect's interpreter fallback, including recursive schema bodies and some transformation paths.
+
+Keep your existing schema callbacks. Schemas still materialize lazily, unused tables do not install parsers, and each function group only imports its own generated function parsers. The shared table registry can still bring unused tables' generated parser code into a bundle. AOT does not precompute schema values or replace Convex validators. Generated parser code increases bundle size, so compare complete function execution costs before enabling it in production.
+
+<Warning>
+  Regenerate before deployment whenever schema definitions or the Effect version
+  change. Generated parsers must match the runtime schemas and Effect version.
+  Use `--schema-aot` consistently in your codegen and dev scripts; running
+  either command without it restores interpreted parsing and removes the
+  generated AOT files.
+</Warning>

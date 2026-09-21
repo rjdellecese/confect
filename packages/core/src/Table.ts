@@ -14,9 +14,15 @@ import type {
 import type { GenericValidator, Validator } from "convex/values";
 import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
+import type * as SchemaAST from "effect/SchemaAST";
 
 export const TypeId = "~@confect/core/Table";
 export type TypeId = typeof TypeId;
+
+export interface CodecPreparation {
+  readonly fields?: (ast: SchemaAST.AST) => void;
+  readonly doc?: (ast: SchemaAST.AST) => void;
+}
 
 // -----------------------------------------------------------------------------
 // Predicates
@@ -100,6 +106,7 @@ export interface UnnamedTable<
 > {
   <const Name_ extends string>(
     tableName: Name_,
+    prepare?: CodecPreparation,
   ): Table<
     Name_,
     TableSchema_,
@@ -267,6 +274,7 @@ const makeBound = <
 >(
   tableName: Name_,
   state: UnnamedState<TableSchema_, Indexes_, SearchIndexes_, VectorIndexes_>,
+  prepare?: CodecPreparation,
 ): Table<
   Name_,
   TableSchema_,
@@ -290,14 +298,20 @@ const makeBound = <
     VectorIndexes_
   >;
 
-  Lazy.defineProperty(bound, "Fields", () => state.lazyFields());
+  Lazy.defineProperty(bound, "Fields", () => {
+    const fields = state.lazyFields();
+    prepare?.fields?.(fields.ast);
+    return fields;
+  });
 
-  Lazy.defineProperty(bound, "Doc", () =>
-    SystemFields.extendWithSystemFields(
+  Lazy.defineProperty(bound, "Doc", () => {
+    const doc = SystemFields.extendWithSystemFields(
       tableName,
       (bound as { Fields: TableSchema_ }).Fields,
-    ),
-  );
+    );
+    prepare?.doc?.(doc.ast);
+    return doc;
+  });
 
   return bound;
 };
@@ -330,6 +344,7 @@ const makeUnnamed = <
 
   const bind = <const Name_ extends string>(
     tableName: Name_,
+    prepare?: CodecPreparation,
   ): Table<
     Name_,
     TableSchema_,
@@ -345,7 +360,7 @@ const makeUnnamed = <
       Indexes_,
       SearchIndexes_,
       VectorIndexes_
-    >(tableName, state);
+    >(tableName, state, prepare);
 
   const index: UnnamedTableFunction<"index"> = (name, fields) =>
     makeUnnamed({

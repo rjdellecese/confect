@@ -25,6 +25,7 @@ import {
 } from "bundle-require";
 import * as esbuild from "esbuild";
 import * as Ansi from "../Ansi";
+import * as AotCompiler from "../AotCompiler";
 import * as Bundler from "../Bundler";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
@@ -177,54 +178,57 @@ const logFunctionPathDiff = Effect.fnUntraced(function* (
   );
 });
 
-export const dev = Command.make("dev", {}, () =>
-  Effect.gen(function* () {
-    yield* logPending("Performing initial sync…");
-    const previousFunctionPaths = yield* loadPreviousFunctionPaths;
-    const initialResult = yield* codegenHandler.pipe(
-      Effect.tap(({ functionPaths }) =>
-        logFunctionPathDiff(previousFunctionPaths, functionPaths),
-      ),
-      Effect.tap(() => logSuccess("Generated files are up-to-date")),
-      CodegenError.catchAndLog,
-    );
-    const initialFunctionPaths = Option.match(initialResult, {
-      onNone: () => emptyFunctionPaths,
-      onSome: ({ functionPaths }) => functionPaths,
-    });
+export const dev = Command.make(
+  "dev",
+  { schemaAot: AotCompiler.flag },
+  ({ schemaAot }) =>
+    Effect.gen(function* () {
+      yield* logPending("Performing initial sync…");
+      const previousFunctionPaths = yield* loadPreviousFunctionPaths;
+      const initialResult = yield* codegenHandler.pipe(
+        Effect.tap(({ functionPaths }) =>
+          logFunctionPathDiff(previousFunctionPaths, functionPaths),
+        ),
+        Effect.tap(() => logSuccess("Generated files are up-to-date")),
+        CodegenError.catchAndLog,
+      );
+      const initialFunctionPaths = Option.match(initialResult, {
+        onNone: () => emptyFunctionPaths,
+        onSome: ({ functionPaths }) => functionPaths,
+      });
 
-    const pendingRef = yield* Ref.make<Pending>(pendingInit);
-    const signal = yield* Queue.sliding<void>(1);
-    const restartQueue = yield* Queue.sliding<void>(1);
-    const watcherErrorsRef =
-      yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
-    const watcherWarningsRef =
-      yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
+      const pendingRef = yield* Ref.make<Pending>(pendingInit);
+      const signal = yield* Queue.sliding<void>(1);
+      const restartQueue = yield* Queue.sliding<void>(1);
+      const watcherErrorsRef =
+        yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
+      const watcherWarningsRef =
+        yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
 
-    yield* Effect.all(
-      [
-        Effect.scoped(
-          entryPointsWatcher(
+      yield* Effect.all(
+        [
+          Effect.scoped(
+            entryPointsWatcher(
+              signal,
+              pendingRef,
+              restartQueue,
+              watcherErrorsRef,
+              watcherWarningsRef,
+            ),
+          ),
+          confectStructureWatcher(signal, pendingRef, restartQueue),
+          convexConfigStructureWatcher(signal, pendingRef, restartQueue),
+          syncLoop(
             signal,
             pendingRef,
-            restartQueue,
+            initialFunctionPaths,
             watcherErrorsRef,
             watcherWarningsRef,
           ),
-        ),
-        confectStructureWatcher(signal, pendingRef, restartQueue),
-        convexConfigStructureWatcher(signal, pendingRef, restartQueue),
-        syncLoop(
-          signal,
-          pendingRef,
-          initialFunctionPaths,
-          watcherErrorsRef,
-          watcherWarningsRef,
-        ),
-      ],
-      { concurrency: "unbounded" },
-    );
-  }),
+        ],
+        { concurrency: "unbounded" },
+      );
+    }).pipe(Effect.provideService(AotCompiler.Enabled, schemaAot)),
 ).pipe(Command.withDescription("Start the Confect development server"));
 
 const esbuildMessageKey = (m: esbuild.Message): string =>

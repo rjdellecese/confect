@@ -255,21 +255,37 @@ const idEffect = Effect.fnUntraced(function* ({
 export const tableWrapper = ({
   tableName,
   unnamedImportPath,
+  schemaAot = false,
 }: Parameters<typeof tableWrapperEffect>[0]) =>
-  tableWrapperEffect({ tableName, unnamedImportPath });
+  tableWrapperEffect({ tableName, unnamedImportPath, schemaAot });
 
 const tableWrapperEffect = Effect.fnUntraced(function* ({
   tableName,
   unnamedImportPath,
+  schemaAot = false,
 }: {
   tableName: string;
   unnamedImportPath: string;
+  schemaAot?: boolean;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
   yield* cbw.writeLine(`import unnamed from "${unnamedImportPath}";`);
+  if (schemaAot) {
+    yield* cbw.writeLine('import * as SchemaAST from "effect/SchemaAST";');
+    yield* cbw.writeLine(
+      `import { install as installFields } from "../schemaCompilers/tables/${tableName}/fields.js";`,
+    );
+    yield* cbw.writeLine(
+      `import { install as installDoc } from "../schemaCompilers/tables/${tableName}/doc.js";`,
+    );
+  }
   yield* cbw.blankLine();
-  yield* cbw.writeLine(`export default unnamed("${tableName}");`);
+  yield* cbw.writeLine(
+    schemaAot
+      ? `export default unnamed("${tableName}", { fields: ast => installFields([SchemaAST.flip(ast)]), doc: ast => installDoc([ast]) });`
+      : `export default unnamed("${tableName}");`,
+  );
 
   return yield* cbw.toString();
 });
@@ -470,6 +486,7 @@ export const registeredFunctionsForGroup = ({
   implImportPath,
   layerExportName,
   useNode = false,
+  compilerImportPath,
 }: Parameters<typeof registeredFunctionsForGroupEffect>[0]) =>
   registeredFunctionsForGroupEffect({
     schemaImportPath,
@@ -477,6 +494,7 @@ export const registeredFunctionsForGroup = ({
     implImportPath,
     layerExportName,
     useNode,
+    compilerImportPath,
   });
 
 const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
@@ -485,12 +503,14 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   implImportPath,
   layerExportName,
   useNode = false,
+  compilerImportPath,
 }: {
   schemaImportPath: string;
   specImportPath: string;
   implImportPath: string;
   layerExportName: string;
   useNode?: boolean;
+  compilerImportPath?: string | undefined;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
@@ -509,6 +529,9 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
 
   yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
   yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
+  if (compilerImportPath !== undefined) {
+    yield* cbw.writeLine(`import { prepare } from "${compilerImportPath}";`);
+  }
   yield* cbw.blankLine();
   // The group's own leaf spec is referenced type-only (`typeof import(...)`),
   // so the spec module is erased at transpile time and never enters the
@@ -520,7 +543,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
     ? "RegisteredNodeFunction.make"
     : "RegisteredConvexFunction.make";
   yield* cbw.writeLine(
-    `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
+    `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${compilerImportPath === undefined ? makeFn : `(schema, item, middleware) => { prepare(item); return ${makeFn}(schema, item, middleware); }`});`,
   );
 
   return yield* cbw.toString();

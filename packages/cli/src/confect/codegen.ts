@@ -1,4 +1,4 @@
-import { Spec, type GroupSpec } from "@confect/core";
+import { Spec, type GroupSpec, type Table } from "@confect/core";
 import * as Command from "effect/unstable/cli/Command";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -12,6 +12,8 @@ import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import * as Ref from "effect/Ref";
 import * as Bundler from "../Bundler";
+import * as AotCompiler from "../AotCompiler";
+import { fromBundlerError } from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import {
   LegacySchemaFileError,
@@ -102,15 +104,19 @@ const LEGACY_PATHS = Effect.gen(function* () {
   ];
 });
 
-export const codegen = Command.make("codegen", {}, () =>
-  Effect.gen(function* () {
-    yield* logPending("Performing initial sync…");
-    yield* codegenHandler.pipe(
-      Effect.asVoid,
-      Effect.tap(() => logSuccess("Generated files are up-to-date")),
-      CodegenError.tapAndLog,
-    );
-  }),
+export const codegen = Command.make(
+  "codegen",
+  { schemaAot: AotCompiler.flag },
+  ({ schemaAot }) =>
+    Effect.gen(function* () {
+      yield* logPending("Performing initial sync…");
+      yield* codegenHandler.pipe(
+        Effect.asVoid,
+        Effect.tap(() => logSuccess("Generated files are up-to-date")),
+        CodegenError.tapAndLog,
+        Effect.provideService(AotCompiler.Enabled, schemaAot),
+      );
+    }),
 ).pipe(
   Command.withDescription(
     "Generate `confect/_generated` files and the contents of the `convex` directory (except `convex.config.ts` and `tsconfig.json`)",
@@ -175,6 +181,7 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
+  yield* generateSchemaCompilers(tableModules, groupSpecsByPosixRelativePath);
   yield* validateImplModules(leaves);
   yield* generateGroupRegisteredFunctions(leaves);
   yield* removeObsoleteRegisteredFunctions(leaves);
@@ -421,6 +428,67 @@ const generateAssembledSpecs = Effect.fnUntraced(function* (
 const validateImplModules = (leaves: ReadonlyArray<LeafModule>) =>
   Effect.forEach(leaves, validateImpl);
 
+const generateSchemaCompilers = Effect.fnUntraced(function* (
+  tableModules: ReadonlyArray<TableModule.TableModule>,
+  groups: ReadonlyMap<string, GroupSpec.AnyWithProps>,
+) {
+  const path = yield* Path.Path;
+  const fs = yield* FileSystem.FileSystem;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const root = path.join(confectDirectory, "_generated", "schemaCompilers");
+  if (!(yield* AotCompiler.Enabled)) {
+    if (yield* fs.exists(root)) {
+      yield* fs.remove(root, { recursive: true });
+      yield* Ref.set(yield* WriteTracker, true);
+      yield* logFileRemoved(root);
+    }
+    return;
+  }
+  const artifacts: Array<AotCompiler.Artifact> = [];
+  for (const tableModule of tableModules) {
+    const { module } = yield* Bundler.bundle(
+      path.join(confectDirectory, tableModule.relativePath),
+    ).pipe(
+      Effect.mapError((error) =>
+        fromBundlerError(tableModule.relativePath, error),
+      ),
+    );
+    const unnamed: Table.UnnamedAnyWithProps = module.default;
+    artifacts.push(
+      ...(yield* Effect.fromResult(
+        AotCompiler.table(
+          tableModule.relativePath,
+          unnamed(tableModule.tableName),
+        ),
+      )),
+    );
+  }
+  for (const [modulePath, group] of groups) {
+    const stem = modulePath.slice(0, -".spec.ts".length);
+    artifacts.push(
+      ...(yield* Effect.fromResult(AotCompiler.group(modulePath, stem, group))),
+    );
+  }
+  for (const artifact of artifacts) {
+    const target = path.join(root, artifact.path);
+    yield* fs.makeDirectory(path.dirname(target), { recursive: true });
+    yield* writeFileStringAndLog(target, artifact.contents);
+  }
+  if (yield* fs.exists(root)) {
+    const expected = new Set(
+      artifacts.map((artifact) => path.join(root, artifact.path)),
+    );
+    for (const relative of yield* fs.readDirectory(root, { recursive: true })) {
+      const target = path.join(root, relative);
+      if ((yield* fs.stat(target)).type === "File" && !expected.has(target)) {
+        yield* removePathIfExists(target);
+        yield* Ref.set(yield* WriteTracker, true);
+        yield* logFileRemoved(target);
+      }
+    }
+  }
+});
+
 const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
   leaves: ReadonlyArray<LeafModule>,
 ) {
@@ -483,6 +551,20 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
         implImportPath,
         layerExportName: leaf.exportName,
         useNode: runtime === "Node",
+        compilerImportPath: (yield* AotCompiler.Enabled)
+          ? yield* toModuleImportPath(
+              path.relative(
+                registryDir,
+                path.join(
+                  confectDirectory,
+                  "_generated",
+                  "schemaCompilers",
+                  "groups",
+                  `${toPosixPath(path, leaf.relativePath).slice(0, -".spec.ts".length)}.ts`,
+                ),
+              ),
+            )
+          : undefined,
       });
 
       yield* writeFileStringAndLog(registryPath, contents);
@@ -716,6 +798,7 @@ const generateTableWrappers = Effect.fnUntraced(function* (
       const contents = yield* templates.tableWrapper({
         tableName: tableModule.tableName,
         unnamedImportPath,
+        schemaAot: yield* AotCompiler.Enabled,
       });
       yield* writeFileStringAndLog(wrapperPath, contents);
     }),

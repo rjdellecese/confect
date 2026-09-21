@@ -155,6 +155,11 @@ export class InvalidConvexConfigError extends Schema.TaggedError<InvalidConvexCo
   },
 ) {}
 
+export class SchemaCompilationError extends Schema.TaggedError<SchemaCompilationError>()(
+  "SchemaCompilationError",
+  { modulePath: Schema.String, cause: Schema.Defect() },
+) {}
+
 export const CodegenError = Schema.Union([
   BuildError,
   MissingImplFileError,
@@ -174,6 +179,7 @@ export const CodegenError = Schema.Union([
   LegacySchemaFileError,
   ConflictingDocNameError,
   InvalidConvexConfigError,
+  SchemaCompilationError,
 ]);
 export type CodegenError = typeof CodegenError.Type;
 
@@ -406,6 +412,14 @@ export const renderCodegenError = (error: CodegenError): string => {
     Match.tag("LegacySchemaFileError", renderLegacySchemaFileError),
     Match.tag("ConflictingDocNameError", renderConflictingDocNameError),
     Match.tag("InvalidConvexConfigError", renderInvalidConvexConfigError),
+    Match.tag("SchemaCompilationError", (compilationError) =>
+      singleLine(
+        "Could not compile schemas from ",
+        formatPath(compilationError.modulePath),
+        ": ",
+        String(compilationError.cause),
+      ),
+    ),
     Match.exhaustive,
   );
 };
