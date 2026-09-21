@@ -1518,7 +1518,7 @@ const makeFlatMap = <
   );
 
   const split = (bound: QueryStreamKeyBounds.ParsedBound): FlatMapBound => {
-    const keyValues = QueryStreamKey.keyValues(bound.key);
+    const keyValues = QueryStreamKey.values(bound.key);
     const { inclusive } = bound;
     return keyValues.length <= outerLength
       ? FlatMapBound.Outer({ keyValues, inclusive })
@@ -1774,9 +1774,9 @@ const makeDistinct = <
     bound: Option.Option<QueryStreamKeyBounds.ParsedBound>,
   ): Option.Option<QueryStreamKeyBounds.KeyBound> =>
     Option.map(bound, ({ inclusive, key }) => ({
-      keyValues: Array.take(QueryStreamKey.keyValues(key), distinctLength),
+      keyValues: Array.take(QueryStreamKey.values(key), distinctLength),
       inclusive:
-        QueryStreamKey.keyValues(key).length > distinctLength || inclusive,
+        QueryStreamKey.values(key).length > distinctLength || inclusive,
     }));
   const { aboveLower, belowUpper } = keyPredicates(parsedBounds);
   const isAdmitted = (keyValues: QueryStreamKeyValues.QueryStreamKeyValues) =>

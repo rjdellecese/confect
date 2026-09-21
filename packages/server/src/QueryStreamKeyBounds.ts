@@ -64,7 +64,7 @@ const cutRank = KeyCut.$match({
 
 const cutKeyValues = KeyCut.$match({
   Predecessor: ({ keyValues }) => keyValues,
-  Exact: ({ key }) => QueryStreamKey.keyValues(key),
+  Exact: ({ key }) => QueryStreamKey.values(key),
   Successor: ({ keyValues }) => keyValues,
 });
 
@@ -184,7 +184,7 @@ export const admittedByLower =
     Result.gen(function* () {
       yield* QueryStreamKeyLayout.validateEquivalence(
         parsedBounds.keyLayout,
-        key.keyLayout,
+        key.layout,
       );
       return Option.match(parsedBounds.lower, {
         onNone: () => true,
@@ -207,7 +207,7 @@ export const admittedByUpper =
     Result.gen(function* () {
       yield* QueryStreamKeyLayout.validateEquivalence(
         parsedBounds.keyLayout,
-        key.keyLayout,
+        key.layout,
       );
       return Option.match(parsedBounds.upper, {
         onNone: () => true,
@@ -285,7 +285,7 @@ export const fromParsed = (
     Option.match(endpoint, {
       onNone: () => Result.succeed(undefined),
       onSome: ({ key }) =>
-        QueryStreamKeyLayout.validateEquivalence(keyLayout, key.keyLayout),
+        QueryStreamKeyLayout.validateEquivalence(keyLayout, key.layout),
     });
   return Result.gen(function* () {
     yield* validateEndpoint(endpoints.lower);
@@ -295,7 +295,7 @@ export const fromParsed = (
 };
 
 const rawBound = (bound: ParsedBound): KeyBound => ({
-  keyValues: QueryStreamKey.keyValues(bound.key),
+  keyValues: QueryStreamKey.values(bound.key),
   inclusive: bound.inclusive,
 });
 
@@ -316,8 +316,8 @@ export const tightestParsedLower = (
 ): Result.Result<ParsedBound, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
   Result.gen(function* () {
     yield* QueryStreamKeyLayout.validateEquivalence(
-      self.key.keyLayout,
-      that.key.keyLayout,
+      self.key.layout,
+      that.key.layout,
     );
     return tighterLower(self, that);
   });
@@ -328,8 +328,8 @@ export const tightestParsedUpper = (
 ): Result.Result<ParsedBound, QueryStreamKeyLayout.KeyLayoutMismatchError> =>
   Result.gen(function* () {
     yield* QueryStreamKeyLayout.validateEquivalence(
-      self.key.keyLayout,
-      that.key.keyLayout,
+      self.key.layout,
+      that.key.layout,
     );
     return tighterUpper(self, that);
   });

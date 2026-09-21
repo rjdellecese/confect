@@ -8,8 +8,8 @@ const TypeId = "~@confect/server/QueryStreamKey";
 
 interface Payload {
   readonly [TypeId]: typeof TypeId;
-  readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
-  readonly keyValues: QueryStreamKeyValues.QueryStreamKeyValues;
+  readonly layout: QueryStreamKeyLayout.QueryStreamKeyLayout;
+  readonly values: QueryStreamKeyValues.QueryStreamKeyValues;
 }
 
 export type QueryStreamKey = Data.TaggedEnum<{
@@ -34,37 +34,37 @@ export class KeyWidthMismatchError extends Data.TaggedError(
 }
 
 export const complete = (
-  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  keyValues: QueryStreamKeyValues.QueryStreamKeyValues,
+  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  values: QueryStreamKeyValues.QueryStreamKeyValues,
 ): Result.Result<Complete, KeyWidthMismatchError> => {
-  const width = QueryStreamKeyLayout.runtimeWidth(keyLayout);
-  return keyValues.length === width
+  const width = QueryStreamKeyLayout.runtimeWidth(layout);
+  return values.length === width
     ? Result.succeed(
-        QueryStreamKey.Complete({ [TypeId]: TypeId, keyLayout, keyValues }),
+        QueryStreamKey.Complete({ [TypeId]: TypeId, layout, values }),
       )
     : Result.fail(
         new KeyWidthMismatchError({
           kind: "complete",
           width,
-          actual: keyValues.length,
+          actual: values.length,
         }),
       );
 };
 
 export const prefix = (
-  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  keyValues: QueryStreamKeyValues.QueryStreamKeyValues,
+  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  values: QueryStreamKeyValues.QueryStreamKeyValues,
 ): Result.Result<Prefix, KeyWidthMismatchError> => {
-  const width = QueryStreamKeyLayout.runtimeWidth(keyLayout);
-  return keyValues.length <= width
+  const width = QueryStreamKeyLayout.runtimeWidth(layout);
+  return values.length <= width
     ? Result.succeed(
-        QueryStreamKey.Prefix({ [TypeId]: TypeId, keyLayout, keyValues }),
+        QueryStreamKey.Prefix({ [TypeId]: TypeId, layout, values }),
       )
     : Result.fail(
         new KeyWidthMismatchError({
           kind: "prefix",
           width,
-          actual: keyValues.length,
+          actual: values.length,
         }),
       );
 };
@@ -73,16 +73,16 @@ export const prefix = (
 export const toPrefix = (self: Complete): Prefix =>
   QueryStreamKey.Prefix({
     [TypeId]: TypeId,
-    keyLayout: self.keyLayout,
-    keyValues: self.keyValues,
+    layout: self.layout,
+    values: self.values,
   });
 
-export const keyValues = (
+export const values = (
   self: QueryStreamKey,
-): QueryStreamKeyValues.QueryStreamKeyValues => self.keyValues;
-export const keyLayout = (
+): QueryStreamKeyValues.QueryStreamKeyValues => self.values;
+export const layout = (
   self: QueryStreamKey,
-): QueryStreamKeyLayout.QueryStreamKeyLayout => self.keyLayout;
+): QueryStreamKeyLayout.QueryStreamKeyLayout => self.layout;
 
 export const isComplete = (value: unknown): value is Complete =>
   Predicate.hasProperty(value, TypeId) && QueryStreamKey.$is("Complete")(value);

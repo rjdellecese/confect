@@ -65,7 +65,7 @@ export const fromKeyLayout = (
       Schema.decodeTo(
         Schema.declare(QueryStreamKey.isComplete).check(
           Schema.makeFilter(
-            (key) => QueryStreamKeyLayout.Equivalence(key.keyLayout, keyLayout),
+            (key) => QueryStreamKeyLayout.Equivalence(key.layout, keyLayout),
             { message: "Cursor key does not belong to the stream layout" },
           ),
         ),
@@ -87,7 +87,7 @@ export const fromKeyLayout = (
           encode: SchemaGetter.transformEffect((key) =>
             QueryStreamCursor.makeEffect({
               runtimeLabels,
-              keyValues: key.keyValues,
+              keyValues: key.values,
             }),
           ),
         },

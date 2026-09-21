@@ -57,4 +57,4 @@ export const fromStreamKey = (
   equalityKeyValues: QueryStreamKeyValues.QueryStreamKeyValues,
   self: QueryStreamKey.QueryStreamKey,
 ): Result.Result<QueryStreamIndexPrefix, IndexPrefixWidthMismatchError> =>
-  make(fieldPaths, Array.appendAll(equalityKeyValues, self.keyValues));
+  make(fieldPaths, Array.appendAll(equalityKeyValues, self.values));

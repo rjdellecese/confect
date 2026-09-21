@@ -486,7 +486,7 @@ describe.each(["asc", "desc"] as const)(
 
         expect([...first.page, ...second.page]).toEqual(ids);
         expect(
-          QueryStreamKey.keyValues(
+          QueryStreamKey.values(
             yield* Schema.decodeEffect(
               QueryStreamCursor.fromKeyLayout(source.keyLayout),
             )(first.continueCursor),
@@ -686,8 +686,8 @@ describe("QueryStream.narrow", () => {
         ] as const) {
           const bound = Option.getOrThrow(endpoint);
           expect(bound.key._tag).toBe("Prefix");
-          expect(QueryStreamKey.keyLayout(bound.key)).toBe(layout);
-          expect(QueryStreamKey.keyValues(bound.key)).toBe(raw.keyValues);
+          expect(QueryStreamKey.layout(bound.key)).toBe(layout);
+          expect(QueryStreamKey.values(bound.key)).toBe(raw.keyValues);
           expect(bound.inclusive).toBe(raw.inclusive);
         }
       }
@@ -719,8 +719,8 @@ describe("QueryStream.narrow", () => {
     expect(received).toHaveLength(1);
     for (const bounds of received) {
       const bound = Option.getOrThrow(bounds.lower);
-      expect(QueryStreamKey.keyLayout(bound.key)).toBe(layout);
-      expect(QueryStreamKey.keyValues(bound.key)).toBe(values);
+      expect(QueryStreamKey.layout(bound.key)).toBe(layout);
+      expect(QueryStreamKey.values(bound.key)).toBe(values);
     }
   });
 });

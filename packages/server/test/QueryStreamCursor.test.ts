@@ -150,7 +150,7 @@ describe("QueryStreamCursor serialization", () => {
       )(cursor).keyValues,
     ).toEqual(keyValues);
     expect(
-      QueryStreamKey.keyValues(
+      QueryStreamKey.values(
         Schema.decodeSync(QueryStreamCursor.fromKeyLayout(layout))(cursor),
       ),
     ).toEqual(keyValues);
@@ -179,7 +179,7 @@ describe("QueryStreamCursor serialization", () => {
       runtimeLabels: ["created", "_id", "body", "_id"],
       keyValues: keyValues,
     });
-    expect(QueryStreamKey.keyValues(Schema.decodeSync(codec)(encoded))).toEqual(
+    expect(QueryStreamKey.values(Schema.decodeSync(codec)(encoded))).toEqual(
       keyValues,
     );
   });
@@ -213,8 +213,8 @@ describe("QueryStreamCursor serialization", () => {
     const decoded = Schema.decodeSync(codec)(
       encode(complete(layout, ["hello", "id"])),
     );
-    expect(QueryStreamKey.keyLayout(decoded)).toBe(layout);
-    expect(QueryStreamKey.keyValues(decoded)).toEqual(["hello", "id"]);
+    expect(QueryStreamKey.layout(decoded)).toBe(layout);
+    expect(QueryStreamKey.values(decoded)).toEqual(["hello", "id"]);
   });
 
   it.each([
@@ -257,7 +257,7 @@ describe("QueryStreamCursor serialization", () => {
       Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex(["text"]), identity),
     ]) {
       expect(() =>
-        QueryStreamKey.keyValues(
+        QueryStreamKey.values(
           Schema.decodeSync(QueryStreamCursor.fromKeyLayout(layout))(cursor),
         ),
       ).toThrow(Schema.SchemaError);
@@ -274,7 +274,7 @@ describe("QueryStreamCursor serialization", () => {
 
     expect(cursor).not.toBe(QueryStreamCursor.END_CURSOR);
     expect(
-      QueryStreamKey.keyValues(
+      QueryStreamKey.values(
         Schema.decodeSync(
           QueryStreamCursor.fromKeyLayout(
             Result.getOrThrowWith(
@@ -329,9 +329,7 @@ describe("QueryStreamCursor serialization", () => {
         >().toEqualTypeOf<QueryStreamKey.Complete>();
         expectTypeOf<typeof bound.Encoded>().toEqualTypeOf<string>();
         expect(
-          QueryStreamKey.keyValues(
-            yield* Schema.decodeEffect(bound)(serialized),
-          ),
+          QueryStreamKey.values(yield* Schema.decodeEffect(bound)(serialized)),
         ).toEqual(value.keyValues);
         expect(
           yield* Schema.encodeEffect(bound)(complete(layout, value.keyValues)),

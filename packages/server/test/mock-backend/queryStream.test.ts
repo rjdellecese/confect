@@ -1842,7 +1842,7 @@ describe("QueryStream", () => {
               const key = yield* Schema.decodeEffect(
                 QueryStreamCursor.fromKeyLayout(source.keyLayout),
               )(cursor);
-              expect(QueryStreamKey.keyValues(key)).toHaveLength(3);
+              expect(QueryStreamKey.values(key)).toHaveLength(3);
 
               for (const bound of ["cursor", "endCursor"] as const) {
                 const result = yield* QueryStream.paginate(relabeled, {
