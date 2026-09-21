@@ -34,6 +34,13 @@ For a function with no arguments, omit `args`; Confect defaults it to an empty f
 
 ## Additional caveats
 
+### Optional-property safety
+
+Confect requires `strict: true` in your TypeScript configuration.
+`exactOptionalPropertyTypes: true` is optional but recommended. See
+[Effect Schema's explanation of `exactOptionalPropertyTypes`](https://effect.website/docs/v4/schema/introduction#the-exactoptionalpropertytypes-option)
+for how it affects optional properties and schema validation.
+
 ### No-op returns from Convex functions
 
 Unlike the vanilla APIs, Convex functions defined with Confect may not return `undefined` or `void`—use `null` (`Schema.Null` as the `returns` validator) instead. Convex coerces `undefined`/`void` returns to `null` anyways—this just makes that more explicit.
