@@ -380,12 +380,12 @@ export const make = <
       | OrderDirection,
     maybeOrder?: OrderDirection,
   ) => {
-    const order = Predicate.isString(indexRangeOrOrder)
+    const orderDirection = Predicate.isString(indexRangeOrOrder)
       ? indexRangeOrOrder
       : (maybeOrder ?? "asc");
 
     // Without a range callback, the leaf scans the entire index.
-    const range = Predicate.isFunction(indexRangeOrOrder)
+    const indexRange = Predicate.isFunction(indexRangeOrOrder)
       ? indexRangeOrOrder(QueryStreamIndexRange.builder())
       : QueryStreamIndexRange.builder();
 
@@ -420,8 +420,8 @@ export const make = <
       tableSchema: table.Fields,
       indexName,
       indexFieldPaths,
-      indexRange: range,
-      orderDirection: order,
+      indexRange,
+      orderDirection,
     });
   }) as QueryInitializerFunction<"stream">;
 
