@@ -214,12 +214,12 @@ export const make = <
   Tables extends Table.AnyWithProps,
   TableName extends Table.Name<Tables>,
 >(
-  tableName: TableName,
   convexDatabaseReader: BaseDatabaseReader<
     DataModel.ToConvex<DataModel.FromTables<Tables>>
   >,
   table: Table.WithName<Tables, TableName>,
 ): QueryInitializer<DataModel.FromTables<Tables>, TableName> => {
+  const tableName = table.tableName;
   type DataModel_ = DataModel.FromTables<Tables>;
   type ConvexDataModel_ = DataModel.ToConvex<DataModel_>;
   type ThisQueryInitializer = QueryInitializer<DataModel_, TableName>;
@@ -272,7 +272,7 @@ export const make = <
           ),
         ),
       ),
-      Effect.andThen(Document.decode(tableName, table)),
+      Effect.andThen(Document.decode(table)),
     );
   };
 
@@ -282,7 +282,7 @@ export const make = <
     if (args.length === 1) {
       const id = args[0] as GenericId<TableName>;
 
-      return getById(tableName, convexDatabaseReader, table)(id);
+      return getById<Tables, TableName>(convexDatabaseReader, table)(id);
     } else {
       const [indexName, ...indexFieldValues] = args;
 
@@ -358,10 +358,7 @@ export const make = <
       applyOrder,
     );
 
-    return OrderedQuery.make<
-      DataModel.TableInfoWithName_<DataModel_, TableName>,
-      TableName
-    >(orderedQuery, tableName, table);
+    return OrderedQuery.make(orderedQuery, table);
   };
 
   const stream: QueryInitializerFunction<"stream"> = ((
@@ -409,7 +406,6 @@ export const make = <
 
     return QueryStream.fromReflection({
       reader: convexDatabaseReader as QueryStream.ReflectionReader,
-      tableName,
       table,
       indexName,
       indexFieldPaths,
@@ -422,14 +418,10 @@ export const make = <
     indexName,
     searchFilter,
   ) =>
-    OrderedQuery.make<
-      DataModel.TableInfoWithName_<DataModel_, TableName>,
-      TableName
-    >(
+    OrderedQuery.make(
       convexDatabaseReader
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),
-      tableName,
       table,
     );
 
@@ -443,7 +435,6 @@ export const make = <
 
 export const getById =
   <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
-    tableName: TableName,
     convexDatabaseReader: BaseDatabaseReader<
       DataModel.ToConvex<DataModel.FromTables<Tables>>
     >,
@@ -456,11 +447,11 @@ export const getById =
         Effect.fromResult(
           Result.fromNullishOr(
             value,
-            () => new GetByIdFailure({ tableName, id }),
+            () => new GetByIdFailure({ tableName: table.tableName, id }),
           ),
         ),
       ),
-      Effect.andThen(Document.decode(tableName, table)),
+      Effect.andThen(Document.decode(table)),
     );
 
 export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>()(

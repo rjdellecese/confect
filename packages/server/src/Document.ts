@@ -7,6 +7,7 @@ import type { ReadonlyRecord } from "effect/Record";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type * as TableInfo from "./TableInfo";
+import type * as Table from "./Table";
 
 export type Document<
   Schema_ extends DatabaseSchema.AnyWithProps,
@@ -21,52 +22,28 @@ export type Any = any;
 export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 
 export const decode = Function.dual<
-  <
-    DataModel_ extends DataModel.AnyWithProps,
-    TableName extends DataModel.TableNames<DataModel_>,
-  >(
-    tableName: TableName,
-    table: {
-      readonly Doc: TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >;
-    },
+  <Table_ extends Table.AnyWithProps>(
+    table: Table_,
   ) => (
-    self: DataModel.TableInfoWithName_<DataModel_, TableName>["convexDocument"],
+    self: TableInfo.TableInfo<Table_>["convexDocument"],
   ) => Effect.Effect<
-    DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
+    TableInfo.TableInfo<Table_>["document"],
     DocumentDecodeError
   >,
-  <
-    DataModel_ extends DataModel.AnyWithProps,
-    TableName extends DataModel.TableNames<DataModel_>,
-  >(
-    self: DataModel.TableInfoWithName_<DataModel_, TableName>["convexDocument"],
-    tableName: TableName,
-    table: {
-      readonly Doc: TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >;
-    },
+  <Table_ extends Table.AnyWithProps>(
+    self: TableInfo.TableInfo<Table_>["convexDocument"],
+    table: Table_,
   ) => Effect.Effect<
-    DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
+    TableInfo.TableInfo<Table_>["document"],
     DocumentDecodeError
   >
 >(
-  3,
-  <
-    DataModel_ extends DataModel.AnyWithProps,
-    TableName extends DataModel.TableNames<DataModel_>,
-  >(
-    self: DataModel.TableInfoWithName_<DataModel_, TableName>["convexDocument"],
-    tableName: TableName,
-    table: {
-      readonly Doc: TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >;
-    },
+  2,
+  <Table_ extends Table.AnyWithProps>(
+    self: TableInfo.TableInfo<Table_>["convexDocument"],
+    table: Table_,
   ): Effect.Effect<
-    DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
+    TableInfo.TableInfo<Table_>["document"],
     DocumentDecodeError
   > =>
     pipe(
@@ -75,83 +52,51 @@ export const decode = Function.dual<
       Effect.catchIf(Schema.isSchemaError, (schemaError) =>
         Effect.fail(
           new DocumentDecodeError({
-            tableName,
+            tableName: table.tableName,
             id: self._id,
             parseError: schemaError.message,
           }),
         ),
-      ),
-      Effect.map(
-        (decodedDoc) =>
-          decodedDoc as DataModel.TableInfoWithName_<
-            DataModel_,
-            TableName
-          >["document"],
       ),
     ),
 );
 
 export const encode = Function.dual<
-  <
-    DataModel_ extends DataModel.AnyWithProps,
-    TableName extends DataModel.TableNames<DataModel_>,
-  >(
-    tableName: TableName,
-    tableSchema: TableInfo.TableSchema<
-      DataModel.TableInfoWithName_<DataModel_, TableName>
-    >,
+  <Table_ extends Table.AnyWithProps>(
+    table: Table_,
   ) => (
-    self: DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
+    self: Schema.Schema.Type<Table.Fields<Table_>>,
   ) => Effect.Effect<
-    DataModel.TableInfoWithName_<DataModel_, TableName>["encodedDocument"],
+    Schema.Codec.Encoded<Table.Fields<Table_>>,
     DocumentEncodeError
   >,
-  <
-    DataModel_ extends DataModel.AnyWithProps,
-    TableName extends DataModel.TableNames<DataModel_>,
-  >(
-    self: DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
-    tableName: TableName,
-    tableSchema: TableInfo.TableSchema<
-      DataModel.TableInfoWithName_<DataModel_, TableName>
-    >,
+  <Table_ extends Table.AnyWithProps>(
+    self: Schema.Schema.Type<Table.Fields<Table_>>,
+    table: Table_,
   ) => Effect.Effect<
-    DataModel.TableInfoWithName_<DataModel_, TableName>["encodedDocument"],
+    Schema.Codec.Encoded<Table.Fields<Table_>>,
     DocumentEncodeError
   >
 >(
-  3,
-  <
-    DataModel_ extends DataModel.AnyWithProps,
-    TableName extends DataModel.TableNames<DataModel_>,
-  >(
-    self: DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
-    tableName: TableName,
-    tableSchema: TableInfo.TableSchema<
-      DataModel.TableInfoWithName_<DataModel_, TableName>
-    >,
+  2,
+  <Table_ extends Table.AnyWithProps>(
+    self: Schema.Schema.Type<Table.Fields<Table_>>,
+    table: Table_,
   ): Effect.Effect<
-    DataModel.TableInfoWithName_<DataModel_, TableName>["encodedDocument"],
+    Schema.Codec.Encoded<Table.Fields<Table_>>,
     DocumentEncodeError
   > =>
     pipe(
       self,
-      Schema.encodeEffect(tableSchema),
+      Schema.encodeEffect(table.Fields),
       Effect.catchIf(Schema.isSchemaError, (schemaError) =>
         Effect.fail(
           new DocumentEncodeError({
-            tableName,
+            tableName: table.tableName,
             id: self._id,
             parseError: schemaError.message,
           }),
         ),
-      ),
-      Effect.map(
-        (encodedDoc) =>
-          encodedDoc as DataModel.TableInfoWithName_<
-            DataModel_,
-            TableName
-          >["encodedDocument"],
       ),
     ),
 );

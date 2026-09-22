@@ -149,7 +149,6 @@ const makeReader = (pending?: PendingRead) => {
   };
   const stream = QueryStream.fromReflection<Document, "asc">({
     reader,
-    tableName: "documents",
     table,
     indexName: "by_group",
     indexFieldPaths: ["group", "_creationTime"],

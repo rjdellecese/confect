@@ -122,7 +122,7 @@ describe("QueryStream", () => {
 
           // The leaf stores the query recipe, not a (one-shot) Convex
           // query object…
-          expect(stream.reflection?.tableName).toBe("notes");
+          expect(stream.reflection?.table.tableName).toBe("notes");
           expect(stream.reflection?.indexName).toBe("by_text");
           expect(stream.reflection?.indexFieldPaths).toEqual([
             "text",

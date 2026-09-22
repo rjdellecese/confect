@@ -17,7 +17,6 @@ import type { DocumentByName as DocumentByName_ } from "./DataModel";
 import * as Document from "./Document";
 import * as QueryInitializer from "./QueryInitializer";
 import type * as Table from "./Table";
-import type * as TableInfo from "./TableInfo";
 
 /**
  * The argument accepted by `patch`: like `Partial<Doc>`, but the fields that
@@ -109,11 +108,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         DocumentByName_<DataModel_, TableName>
       >,
     ) {
-      const encodedDocument = yield* Document.encode(
-        document,
-        tableName,
-        tableDef.Fields,
-      );
+      const encodedDocument = yield* Document.encode(document, tableDef);
 
       const id = yield* Effect.promise(() =>
         convexDatabaseWriter.insert(
@@ -133,15 +128,10 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         Document.WithoutSystemFields<DocumentByName_<DataModel_, TableName>>
       >,
     ) {
-      const tableSchema = tableDef.Fields as TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >;
-
       const originalDecodedDoc = yield* QueryInitializer.getById<
         Table.AnyWithProps,
         TableName
       >(
-        tableName,
         convexDatabaseWriter as any,
         tableDef,
       )(id);
@@ -153,7 +143,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
             ? Record.remove(acc, key)
             : Record.set(acc, key, value),
         ),
-        Document.encode(tableName, tableSchema),
+        Document.encode(tableDef),
       );
 
       yield* Effect.promise(() =>
@@ -175,11 +165,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         DocumentByName_<DataModel_, TableName>
       >,
     ) {
-      const updatedEncodedDoc = yield* Document.encode(
-        value,
-        tableName,
-        tableDef.Fields,
-      );
+      const updatedEncodedDoc = yield* Document.encode(value, tableDef);
 
       yield* Effect.promise(() =>
         convexDatabaseWriter.replace(

@@ -431,7 +431,7 @@ describe("server operation tracing", () => {
           ConvexDataModel["notes"]
         >;
         filter.mockReturnValue(query);
-        const operation = OrderedQuery.make(query, "notes", notes);
+        const operation = OrderedQuery.make(query, notes);
         const predicate: Parameters<typeof operation.paginate>[1] = (q) =>
           q.eq(q.field("value"), "7");
         const options = { numItems: 1, cursor: null };

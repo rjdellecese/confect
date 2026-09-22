@@ -45,7 +45,7 @@ describe("Document.decode", () => {
         evaluations++;
         return NoteSchema;
       })("notes");
-      const decode = Document.decode("notes", table);
+      const decode = Document.decode(table);
 
       expect(evaluations).toBe(0);
 
@@ -72,7 +72,7 @@ describe("Document.decode", () => {
     Effect.gen(function* () {
       const expected = decodeUncached("notes", NoteSchema, convexNote);
 
-      const decoded = yield* Document.decode(convexNote, "notes", notes);
+      const decoded = yield* Document.decode(convexNote, notes);
 
       expect(decoded).toEqual(expected);
     }),
@@ -82,9 +82,9 @@ describe("Document.decode", () => {
     "returns the same output when decoding repeatedly with the same table schema",
     () =>
       Effect.gen(function* () {
-        const first = yield* Document.decode(convexNote, "notes", notes);
-        const second = yield* Document.decode(convexNote, "notes", notes);
-        const third = yield* Document.decode(convexNote, "notes", notes);
+        const first = yield* Document.decode(convexNote, notes);
+        const second = yield* Document.decode(convexNote, notes);
+        const third = yield* Document.decode(convexNote, notes);
 
         expect(second).toEqual(first);
         expect(third).toEqual(first);
@@ -107,13 +107,11 @@ describe("Document.decode", () => {
 
         yield* Document.decode(
           convexNote,
-          "notes",
           Table.make(() => SharedSchema)("notes"),
         );
 
         const decodedPost = yield* Document.decode(
           convexPost,
-          "posts",
           Table.make(() => SharedSchema)("posts"),
         );
 
@@ -133,7 +131,7 @@ describe("Document.decode", () => {
       };
 
       const result = yield* Effect.result(
-        Document.decode("notes", notes)(invalidNote),
+        Document.decode<Table.AnyWithProps>(notes)(invalidNote),
       );
       if (Result.isSuccess(result)) {
         throw new Error("expected document decoding to fail");
@@ -148,12 +146,48 @@ describe("Document.decode", () => {
 });
 
 describe("Document.encode", () => {
+  it.effect("defers Fields until encoding and leaves Doc unmaterialized", () =>
+    Effect.gen(function* () {
+      let evaluations = 0;
+      const table = Table.make(() => {
+        evaluations++;
+        return Schema.Struct({ amount: Schema.FiniteFromString });
+      })("payments");
+      const encode = Document.encode(table);
+
+      expect(evaluations).toBe(0);
+      expect(yield* encode({ amount: 12 })).toEqual({ amount: "12" });
+      expect(yield* encode({ amount: 34 })).toEqual({ amount: "34" });
+      expect(evaluations).toBe(1);
+      expect(Object.getOwnPropertyDescriptor(table, "Doc")).toHaveProperty(
+        "get",
+        expect.any(Function),
+      );
+    }),
+  );
+
+  it.effect(
+    "reports encoding errors with the bound table name and document ID",
+    () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          Document.encode<Table.AnyWithProps>(notes)({
+            ...convexNote,
+            content: 42,
+          }).pipe(Effect.asVoid),
+        );
+        expect(error).toBeInstanceOf(Document.DocumentEncodeError);
+        expect(error.tableName).toBe(notes.tableName);
+        expect(error.id).toBe(convexNote._id);
+      }),
+  );
+
   it.effect("encodes documents identically to an uncached encoder", () =>
     Effect.gen(function* () {
       const decoded = decodeUncached("notes", NoteSchema, convexNote);
       const expected = encodeUncached(NoteSchema, decoded);
 
-      const encoded = yield* Document.encode(decoded, "notes", NoteSchema);
+      const encoded = yield* Document.encode(decoded, notes);
 
       expect(encoded).toEqual(expected);
     }),
@@ -165,9 +199,9 @@ describe("Document.encode", () => {
       Effect.gen(function* () {
         const decoded = decodeUncached("notes", NoteSchema, convexNote);
 
-        const first = yield* Document.encode(decoded, "notes", NoteSchema);
-        const second = yield* Document.encode(decoded, "notes", NoteSchema);
-        const third = yield* Document.encode(decoded, "notes", NoteSchema);
+        const first = yield* Document.encode(decoded, notes);
+        const second = yield* Document.encode(decoded, notes);
+        const third = yield* Document.encode(decoded, notes);
 
         expect(second).toEqual(first);
         expect(third).toEqual(first);
@@ -176,6 +210,29 @@ describe("Document.encode", () => {
 });
 
 describe("Document.Document", () => {
+  it("derives codec input and output types from the bound table", () => {
+    const payments = Table.make(() =>
+      Schema.Struct({ amount: Schema.FiniteFromString }),
+    )("payments");
+    const decode = Document.decode(payments);
+    const encode = Document.encode(payments);
+
+    expectTypeOf<Effect.Success<ReturnType<typeof decode>>>().toEqualTypeOf<
+      TableInfo.TableInfo<typeof payments>["document"]
+    >();
+    expectTypeOf(decode).parameter(0).toExtend<{
+      readonly amount: string;
+      readonly _id: GenericId<"payments">;
+      readonly _creationTime: number;
+    }>();
+    expectTypeOf(encode)
+      .parameter(0)
+      .toEqualTypeOf<{ readonly amount: number }>();
+    expectTypeOf<Effect.Success<ReturnType<typeof encode>>>().toEqualTypeOf<{
+      readonly amount: string;
+    }>();
+  });
+
   it("distributes system fields over union-schema tables", () => {
     const events = unnamedEvents("events");
     type Doc = TableInfo.TableInfo<typeof events>["document"];
