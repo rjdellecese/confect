@@ -99,7 +99,6 @@ layer(NodeServices.layer)("schema AOT codegen integration", (it) => {
         expect((yield* generate).anyWritesHappened).toBe(false);
         const source = `
 import assert from "node:assert/strict";
-import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import * as Document from "@confect/server/Document";
 import table from "./confect/_generated/tables/notes";
@@ -109,16 +108,16 @@ import registered from "./confect/_generated/registeredFunctions/primary";
 assert.equal(stats.builds, 0);
 assert.equal(unused.builds, 0);
 const input = { text: "hello", _id: "abc123", _creationTime: 42 };
-const doc = Effect.runSync(Document.decode(input, "notes", table));
+const doc = Effect.runSync(Document.decode(input, table));
 assert.deepEqual(doc, { length: 5, _id: "abc123", _creationTime: 42 });
 assert.equal(stats.builds, 1);
 assert.equal(stats.decodes, 1);
-assert.deepEqual(Effect.runSync(Schema.encodeEffect(table.Fields)(doc)), { text: "xxxxx" });
+assert.deepEqual(Effect.runSync(Document.encode(doc, table)), { text: "xxxxx" });
 assert.equal(stats.encodes, 1);
 assert.deepEqual(input, { text: "hello", _id: "abc123", _creationTime: 42 });
 assert.equal(await registered.echo._handler({}, { count: "41" }), "42");
 await assert.rejects(registered.echo._handler({}, { count: "-1" }), error => error.data.reason === "negative");
-assert.throws(() => Effect.runSync(Document.decode({ ...input, text: 42 }, "notes", table)));
+assert.throws(() => Effect.runSync(Document.decode({ ...input, text: 42 }, table)));
 assert.equal(unused.builds, 0);
 process.stdout.write("schema-aot-ok");
 `;
