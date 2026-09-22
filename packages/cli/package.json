@@ -10,7 +10,7 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@effect/cli": "^0.77.1",
+    "@effect/cli": "^0.77.2",
     "@effect/platform": "^0.97.1",
     "@effect/platform-node": "^0.108.1",
     "@effect/printer": "^0.51.0",
@@ -26,7 +26,7 @@
     "@effect/vitest": "0.30.0",
     "@types/node": "26.5.1",
     "@vitest/coverage-v8": "5.0.0",
-    "convex": "1.45.0",
+    "convex": "1.46.0",
     "effect": "3.22.2",
     "tsdown": "0.23.0",
     "typescript": "7.0.2",
