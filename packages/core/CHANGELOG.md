@@ -1,5 +1,11 @@
 # @confect/core
 
+## 10.0.0-next.24
+
+### Patch Changes
+
+- 850a3c3: Require `effect@^4.0.0-rc.117` across `@confect/*` and `@effect/platform-node@^4.0.0-rc.117` for `@confect/server`'s optional Node integration. Upgrade these dependencies alongside Confect; existing Confect call sites are unchanged.
+
 ## 10.0.0-next.23
 
 ### Major Changes
