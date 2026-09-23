@@ -8,4 +8,4 @@
 "@confect/test": patch
 ---
 
-Require `effect@^4.0.0-rc.116` across `@confect/*` and `@effect/platform-node@^4.0.0-rc.116` for `@confect/server`'s optional Node integration. Upgrade these dependencies alongside Confect; existing Confect call sites are unchanged.
+Require `effect@^4.0.0-rc.117` across `@confect/*` and `@effect/platform-node@^4.0.0-rc.117` for `@confect/server`'s optional Node integration. Upgrade these dependencies alongside Confect; existing Confect call sites are unchanged.

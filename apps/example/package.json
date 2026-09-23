@@ -9,7 +9,7 @@
     "@convex-dev/workpool": "0.4.12",
     "convex": "1.45.0",
     "convex-helpers": "0.1.124",
-    "effect": "4.0.0-rc.116",
+    "effect": "4.0.0-rc.117",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "vite": "8.3.0"
