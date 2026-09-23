@@ -6,7 +6,7 @@
     "@effect/vitest": "4.0.0-rc.117",
     "effect": "4.0.0-rc.117",
     "typescript": "7.0.2",
-    "vitest": "5.0.0"
+    "vitest": "5.0.1"
   },
   "exports": {
     "./CompilerOptions": "./src/CompilerOptions.ts"
