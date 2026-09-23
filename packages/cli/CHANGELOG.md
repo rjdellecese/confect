@@ -1,5 +1,11 @@
 # @confect/cli
 
+## 9.4.4
+
+### Patch Changes
+
+- cee5b43: Upgrade `@effect/cli` to `^0.77.2` to remove a vulnerability notice from its TOML dependency.
+
 ## 9.4.3
 
 ### Patch Changes
