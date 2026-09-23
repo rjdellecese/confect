@@ -262,11 +262,11 @@ A query stream is a genuine `Stream`, so everything in Effect's `Stream` module 
 `Stream.runCollect` returns an effect that collects all results; `Stream.runHead` returns an effect producing the first result as an `Option`. `Stream.take(n)` is a transform, not a consumer: it returns a plain stream of at most `n` results, which you can then collect.
 
 ```ts
+import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 
-const firstTwoTexts =
-  yield *
-  reader
+Effect.gen(function* () {
+  const firstTwoTexts = yield* reader
     .table("notes")
     .stream("by_text")
     .pipe(
@@ -274,6 +274,7 @@ const firstTwoTexts =
       Stream.take(2),
       Stream.runCollect,
     ); // ["apple", "apple"]
+});
 ```
 
 Once you apply a plain `Stream` combinator the result is an ordinary `Stream`: it can be consumed, but it no longer retains the key layout and stored keys, so it can't be merged or paginated further. Use the `QueryStream` combinators below when you need to keep that ability.
@@ -281,11 +282,13 @@ Once you apply a plain `Stream` combinator the result is an ordinary `Stream`: i
 `QueryStream.unique` consumes a stream expected to hold at most one document, returning an `Option` and failing with `NotUniqueError` if there are two or more:
 
 ```ts
-const cherry =
-  yield *
-  QueryStream.unique(
+import * as Effect from "effect/Effect";
+
+Effect.gen(function* () {
+  const cherry = yield* QueryStream.unique(
     reader.table("notes").stream("by_text", (q) => q.eq("text", "cherry")),
   );
+});
 ```
 
 {/* stream-diagram: unique */}
@@ -757,22 +760,22 @@ For a one-shot read inside a handler, consume the result's `page`. For sequentia
 
 ```ts
 import { QueryStream } from "@confect/server";
+import * as Effect from "effect/Effect";
 
-const query = reader.table("notes").stream("by_text");
-const first =
-  yield *
-  QueryStream.paginate(query, {
+Effect.gen(function* () {
+  const query = reader.table("notes").stream("by_text");
+  const first = yield* QueryStream.paginate(query, {
     cursor: null,
     numItems: 2,
   });
 
-const next = first.isDone
-  ? undefined
-  : yield *
-    QueryStream.paginate(query, {
-      cursor: first.continueCursor,
-      numItems: 2,
-    });
+  const next = first.isDone
+    ? undefined
+    : yield* QueryStream.paginate(query, {
+        cursor: first.continueCursor,
+        numItems: 2,
+      });
+});
 ```
 
 For reactive clients, return the whole pagination result from the handler so the client can pin and split pages, rather than returning just `page`.
