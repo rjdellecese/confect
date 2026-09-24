@@ -95,6 +95,23 @@ export const validateConfectFunctionIdentifier = (identifier: string) => {
 };
 
 /**
+ * Group names are API path segments, not JavaScript binding names.
+ */
+export const validateConfectGroupIdentifier = (identifier: string) => {
+  if (!matchesJsIdentifierPattern(identifier)) {
+    throw new Error(
+      `Expected a valid Confect group identifier, but received: "${identifier}". Valid identifiers must start with a letter, underscore, or dollar sign, and can only contain letters, numbers, underscores, or dollar signs.`,
+    );
+  }
+
+  if (isReservedConvexFileName(identifier)) {
+    throw new Error(
+      `Expected a valid Confect group identifier, but received: "${identifier}". "${identifier}" is a reserved Convex file name.`,
+    );
+  }
+};
+
+/**
  * Validate that `identifier` is suitable as a Convex table name (and,
  * equivalently, as a `confect/tables/<identifier>.ts` filename).
  *

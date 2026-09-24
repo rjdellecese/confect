@@ -20,7 +20,9 @@ export interface SpecAssemblyNode {
 const importBindingFromLeaf = (leaf: LeafModule): SpecImportBinding => ({
   importPath: leaf.specImportPath,
   exportName: leaf.exportName,
-  localName: leaf.pathSegments.join("_"),
+  // Prefixing avoids keywords and template bindings; segment lengths prevent
+  // distinct paths such as `a_b` and `a/b` from sharing an import binding.
+  localName: `$group${leaf.pathSegments.map((segment) => `$${segment.length}_${segment}`).join("")}`,
 });
 
 const assemblyNodesAtDepth = (

@@ -5,7 +5,7 @@ import * as Result from "effect/Result";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
-import { validateConfectFunctionIdentifier } from "./Identifier";
+import { validateConfectGroupIdentifier } from "./Identifier";
 
 export const TypeId = "~@confect/core/GroupSpec";
 export type TypeId = typeof TypeId;
@@ -318,7 +318,7 @@ export const make = (): GroupSpec<"Convex", ""> =>
 export const makeAt = <const Name_ extends string>(
   name: Name_,
 ): GroupSpec<"Convex", Name_> => {
-  validateConfectFunctionIdentifier(name);
+  validateConfectGroupIdentifier(name);
 
   return makeProto({
     runtime: "Convex",
@@ -341,7 +341,7 @@ export const makeNode = (): GroupSpec<"Node", ""> =>
 export const makeNodeAt = <const Name_ extends string>(
   name: Name_,
 ): GroupSpec<"Node", Name_> => {
-  validateConfectFunctionIdentifier(name);
+  validateConfectGroupIdentifier(name);
 
   return makeProto({
     runtime: "Node",
@@ -357,7 +357,7 @@ export function withName<const Name_ extends string, Group extends Any>(
   group: Group,
 ): NamedAt<Group, Name_>;
 export function withName(name: string, group: Any): AnyWithProps {
-  validateConfectFunctionIdentifier(name);
+  validateConfectGroupIdentifier(name);
   const group_ = group as AnyWithProps;
 
   if (group_.name === name) {

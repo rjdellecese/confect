@@ -493,6 +493,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   useNode?: boolean;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+  const layerBindingName = `$${layerExportName}`;
 
   if (useNode) {
     yield* cbw.writeLine(
@@ -508,7 +509,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   }
 
   yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
-  yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
+  yield* cbw.writeLine(`import ${layerBindingName} from "${implImportPath}";`);
   yield* cbw.blankLine();
   // The group's own leaf spec is referenced type-only (`typeof import(...)`),
   // so the spec module is erased at transpile time and never enters the
@@ -520,7 +521,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
     ? "RegisteredNodeFunction.make"
     : "RegisteredConvexFunction.make";
   yield* cbw.writeLine(
-    `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
+    `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerBindingName}, ${makeFn});`,
   );
 
   return yield* cbw.toString();

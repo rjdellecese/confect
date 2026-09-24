@@ -9,6 +9,7 @@ import {
 } from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
+import { transform } from "esbuild";
 
 const leaf = (
   relativePath: string,
@@ -23,6 +24,51 @@ const leaf = (
 });
 
 describe("SpecAssemblyNode", () => {
+  it.effect(
+    "keeps keyword API paths while generating distinct valid bindings",
+    () =>
+      Effect.gen(function* () {
+        const nodes = assemblyNodesFromLeaves([
+          leaf("public.spec.ts", ["public"]),
+          leaf("runtime/protected.spec.ts", ["runtime", "protected"]),
+          leaf("Spec.spec.ts", ["Spec"]),
+          leaf("GroupSpec.spec.ts", ["GroupSpec"]),
+          leaf("spec.spec.ts", ["spec"]),
+          leaf("a_b.spec.ts", ["a_b"]),
+          leaf("a/b.spec.ts", ["a", "b"]),
+        ]);
+        const contents = yield* templates.assembledSpec({ nodes });
+        yield* Effect.promise(() => transform(contents, { loader: "ts" }));
+        expect(contents).toContain('.addAt("public",');
+        expect(contents).toContain('.addGroupAt("protected",');
+        const imports = contents
+          .split("\n")
+          .filter((line) => line.includes('from "../'));
+        expect(new Set(imports.map((line) => line.split(" ")[1])).size).toBe(7);
+      }),
+  );
+
+  it.effect(
+    "keeps a keyword implementation path out of generated bindings",
+    () =>
+      Effect.gen(function* () {
+        for (const useNode of [false, true]) {
+          const contents = yield* templates.registeredFunctionsForGroup({
+            schemaImportPath: "../../schema",
+            specImportPath: "../../../protected.spec",
+            implImportPath: "../../../protected.impl",
+            layerExportName: "protected",
+            useNode,
+          });
+          yield* Effect.promise(() => transform(contents, { loader: "ts" }));
+          expect(contents).toContain('from "../../../protected.impl";');
+          expect(contents).toContain(
+            'typeof import("../../../protected.spec")["default"]',
+          );
+        }
+      }),
+  );
+
   it.effect("assembledSpec builds nested imports from leaf modules", () =>
     Effect.gen(function* () {
       const nodes = assemblyNodesFromLeaves([
@@ -32,17 +78,17 @@ describe("SpecAssemblyNode", () => {
       ]);
       const contents = yield* templates.assembledSpec({ nodes });
 
-      expect(contents).toContain('import env from "../env.spec";');
+      expect(contents).toContain('import $group$3_env from "../env.spec";');
       expect(contents).toContain(
-        'import notesAndRandom_notes from "../notesAndRandom/notes.spec";',
+        'import $group$14_notesAndRandom$5_notes from "../notesAndRandom/notes.spec";',
       );
       expect(contents).toContain(
-        'import notesAndRandom_random from "../notesAndRandom/random.spec";',
+        'import $group$14_notesAndRandom$6_random from "../notesAndRandom/random.spec";',
       );
       expect(contents).toContain(
-        'GroupSpec.makeAt("notesAndRandom").addGroupAt("notes", notesAndRandom_notes).addGroupAt("random", notesAndRandom_random)',
+        'GroupSpec.makeAt("notesAndRandom").addGroupAt("notes", $group$14_notesAndRandom$5_notes).addGroupAt("random", $group$14_notesAndRandom$6_random)',
       );
-      expect(contents).toContain('.addAt("env", env)');
+      expect(contents).toContain('.addAt("env", $group$3_env)');
       // Group paths are resolved impl-side, so the assembled spec no longer
       // emits a `.addPath(...)` registration chain.
       expect(contents).not.toContain(".addPath(");
@@ -59,12 +105,14 @@ describe("SpecAssemblyNode", () => {
         ]);
         const contents = yield* templates.assembledSpec({ nodes });
 
-        expect(contents).toContain('import notes from "../notes.spec";');
         expect(contents).toContain(
-          'import notes_archived from "../notes/archived.spec";',
+          'import $group$5_notes from "../notes.spec";',
         );
         expect(contents).toContain(
-          '.addAt("notes", notes.addGroupAt("archived", notes_archived))',
+          'import $group$5_notes$8_archived from "../notes/archived.spec";',
+        );
+        expect(contents).toContain(
+          '.addAt("notes", $group$5_notes.addGroupAt("archived", $group$5_notes$8_archived))',
         );
         expect(contents).not.toContain('GroupSpec.makeAt("notes")');
       }),
@@ -84,7 +132,7 @@ describe("SpecAssemblyNode", () => {
           'import { GroupSpec, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
-          'GroupSpec.AddGroups<typeof notes, GroupSpec.NamedAt<typeof notes_archived, "archived">>',
+          'GroupSpec.AddGroups<typeof $group$5_notes, GroupSpec.NamedAt<typeof $group$5_notes$8_archived, "archived">>',
         );
       }),
   );
@@ -122,7 +170,7 @@ describe("SpecAssemblyNode", () => {
           'import { GroupSpec, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
-          '.addAt("notes", notes.addGroupAt("archived", GroupSpec.makeAt("archived").addGroupAt("legacy", notes_archived_legacy)))',
+          '.addAt("notes", $group$5_notes.addGroupAt("archived", GroupSpec.makeAt("archived").addGroupAt("legacy", $group$5_notes$8_archived$6_legacy)))',
         );
       }),
   );
@@ -167,19 +215,19 @@ describe("SpecAssemblyNode", () => {
         const contents = yield* templates.assembledSpec({ nodes });
 
         expect(contents).toContain(
-          'import scripts_operational_inviteUser_mutations from "../scripts/operational/inviteUser/mutations.spec";',
+          'import $group$7_scripts$11_operational$10_inviteUser$9_mutations from "../scripts/operational/inviteUser/mutations.spec";',
         );
         expect(contents).toContain(
-          'import scripts_operational_inviteUser_queries from "../scripts/operational/inviteUser/queries.spec";',
+          'import $group$7_scripts$11_operational$10_inviteUser$7_queries from "../scripts/operational/inviteUser/queries.spec";',
         );
         expect(contents).toContain(
-          'import scripts_operational_seed_mutations from "../scripts/operational/seed/mutations.spec";',
+          'import $group$7_scripts$11_operational$4_seed$9_mutations from "../scripts/operational/seed/mutations.spec";',
         );
         expect(contents).toContain(
-          'import scripts_operational_seedTestUser_mutations from "../scripts/operational/seedTestUser/mutations.spec";',
+          'import $group$7_scripts$11_operational$12_seedTestUser$9_mutations from "../scripts/operational/seedTestUser/mutations.spec";',
         );
         expect(contents).toContain(
-          'import scripts_operational_seedTestUser_queries from "../scripts/operational/seedTestUser/queries.spec";',
+          'import $group$7_scripts$11_operational$12_seedTestUser$7_queries from "../scripts/operational/seedTestUser/queries.spec";',
         );
 
         const importLines = contents
@@ -190,19 +238,19 @@ describe("SpecAssemblyNode", () => {
         expect(importLines).toHaveLength(leaves.length);
 
         expect(contents).toContain(
-          '.addGroupAt("mutations", scripts_operational_inviteUser_mutations)',
+          '.addGroupAt("mutations", $group$7_scripts$11_operational$10_inviteUser$9_mutations)',
         );
         expect(contents).toContain(
-          '.addGroupAt("queries", scripts_operational_inviteUser_queries)',
+          '.addGroupAt("queries", $group$7_scripts$11_operational$10_inviteUser$7_queries)',
         );
         expect(contents).toContain(
-          '.addGroupAt("mutations", scripts_operational_seed_mutations)',
+          '.addGroupAt("mutations", $group$7_scripts$11_operational$4_seed$9_mutations)',
         );
         expect(contents).toContain(
-          '.addGroupAt("mutations", scripts_operational_seedTestUser_mutations)',
+          '.addGroupAt("mutations", $group$7_scripts$11_operational$12_seedTestUser$9_mutations)',
         );
         expect(contents).toContain(
-          '.addGroupAt("queries", scripts_operational_seedTestUser_queries)',
+          '.addGroupAt("queries", $group$7_scripts$11_operational$12_seedTestUser$7_queries)',
         );
       }),
   );
@@ -251,7 +299,9 @@ describe("SpecAssemblyNode", () => {
         // Tree-assembly shape is preserved; the addGroupAt-wrapped parent leaf
         // still ends up in the tree, and its impl resolves its group path
         // impl-side rather than through a `.addPath(...)` registration.
-        expect(contents).toContain("remix_routes__app_catalog.addGroupAt(");
+        expect(contents).toContain(
+          "$group$5_remix$6_routes$4__app$7_catalog.addGroupAt(",
+        );
         expect(contents).not.toContain(".addPath(");
       }),
   );
@@ -294,12 +344,12 @@ for (const { name, pathLayer, sep } of [
         const contents = yield* templates.assembledSpec({ nodes });
 
         expect(contents).toContain(
-          'import notesAndRandom_notes from "../notesAndRandom/notes.spec";',
+          'import $group$14_notesAndRandom$5_notes from "../notesAndRandom/notes.spec";',
         );
         expect(contents).toContain(
-          'import scripts_operational_seed_mutations from "../scripts/operational/seed/mutations.spec";',
+          'import $group$7_scripts$11_operational$4_seed$9_mutations from "../scripts/operational/seed/mutations.spec";',
         );
-        expect(contents).toContain('import env from "../env.spec";');
+        expect(contents).toContain('import $group$3_env from "../env.spec";');
         expect(contents).not.toContain("\\");
       }),
     );
