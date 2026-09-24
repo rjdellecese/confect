@@ -164,6 +164,84 @@ layer(BundlerLayer)("bundle", (it) => {
     }).pipe(Effect.scoped),
   );
 
+  for (const rootDependency of [false, true]) {
+    it.effect(
+      rootDependency
+        ? "resolves a workspace dependency from its owner when the entry has another version"
+        : "resolves a dependency available only in the importing workspace",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const tempDir = yield* fs.makeTempDirectoryScoped();
+          const pkgDir = path.join(tempDir, "pkg #owned");
+          const dependencyDir = path.join(pkgDir, "node_modules", "dependency");
+          yield* fs.makeDirectory(dependencyDir, { recursive: true });
+          const dependencyManifest = `{ "name": "dependency", "type": "module", "exports": { "./value": { "import": "./value.js" } } }\n`;
+          yield* fs.writeFileString(
+            path.join(dependencyDir, "package.json"),
+            dependencyManifest,
+          );
+          yield* fs.writeFileString(
+            path.join(dependencyDir, "value.js"),
+            `export const value = "workspace";\n`,
+          );
+          yield* fs.writeFileString(
+            path.join(pkgDir, "package.json"),
+            `{ "name": "@scope/lib", "type": "module", "exports": { ".": "./entry.js" } }\n`,
+          );
+          const workspaceEntry = path.join(pkgDir, "entry.js");
+          yield* fs.writeFileString(
+            workspaceEntry,
+            `export { value } from "dependency/value";\n`,
+          );
+          yield* fs.makeDirectory(
+            path.join(tempDir, "node_modules", "@scope"),
+            {
+              recursive: true,
+            },
+          );
+          yield* fs.symlink(
+            pkgDir,
+            path.join(tempDir, "node_modules", "@scope", "lib"),
+          );
+          if (rootDependency) {
+            const rootDir = path.join(tempDir, "node_modules", "dependency");
+            yield* fs.makeDirectory(rootDir);
+            yield* fs.writeFileString(
+              path.join(rootDir, "package.json"),
+              dependencyManifest,
+            );
+            yield* fs.writeFileString(
+              path.join(rootDir, "value.js"),
+              `export const value = "root";\n`,
+            );
+          }
+          const entry = path.join(tempDir, "entry.ts");
+          yield* fs.writeFileString(
+            entry,
+            `import { value } from "@scope/lib";\nexport default value;\n`,
+          );
+
+          const bundled = yield* Bundler.bundle(entry);
+          expect(bundled.module.default).toBe("workspace");
+          expect(Object.keys(bundled.metafile.inputs)).not.toContain(
+            yield* fs.realPath(path.join(dependencyDir, "value.js")),
+          );
+          const importers = Bundler.importersOfPackage(
+            bundled,
+            "dependency",
+            () => true,
+          );
+          expect(
+            yield* Effect.forEach(importers, (importer) =>
+              fs.realPath(importer),
+            ),
+          ).toStrictEqual([yield* fs.realPath(workspaceEntry)]);
+        }).pipe(Effect.scoped),
+    );
+  }
+
   it.effect(
     "rewrites import.meta.url inside the bundle to the original source path",
     () =>
