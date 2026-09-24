@@ -576,3 +576,16 @@ describe("UnionToTuple", () => {
     >();
   });
 });
+
+describe("UnionToTuple overlapping members", () => {
+  test("retains required and optional fields from every original member", () => {
+    type Broad = { key: string };
+    type Optional = { key: string; optional?: string };
+    type Narrow = { key: string; narrow: string };
+    type Keys<T> = T extends unknown ? keyof T : never;
+    type Members = UnionToTuple<Broad | Optional | Narrow>;
+    expectTypeOf<Keys<Members[number]>>().toEqualTypeOf<
+      "key" | "optional" | "narrow"
+    >();
+  });
+});

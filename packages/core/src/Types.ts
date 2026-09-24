@@ -122,8 +122,16 @@ type _unionToTuple<t, result extends unknown[]> =
   getLastBranch<t> extends infer current
     ? [t] extends [never]
       ? result
-      : _unionToTuple<Exclude<t, current>, [current, ...result]>
+      : _unionToTuple<removeExactBranch<t, current>, [current, ...result]>
     : never;
+
+// Remove only the selected member. Exclude would also remove narrower
+// object members, including their unique required or optional field paths.
+type removeExactBranch<t, branch> = t extends unknown
+  ? (<u>() => u extends t ? 1 : 2) extends <u>() => u extends branch ? 1 : 2
+    ? never
+    : t
+  : never;
 
 type getLastBranch<t> =
   intersectUnion<t extends unknown ? (x: t) => void : never> extends (
