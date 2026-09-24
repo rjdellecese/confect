@@ -1,3 +1,4 @@
+import * as Table from "@confect/server/Table";
 import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
 import type * as QueryStreamKeyValues from "@confect/server/QueryStreamKeyValues";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
@@ -15,7 +16,9 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
-const tableSchema = Schema.Struct({ group: Schema.String });
+const table = Table.make(() => Schema.Struct({ group: Schema.String }))(
+  "documents",
+);
 const distinctFields: ReadonlyArray<string> = ["group"];
 
 const documents = [
@@ -146,8 +149,7 @@ const makeReader = (pending?: PendingRead) => {
   };
   const stream = QueryStream.fromReflection<Document, "asc">({
     reader,
-    tableName: "documents",
-    tableSchema,
+    table,
     indexName: "by_group",
     indexFieldPaths: ["group", "_creationTime"],
     indexRange: QueryStreamIndexRange.builder<
