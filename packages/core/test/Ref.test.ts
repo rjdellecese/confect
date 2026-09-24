@@ -829,3 +829,38 @@ describe("make with middleware options", () => {
     expectTypeOf<Ref.Error<typeof ref>>().toBeNever();
   });
 });
+
+describe("overlapping union codecs", () => {
+  const fields = Schema.Struct({
+    metadata: Schema.Union([
+      Schema.Struct({
+        key: Schema.String,
+        previous: Schema.optionalKey(Schema.String),
+      }),
+      Schema.Struct({ key: Schema.String, member: Schema.String }),
+    ]),
+  });
+  const ref = Ref.make(
+    "overlap",
+    FunctionSpec.publicQuery({
+      name: "echo",
+      args: () => fields.fields,
+      returns: () => fields,
+    }),
+  );
+  const value = { metadata: { key: "key", member: "member" } };
+  it.effect(
+    "preserves nested fields in asynchronous argument and result codecs",
+    () =>
+      Effect.gen(function* () {
+        expect(yield* Ref.encodeArgs(ref, value)).toEqual(value);
+        expect(yield* Ref.decodeReturns(ref, value)).toEqual(value);
+      }),
+  );
+  it("preserves nested fields in synchronous argument and result codecs", () => {
+    expect(Ref.encodeArgsSync(ref, value)).toEqual(value);
+    expect(Ref.decodeArgsSync(ref, value)).toEqual(value);
+    expect(Ref.encodeReturnsSync(ref, value)).toEqual(value);
+    expect(Ref.decodeReturnsSync(ref, value)).toEqual(value);
+  });
+});

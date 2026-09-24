@@ -147,3 +147,31 @@ describe("Document.Document", () => {
     >();
   });
 });
+
+describe("overlapping document unions", () => {
+  const fields = Schema.Struct({
+    metadata: Schema.Union([
+      Schema.Struct({
+        classId: Schema.String,
+        oldRole: Schema.optionalKey(Schema.String),
+      }),
+      Schema.Struct({ classId: Schema.String, removedUserId: Schema.String }),
+    ]),
+  });
+  const value = { metadata: { classId: "class", removedUserId: "member" } };
+  const stored = {
+    ...value,
+    _id: "log" as GenericId<"logs">,
+    _creationTime: 1,
+  };
+  it.effect("keeps fields from the matching nested member while decoding", () =>
+    Effect.gen(function* () {
+      expect(yield* Document.decode(stored, "logs", fields)).toEqual(stored);
+    }),
+  );
+  it.effect("keeps fields from the matching nested member while encoding", () =>
+    Effect.gen(function* () {
+      expect(yield* Document.encode(stored, "logs", fields)).toEqual(value);
+    }),
+  );
+});

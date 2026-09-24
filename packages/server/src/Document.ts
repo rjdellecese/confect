@@ -4,6 +4,8 @@ import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Function from "effect/Function";
 import * as Schema from "effect/Schema";
+import * as Predicate from "effect/Predicate";
+import * as Struct from "effect/Struct";
 import type { ReadonlyRecord } from "effect/Record";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
@@ -42,6 +44,7 @@ const getDecoder = (
     (() => {
       const decoder = Schema.decodeUnknownEffect(
         SystemFields.extendWithSystemFields(tableName, tableSchema),
+        { onExcessProperty: "error" },
       ) as Decode;
       byTable.set(tableName, decoder);
       return decoder;
@@ -121,7 +124,15 @@ const encoderCache = new WeakMap<Schema.Codec<any, any>, Encode>();
 const getEncoder = (tableSchema: Schema.Codec<any, any>): Encode =>
   encoderCache.get(tableSchema) ??
   (() => {
-    const encoder = Schema.encodeEffect(tableSchema) as Encode;
+    const encode = Schema.encodeEffect(tableSchema, {
+      onExcessProperty: "error",
+    }) as Encode;
+    const encoder: Encode = (doc) =>
+      encode(
+        Predicate.isObject(doc)
+          ? Struct.omit(doc, ["_id", "_creationTime"])
+          : doc,
+      );
     encoderCache.set(tableSchema, encoder);
     return encoder;
   })();

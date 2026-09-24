@@ -198,7 +198,7 @@ const queryFunction = <
     Effect.gen(function* () {
       const decodedArgs = yield* pipe(
         actualArgs,
-        Schema.decodeUnknownEffect(args),
+        Schema.decodeUnknownEffect(args, { onExcessProperty: "error" }),
         Effect.catchTag("SchemaError", Effect.die),
       );
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
@@ -230,7 +230,7 @@ const queryFunction = <
       );
       return yield* pipe(
         decodedReturns,
-        Schema.encodeEffect(returns),
+        Schema.encodeEffect(returns, { onExcessProperty: "error" }),
         Effect.catchTag("SchemaError", Effect.die),
       );
     }).pipe(
@@ -316,7 +316,7 @@ const mutationFunction = <
     Effect.gen(function* () {
       const decodedArgs = yield* pipe(
         actualArgs,
-        Schema.decodeUnknownEffect(args),
+        Schema.decodeUnknownEffect(args, { onExcessProperty: "error" }),
         Effect.catchTag("SchemaError", Effect.die),
       );
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
@@ -332,7 +332,7 @@ const mutationFunction = <
       ).pipe(Effect.provide(mutationLayer(databaseSchema, ctx)));
       return yield* pipe(
         decodedReturns,
-        Schema.encodeEffect(returns),
+        Schema.encodeEffect(returns, { onExcessProperty: "error" }),
         Effect.catchTag("SchemaError", Effect.die),
       );
     }).pipe(
