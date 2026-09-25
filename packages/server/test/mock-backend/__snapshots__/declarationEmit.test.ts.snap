@@ -31,9 +31,11 @@ import type { Docs } from "./docs";
 export declare const Auth: typeof Auth_.Auth;
 export type Auth = typeof Auth.Identifier;
 export declare const Scheduler: import("effect/Context").Service<{
+    cancel: (id: import("convex/values").GenericId<"_scheduled_functions">) => import("effect/Effect").Effect<void, never, never>;
     runAfter: <Ref_ extends import("@confect/core/Ref").AnyMutation | import("@confect/core/Ref").AnyAction>(delay: import("effect/Duration").Duration, ref: Ref_, ...args: import("@confect/core/Ref").OptionalArgs<Ref_>) => import("effect/Effect").Effect<import("convex/values").GenericId<"_scheduled_functions">, never, never>;
     runAt: <Ref_ extends import("@confect/core/Ref").AnyMutation | import("@confect/core/Ref").AnyAction>(dateTime: import("effect/DateTime").DateTime, ref: Ref_, ...args: import("@confect/core/Ref").OptionalArgs<Ref_>) => import("effect/Effect").Effect<import("convex/values").GenericId<"_scheduled_functions">, never, never>;
 }, {
+    cancel: (id: import("convex/values").GenericId<"_scheduled_functions">) => import("effect/Effect").Effect<void, never, never>;
     runAfter: <Ref_ extends import("@confect/core/Ref").AnyMutation | import("@confect/core/Ref").AnyAction>(delay: import("effect/Duration").Duration, ref: Ref_, ...args: import("@confect/core/Ref").OptionalArgs<Ref_>) => import("effect/Effect").Effect<import("convex/values").GenericId<"_scheduled_functions">, never, never>;
     runAt: <Ref_ extends import("@confect/core/Ref").AnyMutation | import("@confect/core/Ref").AnyAction>(dateTime: import("effect/DateTime").DateTime, ref: Ref_, ...args: import("@confect/core/Ref").OptionalArgs<Ref_>) => import("effect/Effect").Effect<import("convex/values").GenericId<"_scheduled_functions">, never, never>;
 }>;
