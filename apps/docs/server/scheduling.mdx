@@ -1,12 +1,12 @@
 ---
 icon: "clock"
 title: "Scheduling"
-description: "Schedule functions to run after a delay or at a specific time."
+description: "Schedule functions to run after a delay or at a specific time, and cancel scheduled runs."
 ---
 
 The `Scheduler` service schedules Confect functions to run in the future. It wraps Convex's scheduler with Effect-native types: delays use [`Duration`](https://effect.website/docs/data-types/duration/) and timestamps use [`DateTime`](https://effect.website/docs/data-types/datetime/).
 
-Both `runAfter` and `runAt` accept a ref to a mutation or action and an optional args object matching the ref's args schema.
+Both `runAfter` and `runAt` accept a ref to a mutation or action and an optional args object matching the ref's args schema. They return an ID from the `_scheduled_functions` system table, which you can pass to `cancel`.
 
 ## Run after a delay
 
@@ -38,5 +38,25 @@ Effect.gen(function* () {
   });
 });
 ```
+
+## Cancel a scheduled function
+
+Call `scheduler.cancel(id)` to cancel a previously scheduled function. It returns an `Effect<void>` and is available wherever the `Scheduler` service is provided, including mutations and actions.
+
+```ts
+Effect.gen(function* () {
+  const scheduler = yield* Scheduler;
+
+  const scheduledFunctionId = yield* scheduler.runAfter(
+    Duration.minutes(5),
+    refs.internal.messages.send,
+    { text: "Hello" },
+  );
+
+  yield* scheduler.cancel(scheduledFunctionId);
+});
+```
+
+Cancellation follows Convex's semantics: a pending function will not run. An action that has already started continues running, but any new functions it schedules are canceled. A mutation is canceled atomically or cannot be canceled if it has already committed. Convex cancellation errors surface as Effect defects, matching `runAfter` and `runAt`.
 
 For the full scheduling APIs, see the [Effect `Duration` documentation](https://effect.website/docs/data-types/duration/), the [Effect `DateTime` documentation](https://effect.website/docs/data-types/datetime/), and the [Convex scheduling documentation](https://docs.convex.dev/scheduling/scheduled-functions).
