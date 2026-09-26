@@ -8,18 +8,19 @@ import { convexTest } from "convex-test";
 import { makeFunctionReference } from "convex/server";
 import * as Console from "effect/Console";
 import * as TestConsole from "effect/testing/TestConsole";
-import { vi } from "vitest";
 import confectSchema from "./fixtures/confect/_generated/schema";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
 import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Duration from "effect/Duration";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as SchemaParser from "effect/SchemaParser";
 import * as SchemaCompiler from "effect/unstable/schema/SchemaCompiler";
 import * as Stream from "effect/Stream";
 import * as Option from "effect/Option";
+import { vi } from "vitest";
 import * as DatabaseReader_ from "@confect/server/DatabaseReader";
 import * as DatabaseWriter_ from "@confect/server/DatabaseWriter";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
@@ -27,8 +28,10 @@ import * as QueryStream from "@confect/server/QueryStream";
 import * as Table from "@confect/server/Table";
 import refs from "./fixtures/confect/_generated/refs";
 import {
+  DatabaseReader,
   DatabaseWriter,
   MutationCtx,
+  Scheduler,
 } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
 import type notes from "./fixtures/confect/_generated/tables/notes";
@@ -116,6 +119,39 @@ describe("function logging", () => {
       }),
     );
   }
+});
+
+describe("Scheduler", () => {
+  it.effect("cancels a pending function without executing it", () =>
+    Effect.gen(function* () {
+      vi.useFakeTimers();
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const scheduler = yield* Scheduler;
+          const reader = yield* DatabaseReader;
+          const id = yield* scheduler.runAfter(
+            Duration.minutes(5),
+            refs.public.groups.notes.insert,
+            { text: "This function must not run" },
+          );
+
+          yield* scheduler.cancel(id);
+
+          const scheduled = yield* reader.table("_scheduled_functions").get(id);
+          expect(scheduled.state.kind).toBe("canceled");
+        }),
+      );
+
+      yield* c.finishAllScheduledFunctions(() => vi.runAllTimers());
+
+      expect(yield* c.query(refs.public.groups.notes.list)).toEqual([]);
+    }).pipe(
+      Effect.ensuring(Effect.sync(() => vi.useRealTimers())),
+      Effect.provide(TestConfect.layer),
+    ),
+  );
 });
 
 describe("DatabaseReader", () => {
