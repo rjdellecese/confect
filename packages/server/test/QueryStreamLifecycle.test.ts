@@ -541,74 +541,72 @@ describe("QueryStream iterator lifecycle", () => {
       }),
   );
 
-  for (const stage of [
+  it.effect.each([
     "leaf",
     "reverse discovery",
     "representative probe",
-  ] as const) {
-    it.effect(
-      `releases ${stage} while next is pending and ignores its later resolution`,
-      () =>
-        Effect.gen(function* () {
-          const entered = yield* Deferred.make<void>();
-          const release = yield* Deferred.make<void>();
-          const settled = yield* Deferred.make<void>();
-          const iterator = stage === "representative probe" ? 1 : 0;
-          const reader = makeReader({ iterator, entered, release, settled });
-          const examined: Array<string> = [];
-          let processed = 0;
-          const observed = reader.stream.pipe(
-            QueryStream.filterEffect((document) =>
-              Effect.sync(() => {
-                examined.push(document._id);
-                return true;
-              }),
-            ),
-          );
-          const stream =
-            stage === "leaf"
-              ? observed
-              : observed.pipe(
-                  QueryStream.distinct(distinctFields),
-                  QueryStream.reverse,
-                );
-          const fiber = yield* stream.pipe(
-            QueryStream.mapEffect((document) =>
-              Effect.sync(() => {
-                processed++;
-                return document;
-              }),
-            ),
-            QueryStream.paginate({
-              cursor: null,
-              numItems: 10,
-              maximumRowsRead: 10,
+  ] as const)(
+    "releases %s while next is pending and ignores its later resolution",
+    (stage) =>
+      Effect.gen(function* () {
+        const entered = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        const settled = yield* Deferred.make<void>();
+        const iterator = stage === "representative probe" ? 1 : 0;
+        const reader = makeReader({ iterator, entered, release, settled });
+        const examined: Array<string> = [];
+        let processed = 0;
+        const observed = reader.stream.pipe(
+          QueryStream.filterEffect((document) =>
+            Effect.sync(() => {
+              examined.push(document._id);
+              return true;
             }),
-            Effect.forkScoped,
-          );
+          ),
+        );
+        const stream =
+          stage === "leaf"
+            ? observed
+            : observed.pipe(
+                QueryStream.distinct(distinctFields),
+                QueryStream.reverse,
+              );
+        const fiber = yield* stream.pipe(
+          QueryStream.mapEffect((document) =>
+            Effect.sync(() => {
+              processed++;
+              return document;
+            }),
+          ),
+          QueryStream.paginate({
+            cursor: null,
+            numItems: 10,
+            maximumRowsRead: 10,
+          }),
+          Effect.forkScoped,
+        );
 
-          yield* Deferred.await(entered);
-          expect(reader.runs[iterator]).toMatchObject({
-            next: 1,
-            returned: 0,
-            settled: 0,
-          });
-          yield* Fiber.interrupt(fiber);
-          expect(Exit.hasInterrupts(yield* Fiber.await(fiber))).toBe(true);
-          expect(reader.runs).toHaveLength(iterator + 1);
-          for (const run of reader.runs) expect(run.returned).toBe(1);
-          expect(reader.runs[iterator]?.settled).toBe(0);
-          expect(processed).toBe(0);
-          expect(examined).toEqual(iterator === 1 ? ["b2"] : []);
-          const eventsAfterInterruption = [...reader.events];
+        yield* Deferred.await(entered);
+        expect(reader.runs[iterator]).toMatchObject({
+          next: 1,
+          returned: 0,
+          settled: 0,
+        });
+        yield* Fiber.interrupt(fiber);
+        expect(Exit.hasInterrupts(yield* Fiber.await(fiber))).toBe(true);
+        expect(reader.runs).toHaveLength(iterator + 1);
+        for (const run of reader.runs) expect(run.returned).toBe(1);
+        expect(reader.runs[iterator]?.settled).toBe(0);
+        expect(processed).toBe(0);
+        expect(examined).toEqual(iterator === 1 ? ["b2"] : []);
+        const eventsAfterInterruption = [...reader.events];
 
-          yield* Deferred.succeed(release, undefined);
-          yield* Deferred.await(settled);
-          expect(reader.runs[iterator]?.settled).toBe(1);
-          expect(reader.events).toEqual(eventsAfterInterruption);
-          expect(processed).toBe(0);
-          expect(examined).toEqual(iterator === 1 ? ["b2"] : []);
-        }).pipe(Effect.scoped),
-    );
-  }
+        yield* Deferred.succeed(release, undefined);
+        yield* Deferred.await(settled);
+        expect(reader.runs[iterator]?.settled).toBe(1);
+        expect(reader.events).toEqual(eventsAfterInterruption);
+        expect(processed).toBe(0);
+        expect(examined).toEqual(iterator === 1 ? ["b2"] : []);
+      }).pipe(Effect.scoped),
+  );
 });

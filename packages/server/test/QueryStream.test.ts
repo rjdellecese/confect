@@ -92,8 +92,9 @@ describe("QueryStream type parameters", () => {
 });
 
 describe("QueryStream.merge", () => {
-  for (const direction of ["asc", "desc"] as const) {
-    it.effect(`drains buffered chunks stably in ${direction} order`, () =>
+  it.effect.each(["asc", "desc"] as const)(
+    "drains buffered chunks stably in %s order",
+    (direction) =>
       Effect.gen(function* () {
         const source = (label: string, ranks: ReadonlyArray<number>) =>
           new QueryStream.QueryStream<
@@ -153,8 +154,7 @@ describe("QueryStream.merge", () => {
               ],
         );
       }),
-    );
-  }
+  );
 });
 
 describe("QueryStream key layouts", () => {

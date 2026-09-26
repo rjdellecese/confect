@@ -86,81 +86,78 @@ const clients = [
 ];
 
 describe.each(clients)("$name operation boundaries", ({ name, make }) => {
-  for (const operation of operations) {
-    it.effect(
-      `${operation.name} stays lazy and creates one child span per execution`,
-      () =>
-        Effect.gen(function* () {
-          const invoke = vi.fn(() => Promise.resolve("found"));
-          const tracer = yield* Tracer.Tracer;
-          const span = vi.fn(tracer.span.bind(tracer));
-          const client = make(invoke);
-          const effect = operation.run(client);
+  it.effect.each(operations)(
+    "$name stays lazy and creates one child span per execution",
+    (operation) =>
+      Effect.gen(function* () {
+        const invoke = vi.fn(() => Promise.resolve("found"));
+        const tracer = yield* Tracer.Tracer;
+        const span = vi.fn(tracer.span.bind(tracer));
+        const client = make(invoke);
+        const effect = operation.run(client);
 
-          expect(invoke).not.toHaveBeenCalled();
-          expect(span).not.toHaveBeenCalled();
+        expect(invoke).not.toHaveBeenCalled();
+        expect(span).not.toHaveBeenCalled();
 
-          const results = yield* Effect.all([effect, effect]).pipe(
+        const results = yield* Effect.all([effect, effect]).pipe(
+          Effect.withSpan("caller"),
+          Effect.withTracer(Tracer.make({ span })),
+        );
+
+        expect(results).toEqual(["found", "found"]);
+        expect(invoke).toHaveBeenCalledTimes(2);
+        expect(span.mock.calls.map(([options]) => options.name)).toEqual([
+          "caller",
+          `${name}.${operation.name}`,
+          `${name}.${operation.name}`,
+        ]);
+
+        const [parent, ...children] = span.mock.results.map(
+          (result) => result.value,
+        );
+        for (const child of children) {
+          expect(Option.getOrThrow(child.parent)).toBe(parent);
+          expect(child.traceId).toBe(parent.traceId);
+          expect(child.status._tag).toBe("Ended");
+          assert(child.status._tag === "Ended");
+          expect(Exit.isSuccess(child.status.exit)).toBe(true);
+        }
+        expect(children[0]).not.toBe(children[1]);
+      }),
+  );
+
+  it.effect.each(operations)(
+    "$name preserves typed errors and ends its span with failure",
+    (operation) =>
+      Effect.gen(function* () {
+        const tracer = yield* Tracer.Tracer;
+        const span = vi.fn(tracer.span.bind(tracer));
+        const client = make(() =>
+          Promise.reject(new ConvexError({ _tag: "NotFound", id: "abc" })),
+        );
+        const result = yield* operation
+          .run(client)
+          .pipe(
+            Effect.result,
             Effect.withSpan("caller"),
             Effect.withTracer(Tracer.make({ span })),
           );
 
-          expect(results).toEqual(["found", "found"]);
-          expect(invoke).toHaveBeenCalledTimes(2);
-          expect(span.mock.calls.map(([options]) => options.name)).toEqual([
-            "caller",
-            `${name}.${operation.name}`,
-            `${name}.${operation.name}`,
-          ]);
-
-          const [parent, ...children] = span.mock.results.map(
-            (result) => result.value,
-          );
-          for (const child of children) {
-            expect(Option.getOrThrow(child.parent)).toBe(parent);
-            expect(child.traceId).toBe(parent.traceId);
-            expect(child.status._tag).toBe("Ended");
-            assert(child.status._tag === "Ended");
-            expect(Exit.isSuccess(child.status.exit)).toBe(true);
-          }
-          expect(children[0]).not.toBe(children[1]);
-        }),
-    );
-
-    it.effect(
-      `${operation.name} preserves typed errors and ends its span with failure`,
-      () =>
-        Effect.gen(function* () {
-          const tracer = yield* Tracer.Tracer;
-          const span = vi.fn(tracer.span.bind(tracer));
-          const client = make(() =>
-            Promise.reject(new ConvexError({ _tag: "NotFound", id: "abc" })),
-          );
-          const result = yield* operation
-            .run(client)
-            .pipe(
-              Effect.result,
-              Effect.withSpan("caller"),
-              Effect.withTracer(Tracer.make({ span })),
-            );
-
-          assert(Result.isFailure(result));
-          expect(result.failure).toEqual(new NotFound({ id: "abc" }));
-          expect(span.mock.calls.map(([options]) => options.name)).toEqual([
-            "caller",
-            `${name}.${operation.name}`,
-          ]);
-          const child = span.mock.results[1]?.value;
-          assert(child !== undefined);
-          assert(child.status._tag === "Ended");
-          assert(Exit.isFailure(child.status.exit));
-          expect(
-            Option.getOrThrow(Cause.findErrorOption(child.status.exit.cause)),
-          ).toBe(result.failure);
-        }),
-    );
-  }
-
+        assert(Result.isFailure(result));
+        expect(result.failure).toEqual(new NotFound({ id: "abc" }));
+        expect(span.mock.calls.map(([options]) => options.name)).toEqual([
+          "caller",
+          `${name}.${operation.name}`,
+        ]);
+        const child = span.mock.results[1]?.value;
+        assert(child !== undefined);
+        assert(child.status._tag === "Ended");
+        assert(Exit.isFailure(child.status.exit));
+        expect(
+          Option.getOrThrow(Cause.findErrorOption(child.status.exit.cause)),
+        ).toBe(result.failure);
+      }),
+  );
   it.effect(
     "normalizes omitted args once when constructing the operation",
     () =>
