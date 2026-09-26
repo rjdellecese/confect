@@ -174,7 +174,7 @@ const debugOperation = Effect.logTrace("Entering operation").pipe(
 );
 ```
 
-Trace is a diagnostic severity, not a request to print a stack trace. Confect
+`"Trace"` is a diagnostic severity, not a request to print a stack trace. Confect
 doesn't call `console.trace` for Trace logs.
 
 Each log payload retains the original Effect level, messages, cause, annotations,
