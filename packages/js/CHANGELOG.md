@@ -1,5 +1,9 @@
 # @confect/js
 
+## 10.0.0-next.25
+
+No changes in this release.
+
 ## 10.0.0-next.24
 
 ### Patch Changes
