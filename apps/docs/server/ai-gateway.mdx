@@ -1,12 +1,12 @@
 ---
 icon: "sparkles"
 title: "AI Gateway"
-description: "Use Convex's AI gateway as an Effect AI language-model provider."
+description: "Use Convex's AI gateway with Effect AI language and decision models."
 ---
 
-Confect provides an Effect AI `LanguageModel` backed by the [Convex AI gateway](https://docs.convex.dev/ai-gateway/overview). The provider obtains a short-lived credential from the running Convex action, so you do not need to configure or rotate an upstream model-provider API key.
+Confect provides Effect AI `LanguageModel` and `DecisionModel` services backed by the [Convex AI gateway](https://docs.convex.dev/ai-gateway/overview). Each client obtains a short-lived credential from the running Convex action, so you do not need to configure or rotate an upstream model-provider API key.
 
-The AI gateway is available from actions running on paid Convex Cloud deployments. It is not available on local or self-hosted backends.
+The AI gateway requires a paid Convex plan. See [gateway availability](https://docs.convex.dev/ai-gateway/overview#who-can-use-it) for supported deployment types and local-development requirements.
 
 ## Generate text
 
@@ -68,10 +68,10 @@ Use `AiGatewayLanguageModel.withConfigOverride` when configuration should apply 
 
 ## Handle errors
 
-`AiGatewayClient.layer` exposes the two documented service-token failures as tagged errors:
+Both `AiGatewayClient.layer` and `AiGatewayDecisionClient.layer` expose the same service-token failures as tagged errors:
 
 - `AiGatewayClient.AiGatewayDisabled` means your team is on the free plan or the gateway has been disabled for your team. Upgrade to a paid plan, or email support@convex.dev if this looks wrong.
-- `AiGatewayClient.AiGatewayUnavailable` means the action is running on a local or self-hosted deployment. Call the model provider directly with your own API key stored in a Convex environment variable.
+- `AiGatewayClient.AiGatewayUnavailable` means the deployment cannot use the gateway. Check Convex's local-development requirements, or call the model provider directly with your own API key stored in a Convex environment variable.
 
 Handle either tag after providing the client layer:
 
@@ -88,3 +88,86 @@ const generatedText = LanguageModel.generateText({ prompt }).pipe(
 ```
 
 Unexpected `getServiceToken` failures are defects. Gateway HTTP and model failures remain in Effect AI's `AiError` channel. Handle those errors before calling `Effect.orDie` when your action declares a recoverable error schema. See [AI gateway availability](https://docs.convex.dev/ai-gateway/overview#who-can-use-it) for the supported deployment types.
+
+## Make structured decisions
+
+Use `AiGatewayDecisionModel` with Effect's `DecisionModel.decide` to classify input, rate it against an ordered rubric, or estimate a probability. Unlike a language model, a decision model returns typed answers rather than generated text.
+
+<Warning>
+  Convex's `/alpha/decisions` endpoint is in alpha. Its request and response
+  format may change.
+</Warning>
+
+Define the input schema and named decisions with Effect's `Decision` module, then provide a decision model and its client:
+
+```ts
+import {
+  AiGatewayDecisionClient,
+  AiGatewayDecisionModel,
+} from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as Decision from "effect/unstable/ai/Decision";
+import * as DecisionModel from "effect/unstable/ai/DecisionModel";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+
+const TicketTriage = Decision.make({
+  input: Schema.Struct({ message: Schema.String }),
+  decisions: {
+    priority: Decision.classify({
+      instructions: "Choose the support ticket's priority.",
+      criteria: {
+        urgent: "An outage is blocking users.",
+        normal: "A bug affects users but has a workaround.",
+      },
+    }),
+    severity: Decision.rate({
+      instructions: "Rate the impact on users.",
+      criteria: ["Minor inconvenience", "Work is impaired", "Work is blocked"],
+    }),
+    escalate: Decision.probability({
+      instructions: "The ticket needs human attention.",
+      criteria: {
+        false: "The user can resolve it with self-service instructions.",
+        true: "A support agent needs to intervene.",
+      },
+    }),
+  },
+});
+
+const Jev = AiGatewayDecisionModel.model("typesafe/jev-1.13").pipe(
+  Layer.provide(AiGatewayDecisionClient.layer),
+  Layer.provide(FetchHttpClient.layer),
+);
+
+const triage = DecisionModel.decide(TicketTriage, {
+  input: {
+    message: "All users are unable to sign in. There is no workaround.",
+  },
+}).pipe(
+  Effect.map(({ answers }) => ({
+    priority: answers.priority.label,
+    severity: answers.severity.rating,
+    escalationProbability: answers.escalate.probability,
+  })),
+  Effect.provide(Jev),
+);
+```
+
+Run `triage` inside a Convex action. All three decisions evaluate the same input in one request. The encoded input must be a string, object, or array; wrap numbers and booleans in an object. Decision requests do not support streaming.
+
+`AiGatewayDecisionClient.layer` is separate from the language-model `AiGatewayClient.layer` because decisions use a different protocol. Use `AiGatewayDecisionModel.make({ model })` to construct the service directly, or `AiGatewayDecisionModel.layer({ model })` when you do not need an Effect AI model descriptor. Unlike language-model requests, decision requests do not expose configuration overrides: Convex rejects the upstream routing and session options.
+
+Classifications return a label and a probability distribution. Ratings return a numeric rating, the label with the highest probability, and a distribution keyed by rubric labels. Probability decisions return a number between zero and one. The response also includes `usage.inputTokens` and `usage.outputTokens`; gateway cost and request IDs are not part of Effect's decision response.
+
+Effect requires full probability distributions for classification and rating answers. Missing distributions, missing answers, or invalid probabilities fail with `AiError` rather than returning a partial result. Handle these and service-token failures as described in [Handle errors](#handle-errors).
+
+<Warning>
+  Jev rounds probabilities to two decimal places. The pinned Effect version
+  requires distributions to sum to one within `1e-6`, so a valid rounded
+  distribution such as `0.33, 0.33, 0.33` currently fails with
+  `AiError.InvalidOutputError`. Confect does not renormalize provider
+  probabilities. This limitation affects classification and rating decisions,
+  not standalone probability decisions.
+</Warning>

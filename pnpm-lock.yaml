@@ -558,6 +558,9 @@ importers:
       '@effect/ai-openai-compat':
         specifier: 4.0.0-rc.117
         version: 4.0.0-rc.117(effect@4.0.0-rc.117)
+      '@effect/ai-openrouter':
+        specifier: 4.0.0-rc.117
+        version: 4.0.0-rc.117(effect@4.0.0-rc.117)
       convex:
         specifier: 1.45.0
         version: 1.45.0(react@19.3.0)
@@ -974,6 +977,11 @@ packages:
 
   '@effect/ai-openai-compat@4.0.0-rc.117':
     resolution: {integrity: sha512-TJFO5CGOks+y9d6Fbj3/lfWO4FHWMIS0h+8MOMEcNyDau/BTZYIYP/Ab9OID0Rwsbvq3Wi7kxJKpA88QgaVqkw==}
+    peerDependencies:
+      effect: 4.0.0-rc.117
+
+  '@effect/ai-openrouter@4.0.0-rc.117':
+    resolution: {integrity: sha512-CNfMPZSsYQmg3vt6/H9lYr2Sov9e+EoviMTKoRGtVgl8EVoj+Hd00kgh1MrhGnNanR7ZNUNOOqTzN1ENV1LMlw==}
     peerDependencies:
       effect: 4.0.0-rc.117
 
@@ -8236,6 +8244,10 @@ snapshots:
       - react
 
   '@effect/ai-openai-compat@4.0.0-rc.117(effect@4.0.0-rc.117)':
+    dependencies:
+      effect: 4.0.0-rc.117
+
+  '@effect/ai-openrouter@4.0.0-rc.117(effect@4.0.0-rc.117)':
     dependencies:
       effect: 4.0.0-rc.117
 

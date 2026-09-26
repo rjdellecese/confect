@@ -23,6 +23,7 @@ allowBuilds:
 # cutoff.
 minimumReleaseAgeExclude:
   - "@effect/ai-openai-compat@4.0.0-rc.117"
+  - "@effect/ai-openrouter@4.0.0-rc.117"
   - "@effect/platform-bun@4.0.0-rc.117"
   - "@effect/platform-node-shared@4.0.0-rc.117"
   - "@effect/platform-node@4.0.0-rc.117"
