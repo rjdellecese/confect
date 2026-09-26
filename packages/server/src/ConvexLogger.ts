@@ -2,6 +2,7 @@ import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
+import * as Match from "effect/Match";
 
 /**
  * Writes structured Effect logs through Convex's severity-aware console
@@ -13,20 +14,14 @@ import * as Logger from "effect/Logger";
 export const logger: Logger.Logger<unknown, void> = Logger.make((options) => {
   const console = options.fiber.getRef(Console.Console);
   const output = Logger.formatStructured.log(options);
-  switch (options.logLevel) {
-    case "Trace":
-    case "Debug":
-      return console.debug(output);
-    case "Info":
-      return console.info(output);
-    case "Warn":
-      return console.warn(output);
-    case "Error":
-    case "Fatal":
-      return console.error(output);
-    default:
-      return console.log(output);
-  }
+  return Match.value(options.logLevel).pipe(
+    Match.whenOr("Trace", "Debug", () => console.debug(output)),
+    Match.when("Info", () => console.info(output)),
+    Match.when("Warn", () => console.warn(output)),
+    Match.whenOr("Error", "Fatal", () => console.error(output)),
+    Match.whenOr("All", "None", () => console.log(output)),
+    Match.exhaustive,
+  );
 });
 
 /**
