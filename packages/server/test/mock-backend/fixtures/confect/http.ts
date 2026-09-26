@@ -2,6 +2,7 @@ import { HttpRouter as ConfectHttpRouter } from "@confect/server";
 import { httpActionGeneric } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Schema from "effect/Schema";
 import type * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
@@ -56,6 +57,21 @@ const http = ConfectHttpRouter.make(
     HttpApiBuilder.layer(MetaApi).pipe(Layer.provide(MetaApiLive)),
     HttpApiScalar.layer(NotesApi, { path: "/api/docs" }),
     HttpRouter.add("GET", "/health", HttpServerResponse.text("OK")),
+    HttpRouter.add(
+      "GET",
+      "/logging",
+      Effect.logWarning("HTTP request").pipe(
+        Effect.as(HttpServerResponse.text("logged")),
+      ),
+    ),
+    HttpRouter.add(
+      "GET",
+      "/logging/disabled",
+      Effect.logWarning("hidden").pipe(
+        Effect.provide(Logger.layer([])),
+        Effect.as(HttpServerResponse.text("silent")),
+      ),
+    ),
     HttpRouter.middleware(withTestHeader, { global: true }),
   ),
 );

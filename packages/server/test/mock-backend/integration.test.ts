@@ -1,5 +1,15 @@
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
+import { FunctionSpec } from "@confect/core";
+import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
+import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
+import { RegisteredNodeFunction } from "@confect/server/node";
+import { convexTest } from "convex-test";
+import { makeFunctionReference } from "convex/server";
+import * as Console from "effect/Console";
+import * as TestConsole from "effect/testing/TestConsole";
+import confectSchema from "./fixtures/confect/_generated/schema";
+import convexSchema from "./fixtures/confect/_generated/convexSchema";
 import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -33,6 +43,84 @@ import {
 } from "./fixtures/confect/groups/typedErrors.spec";
 import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
+
+describe("function logging", () => {
+  const cases = [
+    {
+      name: "query",
+      spec: FunctionSpec.publicQuery({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.query(makeFunctionReference<"query">("logging:run"), {}),
+    },
+    {
+      name: "mutation",
+      spec: FunctionSpec.publicMutation({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.mutation(makeFunctionReference<"mutation">("logging:run"), {}),
+    },
+    {
+      name: "action",
+      spec: FunctionSpec.publicAction({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.action(makeFunctionReference<"action">("logging:run"), {}),
+    },
+    {
+      name: "Node action",
+      spec: FunctionSpec.publicNodeAction({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredNodeFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.action(makeFunctionReference<"action">("logging:run"), {}),
+    },
+  ];
+
+  it.effect.each(cases)(
+    "installs the default logger for a registered $name",
+    ({ name, spec, register, invoke }) =>
+      Effect.gen(function* () {
+        const console = {
+          ...(yield* TestConsole.make),
+          warn: vi.fn(),
+          log: vi.fn(),
+        };
+        const item = FunctionRegistryItem.make({
+          functionSpec: spec,
+          groupMiddlewareAttachments: [],
+          handler: () =>
+            Effect.logWarning(name).pipe(
+              Effect.as(null),
+              Effect.provideService(Console.Console, console),
+            ),
+        });
+        assert(item._tag === "Confect");
+        const registered = register(confectSchema, item);
+        const t = convexTest(convexSchema, {
+          ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+          "./fixtures/convex/logging.ts": () =>
+            Promise.resolve({ run: registered }),
+        });
+        expect(yield* Effect.promise(() => invoke(t))).toBeNull();
+        expect(console.warn).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ level: "WARN", message: name }),
+        );
+        expect(console.log).not.toHaveBeenCalled();
+      }),
+  );
+});
 
 describe("TransactionMetadata", () => {
   it.effect("reads updated metrics after database operations", () =>

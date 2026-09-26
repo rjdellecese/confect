@@ -6,6 +6,8 @@ import {
   type RouteSpecWithPathPrefix,
 } from "convex/server";
 import * as Array from "effect/Array";
+import * as Console from "effect/Console";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -19,6 +21,7 @@ import type * as Auth from "./Auth";
 import type { ExecutionMetadata } from "./ExecutionMetadata";
 import type { RequestMetadata } from "./RequestMetadata";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
+import * as ConvexLogger from "./ConvexLogger";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import * as RegisteredFunction from "./RegisteredFunction";
@@ -99,6 +102,7 @@ export const make = (routes: Routes): ConvexHttpRouter => {
   // Convex-aware provider; merged so that request fibers—endpoint handlers
   // and middleware—do too.
   const AppLayer = routes.pipe(
+    Layer.provideMerge(ConvexLogger.layer),
     Layer.provideMerge(ConvexConfigProvider.layer),
     Layer.provide(HttpServer.layerServices),
   );
@@ -116,7 +120,10 @@ export const make = (routes: Routes): ConvexHttpRouter => {
     const services = Effect.runSync(
       Effect.scoped(Layer.build(RegisteredFunction.baseActionLayer(ctx))),
     );
-    return handler(request, services);
+    return handler(
+      request,
+      Context.add(services, Console.Console, globalThis.console),
+    );
   });
 
   const convexHttpRouter = httpRouter();
