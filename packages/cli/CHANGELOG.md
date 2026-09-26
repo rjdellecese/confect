@@ -1,5 +1,31 @@
 # @confect/cli
 
+## 10.0.0-next.25
+
+### Minor Changes
+
+- 0d85daf: Add `ExecutionMetadata`, `RequestMetadata`, and `TransactionMetadata` services for reading function and deployment metadata, request metadata, and current transaction metrics. Generated services expose each capability to the function contexts that support it, including middleware and HTTP handlers where applicable.
+
+  ```ts
+  import * as Effect from "effect/Effect";
+  import {
+    ExecutionMetadata,
+    TransactionMetadata,
+  } from "./_generated/services";
+
+  const queryDetails = Effect.gen(function* () {
+    const execution = yield* ExecutionMetadata;
+    const transaction = yield* TransactionMetadata;
+    const fn = yield* execution.getFunction();
+    const metrics = yield* transaction.getMetrics();
+
+    return {
+      functionName: fn.name,
+      remainingReads: metrics.documentsRead.remaining,
+    };
+  });
+  ```
+
 ## 10.0.0-next.24
 
 ### Patch Changes
