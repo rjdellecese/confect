@@ -2,4 +2,4 @@
 "@confect/server": minor
 ---
 
-Add `Scheduler.cancel(id)` to cancel a scheduled function using the ID returned by `runAfter` or `runAt`.
+Add a `cancel()` method to the `Scheduler` service that cancels a scheduled function using the ID returned by `runAfter()` or `runAt()`.

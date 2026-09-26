@@ -6,7 +6,7 @@ description: "Schedule functions to run after a delay or at a specific time, and
 
 The `Scheduler` service schedules Confect functions to run in the future. It wraps Convex's scheduler with Effect-native types: delays use [`Duration`](https://effect.website/docs/data-types/duration/) and timestamps use [`DateTime`](https://effect.website/docs/data-types/datetime/).
 
-Both `runAfter` and `runAt` accept a ref to a mutation or action and an optional args object matching the ref's args schema. They return an ID from the `_scheduled_functions` system table, which you can pass to `cancel`.
+Both `runAfter()` and `runAt()` accept a ref to a mutation or action and an optional args object matching the ref's args schema. They return an ID from the `_scheduled_functions` system table. Pass this ID to `cancel()` to cancel the scheduled function.
 
 ## Run after a delay
 
