@@ -21,41 +21,42 @@ const makeConsole = Effect.map(TestConsole.make, (console) => ({
 }));
 
 describe("ConvexLogger", () => {
-  it.effect("routes every severity without stack-dumping Trace", () =>
-    Effect.gen(function* () {
-      const console = yield* makeConsole;
-      yield* Effect.gen(function* () {
-        yield* Effect.logTrace("trace");
-        yield* Effect.logDebug("debug");
-        yield* Effect.log("log");
-        yield* Effect.logInfo("info");
-        yield* Effect.logWarning("warning");
-        yield* Effect.logError("error");
-        yield* Effect.logFatal("fatal");
-      }).pipe(
-        Effect.provide(Logger.layer([ConvexLogger.logger])),
-        Effect.provideService(Console.Console, console),
-        Effect.provideService(References.MinimumLogLevel, "Trace"),
-      );
+  it.effect.each([
+    { name: "logTrace", log: Effect.logTrace, level: "TRACE", method: "debug" },
+    { name: "logDebug", log: Effect.logDebug, level: "DEBUG", method: "debug" },
+    { name: "log", log: Effect.log, level: "INFO", method: "info" },
+    { name: "logInfo", log: Effect.logInfo, level: "INFO", method: "info" },
+    {
+      name: "logWarning",
+      log: Effect.logWarning,
+      level: "WARN",
+      method: "warn",
+    },
+    { name: "logError", log: Effect.logError, level: "ERROR", method: "error" },
+    { name: "logFatal", log: Effect.logFatal, level: "FATAL", method: "error" },
+  ] as const)(
+    "routes $name to console.$method at $level",
+    ({ log, level, method }) =>
+      Effect.gen(function* () {
+        const console = yield* makeConsole;
+        yield* log("message").pipe(
+          Effect.provide(Logger.layer([ConvexLogger.logger])),
+          Effect.provideService(Console.Console, console),
+          Effect.provideService(References.MinimumLogLevel, "Trace"),
+        );
 
-      expect(console.debug.mock.calls).toEqual([
-        [expect.objectContaining({ level: "TRACE", message: "trace" })],
-        [expect.objectContaining({ level: "DEBUG", message: "debug" })],
-      ]);
-      expect(console.info.mock.calls).toEqual([
-        [expect.objectContaining({ level: "INFO", message: "log" })],
-        [expect.objectContaining({ level: "INFO", message: "info" })],
-      ]);
-      expect(console.warn.mock.calls).toEqual([
-        [expect.objectContaining({ level: "WARN", message: "warning" })],
-      ]);
-      expect(console.error.mock.calls).toEqual([
-        [expect.objectContaining({ level: "ERROR", message: "error" })],
-        [expect.objectContaining({ level: "FATAL", message: "fatal" })],
-      ]);
-      expect(console.log).not.toHaveBeenCalled();
-      expect(console.trace).not.toHaveBeenCalled();
-    }),
+        expect(console[method]).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ level, message: "message" }),
+        );
+        expect([
+          ...console.debug.mock.calls,
+          ...console.info.mock.calls,
+          ...console.warn.mock.calls,
+          ...console.error.mock.calls,
+        ]).toHaveLength(1);
+        expect(console.log).not.toHaveBeenCalled();
+        expect(console.trace).not.toHaveBeenCalled();
+      }),
   );
 
   it.effect("preserves messages, causes, annotations, and log spans", () =>
@@ -104,20 +105,15 @@ describe("ConvexLogger", () => {
       }).pipe(Effect.scoped),
   );
 
-  it.effect(
-    "does not add a console sink to custom-only or disabled logging",
-    () =>
-      Effect.gen(function* () {
-        const custom = Logger.make(() => undefined);
-        for (const loggers of [
-          new Set([custom]),
-          new Set<Logger.Logger<unknown, void>>(),
-        ]) {
-          const context = yield* Layer.build(ConvexLogger.layer).pipe(
-            Effect.provideService(Logger.CurrentLoggers, loggers),
-          );
-          expect(Context.get(context, Logger.CurrentLoggers)).toEqual(loggers);
-        }
-      }).pipe(Effect.scoped),
+  it.effect.each([
+    { name: "custom-only", loggers: new Set([Logger.make(() => undefined)]) },
+    { name: "disabled", loggers: new Set<Logger.Logger<unknown, void>>() },
+  ])("does not add a console sink to $name logging", ({ loggers }) =>
+    Effect.gen(function* () {
+      const context = yield* Layer.build(ConvexLogger.layer).pipe(
+        Effect.provideService(Logger.CurrentLoggers, loggers),
+      );
+      expect(Context.get(context, Logger.CurrentLoggers)).toEqual(loggers);
+    }).pipe(Effect.scoped),
   );
 });

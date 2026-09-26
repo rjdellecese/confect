@@ -87,8 +87,9 @@ describe("function logging", () => {
     },
   ];
 
-  for (const { name, spec, register, invoke } of cases) {
-    it.effect(`installs the default logger for a registered ${name}`, () =>
+  it.effect.each(cases)(
+    "installs the default logger for a registered $name",
+    ({ name, spec, register, invoke }) =>
       Effect.gen(function* () {
         const console = {
           ...(yield* TestConsole.make),
@@ -117,8 +118,7 @@ describe("function logging", () => {
         );
         expect(console.log).not.toHaveBeenCalled();
       }),
-    );
-  }
+  );
 });
 
 describe("Scheduler", () => {
