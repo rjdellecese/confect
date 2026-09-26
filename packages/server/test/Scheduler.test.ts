@@ -3,6 +3,7 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { Scheduler as ConvexScheduler } from "convex/server";
 import type { GenericId } from "convex/values";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import { vi } from "vitest";
 
 const scheduledFunctionId =
@@ -24,9 +25,7 @@ describe("Scheduler", () => {
       expectTypeOf(scheduler.cancel)
         .parameter(0)
         .toEqualTypeOf<GenericId<"_scheduled_functions">>();
-      expectTypeOf(cancellation).toEqualTypeOf<
-        Effect.Effect<void, Scheduler.SchedulerCancelError>
-      >();
+      expectTypeOf(cancellation).toEqualTypeOf<Effect.Effect<void>>();
       expect(cancel).not.toHaveBeenCalled();
 
       expect(yield* cancellation).toBeUndefined();
@@ -35,8 +34,8 @@ describe("Scheduler", () => {
     }).pipe(Effect.provide(Scheduler.layer(convexScheduler)));
   });
 
-  it.effect("cancel fails with the scheduled ID and original cause", () => {
-    const failure = new Error("Scheduled function already completed");
+  it.effect("cancel preserves unexpected Convex failures as defects", () => {
+    const failure = new Error("Convex cancellation failed");
     const convexScheduler = {
       runAfter: () => Promise.resolve(scheduledFunctionId),
       runAt: () => Promise.resolve(scheduledFunctionId),
@@ -45,55 +44,9 @@ describe("Scheduler", () => {
 
     return Effect.gen(function* () {
       const scheduler = yield* Scheduler.Scheduler;
-      const error = yield* Effect.flip(scheduler.cancel(scheduledFunctionId));
+      const exit = yield* Effect.exit(scheduler.cancel(scheduledFunctionId));
 
-      expectTypeOf(error).toEqualTypeOf<Scheduler.SchedulerCancelError>();
-      expect(error).toBeInstanceOf(Scheduler.SchedulerCancelError);
-      expect(error._tag).toBe("SchedulerCancelError");
-      expect(error.id).toBe(scheduledFunctionId);
-      expect(error.cause).toBe(failure);
-      expect(error.message).toContain(scheduledFunctionId);
-    }).pipe(Effect.provide(Scheduler.layer(convexScheduler)));
-  });
-
-  it.effect("cancel failures can be recovered with catchTag", () => {
-    const failure = "Cancellation rejected";
-    const convexScheduler = {
-      runAfter: () => Promise.resolve(scheduledFunctionId),
-      runAt: () => Promise.resolve(scheduledFunctionId),
-      cancel: () => Promise.reject(failure),
-    } satisfies ConvexScheduler;
-
-    return Effect.gen(function* () {
-      const scheduler = yield* Scheduler.Scheduler;
-      const recovered = yield* scheduler.cancel(scheduledFunctionId).pipe(
-        Effect.catchTag("SchedulerCancelError", (error) => {
-          expect(error.cause).toBe(failure);
-          return Effect.succeed(error.id);
-        }),
-      );
-
-      expect(recovered).toBe(scheduledFunctionId);
-    }).pipe(Effect.provide(Scheduler.layer(convexScheduler)));
-  });
-
-  it.effect("cancel captures synchronous throws in the error channel", () => {
-    const failure = new Error("Invalid scheduled function ID");
-    const convexScheduler = {
-      runAfter: () => Promise.resolve(scheduledFunctionId),
-      runAt: () => Promise.resolve(scheduledFunctionId),
-      cancel: () => {
-        throw failure;
-      },
-    } satisfies ConvexScheduler;
-
-    return Effect.gen(function* () {
-      const scheduler = yield* Scheduler.Scheduler;
-      const error = yield* Effect.flip(scheduler.cancel(scheduledFunctionId));
-
-      expect(error).toBeInstanceOf(Scheduler.SchedulerCancelError);
-      expect(error.id).toBe(scheduledFunctionId);
-      expect(error.cause).toBe(failure);
+      expect(exit).toEqual(Exit.die(failure));
     }).pipe(Effect.provide(Scheduler.layer(convexScheduler)));
   });
 });

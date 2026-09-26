@@ -1,30 +1,15 @@
-import { GenericId, Ref } from "@confect/core";
+import { Ref } from "@confect/core";
 import type { Scheduler as ConvexScheduler } from "convex/server";
+import type { GenericId } from "convex/values";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-
-export class SchedulerCancelError extends Schema.TaggedError<SchedulerCancelError>()(
-  "SchedulerCancelError",
-  {
-    id: GenericId.GenericId("_scheduled_functions"),
-    cause: Schema.Defect(),
-  },
-) {
-  override get message(): string {
-    return `Failed to cancel scheduled function '${this.id}'`;
-  }
-}
 
 const make = (scheduler: ConvexScheduler) => ({
-  cancel: (id: GenericId.GenericId<"_scheduled_functions">) =>
-    Effect.tryPromise({
-      try: () => scheduler.cancel(id),
-      catch: (cause) => new SchedulerCancelError({ id, cause }),
-    }),
+  cancel: (id: GenericId<"_scheduled_functions">) =>
+    Effect.promise(() => scheduler.cancel(id)),
   runAfter: <Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
     delay: Duration.Duration,
     ref: Ref_,
