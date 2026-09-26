@@ -374,12 +374,14 @@ const TimedImpl = MiddlewareImpl.make(
 
 An implementation provided with `MiddlewareImpl.make` uses one strategy for every function type the middleware declares, so its environment is limited to the services available in _all_ of those function types:
 
-| Declared function types                    | Services available to `make`                                                           |
-| ------------------------------------------ | -------------------------------------------------------------------------------------- |
-| One function type                          | That function type's full service set                                                  |
-| Queries and mutations                      | `DatabaseReader`, `Auth`, `StorageReader`, `QueryRunner`                               |
-| Mutations and actions                      | `Auth`, `Scheduler`, `StorageReader`, `StorageWriter`, `QueryRunner`, `MutationRunner` |
-| Any set including both queries and actions | `Auth`, `StorageReader`, `QueryRunner`                                                 |
+| Declared function types                    | Services available to `make`                                                                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| One function type                          | That function type's full service set                                                                                          |
+| Queries and mutations                      | `DatabaseReader`, `Auth`, `StorageReader`, `QueryRunner`, `ExecutionMetadata`, `Transaction`                                   |
+| Mutations and actions                      | `Auth`, `Scheduler`, `StorageReader`, `StorageWriter`, `QueryRunner`, `MutationRunner`, `ExecutionMetadata`, `RequestMetadata` |
+| Any set including both queries and actions | `Auth`, `StorageReader`, `QueryRunner`, `ExecutionMetadata`                                                                    |
+
+The [metadata services](/server/metadata) follow the same intersection rule. You can inspect the current function and deployment in any middleware, but request metadata requires mutations or actions, and transaction metrics require queries or mutations.
 
 ### Per-function-type implementations
 
