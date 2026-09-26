@@ -15,7 +15,7 @@ import {
   StorageActionWriter as StorageActionWriter_,
   StorageReader as StorageReader_,
   StorageWriter as StorageWriter_,
-  Transaction as Transaction_,
+  TransactionMetadata as TransactionMetadata_,
   VectorSearch as VectorSearch_,
 } from "@confect/server";
 import type schemaDefinition from "./schema";
@@ -30,8 +30,8 @@ export type ExecutionMetadata = typeof ExecutionMetadata.Identifier;
 export const RequestMetadata = RequestMetadata_.RequestMetadata;
 export type RequestMetadata = typeof RequestMetadata.Identifier;
 
-export const Transaction = Transaction_.Transaction;
-export type Transaction = typeof Transaction.Identifier;
+export const TransactionMetadata = TransactionMetadata_.TransactionMetadata;
+export type TransactionMetadata = typeof TransactionMetadata.Identifier;
 
 export const Scheduler = Scheduler_.Scheduler;
 export type Scheduler = typeof Scheduler.Identifier;

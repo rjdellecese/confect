@@ -13,7 +13,7 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 import type { ExecutionMetadata } from "./ExecutionMetadata";
 import type { RequestMetadata } from "./RequestMetadata";
-import type { Transaction } from "./Transaction";
+import type { TransactionMetadata } from "./TransactionMetadata";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import type * as Scheduler from "./Scheduler";
@@ -93,7 +93,7 @@ type QueryMutationCommonServices<
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | Auth.Auth
   | ExecutionMetadata
-  | Transaction
+  | TransactionMetadata
   | StorageReader.StorageReader
   | QueryRunner.QueryRunner;
 

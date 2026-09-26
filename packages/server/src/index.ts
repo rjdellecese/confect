@@ -51,5 +51,5 @@ export * as StorageReader from "./StorageReader";
 export * as StorageWriter from "./StorageWriter";
 export * as Table from "./Table";
 export * as TableInfo from "./TableInfo";
-export * as Transaction from "./Transaction";
+export * as TransactionMetadata from "./TransactionMetadata";
 export * as VectorSearch from "./VectorSearch";

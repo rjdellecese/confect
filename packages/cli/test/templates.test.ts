@@ -11,7 +11,7 @@ it.effect("exports metadata services as aliases of the server tags", () =>
     for (const name of [
       "ExecutionMetadata",
       "RequestMetadata",
-      "Transaction",
+      "TransactionMetadata",
     ]) {
       expect(contents).toContain(`${name} as ${name}_,`);
       expect(contents).toContain(`export const ${name} = ${name}_.${name};`);

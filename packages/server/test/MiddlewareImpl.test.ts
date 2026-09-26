@@ -10,7 +10,7 @@ import type * as DatabaseWriterModule from "@confect/server/DatabaseWriter";
 import type * as Handler from "@confect/server/Handler";
 import type { ExecutionMetadata } from "@confect/server/ExecutionMetadata";
 import type { RequestMetadata } from "@confect/server/RequestMetadata";
-import type { Transaction } from "@confect/server/Transaction";
+import type { TransactionMetadata } from "@confect/server/TransactionMetadata";
 import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -273,7 +273,10 @@ describe("function-level implementation requirements", () => {
 });
 
 describe("implementation service bounds", () => {
-  type MetadataServices = ExecutionMetadata | RequestMetadata | Transaction;
+  type MetadataServices =
+    | ExecutionMetadata
+    | RequestMetadata
+    | TransactionMetadata;
 
   it("keeps only execution metadata common to all function types or query+action", () => {
     type QueryAction = MiddlewareImpl.CommonServices<
@@ -288,14 +291,14 @@ describe("implementation service bounds", () => {
       Extract<QueryAction, MetadataServices>
     >().toEqualTypeOf<ExecutionMetadata>();
     expectTypeOf<RequestMetadata>().not.toExtend<AllFunctionTypes>();
-    expectTypeOf<Transaction>().not.toExtend<AllFunctionTypes>();
+    expectTypeOf<TransactionMetadata>().not.toExtend<AllFunctionTypes>();
     expectTypeOf<RequestMetadata>().not.toExtend<QueryAction>();
-    expectTypeOf<Transaction>().not.toExtend<QueryAction>();
+    expectTypeOf<TransactionMetadata>().not.toExtend<QueryAction>();
   });
 
   it("shares transaction metrics but not request metadata across queries and mutations", () => {
     expectTypeOf<Extract<QueryMutation, MetadataServices>>().toEqualTypeOf<
-      ExecutionMetadata | Transaction
+      ExecutionMetadata | TransactionMetadata
     >();
     expectTypeOf<RequestMetadata>().not.toExtend<QueryMutation>();
   });
@@ -309,7 +312,7 @@ describe("implementation service bounds", () => {
     expectTypeOf<Extract<MutationAction, MetadataServices>>().toEqualTypeOf<
       ExecutionMetadata | RequestMetadata
     >();
-    expectTypeOf<Transaction>().not.toExtend<MutationAction>();
+    expectTypeOf<TransactionMetadata>().not.toExtend<MutationAction>();
   });
 
   it("preserves the metadata capabilities of each individual function type", () => {
@@ -323,7 +326,7 @@ describe("implementation service bounds", () => {
     >;
 
     expectTypeOf<Extract<QueryOnly, MetadataServices>>().toEqualTypeOf<
-      ExecutionMetadata | Transaction
+      ExecutionMetadata | TransactionMetadata
     >();
     expectTypeOf<
       Extract<MutationOnly, MetadataServices>
@@ -332,7 +335,7 @@ describe("implementation service bounds", () => {
       ExecutionMetadata | RequestMetadata
     >();
     expectTypeOf<RequestMetadata>().not.toExtend<QueryOnly>();
-    expectTypeOf<Transaction>().not.toExtend<ActionOnly>();
+    expectTypeOf<TransactionMetadata>().not.toExtend<ActionOnly>();
   });
 
   type ReaderService = DatabaseReaderModule.DatabaseReader<

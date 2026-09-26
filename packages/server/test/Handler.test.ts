@@ -13,7 +13,7 @@ import type { ExecutionMetadata } from "@confect/server/ExecutionMetadata";
 import type * as Handler from "@confect/server/Handler";
 import type * as HttpRouter from "@confect/server/HttpRouter";
 import type { RequestMetadata } from "@confect/server/RequestMetadata";
-import type { Transaction } from "@confect/server/Transaction";
+import type { TransactionMetadata } from "@confect/server/TransactionMetadata";
 import type schema from "./mock-backend/fixtures/confect/_generated/schema";
 import {
   internalAction,
@@ -32,12 +32,15 @@ type ExtractActionReturns<F> =
 
 describe("Handler", () => {
   describe("metadata service availability", () => {
-    type MetadataServices = ExecutionMetadata | RequestMetadata | Transaction;
+    type MetadataServices =
+      | ExecutionMetadata
+      | RequestMetadata
+      | TransactionMetadata;
 
     it("allows execution metadata and transaction metrics in queries", () => {
       expectTypeOf<
         Extract<Handler.QueryServices<typeof schema>, MetadataServices>
-      >().toEqualTypeOf<ExecutionMetadata | Transaction>();
+      >().toEqualTypeOf<ExecutionMetadata | TransactionMetadata>();
       expectTypeOf<RequestMetadata>().not.toExtend<
         Handler.QueryServices<typeof schema>
       >();
@@ -71,15 +74,15 @@ describe("Handler", () => {
       expectTypeOf<
         Extract<NodeActionEnvironment, MetadataServices>
       >().toEqualTypeOf<ExecutionMetadata | RequestMetadata>();
-      expectTypeOf<Transaction>().not.toExtend<ActionEnvironment>();
-      expectTypeOf<Transaction>().not.toExtend<NodeActionEnvironment>();
+      expectTypeOf<TransactionMetadata>().not.toExtend<ActionEnvironment>();
+      expectTypeOf<TransactionMetadata>().not.toExtend<NodeActionEnvironment>();
     });
 
     it("allows execution and request metadata but not transactions in HTTP handlers", () => {
       expectTypeOf<
         Extract<HttpRouter.Services, MetadataServices>
       >().toEqualTypeOf<ExecutionMetadata | RequestMetadata>();
-      expectTypeOf<Transaction>().not.toExtend<HttpRouter.Services>();
+      expectTypeOf<TransactionMetadata>().not.toExtend<HttpRouter.Services>();
     });
   });
 

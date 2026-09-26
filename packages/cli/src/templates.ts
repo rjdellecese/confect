@@ -558,7 +558,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
       yield* cbw.writeLine("StorageActionWriter as StorageActionWriter_,");
       yield* cbw.writeLine("StorageReader as StorageReader_,");
       yield* cbw.writeLine("StorageWriter as StorageWriter_,");
-      yield* cbw.writeLine("Transaction as Transaction_,");
+      yield* cbw.writeLine("TransactionMetadata as TransactionMetadata_,");
       yield* cbw.writeLine("VectorSearch as VectorSearch_,");
     }),
   );
@@ -590,9 +590,11 @@ const servicesEffect = Effect.fnUntraced(function* ({
   );
   yield* cbw.blankLine();
 
-  yield* cbw.writeLine("export const Transaction = Transaction_.Transaction;");
   yield* cbw.writeLine(
-    "export type Transaction = typeof Transaction.Identifier;",
+    "export const TransactionMetadata = TransactionMetadata_.TransactionMetadata;",
+  );
+  yield* cbw.writeLine(
+    "export type TransactionMetadata = typeof TransactionMetadata.Identifier;",
   );
   yield* cbw.blankLine();
 

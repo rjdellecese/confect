@@ -1,14 +1,16 @@
-import { Transaction as BarrelTransaction } from "@confect/server";
-import * as Transaction from "@confect/server/Transaction";
+import { TransactionMetadata as BarrelTransactionMetadata } from "@confect/server";
+import * as TransactionMetadata from "@confect/server/TransactionMetadata";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { QueryMeta, TransactionMetrics } from "convex/server";
 import * as Effect from "effect/Effect";
 import { vi } from "vitest";
 
-describe("Transaction", () => {
+describe("TransactionMetadata", () => {
   it("exports the same service through the barrel and leaf module", () => {
-    expect(BarrelTransaction.Transaction).toBe(Transaction.Transaction);
-    expectTypeOf<Transaction.TransactionMetrics>().toEqualTypeOf<TransactionMetrics>();
+    expect(BarrelTransactionMetadata.TransactionMetadata).toBe(
+      TransactionMetadata.TransactionMetadata,
+    );
+    expectTypeOf<TransactionMetadata.TransactionMetrics>().toEqualTypeOf<TransactionMetrics>();
   });
 
   it.effect(
@@ -35,12 +37,12 @@ describe("Transaction", () => {
         QueryMeta,
         "getTransactionMetrics"
       >;
-      const layer = Transaction.layer(meta);
+      const layer = TransactionMetadata.layer(meta);
 
       expect(getTransactionMetrics).not.toHaveBeenCalled();
 
       return Effect.gen(function* () {
-        const transaction = yield* Transaction.Transaction;
+        const transaction = yield* TransactionMetadata.TransactionMetadata;
         const getMetrics = transaction.getMetrics();
 
         expectTypeOf(getMetrics).toEqualTypeOf<
@@ -65,12 +67,12 @@ describe("Transaction", () => {
     } satisfies Pick<QueryMeta, "getTransactionMetrics">;
 
     return Effect.gen(function* () {
-      const transaction = yield* Transaction.Transaction;
+      const transaction = yield* TransactionMetadata.TransactionMetadata;
       expect(
         yield* transaction
           .getMetrics()
           .pipe(Effect.catchDefect(Effect.succeed)),
       ).toBe(failure);
-    }).pipe(Effect.provide(Transaction.layer(meta)));
+    }).pipe(Effect.provide(TransactionMetadata.layer(meta)));
   });
 });

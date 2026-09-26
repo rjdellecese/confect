@@ -31,7 +31,7 @@ import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
 import * as ExecutionMetadata from "./ExecutionMetadata";
 import * as RequestMetadata from "./RequestMetadata";
-import * as Transaction from "./Transaction";
+import * as TransactionMetadata from "./TransactionMetadata";
 import * as MutationCtx from "./MutationCtx";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryCtx from "./QueryCtx";
@@ -183,7 +183,7 @@ const queryFunction = <
     | DatabaseReader.DatabaseReader<DatabaseSchema_>
     | Auth.Auth
     | ExecutionMetadata.ExecutionMetadata
-    | Transaction.Transaction
+    | TransactionMetadata.TransactionMetadata
     | StorageReader
     | QueryRunner.QueryRunner
     | QueryCtx.QueryCtx<
@@ -222,7 +222,7 @@ const queryFunction = <
             DatabaseReader.layer(databaseSchema, ctx.db),
             Auth.layer(ctx.auth),
             ExecutionMetadata.layer(ctx.meta),
-            Transaction.layer(ctx.meta),
+            TransactionMetadata.layer(ctx.meta),
             StorageReader.layer(ctx.storage),
             QueryRunner.layer(ctx.runQuery),
             Layer.succeed(
@@ -261,7 +261,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
     Auth.layer(ctx.auth),
     ExecutionMetadata.layer(ctx.meta),
     RequestMetadata.layer(ctx.meta),
-    Transaction.layer(ctx.meta),
+    TransactionMetadata.layer(ctx.meta),
     Scheduler.layer(ctx.scheduler),
     StorageReader.layer(ctx.storage),
     StorageWriter.layer(ctx.storage),
@@ -282,7 +282,7 @@ export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
   | Auth.Auth
   | ExecutionMetadata.ExecutionMetadata
   | RequestMetadata.RequestMetadata
-  | Transaction.Transaction
+  | TransactionMetadata.TransactionMetadata
   | Scheduler.Scheduler
   | StorageReader
   | StorageWriter

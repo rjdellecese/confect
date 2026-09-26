@@ -22,7 +22,7 @@ import {
   DatabaseWriter,
   MutationCtx,
   Scheduler,
-  Transaction,
+  TransactionMetadata,
 } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
 import type notes from "./fixtures/confect/_generated/tables/notes";
@@ -34,13 +34,13 @@ import {
 import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
 
-describe("Transaction", () => {
+describe("TransactionMetadata", () => {
   it.effect("reads updated metrics after database operations", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
       yield* c.run(
         Effect.gen(function* () {
-          const transaction = yield* Transaction;
+          const transaction = yield* TransactionMetadata;
           const writer = yield* DatabaseWriter;
           const reader = yield* DatabaseReader;
           const getMetrics = transaction.getMetrics();

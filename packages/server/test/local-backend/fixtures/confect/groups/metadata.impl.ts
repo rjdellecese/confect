@@ -5,7 +5,7 @@ import databaseSchema from "../_generated/schema";
 import {
   ExecutionMetadata,
   RequestMetadata,
-  Transaction,
+  TransactionMetadata,
 } from "../_generated/services";
 import metadata, { ObserveExecution } from "./metadata.spec";
 
@@ -37,7 +37,7 @@ const queryMetadata = FunctionImpl.make(
   () =>
     Effect.gen(function* () {
       const execution = yield* readExecution;
-      const transaction = yield* Transaction;
+      const transaction = yield* TransactionMetadata;
       const metrics = yield* transaction.getMetrics();
       return {
         ...execution,
@@ -54,7 +54,7 @@ const mutationMetadata = FunctionImpl.make(
     Effect.gen(function* () {
       const execution = yield* readExecution;
       const request = yield* readRequest;
-      const transaction = yield* Transaction;
+      const transaction = yield* TransactionMetadata;
       const metrics = yield* transaction.getMetrics();
       return {
         ...execution,
