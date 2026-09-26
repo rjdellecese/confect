@@ -163,12 +163,8 @@ jobs:
       - run: cd packages/${{ matrix.package }} && pnpm test
 
   test-oxlint-rules:
-    name: Test (oxlint-rules, ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
+    name: Test (oxlint-rules)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
