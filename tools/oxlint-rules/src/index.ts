@@ -9,13 +9,15 @@
  */
 import { Plugin } from "effect-oxlint";
 import { preferEffectVitest } from "./preferEffectVitest.ts";
+import { preferTestEach } from "./preferTestEach.ts";
 
-export { preferEffectVitest };
+export { preferEffectVitest, preferTestEach };
 
 export default Plugin.define({
   name: "confect",
   specifier: "confect-oxlint-rules",
   rules: {
     "prefer-effect-vitest": preferEffectVitest,
+    "prefer-test-each": preferTestEach,
   },
 });

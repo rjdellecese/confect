@@ -92,6 +92,9 @@ describe("prefer-effect-vitest", () => {
 describe("plugin", () => {
   it("registers the rule under the confect namespace", () => {
     expect(confectPlugin.meta.name).toBe("confect");
-    expect(Object.keys(confectPlugin.rules)).toEqual(["prefer-effect-vitest"]);
+    expect(Object.keys(confectPlugin.rules)).toEqual([
+      "prefer-effect-vitest",
+      "prefer-test-each",
+    ]);
   });
 });
