@@ -27,6 +27,8 @@ import * as ActionRunner from "./ActionRunner";
 import * as Auth from "./Auth";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
+import * as ExecutionMetadata from "./ExecutionMetadata";
+import * as RequestMetadata from "./RequestMetadata";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
@@ -310,6 +312,8 @@ export type ActionServices<
 > =
   | Scheduler.Scheduler
   | Auth.Auth
+  | ExecutionMetadata.ExecutionMetadata
+  | RequestMetadata.RequestMetadata
   | StorageReader.StorageReader
   | StorageWriter.StorageWriter
   | StorageActionWriter.StorageActionWriter
@@ -332,6 +336,8 @@ export const baseActionLayer = <ConvexDataModel extends GenericDataModel>(
   Layer.mergeAll(
     Scheduler.layer(ctx.scheduler),
     Auth.layer(ctx.auth),
+    ExecutionMetadata.layer(ctx.meta),
+    RequestMetadata.layer(ctx.meta),
     StorageReader.StorageReader.layer(ctx.storage),
     StorageWriter.StorageWriter.layer(ctx.storage),
     StorageActionWriter.StorageActionWriter.layer(ctx.storage),

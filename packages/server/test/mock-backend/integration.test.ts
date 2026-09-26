@@ -22,6 +22,7 @@ import {
   DatabaseWriter,
   MutationCtx,
   Scheduler,
+  TransactionMetadata,
 } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
 import type notes from "./fixtures/confect/_generated/tables/notes";
@@ -32,6 +33,34 @@ import {
 } from "./fixtures/confect/groups/typedErrors.spec";
 import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
+
+describe("TransactionMetadata", () => {
+  it.effect("reads updated metrics after database operations", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+      yield* c.run(
+        Effect.gen(function* () {
+          const transaction = yield* TransactionMetadata;
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+          const getMetrics = transaction.getMetrics();
+          const before = yield* getMetrics;
+
+          const id = yield* writer.table("notes").insert({ text: "metrics" });
+          yield* reader.table("notes").get(id);
+          const after = yield* getMetrics;
+
+          expect(after.documentsWritten.used).toBeGreaterThan(
+            before.documentsWritten.used,
+          );
+          expect(after.documentsRead.used).toBeGreaterThan(
+            before.documentsRead.used,
+          );
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+});
 
 describe("Scheduler", () => {
   it.effect("cancels a pending function without executing it", () =>
