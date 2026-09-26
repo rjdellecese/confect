@@ -3,12 +3,43 @@ import { assertEquals } from "@effect/vitest/utils";
 import { HttpRouter as ConfectHttpRouter } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import { vi } from "vitest";
 import { DatabaseWriter } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
 import { NotesApi } from "./fixtures/confect/http";
 import * as TestConfect from "./TestConfect";
 
 describe("HttpRouter", () => {
+  it.effect(
+    "uses each request's console and respects route logger overrides",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+        const original = globalThis.console;
+        const first = { ...original, warn: vi.fn(), log: vi.fn() };
+        const second = { ...original, warn: vi.fn(), log: vi.fn() };
+        yield* Effect.gen(function* () {
+          globalThis.console = first;
+          expect((yield* c.fetch("/logging")).status).toBe(200);
+          globalThis.console = second;
+          expect((yield* c.fetch("/logging")).status).toBe(200);
+          expect((yield* c.fetch("/logging/disabled")).status).toBe(200);
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              globalThis.console = original;
+            }),
+          ),
+        );
+        for (const console of [first, second]) {
+          expect(console.warn).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({ level: "WARN", message: "HTTP request" }),
+          );
+          expect(console.log).not.toHaveBeenCalled();
+        }
+      }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect(
     "serves an HttpApi endpoint whose handler uses a Confect service",
     () =>

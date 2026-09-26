@@ -148,3 +148,42 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
   barrel import pulls the whole `Schema` namespace into the module graph your
   function evaluates at cold start, even when you use only a small part of it.
 </Note>
+
+## Logging
+
+Use `Effect.log*` in your handlers. Confect routes logs through Convex's console
+methods so their severity is preserved in the dashboard and log streams. This
+applies to queries, mutations, actions, Node actions, and HTTP routes.
+
+| Effect level    | Console method  | Convex severity |
+| --------------- | --------------- | --------------- |
+| Trace and Debug | `console.debug` | `DEBUG`         |
+| Info            | `console.info`  | `INFO`          |
+| Warn            | `console.warn`  | `WARN`          |
+| Error and Fatal | `console.error` | `ERROR`         |
+
+`Effect.log` uses Info unless you change Effect's current log level. The default
+minimum level is Info, so Debug and Trace remain hidden until you enable them:
+
+```ts
+import * as Effect from "effect/Effect";
+import * as References from "effect/References";
+
+const debugOperation = Effect.logTrace("Entering operation").pipe(
+  Effect.provideService(References.MinimumLogLevel, "Trace"),
+);
+```
+
+Trace is a diagnostic severity, not a request to print a stack trace. Confect
+doesn't call `console.trace` for Trace logs.
+
+Each log payload retains the original Effect level, messages, cause, annotations,
+log spans, timestamp, and fiber ID. Convex renders this payload as a string; it
+doesn't promote the payload's properties into structured log-stream fields.
+
+Confect preserves Effect's tracer logger and any additional loggers. To replace
+the default output for a handler, provide your own `Logger.layer` inside its
+effect. Use `Logger.layer([])` to disable logging there. The default logger is
+also available as `ConvexLogger.logger` from `@confect/server/ConvexLogger`;
+`ConvexLogger.layer` replaces only Effect's default console logger, leaving custom
+loggers and the minimum level unchanged.

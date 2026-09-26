@@ -5,6 +5,7 @@ export * as ActionRunner from "./ActionRunner";
 export * as Auth from "./Auth";
 export * as BlobNotFoundError from "./BlobNotFoundError";
 export * as ConvexConfigProvider from "./ConvexConfigProvider";
+export * as ConvexLogger from "./ConvexLogger";
 export * as CronJob from "./CronJob";
 export * as CronJobs from "./CronJobs";
 export * as DatabaseReader from "./DatabaseReader";
