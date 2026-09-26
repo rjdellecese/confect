@@ -18,6 +18,8 @@ import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import * as HttpServer from "effect/unstable/http/HttpServer";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
+import type { ExecutionMetadata } from "./ExecutionMetadata";
+import type { RequestMetadata } from "./RequestMetadata";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as ConvexLogger from "./ConvexLogger";
 import type * as MutationRunner from "./MutationRunner";
@@ -38,6 +40,8 @@ export type Services =
   | ActionRunner.ActionRunner
   | Scheduler.Scheduler
   | Auth.Auth
+  | ExecutionMetadata
+  | RequestMetadata
   | StorageReader
   | StorageWriter
   | StorageActionWriter;

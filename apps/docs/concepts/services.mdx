@@ -14,12 +14,15 @@ import {
   Auth,
   DatabaseReader,
   DatabaseWriter,
+  ExecutionMetadata,
   MutationRunner,
   QueryRunner,
+  RequestMetadata,
   Scheduler,
   StorageReader,
   StorageWriter,
   StorageActionWriter,
+  TransactionMetadata,
   VectorSearch,
 } from "./_generated/services";
 ```
@@ -93,6 +96,26 @@ Access the current user's identity.
 <ContextBadges mutation action http />
 
 Schedule Confect functions to run after a delay or at a specific time.
+
+## Metadata
+
+### `ExecutionMetadata`
+
+<ContextBadges query mutation action http />
+
+Read metadata about the current function and deployment.
+
+### `RequestMetadata`
+
+<ContextBadges mutation action http />
+
+Read metadata about the request that triggered the current execution.
+
+### `TransactionMetadata`
+
+<ContextBadges query mutation />
+
+Read transaction usage and remaining limits. See [Metadata](/server/metadata) for examples of all three services.
 
 ## Search
 
