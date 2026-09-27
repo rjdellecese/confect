@@ -15,6 +15,7 @@ allowBuilds:
   opensrc: false
   puppeteer: false
   sharp: true
+  workerd: false
 
 # pnpm's supply-chain policy rejects a lockfile referencing anything published
 # within `minimumReleaseAge` (24 hours by default), which every same-day Effect
