@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
 import * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -190,6 +191,7 @@ describe("Code", () => {
 
 const project = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
   const cwd = yield* fs.makeTempDirectoryScoped({
     prefix: "confect-code-test-",
   });
@@ -197,10 +199,10 @@ const project = Effect.gen(function* () {
     ["convex", "convex"],
     ["@confect/cli", "confect"],
   ]) {
-    const directory = `${cwd}/node_modules/${name}`;
+    const directory = path.join(cwd, "node_modules", name);
     yield* fs.makeDirectory(directory, { recursive: true });
     yield* fs.writeFileString(
-      `${directory}/package.json`,
+      path.join(directory, "package.json"),
       serialize({ name, bin: { [bin]: "cli.js" } }),
     );
   }
@@ -211,6 +213,11 @@ describe("Code command boundary", () => {
   it.effect("discards real process output and sanitizes spawn failures", () =>
     Effect.gen(function* () {
       const runner = yield* CommandRunner;
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const cwd = yield* fs.makeTempDirectoryScoped({
+        prefix: "confect-spawn-test-",
+      });
       const exited = yield* runner
         .prepare({
           command: process.execPath,
@@ -231,7 +238,7 @@ describe("Code command boundary", () => {
         );
       expect(serialize(exited)).not.toContain("test-secret");
       const failed = yield* runner
-        .prepare({ command: "/nonexistent/confect-test-secret", args: [] })
+        .prepare({ command: path.join(cwd, "confect-test-secret"), args: [] })
         .pipe(Effect.result);
       expect(Result.isFailure(failed)).toBe(true);
       if (Result.isFailure(failed))
@@ -240,7 +247,7 @@ describe("Code command boundary", () => {
         );
       expect(serialize(failed)).not.toContain("test-secret");
     }).pipe(
-      Effect.provide(runnerLayer.pipe(Layer.provide(NodeServices.layer))),
+      Effect.provide(runnerLayer.pipe(Layer.provideMerge(NodeServices.layer))),
     ),
   );
 
@@ -249,6 +256,7 @@ describe("Code command boundary", () => {
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
         const cwd = yield* project;
         let envFile = "";
         const calls: string[] = [];
@@ -275,24 +283,24 @@ describe("Code command boundary", () => {
               expect(command.options.env).not.toHaveProperty("NODE_OPTIONS");
               if (command.args[1] === "deploy") {
                 expect(command.args[0]).toBe(
-                  `${cwd}/node_modules/convex/cli.js`,
+                  path.join(cwd, "node_modules", "convex", "cli.js"),
                 );
                 const index = command.args.indexOf("--env-file");
                 expect(index).toBeGreaterThan(0);
                 envFile = command.args[index + 1];
-                expect(command.options.env?.HOME).toBe(
-                  envFile.slice(0, envFile.lastIndexOf("/")),
-                );
+                expect(command.options.env?.HOME).toBe(path.dirname(envFile));
                 expect(command.options.env?.USERPROFILE).toBe(
                   command.options.env?.HOME,
                 );
                 expect(yield* fs.readFileString(envFile)).toBe(
                   "CONVEX_DEPLOY_KEY=prod:happy-otter-123|test-secret\n",
                 );
-                expect((yield* fs.stat(envFile)).mode & 0o777).toBe(0o600);
+                if (process.platform !== "win32") {
+                  expect((yield* fs.stat(envFile)).mode & 0o777).toBe(0o600);
+                }
               } else {
                 expect(command.args[0]).toBe(
-                  `${cwd}/node_modules/@confect/cli/cli.js`,
+                  path.join(cwd, "node_modules", "@confect", "cli", "cli.js"),
                 );
               }
               return ChildProcessSpawner.ExitCode(0);
@@ -306,7 +314,7 @@ describe("Code command boundary", () => {
                 CONVEX_ACCESS_TOKEN: "ambient-management-secret",
                 CONVEX_DEPLOYMENT: "prod:wrong",
                 NODE_OPTIONS: "--inspect",
-                PATH: "/usr/bin",
+                PATH: path.dirname(process.execPath),
               }),
             ),
           ]),
@@ -388,7 +396,6 @@ describe("Code command boundary", () => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const cwd = yield* fs.makeTempDirectoryScoped({
-        directory: "/tmp",
         prefix: "confect-empty-test-",
       });
       const result = yield* deploy({
