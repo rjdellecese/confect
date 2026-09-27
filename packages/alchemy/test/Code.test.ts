@@ -210,6 +210,40 @@ const project = Effect.gen(function* () {
 });
 
 describe("Code command boundary", () => {
+  it.effect(
+    "preserves Windows process prerequisites across environment casing",
+    () =>
+      Effect.gen(function* () {
+        const cwd = yield* project;
+        for (const environment of [
+          { PATH: "C:\\node", SYSTEMROOT: "C:\\Windows" },
+          { Path: "C:\\node", SystemRoot: "C:\\Windows" },
+        ]) {
+          const calls: string[] = [];
+          const spawner = Layer.mock(ChildProcessSpawner.ChildProcessSpawner, {
+            exitCode: (command) =>
+              Effect.sync(() => {
+                expect(command._tag).toBe("StandardCommand");
+                if (command._tag !== "StandardCommand")
+                  return ChildProcessSpawner.ExitCode(1);
+                calls.push(command.args[1]);
+                expect(command.options.env?.PATH).toBe("C:\\node");
+                expect(command.options.env?.SystemRoot).toBe("C:\\Windows");
+                expect(command.options.extendEnv).toBe(false);
+                return ChildProcessSpawner.ExitCode(0);
+              }),
+          });
+          yield* deploy({ ...props, cwd }).pipe(
+            Effect.provide([
+              runnerLayer.pipe(Layer.provide(spawner)),
+              ConfigProvider.layer(ConfigProvider.fromUnknown(environment)),
+            ]),
+          );
+          expect(calls).toEqual(["codegen", "deploy"]);
+        }
+      }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
   it.effect("discards real process output and sanitizes spawn failures", () =>
     Effect.gen(function* () {
       const runner = yield* CommandRunner;

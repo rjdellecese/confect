@@ -120,10 +120,16 @@ export const layer = Layer.effect(
         });
     });
     const environment = Config.all({
-      PATH: Config.String("PATH").pipe(Config.withDefault("")),
+      PATH: Config.String("PATH").pipe(
+        Config.orElse(() => Config.String("Path")),
+        Config.withDefault(""),
+      ),
       HOME: Config.String("HOME").pipe(Config.withDefault("")),
       USERPROFILE: Config.String("USERPROFILE").pipe(Config.withDefault("")),
-      SystemRoot: Config.String("SystemRoot").pipe(Config.withDefault("")),
+      SystemRoot: Config.String("SystemRoot").pipe(
+        Config.orElse(() => Config.String("SYSTEMROOT")),
+        Config.withDefault(""),
+      ),
       TMPDIR: Config.String("TMPDIR").pipe(Config.withDefault("")),
       TEMP: Config.String("TEMP").pipe(Config.withDefault("")),
     }).pipe(Effect.map((env) => ({ ...env, CI: "true", DO_NOT_TRACK: "1" })));
