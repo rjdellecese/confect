@@ -22,6 +22,26 @@ it.effect(
     }),
 );
 
+it.effect("exports unified storage alongside compatible storage aliases", () =>
+  Effect.gen(function* () {
+    const contents = yield* templates.services({
+      schemaImportPath: "./schema",
+    });
+    for (const name of [
+      "Storage",
+      "StorageReader",
+      "StorageWriter",
+      "StorageActionWriter",
+    ]) {
+      expect(contents).toContain(`${name} as ${name}_,`);
+      expect(contents).toContain(`export const ${name} = ${name}_.${name};`);
+      expect(contents).toContain(
+        `export type ${name} = typeof ${name}.Identifier;`,
+      );
+    }
+  }),
+);
+
 it.effect("exports metadata services as aliases of the server tags", () =>
   Effect.gen(function* () {
     const contents = yield* templates.services({

@@ -76,12 +76,30 @@ export declare const api: {
       manyOpsQuery: FunctionReference<"query", "public", {}, number>;
     };
     storage: {
+      deleteBlob: FunctionReference<
+        "mutation",
+        "public",
+        { storageId: Id<"_storage"> },
+        null
+      >;
       generateUploadUrl: FunctionReference<"mutation", "public", {}, string>;
+      get: FunctionReference<
+        "action",
+        "public",
+        { storageId: Id<"_storage"> },
+        string
+      >;
       getUrl: FunctionReference<
         "query",
         "public",
         { storageId: Id<"_storage"> },
         string
+      >;
+      store: FunctionReference<
+        "action",
+        "public",
+        { text: string },
+        Id<"_storage">
       >;
     };
     transactions: {

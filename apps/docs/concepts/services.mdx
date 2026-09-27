@@ -19,9 +19,7 @@ import {
   QueryRunner,
   RequestMetadata,
   Scheduler,
-  StorageReader,
-  StorageWriter,
-  StorageActionWriter,
+  Storage,
   TransactionMetadata,
   VectorSearch,
 } from "./_generated/services";
@@ -135,23 +133,26 @@ not be up to date when the mutation commits. Passing
 
 ## Storage
 
-### `StorageReader`
+### `Storage`
 
 <ContextBadges query mutation action http />
 
-Retrieve URLs for blobs in storage.
+Use one service for file storage. The available operations depend on the function's context:
 
-### `StorageWriter`
+| Operations                    | Available in                                  |
+| ----------------------------- | --------------------------------------------- |
+| `getUrl`                      | Queries, mutations, actions, and HTTP actions |
+| `generateUploadUrl`, `delete` | Mutations, actions, and HTTP actions          |
+| `get`, `store`                | Actions and HTTP actions                      |
 
-<ContextBadges mutation action http />
+See [Storage](/server/storage) for examples and return types.
 
-Generate upload URLs and delete blobs.
-
-### `StorageActionWriter`
-
-<ContextBadges action http />
-
-Get and store blobs.
+<Note>
+  `StorageWriter` and `StorageActionWriter` may appear in operation
+  requirements. Confect supplies them automatically; new code only needs to
+  import `Storage`. The existing storage service exports and generated aliases
+  remain available for compatibility.
+</Note>
 
 ## Authentication
 

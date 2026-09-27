@@ -18,6 +18,7 @@ import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import type { QueryTransactionContext } from "./QueryTransactionContext";
 import type * as Scheduler from "./Scheduler";
+import type { Storage } from "./Storage";
 import type * as StorageReader from "./StorageReader";
 import type * as StorageWriter from "./StorageWriter";
 import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
@@ -96,6 +97,7 @@ type QueryMutationCommonServices<
   | ExecutionMetadata
   | TransactionMetadata
   | QueryTransactionContext
+  | Storage
   | StorageReader.StorageReader
   | QueryRunner.QueryRunner;
 
@@ -104,6 +106,7 @@ type MutationActionCommonServices =
   | ExecutionMetadata
   | RequestMetadata
   | Scheduler.Scheduler
+  | Storage
   | StorageReader.StorageReader
   | StorageWriter.StorageWriter
   | QueryRunner.QueryRunner
@@ -112,6 +115,7 @@ type MutationActionCommonServices =
 type AllFunctionTypesCommonServices =
   | Auth.Auth
   | ExecutionMetadata
+  | Storage
   | StorageReader.StorageReader
   | QueryRunner.QueryRunner;
 

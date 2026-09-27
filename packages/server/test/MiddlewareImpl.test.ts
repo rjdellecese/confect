@@ -13,6 +13,10 @@ import type { RequestMetadata } from "@confect/server/RequestMetadata";
 import type { TransactionMetadata } from "@confect/server/TransactionMetadata";
 import * as QueryTransactionContext from "@confect/server/QueryTransactionContext";
 import * as MutationTransactionContext from "@confect/server/MutationTransactionContext";
+import * as Storage from "@confect/server/Storage";
+import type { StorageWriter } from "@confect/server/StorageWriter";
+import type { StorageActionWriter } from "@confect/server/StorageActionWriter";
+import type { GenericId } from "convex/values";
 import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -370,6 +374,91 @@ describe("implementation service bounds", () => {
           () => effect,
         ),
     });
+  });
+
+  it("allows URL reads but no storage writes in all-context and query+action middleware", () => {
+    class ObserveStorage extends MiddlewareSpec.MiddlewareSpec<ObserveStorage>()(
+      "ObserveStorage",
+      {
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+    class ObserveQueryActionStorage extends MiddlewareSpec.MiddlewareSpec<ObserveQueryActionStorage>()(
+      "ObserveQueryActionStorage",
+      {
+        functionTypes: { query: true, mutation: false, action: true },
+      },
+    ) {}
+    const id = "storage-id" as GenericId<"_storage">;
+    const read = Effect.gen(function* () {
+      const storage = yield* Storage.Storage;
+      return yield* storage.getUrl(id).pipe(Effect.orDie);
+    });
+    const upload = Effect.gen(function* () {
+      const storage = yield* Storage.Storage;
+      return yield* storage.generateUploadUrl;
+    });
+    const remove = Effect.gen(function* () {
+      const storage = yield* Storage.Storage;
+      return yield* storage.delete(id).pipe(Effect.orDie);
+    });
+    const get = Effect.gen(function* () {
+      const storage = yield* Storage.Storage;
+      return yield* storage.get(id).pipe(Effect.orDie);
+    });
+    const store = Effect.gen(function* () {
+      const storage = yield* Storage.Storage;
+      return yield* storage.store(new Blob());
+    });
+
+    type QueryAction = MiddlewareImpl.CommonServices<
+      typeof databaseSchema,
+      "query" | "action"
+    >;
+    expectTypeOf<Storage.Storage>().toExtend<AllFunctionTypes>();
+    expectTypeOf<Storage.Storage>().toExtend<QueryAction>();
+    expectTypeOf<
+      Extract<AllFunctionTypes, StorageWriter | StorageActionWriter>
+    >().toBeNever();
+
+    MiddlewareImpl.make(databaseSchema, ObserveStorage, (effect) =>
+      Effect.andThen(read, effect),
+    );
+    MiddlewareImpl.make(databaseSchema, ObserveQueryActionStorage, (effect) =>
+      Effect.andThen(read, effect),
+    );
+    MiddlewareImpl.make(databaseSchema, ObserveStorage, (effect) =>
+      // @ts-expect-error All-context middleware cannot generate upload URLs.
+      Effect.andThen(upload, effect),
+    );
+    MiddlewareImpl.make(databaseSchema, ObserveStorage, (effect) =>
+      // @ts-expect-error All-context middleware cannot delete blobs.
+      Effect.andThen(remove, effect),
+    );
+    MiddlewareImpl.make(databaseSchema, ObserveStorage, (effect) =>
+      // @ts-expect-error All-context middleware cannot read blob contents.
+      Effect.andThen(get, effect),
+    );
+    MiddlewareImpl.make(databaseSchema, ObserveStorage, (effect) =>
+      // @ts-expect-error All-context middleware cannot store blobs.
+      Effect.andThen(store, effect),
+    );
+    MiddlewareImpl.make(databaseSchema, ObserveQueryActionStorage, (effect) =>
+      // @ts-expect-error Query+action middleware cannot generate upload URLs.
+      Effect.andThen(upload, effect),
+    );
+    MiddlewareImpl.make(databaseSchema, ObserveQueryActionStorage, (effect) =>
+      // @ts-expect-error Query+action middleware cannot delete blobs.
+      Effect.andThen(remove, effect),
+    );
+    MiddlewareImpl.make(databaseSchema, ObserveQueryActionStorage, (effect) =>
+      // @ts-expect-error Query+action middleware cannot read blob contents.
+      Effect.andThen(get, effect),
+    );
+    MiddlewareImpl.make(databaseSchema, ObserveQueryActionStorage, (effect) =>
+      // @ts-expect-error Query+action middleware cannot store blobs.
+      Effect.andThen(store, effect),
+    );
   });
 
   type MetadataServices =
