@@ -551,8 +551,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
       yield* cbw.writeLine("ExecutionMetadata as ExecutionMetadata_,");
       yield* cbw.writeLine("MutationCtx as MutationCtx_,");
       yield* cbw.writeLine("MutationRunner as MutationRunner_,");
+      yield* cbw.writeLine(
+        "MutationTransactionControls as MutationTransactionControls_,",
+      );
       yield* cbw.writeLine("QueryCtx as QueryCtx_,");
       yield* cbw.writeLine("QueryRunner as QueryRunner_,");
+      yield* cbw.writeLine(
+        "QueryTransactionControls as QueryTransactionControls_,",
+      );
       yield* cbw.writeLine("RequestMetadata as RequestMetadata_,");
       yield* cbw.writeLine("Scheduler as Scheduler_,");
       yield* cbw.writeLine("StorageActionWriter as StorageActionWriter_,");
@@ -678,6 +684,21 @@ const servicesEffect = Effect.fnUntraced(function* ({
   );
   yield* cbw.writeLine(
     "export type DatabaseWriter = typeof DatabaseWriter.Identifier;",
+  );
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine(
+    "export const QueryTransactionControls = QueryTransactionControls_.QueryTransactionControls;",
+  );
+  yield* cbw.writeLine(
+    "export type QueryTransactionControls = typeof QueryTransactionControls.Identifier;",
+  );
+  yield* cbw.blankLine();
+  yield* cbw.writeLine(
+    "export const MutationTransactionControls = MutationTransactionControls_.MutationTransactionControls;",
+  );
+  yield* cbw.writeLine(
+    "export type MutationTransactionControls = typeof MutationTransactionControls.Identifier;",
   );
   yield* cbw.blankLine();
 

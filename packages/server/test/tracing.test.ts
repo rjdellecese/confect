@@ -241,9 +241,9 @@ describe("server operation tracing", () => {
           .mockResolvedValue("7");
 
         yield* Effect.gen(function* () {
-          const runQuery = yield* QueryRunner.QueryRunner;
-          const runMutation = yield* MutationRunner.MutationRunner;
-          const runAction = yield* ActionRunner.ActionRunner;
+          const { runQuery } = yield* QueryRunner.QueryRunner;
+          const { runMutation } = yield* MutationRunner.MutationRunner;
+          const { runAction } = yield* ActionRunner.ActionRunner;
           const query = runQuery(queryRef, { value: 2 });
           const mutation = runMutation(mutationRef, { value: 3 });
           const action = runAction(actionRef, { value: 4 });
@@ -290,10 +290,10 @@ describe("server operation tracing", () => {
         ]);
         expect(recorder.spans.map((span) => span.name)).toEqual([
           "caller",
-          "QueryRunner.run",
-          "MutationRunner.run",
-          "ActionRunner.run",
-          "QueryRunner.run",
+          "QueryRunner.runQuery",
+          "MutationRunner.runMutation",
+          "ActionRunner.runAction",
+          "QueryRunner.runQuery",
         ]);
         for (const span of recorder.spans.slice(1)) {
           expect(Option.getOrThrow(span.parent)).toBe(recorder.spans[0]);
@@ -314,7 +314,7 @@ describe("server operation tracing", () => {
             new ConvexError({ _tag: "OperationFailure", reason: "rejected" }),
           );
         const error = yield* Effect.gen(function* () {
-          const runQuery = yield* QueryRunner.QueryRunner;
+          const { runQuery } = yield* QueryRunner.QueryRunner;
           return yield* Effect.flip(runQuery(queryRef, { value: 2 }));
         }).pipe(
           Effect.provide(
@@ -329,7 +329,7 @@ describe("server operation tracing", () => {
         expect(error.reason).toBe("rejected");
         expect(recorder.spans).toHaveLength(1);
         const span = recorder.spans[0]!;
-        expect(span.name).toBe("QueryRunner.run");
+        expect(span.name).toBe("QueryRunner.runQuery");
         assert(span.status._tag === "Ended");
         assert.isTrue(Exit.isFailure(span.status.exit));
       }),

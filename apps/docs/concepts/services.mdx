@@ -47,19 +47,103 @@ Insert, edit, and delete documents from the database.
 
 <ContextBadges query mutation action http />
 
-Run Confect queries.
+Run Confect queries with `runQuery(ref, args, options?)`:
+
+```ts
+import * as Effect from "effect/Effect";
+import refs from "./_generated/refs";
+import { QueryRunner } from "./_generated/services";
+
+const firstNote = Effect.gen(function* () {
+  const { runQuery } = yield* QueryRunner;
+  return yield* runQuery(refs.public.notes_and_random.notes.getFirst, {});
+});
+```
+
+The `transactionLimits` option is available inside queries and mutations.
+The `useStaleSnapshot` option is available only inside mutations, even when
+you pass `false`. Actions and HTTP handlers can call `runQuery` without these
+options. See [Transaction controls](#transaction-controls).
 
 ### `MutationRunner`
 
 <ContextBadges mutation action http />
 
-Run Confect mutations.
+Run Confect mutations with `runMutation(ref, args, options?)`. Obtain the
+method with `const { runMutation } = yield* MutationRunner`.
+
+The `transactionLimits` option is available only inside mutations. Actions
+and HTTP handlers can call `runMutation` without this option.
 
 ### `ActionRunner`
 
 <ContextBadges action http />
 
-Run Confect actions.
+Run Confect actions with `runAction(ref, args)`. Obtain the method with
+`const { runAction } = yield* ActionRunner`. This method has no options
+parameter.
+
+For all three runners, `args` is optional when the referenced function takes
+no arguments. Pass `{}` as the second argument when supplying options to a
+no-argument query or mutation.
+
+### Transaction controls
+
+Pass transaction options to a runner method to control a nested call, not
+the entire enclosing handler:
+
+```ts
+import * as Effect from "effect/Effect";
+import refs from "./_generated/refs";
+import { QueryRunner } from "./_generated/services";
+
+const boundedRead = Effect.gen(function* () {
+  const { runQuery } = yield* QueryRunner;
+  return yield* runQuery(
+    refs.public.notes_and_random.notes.getFirst,
+    {},
+    { transactionLimits: { documentsRead: 100 } },
+  );
+});
+```
+
+`transactionLimits` accepts Convex's `TransactionLimits` fields, including
+`documentsRead`, `bytesRead`, and `databaseQueries`. These are absolute
+maximums for the nested call, capped by Convex's global transaction limits;
+they can lower limits but cannot raise them. Use
+[`TransactionMetadata.getMetrics()`](/server/metadata#transaction-metrics)
+to inspect usage and remaining limits.
+
+| Method and options                                                               | Available in          | Additional Effect requirement |
+| -------------------------------------------------------------------------------- | --------------------- | ----------------------------- |
+| `runQuery(ref, args, { transactionLimits })`                                     | Queries and mutations | `QueryTransactionControls`    |
+| `runQuery(ref, args, { useStaleSnapshot })`, optionally with `transactionLimits` | Mutations             | `MutationTransactionControls` |
+| `runMutation(ref, args, { transactionLimits })`                                  | Mutations             | `MutationTransactionControls` |
+
+Confect supplies `QueryTransactionControls` in queries and mutations and
+`MutationTransactionControls` in mutations. These are transparent call-time
+requirements: keep using the runner methods rather than retrieving the
+control services yourself. They appear in an Effect's requirements when you
+pass the corresponding options, so an unsupported handler or middleware
+implementation fails to typecheck. Calls without transaction options keep
+the runner availability shown above. An empty options object still requires
+the corresponding control service; omit options or pass `undefined` to use
+the ordinary runner.
+
+If a query options value's type has an optional `useStaleSnapshot` field,
+the call requires both control services because it could select either
+path at runtime. Only mutations provide both. Omit that field from the
+options type when sharing a limits-only call between queries and mutations.
+
+`useStaleSnapshot: true` reads from a recent database snapshot that might
+not be up to date when the mutation commits. Passing
+`useStaleSnapshot: false` still requires a mutation context.
+
+<Warning>
+  Stale snapshots can introduce race conditions. Use them only when stale reads
+  are safe for your operation, such as reading immutable records from an
+  append-only table. Prefer ordinary reads otherwise.
+</Warning>
 
 ## Storage
 

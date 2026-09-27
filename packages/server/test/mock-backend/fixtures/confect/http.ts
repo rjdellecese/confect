@@ -29,7 +29,7 @@ export class NotesApi extends HttpApi.make("NotesApi")
 const NotesApiLive = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
   handlers.handle("listNotes", () =>
     Effect.gen(function* () {
-      const runQuery = yield* QueryRunner;
+      const { runQuery } = yield* QueryRunner;
 
       return yield* runQuery(refs.public.databaseReader.listNotes, {});
     }).pipe(Effect.orDie),

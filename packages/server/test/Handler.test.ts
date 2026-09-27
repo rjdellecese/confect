@@ -14,6 +14,8 @@ import type * as Handler from "@confect/server/Handler";
 import type * as HttpRouter from "@confect/server/HttpRouter";
 import type { RequestMetadata } from "@confect/server/RequestMetadata";
 import type { TransactionMetadata } from "@confect/server/TransactionMetadata";
+import type { QueryTransactionControls } from "@confect/server/QueryTransactionControls";
+import type { MutationTransactionControls } from "@confect/server/MutationTransactionControls";
 import type schema from "./mock-backend/fixtures/confect/_generated/schema";
 import {
   internalAction,
@@ -31,6 +33,59 @@ type ExtractActionReturns<F> =
   F extends RegisteredAction<any, any, infer R> ? R : never;
 
 describe("Handler", () => {
+  describe("transaction-control service availability", () => {
+    type Controls = QueryTransactionControls | MutationTransactionControls;
+
+    it("permits query controls but rejects mutation controls in queries", () => {
+      expectTypeOf<
+        Extract<Handler.QueryServices<typeof schema>, Controls>
+      >().toEqualTypeOf<QueryTransactionControls>();
+      expectTypeOf<MutationTransactionControls>().not.toExtend<
+        Handler.QueryServices<typeof schema>
+      >();
+      expectTypeOf<
+        Effect.Effect<string, never, MutationTransactionControls>
+      >().not.toExtend<
+        Effect.Effect<string, never, Handler.QueryServices<typeof schema>>
+      >();
+    });
+
+    it("permits both control services in mutations", () => {
+      expectTypeOf<
+        Extract<Handler.MutationServices<typeof schema>, Controls>
+      >().toEqualTypeOf<Controls>();
+    });
+
+    it("rejects transaction controls in both action runtimes and HTTP handlers", () => {
+      const action = FunctionSpec.publicAction({
+        name: "action",
+        returns: () => Schema.Null,
+      });
+      const nodeAction = FunctionSpec.publicNodeAction({
+        name: "nodeAction",
+        returns: () => Schema.Null,
+      });
+      type ActionEnvironment = Effect.Services<
+        ReturnType<Handler.Handler<typeof schema, typeof action>>
+      >;
+      type NodeActionEnvironment = Effect.Services<
+        ReturnType<Handler.Handler<typeof schema, typeof nodeAction>>
+      >;
+      expectTypeOf<Extract<ActionEnvironment, Controls>>().toBeNever();
+      expectTypeOf<Extract<NodeActionEnvironment, Controls>>().toBeNever();
+      expectTypeOf<Extract<HttpRouter.Services, Controls>>().toBeNever();
+      expectTypeOf<
+        Effect.Effect<null, never, QueryTransactionControls>
+      >().not.toExtend<Effect.Effect<null, never, ActionEnvironment>>();
+      expectTypeOf<
+        Effect.Effect<null, never, MutationTransactionControls>
+      >().not.toExtend<Effect.Effect<null, never, NodeActionEnvironment>>();
+      expectTypeOf<Effect.Effect<null, never, Controls>>().not.toExtend<
+        Effect.Effect<null, never, HttpRouter.Services>
+      >();
+    });
+  });
+
   describe("metadata service availability", () => {
     type MetadataServices =
       | ExecutionMetadata

@@ -84,6 +84,44 @@ export declare const api: {
         string
       >;
     };
+    transactions: {
+      limitedRead: FunctionReference<
+        "query",
+        "public",
+        { caseId: string; limit: number },
+        Array<string>
+      >;
+      limitedReadFromMutation: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; limit: number },
+        Array<string>
+      >;
+      limitedWrite: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; limit: number },
+        null
+      >;
+      rollback: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string },
+        boolean
+      >;
+      seed: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; count: number },
+        null
+      >;
+      staleRead: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; stale: boolean },
+        Array<string>
+      >;
+    };
   };
   metadataNode: {
     metadata: FunctionReference<
@@ -110,6 +148,23 @@ export declare const api: {
  * const myFunctionReference = internal.myModule.myFunction;
  * ```
  */
-export declare const internal: {};
+export declare const internal: {
+  groups: {
+    transactions: {
+      read: FunctionReference<
+        "query",
+        "internal",
+        { caseId: string },
+        Array<string>
+      >;
+      write: FunctionReference<
+        "mutation",
+        "internal",
+        { caseId: string; fail: boolean; value: string },
+        null
+      >;
+    };
+  };
+};
 
 export declare const components: {};

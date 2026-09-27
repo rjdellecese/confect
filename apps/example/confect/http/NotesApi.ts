@@ -37,7 +37,7 @@ See Scalar's documentation on [markdown support](https://github.com/scalar/scala
 const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   handlers.handle("getFirst", () =>
     Effect.gen(function* () {
-      const runQuery = yield* QueryRunner;
+      const { runQuery } = yield* QueryRunner;
 
       const firstNote = yield* runQuery(
         refs.public.notes_and_random.notes.getFirst,

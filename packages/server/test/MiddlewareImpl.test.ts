@@ -11,6 +11,8 @@ import type * as Handler from "@confect/server/Handler";
 import type { ExecutionMetadata } from "@confect/server/ExecutionMetadata";
 import type { RequestMetadata } from "@confect/server/RequestMetadata";
 import type { TransactionMetadata } from "@confect/server/TransactionMetadata";
+import * as QueryTransactionControls from "@confect/server/QueryTransactionControls";
+import * as MutationTransactionControls from "@confect/server/MutationTransactionControls";
 import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -273,6 +275,103 @@ describe("function-level implementation requirements", () => {
 });
 
 describe("implementation service bounds", () => {
+  type Controls =
+    | QueryTransactionControls.QueryTransactionControls
+    | MutationTransactionControls.MutationTransactionControls;
+
+  it("shares query controls only between queries and mutations", () => {
+    expectTypeOf<
+      Extract<QueryMutation, Controls>
+    >().toEqualTypeOf<QueryTransactionControls.QueryTransactionControls>();
+    expectTypeOf<Extract<MutationOnly, Controls>>().toEqualTypeOf<Controls>();
+    expectTypeOf<Extract<AllFunctionTypes, Controls>>().toBeNever();
+    expectTypeOf<
+      Extract<
+        MiddlewareImpl.CommonServices<
+          typeof databaseSchema,
+          "query" | "action"
+        >,
+        Controls
+      >
+    >().toBeNever();
+    expectTypeOf<
+      Extract<
+        MiddlewareImpl.CommonServices<
+          typeof databaseSchema,
+          "mutation" | "action"
+        >,
+        Controls
+      >
+    >().toBeNever();
+    expectTypeOf<
+      Extract<
+        MiddlewareImpl.CommonServices<typeof databaseSchema, "query">,
+        Controls
+      >
+    >().toEqualTypeOf<QueryTransactionControls.QueryTransactionControls>();
+    expectTypeOf<
+      Extract<
+        MiddlewareImpl.CommonServices<typeof databaseSchema, "action">,
+        Controls
+      >
+    >().toBeNever();
+  });
+
+  it("rejects unavailable control requirements in middleware implementations", () => {
+    class Everywhere extends MiddlewareSpec.MiddlewareSpec<Everywhere>()(
+      "Everywhere",
+      {
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+    class Transactions extends MiddlewareSpec.MiddlewareSpec<Transactions>()(
+      "Transactions",
+      {
+        functionTypes: { query: true, mutation: true, action: false },
+      },
+    ) {}
+
+    MiddlewareImpl.make(databaseSchema, Transactions, (effect) =>
+      Effect.flatMap(
+        QueryTransactionControls.QueryTransactionControls,
+        () => effect,
+      ),
+    );
+    MiddlewareImpl.make(databaseSchema, Everywhere, (effect) =>
+      // @ts-expect-error All-function middleware cannot require transaction controls.
+      Effect.flatMap(
+        QueryTransactionControls.QueryTransactionControls,
+        () => effect,
+      ),
+    );
+    MiddlewareImpl.make(databaseSchema, Transactions, (effect) =>
+      // @ts-expect-error Queries cannot provide mutation-only controls.
+      Effect.flatMap(
+        MutationTransactionControls.MutationTransactionControls,
+        () => effect,
+      ),
+    );
+    MiddlewareImpl.makeByFunctionType(databaseSchema, Everywhere, {
+      query: (effect) =>
+        // @ts-expect-error A query implementation cannot require mutation controls.
+        Effect.flatMap(
+          MutationTransactionControls.MutationTransactionControls,
+          () => effect,
+        ),
+      mutation: (effect) =>
+        Effect.flatMap(
+          MutationTransactionControls.MutationTransactionControls,
+          () => effect,
+        ),
+      action: (effect) =>
+        // @ts-expect-error An action implementation cannot require query controls.
+        Effect.flatMap(
+          QueryTransactionControls.QueryTransactionControls,
+          () => effect,
+        ),
+    });
+  });
+
   type MetadataServices =
     | ExecutionMetadata
     | RequestMetadata

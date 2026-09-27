@@ -8,8 +8,10 @@ import {
   ExecutionMetadata as ExecutionMetadata_,
   MutationCtx as MutationCtx_,
   MutationRunner as MutationRunner_,
+  MutationTransactionControls as MutationTransactionControls_,
   QueryCtx as QueryCtx_,
   QueryRunner as QueryRunner_,
+  QueryTransactionControls as QueryTransactionControls_,
   RequestMetadata as RequestMetadata_,
   Scheduler as Scheduler_,
   StorageActionWriter as StorageActionWriter_,
@@ -61,6 +63,12 @@ export const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<
   Docs
 > = DatabaseWriter_.DatabaseWriter<typeof schemaDefinition, Docs>();
 export type DatabaseWriter = typeof DatabaseWriter.Identifier;
+
+export const QueryTransactionControls = QueryTransactionControls_.QueryTransactionControls;
+export type QueryTransactionControls = typeof QueryTransactionControls.Identifier;
+
+export const MutationTransactionControls = MutationTransactionControls_.MutationTransactionControls;
+export type MutationTransactionControls = typeof MutationTransactionControls.Identifier;
 
 export const QueryRunner = QueryRunner_.QueryRunner;
 export type QueryRunner = typeof QueryRunner.Identifier;
