@@ -53,19 +53,23 @@ const runAction = Effect.fn("WebSocketClient.action")(
 );
 
 export const make = (address: string, convexClient: Transport) => {
-  const setAuth = (
+  const setAuth = <R1 = never, R2 = never>(
     fetchToken: (args: {
       forceRefreshToken: boolean;
-    }) => Effect.Effect<string | null | undefined>,
-    onChange?: (isAuthenticated: boolean) => Effect.Effect<void>,
-  ) =>
-    Effect.sync(() => {
+    }) => Effect.Effect<string | null | undefined, never, R1>,
+    onChange?: (isAuthenticated: boolean) => Effect.Effect<void, never, R2>,
+  ): Effect.Effect<void, never, R1 | R2> =>
+    Effect.gen(function* () {
+      const context = yield* Effect.context<R1 | R2>();
+      const runPromise = Effect.runPromiseWith(context);
+      const runFork = Effect.runForkWith(context);
       convexClient.setAuth(
-        (args) => Effect.runPromise(fetchToken(args)),
+        (args) => runPromise(Effect.suspend(() => fetchToken(args))),
         ...(onChange
           ? [
-              (isAuthenticated: boolean) =>
-                Effect.runFork(onChange(isAuthenticated)),
+              (isAuthenticated: boolean) => {
+                runFork(Effect.suspend(() => onChange(isAuthenticated)));
+              },
             ]
           : []),
       );

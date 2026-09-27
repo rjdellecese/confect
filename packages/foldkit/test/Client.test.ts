@@ -1,10 +1,41 @@
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Client from "@confect/foldkit/Client";
 import * as TestClient from "./TestClient";
 
 describe("Client", () => {
+  it.effect("preserves authentication callback requirements", () =>
+    Effect.gen(function* () {
+      class Token extends Context.Service<Token, string>()(
+        "@confect/foldkit/test/Client.test/Token",
+      ) {}
+      class Observer extends Context.Service<
+        Observer,
+        (authenticated: boolean) => void
+      >()("@confect/foldkit/test/Client.test/Observer") {}
+      const testClient = yield* TestClient.TestClient;
+      const client = yield* Client.make(testClient);
+      const both = client.setAuth(
+        () => Token,
+        (authenticated) =>
+          Effect.flatMap(Observer, (notify) =>
+            Effect.sync(() => notify(authenticated)),
+          ),
+      );
+      expectTypeOf(both).toEqualTypeOf<
+        Effect.Effect<void, never, Token | Observer>
+      >();
+      expectTypeOf(client.setAuth(() => Token)).toEqualTypeOf<
+        Effect.Effect<void, never, Token>
+      >();
+      expectTypeOf(client.setAuth(() => Effect.succeed(null))).toEqualTypeOf<
+        Effect.Effect<void>
+      >();
+    }).pipe(Effect.provide(TestClient.layer)),
+  );
+
   it.effect("allocates pagination ids within one client lifetime", () =>
     Effect.gen(function* () {
       const testClient = yield* TestClient.TestClient;

@@ -139,6 +139,17 @@ Effect.gen(function* () {
 
 The optional second argument is a function that receives the current `isAuthenticated` status and returns an `Effect` to run whenever the authentication state changes.
 
+Both callbacks can require Effect services. Provide those services when running
+`setAuth`; its returned Effect includes the requirements of both callbacks.
+Callbacks use the services supplied for that registration, including during
+later token refreshes and authentication-state changes.
+
+Keep scoped callback dependencies alive for as long as the authentication
+registration is active. Registering a callback does not extend the lifetime of
+its dependencies. `setAuth` completes after registering the callbacks, not after
+authentication succeeds, and authentication-state callbacks run asynchronously
+without being awaited by Convex.
+
 ## Running programs
 
 Provide the `WebSocketClient` layer when running your program.

@@ -516,6 +516,11 @@ const SetAuth = FoldkitCommand.define("SetAuth", {
 });
 ```
 
+Authentication callbacks can require Effect services. Supply them when executing
+the command and keep any scoped dependencies alive while authentication remains
+registered. See [WebSocket authentication](/clients/js/websocket#authentication)
+for the callback behavior and lifetime requirements.
+
 ## Not yet covered
 
 An infinite-scroll, load-more counterpart to `@confect/react`'s
