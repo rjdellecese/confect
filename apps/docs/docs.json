@@ -94,7 +94,7 @@
       },
       {
         "group": "Guides",
-        "pages": ["guides/testing"]
+        "pages": ["guides/testing", "guides/alchemy"]
       }
     ]
   },
