@@ -30,5 +30,3 @@ const firstNote = Effect.gen(function* () {
 ```
 
 Pass `{ transactionLimits: { documentsRead: 100 } }` as the third argument to `runQuery` in queries or mutations. For `runMutation`, pass `{ transactionLimits: { documentsWritten: 10 } }` inside mutations. `runQuery` also accepts `useStaleSnapshot` inside mutations; supplying it requires a mutation context even when its value is `false`. `runAction` has no options parameter, and action and HTTP handlers continue using runners without transaction options.
-
-Regenerate `confect/_generated/services.ts` with `confect codegen` to include `QueryTransactionControls` and `MutationTransactionControls`. Confect supplies these call-time requirements automatically in supported handlers and middleware; keep calling runner methods rather than accessing the control services directly.
