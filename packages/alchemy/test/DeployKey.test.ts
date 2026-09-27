@@ -12,6 +12,89 @@ const props: DeployKey.DeployKeyProps = {
 };
 
 it.effect(
+  "tracks Convex's uniquified key name without changing the requested name",
+  () => {
+    const mock = mockClient();
+    mock.client.createDeployKey.mockImplementationOnce(() =>
+      Effect.sync(() => {
+        mock.state.keys.push(key({ name: "example (1d26168f)" }));
+        return { deployKey: Redacted.make("test-secret") };
+      }),
+    );
+    return Effect.gen(function* () {
+      const provider = yield* DeployKey.provider;
+      const output = yield* provider.reconcile({
+        ...lifecycle,
+        news: props,
+        olds: undefined,
+        output: undefined,
+      });
+      expect(output.name).toBe("example");
+      expect(output.keyId).toBe(1);
+      expect(
+        yield* provider.diff({
+          ...lifecycle,
+          oldBindings: [],
+          newBindings: [],
+          news: props,
+          olds: props,
+          output,
+        }),
+      ).toBeUndefined();
+      expect(
+        yield* provider.reconcile({
+          ...lifecycle,
+          news: props,
+          olds: props,
+          output,
+        }),
+      ).toEqual(output);
+      expect(
+        yield* provider.read({ ...lifecycle, olds: props, output }),
+      ).toEqual(output);
+      const missingState = yield* Effect.flip(
+        provider.read({ ...lifecycle, olds: props, output: undefined }),
+      );
+      expect(missingState._tag).toBe("DeployKeyRecoveryRequired");
+      const retry = yield* Effect.flip(
+        provider.reconcile({
+          ...lifecycle,
+          news: props,
+          olds: undefined,
+          output: undefined,
+        }),
+      );
+      expect(retry._tag).toBe("DeployKeyRecoveryRequired");
+      expect(mock.client.createDeployKey).toHaveBeenCalledTimes(1);
+    }).pipe(Effect.provide(mock.layer));
+  },
+);
+
+it.effect("does not confuse similar key labels with the requested name", () => {
+  const mock = mockClient();
+  mock.state.keys = [
+    key({ name: "example-extra (1d26168f)" }),
+    key({ id: 2, name: "example (not-a-suffix)" }),
+  ];
+  return Effect.gen(function* () {
+    const provider = yield* DeployKey.provider;
+    expect(
+      yield* provider.read({ ...lifecycle, olds: props, output: undefined }),
+    ).toBeUndefined();
+    mock.state.keys = [
+      key({ name: "example (1d26168f)" }),
+      key({ id: 2, name: "example (a1b2c3d4)" }),
+    ];
+    const error = yield* Effect.flip(
+      provider.read({ ...lifecycle, olds: props, output: undefined }),
+    );
+    assert(error._tag === "DeployKeyRecoveryRequired");
+    expect(error.keyIds).toEqual([1, 2]);
+    expect(mock.client.createDeployKey).not.toHaveBeenCalled();
+  }).pipe(Effect.provide(mock.layer));
+});
+
+it.effect(
   "preserves the one-time secret across repeated reconciliation and read",
   () => {
     const mock = mockClient();
