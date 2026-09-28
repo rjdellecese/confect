@@ -1,6 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { MutationTransactionControls as BarrelControls } from "@confect/server";
-import * as MutationTransactionControls from "@confect/server/MutationTransactionControls";
+import { MutationTransactionContext as BarrelControls } from "@confect/server";
+import * as MutationTransactionContext from "@confect/server/MutationTransactionContext";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { AdvancedRunQueryOptions, TransactionLimits } from "convex/server";
 import { ConvexError } from "convex/values";
@@ -21,13 +21,13 @@ const definition = {
 const queryRef = Ref.make("notes", FunctionSpec.publicQuery(definition));
 const mutationRef = Ref.make("notes", FunctionSpec.publicMutation(definition));
 
-describe("MutationTransactionControls", () => {
+describe("MutationTransactionContext", () => {
   it("exports the same service through the barrel and native option types", () => {
-    expect(BarrelControls.MutationTransactionControls).toBe(
-      MutationTransactionControls.MutationTransactionControls,
+    expect(BarrelControls.MutationTransactionContext).toBe(
+      MutationTransactionContext.MutationTransactionContext,
     );
-    expectTypeOf<MutationTransactionControls.TransactionLimits>().toEqualTypeOf<TransactionLimits>();
-    expectTypeOf<MutationTransactionControls.QueryOptions>().toEqualTypeOf<AdvancedRunQueryOptions>();
+    expectTypeOf<MutationTransactionContext.TransactionLimits>().toEqualTypeOf<TransactionLimits>();
+    expectTypeOf<MutationTransactionContext.QueryOptions>().toEqualTypeOf<AdvancedRunQueryOptions>();
   });
 
   it.effect(
@@ -36,12 +36,12 @@ describe("MutationTransactionControls", () => {
       const runQuery = vi.fn().mockResolvedValue("2");
       const runMutation = vi.fn().mockResolvedValue("3");
       const ctx = { runQuery, runMutation };
-      const layer = MutationTransactionControls.layer(ctx);
+      const layer = MutationTransactionContext.layer(ctx);
       expect(runQuery).not.toHaveBeenCalled();
       expect(runMutation).not.toHaveBeenCalled();
       return Effect.gen(function* () {
         const controls =
-          yield* MutationTransactionControls.MutationTransactionControls;
+          yield* MutationTransactionContext.MutationTransactionContext;
         const args = { count: 1 };
         const queryOptions = { transactionLimits: {}, useStaleSnapshot: false };
         const mutationOptions = { transactionLimits: {} };
@@ -116,7 +116,7 @@ describe("MutationTransactionControls", () => {
           .mockRejectedValueOnce(defect);
         return Effect.gen(function* () {
           const controls =
-            yield* MutationTransactionControls.MutationTransactionControls;
+            yield* MutationTransactionContext.MutationTransactionContext;
           const run = (count: number) =>
             kind === "query"
               ? controls.runQuery(
@@ -138,7 +138,7 @@ describe("MutationTransactionControls", () => {
           expect(native).toHaveBeenCalledTimes(3);
         }).pipe(
           Effect.provide(
-            MutationTransactionControls.layer({
+            MutationTransactionContext.layer({
               runQuery: native,
               runMutation: native,
             }),

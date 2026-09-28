@@ -7,16 +7,16 @@ import type {
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import type { Options as MutationOptions } from "./QueryTransactionControls";
+import type { Options as MutationOptions } from "./QueryTransactionContext";
 
 export type { TransactionLimits } from "convex/server";
-export type { Options as MutationOptions } from "./QueryTransactionControls";
+export type { Options as MutationOptions } from "./QueryTransactionContext";
 export type QueryOptions = AdvancedRunQueryOptions;
 
 const make = (
   ctx: Pick<GenericMutationCtx<GenericDataModel>, "runQuery" | "runMutation">,
 ) => ({
-  runQuery: Effect.fn("MutationTransactionControls.runQuery")(
+  runQuery: Effect.fn("MutationTransactionContext.runQuery")(
     <Query extends Ref.AnyQuery>(
       query: Query,
       args: Ref.Args<Query>,
@@ -26,7 +26,7 @@ const make = (
         ctx.runQuery(ref, encodedArgs, options),
       ),
   ),
-  runMutation: Effect.fn("MutationTransactionControls.runMutation")(
+  runMutation: Effect.fn("MutationTransactionContext.runMutation")(
     <Mutation extends Ref.AnyMutation>(
       mutation: Mutation,
       args: Ref.Args<Mutation>,
@@ -38,11 +38,11 @@ const make = (
   ),
 });
 
-export class MutationTransactionControls extends Context.Service<
-  MutationTransactionControls,
+export class MutationTransactionContext extends Context.Service<
+  MutationTransactionContext,
   ReturnType<typeof make>
->()("@confect/server/MutationTransactionControls") {}
+>()("@confect/server/MutationTransactionContext") {}
 
 export const layer = (
   ctx: Pick<GenericMutationCtx<GenericDataModel>, "runQuery" | "runMutation">,
-) => Layer.succeed(MutationTransactionControls, make(ctx));
+) => Layer.succeed(MutationTransactionContext, make(ctx));

@@ -4,10 +4,10 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type * as Schema from "effect/Schema";
-import * as MutationTransactionControls from "./MutationTransactionControls";
-import * as QueryTransactionControls from "./QueryTransactionControls";
+import * as MutationTransactionContext from "./MutationTransactionContext";
+import * as QueryTransactionContext from "./QueryTransactionContext";
 
-export type Options = MutationTransactionControls.QueryOptions;
+export type Options = MutationTransactionContext.QueryOptions;
 
 const run = Effect.fn("QueryRunner.runQuery")(
   <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => effect,
@@ -22,14 +22,14 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
     query: Query,
     args: Ref.Args<Query>,
     options:
-      | (QueryTransactionControls.Options & {
+      | (QueryTransactionContext.Options & {
           readonly useStaleSnapshot?: never;
         })
       | undefined,
   ): Effect.Effect<
     Ref.Returns<Query>,
     Ref.Error<Query> | Schema.SchemaError,
-    QueryTransactionControls.QueryTransactionControls
+    QueryTransactionContext.QueryTransactionContext
   >;
   function runQuery<Query extends Ref.AnyQuery>(
     query: Query,
@@ -38,7 +38,7 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
   ): Effect.Effect<
     Ref.Returns<Query>,
     Ref.Error<Query> | Schema.SchemaError,
-    MutationTransactionControls.MutationTransactionControls
+    MutationTransactionContext.MutationTransactionContext
   >;
   function runQuery<Query extends Ref.AnyQuery>(
     query: Query,
@@ -47,8 +47,8 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
   ): Effect.Effect<
     Ref.Returns<Query>,
     Ref.Error<Query> | Schema.SchemaError,
-    | QueryTransactionControls.QueryTransactionControls
-    | MutationTransactionControls.MutationTransactionControls
+    | QueryTransactionContext.QueryTransactionContext
+    | MutationTransactionContext.MutationTransactionContext
   >;
   function runQuery<Query extends Ref.AnyQuery>(
     query: Query,
@@ -57,20 +57,20 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
   ): Effect.Effect<
     Ref.Returns<Query>,
     Ref.Error<Query> | Schema.SchemaError,
-    | QueryTransactionControls.QueryTransactionControls
-    | MutationTransactionControls.MutationTransactionControls
+    | QueryTransactionContext.QueryTransactionContext
+    | MutationTransactionContext.MutationTransactionContext
   > {
     return run(
       Effect.gen(function* () {
         const actualArgs = (args ?? {}) as Ref.Args<Query>;
         if (options?.useStaleSnapshot !== undefined) {
           const controls =
-            yield* MutationTransactionControls.MutationTransactionControls;
+            yield* MutationTransactionContext.MutationTransactionContext;
           return yield* controls.runQuery(query, actualArgs, options);
         }
         if (options !== undefined) {
           const controls =
-            yield* QueryTransactionControls.QueryTransactionControls;
+            yield* QueryTransactionContext.QueryTransactionContext;
           return yield* controls.runQuery(query, actualArgs, options);
         }
         return yield* Ref.runWithCodec(query, actualArgs, (ref, encodedArgs) =>

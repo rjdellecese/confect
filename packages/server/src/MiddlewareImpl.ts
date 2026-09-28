@@ -16,7 +16,7 @@ import type { RequestMetadata } from "./RequestMetadata";
 import type { TransactionMetadata } from "./TransactionMetadata";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
-import type { QueryTransactionControls } from "./QueryTransactionControls";
+import type { QueryTransactionContext } from "./QueryTransactionContext";
 import type * as Scheduler from "./Scheduler";
 import type * as StorageReader from "./StorageReader";
 import type * as StorageWriter from "./StorageWriter";
@@ -95,7 +95,7 @@ type QueryMutationCommonServices<
   | Auth.Auth
   | ExecutionMetadata
   | TransactionMetadata
-  | QueryTransactionControls
+  | QueryTransactionContext
   | StorageReader.StorageReader
   | QueryRunner.QueryRunner;
 

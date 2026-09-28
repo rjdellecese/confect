@@ -34,10 +34,10 @@ import * as RequestMetadata from "./RequestMetadata";
 import * as TransactionMetadata from "./TransactionMetadata";
 import * as MutationCtx from "./MutationCtx";
 import * as MutationRunner from "./MutationRunner";
-import * as MutationTransactionControls from "./MutationTransactionControls";
+import * as MutationTransactionContext from "./MutationTransactionContext";
 import * as QueryCtx from "./QueryCtx";
 import * as QueryRunner from "./QueryRunner";
-import * as QueryTransactionControls from "./QueryTransactionControls";
+import * as QueryTransactionContext from "./QueryTransactionContext";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as FunctionRegistryItem from "./FunctionRegistryItem";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
@@ -188,7 +188,7 @@ const queryFunction = <
     | TransactionMetadata.TransactionMetadata
     | StorageReader
     | QueryRunner.QueryRunner
-    | QueryTransactionControls.QueryTransactionControls
+    | QueryTransactionContext.QueryTransactionContext
     | QueryCtx.QueryCtx<
         DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
       >
@@ -228,7 +228,7 @@ const queryFunction = <
             TransactionMetadata.layer(ctx.meta),
             StorageReader.layer(ctx.storage),
             QueryRunner.layer(ctx.runQuery),
-            QueryTransactionControls.layer(ctx),
+            QueryTransactionContext.layer(ctx),
             Layer.succeed(
               QueryCtx.QueryCtx<
                 DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
@@ -271,8 +271,8 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
     StorageWriter.layer(ctx.storage),
     QueryRunner.layer(ctx.runQuery),
     MutationRunner.layer(ctx.runMutation),
-    QueryTransactionControls.layer(ctx),
-    MutationTransactionControls.layer(ctx),
+    QueryTransactionContext.layer(ctx),
+    MutationTransactionContext.layer(ctx),
     Layer.succeed(
       MutationCtx.MutationCtx<
         DataModel.ToConvex<DataModel.FromSchema<Schema>>
@@ -294,8 +294,8 @@ export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
   | StorageWriter
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
-  | QueryTransactionControls.QueryTransactionControls
-  | MutationTransactionControls.MutationTransactionControls
+  | QueryTransactionContext.QueryTransactionContext
+  | MutationTransactionContext.MutationTransactionContext
   | MutationCtx.MutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>;
 
 const mutationFunction = <

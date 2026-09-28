@@ -1,6 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import * as MutationRunner from "@confect/server/MutationRunner";
-import * as MutationTransactionControls from "@confect/server/MutationTransactionControls";
+import * as MutationTransactionContext from "@confect/server/MutationTransactionContext";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { TransactionLimits } from "convex/server";
 import { ConvexError } from "convex/values";
@@ -99,7 +99,7 @@ describe("MutationRunner", () => {
         Effect.provide(
           Layer.mergeAll(
             MutationRunner.layer(native),
-            MutationTransactionControls.layer(ctx),
+            MutationTransactionContext.layer(ctx),
           ),
         ),
       );
@@ -157,7 +157,7 @@ describe("MutationRunner", () => {
         Effect.provide(
           Layer.mergeAll(
             MutationRunner.layer(native),
-            MutationTransactionControls.layer({
+            MutationTransactionContext.layer({
               runQuery: vi.fn(),
               runMutation,
             }),
@@ -182,7 +182,7 @@ describe("MutationRunner", () => {
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              MutationTransactionControls.MutationTransactionControls
+              MutationTransactionContext.MutationTransactionContext
             >
           >();
           expectTypeOf(
@@ -191,7 +191,7 @@ describe("MutationRunner", () => {
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              MutationTransactionControls.MutationTransactionControls
+              MutationTransactionContext.MutationTransactionContext
             >
           >();
           expectTypeOf(

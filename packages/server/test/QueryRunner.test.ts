@@ -1,7 +1,7 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import * as QueryRunner from "@confect/server/QueryRunner";
-import * as QueryTransactionControls from "@confect/server/QueryTransactionControls";
-import * as MutationTransactionControls from "@confect/server/MutationTransactionControls";
+import * as QueryTransactionContext from "@confect/server/QueryTransactionContext";
+import * as MutationTransactionContext from "@confect/server/MutationTransactionContext";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { AdvancedRunQueryOptions, TransactionLimits } from "convex/server";
 import { ConvexError } from "convex/values";
@@ -108,8 +108,8 @@ describe("QueryRunner", () => {
         Effect.provide(
           Layer.mergeAll(
             QueryRunner.layer(native),
-            QueryTransactionControls.layer(queryCtx),
-            MutationTransactionControls.layer(mutationCtx),
+            QueryTransactionContext.layer(queryCtx),
+            MutationTransactionContext.layer(mutationCtx),
           ),
         ),
       );
@@ -173,8 +173,8 @@ describe("QueryRunner", () => {
         Effect.provide(
           Layer.mergeAll(
             QueryRunner.layer(native),
-            QueryTransactionControls.layer({ runQuery: query }),
-            MutationTransactionControls.layer({
+            QueryTransactionContext.layer({ runQuery: query }),
+            MutationTransactionContext.layer({
               runQuery: mutation,
               runMutation: vi.fn(),
             }),
@@ -208,16 +208,16 @@ describe("QueryRunner", () => {
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              | QueryTransactionControls.QueryTransactionControls
-              | MutationTransactionControls.MutationTransactionControls
+              | QueryTransactionContext.QueryTransactionContext
+              | MutationTransactionContext.MutationTransactionContext
             >
           >();
           expectTypeOf(runner.runQuery(ref, { count: 1 }, maybe)).toEqualTypeOf<
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              | QueryTransactionControls.QueryTransactionControls
-              | MutationTransactionControls.MutationTransactionControls
+              | QueryTransactionContext.QueryTransactionContext
+              | MutationTransactionContext.MutationTransactionContext
             >
           >();
           expectTypeOf(
@@ -226,7 +226,7 @@ describe("QueryRunner", () => {
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              QueryTransactionControls.QueryTransactionControls
+              QueryTransactionContext.QueryTransactionContext
             >
           >();
           expectTypeOf(
@@ -235,22 +235,22 @@ describe("QueryRunner", () => {
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              QueryTransactionControls.QueryTransactionControls
+              QueryTransactionContext.QueryTransactionContext
             >
           >();
           expectTypeOf(runner.runQuery(ref, { count: 1 }, stale)).toEqualTypeOf<
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              MutationTransactionControls.MutationTransactionControls
+              MutationTransactionContext.MutationTransactionContext
             >
           >();
           expectTypeOf(runner.runQuery(ref, { count: 1 }, union)).toEqualTypeOf<
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              | QueryTransactionControls.QueryTransactionControls
-              | MutationTransactionControls.MutationTransactionControls
+              | QueryTransactionContext.QueryTransactionContext
+              | MutationTransactionContext.MutationTransactionContext
             >
           >();
           expectTypeOf(
@@ -259,8 +259,8 @@ describe("QueryRunner", () => {
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              | QueryTransactionControls.QueryTransactionControls
-              | MutationTransactionControls.MutationTransactionControls
+              | QueryTransactionContext.QueryTransactionContext
+              | MutationTransactionContext.MutationTransactionContext
             >
           >();
           expectTypeOf(
@@ -269,8 +269,8 @@ describe("QueryRunner", () => {
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              | QueryTransactionControls.QueryTransactionControls
-              | MutationTransactionControls.MutationTransactionControls
+              | QueryTransactionContext.QueryTransactionContext
+              | MutationTransactionContext.MutationTransactionContext
             >
           >();
           expectTypeOf(
@@ -279,7 +279,7 @@ describe("QueryRunner", () => {
             Effect.Effect<
               number,
               NotFound | Schema.SchemaError,
-              MutationTransactionControls.MutationTransactionControls
+              MutationTransactionContext.MutationTransactionContext
             >
           >();
           expectTypeOf(

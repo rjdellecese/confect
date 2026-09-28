@@ -15,7 +15,7 @@ export interface Options {
 }
 
 const make = (ctx: Pick<GenericQueryCtx<GenericDataModel>, "runQuery">) => ({
-  runQuery: Effect.fn("QueryTransactionControls.runQuery")(
+  runQuery: Effect.fn("QueryTransactionContext.runQuery")(
     <Query extends Ref.AnyQuery>(
       query: Query,
       args: Ref.Args<Query>,
@@ -27,11 +27,11 @@ const make = (ctx: Pick<GenericQueryCtx<GenericDataModel>, "runQuery">) => ({
   ),
 });
 
-export class QueryTransactionControls extends Context.Service<
-  QueryTransactionControls,
+export class QueryTransactionContext extends Context.Service<
+  QueryTransactionContext,
   ReturnType<typeof make>
->()("@confect/server/QueryTransactionControls") {}
+>()("@confect/server/QueryTransactionContext") {}
 
 export const layer = (
   ctx: Pick<GenericQueryCtx<GenericDataModel>, "runQuery">,
-) => Layer.succeed(QueryTransactionControls, make(ctx));
+) => Layer.succeed(QueryTransactionContext, make(ctx));

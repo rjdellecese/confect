@@ -1,7 +1,7 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { QueryTransactionControls as BarrelControls } from "@confect/server";
-import * as QueryTransactionControls from "@confect/server/QueryTransactionControls";
-import type { MutationTransactionControls } from "@confect/server/MutationTransactionControls";
+import { QueryTransactionContext as BarrelControls } from "@confect/server";
+import * as QueryTransactionContext from "@confect/server/QueryTransactionContext";
+import type { MutationTransactionContext } from "@confect/server/MutationTransactionContext";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { TransactionLimits } from "convex/server";
 import { ConvexError } from "convex/values";
@@ -23,14 +23,14 @@ const ref = Ref.make(
   }),
 );
 
-describe("QueryTransactionControls", () => {
+describe("QueryTransactionContext", () => {
   it("exports a distinct nominal service and native limit types", () => {
-    expect(BarrelControls.QueryTransactionControls).toBe(
-      QueryTransactionControls.QueryTransactionControls,
+    expect(BarrelControls.QueryTransactionContext).toBe(
+      QueryTransactionContext.QueryTransactionContext,
     );
-    expectTypeOf<QueryTransactionControls.TransactionLimits>().toEqualTypeOf<TransactionLimits>();
-    expectTypeOf<QueryTransactionControls.QueryTransactionControls>().not.toExtend<MutationTransactionControls>();
-    expectTypeOf<MutationTransactionControls>().not.toExtend<QueryTransactionControls.QueryTransactionControls>();
+    expectTypeOf<QueryTransactionContext.TransactionLimits>().toEqualTypeOf<TransactionLimits>();
+    expectTypeOf<QueryTransactionContext.QueryTransactionContext>().not.toExtend<MutationTransactionContext>();
+    expectTypeOf<MutationTransactionContext>().not.toExtend<QueryTransactionContext.QueryTransactionContext>();
   });
 
   it.effect(
@@ -38,11 +38,10 @@ describe("QueryTransactionControls", () => {
     () => {
       const runQuery = vi.fn().mockResolvedValue("2");
       const ctx = { runQuery };
-      const layer = QueryTransactionControls.layer(ctx);
+      const layer = QueryTransactionContext.layer(ctx);
       expect(runQuery).not.toHaveBeenCalled();
       return Effect.gen(function* () {
-        const controls =
-          yield* QueryTransactionControls.QueryTransactionControls;
+        const controls = yield* QueryTransactionContext.QueryTransactionContext;
         const args = { count: 1 };
         const options = { transactionLimits: {} };
         const operation = controls.runQuery(ref, args, options);
@@ -92,8 +91,7 @@ describe("QueryTransactionControls", () => {
         .mockResolvedValueOnce("invalid")
         .mockRejectedValueOnce(defect);
       return Effect.gen(function* () {
-        const controls =
-          yield* QueryTransactionControls.QueryTransactionControls;
+        const controls = yield* QueryTransactionContext.QueryTransactionContext;
         expect(
           yield* Effect.flip(controls.runQuery(ref, { count: 1 }, {})),
         ).toEqual(new NotFound({ id: "abc" }));
@@ -109,7 +107,7 @@ describe("QueryTransactionControls", () => {
           yield* Effect.flip(controls.runQuery(ref, { count: Number.NaN }, {})),
         ).toBeInstanceOf(Schema.SchemaError);
         expect(runQuery).toHaveBeenCalledTimes(3);
-      }).pipe(Effect.provide(QueryTransactionControls.layer({ runQuery })));
+      }).pipe(Effect.provide(QueryTransactionContext.layer({ runQuery })));
     },
   );
 });

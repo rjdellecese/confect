@@ -11,8 +11,8 @@ import type * as Handler from "@confect/server/Handler";
 import type { ExecutionMetadata } from "@confect/server/ExecutionMetadata";
 import type { RequestMetadata } from "@confect/server/RequestMetadata";
 import type { TransactionMetadata } from "@confect/server/TransactionMetadata";
-import * as QueryTransactionControls from "@confect/server/QueryTransactionControls";
-import * as MutationTransactionControls from "@confect/server/MutationTransactionControls";
+import * as QueryTransactionContext from "@confect/server/QueryTransactionContext";
+import * as MutationTransactionContext from "@confect/server/MutationTransactionContext";
 import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -276,13 +276,13 @@ describe("function-level implementation requirements", () => {
 
 describe("implementation service bounds", () => {
   type Controls =
-    | QueryTransactionControls.QueryTransactionControls
-    | MutationTransactionControls.MutationTransactionControls;
+    | QueryTransactionContext.QueryTransactionContext
+    | MutationTransactionContext.MutationTransactionContext;
 
   it("shares query controls only between queries and mutations", () => {
     expectTypeOf<
       Extract<QueryMutation, Controls>
-    >().toEqualTypeOf<QueryTransactionControls.QueryTransactionControls>();
+    >().toEqualTypeOf<QueryTransactionContext.QueryTransactionContext>();
     expectTypeOf<Extract<MutationOnly, Controls>>().toEqualTypeOf<Controls>();
     expectTypeOf<Extract<AllFunctionTypes, Controls>>().toBeNever();
     expectTypeOf<
@@ -308,7 +308,7 @@ describe("implementation service bounds", () => {
         MiddlewareImpl.CommonServices<typeof databaseSchema, "query">,
         Controls
       >
-    >().toEqualTypeOf<QueryTransactionControls.QueryTransactionControls>();
+    >().toEqualTypeOf<QueryTransactionContext.QueryTransactionContext>();
     expectTypeOf<
       Extract<
         MiddlewareImpl.CommonServices<typeof databaseSchema, "action">,
@@ -333,21 +333,21 @@ describe("implementation service bounds", () => {
 
     MiddlewareImpl.make(databaseSchema, Transactions, (effect) =>
       Effect.flatMap(
-        QueryTransactionControls.QueryTransactionControls,
+        QueryTransactionContext.QueryTransactionContext,
         () => effect,
       ),
     );
     MiddlewareImpl.make(databaseSchema, Everywhere, (effect) =>
       // @ts-expect-error All-function middleware cannot require transaction controls.
       Effect.flatMap(
-        QueryTransactionControls.QueryTransactionControls,
+        QueryTransactionContext.QueryTransactionContext,
         () => effect,
       ),
     );
     MiddlewareImpl.make(databaseSchema, Transactions, (effect) =>
       // @ts-expect-error Queries cannot provide mutation-only controls.
       Effect.flatMap(
-        MutationTransactionControls.MutationTransactionControls,
+        MutationTransactionContext.MutationTransactionContext,
         () => effect,
       ),
     );
@@ -355,18 +355,18 @@ describe("implementation service bounds", () => {
       query: (effect) =>
         // @ts-expect-error A query implementation cannot require mutation controls.
         Effect.flatMap(
-          MutationTransactionControls.MutationTransactionControls,
+          MutationTransactionContext.MutationTransactionContext,
           () => effect,
         ),
       mutation: (effect) =>
         Effect.flatMap(
-          MutationTransactionControls.MutationTransactionControls,
+          MutationTransactionContext.MutationTransactionContext,
           () => effect,
         ),
       action: (effect) =>
         // @ts-expect-error An action implementation cannot require query controls.
         Effect.flatMap(
-          QueryTransactionControls.QueryTransactionControls,
+          QueryTransactionContext.QueryTransactionContext,
           () => effect,
         ),
     });

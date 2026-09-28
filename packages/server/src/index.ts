@@ -23,12 +23,12 @@ export * as MiddlewareImpl from "./MiddlewareImpl";
 export * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 export * as MutationCtx from "./MutationCtx";
 export * as MutationRunner from "./MutationRunner";
-export * as MutationTransactionControls from "./MutationTransactionControls";
+export * as MutationTransactionContext from "./MutationTransactionContext";
 export * as OrderedQuery from "./OrderedQuery";
 export * as QueryCtx from "./QueryCtx";
 export * as QueryInitializer from "./QueryInitializer";
 export * as QueryRunner from "./QueryRunner";
-export * as QueryTransactionControls from "./QueryTransactionControls";
+export * as QueryTransactionContext from "./QueryTransactionContext";
 /**
  * @experimental
  */

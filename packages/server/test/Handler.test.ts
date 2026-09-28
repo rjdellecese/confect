@@ -14,8 +14,8 @@ import type * as Handler from "@confect/server/Handler";
 import type * as HttpRouter from "@confect/server/HttpRouter";
 import type { RequestMetadata } from "@confect/server/RequestMetadata";
 import type { TransactionMetadata } from "@confect/server/TransactionMetadata";
-import type { QueryTransactionControls } from "@confect/server/QueryTransactionControls";
-import type { MutationTransactionControls } from "@confect/server/MutationTransactionControls";
+import type { QueryTransactionContext } from "@confect/server/QueryTransactionContext";
+import type { MutationTransactionContext } from "@confect/server/MutationTransactionContext";
 import type schema from "./mock-backend/fixtures/confect/_generated/schema";
 import {
   internalAction,
@@ -34,17 +34,17 @@ type ExtractActionReturns<F> =
 
 describe("Handler", () => {
   describe("transaction-control service availability", () => {
-    type Controls = QueryTransactionControls | MutationTransactionControls;
+    type Controls = QueryTransactionContext | MutationTransactionContext;
 
     it("permits query controls but rejects mutation controls in queries", () => {
       expectTypeOf<
         Extract<Handler.QueryServices<typeof schema>, Controls>
-      >().toEqualTypeOf<QueryTransactionControls>();
-      expectTypeOf<MutationTransactionControls>().not.toExtend<
+      >().toEqualTypeOf<QueryTransactionContext>();
+      expectTypeOf<MutationTransactionContext>().not.toExtend<
         Handler.QueryServices<typeof schema>
       >();
       expectTypeOf<
-        Effect.Effect<string, never, MutationTransactionControls>
+        Effect.Effect<string, never, MutationTransactionContext>
       >().not.toExtend<
         Effect.Effect<string, never, Handler.QueryServices<typeof schema>>
       >();
@@ -75,10 +75,10 @@ describe("Handler", () => {
       expectTypeOf<Extract<NodeActionEnvironment, Controls>>().toBeNever();
       expectTypeOf<Extract<HttpRouter.Services, Controls>>().toBeNever();
       expectTypeOf<
-        Effect.Effect<null, never, QueryTransactionControls>
+        Effect.Effect<null, never, QueryTransactionContext>
       >().not.toExtend<Effect.Effect<null, never, ActionEnvironment>>();
       expectTypeOf<
-        Effect.Effect<null, never, MutationTransactionControls>
+        Effect.Effect<null, never, MutationTransactionContext>
       >().not.toExtend<Effect.Effect<null, never, NodeActionEnvironment>>();
       expectTypeOf<Effect.Effect<null, never, Controls>>().not.toExtend<
         Effect.Effect<null, never, HttpRouter.Services>

@@ -25,7 +25,7 @@ export default databaseSchema;
 `;
 
 exports[`declaration emit > services.d.ts prints public types by name 1`] = `
-"import { ActionCtx as ActionCtx_, Auth as Auth_, type DataModel, DatabaseReader as DatabaseReader_, DatabaseWriter as DatabaseWriter_, ExecutionMetadata as ExecutionMetadata_, MutationCtx as MutationCtx_, MutationRunner as MutationRunner_, MutationTransactionControls as MutationTransactionControls_, QueryCtx as QueryCtx_, QueryRunner as QueryRunner_, QueryTransactionControls as QueryTransactionControls_, RequestMetadata as RequestMetadata_, StorageActionWriter as StorageActionWriter_, StorageReader as StorageReader_, StorageWriter as StorageWriter_, TransactionMetadata as TransactionMetadata_, VectorSearch as VectorSearch_ } from "@confect/server";
+"import { ActionCtx as ActionCtx_, Auth as Auth_, type DataModel, DatabaseReader as DatabaseReader_, DatabaseWriter as DatabaseWriter_, ExecutionMetadata as ExecutionMetadata_, MutationCtx as MutationCtx_, MutationRunner as MutationRunner_, MutationTransactionContext as MutationTransactionContext_, QueryCtx as QueryCtx_, QueryRunner as QueryRunner_, QueryTransactionContext as QueryTransactionContext_, RequestMetadata as RequestMetadata_, StorageActionWriter as StorageActionWriter_, StorageReader as StorageReader_, StorageWriter as StorageWriter_, TransactionMetadata as TransactionMetadata_, VectorSearch as VectorSearch_ } from "@confect/server";
 import type schemaDefinition from "./schema";
 import type { Docs } from "./docs";
 export declare const Auth: typeof Auth_.Auth;
@@ -58,43 +58,43 @@ export declare const DatabaseReader: DatabaseReader_.DatabaseReaderTag<typeof sc
 export type DatabaseReader = typeof DatabaseReader.Identifier;
 export declare const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<typeof schemaDefinition, Docs>;
 export type DatabaseWriter = typeof DatabaseWriter.Identifier;
-export declare const QueryTransactionControls: typeof QueryTransactionControls_.QueryTransactionControls;
-export type QueryTransactionControls = typeof QueryTransactionControls.Identifier;
-export declare const MutationTransactionControls: typeof MutationTransactionControls_.MutationTransactionControls;
-export type MutationTransactionControls = typeof MutationTransactionControls.Identifier;
+export declare const QueryTransactionContext: typeof QueryTransactionContext_.QueryTransactionContext;
+export type QueryTransactionContext = typeof QueryTransactionContext.Identifier;
+export declare const MutationTransactionContext: typeof MutationTransactionContext_.MutationTransactionContext;
+export type MutationTransactionContext = typeof MutationTransactionContext.Identifier;
 export declare const QueryRunner: import("effect/Context").Service<{
     runQuery: {
         <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, ...args: [...import("@confect/core/Ref").OptionalArgs<Query>, options?: undefined]): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError>;
-        <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, args: import("@confect/core/Ref").Args<Query>, options: (MutationTransactionControls_.MutationOptions & {
+        <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, args: import("@confect/core/Ref").Args<Query>, options: (MutationTransactionContext_.MutationOptions & {
             readonly useStaleSnapshot?: never;
-        }) | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, QueryTransactionControls_.QueryTransactionControls>;
+        }) | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, QueryTransactionContext_.QueryTransactionContext>;
         <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, args: import("@confect/core/Ref").Args<Query>, options: QueryRunner_.Options & {
             readonly useStaleSnapshot: boolean;
-        }): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, MutationTransactionControls_.MutationTransactionControls>;
-        <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, args: import("@confect/core/Ref").Args<Query>, options: QueryRunner_.Options | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, QueryTransactionControls_.QueryTransactionControls | MutationTransactionControls_.MutationTransactionControls>;
+        }): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, MutationTransactionContext_.MutationTransactionContext>;
+        <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, args: import("@confect/core/Ref").Args<Query>, options: QueryRunner_.Options | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, QueryTransactionContext_.QueryTransactionContext | MutationTransactionContext_.MutationTransactionContext>;
     };
 }, {
     runQuery: {
         <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, ...args: [...import("@confect/core/Ref").OptionalArgs<Query>, options?: undefined]): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError>;
-        <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, args: import("@confect/core/Ref").Args<Query>, options: (MutationTransactionControls_.MutationOptions & {
+        <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, args: import("@confect/core/Ref").Args<Query>, options: (MutationTransactionContext_.MutationOptions & {
             readonly useStaleSnapshot?: never;
-        }) | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, QueryTransactionControls_.QueryTransactionControls>;
+        }) | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, QueryTransactionContext_.QueryTransactionContext>;
         <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, args: import("@confect/core/Ref").Args<Query>, options: QueryRunner_.Options & {
             readonly useStaleSnapshot: boolean;
-        }): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, MutationTransactionControls_.MutationTransactionControls>;
-        <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, args: import("@confect/core/Ref").Args<Query>, options: QueryRunner_.Options | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, QueryTransactionControls_.QueryTransactionControls | MutationTransactionControls_.MutationTransactionControls>;
+        }): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, MutationTransactionContext_.MutationTransactionContext>;
+        <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, args: import("@confect/core/Ref").Args<Query>, options: QueryRunner_.Options | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/Schema").SchemaError, QueryTransactionContext_.QueryTransactionContext | MutationTransactionContext_.MutationTransactionContext>;
     };
 }>;
 export type QueryRunner = typeof QueryRunner.Identifier;
 export declare const MutationRunner: import("effect/Context").Service<{
     runMutation: {
         <Mutation extends import("@confect/core/Ref").AnyMutation>(mutation: Mutation, ...args: [...import("@confect/core/Ref").OptionalArgs<Mutation>, options?: undefined]): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Mutation>, import("@confect/core/Ref").Error<Mutation> | import("effect/Schema").SchemaError>;
-        <Mutation extends import("@confect/core/Ref").AnyMutation>(mutation: Mutation, args: import("@confect/core/Ref").Args<Mutation>, options: MutationRunner_.Options | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Mutation>, import("@confect/core/Ref").Error<Mutation> | import("effect/Schema").SchemaError, MutationTransactionControls_.MutationTransactionControls>;
+        <Mutation extends import("@confect/core/Ref").AnyMutation>(mutation: Mutation, args: import("@confect/core/Ref").Args<Mutation>, options: MutationRunner_.Options | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Mutation>, import("@confect/core/Ref").Error<Mutation> | import("effect/Schema").SchemaError, MutationTransactionContext_.MutationTransactionContext>;
     };
 }, {
     runMutation: {
         <Mutation extends import("@confect/core/Ref").AnyMutation>(mutation: Mutation, ...args: [...import("@confect/core/Ref").OptionalArgs<Mutation>, options?: undefined]): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Mutation>, import("@confect/core/Ref").Error<Mutation> | import("effect/Schema").SchemaError>;
-        <Mutation extends import("@confect/core/Ref").AnyMutation>(mutation: Mutation, args: import("@confect/core/Ref").Args<Mutation>, options: MutationRunner_.Options | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Mutation>, import("@confect/core/Ref").Error<Mutation> | import("effect/Schema").SchemaError, MutationTransactionControls_.MutationTransactionControls>;
+        <Mutation extends import("@confect/core/Ref").AnyMutation>(mutation: Mutation, args: import("@confect/core/Ref").Args<Mutation>, options: MutationRunner_.Options | undefined): import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Mutation>, import("@confect/core/Ref").Error<Mutation> | import("effect/Schema").SchemaError, MutationTransactionContext_.MutationTransactionContext>;
     };
 }>;
 export type MutationRunner = typeof MutationRunner.Identifier;

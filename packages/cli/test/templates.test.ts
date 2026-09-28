@@ -10,8 +10,8 @@ it.effect(
         schemaImportPath: "./schema",
       });
       for (const name of [
-        "QueryTransactionControls",
-        "MutationTransactionControls",
+        "QueryTransactionContext",
+        "MutationTransactionContext",
       ]) {
         expect(contents).toContain(`${name} as ${name}_,`);
         expect(contents).toContain(`export const ${name} = ${name}_.${name};`);
