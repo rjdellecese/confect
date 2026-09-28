@@ -108,9 +108,9 @@ const boundedRead = Effect.gen(function* () {
 ```
 
 `transactionLimits` accepts Convex's `TransactionLimits` fields, including
-`documentsRead`, `bytesRead`, and `databaseQueries`. These are absolute
-maximums for the nested call, capped by Convex's global transaction limits;
-they can lower limits but cannot raise them. Use
+`documentsRead`, `bytesRead`, and `databaseQueries`. Each field sets a maximum
+for the nested call. Convex caps these values at its platform transaction
+limits. Use
 [`TransactionMetadata.getMetrics()`](/server/metadata#transaction-metrics)
 to inspect usage and remaining limits.
 
