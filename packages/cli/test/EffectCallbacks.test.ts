@@ -20,7 +20,7 @@ import type * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
-import type * as Command from "effect/unstable/cli/Command";
+import type * as Command from "effect/cli/Command";
 
 type FileServices = FileSystem.FileSystem | Path.Path;
 type GenerationServices = FileServices | ConfectDirectory | ConvexDirectory;

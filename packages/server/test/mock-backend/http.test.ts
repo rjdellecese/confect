@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { HttpRouter as ConfectHttpRouter } from "@confect/server";
 import * as Effect from "effect/Effect";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { vi } from "vitest";
 import { DatabaseWriter } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";

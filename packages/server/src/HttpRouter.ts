@@ -12,10 +12,10 @@ import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import type * as Path from "effect/Path";
-import type * as Etag from "effect/unstable/http/Etag";
-import type * as HttpPlatform from "effect/unstable/http/HttpPlatform";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpServer from "effect/unstable/http/HttpServer";
+import type * as Etag from "effect/http/Etag";
+import type * as HttpPlatform from "effect/http/HttpPlatform";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServer from "effect/http/HttpServer";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
 import type { ExecutionMetadata } from "./ExecutionMetadata";
@@ -49,13 +49,12 @@ export type Services =
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
  *
- * Compose it from Effect's `effect/unstable/http` and `effect/unstable/httpapi`
- * modules: `HttpApiBuilder.layer(api)` registers an `HttpApi`'s endpoints
- * (provide its group handler layers with `Layer.provide`),
- * `HttpApiScalar.layer(api, ...)` serves interactive API docs, `HttpRouter.add`
- * registers a plain route, and `HttpRouter.middleware(fn, { global: true })`
- * applies middleware to every route. Merge any number of these with
- * `Layer.mergeAll`.
+ * Compose it from Effect's `effect/http` and `effect/http-api` modules:
+ * `HttpApiBuilder.layer(api)` registers an `HttpApi`'s endpoints (provide its
+ * group handler layers with `Layer.provide`), `HttpApiScalar.layer(api, ...)`
+ * serves interactive API docs, `HttpRouter.add` registers a plain route, and
+ * `HttpRouter.middleware(fn, { global: true })` applies middleware to every
+ * route. Merge any number of these with `Layer.mergeAll`.
  *
  * Route handlers and middleware may require any of the Confect {@link Services},
  * which surface as request-level `Requires` markers and are supplied per

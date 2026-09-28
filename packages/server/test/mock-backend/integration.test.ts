@@ -17,7 +17,7 @@ import * as Duration from "effect/Duration";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as SchemaParser from "effect/SchemaParser";
-import * as SchemaCompiler from "effect/unstable/schema/SchemaCompiler";
+import * as SchemaCompiler from "effect/schema/SchemaCompiler";
 import * as Stream from "effect/Stream";
 import * as Option from "effect/Option";
 import { vi } from "vitest";
