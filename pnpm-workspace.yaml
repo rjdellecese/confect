@@ -15,6 +15,7 @@ allowBuilds:
   opensrc: false
   puppeteer: false
   sharp: true
+  workerd: false
 
 # pnpm's supply-chain policy rejects a lockfile referencing anything published
 # within `minimumReleaseAge` (24 hours by default), which every same-day Effect
@@ -35,6 +36,7 @@ minimumReleaseAgeExclude:
 overrides:
   convex: 1.45.0
   effect: 4.0.0-rc.117
+  happy-dom: 20.14.5
   react: 19.3.0
   react-dom: 19.3.0
 
