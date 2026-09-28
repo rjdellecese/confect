@@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
 import { resourceName } from "./internal/ResourceIdentity";
+import { checkpointCreate, shouldAdopt } from "./internal/Lifecycle";
 
 export interface ProjectProps {
   readonly teamId: number;
@@ -112,6 +113,7 @@ export const provider = Effect.gen(function* () {
           .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
         return project ? attributes(project) : undefined;
       }
+      if (olds.teamId === undefined) return;
       const project = yield* find(
         olds.teamId,
         olds.name ?? (yield* resourceName("project", fqn, instanceId)),
@@ -124,6 +126,7 @@ export const provider = Effect.gen(function* () {
       news,
       output,
     }) {
+      if (!output) yield* checkpointCreate(fqn, instanceId, news);
       if (output && output.teamId !== news.teamId)
         return yield* new ProjectTeamChange({
           projectId: output.projectId,
@@ -141,16 +144,21 @@ export const provider = Effect.gen(function* () {
         (yield* resourceName("project", fqn, instanceId));
       if (!project) {
         const existing = yield* find(news.teamId, name);
-        if (existing)
+        if (existing && !(yield* shouldAdopt(fqn)))
           return yield* new OwnedBySomeoneElse({
             message: "An existing project requires explicit adoption.",
             resourceType: Project.Type,
             physicalName: name,
           });
-        const created = yield* client.createProject(news.teamId, {
-          projectName: name,
-        });
-        project = yield* client.getProject(created.id);
+        if (existing) {
+          project = existing;
+          yield* checkpointCreate(fqn, instanceId, news, attributes(existing));
+        } else {
+          const created = yield* client.createProject(news.teamId, {
+            projectName: name,
+          });
+          project = yield* client.getProject(created.id);
+        }
       }
       if (project.teamId !== news.teamId)
         return yield* new ProjectTeamChange({

@@ -13,6 +13,7 @@ import * as Schema from "effect/Schema";
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
 import { resourceName } from "./internal/ResourceIdentity";
+import { checkpointCreate, shouldAdopt } from "./internal/Lifecycle";
 
 export interface DeploymentProps {
   readonly projectId: number;
@@ -130,6 +131,7 @@ export const provider = Effect.gen(function* () {
           .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
         return deployment ? yield* attributes(deployment) : undefined;
       }
+      if (olds.projectId === undefined) return;
       const deployment = yield* find(
         olds.projectId,
         olds.reference ?? (yield* resourceName("deployment", fqn, instanceId)),
@@ -142,6 +144,7 @@ export const provider = Effect.gen(function* () {
       news,
       output,
     }) {
+      if (!output) yield* checkpointCreate(fqn, instanceId, news);
       if (output) yield* validate(output, news);
       let deployment = output
         ? yield* client
@@ -154,17 +157,24 @@ export const provider = Effect.gen(function* () {
         (yield* resourceName("deployment", fqn, instanceId));
       if (!deployment) {
         const existing = yield* find(news.projectId, reference);
-        if (existing)
+        if (existing && !(yield* shouldAdopt(fqn)))
           return yield* new OwnedBySomeoneElse({
             message: "An existing deployment requires explicit adoption.",
             resourceType: Deployment.Type,
             physicalName: reference,
           });
-        deployment = yield* client.createDeployment(news.projectId, {
-          type: news.type,
-          reference,
-          ...(news.region === undefined ? {} : { region: news.region }),
-        });
+        if (existing) {
+          const adopted = yield* attributes(existing);
+          yield* validate(adopted, news);
+          yield* checkpointCreate(fqn, instanceId, news, adopted);
+          deployment = existing;
+        } else {
+          deployment = yield* client.createDeployment(news.projectId, {
+            type: news.type,
+            reference,
+            ...(news.region === undefined ? {} : { region: news.region }),
+          });
+        }
       }
       const current = yield* attributes(deployment);
       yield* validate(current, news);

@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
 import { resourceName } from "./internal/ResourceIdentity";
+import { checkpointCreate } from "./internal/Lifecycle";
 
 export interface DeployKeyProps {
   readonly deploymentName: string;
@@ -101,6 +102,7 @@ export const provider = Effect.gen(function* () {
       output,
     }) {
       const deploymentName = output?.deploymentName ?? olds.deploymentName;
+      if (deploymentName === undefined) return;
       const name =
         output?.name ??
         olds.name ??
@@ -131,6 +133,7 @@ export const provider = Effect.gen(function* () {
       news,
       output,
     }) {
+      if (!output) yield* checkpointCreate(fqn, instanceId, news);
       const name =
         news.name ??
         output?.name ??

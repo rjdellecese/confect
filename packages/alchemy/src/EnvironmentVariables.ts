@@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
 
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
+import { checkpointCreate, shouldAdopt } from "./internal/Lifecycle";
 
 export interface EnvironmentVariablesProps {
   readonly url: string;
@@ -86,6 +87,7 @@ export const provider = Effect.gen(function* () {
     }),
     read: Effect.fn("EnvironmentVariables.read")(function* ({ olds, output }) {
       const url = output?.url ?? olds.url;
+      if (url === undefined || olds.deployKey === undefined) return;
       const observed = yield* client.listEnvironmentVariables(
         url,
         olds.deployKey,
@@ -103,9 +105,12 @@ export const provider = Effect.gen(function* () {
       });
     }),
     reconcile: Effect.fn("EnvironmentVariables.reconcile")(function* ({
+      fqn,
+      instanceId,
       news,
       output,
     }) {
+      if (!output) yield* checkpointCreate(fqn, instanceId, news);
       if (output && output.url !== news.url)
         return yield* new EnvironmentTargetChange({
           url: output.url,
@@ -115,6 +120,17 @@ export const provider = Effect.gen(function* () {
         news.deployKey,
       );
       const ownedNames = Object.keys(news.variables);
+      if (!output && (yield* shouldAdopt(fqn))) {
+        const variables = select(observed, ownedNames);
+        output = {
+          url: news.url,
+          deployKey: news.deployKey,
+          ownedNames,
+          variables,
+          originals: variables,
+        };
+        yield* checkpointCreate(fqn, instanceId, news, output);
+      }
       const previousNames = output?.ownedNames ?? [];
       for (const name of ownedNames) {
         if (
