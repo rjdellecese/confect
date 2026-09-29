@@ -1,4 +1,6 @@
 export * as AiGatewayClient from "./AiGatewayClient";
+export * as AiGatewayDecisionClient from "./AiGatewayDecisionClient";
+export * as AiGatewayDecisionModel from "./AiGatewayDecisionModel";
 export * as AiGatewayLanguageModel from "./AiGatewayLanguageModel";
 export * as ActionCtx from "./ActionCtx";
 export * as ActionRunner from "./ActionRunner";
