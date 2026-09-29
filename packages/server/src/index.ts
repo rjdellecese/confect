@@ -51,6 +51,7 @@ export * as RegistryItems from "./RegistryItems";
 export * as ResolvedMiddleware from "./ResolvedMiddleware";
 export * as RequestMetadata from "./RequestMetadata";
 export * as Scheduler from "./Scheduler";
+export * as Storage from "./Storage";
 export * as StorageActionWriter from "./StorageActionWriter";
 export * as StorageReader from "./StorageReader";
 export * as StorageWriter from "./StorageWriter";

@@ -20,6 +20,7 @@ import type * as QueryRunner from "./QueryRunner";
 import type { QueryTransactionContext } from "./QueryTransactionContext";
 import type * as RegisteredFunction from "./RegisteredFunction";
 import type * as Scheduler from "./Scheduler";
+import type { Storage } from "./Storage";
 import type { StorageActionWriter } from "./StorageActionWriter";
 import type { StorageReader } from "./StorageReader";
 import type { StorageWriter } from "./StorageWriter";
@@ -79,6 +80,7 @@ export type QueryServices<
   | Auth.Auth
   | ExecutionMetadata
   | TransactionMetadata
+  | Storage
   | StorageReader
   | QueryRunner.QueryRunner
   | QueryTransactionContext
@@ -96,6 +98,7 @@ export type MutationServices<
   | RequestMetadata
   | TransactionMetadata
   | Scheduler.Scheduler
+  | Storage
   | StorageReader
   | StorageWriter
   | QueryRunner.QueryRunner
@@ -116,6 +119,7 @@ export type ActionServices<
   | Auth.Auth
   | ExecutionMetadata
   | RequestMetadata
+  | Storage
   | StorageReader
   | StorageWriter
   | StorageActionWriter

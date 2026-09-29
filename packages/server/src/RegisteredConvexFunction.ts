@@ -42,7 +42,8 @@ import * as RegisteredFunction from "./RegisteredFunction";
 import type * as FunctionRegistryItem from "./FunctionRegistryItem";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
-import { StorageReader } from "./StorageReader";
+import * as Storage from "./Storage";
+import type { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 
 export const make = (
@@ -186,6 +187,7 @@ const queryFunction = <
     | Auth.Auth
     | ExecutionMetadata.ExecutionMetadata
     | TransactionMetadata.TransactionMetadata
+    | Storage.Storage
     | StorageReader
     | QueryRunner.QueryRunner
     | QueryTransactionContext.QueryTransactionContext
@@ -226,7 +228,7 @@ const queryFunction = <
             Auth.layer(ctx.auth),
             ExecutionMetadata.layer(ctx.meta),
             TransactionMetadata.layer(ctx.meta),
-            StorageReader.layer(ctx.storage),
+            Storage.layer(ctx.storage),
             QueryRunner.layer(ctx.runQuery),
             QueryTransactionContext.layer(ctx),
             Layer.succeed(
@@ -267,7 +269,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
     RequestMetadata.layer(ctx.meta),
     TransactionMetadata.layer(ctx.meta),
     Scheduler.layer(ctx.scheduler),
-    StorageReader.layer(ctx.storage),
+    Storage.layer(ctx.storage),
     StorageWriter.layer(ctx.storage),
     QueryRunner.layer(ctx.runQuery),
     MutationRunner.layer(ctx.runMutation),
@@ -290,6 +292,7 @@ export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
   | RequestMetadata.RequestMetadata
   | TransactionMetadata.TransactionMetadata
   | Scheduler.Scheduler
+  | Storage.Storage
   | StorageReader
   | StorageWriter
   | QueryRunner.QueryRunner

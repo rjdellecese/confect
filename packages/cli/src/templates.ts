@@ -561,6 +561,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
       );
       yield* cbw.writeLine("RequestMetadata as RequestMetadata_,");
       yield* cbw.writeLine("Scheduler as Scheduler_,");
+      yield* cbw.writeLine("Storage as Storage_,");
       yield* cbw.writeLine("StorageActionWriter as StorageActionWriter_,");
       yield* cbw.writeLine("StorageReader as StorageReader_,");
       yield* cbw.writeLine("StorageWriter as StorageWriter_,");
@@ -607,6 +608,10 @@ const servicesEffect = Effect.fnUntraced(function* ({
   // Scheduler
   yield* cbw.writeLine("export const Scheduler = Scheduler_.Scheduler;");
   yield* cbw.writeLine("export type Scheduler = typeof Scheduler.Identifier;");
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine("export const Storage = Storage_.Storage;");
+  yield* cbw.writeLine("export type Storage = typeof Storage.Identifier;");
   yield* cbw.blankLine();
 
   // StorageReader

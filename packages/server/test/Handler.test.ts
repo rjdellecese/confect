@@ -16,6 +16,12 @@ import type { RequestMetadata } from "@confect/server/RequestMetadata";
 import type { TransactionMetadata } from "@confect/server/TransactionMetadata";
 import type { QueryTransactionContext } from "@confect/server/QueryTransactionContext";
 import type { MutationTransactionContext } from "@confect/server/MutationTransactionContext";
+import * as Storage from "@confect/server/Storage";
+import type { StorageReader } from "@confect/server/StorageReader";
+import type { StorageWriter } from "@confect/server/StorageWriter";
+import type { StorageActionWriter } from "@confect/server/StorageActionWriter";
+import type { BlobNotFoundError } from "@confect/server/BlobNotFoundError";
+import type { GenericId } from "convex/values";
 import type schema from "./mock-backend/fixtures/confect/_generated/schema";
 import {
   internalAction,
@@ -83,6 +89,122 @@ describe("Handler", () => {
       expectTypeOf<Effect.Effect<null, never, Controls>>().not.toExtend<
         Effect.Effect<null, never, HttpRouter.Services>
       >();
+    });
+  });
+
+  describe("storage capability availability", () => {
+    type StorageServices =
+      | Storage.Storage
+      | StorageReader
+      | StorageWriter
+      | StorageActionWriter;
+
+    it("preserves legacy services and restricts write capabilities by context", () => {
+      expectTypeOf<
+        Extract<Handler.QueryServices<typeof schema>, StorageServices>
+      >().toEqualTypeOf<Storage.Storage | StorageReader>();
+      expectTypeOf<
+        Extract<Handler.MutationServices<typeof schema>, StorageServices>
+      >().toEqualTypeOf<Storage.Storage | StorageReader | StorageWriter>();
+      expectTypeOf<
+        Extract<Handler.ActionServices<typeof schema>, StorageServices>
+      >().toEqualTypeOf<StorageServices>();
+      expectTypeOf<
+        Extract<HttpRouter.Services, StorageServices>
+      >().toEqualTypeOf<StorageServices>();
+
+      const nodeAction = FunctionSpec.publicNodeAction({
+        name: "storage",
+        returns: () => Schema.Null,
+      });
+      type NodeServices = Effect.Services<
+        ReturnType<Handler.Handler<typeof schema, typeof nodeAction>>
+      >;
+      expectTypeOf<
+        Extract<NodeServices, StorageServices>
+      >().toEqualTypeOf<StorageServices>();
+    });
+
+    it("infers only the capabilities and errors required by each operation", () => {
+      const id = "storage-id" as GenericId<"_storage">;
+      const read = Effect.gen(function* () {
+        const storage = yield* Storage.Storage;
+        return yield* storage.getUrl(id);
+      });
+      const upload = Effect.gen(function* () {
+        const storage = yield* Storage.Storage;
+        return yield* storage.generateUploadUrl;
+      });
+      const remove = Effect.gen(function* () {
+        const storage = yield* Storage.Storage;
+        yield* storage.delete(id);
+      });
+      const get = Effect.gen(function* () {
+        const storage = yield* Storage.Storage;
+        return yield* storage.get(id);
+      });
+      const store = Effect.gen(function* () {
+        const storage = yield* Storage.Storage;
+        return yield* storage.store(new Blob());
+      });
+
+      expectTypeOf(read).toEqualTypeOf<
+        Effect.Effect<URL, BlobNotFoundError, Storage.Storage>
+      >();
+      expectTypeOf(upload).toEqualTypeOf<
+        Effect.Effect<URL, never, Storage.Storage | StorageWriter>
+      >();
+      expectTypeOf(remove).toEqualTypeOf<
+        Effect.Effect<void, BlobNotFoundError, Storage.Storage | StorageWriter>
+      >();
+      expectTypeOf(get).toEqualTypeOf<
+        Effect.Effect<
+          Blob,
+          BlobNotFoundError,
+          Storage.Storage | StorageActionWriter
+        >
+      >();
+      expectTypeOf(store).toEqualTypeOf<
+        Effect.Effect<
+          GenericId<"_storage">,
+          never,
+          Storage.Storage | StorageActionWriter
+        >
+      >();
+
+      expectTypeOf<Effect.Services<typeof read>>().toExtend<
+        Handler.QueryServices<typeof schema>
+      >();
+      expectTypeOf<Effect.Services<typeof upload>>().not.toExtend<
+        Handler.QueryServices<typeof schema>
+      >();
+      expectTypeOf<Effect.Services<typeof remove>>().not.toExtend<
+        Handler.QueryServices<typeof schema>
+      >();
+      expectTypeOf<Effect.Services<typeof get>>().not.toExtend<
+        Handler.QueryServices<typeof schema>
+      >();
+      expectTypeOf<Effect.Services<typeof store>>().not.toExtend<
+        Handler.QueryServices<typeof schema>
+      >();
+      expectTypeOf<Effect.Services<typeof upload | typeof remove>>().toExtend<
+        Handler.MutationServices<typeof schema>
+      >();
+      expectTypeOf<Effect.Services<typeof get>>().not.toExtend<
+        Handler.MutationServices<typeof schema>
+      >();
+      expectTypeOf<Effect.Services<typeof store>>().not.toExtend<
+        Handler.MutationServices<typeof schema>
+      >();
+      expectTypeOf<
+        Effect.Services<
+          | typeof read
+          | typeof upload
+          | typeof remove
+          | typeof get
+          | typeof store
+        >
+      >().toExtend<Handler.ActionServices<typeof schema>>();
     });
   });
 

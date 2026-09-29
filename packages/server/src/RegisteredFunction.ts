@@ -35,8 +35,9 @@ import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
+import * as Storage from "./Storage";
 import * as StorageActionWriter from "./StorageActionWriter";
-import * as StorageReader from "./StorageReader";
+import type * as StorageReader from "./StorageReader";
 import * as StorageWriter from "./StorageWriter";
 import * as VectorSearch from "./VectorSearch";
 
@@ -319,6 +320,7 @@ export type ActionServices<
   | Auth.Auth
   | ExecutionMetadata.ExecutionMetadata
   | RequestMetadata.RequestMetadata
+  | Storage.Storage
   | StorageReader.StorageReader
   | StorageWriter.StorageWriter
   | StorageActionWriter.StorageActionWriter
@@ -343,7 +345,7 @@ export const baseActionLayer = <ConvexDataModel extends GenericDataModel>(
     Auth.layer(ctx.auth),
     ExecutionMetadata.layer(ctx.meta),
     RequestMetadata.layer(ctx.meta),
-    StorageReader.StorageReader.layer(ctx.storage),
+    Storage.layer(ctx.storage),
     StorageWriter.StorageWriter.layer(ctx.storage),
     StorageActionWriter.StorageActionWriter.layer(ctx.storage),
     QueryRunner.layer(ctx.runQuery.bind(ctx)),

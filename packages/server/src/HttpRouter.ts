@@ -26,6 +26,7 @@ import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as Scheduler from "./Scheduler";
+import type { Storage } from "./Storage";
 import type { StorageActionWriter } from "./StorageActionWriter";
 import type { StorageReader } from "./StorageReader";
 import type { StorageWriter } from "./StorageWriter";
@@ -42,6 +43,7 @@ export type Services =
   | Auth.Auth
   | ExecutionMetadata
   | RequestMetadata
+  | Storage
   | StorageReader
   | StorageWriter
   | StorageActionWriter;

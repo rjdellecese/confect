@@ -26,6 +26,8 @@ import * as DatabaseWriter_ from "@confect/server/DatabaseWriter";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as QueryStream from "@confect/server/QueryStream";
 import * as Table from "@confect/server/Table";
+import * as Storage from "@confect/server/Storage";
+import { StorageReader } from "@confect/server/StorageReader";
 import refs from "./fixtures/confect/_generated/refs";
 import {
   DatabaseReader,
@@ -43,6 +45,101 @@ import {
 } from "./fixtures/confect/groups/typedErrors.spec";
 import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
+
+describe("Storage", () => {
+  const read = Effect.gen(function* () {
+    const storage = yield* Storage.Storage;
+    const legacy = yield* StorageReader;
+    return storage.getUrl === legacy.getUrl
+      ? "shared reader"
+      : "different readers";
+  });
+  const write = Effect.gen(function* () {
+    const storage = yield* Storage.Storage;
+    return (yield* storage.generateUploadUrl).protocol;
+  });
+  const roundtrip = Effect.gen(function* () {
+    const storage = yield* Storage.Storage;
+    const id = yield* storage.store(new Blob(["storage roundtrip"]));
+    expect(yield* storage.getUrl(id)).toBeInstanceOf(URL);
+    const blob = yield* storage.get(id);
+    const text = yield* Effect.promise(() => blob.text());
+    yield* storage.delete(id);
+    expect((yield* Effect.flip(storage.get(id))).id).toBe(id);
+    expect((yield* Effect.flip(storage.getUrl(id))).id).toBe(id);
+    return text;
+  }).pipe(Effect.orDie);
+  const cases = [
+    {
+      name: "query",
+      spec: FunctionSpec.publicQuery({
+        name: "run",
+        returns: () => Schema.String,
+      }),
+      handler: read,
+      expected: "shared reader",
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.query(makeFunctionReference<"query">("storage:run"), {}),
+    },
+    {
+      name: "mutation",
+      spec: FunctionSpec.publicMutation({
+        name: "run",
+        returns: () => Schema.String,
+      }),
+      handler: write,
+      expected: "https:",
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.mutation(makeFunctionReference<"mutation">("storage:run"), {}),
+    },
+    {
+      name: "action",
+      spec: FunctionSpec.publicAction({
+        name: "run",
+        returns: () => Schema.String,
+      }),
+      handler: roundtrip,
+      expected: "storage roundtrip",
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.action(makeFunctionReference<"action">("storage:run"), {}),
+    },
+    {
+      name: "Node action",
+      spec: FunctionSpec.publicNodeAction({
+        name: "run",
+        returns: () => Schema.String,
+      }),
+      handler: roundtrip,
+      expected: "storage roundtrip",
+      register: RegisteredNodeFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.action(makeFunctionReference<"action">("storage:run"), {}),
+    },
+  ];
+
+  it.effect.each(cases)(
+    "provides unified storage to a registered $name",
+    ({ spec, handler, expected, register, invoke }) =>
+      Effect.gen(function* () {
+        const item = FunctionRegistryItem.make({
+          functionSpec: spec,
+          groupMiddlewareAttachments: [],
+          handler: () => handler,
+        });
+        assert(item._tag === "Confect");
+        const registered = register(confectSchema, item);
+        const t = convexTest(convexSchema, {
+          ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+          "./fixtures/convex/storage.ts": () =>
+            Promise.resolve({ run: registered }),
+        });
+        expect(yield* Effect.promise(() => invoke(t))).toBe(expected);
+      }),
+  );
+});
 
 describe("function logging", () => {
   const cases = [
