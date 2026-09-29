@@ -1,4 +1,4 @@
-import * as Command from "effect/unstable/cli/Command";
+import * as Command from "effect/cli/Command";
 import * as Layer from "effect/Layer";
 import { codegen } from "./confect/codegen";
 import { dev } from "./confect/dev";

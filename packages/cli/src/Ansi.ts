@@ -1,7 +1,7 @@
 /**
  * Minimal ANSI styling helpers for CLI output (Effect's own ANSI helpers in
- * `effect/unstable/cli` are internal). Styles are functions from text to a
- * styled string with a trailing reset.
+ * `effect/cli` are internal). Styles are functions from text to a styled string
+ * with a trailing reset.
  */
 
 const ESC = "\x1B[";

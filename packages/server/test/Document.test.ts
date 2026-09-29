@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as SchemaParser from "effect/SchemaParser";
-import * as SchemaCompiler from "effect/unstable/schema/SchemaCompiler";
+import * as SchemaCompiler from "effect/schema/SchemaCompiler";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Document from "@confect/server/Document";
 import type * as TableInfo from "@confect/server/TableInfo";

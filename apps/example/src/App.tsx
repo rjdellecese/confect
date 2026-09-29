@@ -8,8 +8,8 @@ import {
   useStreamPaginatedQuery,
 } from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
-import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import type { GenericId } from "convex/values";
 import * as Array from "effect/Array";

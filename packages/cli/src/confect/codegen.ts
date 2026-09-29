@@ -1,5 +1,5 @@
 import { Spec, type GroupSpec } from "@confect/core";
-import * as Command from "effect/unstable/cli/Command";
+import * as Command from "effect/cli/Command";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Array from "effect/Array";
