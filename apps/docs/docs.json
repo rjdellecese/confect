@@ -153,6 +153,7 @@
               "v10/server/storage",
               "v10/server/scheduling",
               "v10/server/authentication",
+              "v10/server/metadata",
               "v10/server/cron-jobs",
               "v10/server/search",
               "v10/server/components",
