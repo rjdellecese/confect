@@ -1,5 +1,17 @@
 # @confect/js
 
+## 10.0.0-next.25
+
+### Minor Changes
+
+- 1660d3a: Allow `setAuth` callbacks on `WebSocketClient` and Foldkit's `Client` to require Effect services. Provide those services when running `setAuth`; the token provider and authentication-state callback use them for later invocations, including token refreshes.
+
+  Keep scoped callback dependencies alive while authentication remains registered. Callbacks without dependencies continue to work unchanged.
+
+### Patch Changes
+
+- f9958b9: Require `effect@^4.0.0-rc.118` and matching Effect platform packages. Upgrade Effect alongside Confect and replace `effect/unstable/*` imports with `effect/*`, using `effect/http-api` for HTTP API imports.
+
 ## 10.0.0-next.24
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @confect/test
 
+## 10.0.0-next.25
+
+### Patch Changes
+
+- f9958b9: Require `effect@^4.0.0-rc.118` and matching Effect platform packages. Upgrade Effect alongside Confect and replace `effect/unstable/*` imports with `effect/*`, using `effect/http-api` for HTTP API imports.
+
 ## 10.0.0-next.24
 
 ### Patch Changes
