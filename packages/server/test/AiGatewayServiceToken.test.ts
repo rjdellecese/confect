@@ -1,4 +1,4 @@
-import { AiGatewayClient } from "@confect/server";
+import { AiGatewayLanguageClient } from "@confect/server";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -13,10 +13,14 @@ const CONVEX_AI_GATEWAY_UNAVAILABLE_MESSAGE =
 
 describe("AiGatewayServiceToken", () => {
   it("exposes a schema for service-token failures", () => {
-    const isAiGatewayError = Schema.is(AiGatewayClient.AiGatewayError);
+    const isAiGatewayError = Schema.is(AiGatewayLanguageClient.AiGatewayError);
 
-    assert.isTrue(isAiGatewayError(new AiGatewayClient.AiGatewayDisabled()));
-    assert.isTrue(isAiGatewayError(new AiGatewayClient.AiGatewayUnavailable()));
+    assert.isTrue(
+      isAiGatewayError(new AiGatewayLanguageClient.AiGatewayDisabled()),
+    );
+    assert.isTrue(
+      isAiGatewayError(new AiGatewayLanguageClient.AiGatewayUnavailable()),
+    );
     assert.isFalse(isAiGatewayError(new Error("unexpected")));
   });
 
@@ -26,7 +30,7 @@ describe("AiGatewayServiceToken", () => {
         new Error(CONVEX_AI_GATEWAY_DISABLED_MESSAGE),
       );
 
-      assert.instanceOf(error, AiGatewayClient.AiGatewayDisabled);
+      assert.instanceOf(error, AiGatewayLanguageClient.AiGatewayDisabled);
       assert.strictEqual(
         error.message,
         "The Convex AI gateway is disabled. Your team may be on the free plan, or the gateway may have been disabled for your team. Upgrade to a paid plan, or email support@convex.dev if this looks wrong.",
@@ -44,7 +48,7 @@ describe("AiGatewayServiceToken", () => {
         ),
       );
 
-      assert.instanceOf(error, AiGatewayClient.AiGatewayDisabled);
+      assert.instanceOf(error, AiGatewayLanguageClient.AiGatewayDisabled);
     }),
   );
 
@@ -54,7 +58,7 @@ describe("AiGatewayServiceToken", () => {
         new Error(CONVEX_AI_GATEWAY_UNAVAILABLE_MESSAGE),
       );
 
-      assert.instanceOf(error, AiGatewayClient.AiGatewayUnavailable);
+      assert.instanceOf(error, AiGatewayLanguageClient.AiGatewayUnavailable);
       assert.strictEqual(
         error.message,
         "The Convex AI gateway is unavailable. This action is running on a local or self-hosted deployment, which cannot use the gateway. Call the model provider directly with your own API key stored in a Convex environment variable.",
@@ -72,7 +76,7 @@ describe("AiGatewayServiceToken", () => {
         ),
       );
 
-      assert.instanceOf(error, AiGatewayClient.AiGatewayUnavailable);
+      assert.instanceOf(error, AiGatewayLanguageClient.AiGatewayUnavailable);
     }),
   );
 
