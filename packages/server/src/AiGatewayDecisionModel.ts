@@ -13,7 +13,7 @@ export interface Options {
  * Create an Effect AI decision model backed by the Convex AI gateway.
  *
  * Model identifiers use Convex's `provider/model` format, such as
- * `typesafe/jev-1.13`. Decisions use the gateway's alpha API.
+ * `typesafe/jev-1.13`.
  */
 export const model = (
   modelId: string,

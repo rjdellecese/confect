@@ -2,7 +2,7 @@
 "@confect/server": minor
 ---
 
-Add `AiGatewayDecisionClient` and `AiGatewayDecisionModel` to classify input, rate it against a rubric, and estimate probabilities with Effect AI through Convex's alpha Decisions API, without configuring a provider API key.
+Add `AiGatewayDecisionClient` and `AiGatewayDecisionModel` to classify input, rate it against a rubric, and estimate probabilities with Effect AI through Convex's AI gateway, without configuring a provider API key.
 
 ```ts
 import {
@@ -19,5 +19,3 @@ const Jev = AiGatewayDecisionModel.model("typesafe/jev-1.13").pipe(
 ```
 
 Provide `Jev` to `DecisionModel.decide` inside a Convex action to evaluate named decisions in one request.
-
-Classification and rating return full probability distributions normalized to sum to one when Jev's two-decimal rounding introduces small discrepancies. Missing or invalid probabilities still fail with `AiError.InvalidOutputError`.

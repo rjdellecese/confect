@@ -15,7 +15,7 @@ export {
 } from "./internal/AiGatewayServiceToken";
 
 /**
- * The OpenAI-compatible client service configured for the Convex AI gateway.
+ * The client service configured for the Convex AI gateway.
  */
 export const AiGatewayClient = OpenAiClient.OpenAiClient;
 export type AiGatewayClient = OpenAiClient.OpenAiClient;
@@ -24,8 +24,6 @@ export type AiGatewayClient = OpenAiClient.OpenAiClient;
  * Construct an AI gateway client using the current Effect HTTP client.
  *
  * The client obtains a short-lived Convex service token when it is constructed.
- * Token acquisition fails with `AiGatewayDisabled` or `AiGatewayUnavailable`
- * when the corresponding documented Convex condition applies.
  */
 export const make: Effect.Effect<
   OpenAiClient.Service,

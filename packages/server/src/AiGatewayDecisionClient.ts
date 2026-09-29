@@ -15,7 +15,7 @@ export {
 } from "./internal/AiGatewayServiceToken";
 
 /**
- * The OpenRouter-compatible client configured for Convex AI gateway decisions.
+ * The client configured for Convex AI gateway decisions.
  */
 export const AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 export type AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
@@ -23,9 +23,7 @@ export type AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 /**
  * Construct a decision client using the current Effect HTTP client.
  *
- * Acquires a short-lived Convex service token when constructed, failing with
- * `AiGatewayDisabled` or `AiGatewayUnavailable` when the gateway is
- * unavailable.
+ * Acquires a short-lived Convex service token when constructed.
  */
 export const make: Effect.Effect<
   OpenRouterClient.Service,

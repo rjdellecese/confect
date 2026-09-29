@@ -51,7 +51,7 @@ Use the same model with Effect AI tools and structured responses. The selected u
 
 ## Configure requests
 
-Pass OpenAI-compatible request options as the second argument to `model`:
+Pass request options as the second argument to `model`:
 
 ```ts
 AiGatewayLanguageModel.model("openai/gpt-4o-mini", {
@@ -68,12 +68,7 @@ Use `AiGatewayLanguageModel.withConfigOverride` when configuration should apply 
 
 ## Handle errors
 
-Both `AiGatewayClient.layer` and `AiGatewayDecisionClient.layer` expose the same service-token failures as tagged errors:
-
-- `AiGatewayClient.AiGatewayDisabled` means your team is on the free plan or the gateway has been disabled for your team. Upgrade to a paid plan, or email support@convex.dev if this looks wrong.
-- `AiGatewayClient.AiGatewayUnavailable` means the deployment cannot use the gateway. Check Convex's local-development requirements, or call the model provider directly with your own API key stored in a Convex environment variable.
-
-Handle either tag after providing the client layer:
+Handle recoverable failures after providing the client layer:
 
 ```ts
 const generatedText = LanguageModel.generateText({ prompt }).pipe(
@@ -87,16 +82,11 @@ const generatedText = LanguageModel.generateText({ prompt }).pipe(
 );
 ```
 
-Unexpected `getServiceToken` failures are defects. Gateway HTTP and model failures remain in Effect AI's `AiError` channel. Handle those errors before calling `Effect.orDie` when your action declares a recoverable error schema. See [AI gateway availability](https://docs.convex.dev/ai-gateway/overview#who-can-use-it) for the supported deployment types.
+Handle recoverable failures before calling `Effect.orDie` when your action declares a recoverable error schema.
 
 ## Make structured decisions
 
 Use `AiGatewayDecisionModel` with Effect's `DecisionModel.decide` to classify input, rate it against an ordered rubric, or estimate a probability. Unlike a language model, a decision model returns typed answers rather than generated text.
-
-<Warning>
-  Convex's `/alpha/decisions` endpoint is in alpha. Its request and response
-  format may change.
-</Warning>
 
 Define the input schema and named decisions with Effect's `Decision` module, then provide a decision model and its client:
 
@@ -155,12 +145,8 @@ const triage = DecisionModel.decide(TicketTriage, {
 );
 ```
 
-Run `triage` inside a Convex action. All three decisions evaluate the same input in one request. The encoded input must be a string, object, or array; wrap numbers and booleans in an object. Decision requests do not support streaming.
+Run `triage` inside a Convex action. All three decisions evaluate the same input in one request.
 
-`AiGatewayDecisionClient.layer` is separate from the language-model `AiGatewayClient.layer` because decisions use a different protocol. Use `AiGatewayDecisionModel.make({ model })` to construct the service directly, or `AiGatewayDecisionModel.layer({ model })` when you do not need an Effect AI model descriptor. Unlike language-model requests, decision requests do not expose configuration overrides: Convex rejects the upstream routing and session options.
+Use `AiGatewayDecisionClient.layer` for decisions and `AiGatewayClient.layer` for language models. Use `AiGatewayDecisionModel.make({ model })` to construct the service directly, or `AiGatewayDecisionModel.layer({ model })` when you do not need an Effect AI model descriptor. Unlike language-model requests, decision requests do not expose configuration overrides.
 
-Classifications return a label and a probability distribution. Ratings return a numeric rating, the label with the highest probability, and a distribution keyed by rubric labels. Probability decisions return a number between zero and one. The response also includes `usage.inputTokens` and `usage.outputTokens`; gateway cost and request IDs are not part of Effect's decision response.
-
-Effect requires full probability distributions for classification and rating answers. Missing distributions, missing answers, or invalid probabilities fail with `AiError` rather than returning a partial result. Handle these and service-token failures as described in [Handle errors](#handle-errors).
-
-Jev rounds probabilities to two decimal places. Effect accounts for that precision and rescales classification and rating distributions with small rounding discrepancies to sum to one. For example, a returned distribution of `0.93, 0.04, 0.02` is accepted and each value is divided by `0.99`. The allowed discrepancy is `0.005` per label, plus `1e-6` for floating-point error. Zero totals, larger discrepancies, and probabilities outside `[0, 1]` still fail with `AiError.InvalidOutputError`. Standalone probability decisions are not rescaled.
+Classifications return a label and a probability distribution. Ratings return a numeric rating, the label with the highest probability, and a distribution keyed by rubric labels. Probability decisions return a number between zero and one. The response also includes `usage.inputTokens` and `usage.outputTokens`.
