@@ -2,8 +2,8 @@
   "name": "docs",
   "version": "0.0.1",
   "devDependencies": {
-    "@mintlify/scraping": "4.0.1024",
-    "mintlify": "4.2.909",
+    "@mintlify/scraping": "4.0.1045",
+    "mintlify": "4.2.940",
     "react": "19.3.0"
   },
   "private": true,
