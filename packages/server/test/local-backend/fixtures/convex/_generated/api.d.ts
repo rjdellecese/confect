@@ -31,6 +31,40 @@ export declare const api: {
       confectWithRawDateNow: FunctionReference<"query", "public", {}, number>;
       confectWithSpan: FunctionReference<"query", "public", {}, number>;
     };
+    documentIds: {
+      createAndDelete: FunctionReference<
+        "mutation",
+        "public",
+        {},
+        Id<"transactionNotes">
+      >;
+      inspect: FunctionReference<
+        "query",
+        "public",
+        {
+          input: string;
+          table: "transactionNotes" | "_storage" | "_scheduled_functions";
+        },
+        {
+          identified: { id: string; table: string } | null;
+          normalized: string | null;
+          parsed: string | null;
+        }
+      >;
+      inspectFromMutation: FunctionReference<
+        "mutation",
+        "public",
+        {
+          input: string;
+          table: "transactionNotes" | "_storage" | "_scheduled_functions";
+        },
+        {
+          identified: { id: string; table: string } | null;
+          normalized: string | null;
+          parsed: string | null;
+        }
+      >;
+    };
     metadata: {
       actionMetadata: FunctionReference<
         "action",

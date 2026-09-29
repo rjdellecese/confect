@@ -6,6 +6,7 @@ import type * as ActionCtx from "./ActionCtx";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
 import type * as DatabaseReader from "./DatabaseReader";
+import type * as DocumentIds from "./DocumentIds";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
@@ -77,6 +78,7 @@ export type QueryServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
+  | DocumentIds.DocumentIds<DatabaseSchema_>
   | Auth.Auth
   | ExecutionMetadata
   | TransactionMetadata
@@ -93,6 +95,7 @@ export type MutationServices<
 > =
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | DatabaseWriter.DatabaseWriter<DatabaseSchema_>
+  | DocumentIds.DocumentIds<DatabaseSchema_>
   | Auth.Auth
   | ExecutionMetadata
   | RequestMetadata

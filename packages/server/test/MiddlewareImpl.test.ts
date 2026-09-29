@@ -8,6 +8,7 @@ import {
 import type * as DatabaseReaderModule from "@confect/server/DatabaseReader";
 import type * as DatabaseWriterModule from "@confect/server/DatabaseWriter";
 import type * as Handler from "@confect/server/Handler";
+import * as DocumentIds from "@confect/server/DocumentIds";
 import type { ExecutionMetadata } from "@confect/server/ExecutionMetadata";
 import type { RequestMetadata } from "@confect/server/RequestMetadata";
 import type { TransactionMetadata } from "@confect/server/TransactionMetadata";
@@ -279,6 +280,34 @@ describe("function-level implementation requirements", () => {
 });
 
 describe("implementation service bounds", () => {
+  it("shares DocumentIds only between queries and mutations", () => {
+    type Ids = DocumentIds.DocumentIds<typeof databaseSchema>;
+    expectTypeOf<Ids>().toExtend<QueryMutation>();
+    expectTypeOf<Ids>().toExtend<MutationOnly>();
+    expectTypeOf<Ids>().not.toExtend<AllFunctionTypes>();
+    expectTypeOf<Ids>().not.toExtend<
+      MiddlewareImpl.CommonServices<typeof databaseSchema, "query" | "action">
+    >();
+    expectTypeOf<Ids>().not.toExtend<
+      MiddlewareImpl.CommonServices<
+        typeof databaseSchema,
+        "mutation" | "action"
+      >
+    >();
+
+    class CheckIds extends MiddlewareSpec.MiddlewareSpec<CheckIds>()(
+      "CheckIds",
+      {
+        functionTypes: { query: true, mutation: true, action: false },
+      },
+    ) {}
+    MiddlewareImpl.make(databaseSchema, CheckIds, (effect) =>
+      Effect.flatMap(DocumentIds.DocumentIds<typeof databaseSchema>(), (ids) =>
+        Effect.andThen(ids.identify("input"), effect),
+      ),
+    );
+  });
+
   type Controls =
     | QueryTransactionContext.QueryTransactionContext
     | MutationTransactionContext.MutationTransactionContext;
