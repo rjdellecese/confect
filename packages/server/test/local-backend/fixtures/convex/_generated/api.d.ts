@@ -31,6 +31,46 @@ export declare const api: {
       confectWithRawDateNow: FunctionReference<"query", "public", {}, number>;
       confectWithSpan: FunctionReference<"query", "public", {}, number>;
     };
+    metadata: {
+      actionMetadata: FunctionReference<
+        "action",
+        "public",
+        {},
+        {
+          deploymentName: string;
+          functionName: string;
+          functionType: string;
+          ip: string | null;
+          requestId: string;
+          scheduledFunctionId: string | null;
+        }
+      >;
+      mutationMetadata: FunctionReference<
+        "mutation",
+        "public",
+        {},
+        {
+          deploymentName: string;
+          functionName: string;
+          functionType: string;
+          ip: string | null;
+          remainingWrites: number;
+          requestId: string;
+          scheduledFunctionId: string | null;
+        }
+      >;
+      queryMetadata: FunctionReference<
+        "query",
+        "public",
+        {},
+        {
+          deploymentName: string;
+          functionName: string;
+          functionType: string;
+          remainingReads: number;
+        }
+      >;
+    };
     scheduling: {
       manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;
       manyOpsQuery: FunctionReference<"query", "public", {}, number>;
@@ -44,6 +84,21 @@ export declare const api: {
         string
       >;
     };
+  };
+  metadataNode: {
+    metadata: FunctionReference<
+      "action",
+      "public",
+      {},
+      {
+        deploymentName: string;
+        functionName: string;
+        functionType: string;
+        ip: string | null;
+        requestId: string;
+        scheduledFunctionId: string | null;
+      }
+    >;
   };
 };
 

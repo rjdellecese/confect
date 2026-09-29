@@ -2,8 +2,8 @@ import { AiGatewayClient, AiGatewayDecisionClient } from "@confect/server";
 import { assert, describe, it } from "@effect/vitest";
 import type * as ConvexServer from "convex/server";
 import * as Effect from "effect/Effect";
-import * as HttpClient from "effect/unstable/http/HttpClient";
-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import { vi } from "vitest";
 
 const { getServiceToken } = vi.hoisted(() => ({ getServiceToken: vi.fn() }));

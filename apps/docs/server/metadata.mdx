@@ -1,0 +1,72 @@
+---
+icon: "info"
+title: "Metadata"
+description: "Read function, deployment, and request metadata, and inspect transaction usage through Effect services."
+---
+
+Confect provides three services for reading Convex metadata. Import them from `confect/_generated/services`; Confect supplies them automatically in supported handlers and middleware.
+
+| Service               | Methods                            | Available in                                   |
+| --------------------- | ---------------------------------- | ---------------------------------------------- |
+| `ExecutionMetadata`   | `getFunction()`, `getDeployment()` | Queries, mutations, actions, and HTTP handlers |
+| `RequestMetadata`     | `get()`                            | Mutations, actions, and HTTP handlers          |
+| `TransactionMetadata` | `getMetrics()`                     | Queries and mutations                          |
+
+Actions include [Node actions](/server/node-actions). Each method returns an Effect containing the native Convex metadata value, without transforming its fields. If the underlying Convex call rejects, the Effect fails with a defect rather than a typed error.
+
+## Function and deployment metadata
+
+Use `ExecutionMetadata` to identify the function and deployment running your code. `getFunction()` returns Convex's `FunctionMetadata`, including the function name, component path, type, and visibility. `getDeployment()` returns `DeploymentMetadata`, including the deployment name, region, and class.
+
+```ts
+import * as Effect from "effect/Effect";
+import { ExecutionMetadata } from "./_generated/services";
+
+const executionDetails = Effect.gen(function* () {
+  const metadata = yield* ExecutionMetadata;
+  const fn = yield* metadata.getFunction();
+  const deployment = yield* metadata.getDeployment();
+
+  return { functionName: fn.name, deploymentName: deployment.name };
+});
+```
+
+## Request metadata
+
+`RequestMetadata.get()` returns Convex's `RequestMetadata`, including the request ID, IP address, user agent, and scheduled function ID. Nested mutation and action calls inherit the originating request's metadata. For scheduled jobs and other executions not triggered by an HTTP request, the IP address and user agent are `null`.
+
+```ts
+import * as Effect from "effect/Effect";
+import { RequestMetadata } from "./_generated/services";
+
+const requestId = Effect.gen(function* () {
+  const metadata = yield* RequestMetadata;
+  const request = yield* metadata.get();
+
+  return request.requestId;
+});
+```
+
+<Warning>
+  Request metadata can contain the raw authentication token in `authToken`. Do
+  not log or return the entire metadata object. Select only the fields you need,
+  and treat IP addresses and user agents as sensitive request data.
+</Warning>
+
+## Transaction metrics
+
+`TransactionMetadata.getMetrics()` returns Convex's `TransactionMetrics`: the `used` and `remaining` amounts for limits such as bytes read, documents written, database queries, and scheduled functions. Read these metrics within a query or mutation to inspect its current usage.
+
+```ts
+import * as Effect from "effect/Effect";
+import { TransactionMetadata } from "./_generated/services";
+
+const remainingReads = Effect.gen(function* () {
+  const transaction = yield* TransactionMetadata;
+  const metrics = yield* transaction.getMetrics();
+
+  return metrics.documentsRead.remaining;
+});
+```
+
+Every execution of `getMetrics()` reads fresh values; the service does not cache them. It only reads metrics and does not start a transaction or change its limits. See [Convex's transaction limits](https://docs.convex.dev/production/state/limits) for the limits these metrics describe.

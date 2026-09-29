@@ -11,6 +11,9 @@ import type * as Auth from "./Auth";
 import type * as DatabaseReader from "./DatabaseReader";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
+import type { ExecutionMetadata } from "./ExecutionMetadata";
+import type { RequestMetadata } from "./RequestMetadata";
+import type { TransactionMetadata } from "./TransactionMetadata";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import type * as Scheduler from "./Scheduler";
@@ -89,11 +92,15 @@ type QueryMutationCommonServices<
 > =
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | Auth.Auth
+  | ExecutionMetadata
+  | TransactionMetadata
   | StorageReader.StorageReader
   | QueryRunner.QueryRunner;
 
 type MutationActionCommonServices =
   | Auth.Auth
+  | ExecutionMetadata
+  | RequestMetadata
   | Scheduler.Scheduler
   | StorageReader.StorageReader
   | StorageWriter.StorageWriter
@@ -102,6 +109,7 @@ type MutationActionCommonServices =
 
 type AllFunctionTypesCommonServices =
   | Auth.Auth
+  | ExecutionMetadata
   | StorageReader.StorageReader
   | QueryRunner.QueryRunner;
 

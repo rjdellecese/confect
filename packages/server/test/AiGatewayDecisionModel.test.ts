@@ -3,11 +3,11 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import * as Decision from "effect/unstable/ai/Decision";
-import * as DecisionModel from "effect/unstable/ai/DecisionModel";
-import * as HttpClient from "effect/unstable/http/HttpClient";
-import type * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
+import * as Decision from "effect/ai/Decision";
+import * as DecisionModel from "effect/ai/DecisionModel";
+import * as HttpClient from "effect/http/HttpClient";
+import type * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as InternalAiGatewayDecisionClient from "../src/internal/AiGatewayDecisionClient";
 import { AiGatewayServiceToken } from "../src/internal/AiGatewayServiceToken";
 
@@ -180,6 +180,158 @@ describe("AiGatewayDecisionModel", () => {
           assert.strictEqual(result.usage.outputTokens, 3);
         }),
     );
+  }
+
+  it.effect("normalizes captured Jev choice and score distributions", () =>
+    Effect.gen(function* () {
+      const definition = Decision.make({
+        input: Schema.String,
+        decisions: {
+          neutral3: Decision.classify({
+            instructions: "Choose a preliminary investigation group",
+            criteria: {
+              group_a: "A general investigation group",
+              group_b: "A general investigation group",
+              group_c: "A general investigation group",
+            },
+          }),
+          urgency5: Decision.rate({
+            instructions: "How urgently should the team respond?",
+            criteria: [
+              "No time pressure",
+              "Low priority",
+              "Normal response time",
+              "Needs attention soon",
+              "Immediate response required",
+            ],
+          }),
+        },
+      });
+      const body = {
+        ...responseBody,
+        answers: {
+          neutral3: {
+            type: "choice",
+            choice: "group_a",
+            probabilities: { group_a: 0.93, group_b: 0.04, group_c: 0.02 },
+            confidence: 0.9,
+          },
+          urgency5: {
+            type: "score",
+            score: 0.77,
+            probabilities: { "0": 0.28, "1": 0.66, "2": 0.05, "3": 0, "4": 0 },
+            confidence: 0.72,
+          },
+        },
+      };
+      const result = yield* DecisionModel.decide(definition, {
+        input: "Help",
+      }).pipe(
+        Effect.provide(
+          AiGatewayDecisionModel.model(modelId).pipe(
+            Layer.provide(
+              clientLayer((request) =>
+                Effect.succeed(jsonResponse(request, body)),
+              ),
+            ),
+          ),
+        ),
+      );
+      assert.strictEqual(result.answers.neutral3.label, "group_a");
+      assert.strictEqual(result.answers.urgency5.label, "Low priority");
+      assert.strictEqual(result.answers.urgency5.rating, 0.77);
+      for (const [probabilities, expected] of [
+        [
+          result.answers.neutral3.probabilities,
+          { group_a: 0.93, group_b: 0.04, group_c: 0.02 },
+        ],
+        [
+          result.answers.urgency5.probabilities,
+          {
+            "No time pressure": 0.28,
+            "Low priority": 0.66,
+            "Normal response time": 0.05,
+            "Needs attention soon": 0,
+            "Immediate response required": 0,
+          },
+        ],
+      ] as const) {
+        for (const [label, probability] of Object.entries(probabilities)) {
+          const expectedProbability = Object.entries(expected).find(
+            ([key]) => key === label,
+          )?.[1];
+          assert(typeof expectedProbability === "number");
+          assert(Math.abs(probability - expectedProbability / 0.99) < 1e-10);
+        }
+        assert(
+          Math.abs(
+            Object.values(probabilities).reduce(
+              (total, value) => total + value,
+              0,
+            ) - 1,
+          ) < 1e-10,
+        );
+      }
+    }),
+  );
+
+  for (const [name, probabilities] of [
+    ["zero totals", [0, 0, 0]],
+    ["excessively low totals", [0.1, 0.1, 0.1]],
+    ["excessively high totals", [0.8, 0.8, 0.8]],
+    ["out-of-range values", [1.1, -0.1, 0]],
+  ] as const) {
+    for (const [decision, answer] of [
+      [
+        "priority",
+        {
+          ...responseBody.answers.priority,
+          probabilities: { urgent: probabilities[0], normal: probabilities[1] },
+        },
+      ],
+      [
+        "severity",
+        {
+          ...responseBody.answers.severity,
+          probabilities: {
+            "0": probabilities[0],
+            "1": probabilities[1],
+            "2": probabilities[2],
+          },
+        },
+      ],
+    ] as const) {
+      it.effect(
+        `rejects ${name} for ${decision} despite rounding tolerance`,
+        () =>
+          Effect.gen(function* () {
+            const error = yield* DecisionModel.decide(TicketTriage, {
+              input: { message: "Help" },
+            }).pipe(
+              Effect.provide(
+                AiGatewayDecisionModel.model(modelId).pipe(
+                  Layer.provide(
+                    clientLayer((request) =>
+                      Effect.succeed(
+                        jsonResponse(request, {
+                          ...responseBody,
+                          answers: {
+                            ...responseBody.answers,
+                            [decision]: answer,
+                          },
+                        }),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Effect.flip,
+            );
+            assert(error._tag === "AiError");
+            assert.strictEqual(error.reason._tag, "InvalidOutputError");
+          }),
+      );
+    }
   }
 
   for (const [name, body] of [

@@ -17,15 +17,16 @@ import type { DocumentByName as DocumentByName_ } from "./DataModel";
 import * as Document from "./Document";
 import * as QueryInitializer from "./QueryInitializer";
 import type * as Table from "./Table";
-import type * as TableInfo from "./TableInfo";
 
 /**
- * The argument accepted by `patch`: like `Partial<Doc>`, but the fields that
- * are already optional also accept `undefined`, since setting a field to
- * `undefined` unsets it.
+ * The argument accepted by `patch`: like `Partial<Doc>` without system fields,
+ * but the fields that are already optional also accept `undefined`, since
+ * setting a field to `undefined` unsets it.
  */
 export type PatchValue<Doc> = {
-  [K in keyof Doc]?: undefined extends Doc[K] ? Doc[K] | undefined : Doc[K];
+  [
+    K in keyof Doc as K extends "_id" | "_creationTime" ? never : K
+  ]?: undefined extends Doc[K] ? Doc[K] | undefined : Doc[K];
 };
 
 export interface DatabaseWriterTableAccessor<
@@ -38,7 +39,7 @@ export interface DatabaseWriterTableAccessor<
   ) => Effect.Effect<GenericId<TableName>, Document.DocumentEncodeError>;
   readonly patch: (
     id: GenericId<TableName>,
-    patchedValues: PatchValue<Document.WithoutSystemFields<Doc>>,
+    patchedValues: PatchValue<Doc>,
   ) => Effect.Effect<
     void,
     | QueryInitializer.GetByIdFailure
@@ -109,11 +110,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         DocumentByName_<DataModel_, TableName>
       >,
     ) {
-      const encodedDocument = yield* Document.encode(
-        document,
-        tableName,
-        tableDef.Fields,
-      );
+      const encodedDocument = yield* Document.encode(document, tableDef);
 
       const id = yield* Effect.promise(() =>
         convexDatabaseWriter.insert(
@@ -129,19 +126,12 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
     const patch = Effect.fn("DatabaseWriter.patch")(function* (
       id: GenericId<TableName>,
-      patchedValues: PatchValue<
-        Document.WithoutSystemFields<DocumentByName_<DataModel_, TableName>>
-      >,
+      patchedValues: PatchValue<DocumentByName_<DataModel_, TableName>>,
     ) {
-      const tableSchema = tableDef.Fields as TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >;
-
       const originalDecodedDoc = yield* QueryInitializer.getById<
         Table.AnyWithProps,
         TableName
       >(
-        tableName,
         convexDatabaseWriter as any,
         tableDef,
       )(id);
@@ -153,7 +143,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
             ? Record.remove(acc, key)
             : Record.set(acc, key, value),
         ),
-        Document.encode(tableName, tableSchema),
+        Document.encode(tableDef),
       );
 
       yield* Effect.promise(() =>
@@ -175,11 +165,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         DocumentByName_<DataModel_, TableName>
       >,
     ) {
-      const updatedEncodedDoc = yield* Document.encode(
-        value,
-        tableName,
-        tableDef.Fields,
-      );
+      const updatedEncodedDoc = yield* Document.encode(value, tableDef);
 
       yield* Effect.promise(() =>
         convexDatabaseWriter.replace(

@@ -8,7 +8,12 @@ import type {
 import type { Infer } from "convex/values";
 import { v } from "convex/values";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import type { ExecutionMetadata } from "@confect/server/ExecutionMetadata";
 import type * as Handler from "@confect/server/Handler";
+import type * as HttpRouter from "@confect/server/HttpRouter";
+import type { RequestMetadata } from "@confect/server/RequestMetadata";
+import type { TransactionMetadata } from "@confect/server/TransactionMetadata";
 import type schema from "./mock-backend/fixtures/confect/_generated/schema";
 import {
   internalAction,
@@ -26,6 +31,61 @@ type ExtractActionReturns<F> =
   F extends RegisteredAction<any, any, infer R> ? R : never;
 
 describe("Handler", () => {
+  describe("metadata service availability", () => {
+    type MetadataServices =
+      | ExecutionMetadata
+      | RequestMetadata
+      | TransactionMetadata;
+
+    it("allows execution metadata and transaction metrics in queries", () => {
+      expectTypeOf<
+        Extract<Handler.QueryServices<typeof schema>, MetadataServices>
+      >().toEqualTypeOf<ExecutionMetadata | TransactionMetadata>();
+      expectTypeOf<RequestMetadata>().not.toExtend<
+        Handler.QueryServices<typeof schema>
+      >();
+    });
+
+    it("allows every metadata service in mutations", () => {
+      expectTypeOf<
+        Extract<Handler.MutationServices<typeof schema>, MetadataServices>
+      >().toEqualTypeOf<MetadataServices>();
+    });
+
+    it("allows execution and request metadata but not transactions in both action runtimes", () => {
+      const action = FunctionSpec.publicAction({
+        name: "action",
+        returns: () => Schema.Null,
+      });
+      const nodeAction = FunctionSpec.publicNodeAction({
+        name: "nodeAction",
+        returns: () => Schema.Null,
+      });
+      type ActionEnvironment = Effect.Services<
+        ReturnType<Handler.Handler<typeof schema, typeof action>>
+      >;
+      type NodeActionEnvironment = Effect.Services<
+        ReturnType<Handler.Handler<typeof schema, typeof nodeAction>>
+      >;
+
+      expectTypeOf<
+        Extract<ActionEnvironment, MetadataServices>
+      >().toEqualTypeOf<ExecutionMetadata | RequestMetadata>();
+      expectTypeOf<
+        Extract<NodeActionEnvironment, MetadataServices>
+      >().toEqualTypeOf<ExecutionMetadata | RequestMetadata>();
+      expectTypeOf<TransactionMetadata>().not.toExtend<ActionEnvironment>();
+      expectTypeOf<TransactionMetadata>().not.toExtend<NodeActionEnvironment>();
+    });
+
+    it("allows execution and request metadata but not transactions in HTTP handlers", () => {
+      expectTypeOf<
+        Extract<HttpRouter.Services, MetadataServices>
+      >().toEqualTypeOf<ExecutionMetadata | RequestMetadata>();
+      expectTypeOf<TransactionMetadata>().not.toExtend<HttpRouter.Services>();
+    });
+  });
+
   describe("ConvexProvenanceHandler preserves the raw Convex registered function type", () => {
     it("query", () => {
       const vQueryArgs = { tag: v.string() };

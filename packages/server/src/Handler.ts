@@ -9,6 +9,9 @@ import type * as DatabaseReader from "./DatabaseReader";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
+import type { ExecutionMetadata } from "./ExecutionMetadata";
+import type { RequestMetadata } from "./RequestMetadata";
+import type { TransactionMetadata } from "./TransactionMetadata";
 import type * as MutationCtx from "./MutationCtx";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryCtx from "./QueryCtx";
@@ -72,6 +75,8 @@ export type QueryServices<
 > =
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | Auth.Auth
+  | ExecutionMetadata
+  | TransactionMetadata
   | StorageReader
   | QueryRunner.QueryRunner
   | QueryCtx.QueryCtx<
@@ -84,6 +89,9 @@ export type MutationServices<
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | DatabaseWriter.DatabaseWriter<DatabaseSchema_>
   | Auth.Auth
+  | ExecutionMetadata
+  | RequestMetadata
+  | TransactionMetadata
   | Scheduler.Scheduler
   | StorageReader
   | StorageWriter
@@ -101,6 +109,8 @@ export type ActionServices<
 > =
   | Scheduler.Scheduler
   | Auth.Auth
+  | ExecutionMetadata
+  | RequestMetadata
   | StorageReader
   | StorageWriter
   | StorageActionWriter

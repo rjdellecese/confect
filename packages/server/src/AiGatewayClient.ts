@@ -1,7 +1,7 @@
 import * as OpenAiClient from "@effect/ai-openai-compat/OpenAiClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import type * as HttpClient from "effect/unstable/http/HttpClient";
+import type * as HttpClient from "effect/http/HttpClient";
 import * as InternalAiGatewayClient from "./internal/AiGatewayClient";
 import {
   AiGatewayServiceToken,

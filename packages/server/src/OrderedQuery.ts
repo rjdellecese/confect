@@ -11,6 +11,7 @@ import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as Document from "./Document";
 import type * as TableInfo from "./TableInfo";
+import type * as Table from "./Table";
 
 export type OrderedQuery<
   TableInfo_ extends TableInfo.AnyWithProps,
@@ -36,14 +37,13 @@ export type OrderedQuery<
   ) => Effect.Effect<PaginationResult<Doc>, Document.DocumentDecodeError>;
 };
 
-export const make = <
-  TableInfo_ extends TableInfo.AnyWithProps,
-  TableName extends string,
->(
-  query: ConvexOrderedQuery<TableInfo.ConvexTableInfo<TableInfo_>>,
-  tableName: TableName,
-  tableSchema: TableInfo.TableSchema<TableInfo_>,
-): OrderedQuery<TableInfo_> => {
+export const make = <Table_ extends Table.AnyWithProps>(
+  query: ConvexOrderedQuery<
+    TableInfo.ConvexTableInfo<TableInfo.TableInfo<Table_>>
+  >,
+  table: Table_,
+): OrderedQuery<TableInfo.TableInfo<Table_>> => {
+  type TableInfo_ = TableInfo.TableInfo<Table_>;
   type OrderedQueryFunction<
     FunctionName extends keyof OrderedQuery<TableInfo_>,
   > = OrderedQuery<TableInfo_>[FunctionName];
@@ -53,10 +53,7 @@ export const make = <
   );
 
   const stream: OrderedQueryFunction<"stream"> = () =>
-    pipe(
-      streamEncoded,
-      Stream.mapEffect(Document.decode(tableName, tableSchema)),
-    );
+    pipe(streamEncoded, Stream.mapEffect(Document.decode(table)));
 
   const first: OrderedQueryFunction<"first"> = () =>
     pipe(stream(), Stream.take(1), Stream.runHead);
@@ -78,7 +75,7 @@ export const make = <
 
     const parsedPage = yield* Effect.forEach(
       paginationResult.page,
-      Document.decode(tableName, tableSchema),
+      Document.decode(table),
     );
 
     return {

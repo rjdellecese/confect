@@ -57,6 +57,7 @@ import * as Result from "effect/Result";
 import * as Tuple from "effect/Tuple";
 import type * as Types from "effect/Types";
 import * as Document from "./Document";
+import type * as Table from "./Table";
 import * as QueryStreamCursor from "./QueryStreamCursor";
 import * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
@@ -476,8 +477,7 @@ export interface Reflection<
     QueryStreamOrderDirection.QueryStreamOrderDirection,
 > {
   readonly reader: ReflectionReader;
-  readonly tableName: string;
-  readonly tableSchema: Schema.Codec<any, any>;
+  readonly table: Table.AnyWithProps;
   readonly indexName: string;
   /**
    * Index fields in declared order, including `_creationTime` where applicable.
@@ -594,7 +594,7 @@ const makeLeaf = <
       Stream.suspend(() =>
         Stream.fromAsyncIterable(
           reflection.reader
-            .query(reflection.tableName)
+            .query(reflection.table.tableName)
             .withIndex(reflection.indexName, (q) =>
               QueryStreamIndexRange.apply(indexRange, q),
             )
@@ -614,7 +614,7 @@ const makeLeaf = <
   const annotated = budgetedDocuments.pipe(
     Stream.mapEffect((encoded) =>
       Effect.map(
-        Document.decode(reflection.tableName, reflection.tableSchema)(encoded),
+        Document.decode(reflection.table)(encoded),
         (doc) =>
           new Element({
             doc: Option.some(doc as Doc),

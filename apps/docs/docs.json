@@ -73,6 +73,7 @@
           "server/storage",
           "server/scheduling",
           "server/authentication",
+          "server/metadata",
           "server/cron-jobs",
           "server/search",
           "server/components",

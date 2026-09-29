@@ -1,12 +1,39 @@
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
+import { FunctionSpec } from "@confect/core";
+import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
+import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
+import { RegisteredNodeFunction } from "@confect/server/node";
+import { convexTest } from "convex-test";
+import { makeFunctionReference } from "convex/server";
+import * as Console from "effect/Console";
+import * as TestConsole from "effect/testing/TestConsole";
+import confectSchema from "./fixtures/confect/_generated/schema";
+import convexSchema from "./fixtures/confect/_generated/convexSchema";
 import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Duration from "effect/Duration";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as SchemaParser from "effect/SchemaParser";
+import * as SchemaCompiler from "effect/schema/SchemaCompiler";
+import * as Stream from "effect/Stream";
+import * as Option from "effect/Option";
+import { vi } from "vitest";
+import * as DatabaseReader_ from "@confect/server/DatabaseReader";
+import * as DatabaseWriter_ from "@confect/server/DatabaseWriter";
+import * as DatabaseSchema from "@confect/server/DatabaseSchema";
+import * as QueryStream from "@confect/server/QueryStream";
+import * as Table from "@confect/server/Table";
 import refs from "./fixtures/confect/_generated/refs";
-import { DatabaseWriter } from "./fixtures/confect/_generated/services";
+import {
+  DatabaseReader,
+  DatabaseWriter,
+  MutationCtx,
+  Scheduler,
+  TransactionMetadata,
+} from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
 import type notes from "./fixtures/confect/_generated/tables/notes";
 import { PaginationDenied } from "./fixtures/confect/databaseReader.spec";
@@ -17,7 +44,228 @@ import {
 import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
 
+describe("function logging", () => {
+  const cases = [
+    {
+      name: "query",
+      spec: FunctionSpec.publicQuery({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.query(makeFunctionReference<"query">("logging:run"), {}),
+    },
+    {
+      name: "mutation",
+      spec: FunctionSpec.publicMutation({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.mutation(makeFunctionReference<"mutation">("logging:run"), {}),
+    },
+    {
+      name: "action",
+      spec: FunctionSpec.publicAction({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.action(makeFunctionReference<"action">("logging:run"), {}),
+    },
+    {
+      name: "Node action",
+      spec: FunctionSpec.publicNodeAction({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredNodeFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.action(makeFunctionReference<"action">("logging:run"), {}),
+    },
+  ];
+
+  it.effect.each(cases)(
+    "installs the default logger for a registered $name",
+    ({ name, spec, register, invoke }) =>
+      Effect.gen(function* () {
+        const console = {
+          ...(yield* TestConsole.make),
+          warn: vi.fn(),
+          log: vi.fn(),
+        };
+        const item = FunctionRegistryItem.make({
+          functionSpec: spec,
+          groupMiddlewareAttachments: [],
+          handler: () =>
+            Effect.logWarning(name).pipe(
+              Effect.as(null),
+              Effect.provideService(Console.Console, console),
+            ),
+        });
+        assert(item._tag === "Confect");
+        const registered = register(confectSchema, item);
+        const t = convexTest(convexSchema, {
+          ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+          "./fixtures/convex/logging.ts": () =>
+            Promise.resolve({ run: registered }),
+        });
+        expect(yield* Effect.promise(() => invoke(t))).toBeNull();
+        expect(console.warn).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ level: "WARN", message: name }),
+        );
+        expect(console.log).not.toHaveBeenCalled();
+      }),
+  );
+});
+
+describe("TransactionMetadata", () => {
+  it.effect("reads updated metrics after database operations", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+      yield* c.run(
+        Effect.gen(function* () {
+          const transaction = yield* TransactionMetadata;
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+          const getMetrics = transaction.getMetrics();
+          const before = yield* getMetrics;
+
+          const id = yield* writer.table("notes").insert({ text: "metrics" });
+          yield* reader.table("notes").get(id);
+          const after = yield* getMetrics;
+
+          expect(after.documentsWritten.used).toBeGreaterThan(
+            before.documentsWritten.used,
+          );
+          expect(after.documentsRead.used).toBeGreaterThan(
+            before.documentsRead.used,
+          );
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+});
+
+describe("Scheduler", () => {
+  it.effect("cancels a pending function without executing it", () =>
+    Effect.gen(function* () {
+      vi.useFakeTimers();
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const scheduler = yield* Scheduler;
+          const reader = yield* DatabaseReader;
+          const id = yield* scheduler.runAfter(
+            Duration.minutes(5),
+            refs.public.groups.notes.insert,
+            { text: "This function must not run" },
+          );
+
+          yield* scheduler.cancel(id);
+
+          const scheduled = yield* reader.table("_scheduled_functions").get(id);
+          expect(scheduled.state.kind).toBe("canceled");
+        }),
+      );
+
+      yield* c.finishAllScheduledFunctions(() => vi.runAllTimers());
+
+      expect(yield* c.query(refs.public.groups.notes.list)).toEqual([]);
+    }).pipe(
+      Effect.ensuring(Effect.sync(() => vi.useRealTimers())),
+      Effect.provide(TestConfect.layer),
+    ),
+  );
+});
+
 describe("DatabaseReader", () => {
+  it.effect("uses the canonical Doc decoder across database read paths", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const ctx = yield* MutationCtx;
+          const id = yield* Effect.promise(() =>
+            ctx.db.insert("notes", { text: "hello" }),
+          );
+          let evaluations = 0;
+          const table = Table.make(() => {
+            evaluations++;
+            return Schema.Struct({ text: Schema.String });
+          })
+            .index("by_text", ["text"])
+            .searchIndex("text", { searchField: "text" })("notes");
+          const schema = DatabaseSchema.make({ notes: table });
+          const reader = DatabaseReader_.make<typeof schema>(
+            schema,
+            ctx.db,
+          ).table("notes");
+          const writer = DatabaseWriter_.make<typeof schema>(
+            schema,
+            ctx.db,
+          ).table("notes");
+          const get = reader.get(id);
+          const getByIndex = reader.get("by_text", "hello");
+          const first = reader.index("by_text").first();
+          const take = reader.index("by_text").take(1);
+          const collect = reader.index("by_text").collect();
+          const orderedStream = reader.index("by_text").stream();
+          const paginate = reader
+            .index("by_text")
+            .paginate({ numItems: 1, cursor: null });
+          const search = reader.search("text", (q) =>
+            q.search("text", "hello"),
+          );
+          const stream = reader.stream("by_text");
+
+          expect(evaluations).toBe(0);
+
+          const encoded = yield* Effect.promise(() => ctx.db.get(id));
+          const doc = table.Doc;
+          const interpreted = SchemaParser.decodeUnknownEffect(doc);
+          yield* interpreted(encoded);
+          let calls = 0;
+          SchemaCompiler.set(doc.ast, {
+            decodeEffect: (input, options) => {
+              calls++;
+              return interpreted(input, options);
+            },
+          });
+
+          expect(yield* get).toEqual(encoded);
+          expect(yield* getByIndex).toEqual(encoded);
+          expect(yield* first).toEqual(Option.some(encoded));
+          expect(yield* take).toEqual([encoded]);
+          expect(yield* collect).toEqual([encoded]);
+          expect(yield* Stream.runCollect(orderedStream)).toEqual([encoded]);
+          expect((yield* paginate).page).toEqual([encoded]);
+          expect(yield* search.collect()).toEqual([encoded]);
+          expect(yield* Stream.runCollect(stream)).toEqual([encoded]);
+          expect(
+            (yield* QueryStream.paginate(stream, { numItems: 1, cursor: null }))
+              .page,
+          ).toEqual([encoded]);
+          expect(calls).toBe(10);
+
+          yield* writer.patch(id, { text: "patched" });
+          expect(calls).toBe(11);
+          expect(evaluations).toBe(1);
+          expect(table.Doc).toBe(doc);
+          expect(encoded?.text).toBe("hello");
+          expect((yield* Effect.promise(() => ctx.db.get(id)))?.text).toBe(
+            "patched",
+          );
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("get", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;

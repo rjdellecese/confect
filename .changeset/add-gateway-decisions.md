@@ -10,7 +10,7 @@ import {
   AiGatewayDecisionModel,
 } from "@confect/server";
 import * as Layer from "effect/Layer";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 
 const Jev = AiGatewayDecisionModel.model("typesafe/jev-1.13").pipe(
   Layer.provide(AiGatewayDecisionClient.layer),
@@ -20,4 +20,4 @@ const Jev = AiGatewayDecisionModel.model("typesafe/jev-1.13").pipe(
 
 Provide `Jev` to `DecisionModel.decide` inside a Convex action to evaluate named decisions in one request.
 
-Classification and rating currently require full probability distributions summing to one within `1e-6`. Jev's two-decimal rounding can cause otherwise valid answers to fail with `AiError.InvalidOutputError`; Confect does not renormalize those probabilities.
+Classification and rating return full probability distributions normalized to sum to one when Jev's two-decimal rounding introduces small discrepancies. Missing or invalid probabilities still fail with `AiError.InvalidOutputError`.

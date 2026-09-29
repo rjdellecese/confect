@@ -9,8 +9,8 @@ import * as Path from "effect/Path";
 import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
-import * as ChildProcess from "effect/unstable/process/ChildProcess";
-import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
+import * as ChildProcess from "effect/process/ChildProcess";
+import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 
 const entries = ["services.ts", "docs.ts", "refs.ts", "schema.ts", "spec.ts"];
 

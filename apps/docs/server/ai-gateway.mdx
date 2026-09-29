@@ -24,8 +24,8 @@ import {
 } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as LanguageModel from "effect/unstable/ai/LanguageModel";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import * as LanguageModel from "effect/ai/LanguageModel";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import databaseSchema from "./_generated/schema";
 import assistant from "./assistant.spec";
 
@@ -108,9 +108,9 @@ import {
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import * as Decision from "effect/unstable/ai/Decision";
-import * as DecisionModel from "effect/unstable/ai/DecisionModel";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import * as Decision from "effect/ai/Decision";
+import * as DecisionModel from "effect/ai/DecisionModel";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 
 const TicketTriage = Decision.make({
   input: Schema.Struct({ message: Schema.String }),
@@ -163,11 +163,4 @@ Classifications return a label and a probability distribution. Ratings return a 
 
 Effect requires full probability distributions for classification and rating answers. Missing distributions, missing answers, or invalid probabilities fail with `AiError` rather than returning a partial result. Handle these and service-token failures as described in [Handle errors](#handle-errors).
 
-<Warning>
-  Jev rounds probabilities to two decimal places. The pinned Effect version
-  requires distributions to sum to one within `1e-6`, so a valid rounded
-  distribution such as `0.33, 0.33, 0.33` currently fails with
-  `AiError.InvalidOutputError`. Confect does not renormalize provider
-  probabilities. This limitation affects classification and rating decisions,
-  not standalone probability decisions.
-</Warning>
+Jev rounds probabilities to two decimal places. Effect accounts for that precision and rescales classification and rating distributions with small rounding discrepancies to sum to one. For example, a returned distribution of `0.93, 0.04, 0.02` is accepted and each value is divided by `0.99`. The allowed discrepancy is `0.005` per label, plus `1e-6` for floating-point error. Zero totals, larger discrepancies, and probabilities outside `[0, 1]` still fail with `AiError.InvalidOutputError`. Standalone probability decisions are not rescaled.

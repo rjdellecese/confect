@@ -71,7 +71,6 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       ) as Table.WithName<IncludedTables<DatabaseSchema_>, TableName>;
 
       return QueryInitializer.make<IncludedTables<DatabaseSchema_>, TableName>(
-        tableName,
         baseDatabaseReader,
         table,
       );

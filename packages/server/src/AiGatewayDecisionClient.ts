@@ -1,7 +1,7 @@
 import * as OpenRouterClient from "@effect/ai-openrouter/OpenRouterClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import type * as HttpClient from "effect/unstable/http/HttpClient";
+import type * as HttpClient from "effect/http/HttpClient";
 import * as InternalAiGatewayDecisionClient from "./internal/AiGatewayDecisionClient";
 import {
   AiGatewayServiceToken,

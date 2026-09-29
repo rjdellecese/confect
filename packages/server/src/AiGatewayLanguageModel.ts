@@ -2,8 +2,8 @@ import type * as OpenAiClient from "@effect/ai-openai-compat/OpenAiClient";
 import * as OpenAiLanguageModel from "@effect/ai-openai-compat/OpenAiLanguageModel";
 import type * as Effect from "effect/Effect";
 import type * as Layer from "effect/Layer";
-import type * as LanguageModel from "effect/unstable/ai/LanguageModel";
-import type * as AiModel from "effect/unstable/ai/Model";
+import type * as LanguageModel from "effect/ai/LanguageModel";
+import type * as AiModel from "effect/ai/Model";
 
 /**
  * Configuration overrides for Convex AI gateway language-model requests.

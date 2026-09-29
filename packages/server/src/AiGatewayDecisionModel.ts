@@ -2,8 +2,8 @@ import type * as OpenRouterClient from "@effect/ai-openrouter/OpenRouterClient";
 import * as OpenRouterDecisionModel from "@effect/ai-openrouter/OpenRouterDecisionModel";
 import type * as Effect from "effect/Effect";
 import type * as Layer from "effect/Layer";
-import type * as DecisionModel from "effect/unstable/ai/DecisionModel";
-import type * as AiModel from "effect/unstable/ai/Model";
+import type * as DecisionModel from "effect/ai/DecisionModel";
+import type * as AiModel from "effect/ai/Model";
 
 export interface Options {
   readonly model: string;
