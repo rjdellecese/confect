@@ -786,6 +786,23 @@ export { schemaReads } from "./schemaReads";
   );
 });
 
+it.effect("exports a schema-typed DocumentIds service without Docs", () =>
+  Effect.gen(function* () {
+    const contents = yield* templates.services({
+      schemaImportPath: "./schema",
+    });
+
+    expect(contents).toContain("DocumentIds as DocumentIds_,");
+    expect(contents).toContain('import type schemaDefinition from "./schema";');
+    expect(contents).toContain(
+      "export const DocumentIds: DocumentIds_.DocumentIdsTag<typeof schemaDefinition> = DocumentIds_.DocumentIds<typeof schemaDefinition>();",
+    );
+    expect(contents).toContain(
+      "export type DocumentIds = typeof DocumentIds.Identifier;",
+    );
+  }),
+);
+
 it.effect(
   "exports transaction control services as aliases of the server tags",
   () =>

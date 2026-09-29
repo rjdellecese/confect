@@ -22,6 +22,7 @@ import * as Stream from "effect/Stream";
 import * as Option from "effect/Option";
 import { vi } from "vitest";
 import * as DatabaseReader_ from "@confect/server/DatabaseReader";
+import * as DocumentIds from "@confect/server/DocumentIds";
 import * as DatabaseWriter_ from "@confect/server/DatabaseWriter";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as QueryStream from "@confect/server/QueryStream";
@@ -45,6 +46,100 @@ import {
 } from "./fixtures/confect/groups/typedErrors.spec";
 import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
+
+describe("DocumentIds", () => {
+  const cases = [
+    {
+      name: "public query",
+      spec: FunctionSpec.publicQuery({
+        name: "run",
+        args: () => ({ input: Schema.String }),
+        returns: () => Schema.Boolean,
+      }),
+      invoke: (t: ReturnType<typeof convexTest>, input: string) =>
+        t.query(makeFunctionReference<"query">("documentIds:run"), { input }),
+    },
+    {
+      name: "internal query",
+      spec: FunctionSpec.internalQuery({
+        name: "run",
+        args: () => ({ input: Schema.String }),
+        returns: () => Schema.Boolean,
+      }),
+      invoke: (t: ReturnType<typeof convexTest>, input: string) =>
+        t.query(makeFunctionReference<"query">("documentIds:run"), { input }),
+    },
+    {
+      name: "public mutation",
+      spec: FunctionSpec.publicMutation({
+        name: "run",
+        args: () => ({ input: Schema.String }),
+        returns: () => Schema.Boolean,
+      }),
+      invoke: (t: ReturnType<typeof convexTest>, input: string) =>
+        t.mutation(makeFunctionReference<"mutation">("documentIds:run"), {
+          input,
+        }),
+    },
+    {
+      name: "internal mutation",
+      spec: FunctionSpec.internalMutation({
+        name: "run",
+        args: () => ({ input: Schema.String }),
+        returns: () => Schema.Boolean,
+      }),
+      invoke: (t: ReturnType<typeof convexTest>, input: string) =>
+        t.mutation(makeFunctionReference<"mutation">("documentIds:run"), {
+          input,
+        }),
+    },
+  ];
+  it.effect.each(cases)(
+    "provides ID operations to a registered $name",
+    ({ spec, invoke }) =>
+      Effect.gen(function* () {
+        const item = FunctionRegistryItem.make({
+          functionSpec: spec,
+          groupMiddlewareAttachments: [],
+          handler: ({ input }) =>
+            Effect.gen(function* () {
+              const ids =
+                yield* DocumentIds.DocumentIds<typeof confectSchema>();
+              const parsed = yield* ids.parse("notes", input);
+              const normalized = yield* ids.normalize("notes", input);
+              const identified = yield* ids.identify(input);
+              return (
+                Option.isSome(parsed) &&
+                parsed.value === input &&
+                Option.isSome(normalized) &&
+                normalized.value === input &&
+                Option.isSome(identified) &&
+                identified.value.table === "notes" &&
+                identified.value.id === input &&
+                Option.isNone(yield* ids.parse("users", input))
+              );
+            }),
+        });
+        assert(item._tag === "Confect");
+        const registered = RegisteredConvexFunction.make(confectSchema, item);
+        const t = convexTest(convexSchema, {
+          ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+          "./fixtures/convex/documentIds.ts": () =>
+            Promise.resolve({ run: registered }),
+        });
+        const id = yield* Effect.promise(() =>
+          t.run(({ db }) =>
+            db
+              .insert("notes", { text: "ID inspection" })
+              .then((inserted) =>
+                db.delete("notes", inserted).then(() => inserted),
+              ),
+          ),
+        );
+        expect(yield* Effect.promise(() => invoke(t, id))).toBe(true);
+      }),
+  );
+});
 
 describe("Storage", () => {
   const read = Effect.gen(function* () {
