@@ -1,5 +1,58 @@
 # @confect/server
 
+## 10.0.0-next.25
+
+### Minor Changes
+
+- 0d85daf: Add `ExecutionMetadata`, `RequestMetadata`, and `TransactionMetadata` services for reading function and deployment metadata, request metadata, and current transaction metrics. Generated services expose each capability to the function contexts that support it, including middleware and HTTP handlers where applicable.
+
+  ```ts
+  import * as Effect from "effect/Effect";
+  import {
+    ExecutionMetadata,
+    TransactionMetadata,
+  } from "./_generated/services";
+
+  const queryDetails = Effect.gen(function* () {
+    const execution = yield* ExecutionMetadata;
+    const transaction = yield* TransactionMetadata;
+    const fn = yield* execution.getFunction();
+    const metrics = yield* transaction.getMetrics();
+
+    return {
+      functionName: fn.name,
+      remainingReads: metrics.documentsRead.remaining,
+    };
+  });
+  ```
+
+- 8be1af3: Add `AiGatewayDecisionClient` and `AiGatewayDecisionModel` to classify input, rate it against a rubric, and estimate probabilities with Effect AI through Convex's AI gateway, without configuring a provider API key.
+
+  ```ts
+  import {
+    AiGatewayDecisionClient,
+    AiGatewayDecisionModel,
+  } from "@confect/server";
+  import * as Layer from "effect/Layer";
+  import * as FetchHttpClient from "effect/http/FetchHttpClient";
+
+  const Jev = AiGatewayDecisionModel.model("typesafe/jev-1.13").pipe(
+    Layer.provide(AiGatewayDecisionClient.layer),
+    Layer.provide(FetchHttpClient.layer),
+  );
+  ```
+
+  Provide `Jev` to `DecisionModel.decide` inside a Convex action to evaluate named decisions in one request.
+
+- 4aa5154: Add a `cancel()` method to the `Scheduler` service that cancels a scheduled function using the ID returned by `runAfter()` or `runAt()`.
+- 35845bb: Route `Effect.log*` output to matching Convex log severities in function handlers and HTTP routes, retaining Effect metadata and custom logger overrides. Add `ConvexLogger` for explicit logger configuration, and keep logs attached to the current invocation when Node actions reuse a process.
+
+### Patch Changes
+
+- f9958b9: Require `effect@^4.0.0-rc.118` and matching Effect platform packages. Upgrade Effect alongside Confect and replace `effect/unstable/*` imports with `effect/*`, using `effect/http-api` for HTTP API imports.
+- 6e19a2f: Exclude `_id` and `_creationTime` from patch value types derived from full documents.
+- 891cbcf: Reuse document decoders consistently across database reads and updates.
+
 ## 10.0.0-next.24
 
 ### Patch Changes
