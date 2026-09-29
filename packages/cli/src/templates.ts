@@ -548,6 +548,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
       yield* cbw.writeLine("type DataModel,");
       yield* cbw.writeLine("DatabaseReader as DatabaseReader_,");
       yield* cbw.writeLine("DatabaseWriter as DatabaseWriter_,");
+      yield* cbw.writeLine("DocumentIds as DocumentIds_,");
       yield* cbw.writeLine("ExecutionMetadata as ExecutionMetadata_,");
       yield* cbw.writeLine("MutationCtx as MutationCtx_,");
       yield* cbw.writeLine("MutationRunner as MutationRunner_,");
@@ -653,6 +654,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
   );
   yield* cbw.writeLine(
     "export type VectorSearch = typeof VectorSearch.Identifier;",
+  );
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine(
+    "export const DocumentIds: DocumentIds_.DocumentIdsTag<typeof schemaDefinition> = DocumentIds_.DocumentIds<typeof schemaDefinition>();",
+  );
+  yield* cbw.writeLine(
+    "export type DocumentIds = typeof DocumentIds.Identifier;",
   );
   yield* cbw.blankLine();
 

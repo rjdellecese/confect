@@ -39,6 +39,108 @@ reader.table("notes").get("by_author", "John Doe");
 reader.table("users").get("by_name_and_age", "John Doe", 21);
 ```
 
+## Validate document IDs
+
+Use `DocumentIds` when you receive a string, such as a URL parameter, and need
+a table-typed ID before reading a document. Import the schema-typed service
+from `confect/_generated/services`. Confect provides it in queries, mutations,
+and middleware that covers only those function types, not in actions or HTTP
+handlers. An action or HTTP handler can call a query to perform the check.
+
+All three methods return an `Effect` containing an `Option`. Table arguments
+are limited to your schema's table names plus `_storage` and
+`_scheduled_functions`.
+
+| Method                    | Use when                                                                | Result inside the `Effect`                                                               |
+| ------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `parse(table, input)`     | You know the expected table and require a current-format ID.            | `Option<GenericId<typeof table>>`                                                        |
+| `identify(input)`         | You need to determine which known table a current-format ID belongs to. | `Option` of correlated `{ readonly table: Name; readonly id: GenericId<Name> }` variants |
+| `normalize(table, input)` | You know the expected table and want to allow legacy ID conversion.     | `Option<GenericId<typeof table>>`                                                        |
+
+### Parse before reading
+
+`parse` returns `Some(id)` only when Convex's native `normalizeId(table, input)`
+returns the input unchanged. Invalid strings, IDs for a different table, and
+legacy strings that require conversion return `None`.
+
+```ts
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import { DatabaseReader, DocumentIds } from "./confect/_generated/services";
+
+const findNote = (input: string) =>
+  Effect.gen(function* () {
+    const ids = yield* DocumentIds;
+    const parsed = yield* ids.parse("notes", input);
+    if (Option.isNone(parsed)) return Option.none();
+
+    const reader = yield* DatabaseReader;
+    return Option.some(yield* reader.table("notes").get(parsed.value));
+  });
+```
+
+Parsing does not prove that a document exists. The separate `get` can still
+fail with `GetByIdFailure`, for example after deletion. None of the `DocumentIds` methods
+establishes authorization or proves that an ID originated in your deployment.
+Check access before returning a document to the caller.
+
+### Identify an unknown table
+
+`identify` tries the tables in your schema and both system tables using native
+runtime ID lookups, not document scans. It uses the same strict rule as `parse`,
+so a legacy string that needs conversion does not identify a table. An invalid
+string or an ID that matches none of the known tables returns `None`.
+
+The result keeps each table name paired with its ID type. Narrow `table` to
+use `id` with a specific table:
+
+```ts
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import { DatabaseReader, DocumentIds } from "./confect/_generated/services";
+
+const findNoteFromUnknownId = (input: string) =>
+  Effect.gen(function* () {
+    const ids = yield* DocumentIds;
+    const identified = yield* ids.identify(input);
+    if (Option.isNone(identified)) return Option.none();
+
+    const match = identified.value;
+    if (match.table !== "notes") return Option.none();
+
+    const reader = yield* DatabaseReader;
+    return Option.some(yield* reader.table("notes").get(match.id));
+  });
+```
+
+Identification is scoped to the current runtime and schema. It is not a
+frontend-only decoder or a way to discover tables across Convex components.
+
+### Normalize legacy IDs
+
+Use `normalize` only when accepting legacy IDs is intentional. Unlike `parse`,
+it accepts any non-null result from Convex's native normalizer, which may differ
+from the input string:
+
+```ts
+import * as Effect from "effect/Effect";
+import { DocumentIds } from "./confect/_generated/services";
+
+const normalizeNoteId = (input: string) =>
+  Effect.gen(function* () {
+    const ids = yield* DocumentIds;
+    return yield* ids.normalize("notes", input);
+  });
+```
+
+Legacy strings do not encode a table. Normalization supplies the table you
+choose, so a successful conversion does not identify the string's original table.
+Use `parse` or `identify` when you need strict membership checking.
+
+Invalid or mismatching IDs return `None`. Unexpected native runtime failures
+remain Effect defects; the service does not disguise them as invalid input.
+This failure behavior applies to all three methods.
+
 ## Retrieve multiple documents
 
 ### Indexes
