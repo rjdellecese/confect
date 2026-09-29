@@ -102,49 +102,39 @@ describe("MutationTransactionContext", () => {
     },
   );
 
-  for (const kind of ["query", "mutation"] as const) {
-    it.effect(
-      `preserves declared errors, codec failures, and defects for ${kind}`,
-      () => {
-        const defect = new Error("offline");
-        const native = vi
-          .fn()
-          .mockRejectedValueOnce(
-            new ConvexError({ _tag: "NotFound", id: "abc" }),
-          )
-          .mockResolvedValueOnce("invalid")
-          .mockRejectedValueOnce(defect);
-        return Effect.gen(function* () {
-          const controls =
-            yield* MutationTransactionContext.MutationTransactionContext;
-          const run = (count: number) =>
-            kind === "query"
-              ? controls.runQuery(
-                  queryRef,
-                  { count },
-                  { useStaleSnapshot: true },
-                )
-              : controls.runMutation(mutationRef, { count }, {});
-          expect(yield* Effect.flip(run(1))).toEqual(
-            new NotFound({ id: "abc" }),
-          );
-          expect(yield* Effect.flip(run(1))).toBeInstanceOf(Schema.SchemaError);
-          expect(yield* run(1).pipe(Effect.catchDefect(Effect.succeed))).toBe(
-            defect,
-          );
-          expect(yield* Effect.flip(run(Number.NaN))).toBeInstanceOf(
-            Schema.SchemaError,
-          );
-          expect(native).toHaveBeenCalledTimes(3);
-        }).pipe(
-          Effect.provide(
-            MutationTransactionContext.layer({
-              runQuery: native,
-              runMutation: native,
-            }),
-          ),
+  it.effect.each(["query", "mutation"] as const)(
+    "preserves declared errors, codec failures, and defects for %s",
+    (kind) => {
+      const defect = new Error("offline");
+      const native = vi
+        .fn()
+        .mockRejectedValueOnce(new ConvexError({ _tag: "NotFound", id: "abc" }))
+        .mockResolvedValueOnce("invalid")
+        .mockRejectedValueOnce(defect);
+      return Effect.gen(function* () {
+        const controls =
+          yield* MutationTransactionContext.MutationTransactionContext;
+        const run = (count: number) =>
+          kind === "query"
+            ? controls.runQuery(queryRef, { count }, { useStaleSnapshot: true })
+            : controls.runMutation(mutationRef, { count }, {});
+        expect(yield* Effect.flip(run(1))).toEqual(new NotFound({ id: "abc" }));
+        expect(yield* Effect.flip(run(1))).toBeInstanceOf(Schema.SchemaError);
+        expect(yield* run(1).pipe(Effect.catchDefect(Effect.succeed))).toBe(
+          defect,
         );
-      },
-    );
-  }
+        expect(yield* Effect.flip(run(Number.NaN))).toBeInstanceOf(
+          Schema.SchemaError,
+        );
+        expect(native).toHaveBeenCalledTimes(3);
+      }).pipe(
+        Effect.provide(
+          MutationTransactionContext.layer({
+            runQuery: native,
+            runMutation: native,
+          }),
+        ),
+      );
+    },
+  );
 });
