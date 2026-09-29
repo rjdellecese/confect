@@ -152,7 +152,8 @@
     {
       "files": ["**/*.test.{ts,tsx,mts,cts}"],
       "rules": {
-        "confect/prefer-effect-vitest": "error"
+        "confect/prefer-effect-vitest": "error",
+        "confect/prefer-test-each": "error"
       }
     }
   ]
