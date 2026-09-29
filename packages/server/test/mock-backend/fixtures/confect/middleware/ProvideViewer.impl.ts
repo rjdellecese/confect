@@ -23,7 +23,7 @@ const viewerFromDatabase = Effect.gen(function* () {
 });
 
 const viewerViaRunQuery = Effect.gen(function* () {
-  const runQuery = yield* QueryRunner;
+  const { runQuery } = yield* QueryRunner;
 
   const username = yield* runQuery(
     refs.internal.groups.middlewareHelpers.firstUsername,

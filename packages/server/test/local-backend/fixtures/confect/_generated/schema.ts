@@ -1,5 +1,11 @@
 import { DatabaseSchema as $DatabaseSchema } from "@confect/server";
 
-const databaseSchema: $DatabaseSchema.DatabaseSchema = $DatabaseSchema.make({});
+import transactionNotes from "./tables/transactionNotes";
+
+const databaseSchema: $DatabaseSchema.DatabaseSchema<{
+  readonly transactionNotes: typeof transactionNotes;
+}> = $DatabaseSchema.make({
+  transactionNotes,
+});
 
 export default databaseSchema;

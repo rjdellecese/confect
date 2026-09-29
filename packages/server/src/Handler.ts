@@ -14,8 +14,10 @@ import type { RequestMetadata } from "./RequestMetadata";
 import type { TransactionMetadata } from "./TransactionMetadata";
 import type * as MutationCtx from "./MutationCtx";
 import type * as MutationRunner from "./MutationRunner";
+import type { MutationTransactionContext } from "./MutationTransactionContext";
 import type * as QueryCtx from "./QueryCtx";
 import type * as QueryRunner from "./QueryRunner";
+import type { QueryTransactionContext } from "./QueryTransactionContext";
 import type * as RegisteredFunction from "./RegisteredFunction";
 import type * as Scheduler from "./Scheduler";
 import type { StorageActionWriter } from "./StorageActionWriter";
@@ -79,6 +81,7 @@ export type QueryServices<
   | TransactionMetadata
   | StorageReader
   | QueryRunner.QueryRunner
+  | QueryTransactionContext
   | QueryCtx.QueryCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >;
@@ -97,6 +100,8 @@ export type MutationServices<
   | StorageWriter
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
+  | QueryTransactionContext
+  | MutationTransactionContext
   | MutationCtx.MutationCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >;
