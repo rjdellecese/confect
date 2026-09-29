@@ -16,7 +16,7 @@ vi.mock("convex/server", (importOriginal) =>
 );
 
 describe("AiGatewayDecisionClient", () => {
-  for (const [name, make] of [
+  describe.each([
     ["make", AiGatewayDecisionClient.make],
     [
       "layer",
@@ -24,8 +24,8 @@ describe("AiGatewayDecisionClient", () => {
         Effect.provide(AiGatewayDecisionClient.layer),
       ),
     ],
-  ] as const) {
-    it.effect(`${name} acquires a token once and authenticates decisions`, () =>
+  ] as const)("%s", (_name, make) => {
+    it.effect("acquires a token once and authenticates decisions", () =>
       Effect.gen(function* () {
         getServiceToken.mockReset().mockResolvedValue("test-token");
         let requests = 0;
@@ -70,27 +70,31 @@ describe("AiGatewayDecisionClient", () => {
       }),
     );
 
-    for (const ErrorType of [
-      AiGatewayDecisionClient.AiGatewayDisabled,
-      AiGatewayDecisionClient.AiGatewayUnavailable,
-    ]) {
-      it.effect(`${name} preserves ${ErrorType.name} before HTTP`, () =>
-        Effect.gen(function* () {
-          getServiceToken
-            .mockReset()
-            .mockRejectedValue({ code: new ErrorType()._tag });
-          const error = yield* make.pipe(
-            Effect.provideService(
-              HttpClient.HttpClient,
-              HttpClient.make(() => Effect.die("Unexpected HTTP request")),
-            ),
-            Effect.flip,
-          );
-          assert.strictEqual(error._tag, new ErrorType()._tag);
-        }),
-      );
-    }
-  }
+    it.effect.each([
+      {
+        name: "AiGatewayDisabled",
+        ErrorType: AiGatewayDecisionClient.AiGatewayDisabled,
+      },
+      {
+        name: "AiGatewayUnavailable",
+        ErrorType: AiGatewayDecisionClient.AiGatewayUnavailable,
+      },
+    ])("preserves $name before HTTP", ({ ErrorType }) =>
+      Effect.gen(function* () {
+        getServiceToken
+          .mockReset()
+          .mockRejectedValue({ code: new ErrorType()._tag });
+        const error = yield* make.pipe(
+          Effect.provideService(
+            HttpClient.HttpClient,
+            HttpClient.make(() => Effect.die("Unexpected HTTP request")),
+          ),
+          Effect.flip,
+        );
+        assert.strictEqual(error._tag, new ErrorType()._tag);
+      }),
+    );
+  });
 
   it("shares the existing gateway error types", () => {
     assert.strictEqual(

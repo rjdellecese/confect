@@ -82,7 +82,7 @@ const jsonResponse = (
   );
 
 describe("AiGatewayDecisionModel", () => {
-  for (const [name, modelLayer] of [
+  it.effect.each([
     ["model", AiGatewayDecisionModel.model(modelId)],
     ["layer", AiGatewayDecisionModel.layer({ model: modelId })],
     [
@@ -92,95 +92,93 @@ describe("AiGatewayDecisionModel", () => {
         AiGatewayDecisionModel.make({ model: modelId }),
       ),
     ],
-  ] as const) {
-    it.effect(
-      `${name} sends all decision kinds in one authenticated request`,
-      () =>
-        Effect.gen(function* () {
-          let requests = 0;
-          const result = yield* DecisionModel.decide(TicketTriage, {
-            input: { message: "Nobody can sign in" },
-          }).pipe(
-            Effect.provide(
-              modelLayer.pipe(
-                Layer.provide(
-                  clientLayer((request) =>
-                    Effect.gen(function* () {
-                      requests++;
-                      assert.strictEqual(request.method, "POST");
-                      assert.strictEqual(
-                        request.url,
-                        "https://ai-gateway.convex.dev/alpha/decisions",
-                      );
-                      assert.strictEqual(
-                        request.headers.authorization,
-                        "Bearer decision-token",
-                      );
-                      assert.strictEqual(request.body._tag, "Uint8Array");
-                      if (request.body._tag === "Uint8Array") {
-                        assert.deepStrictEqual(
-                          yield* Schema.decodeEffect(
-                            Schema.fromJsonString(Schema.Unknown),
-                          )(new TextDecoder().decode(request.body.body)).pipe(
-                            Effect.orDie,
-                          ),
-                          {
-                            model: modelId,
-                            state: { message: "Nobody can sign in" },
-                            questions: {
-                              priority: {
-                                type: "choice",
-                                instructions: "Choose the ticket priority",
-                                criteria: {
-                                  urgent: "An outage",
-                                  normal: "Has a workaround",
-                                },
+  ] as const)(
+    "%s sends all decision kinds in one authenticated request",
+    ([, modelLayer]) =>
+      Effect.gen(function* () {
+        let requests = 0;
+        const result = yield* DecisionModel.decide(TicketTriage, {
+          input: { message: "Nobody can sign in" },
+        }).pipe(
+          Effect.provide(
+            modelLayer.pipe(
+              Layer.provide(
+                clientLayer((request) =>
+                  Effect.gen(function* () {
+                    requests++;
+                    assert.strictEqual(request.method, "POST");
+                    assert.strictEqual(
+                      request.url,
+                      "https://ai-gateway.convex.dev/alpha/decisions",
+                    );
+                    assert.strictEqual(
+                      request.headers.authorization,
+                      "Bearer decision-token",
+                    );
+                    assert.strictEqual(request.body._tag, "Uint8Array");
+                    if (request.body._tag === "Uint8Array") {
+                      assert.deepStrictEqual(
+                        yield* Schema.decodeEffect(
+                          Schema.fromJsonString(Schema.Unknown),
+                        )(new TextDecoder().decode(request.body.body)).pipe(
+                          Effect.orDie,
+                        ),
+                        {
+                          model: modelId,
+                          state: { message: "Nobody can sign in" },
+                          questions: {
+                            priority: {
+                              type: "choice",
+                              instructions: "Choose the ticket priority",
+                              criteria: {
+                                urgent: "An outage",
+                                normal: "Has a workaround",
                               },
-                              severity: {
-                                type: "score",
-                                instructions: "Rate the impact",
-                                criteria: ["low", "medium", "high"],
-                              },
-                              escalate: {
-                                type: "noul",
-                                instructions: "Needs human attention",
-                                criteria: {
-                                  false: "Self-service",
-                                  true: "Needs a human",
-                                },
+                            },
+                            severity: {
+                              type: "score",
+                              instructions: "Rate the impact",
+                              criteria: ["low", "medium", "high"],
+                            },
+                            escalate: {
+                              type: "noul",
+                              instructions: "Needs human attention",
+                              criteria: {
+                                false: "Self-service",
+                                true: "Needs a human",
                               },
                             },
                           },
-                        );
-                      }
-                      return jsonResponse(request, responseBody);
-                    }),
-                  ),
+                        },
+                      );
+                    }
+                    return jsonResponse(request, responseBody);
+                  }),
                 ),
               ),
             ),
-          );
+          ),
+        );
 
-          assert.strictEqual(requests, 1);
-          assert.strictEqual(result.answers.priority.label, "urgent");
-          assert.deepStrictEqual(result.answers.priority.probabilities, {
-            urgent: 0.9,
-            normal: 0.1,
-          });
-          assert.strictEqual(result.answers.priority.confidence, 0.8);
-          assert.strictEqual(result.answers.severity.rating, 1.7);
-          assert.strictEqual(result.answers.severity.label, "high");
-          assert.deepStrictEqual(result.answers.severity.probabilities, {
-            low: 0.1,
-            medium: 0.1,
-            high: 0.8,
-          });
-          assert.strictEqual(result.answers.escalate.probability, 0.95);
-          assert.strictEqual(result.usage.inputTokens, 21);
-          assert.strictEqual(result.usage.outputTokens, 3);
-        }),
-    );
-  }
+        assert.strictEqual(requests, 1);
+        assert.strictEqual(result.answers.priority.label, "urgent");
+        assert.deepStrictEqual(result.answers.priority.probabilities, {
+          urgent: 0.9,
+          normal: 0.1,
+        });
+        assert.strictEqual(result.answers.priority.confidence, 0.8);
+        assert.strictEqual(result.answers.severity.rating, 1.7);
+        assert.strictEqual(result.answers.severity.label, "high");
+        assert.deepStrictEqual(result.answers.severity.probabilities, {
+          low: 0.1,
+          medium: 0.1,
+          high: 0.8,
+        });
+        assert.strictEqual(result.answers.escalate.probability, 0.95);
+        assert.strictEqual(result.usage.inputTokens, 21);
+        assert.strictEqual(result.usage.outputTokens, 3);
+      }),
+  );
 
   it.effect("normalizes captured Jev choice and score distributions", () =>
     Effect.gen(function* () {
@@ -275,13 +273,13 @@ describe("AiGatewayDecisionModel", () => {
     }),
   );
 
-  for (const [name, probabilities] of [
+  describe.each([
     ["zero totals", [0, 0, 0]],
     ["excessively low totals", [0.1, 0.1, 0.1]],
     ["excessively high totals", [0.8, 0.8, 0.8]],
     ["out-of-range values", [1.1, -0.1, 0]],
-  ] as const) {
-    for (const [decision, answer] of [
+  ] as const)("rejects %s", (_name, probabilities) => {
+    it.effect.each([
       [
         "priority",
         {
@@ -300,41 +298,37 @@ describe("AiGatewayDecisionModel", () => {
           },
         },
       ],
-    ] as const) {
-      it.effect(
-        `rejects ${name} for ${decision} despite rounding tolerance`,
-        () =>
-          Effect.gen(function* () {
-            const error = yield* DecisionModel.decide(TicketTriage, {
-              input: { message: "Help" },
-            }).pipe(
-              Effect.provide(
-                AiGatewayDecisionModel.model(modelId).pipe(
-                  Layer.provide(
-                    clientLayer((request) =>
-                      Effect.succeed(
-                        jsonResponse(request, {
-                          ...responseBody,
-                          answers: {
-                            ...responseBody.answers,
-                            [decision]: answer,
-                          },
-                        }),
-                      ),
-                    ),
+    ] as const)("for %s despite rounding tolerance", ([decision, answer]) =>
+      Effect.gen(function* () {
+        const error = yield* DecisionModel.decide(TicketTriage, {
+          input: { message: "Help" },
+        }).pipe(
+          Effect.provide(
+            AiGatewayDecisionModel.model(modelId).pipe(
+              Layer.provide(
+                clientLayer((request) =>
+                  Effect.succeed(
+                    jsonResponse(request, {
+                      ...responseBody,
+                      answers: {
+                        ...responseBody.answers,
+                        [decision]: answer,
+                      },
+                    }),
                   ),
                 ),
               ),
-              Effect.flip,
-            );
-            assert(error._tag === "AiError");
-            assert.strictEqual(error.reason._tag, "InvalidOutputError");
-          }),
-      );
-    }
-  }
+            ),
+          ),
+          Effect.flip,
+        );
+        assert(error._tag === "AiError");
+        assert.strictEqual(error.reason._tag, "InvalidOutputError");
+      }),
+    );
+  });
 
-  for (const [name, body] of [
+  it.effect.each([
     ["missing answers", { ...responseBody, answers: {} }],
     [
       "missing distributions",
@@ -369,28 +363,26 @@ describe("AiGatewayDecisionModel", () => {
         },
       },
     ],
-  ] as const) {
-    it.effect(`rejects ${name} through AiError`, () =>
-      Effect.gen(function* () {
-        const error = yield* DecisionModel.decide(TicketTriage, {
-          input: { message: "Help" },
-        }).pipe(
-          Effect.provide(
-            AiGatewayDecisionModel.model(modelId).pipe(
-              Layer.provide(
-                clientLayer((request) =>
-                  Effect.succeed(jsonResponse(request, body)),
-                ),
+  ] as const)("rejects %s through AiError", ([, body]) =>
+    Effect.gen(function* () {
+      const error = yield* DecisionModel.decide(TicketTriage, {
+        input: { message: "Help" },
+      }).pipe(
+        Effect.provide(
+          AiGatewayDecisionModel.model(modelId).pipe(
+            Layer.provide(
+              clientLayer((request) =>
+                Effect.succeed(jsonResponse(request, body)),
               ),
             ),
           ),
-          Effect.flip,
-        );
-        assert(error._tag === "AiError");
-        assert.strictEqual(error.reason._tag, "InvalidOutputError");
-      }),
-    );
-  }
+        ),
+        Effect.flip,
+      );
+      assert(error._tag === "AiError");
+      assert.strictEqual(error.reason._tag, "InvalidOutputError");
+    }),
+  );
 
   it.effect("rejects scalar state without sending a request", () =>
     Effect.gen(function* () {
