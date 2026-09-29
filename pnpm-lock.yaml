@@ -561,8 +561,8 @@ importers:
         specifier: workspace:*
         version: link:../../tools/bench-harness
       convex-test:
-        specifier: 0.0.59
-        version: 0.0.59(convex@1.46.0(react@19.3.0))
+        specifier: 0.0.60
+        version: 0.0.60(convex@1.46.0(react@19.3.0))
       dotenv:
         specifier: 18.0.4
         version: 18.0.4
@@ -648,7 +648,7 @@ importers:
         version: 1.46.0(react@19.3.0)
       convex-test:
         specifier: '>=0.0.50 <0.1.0'
-        version: 0.0.59(convex@1.46.0(react@19.3.0))
+        version: 0.0.60(convex@1.46.0(react@19.3.0))
     devDependencies:
       '@types/node':
         specifier: 26.6.3
@@ -4370,8 +4370,8 @@ packages:
       zod:
         optional: true
 
-  convex-test@0.0.59:
-    resolution: {integrity: sha512-2bxjk245RmF3RxrsDR86vbPCzGRnEmpqHbjVbs6bSupt18JadtvOR7Lao2+GcdYJIzny499aloDysYnoFPWP4A==}
+  convex-test@0.0.60:
+    resolution: {integrity: sha512-qCAFx+CO6bmpXNc9s1jZvw8NJPS4yM074ib87PUY675FsiaRRW4ALotEB+RbVCYDRMYxh623KMnYZBlrMJIv1Q==}
     peerDependencies:
       convex: 1.46.0
 
@@ -11144,7 +11144,7 @@ snapshots:
       typescript: 7.0.2
       zod: 4.3.6
 
-  convex-test@0.0.59(convex@1.46.0(react@19.3.0)):
+  convex-test@0.0.60(convex@1.46.0(react@19.3.0)):
     dependencies:
       convex: 1.46.0(react@19.3.0)
 
