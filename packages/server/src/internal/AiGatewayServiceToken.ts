@@ -61,16 +61,16 @@ const defaultRuntimeErrorMessagePrefixes: Record<AiGatewayErrorCode, string> = {
     '`getServiceToken("ai-gateway")` isn\'t available on this deployment',
 };
 
+export interface Service {
+  readonly get: (
+    service: "ai-gateway",
+  ) => Effect.Effect<string, AiGatewayError>;
+}
+
 export class AiGatewayServiceToken extends Context.Service<
   AiGatewayServiceToken,
-  {
-    readonly get: (
-      service: "ai-gateway",
-    ) => Effect.Effect<string, AiGatewayError>;
-  }
+  Service
 >()("@confect/server/internal/AiGatewayServiceToken") {}
-
-export type Service = Context.Service.Shape<typeof AiGatewayServiceToken>;
 
 const matchesErrorCode = (
   rejection: unknown,
