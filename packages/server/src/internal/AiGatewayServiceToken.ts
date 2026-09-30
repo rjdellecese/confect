@@ -49,7 +49,7 @@ export const AiGatewayError = Schema.Union([
 export type AiGatewayError = typeof AiGatewayError.Type;
 
 type GetServiceToken = typeof getConvexServiceToken;
-type AiGatewayErrorCode = "AiGatewayDisabled" | "AiGatewayUnavailable";
+type AiGatewayErrorCode = AiGatewayError["_tag"];
 
 const nodeRuntimeErrorCodeFragments: Record<AiGatewayErrorCode, string> = {
   AiGatewayDisabled: '"code":"AiGatewayDisabled"',
