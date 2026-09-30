@@ -10,7 +10,7 @@ export const make = Effect.gen(function* () {
   yield* serviceToken.get("ai-gateway");
   return yield* OpenAiClient.make({
     apiUrl: API_URL,
-    transformClient: AiGatewayServiceToken.withServiceToken(serviceToken),
+    transformClient: AiGatewayServiceToken.transformRequest(serviceToken),
   });
 });
 
