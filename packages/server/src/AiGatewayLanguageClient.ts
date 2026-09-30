@@ -4,7 +4,7 @@ import * as Layer from "effect/Layer";
 import type * as HttpClient from "effect/http/HttpClient";
 import * as InternalAiGatewayLanguageClient from "./internal/AiGatewayLanguageClient";
 import {
-  AiGatewayServiceToken,
+  layer as aiGatewayServiceTokenLayer,
   type AiGatewayError,
 } from "./internal/AiGatewayServiceToken";
 
@@ -28,7 +28,7 @@ export const make: Effect.Effect<
   AiGatewayError,
   HttpClient.HttpClient
 > = InternalAiGatewayLanguageClient.make.pipe(
-  Effect.provide(AiGatewayServiceToken.layer),
+  Effect.provide(aiGatewayServiceTokenLayer),
 );
 
 /**
@@ -40,5 +40,5 @@ export const layer: Layer.Layer<
   AiGatewayError,
   HttpClient.HttpClient
 > = InternalAiGatewayLanguageClient.layer.pipe(
-  Layer.provide(AiGatewayServiceToken.layer),
+  Layer.provide(aiGatewayServiceTokenLayer),
 );
