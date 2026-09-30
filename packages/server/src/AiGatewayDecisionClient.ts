@@ -21,10 +21,7 @@ export const AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 export type AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 
 /**
- * Construct a decision client using the current Effect HTTP client.
- *
- * Acquires a short-lived Convex service token when constructed. Convex caches
- * and refreshes tokens within the running action.
+ * Construct a decision model client using the current Effect HTTP client.
  */
 export const make: Effect.Effect<
   OpenRouterClient.Service,
