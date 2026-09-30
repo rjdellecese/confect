@@ -2,7 +2,7 @@ import * as OpenAiClient from "@effect/ai-openai-compat/OpenAiClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type * as HttpClient from "effect/http/HttpClient";
-import * as InternalAiGatewayClient from "./internal/AiGatewayClient";
+import * as InternalAiGatewayLanguageClient from "./internal/AiGatewayLanguageClient";
 import {
   AiGatewayServiceToken,
   type AiGatewayError,
@@ -15,31 +15,30 @@ export {
 } from "./internal/AiGatewayServiceToken";
 
 /**
- * The client service configured for the Convex AI gateway.
+ * The client service configured for Convex AI gateway language models.
  */
-export const AiGatewayClient = OpenAiClient.OpenAiClient;
-export type AiGatewayClient = OpenAiClient.OpenAiClient;
+export const AiGatewayLanguageClient = OpenAiClient.OpenAiClient;
+export type AiGatewayLanguageClient = OpenAiClient.OpenAiClient;
 
 /**
- * Construct an AI gateway client using the current Effect HTTP client.
- *
- * The client obtains a short-lived Convex service token when it is constructed.
+ * Construct a language client using the current Effect HTTP client.
  */
 export const make: Effect.Effect<
   OpenAiClient.Service,
   AiGatewayError,
   HttpClient.HttpClient
-> = InternalAiGatewayClient.make.pipe(
+> = InternalAiGatewayLanguageClient.make.pipe(
   Effect.provide(AiGatewayServiceToken.layer),
 );
 
 /**
- * Provide the AI gateway client using the current Effect HTTP client.
+ * Provide the AI gateway language model client using the current Effect HTTP
+ * client.
  */
 export const layer: Layer.Layer<
-  AiGatewayClient,
+  AiGatewayLanguageClient,
   AiGatewayError,
   HttpClient.HttpClient
-> = InternalAiGatewayClient.layer.pipe(
+> = InternalAiGatewayLanguageClient.layer.pipe(
   Layer.provide(AiGatewayServiceToken.layer),
 );

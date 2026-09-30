@@ -1,4 +1,7 @@
-import { AiGatewayClient, AiGatewayDecisionClient } from "@confect/server";
+import {
+  AiGatewayLanguageClient,
+  AiGatewayDecisionClient,
+} from "@confect/server";
 import { assert, describe, it } from "@effect/vitest";
 import type * as ConvexServer from "convex/server";
 import * as Effect from "effect/Effect";
@@ -99,11 +102,11 @@ describe("AiGatewayDecisionClient", () => {
   it("shares the existing gateway error types", () => {
     assert.strictEqual(
       AiGatewayDecisionClient.AiGatewayDisabled,
-      AiGatewayClient.AiGatewayDisabled,
+      AiGatewayLanguageClient.AiGatewayDisabled,
     );
     assert.strictEqual(
       AiGatewayDecisionClient.AiGatewayUnavailable,
-      AiGatewayClient.AiGatewayUnavailable,
+      AiGatewayLanguageClient.AiGatewayUnavailable,
     );
   });
 });
