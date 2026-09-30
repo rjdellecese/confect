@@ -6,8 +6,6 @@ description: "Use Convex's AI gateway with Effect AI language and decision model
 
 Confect provides Effect AI `LanguageModel` and `DecisionModel` services backed by the [Convex AI gateway](https://docs.convex.dev/ai-gateway/overview). Each client obtains a short-lived credential from the running Convex action before each outgoing request, so you do not need to configure or rotate an upstream model-provider API key.
 
-Convex caches service tokens within an action and refreshes them as needed. Reusing a client within an action therefore uses the current token without minting a new one for every request. Construct clients inside the action rather than sharing them across invocations. See [Convex's token and timeout guidance](https://docs.convex.dev/ai-gateway/setup#token-and-timeouts).
-
 The AI gateway requires a paid Convex plan. See [gateway availability](https://docs.convex.dev/ai-gateway/overview#who-can-use-it) for supported deployment types and local-development requirements.
 
 ## Generate text
@@ -151,6 +149,6 @@ const triage = DecisionModel.decide(TicketTriage, {
 
 Run `triage` inside a Convex action. All three decisions evaluate the same input in one request.
 
-Use `AiGatewayDecisionClient.layer` for decisions and `AiGatewayLanguageClient.layer` for language models. Use `AiGatewayDecisionModel.make({ model })` to construct the service directly, or `AiGatewayDecisionModel.layer({ model })` when you do not need an Effect AI model descriptor. Unlike language-model requests, decision requests do not expose configuration overrides.
+Use `AiGatewayDecisionClient.layer` for decision models and `AiGatewayLanguageClient.layer` for language models. Use `AiGatewayDecisionModel.make({ model })` to construct the service directly, or `AiGatewayDecisionModel.layer({ model })` when you do not need an Effect AI model descriptor. Unlike language-model requests, decision requests do not expose configuration overrides.
 
 Classifications return a label and a probability distribution. Ratings return a numeric rating, the label with the highest probability, and a distribution keyed by rubric labels. Probability decisions return a number between zero and one. The response also includes `usage.inputTokens` and `usage.outputTokens`.

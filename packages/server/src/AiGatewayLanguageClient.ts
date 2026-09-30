@@ -22,10 +22,6 @@ export type AiGatewayLanguageClient = OpenAiClient.OpenAiClient;
 
 /**
  * Construct a language client using the current Effect HTTP client.
- *
- * Checks gateway availability when constructed and obtains a Convex service
- * token before each request. Convex caches and refreshes tokens within the
- * running action. Later token failures use the client's HTTP/AI error channel.
  */
 export const make: Effect.Effect<
   OpenAiClient.Service,
@@ -36,7 +32,8 @@ export const make: Effect.Effect<
 );
 
 /**
- * Provide the AI gateway language client using the current Effect HTTP client.
+ * Provide the AI gateway language model client using the current Effect HTTP
+ * client.
  */
 export const layer: Layer.Layer<
   AiGatewayLanguageClient,
