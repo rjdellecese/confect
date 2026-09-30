@@ -1,7 +1,6 @@
 import * as OpenRouterClient from "@effect/ai-openrouter/OpenRouterClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { withServiceToken } from "./AiGatewayHttpClient";
 import * as AiGatewayServiceToken from "./AiGatewayServiceToken";
 
 export const make = Effect.gen(function* () {
@@ -9,7 +8,7 @@ export const make = Effect.gen(function* () {
   yield* serviceToken.get("ai-gateway");
   return yield* OpenRouterClient.make({
     apiUrl: "https://ai-gateway.convex.dev/v1",
-    transformClient: withServiceToken(serviceToken),
+    transformClient: AiGatewayServiceToken.withServiceToken(serviceToken),
   });
 });
 
