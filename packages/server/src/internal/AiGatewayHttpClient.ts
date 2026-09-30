@@ -2,9 +2,9 @@ import * as Effect from "effect/Effect";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientError from "effect/http/HttpClientError";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import type { Service } from "./AiGatewayServiceToken";
+import type * as AiGatewayServiceToken from "./AiGatewayServiceToken";
 
-export const withServiceToken = (serviceToken: Service) =>
+export const withServiceToken = (serviceToken: AiGatewayServiceToken.Service) =>
   HttpClient.mapRequestEffect((request) =>
     serviceToken.get("ai-gateway").pipe(
       Effect.map((token) => HttpClientRequest.bearerToken(request, token)),
