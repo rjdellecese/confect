@@ -3,10 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type * as HttpClient from "effect/http/HttpClient";
 import * as InternalAiGatewayDecisionClient from "./internal/AiGatewayDecisionClient";
-import {
-  AiGatewayServiceToken,
-  type AiGatewayError,
-} from "./internal/AiGatewayServiceToken";
+import * as AiGatewayServiceToken from "./internal/AiGatewayServiceToken";
 
 export {
   AiGatewayDisabled,
@@ -25,7 +22,7 @@ export type AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
  */
 export const make: Effect.Effect<
   OpenRouterClient.Service,
-  AiGatewayError,
+  AiGatewayServiceToken.AiGatewayError,
   HttpClient.HttpClient
 > = InternalAiGatewayDecisionClient.make.pipe(
   Effect.provide(AiGatewayServiceToken.layer),
@@ -36,7 +33,7 @@ export const make: Effect.Effect<
  */
 export const layer: Layer.Layer<
   AiGatewayDecisionClient,
-  AiGatewayError,
+  AiGatewayServiceToken.AiGatewayError,
   HttpClient.HttpClient
 > = InternalAiGatewayDecisionClient.layer.pipe(
   Layer.provide(AiGatewayServiceToken.layer),

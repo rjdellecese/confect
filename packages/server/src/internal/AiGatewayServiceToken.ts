@@ -3,6 +3,9 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientError from "effect/http/HttpClientError";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
 
 /**
  * The current team is on the free plan or has the Convex AI gateway disabled.
@@ -46,7 +49,7 @@ export const AiGatewayError = Schema.Union([
 export type AiGatewayError = typeof AiGatewayError.Type;
 
 type GetServiceToken = typeof getConvexServiceToken;
-type AiGatewayErrorCode = "AiGatewayDisabled" | "AiGatewayUnavailable";
+type AiGatewayErrorCode = AiGatewayError["_tag"];
 
 const nodeRuntimeErrorCodeFragments: Record<AiGatewayErrorCode, string> = {
   AiGatewayDisabled: '"code":"AiGatewayDisabled"',
@@ -66,6 +69,11 @@ export interface Service {
     service: "ai-gateway",
   ) => Effect.Effect<string, AiGatewayError>;
 }
+
+export class AiGatewayServiceToken extends Context.Service<
+  AiGatewayServiceToken,
+  Service
+>()("@confect/server/internal/AiGatewayServiceToken") {}
 
 const matchesErrorCode = (
   rejection: unknown,
@@ -97,9 +105,24 @@ export const make = (getServiceToken: GetServiceToken): Service => ({
     }),
 });
 
-export class AiGatewayServiceToken extends Context.Service<
+export const layer = Layer.succeed(
   AiGatewayServiceToken,
-  Service
->()("@confect/server/internal/AiGatewayServiceToken") {
-  static readonly layer = Layer.succeed(this, make(getConvexServiceToken));
-}
+  make(getConvexServiceToken),
+);
+
+export const transformClientRequest = (serviceToken: Service) =>
+  HttpClient.mapRequestEffect((request) =>
+    serviceToken.get("ai-gateway").pipe(
+      Effect.map((token) => HttpClientRequest.bearerToken(request, token)),
+      Effect.mapError(
+        (cause) =>
+          new HttpClientError.HttpClientError({
+            reason: new HttpClientError.TransportError({
+              request,
+              cause,
+              description: cause.message,
+            }),
+          }),
+      ),
+    ),
+  );

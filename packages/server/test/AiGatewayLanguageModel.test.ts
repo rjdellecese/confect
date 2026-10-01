@@ -111,6 +111,7 @@ describe("AiGatewayLanguageModel", () => {
         assert.strictEqual(result.text, "Hello from Convex");
         assert.deepStrictEqual(yield* gateway.serviceTokenCalls, [
           "ai-gateway",
+          "ai-gateway",
         ]);
 
         const requests = yield* gateway.requests;
@@ -188,6 +189,7 @@ describe("AiGatewayLanguageModel", () => {
           "Hello world",
         );
         assert.deepStrictEqual(yield* gateway.serviceTokenCalls, [
+          "ai-gateway",
           "ai-gateway",
         ]);
         assert.strictEqual((yield* gateway.requests).length, 1);
