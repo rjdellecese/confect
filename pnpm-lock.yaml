@@ -587,8 +587,8 @@ importers:
         specifier: workspace:*
         version: link:../../tools/test-types
       convex-test:
-        specifier: 0.0.59
-        version: 0.0.59(convex@1.45.0(react@19.3.0))
+        specifier: 0.0.60
+        version: 0.0.60(convex@1.45.0(react@19.3.0))
       dotenv:
         specifier: 18.0.4
         version: 18.0.4
@@ -4419,8 +4419,8 @@ packages:
     peerDependencies:
       convex: 1.45.0
 
-  convex-test@0.0.59:
-    resolution: {integrity: sha512-2bxjk245RmF3RxrsDR86vbPCzGRnEmpqHbjVbs6bSupt18JadtvOR7Lao2+GcdYJIzny499aloDysYnoFPWP4A==}
+  convex-test@0.0.60:
+    resolution: {integrity: sha512-qCAFx+CO6bmpXNc9s1jZvw8NJPS4yM074ib87PUY675FsiaRRW4ALotEB+RbVCYDRMYxh623KMnYZBlrMJIv1Q==}
     peerDependencies:
       convex: 1.45.0
 
@@ -11345,7 +11345,7 @@ snapshots:
     dependencies:
       convex: 1.45.0(react@19.3.0)
 
-  convex-test@0.0.59(convex@1.45.0(react@19.3.0)):
+  convex-test@0.0.60(convex@1.45.0(react@19.3.0)):
     dependencies:
       convex: 1.45.0(react@19.3.0)
 
