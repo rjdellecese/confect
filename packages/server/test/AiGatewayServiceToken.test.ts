@@ -98,7 +98,7 @@ describe("AiGatewayServiceToken", () => {
     }),
   );
 
-  describe("transformRequest", () => {
+  describe("transformClientRequest", () => {
     it.effect(
       "looks up a token for each concurrent request without mutating inputs",
       () =>
@@ -111,7 +111,7 @@ describe("AiGatewayServiceToken", () => {
               return HttpClientResponse.fromWeb(request, new Response());
             }),
           ).pipe(
-            AiGatewayServiceToken.transformRequest({
+            AiGatewayServiceToken.transformClientRequest({
               get: () => Effect.sync(() => `token-${++tokenCalls}`),
             }),
           );
@@ -157,7 +157,7 @@ describe("AiGatewayServiceToken", () => {
           const client = HttpClient.make(() =>
             Effect.die("Unexpected HTTP request"),
           ).pipe(
-            AiGatewayServiceToken.transformRequest({
+            AiGatewayServiceToken.transformClientRequest({
               get: () => Effect.fail(cause),
             }),
           );
@@ -181,7 +181,7 @@ describe("AiGatewayServiceToken", () => {
         const client = HttpClient.make(() =>
           Effect.die("Unexpected HTTP request"),
         ).pipe(
-          AiGatewayServiceToken.transformRequest({
+          AiGatewayServiceToken.transformClientRequest({
             get: () => Effect.die(defect),
           }),
         );

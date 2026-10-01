@@ -110,7 +110,7 @@ export const layer = Layer.succeed(
   make(getConvexServiceToken),
 );
 
-export const transformRequest = (serviceToken: Service) =>
+export const transformClientRequest = (serviceToken: Service) =>
   HttpClient.mapRequestEffect((request) =>
     serviceToken.get("ai-gateway").pipe(
       Effect.map((token) => HttpClientRequest.bearerToken(request, token)),

@@ -8,7 +8,7 @@ export const make = Effect.gen(function* () {
   yield* serviceToken.get("ai-gateway");
   return yield* OpenRouterClient.make({
     apiUrl: "https://ai-gateway.convex.dev/v1",
-    transformClient: AiGatewayServiceToken.transformRequest(serviceToken),
+    transformClient: AiGatewayServiceToken.transformClientRequest(serviceToken),
   });
 });
 
