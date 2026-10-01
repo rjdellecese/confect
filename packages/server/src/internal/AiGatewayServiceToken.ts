@@ -2,6 +2,7 @@ import { getServiceToken as getConvexServiceToken } from "convex/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientError from "effect/http/HttpClientError";
@@ -79,9 +80,8 @@ const matchesErrorCode = (
   rejection: unknown,
   code: AiGatewayErrorCode,
 ): boolean =>
-  (typeof rejection === "object" &&
-    rejection !== null &&
-    "code" in rejection &&
+  (Predicate.isObjectOrArray(rejection) &&
+    Predicate.hasProperty(rejection, "code") &&
     rejection.code === code) ||
   (rejection instanceof Error &&
     (rejection.message.includes(nodeRuntimeErrorCodeFragments[code]) ||

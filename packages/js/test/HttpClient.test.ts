@@ -23,7 +23,7 @@ interface TestTransport extends InternalHttpClient.Transport {
   readonly calls: (operation: Operation) => Effect.Effect<ReadonlyArray<Call>>;
   readonly failNext: (
     operation: Operation,
-    rejection: unknown,
+    rejection: Error,
   ) => Effect.Effect<void>;
   readonly auth: () => Effect.Effect<Option.Option<string>>;
 }
@@ -78,8 +78,7 @@ const TestHttpClientLayer = Layer.effectContext(
       operation: Operation,
       functionReference: Parameters<InternalHttpClient.Transport[Operation]>[0],
       args: unknown,
-    ): Promise<unknown> =>
-      runPromise(invokeEffect(operation, functionReference, args));
+    ) => runPromise(invokeEffect(operation, functionReference, args));
 
     const service = TestHttpTransport.of({
       url: "https://test.convex.cloud",
@@ -352,7 +351,9 @@ describe("HttpClient error decoding", () => {
       const transport = yield* TestHttpTransport;
       yield* transport.failNext(
         "query",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* HttpClient.HttpClient;
 
@@ -386,7 +387,9 @@ describe("HttpClient error decoding", () => {
       const transport = yield* TestHttpTransport;
       yield* transport.failNext(
         "mutation",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* HttpClient.HttpClient;
 
@@ -417,7 +420,9 @@ describe("HttpClient error decoding", () => {
       const transport = yield* TestHttpTransport;
       yield* transport.failNext(
         "action",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* HttpClient.HttpClient;
 

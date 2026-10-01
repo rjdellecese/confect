@@ -12,10 +12,11 @@ const make = <
 >(
   runtime: Runtime_,
   functionType: FunctionType_,
-): { readonly runtime: Runtime_; readonly functionType: FunctionType_ } => ({
-  runtime,
-  functionType,
-});
+) =>
+  ({
+    runtime,
+    functionType,
+  }) as const;
 
 export type AnyQuery = Extract<
   RuntimeAndFunctionType,

@@ -141,7 +141,7 @@ const makeExtendAst = (
       );
     }
     throw new Error(
-      ast._tag === "Declaration"
+      SchemaAST.isDeclaration(ast)
         ? "Cannot extend a `Declaration` schema (such as a `Schema.Class`) with system fields: its decoded values are constructed instances, which cannot gain extra fields. Use a plain `Schema.Struct`, or transform to one with `Schema.decodeTo`."
         : `Cannot extend a \`${ast._tag}\` schema node with system fields: a table schema must resolve to an object shape at every step of its encoding.`,
     );
@@ -190,7 +190,8 @@ export const extendWithSystemFields = <
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isUnion(s.ast) &&
-      Array.isArray((s as { readonly members?: unknown }).members)
+      "members" in s &&
+      Array.isArray(s.members)
     ) {
       return Schema.Union(
         Array.map(
@@ -202,7 +203,8 @@ export const extendWithSystemFields = <
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isObjects(s.ast) &&
-      typeof (s as { readonly mapFields?: unknown }).mapFields === "function"
+      "mapFields" in s &&
+      Predicate.isFunction(s.mapFields)
     ) {
       return Schema.fieldsAssign(system)(
         s as Schema.Struct<Schema.Struct.Fields>,
@@ -211,10 +213,7 @@ export const extendWithSystemFields = <
     return Schema.make(extendAst(s.ast));
   };
 
-  return extend(schema) as unknown as ExtendWithSystemFields<
-    TableName,
-    TableSchema
-  >;
+  return extend(schema) as ExtendWithSystemFields<TableName, TableSchema>;
 };
 
 /**

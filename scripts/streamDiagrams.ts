@@ -110,7 +110,7 @@ const BY_TEXT_KEYS = [
 ];
 const FILTERED = ["n1", "n3", "n2", "n5", "n4", "(n6)"];
 
-export const diagrams: Readonly<Record<string, string>> = {
+export const diagrams = {
   legend: lines(track("by_text", BY_TEXT), keys(BY_TEXT_KEYS)),
 
   creating: lines(
@@ -299,7 +299,7 @@ export const diagrams: Readonly<Record<string, string>> = {
     "",
     `${cursorAt(2)}${cell("n2").slice(1)}${cell("n5")}╎  exactly this range, however many documents it holds`,
   ),
-};
+} as const satisfies Readonly<Record<string, string>>;
 
 // The formatter keeps a blank line between an MDX comment and a fence.
 const MARKED_BLOCK =
@@ -314,7 +314,7 @@ export const renderDiagrams = Effect.fnUntraced(function* (
   const seen = new Set<string>();
   let unknown: string | undefined;
   const rendered = source.replace(MARKED_BLOCK, (match, name: string) => {
-    const diagram = diagrams[name];
+    const diagram = Object.entries(diagrams).find(([key]) => key === name)?.[1];
     if (diagram === undefined) {
       unknown ??= name;
       return match;

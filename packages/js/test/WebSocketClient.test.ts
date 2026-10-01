@@ -52,7 +52,7 @@ interface TestTransport extends InternalWebSocketClient.Transport {
   readonly calls: (operation: Operation) => Effect.Effect<ReadonlyArray<Call>>;
   readonly failNext: (
     operation: RequestOperation,
-    rejection: unknown,
+    rejection: Error,
   ) => Effect.Effect<void>;
   readonly nextSubscription: () => Effect.Effect<TestSubscription>;
   readonly nextAuth: () => Effect.Effect<AuthRegistration>;
@@ -128,8 +128,7 @@ const TestWebSocketClientLayer = Layer.effectContext(
         InternalWebSocketClient.Transport[RequestOperation]
       >[0],
       args: unknown,
-    ): Promise<unknown> =>
-      runPromise(invokeEffect(operation, functionReference, args));
+    ) => runPromise(invokeEffect(operation, functionReference, args));
 
     const service = TestWebSocketTransport.of({
       setAuth: (...callbacks) => {
@@ -658,7 +657,9 @@ describe("WebSocketClient error decoding", () => {
       const transport = yield* TestWebSocketTransport;
       yield* transport.failNext(
         "query",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* WebSocketClient.WebSocketClient;
 
@@ -692,7 +693,9 @@ describe("WebSocketClient error decoding", () => {
       const transport = yield* TestWebSocketTransport;
       yield* transport.failNext(
         "mutation",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* WebSocketClient.WebSocketClient;
 
@@ -709,7 +712,9 @@ describe("WebSocketClient error decoding", () => {
       const transport = yield* TestWebSocketTransport;
       yield* transport.failNext(
         "action",
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       const client = yield* WebSocketClient.WebSocketClient;
 
@@ -736,7 +741,9 @@ describe("WebSocketClient error decoding", () => {
 
       const subscription = yield* transport.nextSubscription();
       yield* subscription.fail(
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
 
       const result = yield* Fiber.join(fiber);
@@ -780,7 +787,9 @@ describe("WebSocketClient error decoding", () => {
 
       const subscription = yield* transport.nextSubscription();
       yield* subscription.fail(
-        new ConvexError({ _tag: "NotFound", id: "abc" }),
+        new ConvexError(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+        ),
       );
       yield* subscription.emit({ text: "recovered" });
 

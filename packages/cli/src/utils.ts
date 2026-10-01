@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import type { FunctionSpec, Spec } from "@confect/core";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -138,7 +139,9 @@ export const removePathIfExists = Effect.fnUntraced(function* (
     .remove(filePath)
     .pipe(
       Effect.catchTag("PlatformError", (error) =>
-        error.reason._tag === "NotFound" ? Effect.void : Effect.fail(error),
+        Predicate.isTagged(error.reason, "NotFound")
+          ? Effect.void
+          : Effect.fail(error),
       ),
     );
 });

@@ -10,7 +10,8 @@ import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import * as Array from "effect/Array";
 import * as Context from "effect/Context";
-import { getDocumentSize, type Value } from "convex/values";
+import * as Data from "effect/Data";
+import { getDocumentSize } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
@@ -21,8 +22,11 @@ import type * as Types from "effect/Types";
 import {
   DatabaseReader,
   DatabaseWriter,
+  MutationCtx,
 } from "./fixtures/confect/_generated/services";
 import * as TestConfect from "./TestConfect";
+
+const Position = Data.taggedEnum<QueryStreamKeyLayout.Position>();
 
 const collectTexts = <E, R>(
   stream: Stream.Stream<{ text: string }, E, R>,
@@ -515,9 +519,15 @@ describe("QueryStream", () => {
           const notes = reader.table("notes").stream("by_text");
           const initials = (page: ReadonlyArray<{ text: string }>) =>
             page.map((note) => note.text[0]);
-          const [first] = yield* Stream.runCollect(notes);
-          const maximumBytesRead =
-            2.5 * getDocumentSize(first as unknown as Record<string, Value>);
+          const ctx = yield* MutationCtx;
+
+          const first = yield* Effect.promise(() =>
+            ctx.db.query("notes").withIndex("by_text").first(),
+          );
+
+          assert(first !== null);
+
+          const maximumBytesRead = 2.5 * getDocumentSize(first);
 
           const page = yield* QueryStream.paginate(notes, {
             numItems: 10,
@@ -1546,11 +1556,11 @@ describe("QueryStream", () => {
               ),
             );
           expect(QueryStreamKeyLayout.positions(joined.keyLayout)).toEqual([
-            { _tag: "Visible", label: "text" },
-            { _tag: "Visible", label: "_creationTime" },
-            { _tag: "ImplicitId" },
-            { _tag: "Visible", label: "_creationTime" },
-            { _tag: "ImplicitId" },
+            Position.Visible({ label: "text" }),
+            Position.Visible({ label: "_creationTime" }),
+            Position.ImplicitId(),
+            Position.Visible({ label: "_creationTime" }),
+            Position.ImplicitId(),
           ]);
 
           // Relabeling names only the type-visible positions.
@@ -1562,11 +1572,11 @@ describe("QueryStream", () => {
             ]),
           );
           expect(QueryStreamKeyLayout.positions(relabeled.keyLayout)).toEqual([
-            { _tag: "Visible", label: "outerText" },
-            { _tag: "Visible", label: "outerCreated" },
-            { _tag: "ImplicitId" },
-            { _tag: "Visible", label: "innerCreated" },
-            { _tag: "ImplicitId" },
+            Position.Visible({ label: "outerText" }),
+            Position.Visible({ label: "outerCreated" }),
+            Position.ImplicitId(),
+            Position.Visible({ label: "innerCreated" }),
+            Position.ImplicitId(),
           ]);
           const pages = yield* paginateAll(relabeled, 1);
           expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
@@ -1621,12 +1631,12 @@ describe("QueryStream", () => {
             innerKeyLayout: inner.keyLayout,
           });
           expect(QueryStreamKeyLayout.positions(joined.keyLayout)).toEqual([
-            { _tag: "Visible", label: "_creationTime" },
-            { _tag: "ImplicitId" },
-            { _tag: "Visible", label: "_creationTime" },
-            { _tag: "ImplicitId" },
-            { _tag: "Visible", label: "_creationTime" },
-            { _tag: "ImplicitId" },
+            Position.Visible({ label: "_creationTime" }),
+            Position.ImplicitId(),
+            Position.Visible({ label: "_creationTime" }),
+            Position.ImplicitId(),
+            Position.Visible({ label: "_creationTime" }),
+            Position.ImplicitId(),
           ]);
           const renamed = QueryStream.renameKey(joined, [
             "outer",
@@ -1808,9 +1818,8 @@ describe("QueryStream", () => {
           for (const cursor of ["_notjson", "[1, 2]"]) {
             const defect = yield* fromCursor(cursor);
             assert(Predicate.hasProperty(defect, "data"));
-            expect(
-              (defect.data as { paginationError?: string }).paginationError,
-            ).toBe("InvalidCursor");
+            assert(Predicate.hasProperty(defect.data, "paginationError"));
+            expect(defect.data.paginationError).toBe("InvalidCursor");
           }
         }),
       );

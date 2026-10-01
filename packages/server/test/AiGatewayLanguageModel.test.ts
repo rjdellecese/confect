@@ -6,6 +6,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Predicate from "effect/Predicate";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -228,7 +229,7 @@ describe("AiGatewayLanguageModel", () => {
 
 const jsonResponse = (
   request: HttpClientRequest.HttpClientRequest,
-  body: unknown,
+  body: Schema.Json,
 ): HttpClientResponse.HttpClientResponse =>
   HttpClientResponse.fromWeb(
     request,
@@ -271,7 +272,7 @@ const RequestBody = Schema.fromJsonString(
 const requestBody = Effect.fnUntraced(function* (
   request: HttpClientRequest.HttpClientRequest,
 ) {
-  if (request.body._tag !== "Uint8Array") {
+  if (!Predicate.isTagged(request.body, "Uint8Array")) {
     return yield* Effect.die(new Error("Expected a Uint8Array request body"));
   }
   return yield* Schema.decodeEffect(RequestBody)(

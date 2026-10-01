@@ -2,6 +2,7 @@ import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import { FunctionSpec, MiddlewareSpec } from "@confect/core";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 
 describe("make", () => {
@@ -22,7 +23,7 @@ describe("make", () => {
       handler: () => Effect.succeed("ok"),
     });
 
-    assert(item._tag === "Confect");
+    assert(Predicate.isTagged(item, "Confect"));
     expect(item.middlewareAttachments).toEqual([
       { spec: Policy, options: { enabled: true } },
       { spec: Policy, options: { enabled: false } },

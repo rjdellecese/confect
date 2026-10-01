@@ -19,6 +19,7 @@ import { ConvexError } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -172,11 +173,11 @@ export const combineErrorSchemas = (
       resolvedMiddlewares.map(({ middlewareSpec }) => middlewareSpec),
     ),
   ];
-  return schemas.length === 0
-    ? undefined
-    : schemas.length === 1
-      ? schemas[0]
-      : Schema.Union(schemas);
+  return Match.value(schemas.length).pipe(
+    Match.when(0, () => undefined),
+    Match.when(1, () => schemas[0]),
+    Match.orElse(() => Schema.Union(schemas)),
+  );
 };
 
 /**

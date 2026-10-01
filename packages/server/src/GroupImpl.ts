@@ -105,11 +105,7 @@ export const make = <
       registeredFunctionNames: [],
       registeredMiddlewareKeys: [],
     },
-  ) as Layer.Layer<
-    GroupImpl<"Unfinalized">,
-    never,
-    FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
-  >;
+  );
 
 const findUnfinalizedGroupImpl = <S>(
   context: Context.Context<S>,

@@ -3,10 +3,15 @@ import * as Key from "@confect/server/QueryStreamKey";
 import * as Layout from "@confect/server/QueryStreamKeyLayout";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Array from "effect/Array";
+import * as Data from "effect/Data";
 import type * as Chunk from "effect/Chunk";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
+
+const Outcome = Data.taggedEnum<Pagination.Outcome<number>>();
+
+const Continuation = Data.taggedEnum<Pagination.Continuation>();
 
 const layout = Result.getOrThrow(Layout.fromIndex(["_id"]));
 const key = (value: number) => Result.getOrThrow(Key.complete(layout, [value]));
@@ -74,15 +79,16 @@ describe("QueryStreamPagination", () => {
   );
 
   it("parses zero-sized continuation requests without manufacturing an initial cursor", () => {
-    expect(
-      Result.getOrThrow(
-        Pagination.parseRequest(
-          0,
-          Pagination.Start.After({ cursor: "original", key: key(1) }),
-          Pagination.Range.Unpinned(),
-        ),
+    const { _tag, ...unchanged } = Result.getOrThrow(
+      Pagination.parseRequest(
+        0,
+        Pagination.Start.After({ cursor: "original", key: key(1) }),
+        Pagination.Range.Unpinned(),
       ),
-    ).toEqual({ _tag: "Unchanged", cursor: "original" });
+    );
+
+    expect(_tag).toBe("Unchanged");
+    expect(unchanged).toEqual({ cursor: "original" });
     const initial = Pagination.parseRequest(
       0,
       Pagination.Start.Beginning(),
@@ -95,16 +101,22 @@ describe("QueryStreamPagination", () => {
 
   it("distinguishes item-limit progress from exhaustion", () => {
     const req = request();
-    expect(
-      Result.getOrThrow(Pagination.finish(req, scan(req, 1), false)),
-    ).toMatchObject({ _tag: "Done", page: [1] });
+    const exhausted = Result.getOrThrow(
+      Pagination.finish(req, scan(req, 1), false),
+    );
+
+    expect(exhausted).toHaveProperty("_tag", "Done");
+    expect(exhausted).toMatchObject(Outcome.Done({ page: [1] }));
     const stopped = scan(req, 5);
     expect(stopped._tag).toBe("ItemLimit");
-    expect(Result.getOrThrow(Pagination.finish(req, stopped, false))).toEqual({
-      _tag: "Continue",
-      page: [1, 2],
-      key: key(2),
-    });
+    const continued = Result.getOrThrow(Pagination.finish(req, stopped, false));
+    expect(continued).toHaveProperty("_tag", "Continue");
+    expect(continued).toEqual(
+      Outcome.Continue({
+        page: [1, 2],
+        key: key(2),
+      }),
+    );
   });
 
   it("reads pinned ranges past the requested item count", () => {
@@ -115,15 +127,22 @@ describe("QueryStreamPagination", () => {
       const req = request(2, range);
       const state = scan(req, 4);
       expect(state._tag).toBe("Reading");
-      expect(Result.getOrThrow(Pagination.finish(req, state, false))).toEqual({
-        _tag: "SplitRecommended",
-        page: [1, 2, 3, 4],
-        splitKey: key(2),
-        continuation:
-          range._tag === "ThroughKey"
-            ? { _tag: "Key", key: key(9) }
-            : { _tag: "End" },
-      });
+      const throughKey = Pagination.Range.$is("ThroughKey")(range);
+      const split = Result.getOrThrow(Pagination.finish(req, state, false));
+      expect(split).toHaveProperty("_tag", "SplitRecommended");
+      expect(split).toHaveProperty(
+        "continuation._tag",
+        throughKey ? "Key" : "End",
+      );
+      expect(split).toEqual(
+        Outcome.SplitRecommended({
+          page: [1, 2, 3, 4],
+          splitKey: key(2),
+          continuation: throughKey
+            ? Continuation.Key({ key: key(9) })
+            : Continuation.End(),
+        }),
+      );
     }
   });
 
@@ -138,14 +157,19 @@ describe("QueryStreamPagination", () => {
     expect(Result.isFailure(boundary)).toBe(true);
     if (Result.isFailure(boundary))
       expect(boundary.failure.reason).toBe("NoInteriorSplit");
-    expect(
-      Result.getOrThrow(Pagination.finish(req, scan(req, 1, true), true)),
-    ).toEqual({
-      _tag: "SplitRequired",
-      page: [],
-      continuation: { _tag: "Key", key: key(1) },
-      splitKey: key(1),
-    });
+    const split = Result.getOrThrow(
+      Pagination.finish(req, scan(req, 1, true), true),
+    );
+
+    expect(split).toHaveProperty("_tag", "SplitRequired");
+    expect(split).toHaveProperty("continuation._tag", "Key");
+    expect(split).toEqual(
+      Outcome.SplitRequired({
+        page: [],
+        continuation: Continuation.Key({ key: key(1) }),
+        splitKey: key(1),
+      }),
+    );
   });
 
   it("gives read limits precedence over item limits", () => {

@@ -92,7 +92,7 @@ export const groupPathFromRelativeModulePath = Effect.fnUntraced(function* (
     String.split(dir, path.sep),
     String.isNonEmpty,
   );
-  const pathSegments = Array.append(dirSegments, stem) as [string, ...string[]];
+  const pathSegments = Array.append(dirSegments, stem);
   return {
     pathSegments,
     groupPathDot: Array.join(pathSegments, "."),
@@ -302,9 +302,9 @@ const buildImplLayer = Effect.fnUntraced(function* (
   implLayer: Layer.Layer<unknown>,
 ) {
   const registry = Ref.makeUnsafe<RegistryItems.RegistryItems>({});
-  return yield* Layer.build(
-    implLayer as Layer.Layer<unknown, never, never>,
-  ).pipe(Effect.provideService(Registry.Registry, registry));
+  return yield* Layer.build(implLayer).pipe(
+    Effect.provideService(Registry.Registry, registry),
+  );
 }, Effect.scoped);
 
 /**
@@ -345,7 +345,13 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
   const { module: specModule } = yield* Bundler.bundle(specAbsolutePath).pipe(
     Effect.mapError((error) => fromBundlerError(leaf.relativePath, error)),
   );
-  const groupSpec = specModule.default as GroupSpec.AnyWithProps;
+  const groupSpec: GroupSpec.AnyWithProps = specModule.default;
+
+  if (!GroupSpec.isGroupSpec(groupSpec)) {
+    return yield* new SpecMissingDefaultGroupSpecError({
+      specPath: leaf.relativePath,
+    });
+  }
   const expectedFunctionNames = Object.keys(groupSpec.functions);
 
   const context = yield* buildImplLayer(

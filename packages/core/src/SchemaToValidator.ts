@@ -91,14 +91,13 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
     Match.value,
     Match.tag("Objects", ({ indexSignatures }) =>
       Array.isReadonlyArrayEmpty(indexSignatures)
-        ? // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- The return type is derived from the input schema and cannot be recovered from the runtime AST.
-          (compileAst(ast) as Effect.Effect<any>)
+        ? compileAst(ast)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.tag("Union", (unionAst) => compileAst(unionAst)),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
     Effect.runSync,
-  );
+  ) as TableSchemaToTableValidator<TableSchema>;
 };
 
 // Compiler
@@ -251,7 +250,9 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
 export const compileSchema = <T, E>(
   schema: Schema.Codec<T, E>,
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
-  Effect.runSync(compileAst(schema.ast)) as any;
+  Effect.runSync(compileAst(schema.ast)) as ValueToValidator<
+    (typeof schema)["Encoded"]
+  >;
 
 export const isRecursive = (ast: SchemaAST.AST): boolean =>
   pipe(
@@ -500,17 +501,12 @@ const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
         );
       }
     }),
-    Effect.andThen((propertyNamesWithValidators) =>
-      pipe(
-        propertyNamesWithValidators,
-        Array.reduce(
-          {} as Record<string, Validator<any, any, any>>,
-          (acc, { propertyName, validator }) => ({
-            [propertyName]: validator,
-            ...acc,
-          }),
+    Effect.map((propertyNamesWithValidators) =>
+      Object.fromEntries(
+        Array.map(
+          Array.reverse(propertyNamesWithValidators),
+          ({ propertyName, validator }) => [propertyName, validator],
         ),
-        Effect.succeed,
       ),
     ),
   );
@@ -544,7 +540,7 @@ export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
 }> {
   /* v8 ignore start */
   override get message() {
-    return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this.propertyKey}' but only 'string' properties are supported.`;
+    return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${Predicate.isNumber(this.propertyKey) ? "number" : "symbol"}' but only 'string' properties are supported.`;
   }
   /* v8 ignore stop */
 }

@@ -488,7 +488,7 @@ describe("ActionRunner", () => {
       );
 
       expectTypeOf(result).toEqualTypeOf<number>();
-      assertEquals(typeof result, "number");
+      expect(result).toBeTypeOf("number");
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
@@ -787,7 +787,9 @@ describe("typed errors", () => {
           { noteId: missingId },
         );
 
-        expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
+        expect(result).toStrictEqual(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: missingId })),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -808,7 +810,11 @@ describe("typed errors", () => {
           { noteId },
         );
 
-        expect(result).toStrictEqual({ _tag: "Ok", text: "hello" });
+        expect(result).toStrictEqual(
+          Schema.TaggedStruct("Ok", { text: Schema.String }).make({
+            text: "hello",
+          }),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -822,7 +828,9 @@ describe("typed errors", () => {
           { noteId: missingId, asAdmin: true },
         );
 
-        expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
+        expect(result).toStrictEqual(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: missingId })),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -836,10 +844,11 @@ describe("typed errors", () => {
           { noteId: missingId, asAdmin: false },
         );
 
-        expect(result).toStrictEqual({
-          _tag: "Forbidden",
-          reason: "admin required",
-        });
+        expect(result).toStrictEqual(
+          yield* Schema.encodeEffect(Forbidden)(
+            new Forbidden({ reason: "admin required" }),
+          ),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -860,7 +869,7 @@ describe("typed errors", () => {
           { noteId, asAdmin: true },
         );
 
-        expect(result).toStrictEqual({ _tag: "Ok" });
+        expect(result).toStrictEqual(Schema.TaggedStruct("Ok", {}).make({}));
 
         const remaining = yield* c.query(refs.public.databaseReader.listNotes);
         assertEquals(remaining.length, 0);
@@ -876,7 +885,9 @@ describe("typed errors", () => {
           { kind: "notFound" },
         );
 
-        expect(result).toStrictEqual({ _tag: "NotFound", id: "missing" });
+        expect(result).toStrictEqual(
+          yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "missing" })),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -889,10 +900,11 @@ describe("typed errors", () => {
           { kind: "forbidden" },
         );
 
-        expect(result).toStrictEqual({
-          _tag: "Forbidden",
-          reason: "no access",
-        });
+        expect(result).toStrictEqual(
+          yield* Schema.encodeEffect(Forbidden)(
+            new Forbidden({ reason: "no access" }),
+          ),
+        );
       }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
@@ -963,7 +975,11 @@ describe("typed errors", () => {
             { noteId: missingId },
           );
 
-          expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
+          expect(result).toStrictEqual(
+            yield* Schema.encodeEffect(NotFound)(
+              new NotFound({ id: missingId }),
+            ),
+          );
         }).pipe(Effect.provide(TestConfect.layer)),
     );
   });

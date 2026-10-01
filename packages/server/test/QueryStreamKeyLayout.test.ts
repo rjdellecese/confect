@@ -5,6 +5,10 @@ import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Result from "effect/Result";
 
+import * as Data from "effect/Data";
+
+const Position = Data.taggedEnum<QueryStreamKeyLayout.Position>();
+
 describe("QueryStreamKeyLayout", () => {
   it("exports the layout constructors through the public namespace", () => {
     expect(PublicKeyLayout.fromIndex).toBe(QueryStreamKeyLayout.fromIndex);
@@ -17,7 +21,7 @@ describe("QueryStreamKeyLayout", () => {
       count: 0,
       visible: [],
       width: 1,
-      positions: [{ _tag: "ImplicitId" }],
+      positions: [Position.ImplicitId()],
     },
     {
       fieldPaths: ["text", "_creationTime"],
@@ -25,9 +29,9 @@ describe("QueryStreamKeyLayout", () => {
       visible: ["text", "_creationTime"],
       width: 3,
       positions: [
-        { _tag: "Visible", label: "text" },
-        { _tag: "Visible", label: "_creationTime" },
-        { _tag: "ImplicitId" },
+        Position.Visible({ label: "text" }),
+        Position.Visible({ label: "_creationTime" }),
+        Position.ImplicitId(),
       ],
     },
     {
@@ -35,14 +39,14 @@ describe("QueryStreamKeyLayout", () => {
       count: 2,
       visible: [],
       width: 1,
-      positions: [{ _tag: "ImplicitId" }],
+      positions: [Position.ImplicitId()],
     },
     {
       fieldPaths: ["_id"],
       count: 0,
       visible: ["_id"],
       width: 1,
-      positions: [{ _tag: "Visible", label: "_id" }],
+      positions: [Position.Visible({ label: "_id" })],
     },
     { fieldPaths: ["_id"], count: 1, visible: [], width: 0, positions: [] },
     {
@@ -51,9 +55,9 @@ describe("QueryStreamKeyLayout", () => {
       visible: ["_id", "text"],
       width: 3,
       positions: [
-        { _tag: "Visible", label: "_id" },
-        { _tag: "Visible", label: "text" },
-        { _tag: "ImplicitId" },
+        Position.Visible({ label: "_id" }),
+        Position.Visible({ label: "text" }),
+        Position.ImplicitId(),
       ],
     },
   ])(
@@ -85,11 +89,13 @@ describe("QueryStreamKeyLayout", () => {
       expect(error).toBeInstanceOf(
         QueryStreamKeyLayout.InvalidEqualityPrefixError,
       );
-      expect(error).toMatchObject({
-        _tag: "InvalidEqualityPrefixError",
-        fieldPaths: ["_id"],
-        eqCount: count,
-      });
+      expect(error._tag).toBe("InvalidEqualityPrefixError");
+      expect(error).toMatchObject(
+        new QueryStreamKeyLayout.InvalidEqualityPrefixError({
+          fieldPaths: ["_id"],
+          eqCount: count,
+        }),
+      );
     },
   );
 
@@ -165,8 +171,8 @@ describe("QueryStreamKeyLayout", () => {
       explicit,
     );
     expect(QueryStreamKeyLayout.positions(joined)).toEqual([
-      { _tag: "ImplicitId" },
-      { _tag: "Visible", label: "hello" },
+      Position.ImplicitId(),
+      Position.Visible({ label: "hello" }),
     ]);
     expect(
       Result.getOrThrow(
@@ -227,11 +233,13 @@ describe("QueryStreamKeyLayout", () => {
       expect(error).toBeInstanceOf(
         QueryStreamKeyLayout.InvalidLabelPrefixError,
       );
-      expect(error).toMatchObject({
-        _tag: "InvalidLabelPrefixError",
-        keyLabels: QueryStreamKeyLayout.visibleLabels(layout),
-        prefixKeyLabels,
-      });
+      expect(error._tag).toBe("InvalidLabelPrefixError");
+      expect(error).toMatchObject(
+        new QueryStreamKeyLayout.InvalidLabelPrefixError({
+          keyLabels: QueryStreamKeyLayout.visibleLabels(layout),
+          prefixKeyLabels,
+        }),
+      );
     }
     const zero = Result.getOrThrowWith(
       QueryStreamKeyLayout.fromIndex(["_id"], 1),
@@ -402,11 +410,13 @@ describe("QueryStreamKeyLayout", () => {
       expect(error).toBeInstanceOf(
         QueryStreamKeyLayout.LabelCountMismatchError,
       );
-      expect(error).toMatchObject({
-        _tag: "LabelCountMismatchError",
-        keyLabels: QueryStreamKeyLayout.visibleLabels(layout),
-        replacementKeyLabels,
-      });
+      expect(error._tag).toBe("LabelCountMismatchError");
+      expect(error).toMatchObject(
+        new QueryStreamKeyLayout.LabelCountMismatchError({
+          keyLabels: QueryStreamKeyLayout.visibleLabels(layout),
+          replacementKeyLabels,
+        }),
+      );
     }
   });
 
