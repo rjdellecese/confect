@@ -1,5 +1,48 @@
 # @confect/cli
 
+## 10.0.0-next.26
+
+### Minor Changes
+
+- 84acb99: Add nested transaction controls to runner methods and replace callable runner services with objects exposing named methods.
+
+  ### Breaking Changes
+  - `QueryRunner`, `MutationRunner`, and `ActionRunner` are no longer callable. Use their `runQuery`, `runMutation`, and `runAction` methods instead.
+
+  To migrate, destructure the named method from the service. Apply the same change to mutation and action runners; their availability in handlers is unchanged.
+
+  **Before:**
+
+  ```ts
+  const firstNote = Effect.gen(function* () {
+    const runQuery = yield* QueryRunner;
+    return yield* runQuery(refs.public.notes.getFirst, {});
+  });
+  ```
+
+  **After:**
+
+  ```ts
+  const firstNote = Effect.gen(function* () {
+    const { runQuery } = yield* QueryRunner;
+    return yield* runQuery(refs.public.notes.getFirst, {});
+  });
+  ```
+
+  Pass `{ transactionLimits: { documentsRead: 100 } }` as the third argument to `runQuery` in queries or mutations. For `runMutation`, pass `{ transactionLimits: { documentsWritten: 10 } }` inside mutations. `runQuery` also accepts `useStaleSnapshot` inside mutations; supplying it requires a mutation context even when its value is `false`. `runAction` has no options parameter, and action and HTTP handlers continue using runners without transaction options.
+
+- 2cb72ec: Add a unified `Storage` service, available from generated services, for retrieving download URLs, generating upload URLs, deleting files, and reading or storing blobs. Each operation retains its existing context restrictions, and the previous storage services remain available for compatibility.
+
+  ```ts
+  import * as Effect from "effect/Effect";
+  import { Storage } from "./_generated/services";
+
+  const uploadUrl = Effect.gen(function* () {
+    const storage = yield* Storage;
+    return yield* storage.generateUploadUrl;
+  });
+  ```
+
 ## 10.0.0-next.25
 
 ### Minor Changes
