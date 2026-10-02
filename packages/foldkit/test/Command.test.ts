@@ -7,7 +7,7 @@ import * as Fiber from "effect/Fiber";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as FoldkitCommand from "foldkit/command";
-import { m } from "foldkit/message";
+import { defineMessageUnion } from "foldkit/message";
 import * as Command from "@confect/foldkit/Command";
 import * as Client from "@confect/foldkit/Client";
 import * as TestClient from "./TestClient";
@@ -53,9 +53,12 @@ const deleteMutationRef = Ref.make(
   }),
 );
 
-const SucceededSaveNote = m("SucceededSaveNote", { note: Schema.Unknown });
-const FailedSaveNote = m("FailedSaveNote", { error: Schema.Unknown });
-type Message = typeof SucceededSaveNote.Type | typeof FailedSaveNote.Type;
+const Message = defineMessageUnion({
+  SucceededSaveNote: { note: Schema.Unknown },
+  FailedSaveNote: { error: Schema.Unknown },
+});
+const { SucceededSaveNote, FailedSaveNote } = Message;
+type Message = typeof Message.Type;
 
 const saveNoteHandlers = {
   onSuccess: (note: unknown) => SucceededSaveNote({ note }),

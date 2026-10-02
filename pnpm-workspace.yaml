@@ -16,26 +16,14 @@ allowBuilds:
   puppeteer: false
   sharp: true
 
-# pnpm's supply-chain policy rejects a lockfile referencing anything published
-# within `minimumReleaseAge` (24 hours by default), which every same-day Effect
-# prerelease bump trips. These entries are the escape hatch pnpm writes itself;
-# they are safe to delete once the versions named here have aged past the
-# cutoff.
 minimumReleaseAgeExclude:
-  - "@effect/ai-openai-compat@4.0.0-rc.118"
-  - "@effect/ai-openrouter@4.0.0-rc.118"
-  - "@effect/platform-bun@4.0.0-rc.118"
-  - "@effect/platform-node-shared@4.0.0-rc.118"
-  - "@effect/platform-node@4.0.0-rc.118"
-  - "@effect/vitest@4.0.0-rc.118"
-  - effect@4.0.0-rc.118
-  - foldkit@0.148.1
   - effect-oxlint@0.3.4
   - eslint-plugin-jsdoc@64.3.10
+  - foldkit@0.165.0
 
 overrides:
   convex: 1.45.0
-  effect: 4.0.0-rc.118
+  effect: 4.0.0
   react: 19.3.0
   react-dom: 19.3.0
 
@@ -51,8 +39,5 @@ packageExtensions:
 
 peerDependencyRules:
   allowedVersions:
-    # foldkit pins an exact effect prerelease; the `overrides` entry above
-    # already forces every resolved effect instance to the workspace version.
-    "foldkit>effect": "4"
     react: "19"
     react-dom: "19"
