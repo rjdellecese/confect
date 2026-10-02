@@ -30,7 +30,7 @@
     "effect"
   ],
   "license": "ISC",
-  "packageManager": "pnpm@12.4.1",
+  "packageManager": "pnpm@12.8.1",
   "scripts": {
     "build": "vp run --cache --filter \"@confect/*\" build",
     "check": "vp check",
