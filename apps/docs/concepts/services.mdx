@@ -14,6 +14,7 @@ import {
   Auth,
   DatabaseReader,
   DatabaseWriter,
+  DocumentIds,
   ExecutionMetadata,
   MutationRunner,
   QueryRunner,
@@ -38,6 +39,16 @@ Read documents from the database.
 <ContextBadges mutation />
 
 Insert, edit, and delete documents from the database.
+
+### `DocumentIds`
+
+<ContextBadges query mutation />
+
+Parse an ID for a known table, identify its table, or normalize a legacy ID.
+Each method returns an `Effect` containing an `Option`; none fetches a document.
+The generated service is typed to your schema, including the `_storage` and
+`_scheduled_functions` system tables. See [Validate document IDs](/server/database/reading#validate-document-ids)
+for examples and the distinction between strict parsing and normalization.
 
 ## Function invocation
 
