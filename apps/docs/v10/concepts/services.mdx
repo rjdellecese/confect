@@ -19,9 +19,7 @@ import {
   QueryRunner,
   RequestMetadata,
   Scheduler,
-  StorageReader,
-  StorageWriter,
-  StorageActionWriter,
+  Storage,
   TransactionMetadata,
   VectorSearch,
 } from "./_generated/services";
@@ -47,39 +45,114 @@ Insert, edit, and delete documents from the database.
 
 <ContextBadges query mutation action http />
 
-Run Confect queries.
+Run Confect queries with `runQuery(ref, args, options?)`:
+
+```ts
+import * as Effect from "effect/Effect";
+import refs from "./_generated/refs";
+import { QueryRunner } from "./_generated/services";
+
+const firstNote = Effect.gen(function* () {
+  const { runQuery } = yield* QueryRunner;
+  return yield* runQuery(refs.public.notes_and_random.notes.getFirst, {});
+});
+```
+
+The `transactionLimits` option is available inside queries and mutations.
+The `useStaleSnapshot` option is available only inside mutations, even when
+you pass `false`. Actions and HTTP handlers can call `runQuery` without these
+options. See [Transaction controls](#transaction-controls).
 
 ### `MutationRunner`
 
 <ContextBadges mutation action http />
 
-Run Confect mutations.
+Run Confect mutations with `runMutation(ref, args, options?)`. Obtain the
+method with `const { runMutation } = yield* MutationRunner`.
+
+The `transactionLimits` option is available only inside mutations. Actions
+and HTTP handlers can call `runMutation` without this option.
 
 ### `ActionRunner`
 
 <ContextBadges action http />
 
-Run Confect actions.
+Run Confect actions with `runAction(ref, args)`. Obtain the method with
+`const { runAction } = yield* ActionRunner`. This method has no options
+parameter.
+
+For all three runners, `args` is optional when the referenced function takes
+no arguments. Pass `{}` as the second argument when supplying options to a
+no-argument query or mutation.
+
+### Transaction controls
+
+Pass transaction options to a runner method to control a nested call, not
+the entire enclosing handler:
+
+```ts
+import * as Effect from "effect/Effect";
+import refs from "./_generated/refs";
+import { QueryRunner } from "./_generated/services";
+
+const boundedRead = Effect.gen(function* () {
+  const { runQuery } = yield* QueryRunner;
+  return yield* runQuery(
+    refs.public.notes_and_random.notes.getFirst,
+    {},
+    { transactionLimits: { documentsRead: 100 } },
+  );
+});
+```
+
+`transactionLimits` accepts Convex's `TransactionLimits` fields, including
+`documentsRead`, `bytesRead`, and `databaseQueries`. Each field sets a maximum
+for the nested call. Convex caps these values at its platform transaction
+limits. Use
+[`TransactionMetadata.getMetrics()`](/v10/server/metadata#transaction-metrics)
+to inspect usage and remaining limits.
+
+| Method and options                                                               | Available in          |
+| -------------------------------------------------------------------------------- | --------------------- |
+| `runQuery(ref, args, { transactionLimits })`                                     | Queries and mutations |
+| `runQuery(ref, args, { useStaleSnapshot })`, optionally with `transactionLimits` | Mutations             |
+| `runMutation(ref, args, { transactionLimits })`                                  | Mutations             |
+
+In actions and HTTP handlers, omit options or pass `undefined` rather than
+an empty options object.
+
+`useStaleSnapshot: true` reads from a recent database snapshot that might
+not be up to date when the mutation commits. Passing
+`useStaleSnapshot: false` still requires a mutation context.
+
+<Warning>
+  Stale snapshots can introduce race conditions. Use them only when stale reads
+  are safe for your operation, such as reading immutable records from an
+  append-only table. Prefer ordinary reads otherwise.
+</Warning>
 
 ## Storage
 
-### `StorageReader`
+### `Storage`
 
 <ContextBadges query mutation action http />
 
-Retrieve URLs for blobs in storage.
+Use one service for file storage. The available operations depend on the function's context:
 
-### `StorageWriter`
+| Operations                    | Available in                                  |
+| ----------------------------- | --------------------------------------------- |
+| `getUrl`                      | Queries, mutations, actions, and HTTP actions |
+| `generateUploadUrl`, `delete` | Mutations, actions, and HTTP actions          |
+| `get`, `store`                | Actions and HTTP actions                      |
 
-<ContextBadges mutation action http />
+See [Storage](/v10/server/storage) for examples and return types.
 
-Generate upload URLs and delete blobs.
-
-### `StorageActionWriter`
-
-<ContextBadges action http />
-
-Get and store blobs.
+<Note>
+  `StorageWriter` and `StorageActionWriter` may appear in operation
+  requirements. Confect supplies them automatically; new code only needs to
+  import `Storage`. The existing storage service exports and generated aliases
+  remain available for compatibility.
+</Note>
 
 ## Authentication
 
