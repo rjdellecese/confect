@@ -6,7 +6,7 @@
   "fixed": [["@confect/*"]],
   "linked": [],
   "access": "public",
-  "baseBranch": "v10",
+  "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [],
   "privatePackages": { "version": false, "tag": false },

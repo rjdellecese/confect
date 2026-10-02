@@ -1,156 +1,90 @@
 ---
 name: managing-prereleases
-description: How to optionally ship a major version of `@confect/*` as iterative Changesets prereleases on a dedicated `vN` release branch before graduating to stable—one possible release path for a major, not the only one. Use whenever the user wants to cut a beta/next/prerelease, set up a `vN` branch, run `pnpm changeset pre enter`/`pre exit`, publish `X.0.0-next.N` versions under the npm `next` dist-tag, or merge a prerelease line back into `main`.
+description: Graduate a Changesets 3 prerelease to stable on main, or plan an optional future prerelease cycle on a dedicated branch.
 ---
 
 # Managing prereleases
 
-A major version of `@confect/*` can be shipped as iterative prereleases on a dedicated `vN` branch under the npm `next` dist-tag, then graduated to stable when `vN` merges into `main`. This is one release path for a major, not a requirement—a major can also go straight out as a stable release from `main` like any other version. Reach for this workflow only when a major warrants a prerelease cycle (e.g. to let consumers try it under `@next` before it lands on `latest`).
+Stable releases publish from `main` through `.github/workflows/release.yml`.
+All `@confect/*` packages belong to one fixed version group. A major can ship
+directly from `main`; a prerelease cycle is optional, not a release requirement.
 
-For Changesets-specific behavior and caveats, see the upstream [Changesets prereleases docs](https://github.com/changesets/changesets/blob/main/docs/prereleases.md). Read them in full before your first prerelease cycle—the docs themselves open with: "Prereleases are very complicated! Using them requires a thorough understanding of all parts of npm publishes. Mistakes can lead to repository and publish states that are very hard to fix."
+## Graduate a prerelease to stable
 
-## Conventions
+Keep the final candidate on its prerelease branch until it has passed the
+required checks. Prepare graduation separately so removing branch workflows
+does not disable the final candidate's publication.
 
-- All `@confect/*` packages version together via the `fixed` group in `.changeset/config.json`, so a single `pnpm changeset` covers every package being bumped for the major.
-- The release branch is named after the target major (`v9`, `v10`, …). `main` continues to receive patch releases of the current stable line while `vN` is in flight.
-- Keep the release branch current with `main` through the `sync-main-into-prerelease` skill. Every checkpoint is a real merge of the current `main` tip, including content-equivalent merges whose only effect is ancestry; dependency-upgrade skills do not own this propagation.
-- Prereleases publish through the existing [`.github/workflows/release.yml`](.github/workflows/release.yml), extended to trigger on `vN` alongside `main`. Do **not** add a separate `release-vN.yml`—npm trusted publishing (OIDC) is configured for `release.yml`, and a differently named workflow fails publish with a misleading `E404`.
-- Mintlify deploys the generated `release` branch, which contains both the current stable docs and the prerelease docs under versioned paths. A successful package publish updates only that version's pinned docs source; docs-only updates use `docs-release.yml`.
-- The Changesets `pre` tag is `next`, which also becomes the npm dist-tag. Consumers opt in with `pnpm add @confect/server@next`; `latest` continues to resolve to the current stable line.
-- `pnpm release` (defined in the root `package.json`) is `pnpm build && changeset publish`. It works the same in pre mode and stable mode—the difference is purely in what `.changeset/pre.json`/the changesets folder contain at publish time.
+1. Fetch `main` and the prerelease branch. Reconcile the current `main` history
+   with a real merge, not a squash or a content-only replay. Preserve changeset
+   provenance: an ID already in `.changeset/pre/` must not also be pending in
+   `.changeset/`. Do not invent a second changeset for changes already shipped
+   under their original ID.
+2. Review `.changeset/pre/` and pending changesets for the stable release notes.
+   Changesets 3 moves consumed prerelease changesets into `.changeset/pre/`;
+   these are inputs to the stable changelog, not disposable artifacts. For an
+   explicitly requested consolidation, account for every consumed and pending
+   entry against the last stable public API and replace them with one reviewed
+   release changeset. Describe final behavior rather than intermediate
+   prerelease migrations, omit changes already released on the stable line,
+   and preserve the existing prerelease changelog sections and Git history.
+   Outside that reviewed consolidation, remove entries only for an explicitly
+   reviewed duplicate or erroneous note.
+3. Run `pnpm changeset pre exit` on the graduation branch. This changes
+   `.changeset/pre.json` to `mode: "exit"`; it does **not** remove the file or
+   change package versions. Never hand-delete that file to exit pre mode.
+4. Set `.changeset/config.json` `baseBranch` to `main`, remove the old prerelease
+   branch from workflow triggers, and retire its branch-specific automation.
+   Do not run stable publishing on the old branch. Keep `release` intact: it is
+   the Mintlify deployment branch, not the package prerelease branch.
+5. Open the graduation PR against `main`. Use a merge commit when the PR carries
+   the prerelease history so `main` retains ancestry. Do not merge without the
+   user's explicit approval. Run the repository checks and backend suites before
+   graduation, and inspect the stable release plan in a disposable checkout.
+6. After graduation merges, the existing Changesets action on `main` runs
+   `pnpm version-packages` to prepare the stable Version Packages PR. The
+   `changeset version` step consumes the exit state and archived changesets,
+   removes `pre.json` and consumed prerelease notes, writes the stable versions,
+   and composes their changelogs. Review that PR before merging it with approval.
+   If the user instead asks to include versioning in graduation, run the same
+   command on the graduation branch and review those generated changes there;
+   do not version both ways.
+7. On the merged stable version commit, `release.yml` runs `pnpm release`
+   (`pnpm build && changeset publish`). Verify the npm versions and `latest`
+   dist-tags, release tags, and docs deployment before reporting completion.
+   Retire the old package prerelease branch only after explicit approval; never
+   delete `release` as part of that cleanup.
 
-## Never run prereleases on `main`
+The exit behavior above was checked with Changesets 3.0.3 in an isolated
+workspace: `1.0.0` plus a major changeset became `2.0.0-next.0`, then `pre exit`
+left `mode: "exit"`, and the following `version` produced `2.0.0`, removed the
+pre state, and included the archived note in the stable changelog. Recheck this
+behavior when upgrading Changesets; do not simulate graduation in the active
+checkout unless versioning is actually requested.
 
-The upstream docs are explicit on this:
+## Documentation releases
 
-> If you decide to do prereleases from the default branch of your repository, without having a branch for your last stable release without the prerelease changes, you will block other changes until you are ready to exit prerelease mode. We thoroughly recommend only running prereleases from a branch other than the default branch.
+Mintlify serves one current site from `release:apps/docs`. A successful stable
+package publish deploys the matching `main` commit. Docs-only deployments use
+the `release-docs` skill. Old versioned page URLs redirect to the current pages;
+there is no archived site or version selector.
 
-Always use a dedicated `vN` branch so `main` can keep cutting patch releases of the current stable line.
+## Optional future prereleases
 
-## Caveats to keep in mind
+Read the upstream [prerelease guide](https://changesets.dev/guide/prereleases)
+before starting another cycle. Use a dedicated `vN` branch, never `main`, so
+stable fixes can continue publishing independently.
 
-These are from the Changesets docs but are easy to miss:
-
-- **Prerelease versions bump dependents more aggressively than stable releases.** Most semver ranges do not satisfy prerelease versions (e.g. `^5.0.0` is not satisfied by `5.1.0-next.0`), so `changeset version` will bump packages depending on a prereleased package even when the dependent itself has no changeset. With the `@confect/*` fixed group this is mostly invisible, but expect every package in the group to move in lockstep on every `next.N`.
-- **New packages introduced during a prerelease cycle publish to the `latest` dist-tag, not `next`.** A package being published for the first time always goes to `latest`, and continues going to `latest` for subsequent prereleases until the cycle exits. If a brand-new `@confect/foo` is added mid-cycle, its initial publish is _not_ gated by `@next` and will be visible to all consumers immediately.
-- **Reuse `release.yml` for vN publishes—never add `release-vN.yml`.** npm trusted publishing matches on workflow filename. A separate workflow (e.g. `release-v9.yml`) will not match the trusted publisher entry for `release.yml`, and publish fails with `E404` rather than a clear auth error. Extend the existing workflow instead.
-- **Changesets Action does not close an old Version Packages PR when the last changeset disappears.** Keep the `has-changesets == 'false'` cleanup step in `release.yml`; otherwise a retracted dependency changeset can leave a plausible but invalid release PR open indefinitely.
-
-## Entering prerelease mode
-
-1. **Create the release branch off `main`.**
-
-   ```bash
-   git switch main && git pull
-   git switch -c v9
-   ```
-
-2. **Point `baseBranch` at the release branch** in `.changeset/config.json` so `changeset version` compares against the right history:
-
-   ```diff
-   - "baseBranch": "main",
-   + "baseBranch": "v9",
-   ```
-
-3. **Enter pre mode with the `next` tag.** This creates `.changeset/pre.json`, which locks subsequent `changeset version` runs into producing `X.0.0-next.N` and tags the npm publish with `next`.
-
-   ```bash
-   pnpm changeset pre enter next
-   ```
-
-4. **Extend `release.yml` to publish from `vN`.** Add the release branch to the existing workflow's `push.branches`:
-
-   ```diff
-    on:
-      push:
-        branches:
-          - main
-   +      - v9
-   ```
-
-   The other pieces of branch-awareness are permanent fixtures of `release.yml` (kept in place between prerelease cycles)—verify they are still present rather than adding them: `changesets/action@v2` opens its Version Packages PR against the pushed branch by default (its `pr-base-branch` input defaults to `github.ref_name`, so no explicit input is needed), and a successful publish calls the versioned docs deployment using the package's major version. Extend `scripts/assembleDocs.ts` and `docs-release.yml` for the new `vN` while retaining the current stable version; the generated `release` branch must never be replaced directly with either code branch.
-
-   When introducing versioned deployments for the first time, port the complete
-   docs deployment machinery to `main` and merge it there before enabling it on
-   `vN`. In particular, both `release.yml` and `docs-release.yml` on `main` must
-   delegate to `docs-deploy.yml` and must no longer push a branch head directly
-   to `release`. Otherwise, the next stable package or docs-only release can
-   replace the generated versioned tree. The reusable deployment workflow fails
-   closed until `main` satisfies these prerequisites.
-
-5. **Mirror the branch into the other CI workflows.** Add `- v9` to the `push.branches` and `pull_request.branches` lists in any CI workflows that gate `main` (typically `docs.yml`, `example.yml`, `packages.yml`) so PRs against `v9` run the same checks as PRs against `main`.
-
-6. **Commit and push.**
-
-   ```bash
-   git add .changeset/config.json .changeset/pre.json .github/workflows
-   git commit -m "Enter v9 prerelease mode and extend release workflow"
-   git push -u origin v9
-   ```
-
-After the push, `changesets/action` opens a `Version Packages (next)` PR against `v9`. From this point on, retarget every PR that should ship as part of the v9 line at `v9` instead of `main`.
-
-## Publishing iterative prereleases
-
-While `.changeset/pre.json` exists on `v9`:
-
-- Author changesets normally with `pnpm changeset` on feature branches targeting `v9`. Each merged PR is appended to the open `Version Packages (next)` PR.
-- Sync `main` through the dedicated sync skill. Reconcile changesets by ID and provenance: pending originals carry through, IDs already in `.changeset/pre/` are not documented again, released-but-not-yet-absorbed content gets a specific adapted changeset, and no-changeset work stays no-changeset unless a published surface was omitted accidentally.
-- Merging the `Version Packages (next)` PR bumps the next `X.0.0-next.N` and publishes under the `next` dist-tag.
-- After a successful prerelease publish, the release workflow pins that commit as the prerelease documentation source and rebuilds the stable and prerelease docs together.
-- The merged changeset files are kept around (Changesets v3 moves consumed ones into `.changeset/pre/`)—Changesets needs them to compose the final stable changelog on exit. Never delete one as a routine merge-conflict resolution. The only exception is an explicitly reviewed corrective cleanup proving that the entry itself is duplicate or erroneous; remove only that identified entry, preserve the original provenance entry, and explain the correction in its PR.
-
-There is no required cadence; ship as many `next.N`s as the major needs.
-
-## Exiting prerelease mode
-
-Before exiting, audit `.changeset/pre/` by ID against the prerelease changelogs and the originating `main` changesets. Resolve any known duplicate or retracted entries in a reviewed PR while still in pre mode; `pre exit` deliberately composes every remaining file into the stable release, so exit is too late to discover bad provenance.
-
-1. **Exit pre mode and apply the final versions on the release branch.** Both happen in a single commit, directly on `v9` (no PR), matching the Changesets docs' recommended exit workflow.
-
-   ```bash
-   git switch v9 && git pull
-   pnpm changeset pre exit
-   pnpm version-packages
-   git add .
-   git commit -m "Exit prerelease mode and version packages"
-   git push
-   ```
-
-   `pre exit` deletes `.changeset/pre.json`. `pnpm version-packages` (`changeset version && pnpm format`, also used by `release.yml`) then consumes every changeset accumulated during the prerelease cycle and writes the final stable versions (e.g. `9.0.0`) into each `package.json`. The format pass matters because Changesets writes CHANGELOG entries in its own Markdown style, which fails the Format CI job otherwise. Pushing triggers `release.yml`; with no remaining changesets, `changesets/action` skips opening a Version Packages PR and goes straight to `pnpm release`, publishing the final stable to `latest`. The docs assembler recognizes that the published version no longer has a prerelease suffix, makes it the default `Stable` version, and repoints unversioned docs redirects to it.
-
-2. **Open a PR merging `vN` back into `main`** with the major as the title (e.g. `v9`). Use a merge commit so the prerelease history is preserved in `main`—merge commits are enabled repo-wide for exactly this case, even though squash is the norm for regular PRs. If the merge-commit option is missing from the UI (or the API returns `405 Merge commits are not allowed`), check that "Allow merge commits" is still enabled in the repository settings and that no "Require linear history" rule exists on `main`—the rule overrides the repo-level toggle and hides the option.
-
-3. **In a follow-up PR against `main`, clean up the branch-specific machinery.** Direct pushes to `main` are disallowed, so branch off `main` and open a PR. In one commit:
-   - Revert `.changeset/config.json` `baseBranch` back to `main`.
-   - Remove `- v9` from `push.branches` and `pull_request.branches` in every workflow that referenced it (including `release.yml`).
-   - Remove the deleted prerelease branch from docs fetches and from that version's allowed source branches in `scripts/assembleDocs.ts`. Keep the previous stable docs entry and its pinned manifest source until those docs are intentionally retired.
-   - `release.yml` continues to publish stable from `main` with no further changes.
-
-   ```bash
-   git switch main && git pull
-   git switch -c cleanup-v9-machinery
-   # edit configs as above
-   git add .changeset/config.json .github/workflows
-   git commit -m "Update \`v9\` branch references to \`main\`"
-   git push -u origin cleanup-v9-machinery
-   # open a PR against main and merge it once CI is green
-   ```
-
-4. **Delete the release branch** once `main` has fully absorbed it.
-
-   ```bash
-   git push origin --delete v9
-   git branch -d v9
-   ```
-
-## Quick reference
-
-| Step                                                   | Command                         |
-| ------------------------------------------------------ | ------------------------------- |
-| Enter pre mode                                         | `pnpm changeset pre enter next` |
-| Author a changeset                                     | `pnpm changeset`                |
-| Apply versions locally (the action normally does this) | `pnpm version-packages`         |
-| Exit pre mode                                          | `pnpm changeset pre exit`       |
-| Publish manually (the action normally does this)       | `pnpm release`                  |
-| Install a prerelease                                   | `pnpm add @confect/server@next` |
+- Set that branch's Changesets `baseBranch` to `vN` and run
+  `pnpm changeset pre enter next`. Add a changeset for the intended major bump.
+- Extend the existing `release.yml` and ordinary CI triggers for `vN` in a
+  reviewed change. Reuse `release.yml`: npm trusted publishing is tied to its
+  filename. Keep docs deployment restricted to `main`; prereleases must not
+  replace the public stable docs. Use a separate preview if one is needed.
+- Version and publish iterative candidates through Changesets, retaining the
+  `.changeset/pre/` provenance. Verify npm dist-tags, especially when introducing
+  a package that has never been published. Consumers opt in with `@next`.
+- Merge current `main` into `vN` at each checkpoint and inspect changeset IDs,
+  retractions, and dependency conflicts explicitly. There are no active sync
+  jobs or freshness-label checks; add automation only when a new cycle needs it.
+- Follow the graduation procedure above when the candidate is ready.

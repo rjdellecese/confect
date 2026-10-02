@@ -21,14 +21,14 @@ import databaseSchema from "./_generated/schema";
 import settings from "./settings.spec";
 
 const getApiKey = FunctionImpl.make(databaseSchema, settings, "getApiKey", () =>
-  Config.string("API_KEY").pipe(Effect.orDie),
+  Config.String("API_KEY").pipe(Effect.orDie),
 );
 ```
 
-Combinators that read a single variable work as expected—`Config.string`, `Config.number`, `Config.boolean`, `Config.withDefault`, `Config.option`, and `Config.nested`, among others.
+Combinators that read a single variable work as expected—`Config.String`, `Config.Number`, `Config.Boolean`, `Config.withDefault`, `Config.option`, and `Config.nested`, among others.
 
 ```ts
-Config.int("MAX_RESULTS").pipe(Config.withDefault(100));
+Config.Int("MAX_RESULTS").pipe(Config.withDefault(100));
 ```
 
 ## Collections
@@ -65,7 +65,7 @@ import { ConvexConfigProvider } from "@confect/server";
 const provider = ConvexConfigProvider.make();
 ```
 
-It resolves each config path to a single environment variable, joining the path segments with `"_"`. `Config.nested(Config.string("KEY"), "API")` therefore reads `API_KEY`. An empty string counts as a missing value, so `Config.withDefault` and `Config.option` recover from it.
+It resolves each config path to a single environment variable, joining the path segments with `"_"`. `Config.nested(Config.String("KEY"), "API")` therefore reads `API_KEY`. An empty string counts as a missing value, so `Config.withDefault` and `Config.option` recover from it.
 
 To override the provider for part of a handler, provide `ConfigProvider.ConfigProvider` as a service.
 
@@ -79,7 +79,7 @@ import databaseSchema from "./_generated/schema";
 import settings from "./settings.spec";
 
 const getApiKey = FunctionImpl.make(databaseSchema, settings, "getApiKey", () =>
-  Config.nested(Config.string("KEY"), "API").pipe(
+  Config.nested(Config.String("KEY"), "API").pipe(
     Effect.provideService(
       ConfigProvider.ConfigProvider,
       ConvexConfigProvider.make(),

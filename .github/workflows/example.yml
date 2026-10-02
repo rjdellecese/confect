@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - main
-      - v10
   pull_request:
     branches:
       - main
-      - v10
 
 jobs:
   format:
