@@ -1,5 +1,5 @@
 import { bench } from "confect-bench-harness";
-import type { GenericId } from "@confect/core/GenericId";
+import { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
 import * as Schema from "effect/Schema";
 
@@ -20,7 +20,7 @@ const convexNote = {
   content: "Hello, world!",
   tag: "greeting",
   author: { role: "admin" as const, name: "Alice" },
-  _id: "abc123" as GenericId<typeof tableName>,
+  _id: Schema.decodeUnknownSync(GenericId(tableName))("abc123"),
   _creationTime: 1_234_567_890,
 };
 

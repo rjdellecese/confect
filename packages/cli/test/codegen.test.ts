@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -140,7 +141,7 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       );
 
       assert(Result.isFailure(result));
-      assert(result.failure._tag === "DuplicateTableNameError");
+      assert(Predicate.isTagged(result.failure, "DuplicateTableNameError"));
       const byName = Object.fromEntries(
         result.failure.collisions.map((c) => [
           c.tableName,

@@ -1,4 +1,4 @@
-import type { GenericId } from "@confect/core/GenericId";
+import { GenericId } from "@confect/core/GenericId";
 import * as Table from "@confect/server/Table";
 import * as SystemFields from "@confect/core/SystemFields";
 import * as Effect from "effect/Effect";
@@ -19,7 +19,7 @@ const notes = Table.make(() => NoteSchema)("notes");
 
 const convexNote = {
   content: "Hello, world!",
-  _id: "abc123" as GenericId<"notes">,
+  _id: Schema.decodeUnknownSync(GenericId("notes"))("abc123"),
   _creationTime: 1_234_567_890,
 };
 
@@ -101,7 +101,7 @@ describe("Document.decode", () => {
 
         const convexPost = {
           content: "A post",
-          _id: "post456" as GenericId<"posts">,
+          _id: yield* Schema.decodeUnknownEffect(GenericId("posts"))("post456"),
           _creationTime: 9_876_543_210,
         };
 

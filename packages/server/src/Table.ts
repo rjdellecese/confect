@@ -50,21 +50,14 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
 > => {
   const cached = tableDefinitionCache.get(table);
   if (cached !== undefined) {
-    return cached as TableDefinition<
-      Table_.TableValidator<Table>,
-      Table_.Indexes<Table>,
-      Table_.SearchIndexes<Table>,
-      Table_.VectorIndexes<Table>
-    >;
+    return cached;
   }
 
   let definition: TableDefinition<any, any, any, any> = defineTable(
     compileTableSchema(table.Fields),
   );
-  for (const [name, indexFields] of Object.entries(
-    table.indexes as Record<string, any>,
-  )) {
-    definition = definition.index(name, indexFields);
+  for (const [name, indexFields] of Object.entries(table.indexes)) {
+    definition = definition.index(name, indexFields as [string, ...string[]]);
   }
   for (const [name, config] of Object.entries(
     table.searchIndexes as Record<string, any>,
@@ -78,12 +71,7 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
   }
 
   tableDefinitionCache.set(table, definition);
-  return definition as TableDefinition<
-    Table_.TableValidator<Table>,
-    Table_.Indexes<Table>,
-    Table_.SearchIndexes<Table>,
-    Table_.VectorIndexes<Table>
-  >;
+  return definition;
 };
 
 // -----------------------------------------------------------------------------

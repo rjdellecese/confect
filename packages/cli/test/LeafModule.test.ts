@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
@@ -211,7 +212,12 @@ export default GroupSpec.make().middleware(Policy, { roles: ["Internal"] }).addF
           ),
         );
         assert(Result.isFailure(result));
-        assert(result.failure._tag === "InvalidMiddlewareAttachmentError");
+        assert(
+          Predicate.isTagged(
+            result.failure,
+            "InvalidMiddlewareAttachmentError",
+          ),
+        );
         expect(result.failure.specPath).toBe(leaf.relativePath);
         expect(result.failure.message).toMatch(
           /Policy.*equivalent options.*function "get"/,
@@ -297,7 +303,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
       );
 
       assert(Result.isFailure(result));
-      assert(result.failure._tag === "BundleFailedError");
+      assert(Predicate.isTagged(result.failure, "BundleFailedError"));
       expect(result.failure.errors.length).toBeGreaterThan(0);
     }),
   );
@@ -341,7 +347,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
         );
 
         assert(Result.isFailure(result));
-        assert(result.failure._tag === "SpecImportsServerError");
+        assert(Predicate.isTagged(result.failure, "SpecImportsServerError"));
         expect(result.failure.specPath).toBe("groups/_leakyTable.spec.ts");
         expect(result.failure.importerPaths).toStrictEqual([
           "tables/_leaky.ts",
@@ -361,7 +367,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
       );
 
       assert(Result.isFailure(result));
-      assert(result.failure._tag === "SpecImportsServerError");
+      assert(Predicate.isTagged(result.failure, "SpecImportsServerError"));
       expect(result.failure.importerPaths).toStrictEqual([
         "groups/_leaky.spec.ts",
       ]);
@@ -394,7 +400,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
         );
 
         assert(Result.isFailure(result));
-        assert(result.failure._tag === "SpecImportsServerError");
+        assert(Predicate.isTagged(result.failure, "SpecImportsServerError"));
         expect(result.failure.specPath).toBe(
           "groups/_leakyViaMiddleware.spec.ts",
         );
@@ -538,7 +544,7 @@ export default GroupImpl.make(
       );
 
       assert(Result.isFailure(result));
-      assert(result.failure._tag === "BundleFailedError");
+      assert(Predicate.isTagged(result.failure, "BundleFailedError"));
       expect(result.failure.errors.length).toBeGreaterThan(0);
     }),
   );
@@ -650,7 +656,7 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
         );
 
         assert(Result.isFailure(result));
-        assert(result.failure._tag === "ImplMissingFunctionsError");
+        assert(Predicate.isTagged(result.failure, "ImplMissingFunctionsError"));
         // The reported group path is the impl/spec leaf's own filesystem
         // location, which points at the file that is missing functions.
         expect(result.failure.groupPath).toBe("groups._incomplete");

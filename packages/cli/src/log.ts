@@ -162,8 +162,9 @@ const renderImportFailedError = (error: ImportFailedError): string => {
  * `BundleFailedError` carries an array of distinct esbuild messages.
  */
 const renderBundleFailedError = (error: BundleFailedError): string => {
-  const messages = error.errors as readonly esbuild.Message[];
-  const formatted = esbuild.formatMessagesSync(messages as esbuild.Message[], {
+  const messages = error.errors;
+
+  const formatted = esbuild.formatMessagesSync(messages, {
     kind: "error",
     color: true,
     terminalWidth: 80,

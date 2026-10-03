@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
@@ -146,7 +147,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
         );
 
         assert(Result.isFailure(result));
-        assert(result.failure._tag === "InvalidConvexConfigError");
+        assert(Predicate.isTagged(result.failure, "InvalidConvexConfigError"));
         expect(result.failure.reason).toContain('"not a valid name"');
       }),
   );

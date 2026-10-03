@@ -57,7 +57,7 @@ export const make = ({
     Match.tag("Convex", (): AnyWithProps =>
       Object.assign(Object.create(FunctionRegistryItemProto), {
         _tag: "Convex" as const,
-        handler: handler as Handler.AnyConvexProvenance,
+        handler,
       }),
     ),
     Match.tag("Confect", (provenance): AnyWithProps => {
@@ -70,7 +70,7 @@ export const make = ({
           ...groupMiddlewareAttachments,
           ...functionSpec.middlewareAttachments,
         ],
-        handler: handler as Handler.AnyConfectProvenance,
+        handler,
       });
 
       Lazy.defineProperty(item, "args", () => provenance.args);
@@ -79,7 +79,7 @@ export const make = ({
         Lazy.defineProperty(item, "error", () => provenance.error);
       }
 
-      return item as AnyWithProps;
+      return item;
     }),
     Match.exhaustive,
   );

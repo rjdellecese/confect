@@ -130,7 +130,7 @@ const make = Effect.gen(function* () {
     );
   }).pipe(
     Effect.retry({
-      while: (error) => error._tag === "BackendVersionLookupError",
+      while: Schema.is(BackendVersionLookupError),
       schedule: Schedule.exponential("1 second").pipe(
         Schedule.jittered,
         Schedule.upTo({ times: 2 }),

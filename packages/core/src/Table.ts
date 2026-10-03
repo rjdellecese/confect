@@ -276,7 +276,7 @@ const makeBound = <
   VectorIndexes_
 > => {
   const bound = {
-    [TypeId]: TypeId as TypeId,
+    [TypeId]: TypeId,
     tableName,
     indexes: state.indexes,
     searchIndexes: state.searchIndexes,
@@ -293,10 +293,7 @@ const makeBound = <
   Lazy.defineProperty(bound, "Fields", () => state.lazyFields());
 
   Lazy.defineProperty(bound, "Doc", () =>
-    SystemFields.extendWithSystemFields(
-      tableName,
-      (bound as { Fields: TableSchema_ }).Fields,
-    ),
+    SystemFields.extendWithSystemFields(tableName, bound.Fields),
   );
 
   return bound;
@@ -387,28 +384,27 @@ const makeUnnamed = <
     });
 
   return Object.assign(bind, {
-    [TypeId]: TypeId as TypeId,
+    [TypeId]: TypeId,
     indexes: state.indexes,
     searchIndexes: state.searchIndexes,
     vectorIndexes: state.vectorIndexes,
     index,
     searchIndex,
     vectorIndex,
-  }) as UnnamedTable_;
+  } as const) as UnnamedTable_;
 };
 
 export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
   lazyFields: () => TableSchema_,
 ): UnnamedTable<TableSchema_, TableSchemaToTableValidator<TableSchema_>> => {
   type TableValidator_ = TableSchemaToTableValidator<TableSchema_>;
-  type UnnamedTable_ = UnnamedTable<TableSchema_, TableValidator_>;
 
   return makeUnnamed<TableSchema_, TableValidator_, {}, {}, {}>({
     lazyFields,
     indexes: {},
     searchIndexes: {},
     vectorIndexes: {},
-  }) as UnnamedTable_;
+  });
 };
 
 // Vendored types from convex-js, partially modified. Ideally we could use these directly. See https://github.com/get-convex/convex-js/pull/14

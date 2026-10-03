@@ -615,11 +615,12 @@ describe("group assembly enforcement", () => {
   it("throws at build time when a middleware implementation is missing", () => {
     const missingMiddleware = GroupImpl.make(databaseSchema, coveredGroup).pipe(
       Layer.provide(viewerNameImpl),
-    ) as unknown as Layer.Layer<GroupImpl.GroupImpl<"Unfinalized">>;
+    );
 
     expect(() =>
       RegisteredFunctions.buildForGroup<typeof coveredGroup>(
         databaseSchema,
+        // @ts-expect-error Deliberately bypass finalization's static completeness check to exercise the runtime missing-middleware error.
         GroupImpl.finalize(missingMiddleware),
         RegisteredConvexFunction.make,
       ),

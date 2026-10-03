@@ -35,9 +35,7 @@ describe("Table", () => {
 
     it("the unnamed callable still has Function.prototype.name and that does not confuse the predicate", () => {
       const unnamed = Table.make(lazyFields);
-      expect(typeof (unnamed as unknown as { name: unknown }).name).toBe(
-        "string",
-      );
+      expect(unnamed.name).toEqual(expect.any(String));
       expect(Table.isUnnamedTable(unnamed)).toBe(true);
     });
 

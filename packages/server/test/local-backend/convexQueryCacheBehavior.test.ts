@@ -31,8 +31,7 @@ const queryOnce = <R extends Ref.AnyPublicQuery>(
   ...args: Ref.OptionalArgs<R>
 ): Effect.Effect<Ref.Returns<R>, ConvexQueryError> =>
   Effect.tryPromise({
-    try: () =>
-      client.query(Ref.getFunctionReference(ref), (args[0] ?? {}) as never),
+    try: () => client.query(Ref.getFunctionReference(ref), args[0] ?? {}),
     catch: (error) =>
       new ConvexQueryError({ message: `query failed: ${String(error)}` }),
   });

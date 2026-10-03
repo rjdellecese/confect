@@ -5,6 +5,7 @@ import type * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
@@ -198,17 +199,14 @@ export const discoverInstalledComponents = Effect.fn(
     plugins: [componentConfigPlugin(path)],
   }).pipe(Effect.mapError((error) => fromBundlerError(displayPath, error)));
 
-  const app = module.default as
-    | { _isRoot?: unknown; export?: unknown }
-    | null
-    | undefined;
+  const isApp = Schema.is(
+    Schema.Struct({
+      _isRoot: Schema.Literal(true),
+      export: Schema.declare(Predicate.isFunction),
+    }),
+  );
 
-  if (
-    app === null ||
-    typeof app !== "object" ||
-    app._isRoot !== true ||
-    typeof app.export !== "function"
-  ) {
+  if (!isApp(module.default)) {
     return yield* new InvalidConvexConfigError({
       configPath: displayPath,
       reason:
@@ -216,8 +214,10 @@ export const discoverInstalledComponents = Effect.fn(
     });
   }
 
+  const app = module.default;
+
   const analysis = yield* Effect.try({
-    try: () => (app.export as () => unknown)(),
+    try: () => app.export(),
     catch: (cause) =>
       new InvalidConvexConfigError({
         configPath: displayPath,

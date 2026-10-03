@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as Command from "effect/cli/Command";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -737,7 +738,7 @@ const convexConfigStructureWatcher = Effect.fnUntraced(function* (
             signal,
             "specDirty",
             restartQueue,
-            event._tag !== "Update",
+            !Predicate.isTagged(event, "Update"),
           )
         : Effect.void,
     ),

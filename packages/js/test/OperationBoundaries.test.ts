@@ -6,6 +6,7 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
@@ -61,7 +62,7 @@ const operations: ReadonlyArray<{
 const clients = [
   {
     name: "HttpClient",
-    make: (invoke: (args: unknown) => Promise<unknown>) =>
+    make: (invoke: (args: unknown) => Promise<string>) =>
       HttpClient.make({
         url: "https://test.convex.cloud",
         setAuth: () => {},
@@ -73,7 +74,7 @@ const clients = [
   },
   {
     name: "WebSocketClient",
-    make: (invoke: (args: unknown) => Promise<unknown>) =>
+    make: (invoke: (args: unknown) => Promise<string>) =>
       WebSocketClient.make("https://test.convex.cloud", {
         setAuth: () => {},
         close: () => Promise.resolve(),
@@ -119,7 +120,7 @@ describe.each(clients)("$name operation boundaries", ({ name, make }) => {
           expect(Option.getOrThrow(child.parent)).toBe(parent);
           expect(child.traceId).toBe(parent.traceId);
           expect(child.status._tag).toBe("Ended");
-          assert(child.status._tag === "Ended");
+          assert(Predicate.isTagged(child.status, "Ended"));
           expect(Exit.isSuccess(child.status.exit)).toBe(true);
         }
         expect(children[0]).not.toBe(children[1]);
@@ -132,8 +133,11 @@ describe.each(clients)("$name operation boundaries", ({ name, make }) => {
       Effect.gen(function* () {
         const tracer = yield* Tracer.Tracer;
         const span = vi.fn(tracer.span.bind(tracer));
+        const encodedError = yield* Schema.encodeEffect(NotFound)(
+          new NotFound({ id: "abc" }),
+        );
         const client = make(() =>
-          Promise.reject(new ConvexError({ _tag: "NotFound", id: "abc" })),
+          Promise.reject(new ConvexError(encodedError)),
         );
         const result = yield* operation
           .run(client)
@@ -151,7 +155,7 @@ describe.each(clients)("$name operation boundaries", ({ name, make }) => {
         ]);
         const child = span.mock.results[1]?.value;
         assert(child !== undefined);
-        assert(child.status._tag === "Ended");
+        assert(Predicate.isTagged(child.status, "Ended"));
         assert(Exit.isFailure(child.status.exit));
         expect(
           Option.getOrThrow(Cause.findErrorOption(child.status.exit.cause)),

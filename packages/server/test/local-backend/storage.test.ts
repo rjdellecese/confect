@@ -8,7 +8,7 @@
 import { Ref } from "@confect/core";
 import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import { expect, layer } from "@effect/vitest";
-import type { GenericId } from "convex/values";
+import { GenericId } from "@confect/core/GenericId";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -19,7 +19,7 @@ import refs from "./fixtures/confect/_generated/refs";
 import * as LocalBackend from "./LocalBackend";
 
 const UploadResponse = Schema.fromJsonString(
-  Schema.Struct({ storageId: Schema.String }),
+  Schema.Struct({ storageId: GenericId("_storage") }),
 );
 
 layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
@@ -96,7 +96,7 @@ layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
         const blobUrl = yield* Effect.promise(() =>
           client.query(
             Ref.getFunctionReference(refs.public.groups.storage.getUrl),
-            { storageId: storageId as GenericId<"_storage"> },
+            { storageId },
           ),
         );
         expect(new URL(blobUrl).pathname).toContain("/api/storage/");

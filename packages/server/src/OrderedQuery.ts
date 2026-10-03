@@ -78,19 +78,21 @@ export const make = <Table_ extends Table.AnyWithProps>(
       Document.decode(table),
     );
 
-    return {
+    const result: PaginationResult<TableInfo_["document"]> = {
       page: parsedPage,
       isDone: paginationResult.isDone,
       continueCursor: paginationResult.continueCursor,
-      /* v8 ignore start */
-      ...(paginationResult.splitCursor
-        ? { splitCursor: paginationResult.splitCursor }
-        : {}),
-      ...(paginationResult.pageStatus
-        ? { pageStatus: paginationResult.pageStatus }
-        : {}),
-      /* v8 ignore stop */
     };
+    /* v8 ignore start */
+    if (paginationResult.splitCursor) {
+      result.splitCursor = paginationResult.splitCursor;
+    }
+
+    if (paginationResult.pageStatus) {
+      result.pageStatus = paginationResult.pageStatus;
+    }
+    /* v8 ignore stop */
+    return result;
   });
 
   return {

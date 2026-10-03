@@ -45,7 +45,7 @@ const listTableFiles = Effect.gen(function* () {
   const tablesDirectory = path.join(confectDirectory, TABLES_DIRNAME);
 
   if (!(yield* fs.exists(tablesDirectory))) {
-    return [] as ReadonlyArray<string>;
+    return Array.empty<string>();
   }
 
   const allPaths = yield* fs.readDirectory(tablesDirectory, {
