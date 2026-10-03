@@ -12,12 +12,12 @@ Migrate Confect to Effect 4, add middleware, experimental composable query strea
 
 ### Requirements
 
-- Use Node.js 24 or later and `effect ^4.0.0` across your application.
-- Upgrade `convex` to `^1.45.0` when using `@confect/server`.
-- Use the Effect 4 version of `@effect/platform-node` for Node actions. It remains an optional peer of `@confect/server`.
-- Use `foldkit ^0.165.0` with the new `@confect/foldkit` package, with its matching `effect` and `@effect/platform-browser` 4.0.0 peers.
+- All Confect packages require Node.js 24 or later and `effect ^4.0.0`.
+- `@confect/server` requires `convex ^1.45.0`.
+- `@confect/server`'s optional `@effect/platform-node` peer requires `^4.0.0` for Node actions.
+- The new `@confect/foldkit` package requires `foldkit ^0.165.0`.
 
-Confect no longer depends on `@effect/platform` or `@effect/cli`. Their APIs are part of Effect 4; use imports such as `effect/http`, `effect/http-api`, `effect/process`, and `effect/ai`. Upgrade your application's Effect schemas, services, and platform integrations together, then run `confect codegen` to regenerate the v10 bindings.
+Confect no longer depends on `@effect/platform` or `@effect/cli`. Run `confect codegen` to regenerate the v10 bindings after updating your Confect declarations.
 
 ### Breaking changes
 
@@ -75,9 +75,9 @@ export default Table.make(() => Schema.Struct({ text: Schema.String }));
 
 Table declarations still return a schema, not the field maps now used by function arguments. The server's `Table` re-exports remain available for server-only use. Run `confect codegen` to regenerate the deploy schema and client-safe table bindings.
 
-#### Update Effect schemas and error handling
+#### Use serializable schemas and handle updated errors
 
-Use Effect 4's schema APIs, including `Schema.Union([a, b])`, `Schema.Literals([...])`, `Schema.optionalKey`, and checks such as `Schema.String.check(Schema.isMaxLength(100))`. Use a serializable codec such as `Schema.OptionFromNullOr(...)` for an `Option` crossing a Convex boundary: `Schema.Option` no longer provides the serialized representation expected there.
+Confect function schemas must encode to Convex values. Use a serializable codec such as `Schema.OptionFromNullOr(...)` for an `Option` crossing that boundary: `Schema.Option` no longer provides the serialized representation expected there.
 
 Table schemas support object-shaped transformations, encoded-key mappings, brands, suspended schemas, and unions of those schemas while retaining Convex system fields. Every step must remain object-shaped; class schemas such as `Schema.Class` are not valid table schemas.
 
@@ -119,7 +119,7 @@ export default ConfectHttpRouter.make(
 );
 ```
 
-Put the endpoint prefix on the Effect API itself, for example with `.prefix("/api")`, and migrate endpoint and handler declarations to Effect 4. For interactive documentation, configure Scalar's `baseServerURL` with your deployment's site URL. Missing API handler groups are compile-time errors. You can merge plain routes from `effect/http/HttpRouter.add` and global middleware from `HttpRouter.middleware` into the same layer.
+Put the endpoint prefix on the Effect API itself, for example with `.prefix("/api")`. For interactive documentation, configure Scalar's `baseServerURL` with your deployment's site URL. Missing API handler groups are compile-time errors. You can merge plain routes from `effect/http/HttpRouter.add` and global middleware from `HttpRouter.middleware` into the same layer.
 
 The returned Convex router serves Effect routes through a catch-all at `/`; plain Convex routes added to it still take precedence. Route-layer construction, handlers, and middleware can read Convex environment variables through Confect's configuration provider.
 
@@ -225,7 +225,7 @@ Ordinary builder calls are unchanged, and `DataModel.FromTables` still accepts a
 
 #### Review configuration and time-dependent queries
 
-Empty-string environment variables now count as missing values, so `Config.withDefault` and `Config.option` recover from them. Update configuration constructors such as `Config.string` to Effect 4's `Config.String`. Node actions use Effect 4's process APIs and `@effect/platform-node`'s `NodeServices` instead of `@effect/platform`'s `Command` and `NodeContext`.
+Confect's configuration provider now treats empty-string environment variables as missing values, so `Config.withDefault` and `Config.option` recover from them.
 
 Raw `Date.now()` calls in queries now observe time and invalidate Convex's query cache instead of returning v9's globally stubbed value. Explicit Effect clock reads such as `Clock.currentTimeMillis` and `Clock.currentTimeNanos` continue to opt into time tracking. Effect's internal timestamps for logging and tracing do not invalidate the cache.
 
