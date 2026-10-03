@@ -1,10 +1,13 @@
+import * as MiddlewareAttachment from "./MiddlewareAttachment";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
+import * as Result from "effect/Result";
 import type * as FunctionSpec from "./FunctionSpec";
+import type * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 import { validateConfectFunctionIdentifier } from "./Identifier";
 
-export const TypeId = "@confect/core/GroupSpec";
+export const TypeId = "~@confect/core/GroupSpec";
 export type TypeId = typeof TypeId;
 
 export const isGroupSpec = (u: unknown): u is AnyWithProps =>
@@ -17,8 +20,9 @@ export interface GroupSpec<
   // Subgroups may be of any runtime, independent of this group's own runtime: a
   // group is only a namespace for its children, which are otherwise-independent
   // modules. Functions, by contrast, stay homogeneous (a Node group only accepts
-  // Node actions) — `addFunction` keeps the `<Runtime>` bound below.
+  // Node actions)—`addFunction` keeps the `<Runtime>` bound below.
   Groups_ extends AnyWithProps = never,
+  MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec = never,
 > {
   readonly [TypeId]: TypeId;
   readonly runtime: Runtime;
@@ -33,19 +37,54 @@ export interface GroupSpec<
   readonly groups: {
     [GroupName in Name<Groups_>]: WithName<Groups_, GroupName>;
   };
+  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
+  readonly middlewareAttachments: ReadonlyArray<
+    MiddlewareAttachment.MiddlewareAttachment<MiddlewareSpecs_>
+  >;
+  readonly "~Functions": Functions_;
+  readonly "~Groups": Groups_;
 
   addFunction<Function extends FunctionSpec.AnyWithPropsWithRuntime<Runtime>>(
-    function_: Function,
-  ): GroupSpec<Runtime, Name_, Functions_ | Function, Groups_>;
+    function_: Function &
+      MiddlewareSpec.ValidateAddedFunction<Function, MiddlewareSpecs_>,
+  ): GroupSpec<
+    Runtime,
+    Name_,
+    Functions_ | Function,
+    Groups_,
+    MiddlewareSpecs_
+  >;
 
   addGroup<Group extends AnyWithProps>(
     group: Group,
-  ): GroupSpec<Runtime, Name_, Functions_, Groups_ | Group>;
+  ): GroupSpec<Runtime, Name_, Functions_, Groups_ | Group, MiddlewareSpecs_>;
 
   addGroupAt<const AtName extends string, Group extends AnyWithProps>(
     name: AtName,
     group: Group,
-  ): GroupSpec<Runtime, Name_, Functions_, Groups_ | NamedAt<Group, AtName>>;
+  ): GroupSpec<
+    Runtime,
+    Name_,
+    Functions_,
+    Groups_ | NamedAt<Group, AtName>,
+    MiddlewareSpecs_
+  >;
+
+  middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
+    middlewareSpec: MiddlewareSpec_ &
+      MiddlewareSpec.ValidateAttach<
+        MiddlewareSpec_,
+        Functions_,
+        MiddlewareSpecs_
+      >,
+    ...options: MiddlewareAttachment.Args<NoInfer<MiddlewareSpec_>>
+  ): GroupSpec<
+    Runtime,
+    Name_,
+    Functions_,
+    Groups_,
+    MiddlewareSpecs_ | MiddlewareSpec_
+  >;
 }
 
 export interface Any {
@@ -56,7 +95,8 @@ export interface AnyWithProps extends GroupSpec<
   RuntimeAndFunctionType.Runtime,
   string,
   FunctionSpec.AnyWithProps,
-  AnyWithProps
+  AnyWithProps,
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyWithPropsWithRuntime<
@@ -65,16 +105,18 @@ export interface AnyWithPropsWithRuntime<
   Runtime,
   string,
   FunctionSpec.AnyWithPropsWithRuntime<Runtime>,
-  AnyWithPropsWithRuntime<Runtime>
+  AnyWithPropsWithRuntime<Runtime>,
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export type Name<Group extends AnyWithProps> = Group["name"];
 
-export type Functions<Group extends AnyWithProps> =
-  Group["functions"][keyof Group["functions"]];
+export type Functions<Group extends AnyWithProps> = Group["~Functions"];
 
-export type Groups<Group extends AnyWithProps> =
-  Group["groups"][keyof Group["groups"]];
+export type Groups<Group extends AnyWithProps> = Group["~Groups"];
+
+export type MiddlewareSpecs<Group extends AnyWithProps> =
+  Group["middlewareSpecs"][number];
 
 export type GroupNames<Group extends AnyWithProps> = [Groups<Group>] extends [
   never,
@@ -87,7 +129,10 @@ export type WithName<
   Name_ extends Name<Group>,
 > = Extract<Group, { readonly name: Name_ }>;
 
-/** Assigns a segment name to a leaf group created with {@link make} for typing and refs. */
+/**
+ * Assigns a segment name to a leaf group created with {@link make} for typing
+ * and refs.
+ */
 export type NamedAt<Group extends Any, Name_ extends string> = Omit<
   Group,
   "name"
@@ -103,13 +148,24 @@ export type AddGroups<
     infer Runtime,
     infer Name_,
     infer Functions_,
-    infer Groups_
+    infer Groups_,
+    infer MiddlewareSpecs_
   >
-    ? GroupSpec<Runtime, Name_, Functions_, Groups_ | ExtraGroups>
+    ? GroupSpec<
+        Runtime,
+        Name_,
+        Functions_,
+        Groups_ | ExtraGroups,
+        MiddlewareSpecs_
+      >
     : never;
 
 const Proto = {
   [TypeId]: TypeId,
+
+  get middlewareSpecs() {
+    return this.middlewareAttachments.map(({ spec }) => spec);
+  },
 
   addFunction<Function extends FunctionSpec.AnyWithProps>(
     this: Any,
@@ -117,11 +173,26 @@ const Proto = {
   ) {
     const this_ = this as AnyWithProps;
 
+    const overlapping = function_.middlewareAttachments.find(
+      ({ spec: functionMiddlewareSpec }) =>
+        !("options" in functionMiddlewareSpec) &&
+        this_.middlewareAttachments.some(
+          ({ spec: groupMiddlewareSpec }) =>
+            groupMiddlewareSpec.key === functionMiddlewareSpec.key,
+        ),
+    );
+    if (overlapping !== undefined) {
+      throw new Error(
+        `Middleware "${overlapping.spec.key}" is attached to both function "${function_.name}" and its group`,
+      );
+    }
+
     return makeProto({
       runtime: this_.runtime,
       name: this_.name,
       functions: Record.set(this_.functions, function_.name, function_),
       groups: this_.groups,
+      middlewareAttachments: this_.middlewareAttachments,
     });
   },
 
@@ -134,6 +205,7 @@ const Proto = {
       name: this_.name,
       functions: this_.functions,
       groups: Record.set(this_.groups, group_.name, group_),
+      middlewareAttachments: this_.middlewareAttachments,
     });
   },
 
@@ -146,32 +218,93 @@ const Proto = {
       name: this_.name,
       functions: this_.functions,
       groups: Record.set(this_.groups, name, withName(name, group_)),
+      middlewareAttachments: this_.middlewareAttachments,
     });
   },
-};
+
+  middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
+    this: Any,
+    middlewareSpec: MiddlewareSpec_,
+    ...options: ReadonlyArray<unknown>
+  ) {
+    const this_ = this as AnyWithProps;
+
+    if (
+      !("options" in middlewareSpec) &&
+      this_.middlewareAttachments.some(
+        ({ spec }) => spec.key === middlewareSpec.key,
+      )
+    ) {
+      throw new Error(
+        `Middleware "${middlewareSpec.key}" is already attached to this group`,
+      );
+    }
+
+    for (const function_ of Object.values(this_.functions)) {
+      if (
+        !("options" in middlewareSpec) &&
+        function_.middlewareAttachments.some(
+          ({ spec }) => spec.key === middlewareSpec.key,
+        )
+      ) {
+        throw new Error(
+          `Middleware "${middlewareSpec.key}" is attached to both function "${function_.name}" and its group`,
+        );
+      }
+    }
+
+    return makeProto({
+      runtime: this_.runtime,
+      name: this_.name,
+      functions: this_.functions,
+      groups: this_.groups,
+      middlewareAttachments: [
+        ...this_.middlewareAttachments,
+        { spec: middlewareSpec, options: options[0] },
+      ],
+    });
+  },
+} satisfies ThisType<AnyWithProps>;
 
 const makeProto = <
   Runtime extends RuntimeAndFunctionType.Runtime,
   Name_ extends string,
   Functions_ extends FunctionSpec.AnyWithPropsWithRuntime<Runtime>,
   Groups_ extends AnyWithPropsWithRuntime<Runtime>,
+  MiddlewareAttachments_ extends
+    ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>,
 >({
   runtime,
   name,
   functions,
   groups,
+  middlewareAttachments,
 }: {
   runtime: Runtime;
   name: Name_;
   functions: Record.ReadonlyRecord<string, Functions_>;
   groups: Record.ReadonlyRecord<string, Groups_>;
-}): GroupSpec<Runtime, Name_, Functions_, Groups_> =>
+  middlewareAttachments: MiddlewareAttachments_;
+}): GroupSpec<
+  Runtime,
+  Name_,
+  Functions_,
+  Groups_,
+  MiddlewareAttachments_[number]["spec"]
+> =>
   Object.assign(Object.create(Proto), {
     runtime,
     name,
     functions,
     groups,
-  });
+    middlewareAttachments,
+  }) as GroupSpec<
+    Runtime,
+    Name_,
+    Functions_,
+    Groups_,
+    MiddlewareAttachments_[number]["spec"]
+  >;
 
 export const make = (): GroupSpec<"Convex", ""> =>
   makeProto({
@@ -179,6 +312,7 @@ export const make = (): GroupSpec<"Convex", ""> =>
     name: "",
     functions: Record.empty(),
     groups: Record.empty(),
+    middlewareAttachments: [],
   });
 
 export const makeAt = <const Name_ extends string>(
@@ -191,6 +325,7 @@ export const makeAt = <const Name_ extends string>(
     name,
     functions: Record.empty(),
     groups: Record.empty(),
+    middlewareAttachments: [],
   });
 };
 
@@ -200,6 +335,7 @@ export const makeNode = (): GroupSpec<"Node", ""> =>
     name: "",
     functions: Record.empty(),
     groups: Record.empty(),
+    middlewareAttachments: [],
   });
 
 export const makeNodeAt = <const Name_ extends string>(
@@ -212,13 +348,15 @@ export const makeNodeAt = <const Name_ extends string>(
     name,
     functions: Record.empty(),
     groups: Record.empty(),
+    middlewareAttachments: [],
   });
 };
 
-export const withName = <const Name_ extends string>(
+export function withName<const Name_ extends string, Group extends Any>(
   name: Name_,
-  group: Any,
-): AnyWithProps => {
+  group: Group,
+): NamedAt<Group, Name_>;
+export function withName(name: string, group: Any): AnyWithProps {
   validateConfectFunctionIdentifier(name);
   const group_ = group as AnyWithProps;
 
@@ -231,5 +369,24 @@ export const withName = <const Name_ extends string>(
     name,
     functions: group_.functions,
     groups: group_.groups,
+    middlewareAttachments: group_.middlewareAttachments,
   });
-};
+}
+
+export const validateMiddleware = (
+  group: AnyWithProps,
+): Result.Result<void, MiddlewareAttachment.ValidationError> =>
+  Result.gen(function* () {
+    yield* MiddlewareAttachment.validateAll(
+      group.middlewareAttachments,
+      `group "${group.name}"`,
+    );
+    for (const function_ of Object.values(group.functions)) {
+      yield* MiddlewareAttachment.validateAll(
+        [...group.middlewareAttachments, ...function_.middlewareAttachments],
+        `function "${function_.name}"`,
+      );
+    }
+    for (const child of Object.values(group.groups))
+      yield* validateMiddleware(child);
+  });

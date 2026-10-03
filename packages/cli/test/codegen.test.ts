@@ -1,12 +1,12 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -28,10 +28,10 @@ const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fi
 const CodegenLayer = Layer.mergeAll(
   NodePath.layer,
   NodeFileSystem.layer,
-  Layer.mock(ConfectDirectory, {
-    _tag: "@confect/cli/ConfectDirectory",
-    get: Effect.succeed(fixtureConfect),
-  }),
+  Layer.succeed(
+    ConfectDirectory,
+    ConfectDirectory.of({ get: Effect.succeed(fixtureConfect) }),
+  ),
 );
 
 layer(CodegenLayer)("TableModule.discover", (it) => {
@@ -64,10 +64,10 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
         yield* Effect.gen(function* () {
           yield* fs.writeFileString(stowedPath, "export default {};\n");
           const tables = yield* discoverTables;
-          const result = yield* Effect.either(validateTables(tables));
+          const result = yield* Effect.result(validateTables(tables));
 
-          assert(Either.isLeft(result));
-          expect(result.left._tag).toBe("InvalidTableDefaultExportError");
+          assert(Result.isFailure(result));
+          expect(result.failure._tag).toBe("InvalidTableDefaultExportError");
         }).pipe(Effect.ensuring(fs.remove(stowedPath).pipe(Effect.orDie)));
       }),
   );
@@ -89,18 +89,18 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
 
         yield* Effect.gen(function* () {
           yield* fs.writeFileString(invalidPath, "export default {};\n");
-          const result = yield* Effect.either(discoverTables);
+          const result = yield* Effect.result(discoverTables);
 
-          assert(Either.isLeft(result));
-          expect(result.left._tag).toBe("InvalidTableFilenameError");
+          assert(Result.isFailure(result));
+          expect(result.failure._tag).toBe("InvalidTableFilenameError");
         }).pipe(Effect.ensuring(fs.remove(invalidPath).pipe(Effect.orDie)));
       }),
   );
 
   // Names are derived from the basename alone, but the directory is scanned
-  // recursively — so two files in different subdirectories can resolve to the
+  // recursively—so two files in different subdirectories can resolve to the
   // same table name. That must fail loudly rather than racing on a shared
-  // generated wrapper path / emitting duplicate schema bindings. Two distinct
+  // generated wrapper path/emitting duplicate schema bindings. Two distinct
   // colliding names are seeded so we can assert that *all* collisions are
   // captured in a single pass, not just the first.
   it.effect("rejects every set of files that resolve to the same name", () =>
@@ -128,21 +128,21 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
         "export default {};\n",
       );
 
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         discoverTables.pipe(
           Effect.provide(
-            Layer.mock(ConfectDirectory, {
-              _tag: "@confect/cli/ConfectDirectory",
-              get: Effect.succeed(tempDir),
-            }),
+            Layer.succeed(
+              ConfectDirectory,
+              ConfectDirectory.of({ get: Effect.succeed(tempDir) }),
+            ),
           ),
         ),
       );
 
-      assert(Either.isLeft(result));
-      assert(result.left._tag === "DuplicateTableNameError");
+      assert(Result.isFailure(result));
+      assert(result.failure._tag === "DuplicateTableNameError");
       const byName = Object.fromEntries(
-        result.left.collisions.map((c) => [
+        result.failure.collisions.map((c) => [
           c.tableName,
           [...c.tablePaths].sort(),
         ]),
@@ -167,10 +167,10 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
 
       const tables = yield* discoverTables.pipe(
         Effect.provide(
-          Layer.mock(ConfectDirectory, {
-            _tag: "@confect/cli/ConfectDirectory",
-            get: Effect.succeed(tempDir),
-          }),
+          Layer.succeed(
+            ConfectDirectory,
+            ConfectDirectory.of({ get: Effect.succeed(tempDir) }),
+          ),
         ),
       );
 
@@ -200,10 +200,10 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
 
         const tables = yield* discoverTables.pipe(
           Effect.provide(
-            Layer.mock(ConfectDirectory, {
-              _tag: "@confect/cli/ConfectDirectory",
-              get: Effect.succeed(tempDir),
-            }),
+            Layer.succeed(
+              ConfectDirectory,
+              ConfectDirectory.of({ get: Effect.succeed(tempDir) }),
+            ),
           ),
         );
 
@@ -224,7 +224,6 @@ const leaf = (
   specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
 });
 
-const emptyArgs = Schema.Struct({});
 const emptyReturns = Schema.Null;
 
 layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
@@ -235,7 +234,6 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
       const parentGroupSpec = GroupSpec.make().addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: () => emptyArgs,
           returns: () => emptyReturns,
         }),
       );
@@ -256,24 +254,23 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
         const parentGroupSpec = GroupSpec.make().addFunction(
           FunctionSpec.publicQuery({
             name: "archived",
-            args: () => emptyArgs,
             returns: () => emptyReturns,
           }),
         );
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           validateNoParentChildNameCollisions(
             [parent, child],
             new Map([[parent.relativePath, parentGroupSpec]]),
           ),
         );
 
-        assert(Either.isLeft(result));
-        expect(result.left._tag).toBe("ParentChildNameCollisionError");
-        expect(result.left.collisionKind).toBe("function");
-        expect(result.left.collisionName).toBe("archived");
-        expect(result.left.parentSpecPath).toBe("notes.spec.ts");
-        expect(result.left.childSpecPath).toBe("notes/archived.spec.ts");
+        assert(Result.isFailure(result));
+        expect(result.failure._tag).toBe("ParentChildNameCollisionError");
+        expect(result.failure.collisionKind).toBe("function");
+        expect(result.failure.collisionName).toBe("archived");
+        expect(result.failure.parentSpecPath).toBe("notes.spec.ts");
+        expect(result.failure.childSpecPath).toBe("notes/archived.spec.ts");
       }),
   );
 
@@ -286,23 +283,22 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
         const inner = GroupSpec.makeAt("inner").addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: () => emptyArgs,
             returns: () => emptyReturns,
           }),
         );
         const parentGroupSpec = GroupSpec.make().addGroupAt("archived", inner);
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           validateNoParentChildNameCollisions(
             [parent, child],
             new Map([[parent.relativePath, parentGroupSpec]]),
           ),
         );
 
-        assert(Either.isLeft(result));
-        expect(result.left._tag).toBe("ParentChildNameCollisionError");
-        expect(result.left.collisionKind).toBe("group");
-        expect(result.left.collisionName).toBe("archived");
+        assert(Result.isFailure(result));
+        expect(result.failure._tag).toBe("ParentChildNameCollisionError");
+        expect(result.failure.collisionKind).toBe("group");
+        expect(result.failure.collisionName).toBe("archived");
       }),
   );
 
@@ -315,18 +311,20 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
   );
 });
 
-const leafFor = (relativePath: string, pathSegments: [string, ...string[]]) =>
-  Effect.gen(function* () {
-    const specImportPath = yield* specImportPathFromGenerated(relativePath);
-    return {
-      relativePath,
-      pathSegments,
-      groupPathDot: Array.join(pathSegments, "."),
-      exportName: pathSegments[pathSegments.length - 1]!,
-      runtime: Option.none(),
-      specImportPath,
-    } satisfies LeafModule;
-  });
+const leafFor = Effect.fnUntraced(function* (
+  relativePath: string,
+  pathSegments: [string, ...string[]],
+) {
+  const specImportPath = yield* specImportPathFromGenerated(relativePath);
+  return {
+    relativePath,
+    pathSegments,
+    groupPathDot: Array.join(pathSegments, "."),
+    exportName: pathSegments[pathSegments.length - 1]!,
+    runtime: Option.none(),
+    specImportPath,
+  } satisfies LeafModule;
+});
 
 for (const { name, pathLayer, sep } of [
   { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
@@ -347,13 +345,12 @@ for (const { name, pathLayer, sep } of [
             const parentGroupSpec = GroupSpec.make().addFunction(
               FunctionSpec.publicQuery({
                 name: "archived",
-                args: () => emptyArgs,
                 returns: () => emptyReturns,
               }),
             );
 
             const path = yield* Path.Path;
-            const result = yield* Effect.either(
+            const result = yield* Effect.result(
               validateNoParentChildNameCollisions(
                 [parent, child],
                 new Map([
@@ -362,9 +359,9 @@ for (const { name, pathLayer, sep } of [
               ),
             );
 
-            assert(Either.isLeft(result));
-            expect(result.left._tag).toBe("ParentChildNameCollisionError");
-            expect(result.left.collisionName).toBe("archived");
+            assert(Result.isFailure(result));
+            expect(result.failure._tag).toBe("ParentChildNameCollisionError");
+            expect(result.failure.collisionName).toBe("archived");
           }),
       );
     },

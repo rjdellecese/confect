@@ -10,6 +10,8 @@ Typed errors are transported as Convex's native [`ConvexError`](https://docs.con
 
 Error schemas are optional. When omitted, the error type defaults to `never` and every call site keeps its prior shape.
 
+[Middleware](/server/middleware) can declare error schemas too; a middleware's errors join the error union of every function it covers, alongside the function's own `error` schema.
+
 ## Declaring an error schema
 
 Add an `error` field to any `FunctionSpec` constructor. The schema is an ordinary Effect `Schema`, so a `Schema.TaggedError` class works well for a single failure mode.
@@ -29,7 +31,7 @@ export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "getOrFail",
-    args: () => Schema.Struct({ noteId: Id("notes") }),
+    args: () => ({ noteId: Id("notes") }),
     returns: () => notes.Doc,
     error: () => NoteNotFound,
   }),
@@ -55,9 +57,9 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()(
 
 FunctionSpec.publicMutation({
   name: "deleteOrFail",
-  args: () => Schema.Struct({ noteId: Id("notes") }),
+  args: () => ({ noteId: Id("notes") }),
   returns: () => Schema.Null,
-  error: () => Schema.Union(NoteNotFound, Forbidden),
+  error: () => Schema.Union([NoteNotFound, Forbidden]),
 });
 ```
 
@@ -124,7 +126,11 @@ HttpClient.query(refs.public.notes.getOrFail, { noteId });
 // Effect.Effect<Note, NoteNotFound | HttpClientError | ParseError>
 ```
 
-`WebSocketClient.reactiveQuery` carries typed errors too: when the subscribed query fails with a typed error, the returned `Stream` terminates with the decoded value in its error channel. See [HTTP](/clients/js/http) and [WebSocket](/clients/js/websocket).
+`WebSocketClient.reactiveQuery` carries typed errors too: when the subscribed
+query fails, its `Stream` terminates with the decoded value in the error
+channel. `reactiveQueryResult` instead emits successes and failures as `Result`
+values while leaving the Convex subscription open. See
+[HTTP](/clients/js/http) and [WebSocket](/clients/js/websocket).
 
 ### `@confect/test`
 

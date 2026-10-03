@@ -1,7 +1,7 @@
 {
   "name": "@confect/cli",
   "description": "Developer tooling for codegen and sync",
-  "version": "9.4.4",
+  "version": "10.0.0-next.27",
   "author": "RJ Dellecese",
   "bin": {
     "confect": "./bin/confect.mjs"
@@ -10,11 +10,7 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@effect/cli": "^0.77.2",
-    "@effect/platform": "^0.97.1",
-    "@effect/platform-node": "^0.108.1",
-    "@effect/printer": "^0.51.0",
-    "@effect/printer-ansi": "^0.51.0",
+    "@effect/platform-node": "^4.0.0",
     "bundle-require": "^5.1.0",
     "code-block-writer": "^13.0.3",
     "esbuild": "0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0",
@@ -22,12 +18,12 @@
   },
   "devDependencies": {
     "@convex-dev/workpool": "0.4.12",
-    "@effect/tsgo": "0.46.1",
-    "@effect/vitest": "0.30.0",
-    "@types/node": "26.6.3",
+    "@effect/tsgo": "0.44.0",
+    "@effect/vitest": "4.0.0",
+    "@types/node": "24.13.3",
     "@vitest/coverage-v8": "5.0.2",
-    "convex": "1.46.0",
-    "effect": "3.22.2",
+    "convex": "1.45.0",
+    "effect": "4.0.0",
     "tsdown": "0.23.0",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
@@ -36,7 +32,7 @@
     "vitest": "5.0.2"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "exports": {
     "./package.json": "./package.json"
@@ -59,7 +55,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/server": "workspace:^",
-    "effect": "^3.21.2"
+    "effect": "^4.0.0"
   },
   "repository": {
     "type": "git",
@@ -71,7 +67,8 @@
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit --project tsconfig.json"
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "typecheck:inexact": "tsc --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
   },
   "type": "module"
 }

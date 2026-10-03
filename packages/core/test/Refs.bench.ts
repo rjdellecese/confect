@@ -6,7 +6,7 @@ import type * as Ref from "@confect/core/Ref";
 import type * as Refs from "@confect/core/Refs";
 import * as Spec from "@confect/core/Spec";
 
-const Args = Schema.Struct({});
+const Args = { id: Schema.String };
 const Returns = Schema.String;
 
 // --- Small spec: 1 group, 2 functions ---
@@ -15,14 +15,12 @@ const SmallSpec = Spec.make().add(
     .addFunction(
       FunctionSpec.publicQuery({
         name: "login",
-        args: () => Args,
         returns: () => Returns,
       }),
     )
     .addFunction(
       FunctionSpec.publicMutation({
         name: "logout",
-        args: () => Args,
         returns: () => Returns,
       }),
     ),
@@ -347,15 +345,15 @@ void ({} as Refs.Refs<any>);
 
 bench("Refs<Spec> (unfiltered)", () => {
   return {} as Refs.Refs<MediumSpec>;
-}).types([2125, "instantiations"]);
+}).types([2274, "instantiations"]);
 
 bench("Refs<Spec, AnyPublic> (public-filtered)", () => {
   return {} as Refs.Refs<MediumSpec, Ref.AnyPublic>;
-}).types([2042, "instantiations"]);
+}).types([2351, "instantiations"]);
 
 bench("Refs<Spec, AnyInternal> (internal-filtered)", () => {
   return {} as Refs.Refs<MediumSpec, Ref.AnyInternal>;
-}).types([2070, "instantiations"]);
+}).types([2335, "instantiations"]);
 
 // Laziness: accessing one leaf should be cheaper than accessing all leaves.
 // If the type were eagerly evaluated, both benchmarks would have the same
@@ -363,7 +361,7 @@ bench("Refs<Spec, AnyInternal> (internal-filtered)", () => {
 
 bench("resolve one leaf", () => {
   return {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["list"];
-}).types([2314, "instantiations"]);
+}).types([2654, "instantiations"]);
 
 bench("resolve all leaves", () => {
   return [
@@ -374,50 +372,50 @@ bench("resolve all leaves", () => {
     {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["comments"]["list"],
     {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["comments"]["create"],
   ];
-}).types([2712, "instantiations"]);
+}).types([3279, "instantiations"]);
 
 // --- Small spec (1 group, 2 functions) ---
 
 bench("small: Refs (unfiltered)", () => {
   return {} as Refs.Refs<SmallSpec>;
-}).types([655, "instantiations"]);
+}).types([884, "instantiations"]);
 
 bench("small: Refs (public-filtered)", () => {
   return {} as Refs.Refs<SmallSpec, Ref.AnyPublic>;
-}).types([655, "instantiations"]);
+}).types([909, "instantiations"]);
 
 bench("small: Refs (internal-filtered)", () => {
   return {} as Refs.Refs<SmallSpec, Ref.AnyInternal>;
-}).types([631, "instantiations"]);
+}).types([950, "instantiations"]);
 
 bench("small: Refs (resolve one leaf)", () => {
   return {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"];
-}).types([891, "instantiations"]);
+}).types([1095, "instantiations"]);
 
 bench("small: Refs (resolve all leaves)", () => {
   return [
     {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"],
     {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["logout"],
   ];
-}).types([971, "instantiations"]);
+}).types([1194, "instantiations"]);
 
 // --- Large spec (8 groups, 28 functions) ---
 
 bench("large: Refs (unfiltered)", () => {
   return {} as Refs.Refs<LargeSpec>;
-}).types([4104, "instantiations"]);
+}).types([3913, "instantiations"]);
 
 bench("large: Refs (public-filtered)", () => {
   return {} as Refs.Refs<LargeSpec, Ref.AnyPublic>;
-}).types([3963, "instantiations"]);
+}).types([3991, "instantiations"]);
 
 bench("large: Refs (internal-filtered)", () => {
   return {} as Refs.Refs<LargeSpec, Ref.AnyInternal>;
-}).types([3979, "instantiations"]);
+}).types([3969, "instantiations"]);
 
 bench("large: Refs (resolve one leaf)", () => {
   return {} as Refs.Refs<LargeSpec, Ref.AnyPublic>["users"]["list"];
-}).types([4261, "instantiations"]);
+}).types([4320, "instantiations"]);
 
 bench("large: Refs (resolve all leaves)", () => {
   type PublicRefs = Refs.Refs<LargeSpec, Ref.AnyPublic>;
@@ -439,4 +437,4 @@ bench("large: Refs (resolve all leaves)", () => {
     {} as PublicRefs["settings"]["get"],
     {} as PublicRefs["settings"]["update"],
   ];
-}).types([5551, "instantiations"]);
+}).types([6280, "instantiations"]);

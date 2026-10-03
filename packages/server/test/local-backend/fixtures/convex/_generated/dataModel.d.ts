@@ -26,7 +26,24 @@ import type { GenericId } from "convex/values";
  * `mutationGeneric` to make them type-safe.
  */
 
-export type DataModel = {};
+export type DataModel = {
+  transactionNotes: {
+    document: {
+      caseId: string;
+      value: string;
+      _id: Id<"transactionNotes">;
+      _creationTime: number;
+    };
+    fieldPaths: "_creationTime" | "_id" | "caseId" | "value";
+    indexes: {
+      by_id: ["_id"];
+      by_creation_time: ["_creationTime"];
+      by_caseId: ["caseId", "_creationTime"];
+    };
+    searchIndexes: {};
+    vectorIndexes: {};
+  };
+};
 
 /**
  * The names of all of your Convex tables.

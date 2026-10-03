@@ -11,21 +11,22 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
-import type * as DatabaseSchema from "./DatabaseSchema";
+import * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type { DocumentByName as DocumentByName_ } from "./DataModel";
 import * as Document from "./Document";
 import * as QueryInitializer from "./QueryInitializer";
 import type * as Table from "./Table";
-import type * as TableInfo from "./TableInfo";
 
 /**
- * The argument accepted by `patch`: like `Partial<Doc>`, but the fields that
- * are already optional also accept `undefined`, since setting a field to
- * `undefined` unsets it.
+ * The argument accepted by `patch`: like `Partial<Doc>` without system fields,
+ * but the fields that are already optional also accept `undefined`, since
+ * setting a field to `undefined` unsets it.
  */
 export type PatchValue<Doc> = {
-  [K in keyof Doc]?: undefined extends Doc[K] ? Doc[K] | undefined : Doc[K];
+  [
+    K in keyof Doc as K extends "_id" | "_creationTime" ? never : K
+  ]?: undefined extends Doc[K] ? Doc[K] | undefined : Doc[K];
 };
 
 export interface DatabaseWriterTableAccessor<
@@ -38,7 +39,7 @@ export interface DatabaseWriterTableAccessor<
   ) => Effect.Effect<GenericId<TableName>, Document.DocumentEncodeError>;
   readonly patch: (
     id: GenericId<TableName>,
-    patchedValues: PatchValue<Document.WithoutSystemFields<Doc>>,
+    patchedValues: PatchValue<Doc>,
   ) => Effect.Effect<
     void,
     | QueryInitializer.GetByIdFailure
@@ -56,7 +57,8 @@ export interface DatabaseWriterTableAccessor<
  * The service shape backing the `DatabaseWriter` tag. Named (rather than an
  * inferred anonymous object) so declaration emit prints
  * `DatabaseWriterService<…>` by reference instead of expanding the data model.
- * `Docs` is the optional named document registry (see `DatabaseReaderService`).
+ * `Docs` is the optional named document registry (see
+ * `DatabaseReaderService`).
  */
 export interface DatabaseWriterService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -78,13 +80,14 @@ export interface DatabaseWriterService<
 }
 
 /**
- * The tag's *Identifier* is `Docs`-independent (see `DatabaseReaderTag`); only
- * the *Service* carries `Docs` so writer inputs print the named doc interfaces.
+ * The tag's _Identifier_ is `Docs`-independent (see `DatabaseReaderTag`); only
+ * the _Service_ carries `Docs` so writer inputs print the named doc
+ * interfaces.
  */
 export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
-> = Context.Tag<
+> = Context.Service<
   DatabaseWriterService<DatabaseSchema_>,
   DatabaseWriterService<DatabaseSchema_, Docs>
 >;
@@ -100,100 +103,82 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   const table = <const TableName extends DataModel.TableNames<DataModel_>>(
     tableName: TableName,
   ) => {
-    const tableDef = databaseSchema.tables[tableName] as Table.WithName<
-      DatabaseSchema.Tables<DatabaseSchema_>,
-      TableName
-    >;
+    const tableDef = DatabaseSchema.tables(databaseSchema)[tableName];
 
-    const insert = (
+    const insert = Effect.fn("DatabaseWriter.insert")(function* (
       document: Document.WithoutSystemFields<
         DocumentByName_<DataModel_, TableName>
       >,
-    ) =>
-      Effect.gen(function* () {
-        const encodedDocument = yield* Document.encode(
-          document,
+    ) {
+      const encodedDocument = yield* Document.encode(document, tableDef);
+
+      const id = yield* Effect.promise(() =>
+        convexDatabaseWriter.insert(
           tableName,
-          tableDef.Fields,
-        );
+          encodedDocument as WithoutSystemFields<
+            DocumentByName<DataModel.ToConvex<DataModel_>, TableName>
+          >,
+        ),
+      );
 
-        const id = yield* Effect.promise(() =>
-          convexDatabaseWriter.insert(
-            tableName,
-            encodedDocument as WithoutSystemFields<
-              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>
-            >,
-          ),
-        );
+      return id;
+    });
 
-        return id;
-      });
-
-    const patch = (
+    const patch = Effect.fn("DatabaseWriter.patch")(function* (
       id: GenericId<TableName>,
-      patchedValues: PatchValue<
-        Document.WithoutSystemFields<DocumentByName_<DataModel_, TableName>>
-      >,
-    ) =>
-      Effect.gen(function* () {
-        const tableSchema = tableDef.Fields as TableInfo.TableSchema<
-          DataModel.TableInfoWithName_<DataModel_, TableName>
-        >;
+      patchedValues: PatchValue<DocumentByName_<DataModel_, TableName>>,
+    ) {
+      const originalDecodedDoc = yield* QueryInitializer.getById<
+        Table.AnyWithProps,
+        TableName
+      >(
+        convexDatabaseWriter as any,
+        tableDef,
+      )(id);
 
-        const originalDecodedDoc = yield* QueryInitializer.getById(
-          tableName,
-          convexDatabaseWriter as any,
-          tableDef,
-        )(id);
+      const updatedEncodedDoc = yield* pipe(
+        patchedValues,
+        Record.reduce(originalDecodedDoc, (acc, value, key) =>
+          value === undefined
+            ? Record.remove(acc, key)
+            : Record.set(acc, key, value),
+        ),
+        Document.encode(tableDef),
+      );
 
-        const updatedEncodedDoc = yield* pipe(
-          patchedValues,
-          Record.reduce(originalDecodedDoc, (acc, value, key) =>
-            value === undefined
-              ? Record.remove(acc, key)
-              : Record.set(acc, key, value),
-          ),
-          Document.encode(tableName, tableSchema),
-        );
+      yield* Effect.promise(() =>
+        convexDatabaseWriter.replace(
+          id,
+          updatedEncodedDoc as Expand<
+            BetterOmit<
+              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
+              "_creationTime" | "_id"
+            >
+          >,
+        ),
+      );
+    });
 
-        yield* Effect.promise(() =>
-          convexDatabaseWriter.replace(
-            id,
-            updatedEncodedDoc as Expand<
-              BetterOmit<
-                DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
-                "_creationTime" | "_id"
-              >
-            >,
-          ),
-        );
-      });
-
-    const replace = (
+    const replace = Effect.fn("DatabaseWriter.replace")(function* (
       id: GenericId<TableName>,
       value: Document.WithoutSystemFields<
         DocumentByName_<DataModel_, TableName>
       >,
-    ) =>
-      Effect.gen(function* () {
-        const updatedEncodedDoc = yield* Document.encode(
-          value,
-          tableName,
-          tableDef.Fields,
-        );
+    ) {
+      const updatedEncodedDoc = yield* Document.encode(value, tableDef);
 
-        yield* Effect.promise(() =>
-          convexDatabaseWriter.replace(
-            id,
-            updatedEncodedDoc as Expand<
-              BetterOmit<
-                DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
-                "_creationTime" | "_id"
-              >
-            >,
-          ),
-        );
-      });
+      yield* Effect.promise(() =>
+        convexDatabaseWriter.replace(
+          id,
+          updatedEncodedDoc as Expand<
+            BetterOmit<
+              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
+              "_creationTime" | "_id"
+            >
+          >,
+        ),
+      );
+    });
 
     const delete_ = (id: GenericId<TableName>) =>
       Effect.promise(() => convexDatabaseWriter.delete(id));
@@ -215,7 +200,7 @@ export const DatabaseWriter = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 >(): DatabaseWriterTag<DatabaseSchema_, Docs> =>
-  Context.GenericTag<
+  Context.Service<
     DatabaseWriterService<DatabaseSchema_>,
     DatabaseWriterService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseWriter");

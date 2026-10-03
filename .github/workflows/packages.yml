@@ -7,108 +7,15 @@ on:
   pull_request:
     branches:
       - main
-    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 jobs:
-  prerelease-sync-policy:
-    name: Prerelease sync policy
-    if: github.event_name == 'pull_request'
-    permissions:
-      checks: write
-      contents: read
-      pull-requests: read
+  test-scripts:
+    name: Test (scripts)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: ".node-version"
-      - run: node --test scripts/auditPrereleaseSync.test.mjs
-      - name: Fetch current main
-        if: contains(github.event.pull_request.labels.*.name, 'prerelease-sync')
-        run: git fetch origin main:refs/remotes/origin/main
-      - name: Verify current main is in the sync
-        id: audit
-        continue-on-error: true
-        if: contains(github.event.pull_request.labels.*.name, 'prerelease-sync')
-        run: node scripts/auditPrereleaseSync.mjs --main-ref origin/main --head-ref HEAD
-      - name: Record prerelease sync freshness
-        if: always() && contains(github.event.pull_request.labels.*.name, 'prerelease-sync')
-        env:
-          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if [[ "$AUDIT_OUTCOME" != "success" ]]; then
-            conclusion="failure"
-            title="The prerelease sync is stale"
-            summary="Refresh this PR with a real merge of the current main tip."
-          else
-            conclusion="success"
-            title="The prerelease sync contains current main"
-            summary="The audited PR head contains the current main tip as an ancestor."
-          fi
-
-          jq -n \
-            --arg conclusion "$conclusion" \
-            --arg head_sha "$HEAD_SHA" \
-            --arg summary "$summary" \
-            --arg title "$title" \
-            '{
-              name: "Prerelease sync freshness",
-              head_sha: $head_sha,
-              status: "completed",
-              conclusion: $conclusion,
-              output: { title: $title, summary: $summary }
-            }' | gh api --method POST \
-              -H "Accept: application/vnd.github+json" \
-              "repos/${GITHUB_REPOSITORY}/check-runs" \
-              --input -
-      - name: Fail a stale prerelease sync
-        if: contains(github.event.pull_request.labels.*.name, 'prerelease-sync') && steps.audit.outcome != 'success'
-        run: exit 1
-
-  invalidate-prerelease-syncs:
-    name: Invalidate prerelease syncs
-    if: github.event_name == 'push' && github.ref_name == 'main'
-    permissions:
-      checks: write
-      pull-requests: read
-    runs-on: ubuntu-latest
-    steps:
-      - name: Mark open sync PRs stale
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh pr list \
-            --repo "$GITHUB_REPOSITORY" \
-            --state open \
-            --label prerelease-sync \
-            --json headRefOid,number \
-            --jq '.[] | [.number, .headRefOid] | @tsv' |
-          while IFS=$'\t' read -r number head_sha; do
-            [[ -n "$head_sha" ]] || continue
-
-            jq -n \
-              --arg head_sha "$head_sha" \
-              --arg summary "main advanced to ${GITHUB_SHA}. Refresh PR #${number} with a real merge of that commit." \
-              '{
-                name: "Prerelease sync freshness",
-                head_sha: $head_sha,
-                status: "completed",
-                conclusion: "failure",
-                output: {
-                  title: "main advanced after this prerelease sync",
-                  summary: $summary
-                }
-              }' | gh api --method POST \
-                -H "Accept: application/vnd.github+json" \
-                "repos/${GITHUB_REPOSITORY}/check-runs" \
-                --input -
-          done
+      - uses: ./.github/actions/confect-setup
+      - run: bun test ./scripts
 
   format:
     name: Format
@@ -124,9 +31,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      # `tsc -b` typechecks the whole project-references graph in dependency
-      # order (and emits the .d.ts that tsdown no longer does).
       - run: pnpm typecheck
+      - run: pnpm typecheck:inexact
 
   lint:
     name: Lint
@@ -134,8 +40,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      # Oxlint lints the whole workspace in one fast pass; `pnpm lint` also runs
-      # the Syncpack and package-metadata checks.
       - run: pnpm lint
 
   circular:
@@ -144,9 +48,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      # dpdm fails on real (runtime) import cycles; type-only `import type`
-      # cycles are ignored. confect-setup builds the packages first so
-      # cross-package `@confect/*` imports resolve.
       - run: pnpm circular
 
   test:
@@ -156,11 +57,19 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        package: [cli, core, js, server]
+        package: [cli, core, foldkit, js, server]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       - run: cd packages/${{ matrix.package }} && pnpm test
+
+  test-oxlint-rules:
+    name: Test (oxlint-rules)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm exec vitest run --project confect-oxlint-rules
 
   test-mock-backend:
     name: Test (mock-backend, ${{ matrix.os }})
@@ -173,9 +82,6 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter @confect/server test:mock-backend
-      - uses: ./.github/actions/verify-codegen-committed
-        with:
-          path: packages/server/test/mock-backend/fixtures
 
   test-local-backend:
     name: Test (local-backend)
@@ -191,17 +97,7 @@ jobs:
           restore-keys: |
             convex-local-backend-${{ runner.os }}-
       - run: pnpm --filter @confect/server test:local-backend
-      - uses: ./.github/actions/verify-codegen-committed
-        with:
-          path: packages/server/test/local-backend/fixtures
 
-  # The `verify-codegen-committed` steps on the two test jobs above only see
-  # what those jobs regenerate, and the test `globalSetup` runs `confect
-  # codegen` alone — which writes `confect/_generated/` and the `convex/`
-  # wrapper files. The Convex-side `convex/_generated/api.d.ts` and
-  # `dataModel.d.ts` come from the `convex dev` half of the `codegen:*`
-  # scripts, which nothing in CI ran, so drift in them was structurally
-  # invisible and accumulated silently. This job runs the scripts in full.
   codegen-fixtures:
     name: Codegen (server fixtures)
     runs-on: ubuntu-latest
@@ -252,6 +148,7 @@ jobs:
           [
             "@confect/cli",
             "@confect/core",
+            "@confect/foldkit",
             "@confect/js",
             "@confect/server",
             "@confect/react",

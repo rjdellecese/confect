@@ -1,7 +1,7 @@
 import { pipe } from "effect/Function";
 import * as Equal from "effect/Equal";
 import * as Hash from "effect/Hash";
-import { describe, expect, expectTypeOf, test } from "vitest";
+import { describe, expect, expectTypeOf, test } from "@effect/vitest";
 
 import * as QueryResult from "@confect/react/QueryResult";
 
@@ -69,12 +69,15 @@ describe("Equal", () => {
     expect(Equal.equals(QueryResult.succeed(1), QueryResult.succeed(2))).toBe(
       false,
     );
-    const err = new Error("x");
+    const err = { _tag: "NotFound", id: "a" };
     expect(Equal.equals(QueryResult.fail(err), QueryResult.fail(err))).toBe(
       true,
     );
     expect(
-      Equal.equals(QueryResult.fail(new Error("x")), QueryResult.fail(err)),
+      Equal.equals(
+        QueryResult.fail({ _tag: "NotFound", id: "b" }),
+        QueryResult.fail(err),
+      ),
     ).toBe(false);
   });
 
@@ -145,7 +148,7 @@ describe("match", () => {
   test("data-last applies self last", () => {
     const f = QueryResult.match({
       onLoading: (s) => `L:${s}`,
-      onSuccess: (v) => `S:${v}`,
+      onSuccess: (v) => `S:${String(v)}`,
       onFailure: (e) => `F:${String(e)}`,
     });
 

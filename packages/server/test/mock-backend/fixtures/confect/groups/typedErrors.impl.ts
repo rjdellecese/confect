@@ -89,7 +89,7 @@ const tryGetNote = FunctionImpl.make(
   "tryGetNote",
   ({ noteId }) =>
     Effect.gen(function* () {
-      const runQuery = yield* QueryRunner;
+      const { runQuery } = yield* QueryRunner;
 
       const note = yield* runQuery(
         refs.public.groups.typedErrors.getNoteOrFail,
@@ -111,7 +111,7 @@ const tryDeleteNote = FunctionImpl.make(
   "tryDeleteNote",
   ({ noteId, asAdmin }) =>
     Effect.gen(function* () {
-      const runMutation = yield* MutationRunner;
+      const { runMutation } = yield* MutationRunner;
 
       yield* runMutation(refs.public.groups.typedErrors.deleteNoteOrFail, {
         noteId,
@@ -139,12 +139,12 @@ const tryFailingAction = FunctionImpl.make(
   "tryFailingAction",
   ({ kind }) =>
     Effect.gen(function* () {
-      const runAction = yield* ActionRunner;
+      const { runAction } = yield* ActionRunner;
 
       yield* runAction(refs.public.groups.typedErrors.failingAction, { kind });
 
-      return yield* Effect.dieMessage(
-        "failingAction was expected to fail with a typed error",
+      return yield* Effect.die(
+        new Error("failingAction was expected to fail with a typed error"),
       );
     }).pipe(
       Effect.catchTags({
@@ -181,7 +181,7 @@ const tryInternalGetNote = FunctionImpl.make(
   "tryInternalGetNote",
   ({ noteId }) =>
     Effect.gen(function* () {
-      const runQuery = yield* QueryRunner;
+      const { runQuery } = yield* QueryRunner;
 
       const note = yield* runQuery(
         refs.internal.groups.typedErrors.internalGetNoteOrFail,

@@ -1,4 +1,5 @@
-import { FunctionSpec, GroupSpec, Registry } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@confect/core";
+import { Registry, type RegistryItems } from "@confect/server";
 import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
 import { describe, expect, it } from "@effect/vitest";
 import * as Context from "effect/Context";
@@ -10,7 +11,6 @@ import * as Schema from "effect/Schema";
 const fnSpec = <const Name extends string>(name: Name) =>
   FunctionSpec.publicQuery({
     name,
-    args: () => Schema.Struct({}),
     returns: () => Schema.Null,
   });
 
@@ -28,17 +28,16 @@ const handler = (() => Effect.succeed(null)) as never;
  * `RegisteredFunctions.buildForGroup` and the CLI's `validateImpl` build a
  * group's impl layer) and return the resulting `RegistryItems` tree.
  */
-const collectRegistry = <RIn>(
+const collectRegistry = Effect.fnUntraced(function* <RIn>(
   layer: Layer.Layer<RIn, never, never>,
-): Effect.Effect<Registry.RegistryItems> =>
-  Effect.gen(function* () {
-    const ref = yield* Ref.make<Registry.RegistryItems>({});
-    yield* Layer.build(layer).pipe(
-      Effect.scoped,
-      Effect.provideService(Registry.Registry, ref),
-    );
-    return yield* Ref.get(ref);
-  });
+): Effect.fn.Return<RegistryItems.RegistryItems> {
+  const ref = yield* Ref.make<RegistryItems.RegistryItems>({});
+  yield* Layer.build(layer).pipe(
+    Effect.scoped,
+    Effect.provideService(Registry.Registry, ref),
+  );
+  return yield* Ref.get(ref);
+});
 
 describe("FunctionImpl.make", () => {
   it.effect(
@@ -68,8 +67,7 @@ describe("FunctionImpl.make", () => {
     "registers a group's function without any api or assembled-spec context",
     () =>
       Effect.gen(function* () {
-        // Registration consults neither `api` nor the assembled spec tree —
-        // only the group's own spec and the function name — so independent
+        // Registration consults neither `api` nor the assembled spec tree—only the group's own spec and the function name—so independent
         // groups each register their own function flatly.
         const parent = GroupSpec.make().addFunction(fnSpec("parentFn"));
         const child = GroupSpec.make().addFunction(fnSpec("childFn"));
@@ -107,7 +105,7 @@ describe("GroupImpl.finalize", () => {
         );
 
         const registeredFunctionNames = yield* Effect.gen(function* () {
-          const ref = yield* Ref.make<Registry.RegistryItems>({});
+          const ref = yield* Ref.make<RegistryItems.RegistryItems>({});
           const context = yield* Layer.build(groupLayer).pipe(
             Effect.provideService(Registry.Registry, ref),
           );

@@ -1,19 +1,19 @@
 {
   "name": "@confect/react",
   "description": "Client-side bindings for React apps",
-  "version": "9.4.4",
+  "version": "10.0.0-next.27",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "0.30.0",
+    "@effect/vitest": "4.0.0",
     "@testing-library/react": "16.3.3",
-    "@types/node": "26.6.3",
+    "@types/node": "24.13.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "convex": "1.46.0",
-    "effect": "3.22.2",
+    "convex": "1.45.0",
+    "effect": "4.0.0",
     "happy-dom": "20.14.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -24,7 +24,7 @@
     "vitest": "5.0.2"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "exports": {
     ".": {
@@ -58,7 +58,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "convex": "^1.36.0",
-    "effect": "^3.21.2",
+    "effect": "^4.0.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "repository": {
@@ -70,7 +70,8 @@
     "dev": "tsdown --watch --no-clean --config-loader unrun",
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
-    "typecheck": "tsc -b tsconfig.src.json"
+    "typecheck": "tsc -b tsconfig.src.json",
+    "typecheck:inexact": "tsc --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
   },
   "sideEffects": false,
   "type": "module",

@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Confect 🧁",
+  "name": "Confect \ud83e\uddc1",
   "colors": {
     "primary": "#941A97",
     "light": "#F9A8D4",
@@ -53,14 +53,17 @@
         "pages": [
           "server/functions",
           "server/error-handling",
+          "server/middleware",
           "server/plain-convex-functions",
           "server/node-actions",
+          "server/ai-gateway",
           {
             "icon": "database",
             "group": "Database",
             "pages": [
               "server/database/schema",
               "server/database/reading",
+              "server/database/streams",
               "server/database/writing",
               "server/database/system-tables",
               "server/database/determinism"
@@ -70,6 +73,7 @@
           "server/storage",
           "server/scheduling",
           "server/authentication",
+          "server/metadata",
           "server/cron-jobs",
           "server/search",
           "server/components",
@@ -84,7 +88,8 @@
             "icon": "js",
             "group": "JS",
             "pages": ["clients/js/http", "clients/js/websocket"]
-          }
+          },
+          "clients/foldkit"
         ]
       },
       {
@@ -113,5 +118,279 @@
       "cursor",
       "vscode"
     ]
-  }
+  },
+  "redirects": [
+    {
+      "source": "/v9/getting-started/introduction",
+      "destination": "/getting-started/introduction"
+    },
+    {
+      "source": "/v9/getting-started/quickstart",
+      "destination": "/getting-started/quickstart"
+    },
+    {
+      "source": "/v9/concepts/packages",
+      "destination": "/concepts/packages"
+    },
+    {
+      "source": "/v9/concepts/project-structure",
+      "destination": "/concepts/project-structure"
+    },
+    {
+      "source": "/v9/concepts/spec-impl-model",
+      "destination": "/concepts/spec-impl-model"
+    },
+    {
+      "source": "/v9/concepts/file-naming-conventions",
+      "destination": "/concepts/file-naming-conventions"
+    },
+    {
+      "source": "/v9/concepts/services",
+      "destination": "/concepts/services"
+    },
+    {
+      "source": "/v9/concepts/schema-restrictions",
+      "destination": "/concepts/schema-restrictions"
+    },
+    {
+      "source": "/v9/server/functions",
+      "destination": "/server/functions"
+    },
+    {
+      "source": "/v9/server/error-handling",
+      "destination": "/server/error-handling"
+    },
+    {
+      "source": "/v9/server/middleware",
+      "destination": "/server/middleware"
+    },
+    {
+      "source": "/v9/server/plain-convex-functions",
+      "destination": "/server/plain-convex-functions"
+    },
+    {
+      "source": "/v9/server/node-actions",
+      "destination": "/server/node-actions"
+    },
+    {
+      "source": "/v9/server/ai-gateway",
+      "destination": "/server/ai-gateway"
+    },
+    {
+      "source": "/v9/server/database/schema",
+      "destination": "/server/database/schema"
+    },
+    {
+      "source": "/v9/server/database/reading",
+      "destination": "/server/database/reading"
+    },
+    {
+      "source": "/v9/server/database/streams",
+      "destination": "/server/database/streams"
+    },
+    {
+      "source": "/v9/server/database/writing",
+      "destination": "/server/database/writing"
+    },
+    {
+      "source": "/v9/server/database/system-tables",
+      "destination": "/server/database/system-tables"
+    },
+    {
+      "source": "/v9/server/database/determinism",
+      "destination": "/server/database/determinism"
+    },
+    {
+      "source": "/v9/server/http-api",
+      "destination": "/server/http-api"
+    },
+    {
+      "source": "/v9/server/storage",
+      "destination": "/server/storage"
+    },
+    {
+      "source": "/v9/server/scheduling",
+      "destination": "/server/scheduling"
+    },
+    {
+      "source": "/v9/server/authentication",
+      "destination": "/server/authentication"
+    },
+    {
+      "source": "/v9/server/metadata",
+      "destination": "/server/metadata"
+    },
+    {
+      "source": "/v9/server/cron-jobs",
+      "destination": "/server/cron-jobs"
+    },
+    {
+      "source": "/v9/server/search",
+      "destination": "/server/search"
+    },
+    {
+      "source": "/v9/server/components",
+      "destination": "/server/components"
+    },
+    {
+      "source": "/v9/server/environment-variables",
+      "destination": "/server/environment-variables"
+    },
+    {
+      "source": "/v9/clients/react",
+      "destination": "/clients/react"
+    },
+    {
+      "source": "/v9/clients/js/http",
+      "destination": "/clients/js/http"
+    },
+    {
+      "source": "/v9/clients/js/websocket",
+      "destination": "/clients/js/websocket"
+    },
+    {
+      "source": "/v9/clients/foldkit",
+      "destination": "/clients/foldkit"
+    },
+    {
+      "source": "/v9/guides/testing",
+      "destination": "/guides/testing"
+    },
+    {
+      "source": "/v10/getting-started/introduction",
+      "destination": "/getting-started/introduction"
+    },
+    {
+      "source": "/v10/getting-started/quickstart",
+      "destination": "/getting-started/quickstart"
+    },
+    {
+      "source": "/v10/concepts/packages",
+      "destination": "/concepts/packages"
+    },
+    {
+      "source": "/v10/concepts/project-structure",
+      "destination": "/concepts/project-structure"
+    },
+    {
+      "source": "/v10/concepts/spec-impl-model",
+      "destination": "/concepts/spec-impl-model"
+    },
+    {
+      "source": "/v10/concepts/file-naming-conventions",
+      "destination": "/concepts/file-naming-conventions"
+    },
+    {
+      "source": "/v10/concepts/services",
+      "destination": "/concepts/services"
+    },
+    {
+      "source": "/v10/concepts/schema-restrictions",
+      "destination": "/concepts/schema-restrictions"
+    },
+    {
+      "source": "/v10/server/functions",
+      "destination": "/server/functions"
+    },
+    {
+      "source": "/v10/server/error-handling",
+      "destination": "/server/error-handling"
+    },
+    {
+      "source": "/v10/server/middleware",
+      "destination": "/server/middleware"
+    },
+    {
+      "source": "/v10/server/plain-convex-functions",
+      "destination": "/server/plain-convex-functions"
+    },
+    {
+      "source": "/v10/server/node-actions",
+      "destination": "/server/node-actions"
+    },
+    {
+      "source": "/v10/server/ai-gateway",
+      "destination": "/server/ai-gateway"
+    },
+    {
+      "source": "/v10/server/database/schema",
+      "destination": "/server/database/schema"
+    },
+    {
+      "source": "/v10/server/database/reading",
+      "destination": "/server/database/reading"
+    },
+    {
+      "source": "/v10/server/database/streams",
+      "destination": "/server/database/streams"
+    },
+    {
+      "source": "/v10/server/database/writing",
+      "destination": "/server/database/writing"
+    },
+    {
+      "source": "/v10/server/database/system-tables",
+      "destination": "/server/database/system-tables"
+    },
+    {
+      "source": "/v10/server/database/determinism",
+      "destination": "/server/database/determinism"
+    },
+    {
+      "source": "/v10/server/http-api",
+      "destination": "/server/http-api"
+    },
+    {
+      "source": "/v10/server/storage",
+      "destination": "/server/storage"
+    },
+    {
+      "source": "/v10/server/scheduling",
+      "destination": "/server/scheduling"
+    },
+    {
+      "source": "/v10/server/authentication",
+      "destination": "/server/authentication"
+    },
+    {
+      "source": "/v10/server/metadata",
+      "destination": "/server/metadata"
+    },
+    {
+      "source": "/v10/server/cron-jobs",
+      "destination": "/server/cron-jobs"
+    },
+    {
+      "source": "/v10/server/search",
+      "destination": "/server/search"
+    },
+    {
+      "source": "/v10/server/components",
+      "destination": "/server/components"
+    },
+    {
+      "source": "/v10/server/environment-variables",
+      "destination": "/server/environment-variables"
+    },
+    {
+      "source": "/v10/clients/react",
+      "destination": "/clients/react"
+    },
+    {
+      "source": "/v10/clients/js/http",
+      "destination": "/clients/js/http"
+    },
+    {
+      "source": "/v10/clients/js/websocket",
+      "destination": "/clients/js/websocket"
+    },
+    {
+      "source": "/v10/clients/foldkit",
+      "destination": "/clients/foldkit"
+    },
+    {
+      "source": "/v10/guides/testing",
+      "destination": "/guides/testing"
+    }
+  ]
 }

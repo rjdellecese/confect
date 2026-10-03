@@ -5,6 +5,14 @@
   "singleQuote": false,
   "tabWidth": 2,
   "printWidth": 80,
+  "jsdoc": {
+    "capitalizeDescriptions": true,
+    "commentLineStrategy": "multiline",
+    "descriptionWithDot": true,
+    "lineWrappingStyle": "greedy",
+    "preferCodeFences": true,
+    "separateTagGroups": true
+  },
   "sortPackageJson": false,
   "ignorePatterns": ["**/_generated/**", "**/fixtures/convex/**/*.ts"]
 }

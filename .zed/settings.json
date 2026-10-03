@@ -4,9 +4,7 @@
       "initialization_options": {
         "settings": {
           "run": "onType",
-          "fixKind": "safe_fix",
-          "typeAware": true,
-          "unusedDisableDirectives": "deny"
+          "fixKind": "safe_fix"
         }
       }
     },
@@ -20,7 +18,7 @@
     },
     "effect-tsgo": {
       "settings": {
-        "package_version": "0.46.1"
+        "package_version": "0.44.0"
       }
     }
   },

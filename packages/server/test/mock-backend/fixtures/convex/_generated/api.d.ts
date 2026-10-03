@@ -146,6 +146,28 @@ export declare const api: {
     cjsImporter: {
       now: FunctionReference<"query", "public", {}, string>;
     };
+    middleware: {
+      firstNoteForViewer: FunctionReference<"query", "public", {}, string>;
+      shoutName: FunctionReference<"query", "public", {}, string>;
+      viewerName: FunctionReference<"query", "public", {}, string>;
+      viewerNameAction: FunctionReference<"action", "public", {}, string>;
+      viewerNameMutation: FunctionReference<"mutation", "public", {}, string>;
+    };
+    middlewareOptions: {
+      action: FunctionReference<"action", "public", {}, string>;
+      longName: FunctionReference<"query", "public", {}, string>;
+      mutation: FunctionReference<"mutation", "public", {}, string>;
+      shortName: FunctionReference<"query", "public", {}, string>;
+    };
+    middlewareOrder: {
+      record: FunctionReference<
+        "mutation",
+        "public",
+        { blocked: boolean; blockedAtFunction: boolean },
+        null
+      >;
+      recordPlain: FunctionReference<"mutation", "public", {}, null>;
+    };
     notes: {
       delete_: FunctionReference<
         "mutation",
@@ -157,19 +179,15 @@ export declare const api: {
         "query",
         "public",
         {},
-        | { _tag: "None" }
-        | {
-            _tag: "Some";
-            value: {
-              _creationTime: number;
-              _id: Id<"notes">;
-              author?: { name: string; role: "admin" | "user" };
-              embedding?: Array<number>;
-              tag?: string;
-              text: string;
-              userId?: Id<"users">;
-            };
-          }
+        {
+          _creationTime: number;
+          _id: Id<"notes">;
+          author?: { name: string; role: "admin" | "user" };
+          embedding?: Array<number>;
+          tag?: string;
+          text: string;
+          userId?: Id<"users">;
+        } | null
       >;
       insert: FunctionReference<
         "mutation",
@@ -207,6 +225,10 @@ export declare const api: {
         { text: string },
         Id<"notes">
       >;
+    };
+    scheduling: {
+      manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;
+      manyOpsQuery: FunctionReference<"query", "public", {}, number>;
     };
     typedErrors: {
       deleteNoteOrFail: FunctionReference<
@@ -289,24 +311,23 @@ export declare const api: {
  */
 export declare const internal: {
   groups: {
+    middlewareHelpers: {
+      firstUsername: FunctionReference<"query", "internal", {}, string | null>;
+    };
     notes: {
       internalGetFirst: FunctionReference<
         "query",
         "internal",
         {},
-        | { _tag: "None" }
-        | {
-            _tag: "Some";
-            value: {
-              _creationTime: number;
-              _id: Id<"notes">;
-              author?: { name: string; role: "admin" | "user" };
-              embedding?: Array<number>;
-              tag?: string;
-              text: string;
-              userId?: Id<"users">;
-            };
-          }
+        {
+          _creationTime: number;
+          _id: Id<"notes">;
+          author?: { name: string; role: "admin" | "user" };
+          embedding?: Array<number>;
+          tag?: string;
+          text: string;
+          userId?: Id<"users">;
+        } | null
       >;
     };
     typedErrors: {

@@ -1,15 +1,22 @@
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import type { PlatformError } from "effect/PlatformError";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
+import * as Result from "effect/Result";
+import * as String from "effect/String";
 import * as Layer from "effect/Layer";
 import type { CodegenError } from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
+import * as Bundler from "@confect/cli/Bundler";
 import {
+  discoverLeafImplFiles,
+  discoverLeafSpecFiles,
   groupPathFromRelativeModulePath,
   implPathForSpec,
   isLeafImplPath,
@@ -27,10 +34,10 @@ const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fi
 const LeafModuleLayer = Layer.mergeAll(
   NodePath.layer,
   NodeFileSystem.layer,
-  Layer.mock(ConfectDirectory, {
-    _tag: "@confect/cli/ConfectDirectory",
-    get: Effect.succeed(fixtureConfect),
-  }),
+  Layer.succeed(
+    ConfectDirectory,
+    ConfectDirectory.of({ get: Effect.succeed(fixtureConfect) }),
+  ),
 );
 
 interface TempFile {
@@ -38,37 +45,44 @@ interface TempFile {
   readonly contents: string;
 }
 
-const withTempFiles = <A>(
-  files: ReadonlyArray<TempFile>,
-  use: Effect.Effect<
+const withTempFiles = Effect.fnUntraced(
+  function* <A>(
+    files: ReadonlyArray<TempFile>,
+    use: Effect.Effect<
+      A,
+      CodegenError,
+      ConfectDirectory | Path.Path | FileSystem.FileSystem
+    >,
+  ): Effect.fn.Return<
     A,
-    CodegenError,
+    CodegenError | PlatformError,
     ConfectDirectory | Path.Path | FileSystem.FileSystem
-  >,
-) =>
-  Effect.gen(function* () {
+  > {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     yield* Effect.forEach(files, ({ relativePath, contents }) =>
       fs.writeFileString(path.join(fixtureConfect, relativePath), contents),
     );
     return yield* use;
-  }).pipe(
-    Effect.ensuring(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        yield* Effect.forEach(files, ({ relativePath }) =>
-          Effect.gen(function* () {
-            const absolutePath = path.join(fixtureConfect, relativePath);
-            if (yield* fs.exists(absolutePath)) {
-              yield* fs.remove(absolutePath);
-            }
-          }),
-        );
-      }).pipe(Effect.orDie),
+  },
+  (effect, files) =>
+    effect.pipe(
+      Effect.ensuring(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* Effect.forEach(files, ({ relativePath }) =>
+            Effect.gen(function* () {
+              const absolutePath = path.join(fixtureConfect, relativePath);
+              if (yield* fs.exists(absolutePath)) {
+                yield* fs.remove(absolutePath);
+              }
+            }),
+          );
+        }).pipe(Effect.orDie),
+      ),
     ),
-  );
+);
 
 const withTempFile = <A>(
   relativePath: string,
@@ -86,7 +100,7 @@ const withTempFile = <A>(
  * re-exports `./notes.spec`'s GroupSpec by default so impl contents that
  * reference `notes` continue to typecheck against the real notes GroupSpec.
  */
-const withTempLeaf = (
+const withTempLeaf = Effect.fnUntraced(function* (
   stem: string,
   implContents: string,
   use: (
@@ -97,17 +111,16 @@ const withTempLeaf = (
     ConfectDirectory | Path.Path | FileSystem.FileSystem
   >,
   specContents = `export { default } from "./notes.spec";\n`,
-) =>
-  Effect.gen(function* () {
-    const leaf = yield* toLeafModule(`groups/${stem}.spec.ts`);
-    yield* withTempFiles(
-      [
-        { relativePath: `groups/${stem}.spec.ts`, contents: specContents },
-        { relativePath: `groups/${stem}.impl.ts`, contents: implContents },
-      ],
-      use(leaf),
-    );
-  });
+) {
+  const leaf = yield* toLeafModule(`groups/${stem}.spec.ts`);
+  yield* withTempFiles(
+    [
+      { relativePath: `groups/${stem}.spec.ts`, contents: specContents },
+      { relativePath: `groups/${stem}.impl.ts`, contents: implContents },
+    ],
+    use(leaf),
+  );
+});
 
 const PLATFORMS = [
   { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
@@ -177,6 +190,68 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
 }
 
 layer(LeafModuleLayer)("validateSpec", (it) => {
+  it.effect(
+    "rejects equivalent middleware options with a spec-scoped codegen error",
+    () =>
+      Effect.gen(function* () {
+        const leaf = yield* toLeafModule("groups/_duplicateOptions.spec.ts");
+        const result = yield* Effect.result(
+          withTempFile(
+            leaf.relativePath,
+            `import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+class Policy extends MiddlewareSpec.MiddlewareSpec()("Policy", {
+  options: () => Schema.Struct({ roles: Schema.Array(Schema.String) }),
+  functionTypes: { query: true, mutation: false, action: false },
+}) {}
+export default GroupSpec.make().middleware(Policy, { roles: ["Internal"] }).addFunction(
+  FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }).middleware(Policy, { roles: ["Internal"] }),
+);`,
+            validateSpec(leaf),
+          ),
+        );
+        assert(Result.isFailure(result));
+        assert(result.failure._tag === "InvalidMiddlewareAttachmentError");
+        expect(result.failure.specPath).toBe(leaf.relativePath);
+        expect(result.failure.message).toMatch(
+          /Policy.*equivalent options.*function "get"/,
+        );
+      }),
+  );
+
+  it.effect("accepts non-equivalent options for the same middleware key", () =>
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/middlewareOptions.spec.ts");
+      yield* validateSpec(leaf);
+    }),
+  );
+
+  it.effect("keeps schema and equivalence exceptions as defects", () =>
+    Effect.gen(function* () {
+      for (const options of [
+        '() => { throw new Error("schema bug"); }',
+        '() => Schema.String.pipe(Schema.overrideToEquivalence(() => () => { throw new Error("equivalence bug"); }))',
+      ]) {
+        const leaf = yield* toLeafModule("groups/_brokenOptions.spec.ts");
+        const exit = yield* Effect.exit(
+          withTempFile(
+            leaf.relativePath,
+            `import { GroupSpec, MiddlewareSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+class Policy extends MiddlewareSpec.MiddlewareSpec()("Policy", {
+  options: ${options},
+  functionTypes: { query: true, mutation: false, action: false },
+}) {}
+export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "second");`,
+            validateSpec(leaf),
+          ),
+        );
+        expect(Exit.hasDies(exit)).toBe(true);
+        expect(Exit.findErrorOption(exit)).toEqual(Option.none());
+      }
+    }),
+  );
+
   it.effect("accepts a valid leaf spec", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/notes.spec.ts");
@@ -184,7 +259,7 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
     }),
   );
 
-  // A `makeNode()` spec validates regardless of its location — runtime is
+  // A `makeNode()` spec validates regardless of its location—runtime is
   // declared by the spec, not the directory (no `confect/node/` requirement).
   it.effect("accepts a valid node leaf spec at a non-`node/` path", () =>
     Effect.gen(function* () {
@@ -197,7 +272,7 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
   it.effect("rejects a spec without a GroupSpec default export", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/_invalid.spec.ts");
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         withTempFile(
           "groups/_invalid.spec.ts",
           "export default {};\n",
@@ -205,15 +280,15 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
         ),
       );
 
-      assert(Either.isLeft(result));
-      expect(result.left._tag).toBe("SpecMissingDefaultGroupSpecError");
+      assert(Result.isFailure(result));
+      expect(result.failure._tag).toBe("SpecMissingDefaultGroupSpecError");
     }),
   );
 
   it.effect("rejects a spec with a syntax error", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/_brokenSyntax.spec.ts");
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         withTempFile(
           "groups/_brokenSyntax.spec.ts",
           "export default GroupSpec.make(\n",
@@ -221,9 +296,179 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
         ),
       );
 
-      assert(Either.isLeft(result));
-      assert(result.left._tag === "BundleFailedError");
-      expect(result.left.errors.length).toBeGreaterThan(0);
+      assert(Result.isFailure(result));
+      assert(result.failure._tag === "BundleFailedError");
+      expect(result.failure.errors.length).toBeGreaterThan(0);
+    }),
+  );
+
+  // `groups/notes.spec.ts` uses `notes.Doc` from the generated table wrapper,
+  // which binds `confect/tables/notes.ts`. Both must stay free of
+  // `@confect/server` so the spec (and thus `_generated/refs.ts`) can ship
+  // to the client.
+  it.effect(
+    "accepts a spec that uses `notes.Doc` from `_generated/tables/`",
+    () =>
+      Effect.gen(function* () {
+        const leaf = yield* toLeafModule("groups/notes.spec.ts");
+        yield* validateSpec(leaf);
+      }),
+  );
+
+  it.effect(
+    "rejects a spec that reaches `@confect/server` through `tables/`",
+    () =>
+      Effect.gen(function* () {
+        const leaf = yield* toLeafModule("groups/_leakyTable.spec.ts");
+        const result = yield* Effect.result(
+          withTempFiles(
+            [
+              {
+                relativePath: "tables/_leaky.ts",
+                contents: `import { Table } from "@confect/server";\nexport default Table.make(() => {\n  throw new Error("unreachable");\n});\n`,
+              },
+              {
+                relativePath: "_generated/tables/_leaky.ts",
+                contents: `import unnamed from "../../tables/_leaky";\nexport default unnamed("_leaky");\n`,
+              },
+              {
+                relativePath: "groups/_leakyTable.spec.ts",
+                contents: `import { FunctionSpec, GroupSpec } from "@confect/core";\nimport leaky from "../_generated/tables/_leaky";\nexport default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "get", returns: () => leaky.Doc }));\n`,
+              },
+            ],
+            validateSpec(leaf),
+          ),
+        );
+
+        assert(Result.isFailure(result));
+        assert(result.failure._tag === "SpecImportsServerError");
+        expect(result.failure.specPath).toBe("groups/_leakyTable.spec.ts");
+        expect(result.failure.importerPaths).toStrictEqual([
+          "tables/_leaky.ts",
+        ]);
+      }),
+  );
+
+  it.effect("rejects a spec that value-imports `@confect/server`", () =>
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/_leaky.spec.ts");
+      const result = yield* Effect.result(
+        withTempFile(
+          "groups/_leaky.spec.ts",
+          `import { MiddlewareImpl } from "@confect/server";\nexport { default } from "./notes.spec";\nexport const leaked = MiddlewareImpl;\n`,
+          validateSpec(leaf),
+        ),
+      );
+
+      assert(Result.isFailure(result));
+      assert(result.failure._tag === "SpecImportsServerError");
+      expect(result.failure.importerPaths).toStrictEqual([
+        "groups/_leaky.spec.ts",
+      ]);
+    }),
+  );
+
+  // The case the reserved `middleware/` directory creates: codegen never
+  // validates those modules as leaves, so the only thing that catches a
+  // middleware implementation co-located with its declaration is walking the
+  // group spec's transitive imports.
+  it.effect(
+    "rejects a spec reaching a `middleware/` module that value-imports `@confect/server`",
+    () =>
+      Effect.gen(function* () {
+        const leaf = yield* toLeafModule("groups/_leakyViaMiddleware.spec.ts");
+        const result = yield* Effect.result(
+          withTempFiles(
+            [
+              {
+                relativePath: "middleware/_Leaky.spec.ts",
+                contents: `import { MiddlewareImpl } from "@confect/server";\nexport const leaked = MiddlewareImpl;\n`,
+              },
+              {
+                relativePath: "groups/_leakyViaMiddleware.spec.ts",
+                contents: `import { leaked } from "../middleware/_Leaky.spec";\nexport { default } from "./notes.spec";\nexport const used = leaked;\n`,
+              },
+            ],
+            validateSpec(leaf),
+          ),
+        );
+
+        assert(Result.isFailure(result));
+        assert(result.failure._tag === "SpecImportsServerError");
+        expect(result.failure.specPath).toBe(
+          "groups/_leakyViaMiddleware.spec.ts",
+        );
+        expect(result.failure.importerPaths).toStrictEqual([
+          "middleware/_Leaky.spec.ts",
+        ]);
+      }),
+  );
+
+  // esbuild erases `import type` before it produces the metafile, so type-only
+  // imports of server modules cost the client nothing and stay legal.
+  it.effect("accepts a spec whose `@confect/server` import is type-only", () =>
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/_typeOnly.spec.ts");
+      yield* withTempFile(
+        "groups/_typeOnly.spec.ts",
+        `import type * as MiddlewareImpl from "@confect/server/MiddlewareImpl";\nexport { default } from "./notes.spec";\nexport type Make = typeof MiddlewareImpl.make;\n`,
+        validateSpec(leaf),
+      );
+    }),
+  );
+});
+
+layer(LeafModuleLayer)("refs import graph", (it) => {
+  it.effect(
+    "does not value-import `@confect/server` through generated tables",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const refsPath = path.join(fixtureConfect, "_generated", "refs.ts");
+        const bundled = yield* Bundler.bundle(refsPath);
+        expect(
+          Bundler.importersOfPackage(bundled, "@confect/server", () => true),
+        ).toStrictEqual([]);
+      }),
+  );
+});
+
+// Discovery returns paths joined with the host separator, so these compare by
+// path segment rather than against POSIX literals—a substring check for
+// "middleware/" is vacuously true on Windows and asserts nothing there.
+layer(LeafModuleLayer)("discovery", (it) => {
+  it.effect("excludes `middleware/` from leaf spec discovery", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const specFiles = yield* discoverLeafSpecFiles;
+
+      // The fixtures do have middleware specs there—they must not be
+      // discovered as groups.
+      expect(
+        Array.filter(specFiles, (file) =>
+          Array.contains(String.split(file, path.sep), "middleware"),
+        ),
+      ).toStrictEqual([]);
+      // A group whose *name* starts with "middleware" is still discovered.
+      expect(specFiles).toContain(
+        Array.join(["groups", "middleware.spec.ts"], path.sep),
+      );
+    }),
+  );
+
+  it.effect("excludes `middleware/` from leaf impl discovery", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const implFiles = yield* discoverLeafImplFiles;
+
+      expect(
+        Array.filter(implFiles, (file) =>
+          Array.contains(String.split(file, path.sep), "middleware"),
+        ),
+      ).toStrictEqual([]);
+      expect(implFiles).toContain(
+        Array.join(["groups", "middleware.impl.ts"], path.sep),
+      );
     }),
   );
 });
@@ -245,7 +490,7 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
 
   it.effect("rejects impl that does not directly import the sibling spec", () =>
     Effect.gen(function* () {
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         withTempLeaf(
           "_mismatch",
           // Imports `./notes.spec` instead of its sibling `./_mismatch.spec`.
@@ -258,14 +503,14 @@ export default Layer.empty;
         ),
       );
 
-      assert(Either.isLeft(result));
-      expect(result.left._tag).toBe("ImplMissingSpecImportError");
+      assert(Result.isFailure(result));
+      expect(result.failure._tag).toBe("ImplMissingSpecImportError");
     }),
   );
 
   it.effect("rejects impl without a layer default export", () =>
     Effect.gen(function* () {
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         withTempLeaf(
           "_notLayer",
           `import notes from "./_notLayer.spec";
@@ -275,14 +520,14 @@ export default notes;
         ),
       );
 
-      assert(Either.isLeft(result));
-      expect(result.left._tag).toBe("ImplMissingDefaultLayerError");
+      assert(Result.isFailure(result));
+      expect(result.failure._tag).toBe("ImplMissingDefaultLayerError");
     }),
   );
 
   it.effect("rejects impl with a syntax error", () =>
     Effect.gen(function* () {
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         withTempLeaf(
           "_brokenSyntax",
           `import notes from "./_brokenSyntax.spec";
@@ -292,9 +537,9 @@ export default GroupImpl.make(
         ),
       );
 
-      assert(Either.isLeft(result));
-      assert(result.left._tag === "BundleFailedError");
-      expect(result.left.errors.length).toBeGreaterThan(0);
+      assert(Result.isFailure(result));
+      assert(result.failure._tag === "BundleFailedError");
+      expect(result.failure.errors.length).toBeGreaterThan(0);
     }),
   );
 
@@ -302,7 +547,7 @@ export default GroupImpl.make(
     "rejects impl whose default export is not piped through GroupImpl.finalize",
     () =>
       Effect.gen(function* () {
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           withTempLeaf(
             "_unfinalized",
             `import { FunctionImpl, GroupImpl } from "@confect/server";
@@ -363,8 +608,8 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
           ),
         );
 
-        assert(Either.isLeft(result));
-        expect(result.left._tag).toBe("ImplNotFinalizedError");
+        assert(Result.isFailure(result));
+        expect(result.failure._tag).toBe("ImplNotFinalizedError");
       }),
   );
 
@@ -372,7 +617,7 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
     "rejects impl that does not provide every function declared by its spec",
     () =>
       Effect.gen(function* () {
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           withTempLeaf(
             "_incomplete",
             `import { FunctionImpl, GroupImpl } from "@confect/server";
@@ -404,12 +649,12 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
           ),
         );
 
-        assert(Either.isLeft(result));
-        assert(result.left._tag === "ImplMissingFunctionsError");
+        assert(Result.isFailure(result));
+        assert(result.failure._tag === "ImplMissingFunctionsError");
         // The reported group path is the impl/spec leaf's own filesystem
         // location, which points at the file that is missing functions.
-        expect(result.left.groupPath).toBe("groups._incomplete");
-        expect([...result.left.missingFunctionNames].sort()).toEqual(
+        expect(result.failure.groupPath).toBe("groups._incomplete");
+        expect([...result.failure.missingFunctionNames].sort()).toEqual(
           ["delete_", "getFirst", "internalGetFirst", "list"].sort(),
         );
       }),

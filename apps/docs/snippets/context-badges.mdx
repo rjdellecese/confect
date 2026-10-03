@@ -16,23 +16,29 @@ export const ActionBadge = () => (
   </Badge>
 );
 
-export const ContextBadges = ({ query, mutation, action }) => (
+export const ContextBadges = ({ query, mutation, action, http }) => (
   <>
     {query && (
       <Badge color="blue" size="md">
         Query
       </Badge>
     )}
-    {query && (mutation || action) && " "}
+    {query && (mutation || action || http) && " "}
     {mutation && (
       <Badge color="purple" size="md">
         Mutation
       </Badge>
     )}
-    {mutation && action && " "}
+    {mutation && (action || http) && " "}
     {action && (
       <Badge color="orange" size="md">
         Action
+      </Badge>
+    )}
+    {action && http && " "}
+    {http && (
+      <Badge color="green" size="md">
+        HTTP Action
       </Badge>
     )}
   </>

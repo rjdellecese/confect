@@ -7,22 +7,21 @@
     "@confect/react": "workspace:*",
     "@confect/server": "workspace:*",
     "@convex-dev/workpool": "0.4.12",
-    "@effect/platform": "0.97.2",
-    "convex": "1.46.0",
+    "convex": "1.45.0",
     "convex-helpers": "0.1.124",
-    "effect": "3.22.2",
+    "effect": "4.0.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "vite": "8.3.1"
   },
   "devDependencies": {
-    "@types/node": "26.6.3",
+    "@types/node": "24.13.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "concurrently": "10.0.5",
     "typescript": "7.0.2",
-    "vite-plus": "0.3.3"
+    "vite-plus": "0.3.1"
   },
   "private": true,
   "scripts": {
@@ -30,7 +29,8 @@
     "clean": "shx rm -rf dist node_modules",
     "convex-codegen": "pnpm convex codegen",
     "dev": "concurrently --restart-tries=1 --prefix-colors=\"white.bold.bgCyan,white.bold.bgYellow,white.bold.bgGreen\" --prefix=\" {name} \" --names=\"VITE,CONVEX,CONFECT\" \"vite\" \"convex dev --tail-logs\" \"confect dev\"",
-    "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project convex/tsconfig.json"
+    "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project convex/tsconfig.json",
+    "typecheck:inexact": "tsc --noEmit --project tsconfig.json --exactOptionalPropertyTypes false --tsBuildInfoFile node_modules/.cache/tsc/tsconfig.inexact.tsbuildinfo && tsc --noEmit --project convex/tsconfig.json --exactOptionalPropertyTypes false"
   },
   "type": "module"
 }

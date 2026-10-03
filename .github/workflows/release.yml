@@ -16,7 +16,6 @@ jobs:
       id-token: write
       pull-requests: write
     outputs:
-      docs_version: ${{ steps.docs_version.outputs.version }}
       published: ${{ steps.changesets.outputs.published }}
 
     steps:
@@ -33,14 +32,10 @@ jobs:
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
 
+      - uses: ./.github/actions/bun-setup
+
       - name: Install dependencies
         run: pnpm install
-
-      - name: Determine docs version
-        id: docs_version
-        run: |
-          package_version=$(node -p "require('./packages/core/package.json').version")
-          echo "version=v${package_version%%.*}" >> "$GITHUB_OUTPUT"
 
       - name: Create release pull request or publish
         id: changesets
@@ -69,4 +64,3 @@ jobs:
     uses: ./.github/workflows/docs-deploy.yml
     with:
       source_ref: ${{ github.sha }}
-      version: ${{ needs.release.outputs.docs_version }}

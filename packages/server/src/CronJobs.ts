@@ -13,7 +13,7 @@ import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import type * as CronJob from "./CronJob";
 
-export const TypeId = "@confect/server/CronJobs";
+export const TypeId = "~@confect/server/CronJobs";
 export type TypeId = typeof TypeId;
 
 export interface CronJobs {
@@ -76,7 +76,6 @@ const makeProto = (
 
 export const make = (): CronJobs => makeProto({}, makeConvexCrons());
 
-/** @internal */
 export const cronToConvexCronString = (cron: Cron.Cron): string => {
   pipe(
     cron.tz,
@@ -123,13 +122,12 @@ const setToField = (set: ReadonlySet<number>): string => {
   if (set.size === 0) return "*";
   return pipe(
     set,
-    Array.sort(Order.number),
+    Array.sort(Order.Number),
     Array.map((n) => n.toString()),
     Array.join(","),
   );
 };
 
-/** @internal */
 export const durationToConvexIntervalSchedule = (
   duration: Duration.Duration,
 ): IntervalSchedule => {

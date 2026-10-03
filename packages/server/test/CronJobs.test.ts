@@ -3,7 +3,7 @@ import * as Cron from "effect/Cron";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "@effect/vitest";
 import * as CronJob from "@confect/server/CronJob";
 import * as CronJobs from "@confect/server/CronJobs";
 
@@ -12,7 +12,6 @@ const makeMutationRef = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalMutation({
       name,
-      args: () => Schema.Struct({}),
       returns: () => Schema.Void,
     }),
   );
@@ -22,7 +21,6 @@ const makeActionRef = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalAction({
       name,
-      args: () => Schema.Struct({}),
       returns: () => Schema.Void,
     }),
   );
@@ -32,7 +30,7 @@ const makeMutationRefWithArgs = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalMutation({
       name,
-      args: () => Schema.Struct({ email: Schema.String }),
+      args: () => ({ email: Schema.String }),
       returns: () => Schema.Void,
     }),
   );
@@ -63,7 +61,7 @@ describe("cronToConvexCronString", () => {
   });
 
   test("every 15 minutes roundtrips", () => {
-    const cron = Cron.unsafeParse("*/15 * * * *");
+    const cron = Cron.parseUnsafe("*/15 * * * *");
     expect(CronJobs.cronToConvexCronString(cron)).toBe("0,15,30,45 * * * *");
   });
 
@@ -174,7 +172,7 @@ describe("cronToConvexCronString", () => {
       days: [],
       months: [],
       weekdays: [],
-      tz: DateTime.zoneUnsafeMakeNamed("UTC"),
+      tz: DateTime.zoneMakeNamedUnsafe("UTC"),
     });
 
     expect(CronJobs.cronToConvexCronString(cron)).toBe("0 9 * * *");
@@ -187,7 +185,7 @@ describe("cronToConvexCronString", () => {
       days: [],
       months: [],
       weekdays: [],
-      tz: DateTime.zoneUnsafeMakeNamed("Etc/UTC"),
+      tz: DateTime.zoneMakeNamedUnsafe("Etc/UTC"),
     });
 
     expect(CronJobs.cronToConvexCronString(cron)).toBe("0 9 * * *");
@@ -200,7 +198,7 @@ describe("cronToConvexCronString", () => {
       days: [],
       months: [],
       weekdays: [],
-      tz: DateTime.zoneUnsafeMakeNamed("America/New_York"),
+      tz: DateTime.zoneMakeNamedUnsafe("America/New_York"),
     });
 
     expect(() =>
@@ -482,7 +480,7 @@ describe("CronJobs.add", () => {
     const ref = makeMutationRefWithArgs("payments", "sendEmail");
     const cronJob = CronJob.make(
       "payment reminder",
-      Cron.unsafeParse("0 16 1 * *"),
+      Cron.parseUnsafe("0 16 1 * *"),
       ref,
       { email: "billing@example.com" },
     );

@@ -2,7 +2,7 @@ import { FunctionSpec, Ref } from "@confect/core";
 import * as Cron from "effect/Cron";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "@effect/vitest";
 import * as CronJob from "@confect/server/CronJob";
 
 const makeMutationRef = (functionNamespace: string, name: string) =>
@@ -10,7 +10,6 @@ const makeMutationRef = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalMutation({
       name,
-      args: () => Schema.Struct({}),
       returns: () => Schema.Void,
     }),
   );
@@ -20,7 +19,7 @@ const makeMutationRefWithArgs = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalMutation({
       name,
-      args: () => Schema.Struct({ email: Schema.String }),
+      args: () => ({ email: Schema.String }),
       returns: () => Schema.Void,
     }),
   );

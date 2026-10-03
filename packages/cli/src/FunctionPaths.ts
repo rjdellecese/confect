@@ -1,4 +1,4 @@
-import type { GroupSpec, Spec } from "@confect/core";
+import { type GroupSpec, Spec } from "@confect/core";
 import { pipe } from "effect/Function";
 import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
@@ -8,13 +8,17 @@ import * as FunctionPath from "./FunctionPath";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";
 
-export const FunctionPaths = Schema.HashSetFromSelf(
-  FunctionPath.FunctionPath,
-).pipe(Schema.brand("@confect/cli/FunctionPaths"));
+export const FunctionPaths = Schema.HashSet(FunctionPath.FunctionPath).pipe(
+  Schema.brand("@confect/cli/FunctionPaths"),
+);
 export type FunctionPaths = typeof FunctionPaths.Type;
 
 export const make = (spec: Spec.AnyWithProps): FunctionPaths =>
-  makeHelper(spec.groups, Option.none(), FunctionPaths.make(HashSet.empty()));
+  makeHelper(
+    Spec.groups(spec),
+    Option.none(),
+    FunctionPaths.make(HashSet.empty()),
+  );
 
 const makeHelper = (
   groups: {
@@ -32,13 +36,13 @@ const makeHelper = (
     const accWithFunctions = Record.reduce(
       group.functions,
       acc,
-      (acc_, _fn, functionName) =>
+      (acc_, _fn, name) =>
         FunctionPaths.make(
           HashSet.add(
             acc_,
             FunctionPath.FunctionPath.make({
               groupPath,
-              name: functionName,
+              name,
             }),
           ),
         ),
@@ -50,10 +54,8 @@ const makeHelper = (
 export const groupPaths = (
   functionPaths: FunctionPaths,
 ): GroupPaths.GroupPaths =>
-  pipe(
-    functionPaths,
-    HashSet.map(FunctionPath.groupPath),
-    GroupPaths.GroupPaths.make,
+  pipe(functionPaths, HashSet.map(FunctionPath.groupPath), (paths) =>
+    GroupPaths.GroupPaths.make(paths),
   );
 
 export const diff = (
@@ -94,7 +96,7 @@ export const diff = (
     existingGroupsToWhichFunctionsWereAdded,
     HashSet.union(existingGroupsToWhichFunctionsWereRemoved),
     HashSet.difference(HashSet.union(groupsAdded, groupsRemoved)),
-    GroupPaths.GroupPaths.make,
+    (paths) => GroupPaths.GroupPaths.make(paths),
   );
 
   return {

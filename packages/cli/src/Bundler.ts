@@ -1,6 +1,4 @@
-import { realpathSync } from "node:fs";
 import { createRequire, isBuiltin } from "node:module";
-import * as Path from "@effect/platform/Path";
 import {
   bundleRequire,
   loadTsConfig,
@@ -10,7 +8,9 @@ import { resolveModulePath } from "exsolve";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as String from "effect/String";
 import type * as esbuild from "esbuild";
@@ -27,8 +27,15 @@ export interface Bundled {
  * so the metafile's input keys (and each input's `imports[].path`) are stored
  * relative to that cwd. Callers reach for the metafile with absolute paths
  * (e.g. {@link directlyImports}), so we normalize every key/import path to
- * absolute up front. That way the lookup logic stays oblivious to whatever
- * cwd was used during bundling.
+ * absolute up front. That way the lookup logic stays oblivious to whatever cwd
+ * was used during bundling.
+ *
+ * `original` (the specifier as written, before resolution) is filled in from
+ * `path` when esbuild omits it—esbuild only sets it when it differs from the
+ * resolved path, which is exactly the externalized-bare-specifier case that
+ * absolutizing `path` would otherwise mangle into `<cwd>/@confect/server`.
+ * {@link importersOfPackage} relies on `original` always being the raw
+ * specifier.
  */
 const absolutizeMetafile = (
   path: Path.Path,
@@ -42,7 +49,10 @@ const absolutizeMetafile = (
     inputs[absolutize(key)] = {
       ...value,
       imports: value.imports.map((i) =>
-        Object.assign({}, i, { path: absolutize(i.path) }),
+        Object.assign({}, i, {
+          path: absolutize(i.path),
+          original: i.original ?? i.path,
+        }),
       ),
     };
   }
@@ -72,13 +82,11 @@ export const resolveModule = (
     resolveCjs(specifier, importer),
   );
 
-const realPath = Option.liftThrowable((path: string) => realpathSync(path));
-
 /**
  * Bundles first-party workspace dependencies that `bundle-require` would
  * otherwise externalize and hand to Node's native ESM resolver. Resolves each
  * bare specifier and, following symlinks, bundles it when its real path lives
- * outside `node_modules` — mirroring Vite's "linked dependencies are not
+ * outside `node_modules`—mirroring Vite's "linked dependencies are not
  * externalized" heuristic. Registered ahead of `externalPlugin`, so deferring
  * (returning `undefined`) leaves third-party externalization untouched.
  * `skipPatterns` are the tsconfig `paths` regexes, which keep deferring to
@@ -86,6 +94,7 @@ const realPath = Option.liftThrowable((path: string) => realpathSync(path));
  */
 export const bundleWorkspacePlugin = (
   path: Path.Path,
+  fs: FileSystem.FileSystem,
   skipPatterns: ReadonlyArray<RegExp>,
 ): esbuild.Plugin => ({
   name: "confect:bundle-workspace",
@@ -110,16 +119,14 @@ export const bundleWorkspacePlugin = (
             },
           ],
         }),
-        onSome: (resolved) => {
-          const real = Option.getOrElse(realPath(resolved), () => resolved);
-          return pipe(
-            real,
-            String.split(path.sep),
-            Array.contains("node_modules"),
-          )
-            ? undefined
-            : { path: real };
-        },
+        onSome: (resolved) =>
+          Effect.runPromise(
+            fs.realPath(resolved).pipe(Effect.orElseSucceed(() => resolved)),
+          ).then((real) =>
+            pipe(real, String.split(path.sep), Array.contains("node_modules"))
+              ? undefined
+              : { path: real },
+          ),
       });
     });
   },
@@ -149,7 +156,7 @@ const captureBuildResultPlugin = (
 /**
  * Bundle a TypeScript entry point with esbuild via {@link bundleRequire} and
  * import the result. `bundle-require` writes a temp `.mjs` next to the source,
- * `import()`s it, and deletes it — so third-party `node_modules` externals
+ * `import()`s it, and deletes it—so third-party `node_modules` externals
  * resolve through the user's normal `node_modules` walk, while first-party
  * workspace deps are bundled by {@link bundleWorkspacePlugin} and tsconfig
  * `paths` aliases stay inside the bundle.
@@ -164,109 +171,140 @@ const captureBuildResultPlugin = (
  * metafile is captured via a small `onEnd` plugin because `bundle-require`
  * itself only exposes a flat `dependencies: string[]`.
  *
- * `options.plugins` are registered ahead of every other plugin — including
- * `bundle-require`'s own `externalPlugin` — so a caller-supplied plugin can
- * claim resolutions (e.g. `convex.config` imports) before the workspace and
+ * `options.plugins` are registered ahead of every other plugin—including
+ * `bundle-require`'s own `externalPlugin`—so a caller-supplied plugin can claim
+ * resolutions (e.g. `convex.config` imports) before the workspace and
  * externalization heuristics see them.
  */
-export const bundle = (
+export const bundle = Effect.fn("Bundler.bundle")(function* (
   entryPoint: string,
   options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
-): Effect.Effect<Bundled, BundlerError, Path.Path> =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
+): Effect.fn.Return<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> {
+  const path = yield* Path.Path;
+  const fs = yield* FileSystem.FileSystem;
 
-    const buildResultRef = yield* Ref.make<CapturedBuildResult>({
-      metafile: undefined,
-      warnings: [],
-    });
-
-    const cwd = path.dirname(entryPoint);
-    const skipPatterns = tsconfigPathsToRegExp(
-      loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
-    );
-    const result = yield* Effect.tryPromise({
-      try: () =>
-        bundleRequire({
-          filepath: entryPoint,
-          cwd,
-          format: "esm",
-          esbuildOptions: {
-            plugins: [
-              ...(options?.plugins ?? []),
-              bundleWorkspacePlugin(path, skipPatterns),
-              captureBuildResultPlugin(buildResultRef),
-            ],
-            logLevel: "silent",
-          },
-        }),
-      catch: (cause) => new BundlerError({ cause }),
-    }).pipe(
-      Effect.ensuring(
-        Effect.andThen(Ref.get(buildResultRef), (captured) =>
-          logCoalescedBuildWarnings(captured.warnings),
-        ),
-      ),
-    );
-
-    const { metafile } = yield* Ref.get(buildResultRef);
-    if (!metafile) {
-      return yield* Effect.dieMessage("esbuild metafile missing");
-    }
-
-    return {
-      module: result.mod,
-      metafile: absolutizeMetafile(path, metafile, cwd),
-    };
+  const buildResultRef = yield* Ref.make<CapturedBuildResult>({
+    metafile: undefined,
+    warnings: [],
   });
 
-const findMetafileInputKey = (
+  const cwd = path.dirname(entryPoint);
+  const skipPatterns = tsconfigPathsToRegExp(
+    loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
+  );
+  const result = yield* Effect.tryPromise({
+    try: () =>
+      bundleRequire({
+        filepath: entryPoint,
+        cwd,
+        format: "esm",
+        esbuildOptions: {
+          plugins: [
+            ...(options?.plugins ?? []),
+            bundleWorkspacePlugin(path, fs, skipPatterns),
+            captureBuildResultPlugin(buildResultRef),
+          ],
+          logLevel: "silent",
+        },
+      }),
+    catch: (cause) => new BundlerError({ cause }),
+  }).pipe(
+    Effect.ensuring(
+      Effect.andThen(Ref.get(buildResultRef), (captured) =>
+        logCoalescedBuildWarnings(captured.warnings),
+      ),
+    ),
+  );
+
+  const { metafile } = yield* Ref.get(buildResultRef);
+  if (!metafile) {
+    return yield* Effect.die(new Error("esbuild metafile missing"));
+  }
+
+  return {
+    module: result.mod,
+    metafile: absolutizeMetafile(path, metafile, cwd),
+  };
+});
+
+const findMetafileInputKey = Effect.fnUntraced(function* (
   metafile: esbuild.Metafile,
   absolutePath: string,
-) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const resolved = path.resolve(absolutePath);
-    return Array.findFirst(
-      Object.keys(metafile.inputs),
-      (key) => path.resolve(key) === resolved,
-    );
-  });
+) {
+  const path = yield* Path.Path;
+  const resolved = path.resolve(absolutePath);
+  return Array.findFirst(
+    Object.keys(metafile.inputs),
+    (key) => path.resolve(key) === resolved,
+  );
+});
 
 /**
  * Returns `true` when the module bundled from `sourceAbsolutePath` declares a
  * direct import of `targetAbsolutePath` (according to the bundle's esbuild
  * metafile). Returns `false` if either path is missing from the metafile.
  */
-export const directlyImports = (
+export const directlyImports = Effect.fnUntraced(function* (
   bundled: Bundled,
   sourceAbsolutePath: string,
   targetAbsolutePath: string,
-) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const sourceKey = yield* findMetafileInputKey(
-      bundled.metafile,
-      sourceAbsolutePath,
-    );
-    const targetKey = yield* findMetafileInputKey(
-      bundled.metafile,
-      targetAbsolutePath,
-    );
+) {
+  const path = yield* Path.Path;
+  const sourceKey = yield* findMetafileInputKey(
+    bundled.metafile,
+    sourceAbsolutePath,
+  );
+  const targetKey = yield* findMetafileInputKey(
+    bundled.metafile,
+    targetAbsolutePath,
+  );
 
-    return pipe(
-      Option.all([sourceKey, targetKey]),
-      Option.flatMap(([sourceKey_, targetKey_]) =>
-        Option.fromNullable(bundled.metafile.inputs[sourceKey_]).pipe(
-          Option.map((sourceInput) => {
-            const targetResolved = path.resolve(targetKey_);
-            return sourceInput.imports.some(
-              (importedFile) =>
-                path.resolve(importedFile.path) === targetResolved,
-            );
-          }),
-        ),
+  return pipe(
+    Option.all([sourceKey, targetKey]),
+    Option.flatMap(([sourceKey_, targetKey_]) =>
+      Option.fromNullishOr(bundled.metafile.inputs[sourceKey_]).pipe(
+        Option.map((sourceInput) => {
+          const targetResolved = path.resolve(targetKey_);
+          return sourceInput.imports.some(
+            (importedFile) =>
+              path.resolve(importedFile.path) === targetResolved,
+          );
+        }),
       ),
-      Option.getOrElse(() => false),
-    );
-  });
+    ),
+    Option.getOrElse(() => false),
+  );
+});
+
+/**
+ * Returns the absolute paths of every module in the bundle that declares a
+ * direct import of `packageName` (the package itself or one of its subpaths)
+ * and satisfies `where`. Use `where` to restrict the search to the modules you
+ * care about—the bundle's inputs include every transitive dependency.
+ *
+ * Matching is on the specifier as written rather than the resolved path,
+ * because {@link bundleWorkspacePlugin} bundles first-party workspace
+ * dependencies (so `@confect/server` resolves to a path inside the monorepo)
+ * while a published install externalizes them (so it stays a bare specifier).
+ * esbuild erases `import type` before it produces the metafile, so type-only
+ * imports are not reported.
+ */
+export const importersOfPackage = (
+  bundled: Bundled,
+  packageName: string,
+  where: (absolutePath: string) => boolean,
+): ReadonlyArray<string> => {
+  const subpathPrefix = `${packageName}/`;
+
+  return Object.entries(bundled.metafile.inputs)
+    .filter(
+      ([absolutePath, input]) =>
+        where(absolutePath) &&
+        input.imports.some(
+          (imported) =>
+            imported.original === packageName ||
+            imported.original?.startsWith(subpathPrefix) === true,
+        ),
+    )
+    .map(([absolutePath]) => absolutePath);
+};

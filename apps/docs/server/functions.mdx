@@ -23,7 +23,7 @@ For Node.js actions, see [Node Actions](/server/node-actions). To integrate plai
 
 ## Defining a spec
 
-Each function spec defines the function's name, arguments schema, and returns schema. The `args`, `returns`, and (optional) `error` schemas are passed as `() => Schema` callbacks, evaluated lazily the first time the function is invoked. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
+Each function spec defines the function's name, argument fields, and returns schema. The optional `args` callback returns a `Schema.Struct` field map and defaults to `{}` when omitted, while `returns` and the optional `error` are callbacks returning schemas. All provided callbacks are evaluated lazily the first time the function is invoked. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
@@ -33,7 +33,6 @@ import notes from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
-  args: () => Schema.Struct({}),
   returns: () => Schema.Array(notes.Doc),
 });
 
@@ -59,7 +58,7 @@ class NoteNotFound extends Schema.TaggedError<NoteNotFound>()("NoteNotFound", {
 
 FunctionSpec.publicQuery({
   name: "getOrFail",
-  args: () => Schema.Struct({ noteId: Id("notes") }),
+  args: () => ({ noteId: Id("notes") }),
   returns: () => notes.Doc,
   error: () => NoteNotFound,
 });
@@ -67,7 +66,7 @@ FunctionSpec.publicQuery({
 
 ### Paginated queries
 
-Define a paginated query with `FunctionSpec.publicPaginatedQuery` (or `internalPaginatedQuery`). Instead of `returns`, pass an `item` schema — the type of one element in a page. The optional `args` schema declares only your own arguments; Confect composes the Convex-facing schemas for you, adding the `paginationOpts` argument (with all of Convex's [pagination protocol fields](https://docs.convex.dev/database/pagination)) and wrapping `item` in a `PaginationResult` returns schema.
+Define a paginated query with `FunctionSpec.publicPaginatedQuery` (or `internalPaginatedQuery`). Instead of `returns`, pass an `item` schema—the type of one element in a page. The optional `args` field map declares only your own arguments; Confect composes the Convex-facing schemas for you, adding the `paginationOpts` argument (with all of Convex's [pagination protocol fields](https://docs.convex.dev/database/pagination)) and wrapping `item` in a `PaginationResult` returns schema.
 
 ```ts confect/notes.spec.ts
 import { FunctionSpec } from "@confect/core";
@@ -77,12 +76,12 @@ import notes from "./_generated/tables/notes";
 
 FunctionSpec.publicPaginatedQuery({
   name: "listByAuthor",
-  args: () => Schema.Struct({ author: Schema.String }), // optional; omit for no extra args
+  args: () => ({ author: Schema.String }), // optional; omit for no extra args
   item: () => notes.Doc,
 });
 ```
 
-Do not declare `paginationOpts` in `args` — it is added automatically, and declaring it yourself is a type (and runtime) error.
+Do not declare `paginationOpts` in `args`—it is added automatically, and declaring it yourself is a type (and runtime) error.
 
 The handler receives the decoded args including `paginationOpts`, which it typically forwards directly to [`paginate`](/server/database/reading#paginate):
 
@@ -149,3 +148,42 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
   barrel import pulls the whole `Schema` namespace into the module graph your
   function evaluates at cold start, even when you use only a small part of it.
 </Note>
+
+## Logging
+
+Use `Effect.log*` in your handlers. Confect routes logs through Convex's console
+methods so their severity is preserved in the dashboard and log streams. This
+applies to queries, mutations, actions, Node actions, and HTTP routes.
+
+| Effect level    | Console method  | Convex severity |
+| --------------- | --------------- | --------------- |
+| Trace and Debug | `console.debug` | `DEBUG`         |
+| Info            | `console.info`  | `INFO`          |
+| Warn            | `console.warn`  | `WARN`          |
+| Error and Fatal | `console.error` | `ERROR`         |
+
+`Effect.log` uses Info unless you change Effect's current log level. The default
+minimum level is Info, so Debug and Trace remain hidden until you enable them:
+
+```ts
+import * as Effect from "effect/Effect";
+import * as References from "effect/References";
+
+const debugOperation = Effect.logTrace("Entering operation").pipe(
+  Effect.provideService(References.MinimumLogLevel, "Trace"),
+);
+```
+
+`"Trace"` is a diagnostic severity, not a request to print a stack trace. Confect
+doesn't call `console.trace` for Trace logs.
+
+Each log payload retains the original Effect level, messages, cause, annotations,
+log spans, timestamp, and fiber ID. Convex renders this payload as a string; it
+doesn't promote the payload's properties into structured log-stream fields.
+
+Confect preserves Effect's tracer logger and any additional loggers. To replace
+the default output for a handler, provide your own `Logger.layer` inside its
+effect. Use `Logger.layer([])` to disable logging there. The default logger is
+also available as `ConvexLogger.logger` from `@confect/server/ConvexLogger`;
+`ConvexLogger.layer` replaces only Effect's default console logger, leaving custom
+loggers and the minimum level unchanged.

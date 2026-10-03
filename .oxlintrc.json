@@ -1,6 +1,29 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "import", "promise", "node", "oxc"],
+  "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
+  "extends": ["./node_modules/@effect/tsgo/oxlint-presets/recommended.json"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "import",
+    "promise",
+    "node",
+    "oxc",
+    "effecttsgo"
+  ],
+  "jsPlugins": [
+    "confect-oxlint-rules",
+    { "name": "jsdoc-style", "specifier": "eslint-plugin-jsdoc" }
+  ],
+  "settings": {
+    "jsdoc": {
+      "tagNamePreference": { "typeParam": "typeParam" }
+    }
+  },
+  "options": {
+    "typeAware": true,
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "deny"
+  },
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -19,6 +42,22 @@
     "**/.mintlify/**"
   ],
   "rules": {
+    "jsdoc-style/check-alignment": "error",
+    "jsdoc-style/check-line-alignment": [
+      "error",
+      "never",
+      {
+        "disableWrapIndent": true,
+        "preserveMainDescriptionPostDelimiter": true
+      }
+    ],
+    "jsdoc-style/no-multi-asterisks": ["error", { "allowWhitespace": true }],
+    "jsdoc-style/require-asterisk-prefix": "error",
+    "jsdoc-style/require-hyphen-before-param-description": [
+      "error",
+      "always",
+      { "tags": { "template": "always", "typeParam": "always" } }
+    ],
     "no-unused-vars": [
       "error",
       {
@@ -30,7 +69,15 @@
     "no-underscore-dangle": "off",
     "unicorn/consistent-function-scoping": "off",
     "unicorn/no-array-sort": "off",
-    "oxc/no-accumulating-spread": "off"
+    "oxc/no-accumulating-spread": "off",
+    "typescript/consistent-return": "off",
+    "typescript/no-unsafe-type-assertion": "off",
+    "typescript/no-unnecessary-type-assertion": "off",
+    "typescript/no-unnecessary-type-arguments": "off",
+    "typescript/no-unnecessary-type-parameters": "off",
+    "effecttsgo/any-unknown-in-error-context": "error",
+    "effecttsgo/deterministic-keys": "error",
+    "effecttsgo/strict-effect-provide": "off"
   },
   "overrides": [
     {
@@ -64,6 +111,35 @@
             ],
             "patterns": [
               {
+                "group": ["@effect/*", "!@effect/vitest", "!@effect/tsgo/**"],
+                "message": "Import @effect/* modules from their submodule path so they tree-shake, e.g. `import * as Path from \"@effect/platform/Path\"`.",
+                "allowTypeImports": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.spec.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "effect",
+                "message": "Import Effect modules from their submodule path so they tree-shake, e.g. `import * as Schema from \"effect/Schema\"`. Bare helpers (pipe, flow, identity) come from \"effect/Function\".",
+                "allowTypeImports": true
+              },
+              {
+                "name": "@confect/server",
+                "message": "Spec modules are bundled into the client, so anything they import ships to the browser. Move server logic into a `*.impl.ts` module, or use `import type` if you only need the types.",
+                "allowTypeImports": true
+              }
+            ],
+            "patterns": [
+              {
                 "group": ["@effect/*", "!@effect/vitest"],
                 "message": "Import @effect/* modules from their submodule path so they tree-shake, e.g. `import * as Path from \"@effect/platform/Path\"`.",
                 "allowTypeImports": true
@@ -71,6 +147,13 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "files": ["**/*.test.{ts,tsx,mts,cts}"],
+      "rules": {
+        "confect/prefer-effect-vitest": "error",
+        "confect/prefer-test-each": "error"
       }
     }
   ]

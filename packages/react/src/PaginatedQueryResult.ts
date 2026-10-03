@@ -1,4 +1,3 @@
-import { identity } from "effect/Function";
 import * as Equal from "effect/Equal";
 import * as Function from "effect/Function";
 import * as Hash from "effect/Hash";
@@ -6,27 +5,27 @@ import * as Match from "effect/Match";
 import * as Pipeable from "effect/Pipeable";
 import * as Predicate from "effect/Predicate";
 
-const TypeId = "@confect/react/PaginatedQueryResult";
+const TypeId = "~@confect/react/PaginatedQueryResult";
 type TypeId = typeof TypeId;
 
 /**
  * A `PaginatedQueryResult` represents the result of a Confect paginated query.
  * The non-`Failure` variants mirror the statuses of `usePaginatedQuery` from
  * `convex/react` and all carry `results` and `isLoading`, so the common UI
- * shape — render the list, show a spinner while loading — needs only an
+ * shape—render the list, show a spinner while loading—needs only an
  * {@link isFailure} early-out and plain field access.
  *
  * Every variant carries `results`, including `Failure`: when a later page
  * fails, the pages already loaded are still worth rendering alongside the
- * error, so they are not discarded. `Failure` additionally carries the
- * query's decoded typed error.
+ * error, so they are not discarded. `Failure` additionally carries the query's
+ * decoded typed error.
  *
- * `loadMore` appears only on `CanLoadMore`, the one state it can make
- * progress from. The underlying Convex hook exposes it on every status, but
- * calling it while a page is in flight, once the list is exhausted, or after
- * a failure is an intentional no-op there; narrowing to `CanLoadMore` — via
- * {@link isCanLoadMore} or {@link match} — makes that statically apparent
- * instead of silently dropping the call.
+ * `loadMore` appears only on `CanLoadMore`, the one state it can make progress
+ * from. The underlying Convex hook exposes it on every status, but calling it
+ * while a page is in flight, once the list is exhausted, or after a failure is
+ * an intentional no-op there; narrowing to `CanLoadMore`—via
+ * {@link isCanLoadMore} or {@link match}—makes that statically apparent instead
+ * of silently dropping the call.
  *
  * When the query declares no `error` schema (`E` is `never`), the `Failure`
  * variant is excluded from the type entirely, so `isLoading` is accessible
@@ -49,9 +48,9 @@ export type PaginatedQueryResult<Item, E = never> = [E] extends [never]
       | Failure<Item, E>;
 
 /**
- * Every variant regardless of `E` — the parameter type for guards and
- * {@link match}, since `PaginatedQueryResult` itself excludes `Failure` when
- * `E` is `never`.
+ * Every variant regardless of `E`—the parameter type for guards and
+ * {@link match}, since `PaginatedQueryResult` itself excludes `Failure` when `E`
+ * is `never`.
  */
 export type Variants<Item, E = never> =
   | LoadingFirstPage<Item, E>
@@ -61,18 +60,19 @@ export type Variants<Item, E = never> =
   | Failure<Item, E>;
 
 export declare namespace PaginatedQueryResult {
-  // eslint-disable-next-line @typescript-eslint/no-shadow, import/namespace -- oxlint's namespace resolution misses type-only exports, and `Pipeable` is an interface
-  export interface Proto<Item, E> extends Pipeable.Pipeable {
-    readonly [TypeId]: {
-      readonly E: (_: never) => E;
-      readonly Item: (_: never) => Item;
-    };
+  // eslint-disable-next-line @typescript-eslint/no-shadow
+  export interface Proto<out Item, out E> extends Pipeable.Pipeable {
+    readonly [TypeId]: TypeId;
+    readonly "~Item": Item;
+    readonly "~E": E;
   }
 
-  export type Item<R> = R extends Proto<infer Item_, infer _E> ? Item_ : never;
+  export type Item<R> = R extends { readonly "~Item": infer Item_ }
+    ? Item_
+    : never;
 
   // eslint-disable-next-line @typescript-eslint/no-shadow
-  export type Failure<R> = R extends Proto<infer _Item, infer E> ? E : never;
+  export type Failure<R> = R extends { readonly "~E": infer E } ? E : never;
 }
 
 export interface LoadingFirstPage<
@@ -119,7 +119,9 @@ export interface Failure<Item, E = never> extends PaginatedQueryResult.Proto<
 > {
   readonly _tag: "Failure";
   readonly error: E;
-  /** The pages loaded before the failure. */
+  /**
+   * The pages loaded before the failure.
+   */
   readonly results: ReadonlyArray<Item>;
 }
 
@@ -128,10 +130,7 @@ export const isPaginatedQueryResult = (
 ): u is Variants<unknown, unknown> => Predicate.hasProperty(u, TypeId);
 
 const PaginatedQueryResultProto = {
-  [TypeId]: {
-    E: identity,
-    Item: identity,
-  },
+  [TypeId]: TypeId,
   pipe(this: Variants<any, any>, ...args: ReadonlyArray<unknown>) {
     return Pipeable.pipeArguments(
       this,
@@ -168,17 +167,14 @@ const PaginatedQueryResultProto = {
     const tagHash = Hash.string(this._tag);
     return Match.value(this).pipe(
       Match.tag("LoadingFirstPage", (self) =>
-        Hash.cached(self, Hash.combine(tagHash)(Hash.hash(self.skipped))),
+        Hash.combine(tagHash)(Hash.hash(self.skipped)),
       ),
       Match.tag("LoadingMore", "CanLoadMore", "Exhausted", (self) =>
-        Hash.cached(self, Hash.combine(tagHash)(Hash.hash(self.results))),
+        Hash.combine(tagHash)(Hash.hash(self.results)),
       ),
       Match.tag("Failure", (self) =>
-        Hash.cached(
-          self,
-          Hash.combine(tagHash)(
-            Hash.combine(Hash.hash(self.error))(Hash.hash(self.results)),
-          ),
+        Hash.combine(tagHash)(
+          Hash.combine(Hash.hash(self.error))(Hash.hash(self.results)),
         ),
       ),
       Match.exhaustive,
@@ -281,9 +277,9 @@ type MatchReturns<E, V, W, X, Y, Z> = [E] extends [never]
   : V | W | X | Y | Z;
 
 /**
- * Matches a {@link PaginatedQueryResult} to the appropriate handler based on
- * its tag. If the provided result cannot fail (i.e. `E` is `never`),
- * `onFailure` is not required.
+ * Matches a {@link PaginatedQueryResult} to the appropriate handler based on its
+ * tag. If the provided result cannot fail (i.e. `E` is `never`), `onFailure` is
+ * not required.
  */
 export const match: {
   <Item, E, V, W, X, Y, Z = never>(

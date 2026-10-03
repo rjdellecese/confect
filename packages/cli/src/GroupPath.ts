@@ -1,8 +1,7 @@
-import { type GroupSpec, type Spec } from "@confect/core";
-import * as Path from "@effect/platform/Path";
+import { type GroupSpec, Spec } from "@confect/core";
+import * as Path from "effect/Path";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
@@ -13,14 +12,14 @@ import * as String from "effect/String";
  * The path to a group in the Confect API.
  */
 export class GroupPath extends Schema.Class<GroupPath>("GroupPath")({
-  pathSegments: Schema.Data(Schema.NonEmptyArray(Schema.NonEmptyString)),
+  pathSegments: Schema.NonEmptyArray(Schema.NonEmptyString),
 }) {}
 
 /**
  * Create a GroupPath from path segments.
  */
 export const make = (pathSegments: readonly [string, ...string[]]): GroupPath =>
-  GroupPath.make({ pathSegments: Data.array(pathSegments) });
+  GroupPath.make({ pathSegments });
 
 /**
  * Append a group name to a GroupPath to create a new GroupPath.
@@ -29,37 +28,38 @@ export const append = (groupPath: GroupPath, groupName: string): GroupPath =>
   make([...groupPath.pathSegments, groupName]);
 
 /**
- * Expects a path string of the form `./group1/group2.ts`, relative to the Convex functions directory.
+ * Expects a path string of the form `./group1/group2.ts`, relative to the
+ * Convex functions directory.
  */
-export const fromGroupModulePath = (groupModulePath: string) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
+export const fromGroupModulePath = Effect.fnUntraced(function* (
+  groupModulePath: string,
+) {
+  const path = yield* Path.Path;
 
-    const { dir, name, ext } = path.parse(groupModulePath);
+  const { dir, name, ext } = path.parse(groupModulePath);
 
-    if (ext === ".ts") {
-      const dirSegments = Array.filter(
-        String.split(dir, path.sep),
-        String.isNonEmpty,
-      );
-      yield* Effect.logDebug(Array.append(dirSegments, name));
-      return make(Array.append(dirSegments, name));
-    } else {
-      return yield* new GroupModulePathIsNotATypeScriptFileError({
-        path: groupModulePath,
-      });
-    }
-  });
+  if (ext === ".ts") {
+    const dirSegments = Array.filter(
+      String.split(dir, path.sep),
+      String.isNonEmpty,
+    );
+    yield* Effect.logDebug(Array.append(dirSegments, name));
+    return make(Array.append(dirSegments, name));
+  } else {
+    return yield* new GroupModulePathIsNotATypeScriptFileError({
+      path: groupModulePath,
+    });
+  }
+});
 
 /**
  * Get the module path for a group, relative to the Convex functions directory.
  */
-export const modulePath = (groupPath: GroupPath) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
+export const modulePath = Effect.fnUntraced(function* (groupPath: GroupPath) {
+  const path = yield* Path.Path;
 
-    return path.join(...groupPath.pathSegments) + ".ts";
-  });
+  return path.join(...groupPath.pathSegments) + ".ts";
+});
 
 export const getGroupSpec = (
   spec: Spec.AnyWithProps,
@@ -71,9 +71,9 @@ export const getGroupSpec = (
       onEmpty: () => Option.none(),
       onNonEmpty: (head, tail) =>
         pipe(
-          Record.get(spec.groups, head),
+          Record.get(Spec.groups(spec), head),
           Option.flatMap((group) =>
-            Array.isNonEmptyArray(tail)
+            Array.isArrayNonEmpty(tail)
               ? getGroupSpecHelper(group, tail)
               : Option.some(group),
           ),
@@ -93,7 +93,7 @@ const getGroupSpecHelper = (
         pipe(
           Record.get(group.groups, head),
           Option.flatMap((subGroup) =>
-            Array.isNonEmptyArray(tail)
+            Array.isArrayNonEmpty(tail)
               ? getGroupSpecHelper(subGroup, tail)
               : Option.some(subGroup),
           ),

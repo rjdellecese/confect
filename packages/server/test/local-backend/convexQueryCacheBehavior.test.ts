@@ -1,9 +1,10 @@
 /**
- * End-to-end regression test for the cache-stubbing fix in
- * `RegisteredConvexFunction.queryFunction` (`withStubbedDateNow`). Asserts
- * at the cache layer that Confect-wrapped queries don't trip
- * `observed_time` and so stay cached across `MAX_CACHE_AGE`, while the
- * `Clock.currentTimeMillis` opt-in still evicts.
+ * End-to-end test of Confect's query-cache contract, enforced by the constant
+ * `Clock` that `RegisteredConvexFunction.queryFunction` provides. Asserts at
+ * the cache layer that Effect's internal clock reads (log timestamps, spans)
+ * don't trip `observed_time`—those queries stay cached across
+ * `MAX_CACHE_AGE`—while explicit time reads (`Clock.currentTimeMillis` or a raw
+ * `Date.now()` call) opt the query out and evict.
  */
 
 import { Ref } from "@confect/core";
@@ -37,19 +38,20 @@ const queryOnce = <R extends Ref.AnyPublicQuery>(
   });
 
 // `MAX_CACHE_AGE` plus 1s of slack for scheduling jitter.
-const SLEEP_PAST_CACHE = Duration.sum(LocalBackend.maxCacheAge, "1 second");
+const SLEEP_PAST_CACHE = Duration.sum(
+  LocalBackend.maxCacheAge,
+  Duration.seconds(1),
+);
 
-const captureAcrossEvictionWindow = <PublicQueryRef extends Ref.AnyPublicQuery>(
-  ref: PublicQueryRef,
-  ...args: Ref.OptionalArgs<PublicQueryRef>
-) =>
-  Effect.gen(function* () {
-    const { client } = yield* LocalBackend.LocalBackend;
-    const initial = yield* queryOnce(client, ref, ...args);
-    yield* Effect.sleep(SLEEP_PAST_CACHE);
-    const afterMaxCacheAge = yield* queryOnce(client, ref, ...args);
-    return { initial, afterMaxCacheAge };
-  });
+const captureAcrossEvictionWindow = Effect.fnUntraced(function* <
+  PublicQueryRef extends Ref.AnyPublicQuery,
+>(ref: PublicQueryRef, ...args: Ref.OptionalArgs<PublicQueryRef>) {
+  const { client } = yield* LocalBackend.LocalBackend;
+  const initial = yield* queryOnce(client, ref, ...args);
+  yield* Effect.sleep(SLEEP_PAST_CACHE);
+  const afterMaxCacheAge = yield* queryOnce(client, ref, ...args);
+  return { initial, afterMaxCacheAge };
+});
 
 // `excludeTestServices: true` opts out of `TestClock` so `Effect.sleep`
 // waits real wall-clock time and actually crosses the eviction window.
@@ -79,13 +81,16 @@ layer(LocalBackend.layer, {
     }),
   );
 
-  it.effect("a Confect query that calls raw Date.now stays cached", () =>
-    Effect.gen(function* () {
-      const { initial, afterMaxCacheAge } = yield* captureAcrossEvictionWindow(
-        refs.public.groups.cacheStubbed.confectWithRawDateNow,
-      );
-      expect(initial).toBe(afterMaxCacheAge);
-    }),
+  it.effect(
+    "a Confect query that calls raw Date.now is evicted from the cache",
+    () =>
+      Effect.gen(function* () {
+        const { initial, afterMaxCacheAge } =
+          yield* captureAcrossEvictionWindow(
+            refs.public.groups.cacheStubbed.confectWithRawDateNow,
+          );
+        expect(initial).not.toBe(afterMaxCacheAge);
+      }),
   );
 
   it.effect(

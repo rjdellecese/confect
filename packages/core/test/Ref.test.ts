@@ -7,16 +7,108 @@ import type {
   RegisteredQuery,
 } from "convex/server";
 import { ConvexError } from "convex/values";
+import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as MutableRef from "effect/MutableRef";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { describe, expect, expectTypeOf, test } from "vitest";
+import { describe, expect, expectTypeOf, test } from "@effect/vitest";
+import { vi } from "vitest";
 
 import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as PaginationOptions from "@confect/core/PaginationOptions";
 import * as PaginationResult from "@confect/core/PaginationResult";
 import * as Ref from "@confect/core/Ref";
+import type * as RuntimeAndFunctionType from "@confect/core/RuntimeAndFunctionType";
+
+describe("runWithCodec", () => {
+  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    id: Schema.String,
+  }) {}
+
+  class TransportFailure extends Schema.TaggedError<TransportFailure>()(
+    "TransportFailure",
+    {
+      cause: Schema.Unknown,
+    },
+  ) {}
+
+  const ref = Ref.make(
+    "notes",
+    FunctionSpec.publicQuery({
+      name: "count",
+      args: () => ({ count: Schema.FiniteFromString }),
+      returns: () => Schema.FiniteFromString,
+      error: () => NotFound,
+    }),
+  );
+
+  it.effect(
+    "defers encoding and invocation and repeats the codec workflow",
+    () =>
+      Effect.gen(function* () {
+        const readCount = vi.fn(() => 1);
+        const invoke = vi.fn(() => Promise.resolve("2"));
+        const effect = Ref.runWithCodec(
+          ref,
+          {
+            get count() {
+              return readCount();
+            },
+          },
+          invoke,
+        );
+
+        expectTypeOf(effect).toEqualTypeOf<
+          Effect.Effect<number, NotFound | Schema.SchemaError>
+        >();
+        expect(readCount).not.toHaveBeenCalled();
+        expect(invoke).not.toHaveBeenCalled();
+
+        expect(yield* effect).toBe(2);
+        readCount.mockReturnValue(3);
+        expect(yield* effect).toBe(2);
+        expect(invoke).toHaveBeenNthCalledWith(
+          1,
+          Ref.getFunctionReference(ref),
+          { count: "1" },
+        );
+        expect(invoke).toHaveBeenNthCalledWith(
+          2,
+          Ref.getFunctionReference(ref),
+          { count: "3" },
+        );
+      }),
+  );
+
+  it.effect("preserves typed Convex failures", () =>
+    Effect.gen(function* () {
+      const effect = Ref.runWithCodec(ref, { count: 1 }, () =>
+        Promise.reject(new ConvexError({ _tag: "NotFound", id: "abc" })),
+      );
+      const error = yield* Effect.flip(effect);
+      expect(error).toEqual(new NotFound({ id: "abc" }));
+    }),
+  );
+
+  it.effect("infers and preserves the caller's unknown-error mapping", () =>
+    Effect.gen(function* () {
+      const rejection = new Error("offline");
+      const effect = Ref.runWithCodec(
+        ref,
+        { count: 1 },
+        () => Promise.reject(rejection),
+        (cause) => new TransportFailure({ cause }),
+      );
+      expectTypeOf(effect).toEqualTypeOf<
+        Effect.Effect<number, NotFound | TransportFailure | Schema.SchemaError>
+      >();
+      const error = yield* Effect.flip(effect);
+      expect(error).toEqual(new TransportFailure({ cause: rejection }));
+    }),
+  );
+});
 
 describe("FunctionReference", () => {
   test("public query", () => {
@@ -94,11 +186,17 @@ describe("FunctionReference", () => {
   test("preserves args and returns", () => {
     const _spec = FunctionSpec.publicQuery({
       name: "get",
-      args: () => Schema.Struct({ id: Schema.String }),
-      returns: () => Schema.Array(Schema.Number),
+      args: () => ({ id: Schema.String }),
+      returns: () => Schema.Array(Schema.Finite),
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{ readonly id: string }>();
+    expectTypeOf<Ref.ArgsFields<Ref_>>().toEqualTypeOf<{
+      readonly id: typeof Schema.String;
+    }>();
+    expectTypeOf<Ref.ArgsSchema<Ref_>["fields"]>().toEqualTypeOf<
+      Ref.ArgsFields<Ref_>
+    >();
     expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<readonly number[]>();
     expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
       FunctionReference<"query", "public">
@@ -108,12 +206,75 @@ describe("FunctionReference", () => {
   test("empty args", () => {
     const _spec = FunctionSpec.internalMutation({
       name: "reset",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{}>();
     expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<void>();
+  });
+
+  test("AnyConfect", () => {
+    expectTypeOf<Ref.Args<Ref.AnyConfect>>().toBeAny();
+    expectTypeOf<Ref.Returns<Ref.AnyConfect>>().toBeAny();
+    expectTypeOf<Ref.Error<Ref.AnyConfect>>().toBeAny();
+    expectTypeOf<Ref.ArgsSchema<Ref.AnyConfect>>().toExtend<
+      Schema.Codec<any, any>
+    >();
+  });
+
+  test("AnyPaginatedQuery", () => {
+    expectTypeOf<Ref.AnyPaginatedQuery>().not.toBeNever();
+    expectTypeOf<Ref.AnyPaginatedQuery>().toExtend<Ref.AnyQuery>();
+    expectTypeOf<Ref.AnyPublicPaginatedQuery>().toExtend<Ref.AnyPaginatedQuery>();
+    expectTypeOf<Ref.FunctionReference<Ref.AnyPaginatedQuery>>().toEqualTypeOf<
+      FunctionReference<"query", FunctionVisibility>
+    >();
+  });
+
+  test("AnyConfect public refs", () => {
+    expectTypeOf<Ref.AnyConfectPublicQuery>().not.toBeNever();
+    expectTypeOf<Ref.AnyConfectPublicQuery>().toExtend<Ref.AnyConfect>();
+    expectTypeOf<
+      Ref.FunctionReference<Ref.AnyConfectPublicQuery>
+    >().toEqualTypeOf<FunctionReference<"query", "public">>();
+
+    expectTypeOf<Ref.AnyConfectPublicPaginatedQuery>().not.toBeNever();
+    expectTypeOf<Ref.AnyConfectPublicPaginatedQuery>().toExtend<Ref.AnyConfectPublicQuery>();
+    expectTypeOf<Ref.AnyConfectPublicPaginatedQuery>().toExtend<Ref.AnyPublicPaginatedQuery>();
+
+    expectTypeOf<Ref.AnyConfectPublicMutation>().not.toBeNever();
+    expectTypeOf<
+      Ref.FunctionReference<Ref.AnyConfectPublicMutation>
+    >().toEqualTypeOf<FunctionReference<"mutation", "public">>();
+
+    expectTypeOf<Ref.AnyConfectPublicAction>().not.toBeNever();
+    expectTypeOf<
+      Ref.FunctionReference<Ref.AnyConfectPublicAction>
+    >().toEqualTypeOf<FunctionReference<"action", "public">>();
+  });
+
+  test("Ref preserves its value types", () => {
+    type Ref_ = Ref.Ref<
+      RuntimeAndFunctionType.ConvexQuery,
+      "public",
+      { readonly id: string },
+      number,
+      "NotFound"
+    >;
+
+    expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{ readonly id: string }>();
+    expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<number>();
+    expectTypeOf<Ref.Error<Ref_>>().toEqualTypeOf<"NotFound">();
+
+    expectTypeOf<
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexQuery,
+        "public",
+        // @ts-expect-error—ref args must be struct-shaped
+        string,
+        number
+      >
+    >();
   });
 
   test("AnyQuery", () => {
@@ -139,7 +300,6 @@ describe("OptionalArgs", () => {
   test("optional tuple when args are empty", () => {
     const _spec = FunctionSpec.publicQuery({
       name: "list",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
@@ -149,7 +309,7 @@ describe("OptionalArgs", () => {
   test("required tuple when args have keys", () => {
     const _spec = FunctionSpec.publicQuery({
       name: "get",
-      args: () => Schema.Struct({ id: Schema.String }),
+      args: () => ({ id: Schema.String }),
       returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
@@ -164,7 +324,6 @@ describe("getFunctionReference", () => {
     "notes",
     FunctionSpec.publicQuery({
       name: "list",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Void,
     }),
   );
@@ -178,7 +337,6 @@ describe("getFunctionReference", () => {
       "notes",
       FunctionSpec.publicQuery({
         name: "get",
-        args: () => Schema.Struct({}),
         returns: () => Schema.Void,
       }),
     );
@@ -193,7 +351,7 @@ describe("Error type extraction", () => {
   test("no error schema means Error is never", () => {
     const _spec = FunctionSpec.publicMutation({
       name: "create",
-      args: () => Schema.Struct({ name: Schema.String }),
+      args: () => ({ name: Schema.String }),
       returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
@@ -207,7 +365,7 @@ describe("Error type extraction", () => {
 
     const _spec = FunctionSpec.publicMutation({
       name: "update",
-      args: () => Schema.Struct({ id: Schema.String }),
+      args: () => ({ id: Schema.String }),
       returns: () => Schema.Void,
       error: () => NotFound,
     });
@@ -225,9 +383,9 @@ describe("Error type extraction", () => {
 
     const _spec = FunctionSpec.publicMutation({
       name: "remove",
-      args: () => Schema.Struct({ id: Schema.String }),
+      args: () => ({ id: Schema.String }),
       returns: () => Schema.Void,
-      error: () => Schema.Union(NotFound, Forbidden),
+      error: () => Schema.Union([NotFound, Forbidden]),
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Error<Ref_>>().toEqualTypeOf<NotFound | Forbidden>();
@@ -252,41 +410,42 @@ describe("isConvexError", () => {
 });
 
 describe("decodeError", () => {
-  test("decodes error data using the error schema", async () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
-      id: Schema.String,
-    }) {}
+  it.effect("decodes error data using the error schema", () =>
+    Effect.gen(function* () {
+      class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+        id: Schema.String,
+      }) {}
 
-    const spec = FunctionSpec.publicMutation({
-      name: "update",
-      args: () => Schema.Struct({}),
-      returns: () => Schema.Void,
-      error: () => NotFound,
-    });
-    const ref = Ref.make("test/mod", spec);
+      const spec = FunctionSpec.publicMutation({
+        name: "update",
+        returns: () => Schema.Void,
+        error: () => NotFound,
+      });
+      const ref = Ref.make("test/mod", spec);
 
-    const result = await Effect.runPromise(
-      Ref.decodeError(ref, { _tag: "NotFound", id: "abc" }),
-    );
-    expect(Option.isSome(result)).toBe(true);
-    const decoded = Option.getOrThrow(result);
-    expect(decoded).toBeInstanceOf(NotFound);
-    expect(decoded.id).toBe("abc");
-  });
+      const result = yield* Ref.decodeError(ref, {
+        _tag: "NotFound",
+        id: "abc",
+      });
+      expect(Option.isSome(result)).toBe(true);
+      const decoded = Option.getOrThrow(result);
+      expect(decoded).toBeInstanceOf(NotFound);
+      expect(decoded.id).toBe("abc");
+    }),
+  );
 
-  test("returns None when the ref has no error schema", async () => {
-    const spec = FunctionSpec.publicMutation({
-      name: "create",
-      args: () => Schema.Struct({}),
-      returns: () => Schema.Void,
-    });
-    const ref = Ref.make("test/mod", spec);
+  it.effect("returns None when the ref has no error schema", () =>
+    Effect.gen(function* () {
+      const spec = FunctionSpec.publicMutation({
+        name: "create",
+        returns: () => Schema.Void,
+      });
+      const ref = Ref.make("test/mod", spec);
 
-    const result = await Effect.runPromise(
-      Ref.decodeError(ref, { anything: "goes" }),
-    );
-    expect(Option.isNone(result)).toBe(true);
-  });
+      const result = yield* Ref.decodeError(ref, { anything: "goes" });
+      expect(Option.isNone(result)).toBe(true);
+    }),
+  );
 });
 
 describe("decodeErrorOption", () => {
@@ -298,7 +457,6 @@ describe("decodeErrorOption", () => {
     "test/mod",
     FunctionSpec.publicQuery({
       name: "getOrFail",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Void,
       error: () => NotFound,
     }),
@@ -314,7 +472,7 @@ describe("decodeErrorOption", () => {
     expect(Option.getOrThrow(decoded)).toBeInstanceOf(NotFound);
   });
 
-  test("returns None — rather than throwing — for data that does not match", () => {
+  test("returns None—rather than throwing—for data that does not match", () => {
     // Convex raises its own `ConvexError`s (this is the shape of a pagination
     // `InvalidCursor`), which never match a user-declared error schema.
     // Throwing here would replace the real error with an opaque `ParseError`,
@@ -332,7 +490,6 @@ describe("decodeErrorOption", () => {
       "test/mod",
       FunctionSpec.publicQuery({
         name: "get",
-        args: () => Schema.Struct({}),
         returns: () => Schema.Void,
       }),
     );
@@ -352,7 +509,6 @@ describe("decodeErrorOrElse", () => {
     "test/mod",
     FunctionSpec.publicMutation({
       name: "update",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Void,
       error: () => NotFound,
     }),
@@ -362,7 +518,6 @@ describe("decodeErrorOrElse", () => {
     "test/mod",
     FunctionSpec.publicMutation({
       name: "create",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Void,
     }),
   );
@@ -407,7 +562,6 @@ describe("hasErrorSchema", () => {
       "test/mod",
       FunctionSpec.publicMutation({
         name: "update",
-        args: () => Schema.Struct({}),
         returns: () => Schema.Void,
         error: () => NotFound,
       }),
@@ -421,7 +575,6 @@ describe("hasErrorSchema", () => {
       "test/mod",
       FunctionSpec.publicMutation({
         name: "create",
-        args: () => Schema.Struct({}),
         returns: () => Schema.Void,
       }),
     );
@@ -441,13 +594,13 @@ describe("hasErrorSchema", () => {
 });
 
 describe("paginated queries", () => {
-  const paginatedDoc = Schema.Struct({ value: Schema.NumberFromString });
+  const paginatedDoc = Schema.Struct({ value: Schema.FiniteFromString });
 
   const paginatedRef = Ref.make(
     "notes",
     FunctionSpec.publicPaginatedQuery({
       name: "listPaginated",
-      args: () => Schema.Struct({ count: Schema.NumberFromString }),
+      args: () => ({ count: Schema.FiniteFromString }),
       item: () => paginatedDoc,
     }),
   );
@@ -470,11 +623,10 @@ describe("paginated queries", () => {
     "notes",
     FunctionSpec.publicQuery({
       name: "listPaginated",
-      args: () =>
-        Schema.Struct({
-          count: Schema.NumberFromString,
-          paginationOpts: PaginationOptions.PaginationOptions,
-        }),
+      args: () => ({
+        count: Schema.FiniteFromString,
+        paginationOpts: PaginationOptions.PaginationOptions,
+      }),
       returns: () => PaginationResult.PaginationResult(paginatedDoc),
     }),
   );
@@ -562,5 +714,118 @@ describe("paginated queries", () => {
         args,
       );
     });
+  });
+});
+
+describe("ConvexRef", () => {
+  test("carries no codec schemas or middleware surface", () => {
+    expectTypeOf<
+      Extract<
+        keyof Ref.ConvexRef<any, any, any, any>,
+        "args" | "returns" | "error" | "kind" | "middlewareSpecs"
+      >
+    >().toBeNever();
+  });
+});
+
+describe("error schema laziness at decode time", () => {
+  test("forces error schema thunks only when an error is decoded", () => {
+    const specErrorBuilt = MutableRef.make(false);
+    const middlewareErrorBuilt = MutableRef.make(false);
+
+    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {}) {}
+    class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
+
+    class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("LazyDecodeGate", {
+      functionTypes: { query: true, mutation: true, action: true },
+      error: () => {
+        MutableRef.set(middlewareErrorBuilt, true);
+        return Blocked;
+      },
+    }) {}
+
+    const ref = Ref.make(
+      "test/mod",
+      FunctionSpec.publicQuery({
+        name: "get",
+        returns: () => Schema.String,
+        error: () => {
+          MutableRef.set(specErrorBuilt, true);
+          return NotFound;
+        },
+      }),
+      [{ spec: Gate, options: undefined }],
+    );
+
+    Ref.encodeArgsSync(ref, {});
+    Ref.decodeReturnsSync(ref, "value");
+
+    expect(MutableRef.get(specErrorBuilt)).toBe(false);
+    expect(MutableRef.get(middlewareErrorBuilt)).toBe(false);
+
+    const decoded = Ref.decodeErrorOption(ref, { _tag: "Blocked" });
+
+    expect(Option.isSome(decoded)).toBe(true);
+    expect(MutableRef.get(specErrorBuilt)).toBe(true);
+    expect(MutableRef.get(middlewareErrorBuilt)).toBe(true);
+  });
+});
+
+describe("make with middleware options", () => {
+  const query = FunctionSpec.publicQuery({
+    name: "get",
+    returns: () => Schema.String,
+  });
+
+  it("derives middleware specs from ordered attachments without forcing schemas", () => {
+    const optionsBuilt = MutableRef.make(false);
+    const errorBuilt = MutableRef.make(false);
+    class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
+    class Policy extends MiddlewareSpec.MiddlewareSpec<Policy>()("Policy", {
+      options: () => {
+        MutableRef.set(optionsBuilt, true);
+        return Schema.Struct({ enabled: Schema.Boolean });
+      },
+      error: () => {
+        MutableRef.set(errorBuilt, true);
+        return Blocked;
+      },
+      functionTypes: { query: true, mutation: false, action: false },
+    }) {}
+    const ref = Ref.make(
+      "policies",
+      query.middleware(Policy, { enabled: false }),
+      [{ spec: Policy, options: { enabled: true } }],
+    );
+
+    expect(ref.middlewareSpecs).toEqual([Policy, Policy]);
+    expect(ref.middlewareSpecs).toEqual(
+      ref.middlewareAttachments.map(({ spec }) => spec),
+    );
+    expect(Ref.hasErrorSchema(ref)).toBe(true);
+    expect(MutableRef.get(optionsBuilt)).toBe(false);
+    expect(MutableRef.get(errorBuilt)).toBe(false);
+  });
+
+  it("retains client-safe resolver values without serializing them", () => {
+    class Resource extends MiddlewareSpec.MiddlewareSpec<Resource>()(
+      "Resource",
+      {
+        options: () =>
+          Schema.Struct({
+            resolve: Schema.declare<(args: unknown) => string>(
+              (value): value is (args: unknown) => string =>
+                typeof value === "function",
+            ),
+            tolerateMissing: Schema.Boolean,
+          }),
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
+    const resolve = (_args: unknown) => "resource-id";
+    const options = { resolve, tolerateMissing: true };
+    const ref = Ref.make("resources", query.middleware(Resource, options));
+    expect(ref.middlewareAttachments[0]?.options).toBe(options);
+    expectTypeOf<Ref.Error<typeof ref>>().toBeNever();
   });
 });

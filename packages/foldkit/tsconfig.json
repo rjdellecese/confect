@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "isolatedDeclarations": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "paths": {
+      "@confect/foldkit": ["./src/index.ts"],
+      "@confect/foldkit/*": ["./src/*"]
+    }
+  },
+  "exclude": ["coverage", "dist", "node_modules"],
+  "extends": ["../../tsconfig.base.json"]
+}

@@ -7,15 +7,14 @@ import type {
 } from "convex/server";
 import { identity, pipe } from "effect/Function";
 import type { Option } from "effect";
-import * as Chunk from "effect/Chunk";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as Document from "./Document";
 import type * as TableInfo from "./TableInfo";
+import type * as Table from "./Table";
 
 export type OrderedQuery<
   TableInfo_ extends TableInfo.AnyWithProps,
-  _TableName extends string,
   Doc = TableInfo_["document"],
 > = {
   readonly first: () => Effect.Effect<
@@ -38,69 +37,61 @@ export type OrderedQuery<
   ) => Effect.Effect<PaginationResult<Doc>, Document.DocumentDecodeError>;
 };
 
-export const make = <
-  TableInfo_ extends TableInfo.AnyWithProps,
-  TableName extends string,
->(
-  query: ConvexOrderedQuery<TableInfo.ConvexTableInfo<TableInfo_>>,
-  tableName: TableName,
-  tableSchema: TableInfo.TableSchema<TableInfo_>,
-): OrderedQuery<TableInfo_, TableName> => {
+export const make = <Table_ extends Table.AnyWithProps>(
+  query: ConvexOrderedQuery<
+    TableInfo.ConvexTableInfo<TableInfo.TableInfo<Table_>>
+  >,
+  table: Table_,
+): OrderedQuery<TableInfo.TableInfo<Table_>> => {
+  type TableInfo_ = TableInfo.TableInfo<Table_>;
   type OrderedQueryFunction<
-    FunctionName extends keyof OrderedQuery<TableInfo_, TableName>,
-  > = OrderedQuery<TableInfo_, TableName>[FunctionName];
+    FunctionName extends keyof OrderedQuery<TableInfo_>,
+  > = OrderedQuery<TableInfo_>[FunctionName];
 
   const streamEncoded = Stream.fromAsyncIterable(query, identity).pipe(
     Stream.orDie,
   );
 
   const stream: OrderedQueryFunction<"stream"> = () =>
-    pipe(
-      streamEncoded,
-      Stream.mapEffect(Document.decode(tableName, tableSchema)),
-    );
+    pipe(streamEncoded, Stream.mapEffect(Document.decode(table)));
 
   const first: OrderedQueryFunction<"first"> = () =>
     pipe(stream(), Stream.take(1), Stream.runHead);
 
   const take: OrderedQueryFunction<"take"> = (n: number) =>
-    pipe(
-      stream(),
-      Stream.take(n),
-      Stream.runCollect,
-      Effect.map((chunk) => Chunk.toReadonlyArray(chunk)),
-    );
+    pipe(stream(), Stream.take(n), Stream.runCollect);
 
   const collect: OrderedQueryFunction<"collect"> = () =>
-    pipe(stream(), Stream.runCollect, Effect.map(Chunk.toReadonlyArray));
+    pipe(stream(), Stream.runCollect);
 
-  const paginate: OrderedQueryFunction<"paginate"> = (options, filter) =>
-    Effect.gen(function* () {
-      const filteredQuery = filter !== undefined ? query.filter(filter) : query;
+  const paginate: OrderedQueryFunction<"paginate"> = Effect.fn(
+    "OrderedQuery.paginate",
+  )(function* (options, filter) {
+    const filteredQuery = filter !== undefined ? query.filter(filter) : query;
 
-      const paginationResult = yield* Effect.promise(() =>
-        filteredQuery.paginate(options),
-      );
+    const paginationResult = yield* Effect.promise(() =>
+      filteredQuery.paginate(options),
+    );
 
-      const parsedPage = yield* Effect.forEach(
-        paginationResult.page,
-        Document.decode(tableName, tableSchema),
-      );
+    const parsedPage = yield* Effect.forEach(
+      paginationResult.page,
+      Document.decode(table),
+    );
 
-      return {
-        page: parsedPage,
-        isDone: paginationResult.isDone,
-        continueCursor: paginationResult.continueCursor,
-        /* v8 ignore start */
-        ...(paginationResult.splitCursor
-          ? { splitCursor: paginationResult.splitCursor }
-          : {}),
-        ...(paginationResult.pageStatus
-          ? { pageStatus: paginationResult.pageStatus }
-          : {}),
-        /* v8 ignore stop */
-      };
-    });
+    return {
+      page: parsedPage,
+      isDone: paginationResult.isDone,
+      continueCursor: paginationResult.continueCursor,
+      /* v8 ignore start */
+      ...(paginationResult.splitCursor
+        ? { splitCursor: paginationResult.splitCursor }
+        : {}),
+      ...(paginationResult.pageStatus
+        ? { pageStatus: paginationResult.pageStatus }
+        : {}),
+      /* v8 ignore stop */
+    };
+  });
 
   return {
     first,

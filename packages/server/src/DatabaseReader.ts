@@ -2,7 +2,7 @@ import type { GenericDatabaseReader } from "convex/server";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 import type { BaseDatabaseReader } from "@confect/core/Types";
-import type * as DatabaseSchema from "./DatabaseSchema";
+import * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as QueryInitializer from "./QueryInitializer";
 import * as Table from "./Table";
@@ -12,7 +12,7 @@ type IncludedTables<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | Table.SystemTables;
 
 type IncludedDataModel<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
-  DataModel.DataModel<IncludedTables<DatabaseSchema_>>;
+  DataModel.FromTables<IncludedTables<DatabaseSchema_>>;
 
 export interface DatabaseReaderService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -25,8 +25,6 @@ export interface DatabaseReaderService<
   ) => QueryInitializer.QueryInitializer<
     IncludedDataModel<DatabaseSchema_>,
     TableName,
-    DataModel.TableInfoWithName<IncludedDataModel<DatabaseSchema_>, TableName>,
-    DataModel.TableInfoWithName_<IncludedDataModel<DatabaseSchema_>, TableName>,
     TableName extends keyof Docs
       ? Docs[TableName]
       : DataModel.DocumentWithName<
@@ -52,12 +50,16 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
       const baseDatabaseReader: BaseDatabaseReader<any> = isSystem
         ? {
-            get: convexDatabaseReader.system.get,
-            query: convexDatabaseReader.system.query,
+            get: convexDatabaseReader.system.get.bind(
+              convexDatabaseReader.system,
+            ),
+            query: convexDatabaseReader.system.query.bind(
+              convexDatabaseReader.system,
+            ),
           }
         : {
-            get: convexDatabaseReader.get,
-            query: convexDatabaseReader.query,
+            get: convexDatabaseReader.get.bind(convexDatabaseReader),
+            query: convexDatabaseReader.query.bind(convexDatabaseReader),
           };
 
       const table = (
@@ -65,11 +67,10 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
           ? (Table.systemTables as Record<string, Table.AnyWithProps>)[
               tableName
             ]
-          : databaseSchema.tables[tableName]
+          : DatabaseSchema.tables(databaseSchema)[tableName]
       ) as Table.WithName<IncludedTables<DatabaseSchema_>, TableName>;
 
       return QueryInitializer.make<IncludedTables<DatabaseSchema_>, TableName>(
-        tableName,
         baseDatabaseReader,
         table,
       );
@@ -78,16 +79,16 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 };
 
 /**
- * The tag's *Identifier* (the Effect requirements-channel type) is
+ * The tag's _Identifier_ (the Effect requirements-channel type) is
  * `Docs`-independent so a helper's `R` channel is the same whether or not a
- * codegen document registry is supplied — this keeps it identical to what
- * `Handler`/runtime provisioning provide. The tag's *Service* (what `yield*`
+ * codegen document registry is supplied—this keeps it identical to what
+ * `Handler`/runtime provisioning provide. The tag's _Service_ (what `yield*`
  * produces) carries `Docs`, so queries resolve to the named doc interfaces.
  */
 export type DatabaseReaderTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
-> = Context.Tag<
+> = Context.Service<
   DatabaseReaderService<DatabaseSchema_>,
   DatabaseReaderService<DatabaseSchema_, Docs>
 >;
@@ -96,7 +97,7 @@ export const DatabaseReader = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 >(): DatabaseReaderTag<DatabaseSchema_, Docs> =>
-  Context.GenericTag<
+  Context.Service<
     DatabaseReaderService<DatabaseSchema_>,
     DatabaseReaderService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseReader");

@@ -1,10 +1,41 @@
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
+import { FunctionSpec } from "@confect/core";
+import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
+import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
+import { RegisteredNodeFunction } from "@confect/server/node";
+import { convexTest } from "convex-test";
+import { makeFunctionReference } from "convex/server";
+import * as Console from "effect/Console";
+import * as TestConsole from "effect/testing/TestConsole";
+import confectSchema from "./fixtures/confect/_generated/schema";
+import convexSchema from "./fixtures/confect/_generated/convexSchema";
+import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as Duration from "effect/Duration";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import * as SchemaParser from "effect/SchemaParser";
+import * as SchemaCompiler from "effect/schema/SchemaCompiler";
+import * as Stream from "effect/Stream";
+import * as Option from "effect/Option";
+import { vi } from "vitest";
+import * as DatabaseReader_ from "@confect/server/DatabaseReader";
+import * as DatabaseWriter_ from "@confect/server/DatabaseWriter";
+import * as DatabaseSchema from "@confect/server/DatabaseSchema";
+import * as QueryStream from "@confect/server/QueryStream";
+import * as Table from "@confect/server/Table";
+import * as Storage from "@confect/server/Storage";
+import { StorageReader } from "@confect/server/StorageReader";
 import refs from "./fixtures/confect/_generated/refs";
-import { DatabaseWriter } from "./fixtures/confect/_generated/services";
+import {
+  DatabaseReader,
+  DatabaseWriter,
+  MutationCtx,
+  Scheduler,
+  TransactionMetadata,
+} from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
 import type notes from "./fixtures/confect/_generated/tables/notes";
 import { PaginationDenied } from "./fixtures/confect/databaseReader.spec";
@@ -15,7 +46,323 @@ import {
 import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
 
+describe("Storage", () => {
+  const read = Effect.gen(function* () {
+    const storage = yield* Storage.Storage;
+    const legacy = yield* StorageReader;
+    return storage.getUrl === legacy.getUrl
+      ? "shared reader"
+      : "different readers";
+  });
+  const write = Effect.gen(function* () {
+    const storage = yield* Storage.Storage;
+    return (yield* storage.generateUploadUrl).protocol;
+  });
+  const roundtrip = Effect.gen(function* () {
+    const storage = yield* Storage.Storage;
+    const id = yield* storage.store(new Blob(["storage roundtrip"]));
+    expect(yield* storage.getUrl(id)).toBeInstanceOf(URL);
+    const blob = yield* storage.get(id);
+    const text = yield* Effect.promise(() => blob.text());
+    yield* storage.delete(id);
+    expect((yield* Effect.flip(storage.get(id))).id).toBe(id);
+    expect((yield* Effect.flip(storage.getUrl(id))).id).toBe(id);
+    return text;
+  }).pipe(Effect.orDie);
+  const cases = [
+    {
+      name: "query",
+      spec: FunctionSpec.publicQuery({
+        name: "run",
+        returns: () => Schema.String,
+      }),
+      handler: read,
+      expected: "shared reader",
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.query(makeFunctionReference<"query">("storage:run"), {}),
+    },
+    {
+      name: "mutation",
+      spec: FunctionSpec.publicMutation({
+        name: "run",
+        returns: () => Schema.String,
+      }),
+      handler: write,
+      expected: "https:",
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.mutation(makeFunctionReference<"mutation">("storage:run"), {}),
+    },
+    {
+      name: "action",
+      spec: FunctionSpec.publicAction({
+        name: "run",
+        returns: () => Schema.String,
+      }),
+      handler: roundtrip,
+      expected: "storage roundtrip",
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.action(makeFunctionReference<"action">("storage:run"), {}),
+    },
+    {
+      name: "Node action",
+      spec: FunctionSpec.publicNodeAction({
+        name: "run",
+        returns: () => Schema.String,
+      }),
+      handler: roundtrip,
+      expected: "storage roundtrip",
+      register: RegisteredNodeFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.action(makeFunctionReference<"action">("storage:run"), {}),
+    },
+  ];
+
+  it.effect.each(cases)(
+    "provides unified storage to a registered $name",
+    ({ spec, handler, expected, register, invoke }) =>
+      Effect.gen(function* () {
+        const item = FunctionRegistryItem.make({
+          functionSpec: spec,
+          groupMiddlewareAttachments: [],
+          handler: () => handler,
+        });
+        assert(item._tag === "Confect");
+        const registered = register(confectSchema, item);
+        const t = convexTest(convexSchema, {
+          ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+          "./fixtures/convex/storage.ts": () =>
+            Promise.resolve({ run: registered }),
+        });
+        expect(yield* Effect.promise(() => invoke(t))).toBe(expected);
+      }),
+  );
+});
+
+describe("function logging", () => {
+  const cases = [
+    {
+      name: "query",
+      spec: FunctionSpec.publicQuery({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.query(makeFunctionReference<"query">("logging:run"), {}),
+    },
+    {
+      name: "mutation",
+      spec: FunctionSpec.publicMutation({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.mutation(makeFunctionReference<"mutation">("logging:run"), {}),
+    },
+    {
+      name: "action",
+      spec: FunctionSpec.publicAction({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.action(makeFunctionReference<"action">("logging:run"), {}),
+    },
+    {
+      name: "Node action",
+      spec: FunctionSpec.publicNodeAction({
+        name: "run",
+        returns: () => Schema.Null,
+      }),
+      register: RegisteredNodeFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.action(makeFunctionReference<"action">("logging:run"), {}),
+    },
+  ];
+
+  it.effect.each(cases)(
+    "installs the default logger for a registered $name",
+    ({ name, spec, register, invoke }) =>
+      Effect.gen(function* () {
+        const console = {
+          ...(yield* TestConsole.make),
+          warn: vi.fn(),
+          log: vi.fn(),
+        };
+        const item = FunctionRegistryItem.make({
+          functionSpec: spec,
+          groupMiddlewareAttachments: [],
+          handler: () =>
+            Effect.logWarning(name).pipe(
+              Effect.as(null),
+              Effect.provideService(Console.Console, console),
+            ),
+        });
+        assert(item._tag === "Confect");
+        const registered = register(confectSchema, item);
+        const t = convexTest(convexSchema, {
+          ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+          "./fixtures/convex/logging.ts": () =>
+            Promise.resolve({ run: registered }),
+        });
+        expect(yield* Effect.promise(() => invoke(t))).toBeNull();
+        expect(console.warn).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ level: "WARN", message: name }),
+        );
+        expect(console.log).not.toHaveBeenCalled();
+      }),
+  );
+});
+
+describe("TransactionMetadata", () => {
+  it.effect("reads updated metrics after database operations", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+      yield* c.run(
+        Effect.gen(function* () {
+          const transaction = yield* TransactionMetadata;
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+          const getMetrics = transaction.getMetrics();
+          const before = yield* getMetrics;
+
+          const id = yield* writer.table("notes").insert({ text: "metrics" });
+          yield* reader.table("notes").get(id);
+          const after = yield* getMetrics;
+
+          expect(after.documentsWritten.used).toBeGreaterThan(
+            before.documentsWritten.used,
+          );
+          expect(after.documentsRead.used).toBeGreaterThan(
+            before.documentsRead.used,
+          );
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+});
+
+describe("Scheduler", () => {
+  it.effect("cancels a pending function without executing it", () =>
+    Effect.gen(function* () {
+      vi.useFakeTimers();
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const scheduler = yield* Scheduler;
+          const reader = yield* DatabaseReader;
+          const id = yield* scheduler.runAfter(
+            Duration.minutes(5),
+            refs.public.groups.notes.insert,
+            { text: "This function must not run" },
+          );
+
+          yield* scheduler.cancel(id);
+
+          const scheduled = yield* reader.table("_scheduled_functions").get(id);
+          expect(scheduled.state.kind).toBe("canceled");
+        }),
+      );
+
+      yield* c.finishAllScheduledFunctions(() => vi.runAllTimers());
+
+      expect(yield* c.query(refs.public.groups.notes.list)).toEqual([]);
+    }).pipe(
+      Effect.ensuring(Effect.sync(() => vi.useRealTimers())),
+      Effect.provide(TestConfect.layer),
+    ),
+  );
+});
+
 describe("DatabaseReader", () => {
+  it.effect("uses the canonical Doc decoder across database read paths", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const ctx = yield* MutationCtx;
+          const id = yield* Effect.promise(() =>
+            ctx.db.insert("notes", { text: "hello" }),
+          );
+          let evaluations = 0;
+          const table = Table.make(() => {
+            evaluations++;
+            return Schema.Struct({ text: Schema.String });
+          })
+            .index("by_text", ["text"])
+            .searchIndex("text", { searchField: "text" })("notes");
+          const schema = DatabaseSchema.make({ notes: table });
+          const reader = DatabaseReader_.make<typeof schema>(
+            schema,
+            ctx.db,
+          ).table("notes");
+          const writer = DatabaseWriter_.make<typeof schema>(
+            schema,
+            ctx.db,
+          ).table("notes");
+          const get = reader.get(id);
+          const getByIndex = reader.get("by_text", "hello");
+          const first = reader.index("by_text").first();
+          const take = reader.index("by_text").take(1);
+          const collect = reader.index("by_text").collect();
+          const orderedStream = reader.index("by_text").stream();
+          const paginate = reader
+            .index("by_text")
+            .paginate({ numItems: 1, cursor: null });
+          const search = reader.search("text", (q) =>
+            q.search("text", "hello"),
+          );
+          const stream = reader.stream("by_text");
+
+          expect(evaluations).toBe(0);
+
+          const encoded = yield* Effect.promise(() => ctx.db.get(id));
+          const doc = table.Doc;
+          const interpreted = SchemaParser.decodeUnknownEffect(doc);
+          yield* interpreted(encoded);
+          let calls = 0;
+          SchemaCompiler.set(doc.ast, {
+            decodeEffect: (input, options) => {
+              calls++;
+              return interpreted(input, options);
+            },
+          });
+
+          expect(yield* get).toEqual(encoded);
+          expect(yield* getByIndex).toEqual(encoded);
+          expect(yield* first).toEqual(Option.some(encoded));
+          expect(yield* take).toEqual([encoded]);
+          expect(yield* collect).toEqual([encoded]);
+          expect(yield* Stream.runCollect(orderedStream)).toEqual([encoded]);
+          expect((yield* paginate).page).toEqual([encoded]);
+          expect(yield* search.collect()).toEqual([encoded]);
+          expect(yield* Stream.runCollect(stream)).toEqual([encoded]);
+          expect(
+            (yield* QueryStream.paginate(stream, { numItems: 1, cursor: null }))
+              .page,
+          ).toEqual([encoded]);
+          expect(calls).toBe(10);
+
+          yield* writer.patch(id, { text: "patched" });
+          expect(calls).toBe(11);
+          expect(evaluations).toBe(1);
+          expect(table.Doc).toBe(doc);
+          expect(encoded?.text).toBe("hello");
+          expect((yield* Effect.promise(() => ctx.db.get(id)))?.text).toBe(
+            "patched",
+          );
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("get", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -38,7 +385,7 @@ describe("DatabaseReader", () => {
         .pipe(Effect.map((note) => note.text));
 
       assertEquals(retrievedText, text);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("collect", () =>
@@ -62,7 +409,7 @@ describe("DatabaseReader", () => {
       assertEquals(notes.length, 10);
       assertEquals(notes[0]?.text, "10");
       assertEquals(notes[9]?.text, "1");
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
@@ -94,16 +441,18 @@ describe("DatabaseWriter", () => {
 
       assertEquals(note.text, "patched");
       assert.isFalse(Object.hasOwn(note, "tag"));
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
-  it("patch accepts undefined only where the field type allows it", () => {
+  it("patch accepts undefined according to field types and compiler optionality", () => {
     const patchNote = (writer: DatabaseWriter) => writer.table("notes").patch;
     type Patch = Parameters<ReturnType<typeof patchNote>>[1];
 
     expectTypeOf<{ tag: undefined }>().toExtend<Patch>();
     expectTypeOf<{ author: undefined }>().toExtend<Patch>();
-    expectTypeOf<{ text: undefined }>().not.toExtend<Patch>();
+    expectTypeOf<
+      { text: undefined } extends Patch ? true : false
+    >().toEqualTypeOf<CompilerOptions.AllowsExplicitUndefined>();
     expectTypeOf<{ text: string }>().toExtend<Patch>();
   });
 });
@@ -125,7 +474,7 @@ describe("MutationRunner", () => {
       });
       expectTypeOf(note).toEqualTypeOf<(typeof notes.Doc)["Type"]>();
       assertEquals(note.text, text);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
@@ -140,7 +489,7 @@ describe("ActionRunner", () => {
 
       expectTypeOf(result).toEqualTypeOf<number>();
       assertEquals(typeof result, "number");
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
@@ -158,7 +507,7 @@ describe("QueryRunner", () => {
 
       expectTypeOf(count).toEqualTypeOf<number>();
       assertEquals(count, 2);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
@@ -190,7 +539,7 @@ describe("paginate", () => {
 
       assertEquals(result2.page.length, 2);
       assertEquals(result2.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("accepts the protocol fields Convex's client sends", () =>
@@ -216,7 +565,7 @@ describe("paginate", () => {
 
       assertEquals(result.page.length, 3);
       assertEquals(result.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("paginate with filter", () =>
@@ -247,7 +596,7 @@ describe("paginate", () => {
       assertEquals(texts.has("a"), true);
       assertEquals(texts.has("c"), true);
       assertEquals(texts.has("e"), true);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("paginate with filter returns empty when no matches", () =>
@@ -270,7 +619,7 @@ describe("paginate", () => {
 
       assertEquals(result.page.length, 0);
       assertEquals(result.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("paginate with filter paginates correctly", () =>
@@ -299,7 +648,7 @@ describe("paginate", () => {
       for (const note of page1.page) {
         assertEquals(note.tag, "even");
       }
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("surfaces the declared typed error", () =>
@@ -311,9 +660,9 @@ describe("paginate", () => {
           paginationOpts: { cursor: null, numItems: 3 },
           shouldFail: true,
         })
-        .pipe(Effect.either, Effect.map(expectFailure));
+        .pipe(Effect.result, Effect.map(expectFailure));
 
-      assert(failure instanceof PaginationDenied);
+      assert(Schema.is(PaginationDenied)(failure));
       assertEquals(failure.reason, "denied");
 
       const result = yield* c.query(
@@ -326,13 +675,13 @@ describe("paginate", () => {
 
       assertEquals(result.page.length, 0);
       assertEquals(result.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
-const expectFailure = <A, E>(either: Either.Either<A, E>): E => {
-  assert(Either.isLeft(either));
-  return either.left;
+const expectFailure = <A, E>(result: Result.Result<A, E>): E => {
+  assert(Result.isFailure(result));
+  return result.failure;
 };
 
 // Insert a note then immediately delete it to obtain a well-formed Convex id
@@ -358,16 +707,16 @@ describe("typed errors", () => {
         const c = yield* TestConfect.TestConfect;
         const missingId = yield* insertAndDeleteNote;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           c.query(refs.public.groups.typedErrors.getNoteOrFail, {
             noteId: missingId,
           }),
         );
 
         const error = expectFailure(result);
-        expect(error).toBeInstanceOf(NotFound);
-        expect((error as NotFound).id).toBe(missingId);
-      }).pipe(Effect.provide(TestConfect.layer())),
+        assert(Schema.is(NotFound)(error));
+        expect(error.id).toBe(missingId);
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect(
@@ -377,7 +726,7 @@ describe("typed errors", () => {
           const c = yield* TestConfect.TestConfect;
           const missingId = yield* insertAndDeleteNote;
 
-          const result = yield* Effect.either(
+          const result = yield* Effect.result(
             c.mutation(refs.public.groups.typedErrors.deleteNoteOrFail, {
               noteId: missingId,
               asAdmin: true,
@@ -385,9 +734,9 @@ describe("typed errors", () => {
           );
 
           const error = expectFailure(result);
-          expect(error).toBeInstanceOf(NotFound);
-          expect((error as NotFound).id).toBe(missingId);
-        }).pipe(Effect.provide(TestConfect.layer())),
+          assert(Schema.is(NotFound)(error));
+          expect(error.id).toBe(missingId);
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect(
@@ -397,7 +746,7 @@ describe("typed errors", () => {
           const c = yield* TestConfect.TestConfect;
           const missingId = yield* insertAndDeleteNote;
 
-          const result = yield* Effect.either(
+          const result = yield* Effect.result(
             c.mutation(refs.public.groups.typedErrors.deleteNoteOrFail, {
               noteId: missingId,
               asAdmin: false,
@@ -405,25 +754,25 @@ describe("typed errors", () => {
           );
 
           const error = expectFailure(result);
-          expect(error).toBeInstanceOf(Forbidden);
-          expect((error as Forbidden).reason).toBe("admin required");
-        }).pipe(Effect.provide(TestConfect.layer())),
+          assert(Schema.is(Forbidden)(error));
+          expect(error.reason).toBe("admin required");
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("action handler typed error surfaces as the typed error", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           c.action(refs.public.groups.typedErrors.failingAction, {
             kind: "forbidden",
           }),
         );
 
         const error = expectFailure(result);
-        expect(error).toBeInstanceOf(Forbidden);
-        expect((error as Forbidden).reason).toBe("no access");
-      }).pipe(Effect.provide(TestConfect.layer())),
+        assert(Schema.is(Forbidden)(error));
+        expect(error.reason).toBe("no access");
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -439,7 +788,7 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("QueryRunner Ok path: returns the decoded note text", () =>
@@ -460,7 +809,7 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "Ok", text: "hello" });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("MutationRunner decodes NotFound to tagged result", () =>
@@ -474,7 +823,7 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("MutationRunner decodes Forbidden to tagged result", () =>
@@ -491,7 +840,7 @@ describe("typed errors", () => {
           _tag: "Forbidden",
           reason: "admin required",
         });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("MutationRunner Ok path: deletes the existing note", () =>
@@ -515,7 +864,7 @@ describe("typed errors", () => {
 
         const remaining = yield* c.query(refs.public.databaseReader.listNotes);
         assertEquals(remaining.length, 0);
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("ActionRunner decodes NotFound to tagged result", () =>
@@ -528,7 +877,7 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "NotFound", id: "missing" });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("ActionRunner decodes Forbidden to tagged result", () =>
@@ -544,7 +893,7 @@ describe("typed errors", () => {
           _tag: "Forbidden",
           reason: "no access",
         });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -556,25 +905,25 @@ describe("typed errors", () => {
           const c = yield* TestConfect.TestConfect;
           const missingId = yield* insertAndDeleteNote;
 
-          const queryResult = yield* Effect.either(
+          const queryResult = yield* Effect.result(
             c.query(refs.public.groups.typedErrors.getNoteOrFail, {
               noteId: missingId,
             }),
           );
           const notFound = expectFailure(queryResult);
-          expect(notFound).toBeInstanceOf(NotFound);
-          expect((notFound as NotFound).id).toBe(missingId);
+          assert(Schema.is(NotFound)(notFound));
+          expect(notFound.id).toBe(missingId);
 
-          const mutationResult = yield* Effect.either(
+          const mutationResult = yield* Effect.result(
             c.mutation(refs.public.groups.typedErrors.deleteNoteOrFail, {
               noteId: missingId,
               asAdmin: false,
             }),
           );
           const forbidden = expectFailure(mutationResult);
-          expect(forbidden).toBeInstanceOf(Forbidden);
-          expect((forbidden as Forbidden).reason).toBe("admin required");
-        }).pipe(Effect.provide(TestConfect.layer())),
+          assert(Schema.is(Forbidden)(forbidden));
+          expect(forbidden.reason).toBe("admin required");
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -585,19 +934,19 @@ describe("typed errors", () => {
         Effect.gen(function* () {
           const c = yield* TestConfect.TestConfect;
 
-          const result = yield* Effect.either(
+          const result = yield* Effect.result(
             c.mutation(refs.public.groups.typedErrors.insertThenFail, {
               text: "should not persist",
             }),
           );
 
           const error = expectFailure(result);
-          expect(error).toBeInstanceOf(NotFound);
-          expect((error as NotFound).id).toBe("rolled-back");
+          assert(Schema.is(NotFound)(error));
+          expect(error.id).toBe("rolled-back");
 
           const notes = yield* c.query(refs.public.databaseReader.listNotes);
           assertEquals(notes.length, 0);
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -615,7 +964,7 @@ describe("typed errors", () => {
           );
 
           expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -626,16 +975,16 @@ describe("typed errors", () => {
         Effect.gen(function* () {
           const c = yield* TestConfect.TestConfect;
 
-          const result = yield* Effect.either(
+          const result = yield* Effect.result(
             c.action(refs.public.typedErrorsNode.failingNodeAction, {
               id: "abc",
             }),
           );
 
           const error = expectFailure(result);
-          expect(error).toBeInstanceOf(NodeNotFound);
-          expect((error as NodeNotFound).id).toBe("abc");
-        }).pipe(Effect.provide(TestConfect.layer())),
+          assert(Schema.is(NodeNotFound)(error));
+          expect(error.id).toBe("abc");
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 });

@@ -1,20 +1,39 @@
-import * as Command from "@effect/platform/Command";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
-import * as NodeContext from "@effect/platform-node/NodeContext";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
 import * as Record from "effect/Record";
+import * as Schema from "effect/Schema";
 import * as String from "effect/String";
+import * as ChildProcess from "effect/process/ChildProcess";
+import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 
 const entries = ["services.ts", "docs.ts", "refs.ts", "schema.ts", "spec.ts"];
 
-class DeclarationEmit extends Context.Tag(
-  "@confect/server/test/mock-backend/declarationEmit.test/DeclarationEmit",
-)<
+const TypeScriptConfig = Schema.fromJsonString(
+  Schema.Struct({
+    extends: Schema.String,
+    compilerOptions: Schema.Struct({
+      noEmit: Schema.Boolean,
+      emitDeclarationOnly: Schema.Boolean,
+      declaration: Schema.Boolean,
+      declarationMap: Schema.Boolean,
+      sourceMap: Schema.Boolean,
+      rootDir: Schema.String,
+      outDir: Schema.String,
+      plugins: Schema.Array(
+        Schema.Struct({ name: Schema.String, diagnostics: Schema.Boolean }),
+      ),
+    }),
+    files: Schema.Array(Schema.String),
+  }),
+);
+
+class DeclarationEmit extends Context.Service<
   DeclarationEmit,
   {
     /**
@@ -22,22 +41,25 @@ class DeclarationEmit extends Context.Tag(
      * and every assertion below expects it to be empty.
      */
     readonly diagnostics: string;
-    /** Emitted `.d.ts` text, keyed by the `entries` name it came from. */
+    /**
+     * Emitted `.d.ts` text, keyed by the `entries` name it came from.
+     */
     readonly declarations: Record<string, string>;
   }
->() {}
+>()("@confect/server/test/mock-backend/declarationEmit.test/DeclarationEmit") {}
 
 /**
  * TypeScript 7 is a native binary: the `typescript` package no longer exports a
  * JavaScript compiler API to build a `Program` with, so this drives the real
  * `tsc` over a generated project and reads what it wrote. `lib/tsc.js` is the
- * package's own launcher, which finds the platform binary — going through it
+ * package's own launcher, which finds the platform binary—going through it
  * (rather than `node_modules/.bin/tsc`) keeps the spawn identical on Windows,
  * where the bin entry is a shell script.
  */
 const emitDeclarations = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  const spawner = yield* ChildProcessSpawner;
 
   const packageRoot = path.resolve(import.meta.dirname, "../..");
   const generated = path.resolve(
@@ -49,22 +71,24 @@ const emitDeclarations = Effect.gen(function* () {
   const outDir = path.join(workDir, "out");
   const configPath = path.join(workDir, "tsconfig.json");
 
-  yield* fs.writeFileString(
-    configPath,
-    JSON.stringify({
-      extends: path.join(packageRoot, "tsconfig.json"),
-      compilerOptions: {
-        noEmit: false,
-        emitDeclarationOnly: true,
-        declaration: true,
-        declarationMap: false,
-        sourceMap: false,
-        rootDir: packageRoot,
-        outDir,
-      },
-      files: Array.map(entries, (entry) => path.join(generated, entry)),
-    }),
-  );
+  const config = yield* Schema.encodeEffect(TypeScriptConfig)({
+    extends: path.join(packageRoot, "tsconfig.json"),
+    compilerOptions: {
+      noEmit: false,
+      emitDeclarationOnly: true,
+      declaration: true,
+      declarationMap: false,
+      sourceMap: false,
+      rootDir: packageRoot,
+      outDir,
+      // Oxlint owns Effect diagnostics; declaration emit should report only
+      // TypeScript diagnostics on the stream asserted below.
+      plugins: [{ name: "@effect/language-service", diagnostics: false }],
+    },
+    files: Array.map(entries, (entry) => path.join(generated, entry)),
+  });
+
+  yield* fs.writeFileString(configPath, config);
 
   const typescript = path.dirname(
     yield* path.fromFileUrl(
@@ -72,15 +96,14 @@ const emitDeclarations = Effect.gen(function* () {
     ),
   );
 
-  const diagnostics = yield* Command.string(
-    Command.make(
-      process.execPath,
+  const diagnostics = yield* spawner.string(
+    ChildProcess.make(process.execPath, [
       path.join(typescript, "lib", "tsc.js"),
       "--project",
       configPath,
       "--pretty",
       "false",
-    ),
+    ]),
   );
 
   const declarationPath = (entry: string) =>
@@ -97,8 +120,10 @@ const emitDeclarations = Effect.gen(function* () {
       Effect.flatMap((exists) =>
         exists
           ? fs.readFileString(declarationPath(entry))
-          : Effect.dieMessage(
-              `${entry} produced no declaration emit:\n${diagnostics}`,
+          : Effect.die(
+              new Error(
+                `${entry} produced no declaration emit:\n${diagnostics}`,
+              ),
             ),
       ),
       Effect.map((declaration) => [entry, declaration] as const),
@@ -109,8 +134,8 @@ const emitDeclarations = Effect.gen(function* () {
 });
 
 const TestLayer = Layer.provideMerge(
-  Layer.scoped(DeclarationEmit, emitDeclarations),
-  NodeContext.layer,
+  Layer.effect(DeclarationEmit, emitDeclarations),
+  NodeServices.layer,
 );
 
 layer(TestLayer, { timeout: "120 seconds" })("declaration emit", (it) => {
@@ -132,7 +157,7 @@ layer(TestLayer, { timeout: "120 seconds" })("declaration emit", (it) => {
 
         expect(
           diagnostics,
-          "docs.ts must typecheck cleanly — non-object doc types require `type` aliases, not `interface … extends`",
+          "docs.ts must typecheck cleanly—non-object doc types require `type` aliases, not `interface … extends`",
         ).toBe("");
       }),
     120_000,

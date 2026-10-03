@@ -39,7 +39,10 @@ export interface VectorSearchService<
 }
 
 export type VectorSearchTag<DataModel_ extends DataModel.AnyWithProps> =
-  Context.Tag<VectorSearchService<DataModel_>, VectorSearchService<DataModel_>>;
+  Context.Service<
+    VectorSearchService<DataModel_>,
+    VectorSearchService<DataModel_>
+  >;
 
 export const make =
   <DataModel_ extends DataModel.AnyWithProps>(
@@ -51,7 +54,7 @@ export const make =
 export const VectorSearch = <
   DataModel_ extends DataModel.AnyWithProps,
 >(): VectorSearchTag<DataModel_> =>
-  Context.GenericTag<VectorSearchService<DataModel_>>(
+  Context.Service<VectorSearchService<DataModel_>>(
     "@confect/server/VectorSearch",
   );
 

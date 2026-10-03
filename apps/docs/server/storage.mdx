@@ -4,75 +4,101 @@ title: "Storage"
 description: "Store and retrieve blobs using Convex file storage."
 ---
 
-## Reading
+import { ContextBadges } from "/snippets/context-badges.mdx";
 
-The `StorageReader` service is used to retrieve the URLs of blobs in storage.
-
-```ts
-import * as Effect from "effect/Effect";
-import { StorageReader } from "./confect/_generated/services";
-
-Effect.gen(function* () {
-  const reader = yield* StorageReader;
-
-  return yield* reader.getUrl(storageId);
-});
-```
-
-## Writing in mutations
-
-The `StorageWriter` service is used to write blobs to storage in mutations.
+Use the `Storage` service for file storage in queries, mutations, actions, and HTTP actions. Import it from your generated services module:
 
 ```ts
 import * as Effect from "effect/Effect";
-import { StorageWriter } from "./confect/_generated/services";
+import { Storage } from "./confect/_generated/services";
 
 Effect.gen(function* () {
-  const storage = yield* StorageWriter;
+  const storage = yield* Storage;
 
-  // ...
+  return yield* storage.getUrl(storageId);
 });
 ```
 
-### Methods
+The service is available in every context, but each operation retains Convex's context restrictions. Confect checks these requirements when you implement a function or middleware.
 
-#### Generate an upload URL
+| Operation               | Returns    | Available in                                  |
+| ----------------------- | ---------- | --------------------------------------------- |
+| `getUrl(storageId)`     | `URL`      | Queries, mutations, actions, and HTTP actions |
+| `generateUploadUrl`     | `URL`      | Mutations, actions, and HTTP actions          |
+| `delete(storageId)`     | `void`     | Mutations, actions, and HTTP actions          |
+| `get(storageId)`        | `Blob`     | Actions and HTTP actions                      |
+| `store(blob, options?)` | Storage ID | Actions and HTTP actions                      |
+
+Every operation returns an Effect. The table lists the value produced when it succeeds.
+
+## Get a download URL
+
+<ContextBadges query mutation action http />
+
+Retrieve a blob's download URL with `getUrl`. The result is a `URL` object, not a string. If the blob doesn't exist, the effect fails with `BlobNotFoundError`.
 
 ```ts
-storage.generateUploadUrl();
-```
-
-#### Delete a blob
-
-```ts
-storage.delete(storageId);
-```
-
-## Writing in actions
-
-The `StorageActionWriter` service is used to read and write blobs to storage in actions.
-
-```ts
-import * as Effect from "effect/Effect";
-import { StorageActionWriter } from "./confect/_generated/services";
-
 Effect.gen(function* () {
-  const storage = yield* StorageActionWriter;
-
-  // ...
+  const storage = yield* Storage;
+  return yield* storage.getUrl(storageId);
 });
 ```
 
-### Methods
+## Generate an upload URL
 
-#### Get a blob
+<ContextBadges mutation action http />
+
+Generate a URL that a client can use to upload a blob. `generateUploadUrl` is an Effect property, so yield it without parentheses. It produces a `URL` object.
 
 ```ts
-storage.get(storageId);
+Effect.gen(function* () {
+  const storage = yield* Storage;
+  return yield* storage.generateUploadUrl;
+});
 ```
 
-#### Store a blob
+## Delete a blob
+
+<ContextBadges mutation action http />
+
+Delete a stored blob by its storage ID. If deletion fails, the effect fails with `BlobNotFoundError`.
 
 ```ts
-storage.store(blob, { sha256: optionalHash });
+Effect.gen(function* () {
+  const storage = yield* Storage;
+  yield* storage.delete(storageId);
+});
+```
+
+## Get a blob
+
+<ContextBadges action http />
+
+Read a stored file directly as a `Blob`. If the blob doesn't exist, the effect fails with `BlobNotFoundError`.
+
+```ts
+Effect.gen(function* () {
+  const storage = yield* Storage;
+  return yield* storage.get(storageId);
+});
+```
+
+## Store a blob
+
+<ContextBadges action http />
+
+Store a `Blob` directly and receive its storage ID. Optionally supply a SHA-256 hash in `options` for Convex to verify.
+
+```ts
+Effect.gen(function* () {
+  const storage = yield* Storage;
+  return yield* storage.store(blob);
+});
+```
+
+```ts
+Effect.gen(function* () {
+  const storage = yield* Storage;
+  return yield* storage.store(blob, { sha256: expectedHash });
+});
 ```

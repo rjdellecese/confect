@@ -5,19 +5,21 @@ import {
   useMutation,
   usePaginatedQuery,
   useQuery,
+  useStreamPaginatedQuery,
 } from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
-import * as FetchHttpClient from "@effect/platform/FetchHttpClient";
-import * as HttpApiClient from "@effect/platform/HttpApiClient";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import type { GenericId } from "convex/values";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
-import { Api } from "../confect/http/pathPrefix";
+import { Api } from "../confect/http/NotesApi";
 
 const App = () => {
   const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
@@ -97,6 +99,10 @@ const Page = () => {
 
       <br />
 
+      <ViewerDemo />
+
+      <br />
+
       <textarea
         rows={4}
         cols={50}
@@ -113,8 +119,76 @@ const Page = () => {
 
       <NoteList />
       <PaginatedNoteList />
+      <StreamFeed />
       <NoteLookup />
       <HttpEndpoints />
+    </div>
+  );
+};
+
+const ViewerDemo = () => {
+  const [username, setUsername] = useState("");
+  const [viewerNote, setViewerNote] = useState("");
+  const [postStatus, setPostStatus] = useState<string | null>(null);
+
+  // `whoAmI` is covered by the `RequireViewer` middleware: it provides the
+  // current viewer to the handler, or fails with the typed `NotSignedIn`
+  // error—which surfaces here, decoded, in `onFailure`.
+  const whoAmI = useQuery(refs.public.viewer.whoAmI, {});
+  const createUser = useMutation(refs.public.users.create);
+  const clearUsers = useMutation(refs.public.users.clearAll);
+  const postNote = useMutation(refs.public.viewer.postNote);
+
+  const handlePostNote = () => {
+    void postNote({ text: viewerNote }).then((result) => {
+      setPostStatus(
+        Result.match(result, {
+          onSuccess: () => "Posted!",
+          onFailure: () => "Not signed in—create a user first.",
+        }),
+      );
+      setViewerNote("");
+      return null;
+    });
+  };
+
+  return (
+    <div>
+      <strong>Middleware (viewer)</strong>
+      <div>
+        {QueryResult.match(whoAmI, {
+          onLoading: () => "Loading…",
+          onSuccess: (name) => `Signed in as ${name}`,
+          onFailure: () => "Not signed in—create a user below.",
+        })}
+      </div>
+      <input
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        placeholder="username"
+      />
+      <button
+        type="button"
+        onClick={() =>
+          void createUser({ username }).then(() => setUsername(""))
+        }
+      >
+        Create user
+      </button>
+      <button type="button" onClick={() => void clearUsers({})}>
+        Clear users
+      </button>
+      <div>
+        <input
+          value={viewerNote}
+          onChange={(e) => setViewerNote(e.target.value)}
+          placeholder="note text"
+        />
+        <button type="button" onClick={handlePostNote}>
+          Post note as viewer
+        </button>
+        {postStatus && <span style={{ marginLeft: 8 }}>{postStatus}</span>}
+      </div>
     </div>
   );
 };
@@ -157,15 +231,11 @@ const NoteLookup = () => {
 };
 
 const WorkpoolDemo = () => {
-  const [jobs, setJobs] = useState<Array<{ id: WorkId; enqueuedAt: number }>>(
-    [],
-  );
+  const [jobs, setJobs] = useState<Array<WorkId>>([]);
   const enqueue = useMutation(refs.public.workpool.enqueue);
 
   const handleEnqueue = () => {
-    void enqueue({}).then((id) =>
-      setJobs((prev) => [...prev, { id, enqueuedAt: Date.now() }]),
-    );
+    void enqueue({}).then((id) => setJobs((prev) => [...prev, id]));
   };
 
   return (
@@ -187,11 +257,11 @@ const WorkpoolDemo = () => {
             {jobs
               .slice(-10)
               .toReversed()
-              .map((job, i) => (
+              .map((workId, i) => (
                 <WorkStatusRow
-                  key={job.id}
+                  key={workId}
                   index={jobs.length - i}
-                  workId={job.id}
+                  workId={workId}
                 />
               ))}
           </tbody>
@@ -311,6 +381,68 @@ const PaginatedNoteList = () => {
       {PaginatedQueryResult.isExhausted(paginatedNotes) && (
         <p>All notes loaded.</p>
       )}
+    </div>
+  );
+};
+
+const StreamFeed = () => {
+  const [text, setText] = useState("");
+  const insertAuthored = useMutation(
+    refs.public.notes_and_random.notes.insertAuthored,
+  );
+
+  const feed = useStreamPaginatedQuery(
+    refs.public.notes_and_random.notes.feed,
+    {},
+    { initialNumItems: 3 },
+  );
+
+  const post = (role: "admin" | "user", hidden?: boolean) =>
+    void insertAuthored({
+      text: text === "" ? `Hello from ${role}` : text,
+      role,
+      ...(hidden === true ? { hidden } : {}),
+    }).then(() => setText(""));
+
+  return (
+    <div>
+      <h2>Stream feed</h2>
+      <p style={{ maxWidth: 480, fontSize: "0.9em", color: "#666" }}>
+        A <code>QueryStream.merge</code> of the admin- and user-authored note
+        streams (two ranges of the <code>by_role</code> index), interleaved
+        newest-first by creation time, filtered with <code>filterEffect</code>{" "}
+        (hidden notes are skipped without breaking pagination), and paginated
+        reactively with endCursor-pinned pages.
+      </p>
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="feed post text"
+      />
+      <button type="button" onClick={() => post("admin")}>
+        Post as admin
+      </button>
+      <button type="button" onClick={() => post("user")}>
+        Post as user
+      </button>
+      <button type="button" onClick={() => post("user", true)}>
+        Post hidden
+      </button>
+      <ul>
+        {Array.map(feed.results, (note) => (
+          <li key={note._id}>
+            <strong>{note.author?.name ?? "?"}</strong> ({note.author?.role}):{" "}
+            {note.text}
+          </li>
+        ))}
+      </ul>
+      {feed.isLoading && <p>Loading…</p>}
+      {PaginatedQueryResult.isCanLoadMore(feed) && (
+        <button type="button" onClick={() => feed.loadMore(3)}>
+          Load more
+        </button>
+      )}
+      {PaginatedQueryResult.isExhausted(feed) && <p>End of feed.</p>}
     </div>
   );
 };

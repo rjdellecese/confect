@@ -1,7 +1,7 @@
 import { Identifier } from "@confect/core";
-import * as Table from "@confect/server/Table";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as Table from "@confect/core/Table";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -21,21 +21,22 @@ export const TABLES_DIRNAME = "tables";
  * Discovered metadata for a single user-authored table module under
  * `confect/tables/`.
  *
- * - `relativePath` — path from `confect/` to the file (e.g. `tables/notes.ts`).
- * - `tableName` — the file basename (e.g. `notes`). This is also the import
- *   binding used in generated files, and the table name surfaced to Convex.
+ * - `relativePath`—path from `confect/` to the file (e.g. `tables/notes.ts`).
+ * - `tableName`—the file basename (e.g. `notes`). This is also the import binding
+ *   used in generated files, and the table name surfaced to Convex.
  */
 export interface TableModule {
   readonly relativePath: string;
   readonly tableName: string;
 }
 
-const tableNameFromRelativePath = (relativePath: string) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const { name } = path.parse(relativePath);
-    return name;
-  });
+const tableNameFromRelativePath = Effect.fnUntraced(function* (
+  relativePath: string,
+) {
+  const path = yield* Path.Path;
+  const { name } = path.parse(relativePath);
+  return name;
+});
 
 const listTableFiles = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -59,19 +60,19 @@ const listTableFiles = Effect.gen(function* () {
 });
 
 const byTableName = Order.mapInput(
-  Order.string,
+  Order.String,
   (tableModule: TableModule) => tableModule.tableName,
 );
 
 /**
  * Discover every `confect/tables/**\/*.ts` module by listing the directory.
- * Validates that each filename is a legal table identifier — the table name is
+ * Validates that each filename is a legal table identifier—the table name is
  * derived from the file basename, so the filename must be a valid JavaScript
  * identifier with no leading underscore (Convex reserves `_<name>` for system
  * tables).
  *
- * This step does *not* bundle the table modules. It runs early in the codegen
- * pipeline so the `_generated/id.ts` constructor can be emitted *before* any
+ * This step does _not_ bundle the table modules. It runs early in the codegen
+ * pipeline so the `_generated/id.ts` constructor can be emitted _before_ any
  * user-authored table is bundled (those modules import from `_generated/id.ts`
  * for cross-table refs).
  *
@@ -88,19 +89,18 @@ export const discover = Effect.gen(function* () {
 
   const tableModules = yield* Effect.forEach(
     relativePaths,
-    (relativePath) =>
-      Effect.gen(function* () {
-        const tableName = yield* tableNameFromRelativePath(relativePath);
-        yield* Effect.try({
-          try: () => Identifier.validateConfectTableIdentifier(tableName),
-          catch: (e) =>
-            new InvalidTableFilenameError({
-              tablePath: relativePath,
-              reason: e instanceof Error ? e.message : String(e),
-            }),
-        });
-        return { relativePath, tableName } satisfies TableModule;
-      }),
+    Effect.fnUntraced(function* (relativePath: string) {
+      const tableName = yield* tableNameFromRelativePath(relativePath);
+      yield* Effect.try({
+        try: () => Identifier.validateConfectTableIdentifier(tableName),
+        catch: (e) =>
+          new InvalidTableFilenameError({
+            tablePath: relativePath,
+            reason: e instanceof Error ? e.message : String(e),
+          }),
+      });
+      return { relativePath, tableName } satisfies TableModule;
+    }),
     { concurrency: "unbounded" },
   );
 
@@ -123,35 +123,39 @@ export const discover = Effect.gen(function* () {
 });
 
 /**
- * Bundle every discovered table module and verify that its default export is
- * an {@link Table.UnnamedTable} (the result of `Table.make(...)` before a
- * name has been bound). Fails with {@link InvalidTableDefaultExportError} if
- * any module's default export is missing or has the wrong shape.
+ * Bundle every discovered table module and verify that its default export is an
+ * {@link Table.UnnamedTable} (the result of `Table.make(...)` before a name has
+ * been bound). Fails with {@link InvalidTableDefaultExportError} if any
+ * module's default export is missing or has the wrong shape.
  *
- * Must run *after* `_generated/id.ts` has been emitted, because user-authored
+ * Must run _after_ `_generated/id.ts` has been emitted, because user-authored
  * table modules typically `import { Id } from "../_generated/id"` for
  * cross-table references.
  */
-export const validate = (tableModules: ReadonlyArray<TableModule>) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const confectDirectory = yield* ConfectDirectory.get;
+export const validate = Effect.fnUntraced(function* (
+  tableModules: ReadonlyArray<TableModule>,
+) {
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
 
-    yield* Effect.forEach(
-      tableModules,
-      ({ relativePath }) =>
-        Effect.gen(function* () {
-          const absolutePath = path.resolve(confectDirectory, relativePath);
-          const { module } = yield* Bundler.bundle(absolutePath).pipe(
-            Effect.mapError((error) => fromBundlerError(relativePath, error)),
-          );
-
-          if (!Table.isUnnamedTable(module.default)) {
-            return yield* new InvalidTableDefaultExportError({
-              tablePath: relativePath,
-            });
-          }
-        }),
-      { concurrency: "unbounded" },
+  const validateRelativePath = Effect.fnUntraced(function* (
+    relativePath: string,
+  ) {
+    const absolutePath = path.resolve(confectDirectory, relativePath);
+    const { module } = yield* Bundler.bundle(absolutePath).pipe(
+      Effect.mapError((error) => fromBundlerError(relativePath, error)),
     );
+
+    if (!Table.isUnnamedTable(module.default)) {
+      return yield* new InvalidTableDefaultExportError({
+        tablePath: relativePath,
+      });
+    }
   });
+
+  yield* Effect.forEach(
+    tableModules,
+    ({ relativePath }: TableModule) => validateRelativePath(relativePath),
+    { concurrency: "unbounded" },
+  );
+});

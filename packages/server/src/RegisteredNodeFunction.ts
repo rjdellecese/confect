@@ -1,8 +1,8 @@
-import type * as FunctionSpec from "@confect/core/FunctionSpec";
-import * as NodeContext from "@effect/platform-node/NodeContext";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   actionGeneric,
   type DefaultFunctionArgs,
+  type FunctionVisibility,
   internalActionGeneric,
 } from "convex/server";
 import type { Effect } from "effect";
@@ -10,37 +10,33 @@ import type { Schema } from "effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import type * as DatabaseSchema from "./DatabaseSchema";
-import type * as Handler from "./Handler";
 import * as RegisteredFunction from "./RegisteredFunction";
-import type * as RegistryItem from "./RegistryItem";
+import type * as FunctionRegistryItem from "./FunctionRegistryItem";
+import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
-  { functionSpec, handler }: RegistryItem.AnyWithProps,
-): RegisteredFunction.Any =>
-  Match.value(functionSpec.functionProvenance).pipe(
-    Match.tag("Convex", () => handler as RegisteredFunction.Any),
-    Match.tag("Confect", () => {
-      const { functionVisibility, functionProvenance } =
-        functionSpec as FunctionSpec.AnyConfect;
-
-      const genericFunction = Match.value(functionVisibility).pipe(
-        Match.when("public", () => actionGeneric),
-        Match.when("internal", () => internalActionGeneric),
-        Match.exhaustive,
-      );
-
-      return genericFunction(
-        nodeActionFunction(databaseSchema, {
-          args: functionProvenance.args,
-          returns: functionProvenance.returns,
-          error: functionProvenance.error,
-          handler: handler as Handler.AnyConfectProvenance,
-        }),
-      );
-    }),
+  item: FunctionRegistryItem.ConfectFunctionRegistryItem,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
+): RegisteredFunction.Any => {
+  const genericFunction = Match.value(item.functionVisibility).pipe(
+    Match.when("public", () => actionGeneric),
+    Match.when("internal", () => internalActionGeneric),
     Match.exhaustive,
   );
+
+  return genericFunction(
+    nodeActionFunction(databaseSchema, {
+      name: item.name,
+      functionVisibility: item.functionVisibility,
+      args: item.args,
+      returns: item.returns,
+      error: item.error,
+      handler: item.handler,
+      resolvedMiddlewares,
+    }),
+  );
+};
 
 const nodeActionFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -52,32 +48,41 @@ const nodeActionFunction = <
 >(
   databaseSchema: DatabaseSchema_,
   {
+    name,
+    functionVisibility,
     args,
     returns,
     error,
     handler,
+    resolvedMiddlewares,
   }: {
-    args: Schema.Schema<Args, ConvexArgs>;
-    returns: Schema.Schema<Returns, ConvexReturns>;
-    error: Schema.Schema.AnyNoContext | undefined;
+    name: string;
+    functionVisibility: FunctionVisibility;
+    args: Schema.Codec<Args, ConvexArgs>;
+    returns: Schema.Codec<Returns, ConvexReturns>;
+    error: Schema.Codec<any, any> | undefined;
     handler: (
       a: Args,
     ) => Effect.Effect<
       Returns,
       E,
       | RegisteredFunction.ActionServices<DatabaseSchema_>
-      | NodeContext.NodeContext
+      | NodeServices.NodeServices
     >;
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
+    name,
+    functionVisibility,
     args,
     returns,
     error,
     handler,
+    resolvedMiddlewares,
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(databaseSchema, ctx),
-        NodeContext.layer,
+        NodeServices.layer,
       ),
   });

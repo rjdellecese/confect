@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { expect, layer } from "@effect/vitest";
@@ -107,7 +107,7 @@ layer(BundlerLayer)("bundle", (it) => {
         yield* fs.makeDirectory(path.join(pkgDir, "dist", "Widget"), {
           recursive: true,
         });
-        // Conditional `exports` with only `import`/`types` — no
+        // Conditional `exports` with only `import`/`types`—no
         // `require`/`default`. CommonJS resolution (`createRequire`) throws
         // ERR_PACKAGE_PATH_NOT_EXPORTED for this shape, so it only bundles
         // once resolution honors the ESM `import` condition.
@@ -177,11 +177,125 @@ layer(BundlerLayer)("bundle", (it) => {
 
         const bundled = yield* Bundler.bundle(entry);
         // esbuild canonicalizes `import.meta.url` to the entry's real path, so
-        // resolve symlinks before comparing — otherwise this fails when the
+        // resolve symlinks before comparing—otherwise this fails when the
         // temp dir lives under a symlinked root (e.g. macOS `/tmp` ->
         // `/private/tmp`).
         const realEntry = yield* fs.realPath(entry);
         expect(bundled.module.default).toBe(pathToFileURL(realEntry).href);
       }).pipe(Effect.scoped),
+  );
+});
+
+layer(BundlerLayer)("importersOfPackage", (it) => {
+  // The two shapes `@confect/server` takes in the wild: externalized in a
+  // published install, bundled in this monorepo (a symlinked workspace dep whose
+  // realpath is outside `node_modules`). Matching on the resolved path would
+  // only ever catch one of them, so the lookup reads the original specifier.
+  it.effect("finds an importer of an externalized package", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      // Under the repo so the externalized `effect` resolves from the temp
+      // `.mjs` that `bundle-require` writes beside the entry.
+      const tempDir = yield* fs.makeTempDirectoryScoped({
+        directory: process.cwd(),
+      });
+
+      const entry = path.join(tempDir, "entry.ts");
+      yield* fs.writeFileString(
+        entry,
+        `import { pipe } from "effect/Function";\nexport default pipe(1, (n) => n + 1);\n`,
+      );
+
+      const bundled = yield* Bundler.bundle(entry);
+
+      expect(
+        Bundler.importersOfPackage(bundled, "effect", () => true),
+      ).toStrictEqual([yield* fs.realPath(entry)]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("finds an importer of a bundled workspace package", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const tempDir = yield* fs.makeTempDirectoryScoped();
+
+      const pkgDir = path.join(tempDir, "pkg");
+      yield* fs.makeDirectory(path.join(pkgDir, "dist"), { recursive: true });
+      yield* fs.writeFileString(
+        path.join(pkgDir, "package.json"),
+        `{ "name": "@scope/lib", "type": "module", "exports": { ".": "./dist/index.js" } }\n`,
+      );
+      yield* fs.writeFileString(
+        path.join(pkgDir, "dist", "index.js"),
+        `export const value = "bundled";\n`,
+      );
+
+      yield* fs.makeDirectory(path.join(tempDir, "node_modules", "@scope"), {
+        recursive: true,
+      });
+      yield* fs.symlink(
+        pkgDir,
+        path.join(tempDir, "node_modules", "@scope", "lib"),
+      );
+
+      const entry = path.join(tempDir, "entry.ts");
+      yield* fs.writeFileString(
+        entry,
+        `import { value } from "@scope/lib";\nexport default value;\n`,
+      );
+
+      const bundled = yield* Bundler.bundle(entry);
+
+      // The import resolved to an absolute path inside `pkg/dist`, yet the
+      // package is still found by name. Canonicalize the returned path because
+      // macOS exposes the same temporary directory through both `/var` and
+      // `/private/var`.
+      const importers = Bundler.importersOfPackage(
+        bundled,
+        "@scope/lib",
+        () => true,
+      );
+      expect(
+        yield* Effect.forEach(importers, (importer) => fs.realPath(importer)),
+      ).toStrictEqual([yield* fs.realPath(entry)]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("matches subpath imports and honours the `where` filter", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const tempDir = yield* fs.makeTempDirectoryScoped({
+        directory: process.cwd(),
+      });
+
+      // Only the sibling imports `effect/*`; the entry re-exports it.
+      const sibling = path.join(tempDir, "sibling.ts");
+      yield* fs.writeFileString(
+        sibling,
+        `import { pipe } from "effect/Function";\nexport default pipe(1, (n) => n + 1);\n`,
+      );
+      const entry = path.join(tempDir, "entry.ts");
+      yield* fs.writeFileString(
+        entry,
+        `export { default } from "./sibling";\n`,
+      );
+
+      const bundled = yield* Bundler.bundle(entry);
+      const realSibling = yield* fs.realPath(sibling);
+
+      expect(
+        Bundler.importersOfPackage(bundled, "effect", () => true),
+      ).toStrictEqual([realSibling]);
+      expect(
+        Bundler.importersOfPackage(
+          bundled,
+          "effect",
+          (absolutePath) => absolutePath !== realSibling,
+        ),
+      ).toStrictEqual([]);
+    }).pipe(Effect.scoped),
   );
 });

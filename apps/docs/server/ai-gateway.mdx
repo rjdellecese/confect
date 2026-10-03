@@ -1,0 +1,154 @@
+---
+icon: "sparkles"
+title: "AI Gateway"
+description: "Use Convex's AI gateway with Effect AI language and decision models."
+---
+
+Confect provides Effect AI `LanguageModel` and `DecisionModel` services backed by the [Convex AI gateway](https://docs.convex.dev/ai-gateway/overview). Each client obtains a short-lived credential from the running Convex action before each outgoing request, so you do not need to configure or rotate an upstream model-provider API key.
+
+The AI gateway requires a paid Convex plan. See [gateway availability](https://docs.convex.dev/ai-gateway/overview#who-can-use-it) for supported deployment types and local-development requirements.
+
+## Generate text
+
+Provide three layers to an Effect AI operation:
+
+- `AiGatewayLanguageModel.model(...)` selects a gateway model using its `provider/model` identifier.
+- `AiGatewayLanguageClient.layer` authenticates requests with the current Convex deployment.
+- `FetchHttpClient.layer` sends requests through the Fetch API available in both Convex action runtimes.
+
+```ts confect/assistant.impl.ts
+import {
+  AiGatewayLanguageClient,
+  AiGatewayLanguageModel,
+  FunctionImpl,
+} from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as LanguageModel from "effect/ai/LanguageModel";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import databaseSchema from "./_generated/schema";
+import assistant from "./assistant.spec";
+
+const Claude = AiGatewayLanguageModel.model("anthropic/claude-sonnet-4.5").pipe(
+  Layer.provide(AiGatewayLanguageClient.layer),
+  Layer.provide(FetchHttpClient.layer),
+);
+
+const answer = FunctionImpl.make(
+  databaseSchema,
+  assistant,
+  "answer",
+  ({ prompt }) =>
+    LanguageModel.generateText({ prompt }).pipe(
+      Effect.map((response) => response.text),
+      Effect.provide(Claude),
+      Effect.orDie,
+    ),
+);
+```
+
+Use the same model with Effect AI tools and structured responses. The selected upstream model determines which capabilities are available.
+
+## Configure requests
+
+Pass request options as the second argument to `model`:
+
+```ts
+AiGatewayLanguageModel.model("openai/gpt-4o-mini", {
+  temperature: 0.2,
+  max_output_tokens: 500,
+});
+```
+
+Use `AiGatewayLanguageModel.withConfigOverride` when configuration should apply only within part of a larger Effect.
+
+## Stream responses
+
+`LanguageModel.streamText` consumes the gateway's server-sent event stream inside the action. A normal Convex action still returns one value to its caller; use a Convex HTTP action or persist partial output when a client must observe tokens as they arrive.
+
+## Handle errors
+
+Handle recoverable failures after providing the client layer:
+
+```ts
+const generatedText = LanguageModel.generateText({ prompt }).pipe(
+  Effect.map((response) => response.text),
+  Effect.provide(Claude),
+  Effect.catchTags({
+    AiGatewayDisabled: () => Effect.succeed("AI features are disabled."),
+    AiGatewayUnavailable: () =>
+      Effect.succeed("AI features are unavailable on this deployment."),
+  }),
+);
+```
+
+Handle recoverable failures before calling `Effect.orDie` when your action declares a recoverable error schema.
+
+The client checks gateway availability during construction, when `AiGatewayDisabled` and `AiGatewayUnavailable` can occur. If obtaining a token fails for a later request, model operations report an Effect AI `AiError` with a `NetworkError` reason; direct HTTP client calls report an `HttpClientError` whose transport-error cause preserves the gateway error. The failed request is not sent.
+
+## Make structured decisions
+
+Use `AiGatewayDecisionModel` with Effect's `DecisionModel.decide` to classify input, rate it against an ordered rubric, or estimate a probability. Unlike a language model, a decision model returns typed answers rather than generated text.
+
+Define the input schema and named decisions with Effect's `Decision` module, then provide a decision model and its client:
+
+```ts
+import {
+  AiGatewayDecisionClient,
+  AiGatewayDecisionModel,
+} from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as Decision from "effect/ai/Decision";
+import * as DecisionModel from "effect/ai/DecisionModel";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+
+const TicketTriage = Decision.make({
+  input: Schema.Struct({ message: Schema.String }),
+  decisions: {
+    priority: Decision.classify({
+      instructions: "Choose the support ticket's priority.",
+      criteria: {
+        urgent: "An outage is blocking users.",
+        normal: "A bug affects users but has a workaround.",
+      },
+    }),
+    severity: Decision.rate({
+      instructions: "Rate the impact on users.",
+      criteria: ["Minor inconvenience", "Work is impaired", "Work is blocked"],
+    }),
+    escalate: Decision.probability({
+      instructions: "The ticket needs human attention.",
+      criteria: {
+        false: "The user can resolve it with self-service instructions.",
+        true: "A support agent needs to intervene.",
+      },
+    }),
+  },
+});
+
+const Jev = AiGatewayDecisionModel.model("typesafe/jev-1.13").pipe(
+  Layer.provide(AiGatewayDecisionClient.layer),
+  Layer.provide(FetchHttpClient.layer),
+);
+
+const triage = DecisionModel.decide(TicketTriage, {
+  input: {
+    message: "All users are unable to sign in. There is no workaround.",
+  },
+}).pipe(
+  Effect.map(({ answers }) => ({
+    priority: answers.priority.label,
+    severity: answers.severity.rating,
+    escalationProbability: answers.escalate.probability,
+  })),
+  Effect.provide(Jev),
+);
+```
+
+Run `triage` inside a Convex action. All three decisions evaluate the same input in one request.
+
+Use `AiGatewayDecisionClient.layer` for decision models and `AiGatewayLanguageClient.layer` for language models. Use `AiGatewayDecisionModel.make({ model })` to construct the service directly, or `AiGatewayDecisionModel.layer({ model })` when you do not need an Effect AI model descriptor. Unlike language-model requests, decision requests do not expose configuration overrides.
+
+Classifications return a label and a probability distribution. Ratings return a numeric rating, the label with the highest probability, and a distribution keyed by rubric labels. Probability decisions return a number between zero and one. The response also includes `usage.inputTokens` and `usage.outputTokens`.

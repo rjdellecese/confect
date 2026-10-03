@@ -1,5 +1,6 @@
 import type { StorageActionWriter as ConvexStorageActionWriter } from "convex/server";
 import type { GenericId } from "convex/values";
+import * as Context from "effect/Context";
 import { flow } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -11,7 +12,7 @@ const make = (storageActionWriter: ConvexStorageActionWriter) => ({
     Effect.promise(() => storageActionWriter.get(storageId)).pipe(
       Effect.andThen(
         flow(
-          Option.fromNullable,
+          Option.fromNullishOr,
           Option.match({
             onNone: () => Effect.fail(new BlobNotFoundError({ id: storageId })),
             onSome: Effect.succeed,
@@ -23,9 +24,10 @@ const make = (storageActionWriter: ConvexStorageActionWriter) => ({
     Effect.promise(() => storageActionWriter.store(blob, options)),
 });
 
-export class StorageActionWriter extends Effect.Tag(
-  "@confect/server/StorageActionWriter",
-)<StorageActionWriter, ReturnType<typeof make>>() {
+export class StorageActionWriter extends Context.Service<
+  StorageActionWriter,
+  ReturnType<typeof make>
+>()("@confect/server/StorageActionWriter") {
   static readonly layer = (storageActionWriter: ConvexStorageActionWriter) =>
     Layer.succeed(this, make(storageActionWriter));
 }

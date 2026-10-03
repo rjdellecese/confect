@@ -21,65 +21,69 @@ import databaseSchema from "./_generated/schema";
 import settings from "./settings.spec";
 
 const getApiKey = FunctionImpl.make(databaseSchema, settings, "getApiKey", () =>
-  Config.string("API_KEY").pipe(Effect.orDie),
+  Config.String("API_KEY").pipe(Effect.orDie),
 );
 ```
 
-Combinators that read a single variable work as expected—`Config.string`, `Config.number`, `Config.boolean`, `Config.withDefault`, `Config.option`, and `Config.nested`, among others.
+Combinators that read a single variable work as expected—`Config.String`, `Config.Number`, `Config.Boolean`, `Config.withDefault`, `Config.option`, and `Config.nested`, among others.
 
 ```ts
-Config.integer("MAX_RESULTS").pipe(Config.withDefault(100));
+Config.Int("MAX_RESULTS").pipe(Config.withDefault(100));
 ```
 
-## Limitations
+## Collections
 
-Config operations that enumerate `process.env` are unsupported in the Convex runtime, and fail with an `Unsupported` config error. This covers every combinator that resolves a collection of keys rather than a single one:
+`Config.Array` and `Config.Record` read a collection from a single delimited variable, so they work in the Convex runtime like any other combinator. Pass them to `Config.schema` with the variable's name.
 
-- `Config.array`, `Config.chunk`, and `Config.hashSet`
-- `Config.hashMap`
-
-`Config.array` is the surprising member of that list, since it looks like a way to read one comma-separated variable. Effect resolves a sequence by first looking for indexed keys (`ALLOWED_ORIGINS[0]`, `ALLOWED_ORIGINS[1]`, and so on), which requires enumeration, so it fails before it can fall back to splitting a delimited value.
-
-To read a delimited variable, parse it yourself:
+Given `ALLOWED_ORIGINS="https://a.example,https://b.example"`:
 
 ```ts
-Config.string("ALLOWED_ORIGINS").pipe(
-  Config.map((origins) => origins.split(",").map((origin) => origin.trim())),
-);
+import * as Schema from "effect/Schema";
+
+Config.schema(Config.Array(Schema.String), "ALLOWED_ORIGINS");
+// ["https://a.example", "https://b.example"]
 ```
 
-These combinators do work in [Node actions](/server/node-actions), since Effect's default provider can enumerate `process.env` in the Node.js runtime. Avoid depending on that if the handler might later move to the Convex runtime.
+Given `FEATURE_LIMITS="uploads=10,exports=5"`:
+
+```ts
+Config.schema(Config.Record(Schema.String, Schema.String), "FEATURE_LIMITS");
+// { uploads: "10", exports: "5" }
+```
+
+Both default to `","` as the separator, and `Config.Record` to `"="` between key and value; pass `separator` or `keyValueSeparator` to change them. Neither trims whitespace around elements, so write the variable without spaces after the separator, or map over the result to trim.
+
+The collection has to live in one variable. Effect's default provider can also assemble one from several variables—`ORIGINS_0` and `ORIGINS_1` for an array, `FEATURE_LIMITS_UPLOADS` for a record—because it reads the whole environment and discovers the keys under a prefix. Confect's provider resolves each config path to a single variable and never reports child keys, so that spread-out form fails with `Expected array at ["ORIGINS"]` or `Expected object at ["FEATURE_LIMITS"]`. It works in [Node actions](/server/node-actions), which use the default provider; avoid it if the handler might later move to the Convex runtime.
 
 ## Custom config provider
 
-The `ConvexConfigProvider` module is exported from `@confect/server`. `ConvexConfigProvider.make()` takes the same options as Effect's [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/#loading-configuration-from-environment-variables), and both are optional—calling it with no arguments returns the provider Confect already installs for you.
+The `ConvexConfigProvider` module is exported from `@confect/server`. `ConvexConfigProvider.make()` takes no arguments and returns the provider Confect already installs for you.
 
 ```ts
 import { ConvexConfigProvider } from "@confect/server";
 
-const provider = ConvexConfigProvider.make({ pathDelim: "__" });
+const provider = ConvexConfigProvider.make();
 ```
 
-| Option      | Default | Description                                                                                                                                                                   |
-| ----------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pathDelim` | `"_"`   | Joins the segments of a nested config path into a variable name. With `"__"`, `Config.nested(Config.string("HOST"), "DB")` reads `DB__HOST`.                                  |
-| `seqDelim`  | `","`   | Separates the elements of a sequence. This has no effect in the Convex runtime, because the sequence combinators that would consume it are [unsupported](#limitations) there. |
+It resolves each config path to a single environment variable, joining the path segments with `"_"`. `Config.nested(Config.String("KEY"), "API")` therefore reads `API_KEY`. An empty string counts as a missing value, so `Config.withDefault` and `Config.option` recover from it.
 
-To use a custom provider in a function handler, pass it to `Effect.withConfigProvider`.
+To override the provider for part of a handler, provide `ConfigProvider.ConfigProvider` as a service.
 
 ```ts confect/settings.impl.ts
 import { ConvexConfigProvider, FunctionImpl } from "@confect/server";
 import * as Config from "effect/Config";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 
 import databaseSchema from "./_generated/schema";
 import settings from "./settings.spec";
 
-const provider = ConvexConfigProvider.make({ pathDelim: "__" });
-
 const getApiKey = FunctionImpl.make(databaseSchema, settings, "getApiKey", () =>
-  Config.nested(Config.string("KEY"), "API").pipe(
-    Effect.withConfigProvider(provider),
+  Config.nested(Config.String("KEY"), "API").pipe(
+    Effect.provideService(
+      ConfigProvider.ConfigProvider,
+      ConvexConfigProvider.make(),
+    ),
     Effect.orDie,
   ),
 );

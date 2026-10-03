@@ -1,16 +1,17 @@
-import { describe, expect, it } from "@effect/vitest";
-import { expectTypeOf } from "vitest";
+import type * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as MutableRef from "effect/MutableRef";
 import * as Schema from "effect/Schema";
-import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Ref from "@confect/core/Ref";
+
+declare const ServicefulString: Schema.Codec<string, string, "RequiredService">;
 
 describe("isFunctionSpec", () => {
   it("checks whether a value is a function spec", () => {
     const functionSpec: unknown = FunctionSpec.publicQuery({
       name: "myFunction",
-      args: () => Schema.Struct({}),
       returns: () => Schema.String,
     });
 
@@ -19,11 +20,75 @@ describe("isFunctionSpec", () => {
 });
 
 describe("make", () => {
+  it("defaults omitted args to an empty field map", () => {
+    const spec = FunctionSpec.publicQuery({
+      name: "withoutArgs",
+      returns: () => Schema.String,
+      error: () => Schema.Finite,
+    });
+
+    expectTypeOf<FunctionSpec.Args<typeof spec>>().toEqualTypeOf<{}>();
+    expectTypeOf<FunctionSpec.EncodedArgs<typeof spec>>().toEqualTypeOf<{}>();
+    expectTypeOf<FunctionSpec.ReturnsSchema<typeof spec>>().toEqualTypeOf<
+      typeof Schema.String
+    >();
+    expectTypeOf<FunctionSpec.ErrorSchema<typeof spec>>().toEqualTypeOf<
+      typeof Schema.Finite
+    >();
+    expectTypeOf<FunctionSpec.Error<typeof spec>>().toEqualTypeOf<number>();
+    expectTypeOf<
+      Ref.OptionalArgs<Ref.FromFunctionSpec<typeof spec>>
+    >().toEqualTypeOf<[args?: {}]>();
+    expect(spec.functionProvenance.args.fields).toStrictEqual({});
+  });
+
+  it("keeps erased Confect specs safely generic", () => {
+    expectTypeOf<FunctionSpec.Args<FunctionSpec.AnyConfect>>().toBeAny();
+    expectTypeOf<FunctionSpec.Returns<FunctionSpec.AnyConfect>>().toBeAny();
+    expectTypeOf<FunctionSpec.Error<FunctionSpec.AnyConfect>>().toBeAny();
+    expectTypeOf<FunctionSpec.ArgsSchema<FunctionSpec.AnyConfect>>().toExtend<
+      Schema.Codec<any, any>
+    >();
+    expectTypeOf<
+      FunctionSpec.ReturnsSchema<FunctionSpec.AnyConfect>
+    >().toExtend<Schema.Codec<any, any>>();
+    expectTypeOf<FunctionSpec.ErrorSchema<FunctionSpec.AnyConfect>>().toExtend<
+      Schema.Codec<any, any>
+    >();
+  });
+
+  it("extracts no error schema when none is declared", () => {
+    const spec = FunctionSpec.publicQuery({
+      name: "withoutError",
+      returns: () => Schema.String,
+    });
+
+    expectTypeOf<FunctionSpec.ErrorSchema<typeof spec>>().toBeNever();
+    expectTypeOf<FunctionSpec.Error<typeof spec>>().toBeNever();
+  });
+
+  it("only accepts context-free struct fields as args", () => {
+    const nonStruct = FunctionSpec.publicQuery({
+      name: "nonStruct",
+      // @ts-expect-error—function args must be a struct field map
+      args: () => Schema.String,
+      returns: () => Schema.String,
+    });
+    const serviceful = FunctionSpec.publicQuery({
+      name: "serviceful",
+      // @ts-expect-error—function args must be synchronously encodable and decodable
+      args: () => ({ value: ServicefulString }),
+      returns: () => Schema.String,
+    });
+
+    void nonStruct;
+    void serviceful;
+  });
+
   it("disallows invalid JS identifiers as function names", () => {
     expect(() =>
       FunctionSpec.publicQuery({
         name: "123",
-        args: () => Schema.Struct({}),
         returns: () => Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
@@ -35,7 +100,6 @@ describe("make", () => {
     expect(() =>
       FunctionSpec.publicQuery({
         name: "if",
-        args: () => Schema.Struct({}),
         returns: () => Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
@@ -47,7 +111,6 @@ describe("make", () => {
     expect(() =>
       FunctionSpec.publicQuery({
         name: "schema",
-        args: () => Schema.Struct({}),
         returns: () => Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
@@ -56,12 +119,13 @@ describe("make", () => {
   });
 });
 
-// LAZINESS INVARIANT — DO NOT REGRESS.
+// LAZINESS INVARIANT—DO NOT REGRESS.
 //
-// `args`/`returns`/`error` are passed as `() => Schema` thunks and exposed as
-// lazy memoised getters so that importing the assembled `_generated/spec.ts`
-// (which transitively references every function in the project) does not build
-// any schemas at module load. The cold-start win depends on two rules:
+// `args` fields and `returns`/`error` schemas are passed as thunks and exposed
+// as lazy memoised schema getters so that importing the assembled
+// `_generated/spec.ts` (which transitively references every function in the
+// project) does not build any schemas at module load. The cold-start win
+// depends on two rules:
 //
 //   1. Constructing a `FunctionSpec` must NOT evaluate any schema thunk.
 //   2. Code that only needs to know WHETHER an `error` schema exists must use a
@@ -69,7 +133,7 @@ describe("make", () => {
 //      `.error`, which would force-build the schema. See `Ref.hasErrorSchema`.
 //
 // If you are changing `FunctionProvenance`, `FunctionSpec`, or `Ref` and these
-// tests fail, do not "fix" them by eagerly reading the schemas — preserve the
+// tests fail, do not "fix" them by eagerly reading the schemas—preserve the
 // laziness instead.
 describe("laziness invariant", () => {
   const makeSpec = (track: {
@@ -81,7 +145,7 @@ describe("laziness invariant", () => {
       name: "tracked",
       args: () => {
         track.args?.();
-        return Schema.Struct({});
+        return { tracked: Schema.Boolean };
       },
       returns: () => {
         track.returns?.();
@@ -120,10 +184,37 @@ describe("laziness invariant", () => {
     expect(MutableRef.get(errorBuilt)).toBe(false);
   });
 
+  it("Ref.make forces no schema thunks, and the ref's schemas are the spec's own", () => {
+    const argsBuilt = MutableRef.make(false);
+    const returnsBuilt = MutableRef.make(false);
+    const errorBuilt = MutableRef.make(false);
+
+    const spec = makeSpec({
+      args: () => MutableRef.set(argsBuilt, true),
+      returns: () => MutableRef.set(returnsBuilt, true),
+      error: () => MutableRef.set(errorBuilt, true),
+    });
+    const ref = Ref.make("ns", spec);
+
+    expect(MutableRef.get(argsBuilt)).toBe(false);
+    expect(MutableRef.get(returnsBuilt)).toBe(false);
+    expect(MutableRef.get(errorBuilt)).toBe(false);
+
+    expect(ref.args).toBe(spec.functionProvenance.args);
+    expect(MutableRef.get(argsBuilt)).toBe(true);
+    expect(ref.returns).toBe(spec.functionProvenance.returns);
+    expect(MutableRef.get(returnsBuilt)).toBe(true);
+
+    // `error` is present without forcing, and delegates like the others.
+    expect("error" in ref).toBe(true);
+    expect(MutableRef.get(errorBuilt)).toBe(false);
+    expect(ref.error).toBe(spec.functionProvenance.error);
+    expect(MutableRef.get(errorBuilt)).toBe(true);
+  });
+
   it("a spec without an error schema reports no error without defining the key", () => {
     const spec = FunctionSpec.publicQuery({
       name: "noError",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Null,
     });
     const ref = Ref.make("ns", spec);
@@ -147,7 +238,7 @@ describe("laziness invariant", () => {
 });
 
 describe("paginated queries", () => {
-  const item = Schema.Struct({ value: Schema.NumberFromString });
+  const item = Schema.Struct({ value: Schema.FiniteFromString });
 
   describe("laziness invariant", () => {
     const makePaginatedSpec = (track: {
@@ -159,7 +250,7 @@ describe("paginated queries", () => {
         name: "tracked",
         args: () => {
           track.args?.();
-          return Schema.Struct({});
+          return { tracked: Schema.Boolean };
         },
         item: () => {
           track.item?.();
@@ -203,7 +294,6 @@ describe("paginated queries", () => {
     it("a standard spec's kind is Standard", () => {
       const spec = FunctionSpec.publicQuery({
         name: "list",
-        args: () => Schema.Struct({}),
         returns: () => Schema.Null,
       });
 
@@ -239,12 +329,11 @@ describe("paginated queries", () => {
     it("composes `paginationOpts` into the args schema", () => {
       const spec = FunctionSpec.publicPaginatedQuery({
         name: "listPaginated",
-        args: () => Schema.Struct({ author: Schema.String }),
+        args: () => ({ author: Schema.String }),
         item: () => item,
       });
 
-      const args = spec.functionProvenance
-        .args as unknown as FunctionProvenance.AnyUserArgs;
+      const args = spec.functionProvenance.args;
       expect(Object.keys(args.fields)).toEqual(["author", "paginationOpts"]);
     });
 
@@ -254,8 +343,7 @@ describe("paginated queries", () => {
         item: () => item,
       });
 
-      const args = spec.functionProvenance
-        .args as unknown as FunctionProvenance.AnyUserArgs;
+      const args = spec.functionProvenance.args;
       expect(Object.keys(args.fields)).toEqual(["paginationOpts"]);
     });
 
@@ -265,8 +353,7 @@ describe("paginated queries", () => {
         item: () => item,
       });
 
-      const returns = spec.functionProvenance
-        .returns as unknown as FunctionProvenance.AnyUserArgs;
+      const returns = spec.functionProvenance.returns;
       expect(Object.keys(returns.fields)).toEqual([
         "page",
         "isDone",
@@ -279,18 +366,17 @@ describe("paginated queries", () => {
     it("throws when the user args schema declares paginationOpts", () => {
       const spec = FunctionSpec.publicPaginatedQuery({
         name: "listPaginated",
-        // @ts-expect-error — paginationOpts must not be declared in user args
-        args: () =>
-          Schema.Struct({
-            paginationOpts: Schema.Struct({ numItems: Schema.Number }),
-          }),
+        // @ts-expect-error—paginationOpts must not be declared in user args
+        args: () => ({
+          paginationOpts: Schema.Struct({ numItems: Schema.Finite }),
+        }),
         item: () => item,
       });
 
       expect(
         () => spec.functionProvenance.args,
       ).toThrowErrorMatchingInlineSnapshot(
-        `[Error: A paginated query's args schema must not declare \`paginationOpts\` — it is added automatically from the \`PaginationOptions\` schema]`,
+        `[Error: A paginated query's args schema must not declare \`paginationOpts\`—it is added automatically from the \`PaginationOptions\` schema]`,
       );
     });
   });
@@ -299,7 +385,7 @@ describe("paginated queries", () => {
     it("derives Args/Returns/Error from the composed schemas", () => {
       const _spec = FunctionSpec.publicPaginatedQuery({
         name: "listPaginated",
-        args: () => Schema.Struct({ author: Schema.String }),
+        args: () => ({ author: Schema.String }),
         item: () => item,
         error: () => Schema.String,
       });
@@ -309,6 +395,9 @@ describe("paginated queries", () => {
         FunctionSpec.Args<Spec>["paginationOpts"]["numItems"]
       >().toEqualTypeOf<number>();
       expectTypeOf<FunctionSpec.Args<Spec>["author"]>().toEqualTypeOf<string>();
+      expectTypeOf<
+        FunctionSpec.ArgsSchema<Spec>["fields"]["author"]
+      >().toEqualTypeOf<typeof Schema.String>();
       expectTypeOf<FunctionSpec.Returns<Spec>["page"][number]>().toEqualTypeOf<{
         readonly value: number;
       }>();
@@ -317,5 +406,95 @@ describe("paginated queries", () => {
         FunctionSpec.EncodedReturns<Spec>["page"][number]
       >().toEqualTypeOf<{ readonly value: string }>();
     });
+  });
+});
+
+describe("middleware options", () => {
+  class AccessDenied extends Schema.TaggedError<AccessDenied>()(
+    "AccessDenied",
+    {},
+  ) {}
+
+  class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
+    "RequireRole",
+    {
+      options: () =>
+        Schema.Struct({
+          roles: Schema.Array(Schema.Literals(["Internal", "Buyer"])),
+        }),
+      error: () => AccessDenied,
+      functionTypes: { query: true, mutation: true, action: true },
+    },
+  ) {}
+
+  class Observe extends MiddlewareSpec.MiddlewareSpec<Observe>()("Observe", {
+    functionTypes: { query: true, mutation: true, action: true },
+  }) {}
+
+  const query = FunctionSpec.publicQuery({
+    name: "get",
+    returns: () => Schema.String,
+  });
+
+  it("requires exactly the declared attachment options", () => {
+    query.middleware(RequireRole, { roles: ["Internal"] });
+    query.middleware(Observe);
+    // @ts-expect-error
+    query.middleware(RequireRole);
+    // @ts-expect-error
+    query.middleware(RequireRole, { roles: ["Unknown"] });
+    // @ts-expect-error
+    query.middleware(RequireRole, {});
+    // @ts-expect-error
+    query.middleware(Observe, {});
+  });
+
+  it("keeps attachment values independent without mutating the spec or builder", () => {
+    const internal = query.middleware(RequireRole, { roles: ["Internal"] });
+    const buyer = query.middleware(RequireRole, { roles: ["Buyer"] });
+    expect(internal.middlewareAttachments[0]?.options).toEqual({
+      roles: ["Internal"],
+    });
+    expect(buyer.middlewareAttachments[0]?.options).toEqual({
+      roles: ["Buyer"],
+    });
+    expect(query.middlewareAttachments).toEqual([]);
+    expect(internal.middlewareSpecs).toEqual([RequireRole]);
+    expectTypeOf<MiddlewareSpec.Options<typeof RequireRole>>().toEqualTypeOf<{
+      readonly roles: ReadonlyArray<"Internal" | "Buyer">;
+    }>();
+  });
+
+  it("preserves optionless members in mixed attachment types", () => {
+    const mixed = query
+      .middleware(Observe)
+      .middleware(RequireRole, { roles: ["Internal"] });
+
+    expectTypeOf<(typeof mixed.middlewareAttachments)[number]>().toEqualTypeOf<
+      | MiddlewareAttachment.MiddlewareAttachment<typeof Observe>
+      | MiddlewareAttachment.MiddlewareAttachment<typeof RequireRole>
+    >();
+    expectTypeOf<
+      (typeof mixed.middlewareAttachments)[number]["options"]
+    >().toEqualTypeOf<MiddlewareSpec.Options<typeof RequireRole> | undefined>();
+    expect(mixed.middlewareAttachments.map(({ options }) => options)).toEqual([
+      undefined,
+      { roles: ["Internal"] },
+    ]);
+  });
+
+  it("derives middleware specs without storing a parallel array", () => {
+    const covered = query
+      .middleware(RequireRole, { roles: ["Internal"] })
+      .middleware(Observe);
+
+    expect(covered.middlewareSpecs).toEqual([RequireRole, Observe]);
+    expect(covered.middlewareSpecs).toEqual(
+      covered.middlewareAttachments.map(({ spec }) => spec),
+    );
+    expect(Object.hasOwn(covered, "middlewareSpecs")).toBe(false);
+    expect(Object.hasOwn(query, "middlewareSpecs")).toBe(false);
+    expect(query.middlewareSpecs).toEqual([]);
+    expect(query.middlewareAttachments).toEqual([]);
   });
 });

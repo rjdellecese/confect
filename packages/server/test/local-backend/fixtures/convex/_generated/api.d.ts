@@ -31,6 +31,130 @@ export declare const api: {
       confectWithRawDateNow: FunctionReference<"query", "public", {}, number>;
       confectWithSpan: FunctionReference<"query", "public", {}, number>;
     };
+    metadata: {
+      actionMetadata: FunctionReference<
+        "action",
+        "public",
+        {},
+        {
+          deploymentName: string;
+          functionName: string;
+          functionType: string;
+          ip: string | null;
+          requestId: string;
+          scheduledFunctionId: string | null;
+        }
+      >;
+      mutationMetadata: FunctionReference<
+        "mutation",
+        "public",
+        {},
+        {
+          deploymentName: string;
+          functionName: string;
+          functionType: string;
+          ip: string | null;
+          remainingWrites: number;
+          requestId: string;
+          scheduledFunctionId: string | null;
+        }
+      >;
+      queryMetadata: FunctionReference<
+        "query",
+        "public",
+        {},
+        {
+          deploymentName: string;
+          functionName: string;
+          functionType: string;
+          remainingReads: number;
+        }
+      >;
+    };
+    scheduling: {
+      manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;
+      manyOpsQuery: FunctionReference<"query", "public", {}, number>;
+    };
+    storage: {
+      deleteBlob: FunctionReference<
+        "mutation",
+        "public",
+        { storageId: Id<"_storage"> },
+        null
+      >;
+      generateUploadUrl: FunctionReference<"mutation", "public", {}, string>;
+      get: FunctionReference<
+        "action",
+        "public",
+        { storageId: Id<"_storage"> },
+        string
+      >;
+      getUrl: FunctionReference<
+        "query",
+        "public",
+        { storageId: Id<"_storage"> },
+        string
+      >;
+      store: FunctionReference<
+        "action",
+        "public",
+        { text: string },
+        Id<"_storage">
+      >;
+    };
+    transactions: {
+      limitedRead: FunctionReference<
+        "query",
+        "public",
+        { caseId: string; limit: number },
+        Array<string>
+      >;
+      limitedReadFromMutation: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; limit: number },
+        Array<string>
+      >;
+      limitedWrite: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; limit: number },
+        null
+      >;
+      rollback: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string },
+        boolean
+      >;
+      seed: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; count: number },
+        null
+      >;
+      staleRead: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; stale: boolean },
+        Array<string>
+      >;
+    };
+  };
+  metadataNode: {
+    metadata: FunctionReference<
+      "action",
+      "public",
+      {},
+      {
+        deploymentName: string;
+        functionName: string;
+        functionType: string;
+        ip: string | null;
+        requestId: string;
+        scheduledFunctionId: string | null;
+      }
+    >;
   };
 };
 
@@ -42,6 +166,23 @@ export declare const api: {
  * const myFunctionReference = internal.myModule.myFunction;
  * ```
  */
-export declare const internal: {};
+export declare const internal: {
+  groups: {
+    transactions: {
+      read: FunctionReference<
+        "query",
+        "internal",
+        { caseId: string },
+        Array<string>
+      >;
+      write: FunctionReference<
+        "mutation",
+        "internal",
+        { caseId: string; fail: boolean; value: string },
+        null
+      >;
+    };
+  };
+};
 
 export declare const components: {};

@@ -11,29 +11,29 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()("Forbidden", {
   reason: Schema.String,
 }) {}
 
-const NoteError = Schema.Union(NotFound, Forbidden);
+const NoteError = Schema.Union([NotFound, Forbidden]);
 
-const TryGetResult = Schema.Union(
+const TryGetResult = Schema.Union([
   Schema.TaggedStruct("Ok", { text: Schema.String }),
   Schema.TaggedStruct("NotFound", { id: Schema.String }),
-);
+]);
 
-const TryDeleteResult = Schema.Union(
+const TryDeleteResult = Schema.Union([
   Schema.TaggedStruct("Ok", {}),
   Schema.TaggedStruct("NotFound", { id: Schema.String }),
   Schema.TaggedStruct("Forbidden", { reason: Schema.String }),
-);
+]);
 
-const TryFailingActionResult = Schema.Union(
+const TryFailingActionResult = Schema.Union([
   Schema.TaggedStruct("NotFound", { id: Schema.String }),
   Schema.TaggedStruct("Forbidden", { reason: Schema.String }),
-);
+]);
 
 export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getNoteOrFail",
-      args: () => Schema.Struct({ noteId: Id("notes") }),
+      args: () => ({ noteId: Id("notes") }),
       returns: () => notes.Doc,
       error: () => NotFound,
     }),
@@ -41,11 +41,10 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "deleteNoteOrFail",
-      args: () =>
-        Schema.Struct({
-          noteId: Id("notes"),
-          asAdmin: Schema.Boolean,
-        }),
+      args: () => ({
+        noteId: Id("notes"),
+        asAdmin: Schema.Boolean,
+      }),
       returns: () => Schema.Null,
       error: () => NoteError,
     }),
@@ -53,10 +52,9 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicAction({
       name: "failingAction",
-      args: () =>
-        Schema.Struct({
-          kind: Schema.Literal("notFound", "forbidden"),
-        }),
+      args: () => ({
+        kind: Schema.Literals(["notFound", "forbidden"]),
+      }),
       returns: () => Schema.Null,
       error: () => NoteError,
     }),
@@ -64,7 +62,7 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "insertThenFail",
-      args: () => Schema.Struct({ text: Schema.String }),
+      args: () => ({ text: Schema.String }),
       returns: () => Schema.Null,
       error: () => NotFound,
     }),
@@ -72,35 +70,33 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "tryGetNote",
-      args: () => Schema.Struct({ noteId: Id("notes") }),
+      args: () => ({ noteId: Id("notes") }),
       returns: () => TryGetResult,
     }),
   )
   .addFunction(
     FunctionSpec.publicAction({
       name: "tryDeleteNote",
-      args: () =>
-        Schema.Struct({
-          noteId: Id("notes"),
-          asAdmin: Schema.Boolean,
-        }),
+      args: () => ({
+        noteId: Id("notes"),
+        asAdmin: Schema.Boolean,
+      }),
       returns: () => TryDeleteResult,
     }),
   )
   .addFunction(
     FunctionSpec.publicAction({
       name: "tryFailingAction",
-      args: () =>
-        Schema.Struct({
-          kind: Schema.Literal("notFound", "forbidden"),
-        }),
+      args: () => ({
+        kind: Schema.Literals(["notFound", "forbidden"]),
+      }),
       returns: () => TryFailingActionResult,
     }),
   )
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetNoteOrFail",
-      args: () => Schema.Struct({ noteId: Id("notes") }),
+      args: () => ({ noteId: Id("notes") }),
       returns: () => notes.Doc,
       error: () => NotFound,
     }),
@@ -108,7 +104,7 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicAction({
       name: "tryInternalGetNote",
-      args: () => Schema.Struct({ noteId: Id("notes") }),
+      args: () => ({ noteId: Id("notes") }),
       returns: () => TryGetResult,
     }),
   );

@@ -1,5 +1,5 @@
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { expect, layer } from "@effect/vitest";
@@ -37,8 +37,7 @@ layer(TestLayer)("import isolation", (it) => {
         const contents = yield* fs.readFileString(registry);
         // The DatabaseSchema value is imported (cheap: table schemas only).
         expect(contents).toContain('import databaseSchema from "../../schema"');
-        // The project-wide api/spec modules must NOT be runtime-imported —
-        // importing them is what drags every sibling spec into this one
+        // The project-wide api/spec modules must NOT be runtime-imported—importing them is what drags every sibling spec into this one
         // function's bundle.
         expect(contents).not.toMatch(
           /^import .* from "[^"]*\/(api|nodeApi)";$/m,

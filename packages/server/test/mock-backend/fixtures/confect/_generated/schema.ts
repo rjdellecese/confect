@@ -5,12 +5,12 @@ import notes from "./tables/notes";
 import tags from "./tables/tags";
 import users from "./tables/users";
 
-const databaseSchema: $DatabaseSchema.DatabaseSchema<
-  typeof events |
-  typeof notes |
-  typeof tags |
-  typeof users
-> = $DatabaseSchema.make({
+const databaseSchema: $DatabaseSchema.DatabaseSchema<{
+  readonly events: typeof events;
+  readonly notes: typeof notes;
+  readonly tags: typeof tags;
+  readonly users: typeof users;
+}> = $DatabaseSchema.make({
   events,
   notes,
   tags,

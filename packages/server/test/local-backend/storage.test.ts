@@ -1,0 +1,106 @@
+/**
+ * End-to-end test of Confect's storage services inside Convex's real UDF
+ * isolate. Convex returns storage URLs as plain strings, which the storage
+ * services decode with Effect's `Schema.URLFromString`—so these only pass if
+ * that string→URL decode succeeds in the isolate.
+ */
+
+import { Ref } from "@confect/core";
+import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
+import { expect, layer } from "@effect/vitest";
+import type { GenericId } from "convex/values";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as HttpBody from "effect/http/HttpBody";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
+import refs from "./fixtures/confect/_generated/refs";
+import * as LocalBackend from "./LocalBackend";
+
+const UploadResponse = Schema.fromJsonString(
+  Schema.Struct({ storageId: Schema.String }),
+);
+
+layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
+  timeout: "120 seconds",
+})("Storage services inside the Convex isolate", (it) => {
+  it.effect("shares stored blobs across actions, queries, and mutations", () =>
+    Effect.gen(function* () {
+      const { client } = yield* LocalBackend.LocalBackend;
+      const storage = refs.public.groups.storage;
+      const text = "stored through the unified service";
+      const storageId = yield* Effect.promise(() =>
+        client.action(Ref.getFunctionReference(storage.store), { text }),
+      );
+      const contents = yield* Effect.promise(() =>
+        client.action(Ref.getFunctionReference(storage.get), { storageId }),
+      );
+      expect(contents).toBe(text);
+      const url = yield* Effect.promise(() =>
+        client.query(Ref.getFunctionReference(storage.getUrl), { storageId }),
+      );
+      expect(new URL(url).pathname).toContain("/api/storage/");
+      expect(
+        yield* HttpClient.get(url).pipe(
+          Effect.flatMap(HttpClientResponse.filterStatusOk),
+          Effect.flatMap((response) => response.text),
+        ),
+      ).toBe(text);
+      expect(
+        yield* Effect.promise(() =>
+          client.mutation(Ref.getFunctionReference(storage.deleteBlob), {
+            storageId,
+          }),
+        ),
+      ).toBeNull();
+      yield* Effect.promise(() =>
+        expect(
+          client.query(Ref.getFunctionReference(storage.getUrl), { storageId }),
+        ).rejects.toThrow(/BlobNotFoundError/),
+      );
+      yield* Effect.promise(() =>
+        expect(
+          client.action(Ref.getFunctionReference(storage.get), { storageId }),
+        ).rejects.toThrow(/BlobNotFoundError/),
+      );
+    }),
+  );
+
+  it.effect(
+    "generateUploadUrl decodes the isolate's string URL, and getUrl resolves an uploaded blob",
+    () =>
+      Effect.gen(function* () {
+        const { client } = yield* LocalBackend.LocalBackend;
+
+        const uploadUrl = yield* Effect.promise(() =>
+          client.mutation(
+            Ref.getFunctionReference(
+              refs.public.groups.storage.generateUploadUrl,
+            ),
+            {},
+          ),
+        );
+        expect(new URL(uploadUrl).pathname).toContain("/api/storage/upload");
+
+        const uploadResponseBody = yield* HttpClient.post(uploadUrl, {
+          body: HttpBody.text("hello, storage"),
+          headers: { "Content-Type": "text/plain" },
+        }).pipe(
+          Effect.flatMap(HttpClientResponse.filterStatusOk),
+          Effect.flatMap((response) => response.text),
+        );
+        const { storageId } =
+          yield* Schema.decodeEffect(UploadResponse)(uploadResponseBody);
+
+        const blobUrl = yield* Effect.promise(() =>
+          client.query(
+            Ref.getFunctionReference(refs.public.groups.storage.getUrl),
+            { storageId: storageId as GenericId<"_storage"> },
+          ),
+        );
+        expect(new URL(blobUrl).pathname).toContain("/api/storage/");
+      }),
+    60_000,
+  );
+});

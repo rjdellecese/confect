@@ -1,24 +1,28 @@
-import type { CommandExecutor } from "@effect/platform";
-import * as Command from "@effect/platform/Command";
-import * as Path from "@effect/platform/Path";
-import * as NodeContext from "@effect/platform-node/NodeContext";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
+import * as Path from "effect/Path";
+import * as ChildProcess from "effect/process/ChildProcess";
+import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 
 const runCommand = (
   command: string,
-  args: string[],
-): Effect.Effect<void, never, CommandExecutor.CommandExecutor> =>
-  Command.make(command, ...args).pipe(
-    Command.stderr("inherit"),
-    Command.exitCode,
-    Effect.andThen((exitCode) =>
-      exitCode !== 0
-        ? Effect.dieMessage(`${command} failed (exit code ${exitCode})`)
-        : Effect.void,
-    ),
-    Effect.orDie,
-  );
+  args: ReadonlyArray<string>,
+): Effect.Effect<void, never, ChildProcessSpawner> =>
+  Effect.gen(function* () {
+    const spawner = yield* ChildProcessSpawner;
+    const exitCode = yield* spawner.exitCode(
+      ChildProcess.make(command, args, {
+        stdout: "inherit",
+        stderr: "inherit",
+      }),
+    );
+    if (exitCode !== 0) {
+      return yield* Effect.die(
+        new Error(`${command} failed (exit code ${exitCode})`),
+      );
+    }
+  }).pipe(Effect.orDie);
 
 // Absolute path to the `confect` bin shim, resolved from this file's
 // location rather than via a `confect` bin in `node_modules/.bin/`. The shim
@@ -39,20 +43,19 @@ const confectCliEntryUrl = new URL(
 );
 
 /**
- * Build a Vitest `globalSetup` that runs `confect codegen` against the
- * given fixture directory before the suite starts.
+ * Build a Vitest `globalSetup` that runs `confect codegen` against the given
+ * fixture directory before the suite starts.
  *
- * The CLI walks up from `process.cwd()` to find the nearest `package.json`
- * (see `@confect/cli`'s `ProjectRoot`), which it then treats as the project
- * root when locating the Convex directory. Each fixture project therefore
- * needs to be the cwd while its codegen runs. We chdir for the duration
- * of the codegen call and restore the original cwd via `ensuring`.
+ * The CLI walks up from `process.cwd()` to find the nearest `package.json` (see
+ * `@confect/cli`'s `ProjectRoot`), which it then treats as the project root
+ * when locating the Convex directory. Each fixture project therefore needs to
+ * be the cwd while its codegen runs. We chdir for the duration of the codegen
+ * call and restore the original cwd via `ensuring`.
  *
  * Codegen runs both locally and on CI. The fixtures' generated outputs
  * (`confect/_generated/` and the wrapper files under `convex/`) are committed
- * to the repo, and CI verifies (via the `verify-codegen-committed` action)
- * that codegen produces no changes—i.e. that the committed outputs are
- * up-to-date.
+ * to the repo, and CI verifies (via the `verify-codegen-committed` action) that
+ * codegen produces no changes—i.e. that the committed outputs are up-to-date.
  */
 export const setupForFixture =
   (baseDir: string, fixtureSubpath: string) => () =>
@@ -68,6 +71,6 @@ export const setupForFixture =
           yield* runCommand(process.execPath, [cliEntry, "codegen"]);
         }).pipe(Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))));
       }),
-      Effect.provide(NodeContext.layer),
+      Effect.provide(NodeServices.layer),
       Effect.runPromise,
     );
