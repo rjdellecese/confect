@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Confect 🧁",
+  "name": "Confect \ud83e\uddc1",
   "colors": {
     "primary": "#941A97",
     "light": "#F9A8D4",
@@ -32,156 +32,69 @@
         }
       ]
     },
-    "versions": [
+    "groups": [
       {
-        "version": "v9",
-        "default": true,
-        "tag": "Stable",
-        "groups": [
-          {
-            "group": "Getting Started",
-            "pages": [
-              "v9/getting-started/introduction",
-              "v9/getting-started/quickstart"
-            ]
-          },
-          {
-            "group": "Concepts",
-            "pages": [
-              "v9/concepts/packages",
-              "v9/concepts/project-structure",
-              "v9/concepts/spec-impl-model",
-              "v9/concepts/file-naming-conventions",
-              "v9/concepts/services",
-              "v9/concepts/schema-restrictions"
-            ]
-          },
-          {
-            "group": "Server",
-            "pages": [
-              "v9/server/functions",
-              "v9/server/error-handling",
-              "v9/server/plain-convex-functions",
-              "v9/server/node-actions",
-              {
-                "icon": "database",
-                "group": "Database",
-                "pages": [
-                  "v9/server/database/schema",
-                  "v9/server/database/reading",
-                  "v9/server/database/writing",
-                  "v9/server/database/system-tables",
-                  "v9/server/database/determinism"
-                ]
-              },
-              "v9/server/http-api",
-              "v9/server/storage",
-              "v9/server/scheduling",
-              "v9/server/authentication",
-              "v9/server/cron-jobs",
-              "v9/server/search",
-              "v9/server/components",
-              "v9/server/environment-variables"
-            ]
-          },
-          {
-            "group": "Clients",
-            "pages": [
-              "v9/clients/react",
-              {
-                "icon": "js",
-                "group": "JS",
-                "pages": [
-                  "v9/clients/js/http",
-                  "v9/clients/js/websocket"
-                ]
-              }
-            ]
-          },
-          {
-            "group": "Guides",
-            "pages": [
-              "v9/guides/testing"
-            ]
-          }
+        "group": "Getting Started",
+        "pages": ["getting-started/introduction", "getting-started/quickstart"]
+      },
+      {
+        "group": "Concepts",
+        "pages": [
+          "concepts/packages",
+          "concepts/project-structure",
+          "concepts/spec-impl-model",
+          "concepts/file-naming-conventions",
+          "concepts/services",
+          "concepts/schema-restrictions"
         ]
       },
       {
-        "version": "v10",
-        "tag": "Prerelease",
-        "groups": [
+        "group": "Server",
+        "pages": [
+          "server/functions",
+          "server/error-handling",
+          "server/middleware",
+          "server/plain-convex-functions",
+          "server/node-actions",
+          "server/ai-gateway",
           {
-            "group": "Getting Started",
+            "icon": "database",
+            "group": "Database",
             "pages": [
-              "v10/getting-started/introduction",
-              "v10/getting-started/quickstart"
+              "server/database/schema",
+              "server/database/reading",
+              "server/database/streams",
+              "server/database/writing",
+              "server/database/system-tables",
+              "server/database/determinism"
             ]
           },
-          {
-            "group": "Concepts",
-            "pages": [
-              "v10/concepts/packages",
-              "v10/concepts/project-structure",
-              "v10/concepts/spec-impl-model",
-              "v10/concepts/file-naming-conventions",
-              "v10/concepts/services",
-              "v10/concepts/schema-restrictions"
-            ]
-          },
-          {
-            "group": "Server",
-            "pages": [
-              "v10/server/functions",
-              "v10/server/error-handling",
-              "v10/server/middleware",
-              "v10/server/plain-convex-functions",
-              "v10/server/node-actions",
-              "v10/server/ai-gateway",
-              {
-                "icon": "database",
-                "group": "Database",
-                "pages": [
-                  "v10/server/database/schema",
-                  "v10/server/database/reading",
-                  "v10/server/database/streams",
-                  "v10/server/database/writing",
-                  "v10/server/database/system-tables",
-                  "v10/server/database/determinism"
-                ]
-              },
-              "v10/server/http-api",
-              "v10/server/storage",
-              "v10/server/scheduling",
-              "v10/server/authentication",
-              "v10/server/metadata",
-              "v10/server/cron-jobs",
-              "v10/server/search",
-              "v10/server/components",
-              "v10/server/environment-variables"
-            ]
-          },
-          {
-            "group": "Clients",
-            "pages": [
-              "v10/clients/react",
-              {
-                "icon": "js",
-                "group": "JS",
-                "pages": [
-                  "v10/clients/js/http",
-                  "v10/clients/js/websocket"
-                ]
-              },
-              "v10/clients/foldkit"
-            ]
-          },
-          {
-            "group": "Guides",
-            "pages": [
-              "v10/guides/testing"
-            ]
-          }
+          "server/http-api",
+          "server/storage",
+          "server/scheduling",
+          "server/authentication",
+          "server/metadata",
+          "server/cron-jobs",
+          "server/search",
+          "server/components",
+          "server/environment-variables"
         ]
+      },
+      {
+        "group": "Clients",
+        "pages": [
+          "clients/react",
+          {
+            "icon": "js",
+            "group": "JS",
+            "pages": ["clients/js/http", "clients/js/websocket"]
+          },
+          "clients/foldkit"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": ["guides/testing"]
       }
     ]
   },
@@ -208,120 +121,276 @@
   },
   "redirects": [
     {
-      "source": "/getting-started/introduction",
-      "destination": "/v9/getting-started/introduction"
+      "source": "/v9/getting-started/introduction",
+      "destination": "/getting-started/introduction"
     },
     {
-      "source": "/getting-started/quickstart",
-      "destination": "/v9/getting-started/quickstart"
+      "source": "/v9/getting-started/quickstart",
+      "destination": "/getting-started/quickstart"
     },
     {
-      "source": "/concepts/packages",
-      "destination": "/v9/concepts/packages"
+      "source": "/v9/concepts/packages",
+      "destination": "/concepts/packages"
     },
     {
-      "source": "/concepts/project-structure",
-      "destination": "/v9/concepts/project-structure"
+      "source": "/v9/concepts/project-structure",
+      "destination": "/concepts/project-structure"
     },
     {
-      "source": "/concepts/spec-impl-model",
-      "destination": "/v9/concepts/spec-impl-model"
+      "source": "/v9/concepts/spec-impl-model",
+      "destination": "/concepts/spec-impl-model"
     },
     {
-      "source": "/concepts/file-naming-conventions",
-      "destination": "/v9/concepts/file-naming-conventions"
+      "source": "/v9/concepts/file-naming-conventions",
+      "destination": "/concepts/file-naming-conventions"
     },
     {
-      "source": "/concepts/services",
-      "destination": "/v9/concepts/services"
+      "source": "/v9/concepts/services",
+      "destination": "/concepts/services"
     },
     {
-      "source": "/concepts/schema-restrictions",
-      "destination": "/v9/concepts/schema-restrictions"
+      "source": "/v9/concepts/schema-restrictions",
+      "destination": "/concepts/schema-restrictions"
     },
     {
-      "source": "/server/functions",
-      "destination": "/v9/server/functions"
+      "source": "/v9/server/functions",
+      "destination": "/server/functions"
     },
     {
-      "source": "/server/error-handling",
-      "destination": "/v9/server/error-handling"
+      "source": "/v9/server/error-handling",
+      "destination": "/server/error-handling"
     },
     {
-      "source": "/server/plain-convex-functions",
-      "destination": "/v9/server/plain-convex-functions"
+      "source": "/v9/server/middleware",
+      "destination": "/server/middleware"
     },
     {
-      "source": "/server/node-actions",
-      "destination": "/v9/server/node-actions"
+      "source": "/v9/server/plain-convex-functions",
+      "destination": "/server/plain-convex-functions"
     },
     {
-      "source": "/server/database/schema",
-      "destination": "/v9/server/database/schema"
+      "source": "/v9/server/node-actions",
+      "destination": "/server/node-actions"
     },
     {
-      "source": "/server/database/reading",
-      "destination": "/v9/server/database/reading"
+      "source": "/v9/server/ai-gateway",
+      "destination": "/server/ai-gateway"
     },
     {
-      "source": "/server/database/writing",
-      "destination": "/v9/server/database/writing"
+      "source": "/v9/server/database/schema",
+      "destination": "/server/database/schema"
     },
     {
-      "source": "/server/database/system-tables",
-      "destination": "/v9/server/database/system-tables"
+      "source": "/v9/server/database/reading",
+      "destination": "/server/database/reading"
     },
     {
-      "source": "/server/database/determinism",
-      "destination": "/v9/server/database/determinism"
+      "source": "/v9/server/database/streams",
+      "destination": "/server/database/streams"
     },
     {
-      "source": "/server/http-api",
-      "destination": "/v9/server/http-api"
+      "source": "/v9/server/database/writing",
+      "destination": "/server/database/writing"
     },
     {
-      "source": "/server/storage",
-      "destination": "/v9/server/storage"
+      "source": "/v9/server/database/system-tables",
+      "destination": "/server/database/system-tables"
     },
     {
-      "source": "/server/scheduling",
-      "destination": "/v9/server/scheduling"
+      "source": "/v9/server/database/determinism",
+      "destination": "/server/database/determinism"
     },
     {
-      "source": "/server/authentication",
-      "destination": "/v9/server/authentication"
+      "source": "/v9/server/http-api",
+      "destination": "/server/http-api"
     },
     {
-      "source": "/server/cron-jobs",
-      "destination": "/v9/server/cron-jobs"
+      "source": "/v9/server/storage",
+      "destination": "/server/storage"
     },
     {
-      "source": "/server/search",
-      "destination": "/v9/server/search"
+      "source": "/v9/server/scheduling",
+      "destination": "/server/scheduling"
     },
     {
-      "source": "/server/components",
-      "destination": "/v9/server/components"
+      "source": "/v9/server/authentication",
+      "destination": "/server/authentication"
     },
     {
-      "source": "/server/environment-variables",
-      "destination": "/v9/server/environment-variables"
+      "source": "/v9/server/metadata",
+      "destination": "/server/metadata"
     },
     {
-      "source": "/clients/react",
-      "destination": "/v9/clients/react"
+      "source": "/v9/server/cron-jobs",
+      "destination": "/server/cron-jobs"
     },
     {
-      "source": "/clients/js/http",
-      "destination": "/v9/clients/js/http"
+      "source": "/v9/server/search",
+      "destination": "/server/search"
     },
     {
-      "source": "/clients/js/websocket",
-      "destination": "/v9/clients/js/websocket"
+      "source": "/v9/server/components",
+      "destination": "/server/components"
     },
     {
-      "source": "/guides/testing",
-      "destination": "/v9/guides/testing"
+      "source": "/v9/server/environment-variables",
+      "destination": "/server/environment-variables"
+    },
+    {
+      "source": "/v9/clients/react",
+      "destination": "/clients/react"
+    },
+    {
+      "source": "/v9/clients/js/http",
+      "destination": "/clients/js/http"
+    },
+    {
+      "source": "/v9/clients/js/websocket",
+      "destination": "/clients/js/websocket"
+    },
+    {
+      "source": "/v9/clients/foldkit",
+      "destination": "/clients/foldkit"
+    },
+    {
+      "source": "/v9/guides/testing",
+      "destination": "/guides/testing"
+    },
+    {
+      "source": "/v10/getting-started/introduction",
+      "destination": "/getting-started/introduction"
+    },
+    {
+      "source": "/v10/getting-started/quickstart",
+      "destination": "/getting-started/quickstart"
+    },
+    {
+      "source": "/v10/concepts/packages",
+      "destination": "/concepts/packages"
+    },
+    {
+      "source": "/v10/concepts/project-structure",
+      "destination": "/concepts/project-structure"
+    },
+    {
+      "source": "/v10/concepts/spec-impl-model",
+      "destination": "/concepts/spec-impl-model"
+    },
+    {
+      "source": "/v10/concepts/file-naming-conventions",
+      "destination": "/concepts/file-naming-conventions"
+    },
+    {
+      "source": "/v10/concepts/services",
+      "destination": "/concepts/services"
+    },
+    {
+      "source": "/v10/concepts/schema-restrictions",
+      "destination": "/concepts/schema-restrictions"
+    },
+    {
+      "source": "/v10/server/functions",
+      "destination": "/server/functions"
+    },
+    {
+      "source": "/v10/server/error-handling",
+      "destination": "/server/error-handling"
+    },
+    {
+      "source": "/v10/server/middleware",
+      "destination": "/server/middleware"
+    },
+    {
+      "source": "/v10/server/plain-convex-functions",
+      "destination": "/server/plain-convex-functions"
+    },
+    {
+      "source": "/v10/server/node-actions",
+      "destination": "/server/node-actions"
+    },
+    {
+      "source": "/v10/server/ai-gateway",
+      "destination": "/server/ai-gateway"
+    },
+    {
+      "source": "/v10/server/database/schema",
+      "destination": "/server/database/schema"
+    },
+    {
+      "source": "/v10/server/database/reading",
+      "destination": "/server/database/reading"
+    },
+    {
+      "source": "/v10/server/database/streams",
+      "destination": "/server/database/streams"
+    },
+    {
+      "source": "/v10/server/database/writing",
+      "destination": "/server/database/writing"
+    },
+    {
+      "source": "/v10/server/database/system-tables",
+      "destination": "/server/database/system-tables"
+    },
+    {
+      "source": "/v10/server/database/determinism",
+      "destination": "/server/database/determinism"
+    },
+    {
+      "source": "/v10/server/http-api",
+      "destination": "/server/http-api"
+    },
+    {
+      "source": "/v10/server/storage",
+      "destination": "/server/storage"
+    },
+    {
+      "source": "/v10/server/scheduling",
+      "destination": "/server/scheduling"
+    },
+    {
+      "source": "/v10/server/authentication",
+      "destination": "/server/authentication"
+    },
+    {
+      "source": "/v10/server/metadata",
+      "destination": "/server/metadata"
+    },
+    {
+      "source": "/v10/server/cron-jobs",
+      "destination": "/server/cron-jobs"
+    },
+    {
+      "source": "/v10/server/search",
+      "destination": "/server/search"
+    },
+    {
+      "source": "/v10/server/components",
+      "destination": "/server/components"
+    },
+    {
+      "source": "/v10/server/environment-variables",
+      "destination": "/server/environment-variables"
+    },
+    {
+      "source": "/v10/clients/react",
+      "destination": "/clients/react"
+    },
+    {
+      "source": "/v10/clients/js/http",
+      "destination": "/clients/js/http"
+    },
+    {
+      "source": "/v10/clients/js/websocket",
+      "destination": "/clients/js/websocket"
+    },
+    {
+      "source": "/v10/clients/foldkit",
+      "destination": "/clients/foldkit"
+    },
+    {
+      "source": "/v10/guides/testing",
+      "destination": "/guides/testing"
     }
   ]
 }
