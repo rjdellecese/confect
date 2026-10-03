@@ -25,23 +25,12 @@ accepted.
 ## Installation
 
 ```bash
-pnpm add @confect/foldkit @confect/js @confect/core foldkit
+pnpm add @confect/foldkit @confect/js @confect/core foldkit@^0.165.0 effect@4.0.0 @effect/platform-browser@4.0.0
 ```
 
 <Note>
-  Foldkit pins an exact `effect` version in its `peerDependencies`. When
-  Confect tracks a newer Effect release than Foldkit does, tell your package
-  manager to accept the mismatch—with pnpm, in `pnpm-workspace.yaml`:
-
-```yaml
-peerDependencyRules:
-  allowedVersions:
-    "foldkit>effect": "4"
-```
-
-With npm, use an [`overrides`](https://docs.npmjs.com/cli/configuring-npm/package-json#overrides)
-entry that pins `effect` to the version your app uses.
-
+  Foldkit 0.165 requires `effect` and `@effect/platform-browser` 4.0.0. Install
+  those matching versions; no peer-dependency override is needed.
 </Note>
 
 ## Setup
@@ -53,6 +42,11 @@ of the app, and closes the WebSocket at teardown.
 ```ts src/entry.ts
 import * as Confect from "@confect/foldkit";
 import { Runtime } from "foldkit";
+
+import { Model } from "./model";
+import { init, update } from "./update";
+import { view } from "./view";
+import { subscriptions } from "./subscription";
 
 const application = Runtime.makeApplication({
   Model,
@@ -69,6 +63,9 @@ Runtime.run(application);
 
 Commands and subscription entries built by `@confect/foldkit` require the
 `Confect.Client.Client` service, which this layer satisfies.
+`init` and `update` return records: `{ model, commands }`, with `commands`
+omitted when there are none. Updates that emit an OutMessage to a parent use
+`Update.ReturnWithOutMessage` and may also include `outMessage`.
 
 ## Reactive queries as Subscriptions
 
@@ -79,18 +76,37 @@ extracted from your Model: `None` closes the subscription, a change from one
 leave the subscription running (dependency equivalence is derived from the
 ref's `args` schema).
 
+Declare your Messages with `defineMessageUnion` and use constructors on the
+`Message` namespace. In these examples, `Note` is your app's schema for a decoded
+note, matching the query's return schema:
+
+```ts src/model.ts
+import * as Schema from "effect/Schema";
+import { defineMessageUnion } from "foldkit/message";
+
+import { Note } from "./note";
+
+export const Model = Schema.Struct({
+  selectedNoteId: Schema.Option(Schema.String),
+});
+export type Model = typeof Model.Type;
+
+export const Message = defineMessageUnion({
+  SucceededGetNote: { note: Note },
+  FailedGetNote: { message: Schema.String },
+  SucceededGetNotes: { notes: Schema.Array(Note) },
+  FailedGetNotes: { message: Schema.String },
+});
+export type Message = typeof Message.Type;
+```
+
 ```ts src/subscription.ts
 import * as Confect from "@confect/foldkit";
 import * as Option from "effect/Option";
 import * as Subscription from "foldkit/subscription";
 
 import refs from "../confect/_generated/refs";
-import {
-  FailedGetNote,
-  SucceededGetNote,
-  type Message,
-  type Model,
-} from "./model";
+import { Message, type Model } from "./model";
 
 export const subscriptions = Subscription.make<
   Model,
@@ -99,8 +115,8 @@ export const subscriptions = Subscription.make<
 >()(() => ({
   note: Confect.Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
     args: (model) => Option.map(model.selectedNoteId, (noteId) => ({ noteId })),
-    onSuccess: (note) => SucceededGetNote({ note }),
-    onError: (error) => FailedGetNote({ message: String(error) }),
+    onSuccess: (note) => Message.SucceededGetNote({ note }),
+    onError: (error) => Message.FailedGetNote({ message: String(error) }),
   }),
 }));
 ```
@@ -117,8 +133,8 @@ subscription always open:
 
 ```ts
 Confect.Subscription.reactiveQuery<Model>()(refs.public.notes.list, {
-  onSuccess: (notes) => SucceededGetNotes({ notes }),
-  onError: (error) => FailedGetNotes({ message: String(error) }),
+  onSuccess: (notes) => Message.SucceededGetNotes({ notes }),
+  onError: (error) => Message.FailedGetNotes({ message: String(error) }),
 });
 ```
 
@@ -128,7 +144,14 @@ When an entry needs extra dependencies or custom gating, write it by hand and
 use `Subscription.reactiveQueryStream` as its `dependenciesToStream` body:
 
 ```ts
+import * as Confect from "@confect/foldkit";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as Subscription from "foldkit/subscription";
+
+import refs from "../confect/_generated/refs";
+import { Message, type Model } from "./model";
 
 Subscription.make<Model, Message, Confect.Client.Client>()((entry) => ({
   note: entry(
@@ -138,11 +161,12 @@ Subscription.make<Model, Message, Confect.Client.Client>()((entry) => ({
       dependenciesToStream: ({ noteId }) =>
         Option.match(noteId, {
           onNone: () => Stream.empty,
-          onSome: (noteId) =>
+          onSome: (selectedNoteId) =>
             Confect.Subscription.reactiveQueryStream(refs.public.notes.get, {
-              onSuccess: (note) => SucceededGetNote({ note }),
-              onError: (error) => FailedGetNote({ message: String(error) }),
-            })({ noteId }),
+              onSuccess: (note) => Message.SucceededGetNote({ note }),
+              onError: (error) =>
+                Message.FailedGetNote({ message: String(error) }),
+            })({ noteId: selectedNoteId }),
         }),
     },
   ),
@@ -156,28 +180,37 @@ Command definitions whose Command args are the ref's args. `messages`
 declares the Messages the Command can produce—the same declaration
 Foldkit's own `Command.define` takes—and the handlers must produce
 instances of them. Call the definition from `update` to construct a Command
-instance—nothing runs until the Foldkit runtime executes it. Add the handler
-to your exhaustive update Match with `Match.tag`:
+instance—nothing runs until the Foldkit runtime executes it. Add
+`ClickedSave: {}`, `SucceededSaveNote: { noteId: Schema.String }`, and
+`FailedSaveNote: { message: Schema.String }` to your Message union, and a
+`draft: Schema.String` field to your Model:
 
 ```ts src/command.ts
 import * as Confect from "@confect/foldkit";
 
 import refs from "../confect/_generated/refs";
-import { FailedSaveNote, SucceededSaveNote } from "./model";
+import { Message } from "./model";
 
 export const SaveNote = Confect.Command.mutation(
   "SaveNote",
   refs.public.notes.insert,
   {
-    messages: [SucceededSaveNote, FailedSaveNote],
-    onSuccess: (noteId) => SucceededSaveNote({ noteId }),
-    onError: (error) => FailedSaveNote({ message: String(error) }),
+    messages: [Message.SucceededSaveNote, Message.FailedSaveNote],
+    onSuccess: (noteId) => Message.SucceededSaveNote({ noteId }),
+    onError: (error) => Message.FailedSaveNote({ message: String(error) }),
   },
 );
 ```
 
-```ts src/update.ts
-Match.tag("ClickedSave", () => [model, [SaveNote({ text: model.draft })]]),
+Add this handler to `Message.match` in `update`. Command-producing updates use
+`Update.Return<Model, Message, Confect.Client.Client>` so their resource
+requirement reaches the runtime:
+
+```ts
+ClickedSave: () => ({
+  model,
+  commands: [SaveNote({ text: model.draft })],
+}),
 ```
 
 Follow Foldkit's [naming convention](https://foldkit.dev/core/commands):
@@ -197,28 +230,39 @@ Messages are guaranteed never to dispatch) or `NotFound` (nothing was in
 flight).
 
 `interrupt: true` keys every invocation by the Command name—right when at
-most one invocation is meaningfully in flight:
+most one invocation is meaningfully in flight.
+
+For the following examples, extend your Message union with
+`SucceededSaveDraft: { noteId: Schema.String }`,
+`FailedSaveDraft: { message: Schema.String }`, `SucceededDeleteNote: {}`,
+`FailedDeleteNote: { message: Schema.String }`, and `ClickedCancel: {}`.
+The cancellation result variants `CompletedCancelSaveDraft` and
+`CompletedCancelDeleteNote` both have
+`{ outcome: FoldkitCommand.Interruptible.Outcome }` fields, where
+`FoldkitCommand` is imported from `foldkit/command`:
 
 ```ts
 export const SaveDraft = Confect.Command.mutation(
   "SaveDraft",
   refs.public.notes.insert,
   {
-    messages: [SucceededSaveDraft, FailedSaveDraft],
-    onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
-    onError: (error) => FailedSaveDraft({ message: String(error) }),
+    messages: [Message.SucceededSaveDraft, Message.FailedSaveDraft],
+    onSuccess: (noteId) => Message.SucceededSaveDraft({ noteId }),
+    onError: (error) => Message.FailedSaveDraft({ message: String(error) }),
     interrupt: true,
   },
 );
 ```
 
-Build the interrupt Command from its `Match.tag` update handler:
+Build the interrupt Command from its `Message.match` update handler:
 
 ```ts
-Match.tag("ClickedCancel", () => [
-    model,
-    [SaveDraft.Interrupt((outcome) => CompletedCancelSaveDraft({ outcome }))],
-  ]),
+ClickedCancel: () => ({
+  model,
+  commands: [
+    SaveDraft.Interrupt((outcome) => Message.CompletedCancelSaveDraft({ outcome })),
+  ],
+}),
 ```
 
 `interrupt: { keyFields, toKey }` derives the key from the ref's args, so
@@ -230,9 +274,9 @@ export const DeleteNote = Confect.Command.mutation(
   "DeleteNote",
   refs.public.notes.delete,
   {
-    messages: [SucceededDeleteNote, FailedDeleteNote],
-    onSuccess: () => SucceededDeleteNote(),
-    onError: (error) => FailedDeleteNote({ message: String(error) }),
+    messages: [Message.SucceededDeleteNote, Message.FailedDeleteNote],
+    onSuccess: () => Message.SucceededDeleteNote(),
+    onError: (error) => Message.FailedDeleteNote({ message: String(error) }),
     interrupt: {
       keyFields: ["noteId"],
       toKey: ({ noteId }) => noteId,
@@ -240,8 +284,14 @@ export const DeleteNote = Confect.Command.mutation(
   },
 );
 
-// In update:
-// [model, [DeleteNote.Interrupt({ noteId }, (outcome) => CompletedCancelDeleteNote({ outcome }))]]
+export const cancelDelete = (model: Model, noteId: string) => ({
+  model,
+  commands: [
+    DeleteNote.Interrupt({ noteId }, (outcome) =>
+      Message.CompletedCancelDeleteNote({ outcome }),
+    ),
+  ],
+});
 ```
 
 <Note>
@@ -266,14 +316,17 @@ import * as Confect from "@confect/foldkit";
 import * as FoldkitCommand from "foldkit/command";
 import * as Schema from "effect/Schema";
 
+import refs from "../confect/_generated/refs";
+import { Message } from "./model";
+
 const saveNote = Confect.Command.mutationEffect(refs.public.notes.insert, {
-  onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
-  onError: (error) => FailedSaveDraft({ message: String(error) }),
+  onSuccess: (noteId) => Message.SucceededSaveDraft({ noteId }),
+  onError: (error) => Message.FailedSaveDraft({ message: String(error) }),
 });
 
 export const SaveDraft = FoldkitCommand.define("SaveDraft", {
   args: { text: Schema.String, localDraftId: Schema.String },
-  messages: [SucceededSaveDraft, FailedSaveDraft],
+  messages: [Message.SucceededSaveDraft, Message.FailedSaveDraft],
   execute: ({ text }) => saveNote({ text }),
 });
 ```
@@ -282,35 +335,52 @@ export const SaveDraft = FoldkitCommand.define("SaveDraft", {
 
 Foldkit's [`AsyncData`](https://foldkit.dev/core/async-data) is the idiomatic
 Model representation for query state. Map errors to a view-ready schema type
-in your `onError` handler, then settle the `AsyncData` field with `Match.tags`
-in `update`:
+in your `onError` handler, then handle the result Messages with `Message.match`
+in `update`. This example replaces the earlier Model with a list-only Model:
 
 ```ts src/model.ts
 import { AsyncData } from "foldkit";
-import { m } from "foldkit/message";
+import { defineMessageUnion } from "foldkit/message";
 import * as Schema from "effect/Schema";
 
-const Notes = AsyncData.Schema(Schema.Array(Note), Schema.String);
+import { Note } from "./note";
+
+export const Notes = AsyncData.Schema(Schema.Array(Note), Schema.String);
 
 export const Model = Schema.Struct({ notes: Notes.schema });
+export type Model = typeof Model.Type;
+export const initialModel = Model.make({ notes: Notes.Idle() });
 
-export const SucceededGetNotes = m("SucceededGetNotes", {
-  notes: Schema.Array(Note),
+export const Message = defineMessageUnion({
+  SucceededGetNotes: { notes: Schema.Array(Note) },
+  FailedGetNotes: { message: Schema.String },
 });
-export const FailedGetNotes = m("FailedGetNotes", { message: Schema.String });
+export type Message = typeof Message.Type;
 ```
 
 ```ts src/update.ts
-Match.tags({
-  SucceededGetNotes: ({ notes }) => [
-    evo(model, { notes: () => Notes.Success({ data: notes }) }),
-    [],
-  ],
-  FailedGetNotes: ({ message }) => [
-    evo(model, { notes: () => Notes.Failure({ error: message }) }),
-    [],
-  ],
-}),
+import type * as Update from "foldkit/update";
+import { modifyFields } from "foldkit/struct";
+
+import { Message, Model, Notes, initialModel } from "./model";
+
+export const init = (): Update.Return<Model, Message> => ({
+  model: initialModel,
+});
+
+export const update = (model: Model, message: Message) =>
+  Message.match<Update.Return<Model, Message>>(message, {
+    SucceededGetNotes: ({ notes }) => ({
+      model: modifyFields(model, {
+        notes: () => Notes.Success({ data: notes }),
+      }),
+    }),
+    FailedGetNotes: ({ message: errorMessage }) => ({
+      model: modifyFields(model, {
+        notes: () => Notes.Failure({ error: errorMessage }),
+      }),
+    }),
+  });
 ```
 
 ## Paginated queries
@@ -330,7 +400,7 @@ last good page.
 
 ```ts src/model.ts
 import * as Confect from "@confect/foldkit";
-import { m } from "foldkit/message";
+import { defineMessageUnion } from "foldkit/message";
 import * as Schema from "effect/Schema";
 
 import refs from "../confect/_generated/refs";
@@ -340,12 +410,17 @@ export const Notes = Confect.PaginatedQuery.make(refs.public.notes.paginate);
 export const Model = Schema.Struct({
   notes: Notes.schema,
 });
+export type Model = typeof Model.Type;
 
 export const initialModel = Model.make({ notes: Notes.idle });
 
-export const SettledGetNotesPage = m("SettledGetNotesPage", {
-  settlement: Notes.settlement,
+export const Message = defineMessageUnion({
+  OpenedNotes: { channel: Schema.String },
+  SettledGetNotesPage: { settlement: Notes.settlement },
+  ClickedNextPage: {},
+  ClosedNotes: {},
 });
+export type Message = typeof Message.Type;
 ```
 
 Wire the subscription entry to the machine state:
@@ -354,6 +429,8 @@ Wire the subscription entry to the machine state:
 import * as Confect from "@confect/foldkit";
 import * as Subscription from "foldkit/subscription";
 
+import { Message, Model, Notes } from "./model";
+
 export const subscriptions = Subscription.make<
   Model,
   Message,
@@ -361,7 +438,7 @@ export const subscriptions = Subscription.make<
 >()(() => ({
   notesPage: Confect.Subscription.paginatedQuery<Model>()(Notes, {
     state: (model) => model.notes,
-    onSettled: (settlement) => SettledGetNotesPage({ settlement }),
+    onSettled: (settlement) => Message.SettledGetNotesPage({ settlement }),
   }),
 }));
 ```
@@ -382,52 +459,53 @@ operations remain pure:
 import * as Confect from "@confect/foldkit";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
-import type * as Command from "foldkit/command";
+import type * as Update from "foldkit/update";
+import { modifyFields } from "foldkit/struct";
 
-type UpdateReturn = readonly [Model, ReadonlyArray<Command.Command<Message>>];
+import { Message, Model, Notes, initialModel } from "./model";
 
-export const update = (model: Model, message: Message): UpdateReturn =>
-  Match.value(message).pipe(
-    Match.withReturnType<UpdateReturn>(),
-    Match.tagsExhaustive({
-      OpenedNotes: ({ channel }) => {
-        const notes = Match.value(model.notes).pipe(
-          Match.tag("Idle", (idle) =>
-            Notes.init(idle, { channel }, { initialNumItems: 20 }),
-          ),
-          Match.tag("Active", (active) =>
-            Notes.reinitialize(active, { channel }, { initialNumItems: 20 }),
-          ),
-          Match.exhaustive,
-        );
-        return [evo(model, { notes: () => notes }), []];
-      },
-      SettledGetNotesPage: ({ settlement }) => [
-        evo(model, {
-          notes: Confect.PaginatedQuery.settle(settlement),
-        }),
-        [],
-      ],
-      ClickedNextPage: () => {
-        const notes = Match.value(model.notes).pipe(
-          Match.tag("Idle", (idle) => idle),
-          Match.tag("Active", (active) =>
-            Option.getOrElse(Confect.PaginatedQuery.next(active), () => active),
-          ),
-          Match.exhaustive,
-        );
-        return [evo(model, { notes: () => notes }), []];
-      },
-      ClosedNotes: () => {
-        const notes = Match.value(model.notes).pipe(
-          Match.tag("Idle", (idle) => idle),
-          Match.tag("Active", Confect.PaginatedQuery.close),
-          Match.exhaustive,
-        );
-        return [evo(model, { notes: () => notes }), []];
-      },
+export const init = (): Update.Return<Model, Message> => ({
+  model: initialModel,
+});
+
+export const update = (model: Model, message: Message) =>
+  Message.match<Update.Return<Model, Message>>(message, {
+    OpenedNotes: ({ channel }) => {
+      const notes = Match.value(model.notes).pipe(
+        Match.tag("Idle", (idle) =>
+          Notes.init(idle, { channel }, { initialNumItems: 20 }),
+        ),
+        Match.tag("Active", (active) =>
+          Notes.reinitialize(active, { channel }, { initialNumItems: 20 }),
+        ),
+        Match.exhaustive,
+      );
+      return { model: modifyFields(model, { notes: () => notes }) };
+    },
+    SettledGetNotesPage: ({ settlement }) => ({
+      model: modifyFields(model, {
+        notes: Confect.PaginatedQuery.settle(settlement),
+      }),
     }),
-  );
+    ClickedNextPage: () => {
+      const notes = Match.value(model.notes).pipe(
+        Match.tag("Idle", (idle) => idle),
+        Match.tag("Active", (active) =>
+          Option.getOrElse(Confect.PaginatedQuery.next(active), () => active),
+        ),
+        Match.exhaustive,
+      );
+      return { model: modifyFields(model, { notes: () => notes }) };
+    },
+    ClosedNotes: () => {
+      const notes = Match.value(model.notes).pipe(
+        Match.tag("Idle", (idle) => idle),
+        Match.tag("Active", Confect.PaginatedQuery.close),
+        Match.exhaustive,
+      );
+      return { model: modifyFields(model, { notes: () => notes }) };
+    },
+  });
 ```
 
 `getPage` and `getItems` return `Option`s because the initial load can have no
@@ -437,23 +515,32 @@ loads and after a refresh fails. `Page.number` is the page being displayed;
 navigation:
 
 ```ts
-const items = Option.getOrElse(
-  Confect.PaginatedQuery.getItems(state),
-  () => [],
-);
-const label = Match.value(state).pipe(
-  Match.tag("Idle", () => "Closed"),
-  Match.tag("Active", (active) =>
-    Option.match(Confect.PaginatedQuery.getPage(active), {
-      onNone: () =>
-        `Loading page ${Confect.PaginatedQuery.targetPageNumber(active)}`,
-      onSome: (page) => `Page ${page.number}`,
-    }),
-  ),
-  Match.exhaustive,
-);
-const nextDisabled = !Confect.PaginatedQuery.canNext(state);
-const prevDisabled = !Confect.PaginatedQuery.canPrev(state);
+import * as Confect from "@confect/foldkit";
+import * as Match from "effect/Match";
+import * as Option from "effect/Option";
+
+import type { Model } from "./model";
+
+export const describePage = (state: Model["notes"]) => {
+  const items = Option.getOrElse(
+    Confect.PaginatedQuery.getItems(state),
+    () => [],
+  );
+  const label = Match.value(state).pipe(
+    Match.tag("Idle", () => "Closed"),
+    Match.tag("Active", (active) =>
+      Option.match(Confect.PaginatedQuery.getPage(active), {
+        onNone: () =>
+          `Loading page ${Confect.PaginatedQuery.targetPageNumber(active)}`,
+        onSome: (page) => `Page ${page.number}`,
+      }),
+    ),
+    Match.exhaustive,
+  );
+  const nextDisabled = !Confect.PaginatedQuery.canNext(state);
+  const prevDisabled = !Confect.PaginatedQuery.canPrev(state);
+  return { items, label, nextDisabled, prevDisabled };
+};
 ```
 
 `isIdle`, `isLoading`, `isRefreshing`, `isSuccess`, `isFailure`, and `isStale`
@@ -501,18 +588,23 @@ documents are inserted and deleted.
 ## Authentication
 
 `setAuth` is available on the `Client` service. Wire it up as a
-Command:
+Command. Add `CompletedSetAuth: {}` to your Message union; `fetchToken` should
+return an Effect that produces a token (or `null` when signed out) with no typed
+errors:
 
 ```ts
 import * as Confect from "@confect/foldkit";
 import * as Effect from "effect/Effect";
 import * as FoldkitCommand from "foldkit/command";
 
-const SetAuth = FoldkitCommand.define("SetAuth", {
-  messages: [CompletedSetAuth],
+import { Message } from "./model";
+import { fetchToken } from "./auth";
+
+export const SetAuth = FoldkitCommand.define("SetAuth", {
+  messages: [Message.CompletedSetAuth],
   execute: Effect.flatMap(Confect.Client.Client, (client) =>
     client.setAuth(({ forceRefreshToken }) => fetchToken(forceRefreshToken)),
-  ).pipe(Effect.as(CompletedSetAuth())),
+  ).pipe(Effect.as(Message.CompletedSetAuth())),
 });
 ```
 
