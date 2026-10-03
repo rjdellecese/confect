@@ -1,5 +1,11 @@
 # @confect/test
 
+## 10.0.0-next.27
+
+### Minor Changes
+
+- 6424f03: Require stable `effect@^4.0.0` and matching Effect platform and AI provider packages. `@confect/foldkit` now requires `foldkit@^0.165.0`, which supports Effect 4.0.0 without a peer-dependency override.
+
 ## 10.0.0-next.26
 
 No changes in this release.
