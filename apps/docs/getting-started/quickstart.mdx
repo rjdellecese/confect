@@ -32,6 +32,12 @@ bun add effect@^4 convex @confect/core @confect/server @confect/cli @confect/rea
 
 </CodeGroup>
 
+<Note>
+  If pnpm reports ignored build scripts for `esbuild`, run `pnpm approve-builds`
+  and approve only `esbuild`, then rerun `pnpm install`. Keep this approval
+  scoped to your project rather than enabling all dependency scripts.
+</Note>
+
 The commands below use `pnpm exec` to run the locally installed CLIs. With npm,
 use `npx` instead; with Yarn, use `yarn`; with Bun, use `bunx`.
 
