@@ -8,6 +8,71 @@ import type { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
 
 describe("extendWithSystemFields", () => {
+  describe("schema-level checks", () => {
+    const Range = Schema.Struct({ min: Schema.Finite, max: Schema.Finite });
+    const orderedRange = Schema.makeFilter(
+      ({ min, max }: typeof Range.Type) => min <= max || "min must be <= max",
+    );
+    const CheckedRange = Range.check(orderedRange);
+    const OtherRange = Schema.Struct({
+      min: Schema.Finite,
+      max: Schema.Finite,
+      label: Schema.String,
+    });
+    const invalid = {
+      min: 10,
+      max: 1,
+      _id: "some-id",
+      _creationTime: 1,
+    };
+    const valid = { ...invalid, max: 20 };
+
+    describe.each([
+      ["a checked struct", CheckedRange],
+      ["a checked union member", Schema.Union([CheckedRange, OtherRange])],
+      [
+        "a checked union",
+        Schema.Union([Range, OtherRange]).check(orderedRange),
+      ],
+    ] as const)("%s", (_name, schema) => {
+      const extended = SystemFields.extendWithSystemFields("ranges", schema);
+
+      test("preserves checks when decoding", () => {
+        expect(Schema.decodeUnknownSync(extended)(valid)).toEqual(valid);
+        expect(Schema.decodeExit(schema)({ min: 10, max: 1 })._tag).toBe(
+          "Failure",
+        );
+        expect(Schema.decodeUnknownExit(extended)(invalid)._tag).toBe(
+          "Failure",
+        );
+      });
+
+      test("preserves checks when encoding", () => {
+        expect(Schema.encodeUnknownSync(extended)(valid)).toEqual(valid);
+        expect(Schema.encodeUnknownExit(schema)({ min: 10, max: 1 })._tag).toBe(
+          "Failure",
+        );
+        expect(Schema.encodeUnknownExit(extended)(invalid)._tag).toBe(
+          "Failure",
+        );
+      });
+    });
+
+    test("preserves the union's oneOf mode", () => {
+      const schema = Schema.Union([Range, OtherRange], { mode: "oneOf" });
+      const extended = SystemFields.extendWithSystemFields("ranges", schema);
+      const ambiguous = { ...valid, label: "both members match" };
+
+      expect(Schema.decodeExit(schema)(ambiguous)._tag).toBe("Failure");
+      expect(Schema.decodeUnknownExit(extended)(ambiguous)._tag).toBe(
+        "Failure",
+      );
+      expect(Schema.encodeUnknownExit(extended)(ambiguous)._tag).toBe(
+        "Failure",
+      );
+    });
+  });
+
   describe("a struct table", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
