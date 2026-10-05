@@ -11,7 +11,7 @@
   },
   "devDependencies": {
     "@confect/cli": "workspace:*",
-    "@types/luxon": "3.7.5"
+    "@types/luxon": "3.7.6"
   },
   "private": true,
   "type": "module"
