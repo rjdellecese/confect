@@ -27,8 +27,7 @@
  * ranges to keep loaded pages gap-free. Foldkit's `PaginatedQuery` also
  * supports stream pagination.
  *
- * Stream querying is experimental on the v10 prerelease line. Its API may
- * change between prereleases.
+ * Stream querying is experimental. Its API may still change.
  */
 import type {
   PaginationOptions as ConvexPaginationOptions,
