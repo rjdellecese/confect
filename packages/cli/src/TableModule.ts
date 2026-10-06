@@ -38,7 +38,7 @@ const tableNameFromRelativePath = Effect.fnUntraced(function* (
   return name;
 });
 
-const listTableFiles = Effect.gen(function* () {
+export const discoverTableFiles = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
@@ -85,7 +85,7 @@ const byTableName = Order.mapInput(
  * `tables/b/notes.ts` would collide).
  */
 export const discover = Effect.gen(function* () {
-  const relativePaths = yield* listTableFiles;
+  const relativePaths = yield* discoverTableFiles;
 
   const tableModules = yield* Effect.forEach(
     relativePaths,

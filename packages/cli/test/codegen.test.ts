@@ -11,8 +11,13 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
-import { validateNoParentChildNameCollisions } from "@confect/cli/confect/codegen";
+import {
+  codegenHandler,
+  validateNoParentChildNameCollisions,
+} from "@confect/cli/confect/codegen";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
+import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
+import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import {
   specImportPathFromGenerated,
   type LeafModule,
@@ -22,6 +27,41 @@ import {
   validate as validateTables,
 } from "@confect/cli/TableModule";
 import { toPosixPath } from "@confect/cli/utils";
+import * as Project from "./integration/Project";
+
+layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
+  "codegenHandler",
+  (it) => {
+    it.effect(
+      "bootstraps dependent modules once without relying on stale output",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const confect = path.join(project.root, "confect");
+          const run = codegenHandler.pipe(
+            Effect.provideService(ProjectRoot, {
+              get: Effect.succeed(project.root),
+            }),
+            Effect.provideService(ConfectDirectory, {
+              get: Effect.succeed(confect),
+            }),
+            Effect.provideService(ConvexDirectory, {
+              get: Effect.succeed(path.join(project.root, "convex")),
+            }),
+          );
+          expect((yield* run).anyWritesHappened).toBe(true);
+          expect((yield* run).anyWritesHappened).toBe(false);
+          yield* fs.remove(path.join(confect, "_generated"), {
+            recursive: true,
+          });
+          expect((yield* run).anyWritesHappened).toBe(true);
+          expect((yield* run).anyWritesHappened).toBe(false);
+        }).pipe(Effect.scoped),
+    );
+  },
+);
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
