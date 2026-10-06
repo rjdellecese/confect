@@ -3,8 +3,8 @@
   "description": "Internal type-only helpers for Confect's test suites.",
   "version": "0.0.0",
   "devDependencies": {
-    "@effect/vitest": "4.0.0",
-    "effect": "4.0.0",
+    "@effect/vitest": "4.0.1",
+    "effect": "4.0.1",
     "typescript": "7.0.2",
     "vitest": "5.0.2"
   },
