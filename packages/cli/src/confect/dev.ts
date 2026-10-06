@@ -35,6 +35,7 @@ import type * as GroupPath from "../GroupPath";
 import type * as GroupPaths from "../GroupPaths";
 import {
   discoverLeafImplFiles,
+  discoverLeafSpecFiles,
   isLeafImplPath,
   isLeafSpecPath,
 } from "../LeafModule";
@@ -47,14 +48,9 @@ import {
   logSuccess,
 } from "../log";
 import { ProjectRoot } from "../ProjectRoot";
+import { discoverTableFiles, TABLES_DIRNAME } from "../TableModule";
 import { generateAuthConfig, generateCrons, generateHttp } from "../utils";
 import { codegenHandler, loadPreviousFunctionPaths } from "./codegen";
-
-const GENERATED_DIRNAME = "_generated";
-
-const GENERATED_SPEC_PATH = Effect.map(Path.Path, (path) =>
-  path.join(GENERATED_DIRNAME, "spec.ts"),
-);
 
 // Quiescence window: the sync loop waits this long for further signals
 // after each batch. One user edit fires `onEnd` on every esbuild
@@ -205,6 +201,7 @@ export const dev = Command.make("dev", {}, () =>
       [
         Effect.scoped(
           entryPointsWatcher(
+            Option.isNone(initialResult),
             signal,
             pendingRef,
             restartQueue,
@@ -429,24 +426,19 @@ const discoverEntryPoints = Effect.gen(function* () {
     });
   });
 
-  const generatedSpecPath = yield* GENERATED_SPEC_PATH;
-
   const fixedEntryOptions = yield* Effect.all([
-    tryEntry(generatedSpecPath, "specDirty"),
-    // `confect/schema.ts` is no longer user-authored; the runtime
-    // `DatabaseSchema` lives at `_generated/schema.ts` (codegen-written,
-    // so not an entry point—wiring it through esbuild would form a
-    // codegen→write→onEnd→codegen loop). Updates to `confect/tables/*.ts`
-    // still reach this dev loop via the impl entry points' import graphs;
-    // brand-new tables are caught by the Create-event safety net below.
     tryEntry("http.ts", "httpDirty"),
     tryEntry("crons.ts", "cronsDirty"),
     tryEntry("auth.ts", "authDirty"),
   ]);
 
-  const implRelativePaths = yield* discoverLeafImplFiles;
-  const implEntryOptions = yield* Effect.forEach(
-    implRelativePaths,
+  const moduleRelativePaths = yield* Effect.all([
+    discoverLeafSpecFiles,
+    discoverLeafImplFiles,
+    discoverTableFiles,
+  ]).pipe(Effect.map(Array.flatten));
+  const moduleEntryOptions = yield* Effect.forEach(
+    moduleRelativePaths,
     (relativePath) => tryEntry(relativePath, "specDirty"),
   );
 
@@ -469,7 +461,7 @@ const discoverEntryPoints = Effect.gen(function* () {
   return Array.getSomes([
     ...fixedEntryOptions,
     convexConfigEntryOption,
-    ...implEntryOptions,
+    ...moduleEntryOptions,
   ]);
 });
 
@@ -478,18 +470,12 @@ const esbuildOptions = (
   fs: FileSystem.FileSystem,
   entry: EntryPoint,
   notExternal: ReadonlyArray<RegExp>,
+  initialSyncFailed: boolean,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   watcherErrorsRef: Ref.Ref<WatcherMessages>,
   watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) => {
-  // First `onEnd` fires when esbuild finishes the watcher's initial
-  // build. At startup that's an echo of the just-completed initial
-  // codegen pass; for a watcher spawned mid-session (e.g. a newly
-  // added impl) it's an echo of the codegen run that triggered the
-  // restart. Either way, the entry's contents were already accounted
-  // for, so we record any errors but don't flip dirty or push a
-  // signal—only genuine subsequent rebuilds should do that.
   const initialBuildSeenRef = Ref.makeUnsafe(false);
   return {
     entryPoints: [entry.absolutePath],
@@ -531,7 +517,12 @@ const esbuildOptions = (
                   }
                   return next;
                 });
-                if (isInitial && result.errors.length === 0) return;
+                if (
+                  isInitial &&
+                  !initialSyncFailed &&
+                  result.errors.length === 0
+                )
+                  return;
                 yield* Ref.update(pendingRef, (p) => ({
                   ...p,
                   [entry.pendingKey]: true,
@@ -551,6 +542,7 @@ const createEntryPointWatcher = (
   fs: FileSystem.FileSystem,
   entry: EntryPoint,
   notExternal: ReadonlyArray<RegExp>,
+  initialSyncFailed: boolean,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   watcherErrorsRef: Ref.Ref<WatcherMessages>,
@@ -565,6 +557,7 @@ const createEntryPointWatcher = (
             fs,
             entry,
             notExternal,
+            initialSyncFailed,
             signal,
             pendingRef,
             watcherErrorsRef,
@@ -602,6 +595,7 @@ const createEntryPointWatcher = (
  * files.
  */
 const entryPointsWatcher = Effect.fnUntraced(function* (
+  initialSyncFailed: boolean,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
@@ -659,6 +653,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
           fs,
           entry,
           notExternal,
+          initialSyncFailed,
           signal,
           pendingRef,
           watcherErrorsRef,
@@ -696,11 +691,13 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
   const confectDirectory = yield* ConfectDirectory.get;
 
   yield* pipe(
-    fs.watch(confectDirectory),
-    Stream.debounce(Duration.millis(200)),
+    fs.watch(confectDirectory, { recursive: true }),
     Stream.runForEach((event) =>
       handleConfectChange({
-        relativePath: path.relative(confectDirectory, event.path),
+        relativePath: path.relative(
+          confectDirectory,
+          path.resolve(confectDirectory, event.path),
+        ),
         eventTag: event._tag,
         signal,
         pendingRef,
@@ -778,9 +775,6 @@ const handleConfectChange = ({
   pendingRef: Ref.Ref<Pending>;
   restartQueue: Queue.Queue<void>;
 }) => {
-  // _generated/ files are written by codegen itself; reacting to them here
-  // would form a loop. The esbuild watchers track the generated specs as
-  // entry points, so changes there flow back through `notify-rebuild`.
   if (relativePath.split(/[/\\]/).includes("_generated")) {
     return Effect.void;
   }
@@ -816,7 +810,11 @@ const handleConfectChange = ({
     );
   }
 
-  if (isLeafSpecPath(relativePath) || isLeafImplPath(relativePath)) {
+  if (
+    isLeafSpecPath(relativePath) ||
+    isLeafImplPath(relativePath) ||
+    relativePath.split(/[/\\]/)[0] === TABLES_DIRNAME
+  ) {
     return flipDirtyAndSignal(
       pendingRef,
       signal,
