@@ -3,7 +3,7 @@
   "description": "Internal re-export of @ark/attest's bench, resolved against the TypeScript version the type benchmarks need.",
   "version": "0.0.0",
   "devDependencies": {
-    "@ark/attest": "0.56.5",
+    "@ark/attest": "0.56.7",
     "typescript": "6.0.3"
   },
   "exports": {
