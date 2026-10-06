@@ -51,7 +51,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       { missing: "spec", directory: "nested/" },
       { missing: "impl", directory: "nested/" },
     ] as const)(
-      "reports a missing $directory$missing and recovers when it is authored",
+      'reports a missing $missing in "$directory" and recovers when it is authored',
       ({ missing, directory }) =>
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem;
