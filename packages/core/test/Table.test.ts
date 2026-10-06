@@ -3,6 +3,31 @@ import * as Schema from "effect/Schema";
 import * as Table from "@confect/core/Table";
 
 describe("Table", () => {
+  it("preserves top-level field checks in Doc", () => {
+    const Range = Schema.Struct({
+      min: Schema.Finite,
+      max: Schema.Finite,
+    }).check(
+      Schema.makeFilter(({ min, max }) => min <= max || "min must be <= max"),
+    );
+    const ranges = Table.make(() => Range)("ranges");
+    const invalidFields = { min: 10, max: 1 };
+    const invalidDocument = {
+      ...invalidFields,
+      _id: "some-id",
+      _creationTime: 1,
+    };
+
+    expect(ranges.Fields).toBe(Range);
+    expect(Schema.decodeExit(Range)(invalidFields)._tag).toBe("Failure");
+    expect(Schema.decodeExit(ranges.Fields)(invalidFields)._tag).toBe(
+      "Failure",
+    );
+    expect(Schema.decodeUnknownExit(ranges.Doc)(invalidDocument)._tag).toBe(
+      "Failure",
+    );
+  });
+
   describe("UnnamedTable callable shape", () => {
     const lazyFields = () => Schema.Struct({ text: Schema.String });
 
