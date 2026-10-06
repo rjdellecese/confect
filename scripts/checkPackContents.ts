@@ -4,6 +4,7 @@ import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
@@ -104,7 +105,7 @@ export const publishedPackages = Effect.fn("PackContents.publishedPackages")(
           ),
           Effect.option,
         );
-      if (manifest._tag === "Some" && manifest.value.private !== true)
+      if (Option.isSome(manifest) && manifest.value.private !== true)
         directories.push(directory);
     }
     return directories;

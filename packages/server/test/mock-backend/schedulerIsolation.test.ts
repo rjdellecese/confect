@@ -47,8 +47,12 @@ const withConvexIsolateTimers = <A>(run: () => Promise<A>): Promise<A> => {
       `Can't use ${name} in queries and mutations. Please consider using an action.`,
     );
   };
-  globalThis.setTimeout = ban("setTimeout") as never;
-  globalThis.setImmediate = ban("setImmediate") as never;
+  globalThis.setTimeout = Object.assign(ban("setTimeout"), {
+    __promisify__: ban("setTimeout"),
+  });
+  globalThis.setImmediate = Object.assign(ban("setImmediate"), {
+    __promisify__: ban("setImmediate"),
+  });
   return run().finally(() => {
     globalThis.setTimeout = originalSetTimeout;
     globalThis.setImmediate = originalSetImmediate;

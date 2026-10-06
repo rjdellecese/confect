@@ -61,13 +61,7 @@ export const groupPaths = (
 export const diff = (
   previousFunctions: FunctionPaths,
   currentFunctions: FunctionPaths,
-): {
-  functionsAdded: FunctionPaths;
-  functionsRemoved: FunctionPaths;
-  groupsRemoved: GroupPaths.GroupPaths;
-  groupsAdded: GroupPaths.GroupPaths;
-  groupsChanged: GroupPaths.GroupPaths;
-} => {
+) => {
   const currentGroups = groupPaths(currentFunctions);
   const previousGroups = groupPaths(previousFunctions);
 

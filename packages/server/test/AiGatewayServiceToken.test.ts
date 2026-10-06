@@ -195,7 +195,7 @@ describe("AiGatewayServiceToken", () => {
   });
 });
 
-const getServiceTokenError = (rejection: unknown) =>
+const getServiceTokenError = (rejection: Error) =>
   AiGatewayServiceToken.make(() => Promise.reject(rejection))
     .get("ai-gateway")
     .pipe(Effect.flip);

@@ -2,6 +2,7 @@ import { ConvexError } from "convex/values";
 import type { Value } from "convex/values";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 
 /**
@@ -23,13 +24,10 @@ const ConvexErrorIdentifier = Symbol.for("ConvexError");
 
 const isConvexError = (error: unknown): error is ConvexError<Value> =>
   error instanceof ConvexError ||
-  (typeof error === "object" &&
-    error !== null &&
-    ConvexErrorIdentifier in error);
+  (Predicate.isObjectOrArray(error) && ConvexErrorIdentifier in error);
 
 const isInvalidCursorData = (value: unknown): value is InvalidCursorData =>
-  typeof value === "object" &&
-  value !== null &&
+  Predicate.isObjectOrArray(value) &&
   "isConvexSystemError" in value &&
   value.isConvexSystemError === true &&
   "paginationError" in value &&

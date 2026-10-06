@@ -54,11 +54,8 @@ export const isQueryResult = (u: unknown): u is QueryResult<unknown, unknown> =>
 
 const QueryResultProto = {
   [TypeId]: TypeId,
-  pipe(this: QueryResult<any, any>, ...args: ReadonlyArray<unknown>) {
-    return Pipeable.pipeArguments(
-      this,
-      args as unknown as Parameters<typeof Pipeable.pipeArguments>[1],
-    );
+  pipe() {
+    return Pipeable.pipeArguments(this, arguments);
   },
   [Equal.symbol](
     this: QueryResult<any, any>,
@@ -70,13 +67,15 @@ const QueryResultProto = {
     return Match.value(this).pipe(
       Match.tag(
         "Loading",
-        (self) => self.skipped === (that as Loading<any, any>).skipped,
+        (self) => isLoading(that) && self.skipped === that.skipped,
       ),
-      Match.tag("Success", (self) =>
-        Equal.equals(self.value, (that as Success<any, any>).value),
+      Match.tag(
+        "Success",
+        (self) => isSuccess(that) && Equal.equals(self.value, that.value),
       ),
-      Match.tag("Failure", (self) =>
-        Equal.equals(self.error, (that as Failure<any, any>).error),
+      Match.tag(
+        "Failure",
+        (self) => isFailure(that) && Equal.equals(self.error, that.error),
       ),
       Match.exhaustive,
     );
@@ -118,15 +117,15 @@ export const fail = <E, A = never>(error: E): Failure<A, E> =>
 
 export const isLoading = <A, E>(
   queryResult: QueryResult<A, E>,
-): queryResult is Loading<A, E> => queryResult._tag === "Loading";
+): queryResult is Loading<A, E> => Predicate.isTagged(queryResult, "Loading");
 
 export const isSuccess = <A, E>(
   queryResult: QueryResult<A, E>,
-): queryResult is Success<A, E> => queryResult._tag === "Success";
+): queryResult is Success<A, E> => Predicate.isTagged(queryResult, "Success");
 
 export const isFailure = <A, E>(
   queryResult: QueryResult<A, E>,
-): queryResult is Failure<A, E> => queryResult._tag === "Failure";
+): queryResult is Failure<A, E> => Predicate.isTagged(queryResult, "Failure");
 
 type MatchOptions<A, E, X, Y, Z> = {
   readonly onLoading: (skipped: boolean) => X;

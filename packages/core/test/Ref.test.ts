@@ -9,8 +9,10 @@ import type {
 import { ConvexError } from "convex/values";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Data from "effect/Data";
 import * as MutableRef from "effect/MutableRef";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import { describe, expect, expectTypeOf, test } from "@effect/vitest";
 import { vi } from "vitest";
@@ -85,7 +87,11 @@ describe("runWithCodec", () => {
   it.effect("preserves typed Convex failures", () =>
     Effect.gen(function* () {
       const effect = Ref.runWithCodec(ref, { count: 1 }, () =>
-        Promise.reject(new ConvexError({ _tag: "NotFound", id: "abc" })),
+        Promise.reject(
+          new ConvexError(
+            Schema.encodeSync(NotFound)(new NotFound({ id: "abc" })),
+          ),
+        ),
       );
       const error = yield* Effect.flip(effect);
       expect(error).toEqual(new NotFound({ id: "abc" }));
@@ -423,10 +429,10 @@ describe("decodeError", () => {
       });
       const ref = Ref.make("test/mod", spec);
 
-      const result = yield* Ref.decodeError(ref, {
-        _tag: "NotFound",
-        id: "abc",
-      });
+      const result = yield* Ref.decodeError(
+        ref,
+        yield* Schema.encodeEffect(NotFound)(new NotFound({ id: "abc" })),
+      );
       expect(Option.isSome(result)).toBe(true);
       const decoded = Option.getOrThrow(result);
       expect(decoded).toBeInstanceOf(NotFound);
@@ -463,10 +469,10 @@ describe("decodeErrorOption", () => {
   );
 
   test("decodes error data matching the error schema", () => {
-    const decoded = Ref.decodeErrorOption(refWithError, {
-      _tag: "NotFound",
-      id: "abc",
-    });
+    const decoded = Ref.decodeErrorOption(
+      refWithError,
+      Schema.encodeSync(NotFound)(new NotFound({ id: "abc" })),
+    );
 
     expect(Option.isSome(decoded)).toBe(true);
     expect(Option.getOrThrow(decoded)).toBeInstanceOf(NotFound);
@@ -524,9 +530,11 @@ describe("decodeErrorOrElse", () => {
 
   test("decodes a ConvexError into the typed error when the schema matches", () => {
     const handler = Ref.decodeErrorOrElse(refWithSchema, () => "FALLBACK");
-    const decoded = handler(new ConvexError({ _tag: "NotFound", id: "abc" }));
+    const decoded = handler(
+      new ConvexError(Schema.encodeSync(NotFound)(new NotFound({ id: "abc" }))),
+    );
     expect(decoded).toBeInstanceOf(NotFound);
-    expect((decoded as NotFound).id).toBe("abc");
+    expect(Schema.is(NotFound)(decoded) && decoded.id).toBe("abc");
   });
 
   test("calls the fallback for a non-ConvexError input", () => {
@@ -545,7 +553,12 @@ describe("decodeErrorOrElse", () => {
       return error;
     };
     const handler = Ref.decodeErrorOrElse(refWithoutSchema, fallback);
-    const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
+    const convexError = new ConvexError(
+      Data.taggedEnum<{
+        readonly _tag: "Anything";
+        readonly id: string;
+      }>().Anything({ id: "abc" }),
+    );
 
     expect(handler(convexError)).toBe(convexError);
     expect(MutableRef.get(calls)).toEqual([convexError]);
@@ -693,10 +706,12 @@ describe("paginated queries", () => {
     });
 
     test("drops a stray paginationOpts key instead of sending it", () => {
-      const encoded = Ref.encodePaginatedQueryArgsSync(paginatedRef, {
+      const args = {
         count: 42,
         paginationOpts: { numItems: 50, cursor: null },
-      } as never);
+      };
+
+      const encoded = Ref.encodePaginatedQueryArgsSync(paginatedRef, args);
 
       expect(encoded).toEqual({ count: "42" });
     });
@@ -763,7 +778,10 @@ describe("error schema laziness at decode time", () => {
     expect(MutableRef.get(specErrorBuilt)).toBe(false);
     expect(MutableRef.get(middlewareErrorBuilt)).toBe(false);
 
-    const decoded = Ref.decodeErrorOption(ref, { _tag: "Blocked" });
+    const decoded = Ref.decodeErrorOption(
+      ref,
+      Schema.encodeSync(Blocked)(new Blocked({})),
+    );
 
     expect(Option.isSome(decoded)).toBe(true);
     expect(MutableRef.get(specErrorBuilt)).toBe(true);
@@ -815,7 +833,7 @@ describe("make with middleware options", () => {
           Schema.Struct({
             resolve: Schema.declare<(args: unknown) => string>(
               (value): value is (args: unknown) => string =>
-                typeof value === "function",
+                Predicate.isFunction(value),
             ),
             tolerateMissing: Schema.Boolean,
           }),

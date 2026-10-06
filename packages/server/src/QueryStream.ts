@@ -368,7 +368,7 @@ Object.defineProperties(queryStreamPrototype, {
   [TypeId]: { value: TypeId },
   [Stream.TypeId]: { value: streamVariance },
   pipe: {
-    value: function (this: unknown) {
+    value: function (this: QueryStream<unknown>) {
       return pipeArguments(this, arguments);
     },
   },
@@ -406,24 +406,25 @@ export const isQueryStream = (u: unknown): u is Any =>
  *
  * @experimental
  */
-export const empty =
-  <Doc>(): {
-    <const KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
-      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
-    ): QueryStream<Doc, KeyLabels, "asc", never, never>;
-    <
-      const KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
-      OrderDirection extends
-        QueryStreamOrderDirection.QueryStreamOrderDirection,
-    >(
-      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
-      orderDirection: OrderDirection,
-    ): QueryStream<Doc, KeyLabels, OrderDirection, never, never>;
-  } =>
-  <KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
+export const empty = <Doc>() => {
+  function fromLayout<
+    const KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  >(
+    keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
+  ): QueryStream<Doc, KeyLabels, "asc", never, never>;
+  function fromLayout<
+    const KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
+  >(
+    keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
+    orderDirection: OrderDirection,
+  ): QueryStream<Doc, KeyLabels, OrderDirection, never, never>;
+  function fromLayout<
+    KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  >(
     keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
     orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection = "asc",
-  ) => {
+  ) {
     // The overloads preserve the supplied direction or its ascending default.
     const make = (
       currentOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
@@ -438,7 +439,10 @@ export const empty =
         () => make(QueryStreamOrderDirection.flip(currentOrderDirection)),
       );
     return make(orderDirection);
-  };
+  }
+
+  return fromLayout;
+};
 
 // -----------------------------------------------------------------------------
 // Constructors
@@ -617,7 +621,7 @@ const makeLeaf = <
         Document.decode(reflection.table)(encoded),
         (doc) =>
           new Element({
-            doc: Option.some(doc as Doc),
+            doc: Option.some(doc),
             keyValues: QueryStreamKeyValues.extract(
               encoded as Record.ReadonlyRecord<string, unknown>,
               keyPaths,
@@ -770,7 +774,7 @@ const mergeStep =
         Option.none<MergeCandidate<Doc>>(),
         (best, source, index) =>
           Option.match(
-            source._tag === "Buffered"
+            MergeSource.$is("Buffered")(source)
               ? Option.some(source.head)
               : Option.none<Element<Doc>>(),
             {
@@ -795,7 +799,7 @@ const mergeStep =
           Tuple.make(
             element,
             Array.map(filled, (source, sourceIndex) =>
-              sourceIndex === index && source._tag === "Buffered"
+              sourceIndex === index && MergeSource.$is("Buffered")(source)
                 ? Option.match(Chunk.head(source.tail), {
                     onNone: () => MergeSource.NeedsPull({ pull: source.pull }),
                     onSome: (head) =>
@@ -2356,7 +2360,7 @@ export const paginate: {
           EmptyInitialPageError: Effect.die,
         }),
       );
-      if (request._tag === "Unchanged") {
+      if (Predicate.isTagged(request, "Unchanged")) {
         return {
           page: [],
           isDone: false,
@@ -2393,7 +2397,7 @@ export const paginate: {
         narrowed.annotated,
         Sink.fold(
           () => QueryStreamPagination.initial<Doc>(),
-          (state) => state._tag === "Reading",
+          (state) => Predicate.isTagged(state, "Reading"),
           (state, { doc, keyValues }: Element<Doc>) =>
             Effect.map(readBudget.isExhausted, (hitLimit) =>
               QueryStreamPagination.record(

@@ -5,6 +5,7 @@ import * as Storage from "@confect/server/Storage";
 import { StorageReader } from "@confect/server/StorageReader";
 import { convexTest } from "convex-test";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
@@ -102,9 +103,13 @@ describe("HttpRouter", () => {
         const response = yield* c.fetch("/api/notes");
         assertEquals(response.status, 200);
 
-        const body = (yield* Effect.promise(() => response.json())) as Array<{
-          text: string;
-        }>;
+        const body = yield* Effect.promise(() => response.json()).pipe(
+          Effect.flatMap(
+            Schema.decodeUnknownEffect(
+              Schema.Array(Schema.Struct({ text: Schema.String })),
+            ),
+          ),
+        );
         assertEquals(body.length, 1);
         assertEquals(body[0]?.text, text);
       }).pipe(Effect.provide(TestConfect.layer)),

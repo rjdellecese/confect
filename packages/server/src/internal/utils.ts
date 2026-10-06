@@ -1,4 +1,4 @@
-import type { Predicate } from "effect";
+import * as Predicate from "effect/Predicate";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Record from "effect/Record";
@@ -12,15 +12,15 @@ export const mapLeaves = <T, U>(
   leafRefinement: Predicate.Refinement<unknown, T>,
   f: (value: T) => U,
 ): NestedObject<U> => {
-  const result: any = {};
+  const result: NestedObject<U> = {};
 
   for (const key in obj) {
     const value = obj[key];
 
     if (leafRefinement(value)) {
-      result[key] = f(value as T);
+      result[key] = f(value);
     } else {
-      result[key] = mapLeaves(value as NestedObject<T>, leafRefinement, f);
+      result[key] = mapLeaves(value, leafRefinement, f);
     }
   }
 
@@ -32,7 +32,7 @@ const collectBranchLeaves = <T>(
   leafRefinement: Predicate.Refinement<unknown, T>,
   path: string[] = [],
 ): { path: string[]; values: Record<string, T> }[] => {
-  const leaves = Record.filter(obj, leafRefinement) as Record<string, T>;
+  const leaves = Record.filter(obj, leafRefinement);
   const hasLeaves = Record.keys(leaves).length > 0;
 
   const currentBranch = hasLeaves ? [{ path, values: leaves }] : [];
@@ -40,11 +40,11 @@ const collectBranchLeaves = <T>(
   const nestedBranches = Array.flatMap(Record.keys(obj), (key) => {
     const value = obj[key];
 
-    if (!leafRefinement(value) && typeof value === "object") {
-      return collectBranchLeaves(value as NestedObject<T>, leafRefinement, [
-        ...path,
-        key,
-      ]);
+    if (
+      !leafRefinement(value) &&
+      (Predicate.isObjectOrArray(value) || value === null)
+    ) {
+      return collectBranchLeaves(value, leafRefinement, [...path, key]);
     }
     return [];
   });
@@ -76,12 +76,12 @@ export const setNestedProperty = <T extends object>(
   }
 
   if (path.length === 1) {
-    const key = path[0] as keyof T;
+    const key = path[0];
     return { ...obj, [key]: value };
   }
 
   const [head, ...tail] = path;
-  const key = head as keyof T;
+  const key = head;
   return {
     ...obj,
     [key]: setNestedProperty((obj as any)[key] ?? {}, tail, value),

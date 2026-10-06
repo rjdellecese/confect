@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import {
   checkPackContents,
   decodePackedFiles,
@@ -125,7 +126,7 @@ test(
         yield* fs.remove(path.join(root, "two", "dist"), { recursive: true });
         const error = yield* checkPackContents(root).pipe(Effect.flip);
         expect(error._tag).toBe("InvalidPackContents");
-        if (error._tag === "InvalidPackContents") {
+        if (Predicate.isTagged(error, "InvalidPackContents")) {
           expect(error.packages).toHaveLength(2);
           expect(
             error.packages

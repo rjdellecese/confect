@@ -3,6 +3,8 @@ import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
 import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import { GenericId as GenericIdSchema } from "@confect/core/GenericId";
 import type {
   IndexRange as ConvexIndexRange,
   IndexRangeBuilder as ConvexIndexRangeBuilder,
@@ -25,6 +27,8 @@ type Doc = {
   score: number;
   nested: { active: boolean };
 };
+
+const itemId = Schema.decodeUnknownSync(GenericIdSchema("items"));
 
 const builder = () =>
   QueryStreamIndexRange.builder<Doc, ["category", "score", "_id"]>();
@@ -100,9 +104,7 @@ describe("QueryStreamIndexRange.builder", () => {
     expect(lower).not.toHaveProperty("eq");
     expect(lower).not.toHaveProperty("gt");
     expect(bounded).not.toHaveProperty("lt");
-    const allPinned = pinned
-      .eq("score", 2)
-      .eq("_id", "item" as GenericId<"items">);
+    const allPinned = pinned.eq("score", 2).eq("_id", itemId("item"));
     expectTypeOf<QueryStreamIndexRange.Remaining<typeof root>>().toEqualTypeOf<
       ["category", "score", "_id"]
     >();
@@ -174,8 +176,6 @@ describe("QueryStreamIndexRange.apply", () => {
       return new UpperBuilder([...this.calls, ["gte", fieldPath, value]]);
     }
   }
-
-  // Convex exports IndexRange only as a type; the recording fixture supplies
   // its behavior without access to the SDK's private nominal marker.
   const recordingBuilder = () =>
     new RecordingBuilder() as RecordingBuilder &
@@ -210,8 +210,8 @@ describe("QueryStreamIndexRange.apply", () => {
       builder()
         .eq("category", "a")
         .eq("score", 1)
-        .gt("_id", "first" as GenericId<"items">)
-        .lte("_id", "last" as GenericId<"items">),
+        .gt("_id", itemId("first"))
+        .lte("_id", itemId("last")),
       target,
     );
     expect(result).toEqual(

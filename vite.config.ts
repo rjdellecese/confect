@@ -20,5 +20,5 @@ export default defineConfig({
     ...lint,
     extends: [effectTsgoRecommended],
   } as unknown as OxlintConfig,
-  fmt: fmt as unknown as OxfmtConfig,
+  fmt: fmt as OxfmtConfig,
 });

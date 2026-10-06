@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as Bundler from "@confect/cli/Bundler";
 import * as CodegenError from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -105,7 +106,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
 
           MutableRef.set(relativePath, "invalid.ts");
           const error = yield* Effect.flip(validate);
-          assert(error._tag === "InvalidTableDefaultExportError");
+          assert(Predicate.isTagged(error, "InvalidTableDefaultExportError"));
           expect(error.tablePath).toBe("invalid.ts");
           expect(MutableRef.get(reads)).toBe(2);
         }),
@@ -157,7 +158,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             ]).toContain(parent.name);
           }
           for (const span of spans) {
-            assert(span.status._tag === "Ended");
+            assert(Predicate.isTagged(span.status, "Ended"));
             expect(Exit.isSuccess(span.status.exit)).toBe(true);
           }
         }),
@@ -193,7 +194,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
               (candidate) => candidate.name === operationName,
             );
             assert(span !== undefined);
-            assert(span.status._tag === "Ended");
+            assert(Predicate.isTagged(span.status, "Ended"));
             expect(Exit.isFailure(span.status.exit)).toBe(true);
           }
         }),
@@ -216,8 +217,8 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
         yield* fs.remove(entry);
         expect(Exit.isFailure(yield* Effect.exit(bundle))).toBe(true);
         expect(spans).toHaveLength(2);
-        assert(spans[0]?.status._tag === "Ended");
-        assert(spans[1]?.status._tag === "Ended");
+        assert(Predicate.isTagged(spans[0]?.status, "Ended"));
+        assert(Predicate.isTagged(spans[1]?.status, "Ended"));
         expect(Exit.isSuccess(spans[0].status.exit)).toBe(true);
         expect(Exit.isFailure(spans[1].status.exit)).toBe(true);
       }),

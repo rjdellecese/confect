@@ -7,6 +7,8 @@ import type {
 } from "convex-test";
 import { convexTest } from "convex-test";
 import type {
+  DefaultFunctionArgs,
+  FunctionReference,
   GenericMutationCtx,
   GenericSchema,
   SchemaDefinition,
@@ -100,7 +102,10 @@ class TestConfectImplWithoutIdentity<
       queryRef,
       (args[0] ?? {}) as Ref.Args<QueryRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.query(functionReference as any, encodedArgs),
+        this.testConvex.query(
+          functionReference as FunctionReference<"query", any>,
+          encodedArgs as DefaultFunctionArgs,
+        ),
     );
 
   readonly mutation = <MutationRef extends Ref.AnyMutation>(
@@ -114,7 +119,10 @@ class TestConfectImplWithoutIdentity<
       mutationRef,
       (args[0] ?? {}) as Ref.Args<MutationRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.mutation(functionReference as any, encodedArgs),
+        this.testConvex.mutation(
+          functionReference as FunctionReference<"mutation", any>,
+          encodedArgs as DefaultFunctionArgs,
+        ),
     );
 
   readonly action = <ActionRef extends Ref.AnyAction>(
@@ -128,7 +136,10 @@ class TestConfectImplWithoutIdentity<
       actionRef,
       (args[0] ?? {}) as Ref.Args<ActionRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.action(functionReference as any, encodedArgs),
+        this.testConvex.action(
+          functionReference as FunctionReference<"action", any>,
+          encodedArgs as DefaultFunctionArgs,
+        ),
     );
 
   readonly run: TestConfectWithoutIdentity<ConfectSchema>["run"] = (<
@@ -148,12 +159,7 @@ class TestConfectImplWithoutIdentity<
         DataModel.ToConvex<DataModel.FromSchema<ConfectSchema>>
       >,
     ): Layer.Layer<RegisteredConvexFunction.MutationServices<ConfectSchema>> =>
-      RegisteredConvexFunction.mutationLayer(
-        this.confectSchema,
-        mutationCtx,
-      ) as Layer.Layer<
-        RegisteredConvexFunction.MutationServices<ConfectSchema>
-      >;
+      RegisteredConvexFunction.mutationLayer(this.confectSchema, mutationCtx);
 
     return returns === undefined
       ? Effect.promise(() =>
@@ -207,6 +213,7 @@ class TestConfectImpl<
       confectSchema,
       testConvex,
     );
+    this.run = this.testConfectImplWithoutIdentity.run;
   }
 
   readonly withIdentity = (userIdentity: Partial<UserIdentity>) =>
@@ -230,14 +237,7 @@ class TestConfectImpl<
     ...args: Ref.OptionalArgs<ActionRef>
   ) => this.testConfectImplWithoutIdentity.action(actionRef, ...args);
 
-  readonly run: TestConfect<ConfectSchema>["run"] = ((
-    handler: any,
-    returns?: any,
-  ) =>
-    this.testConfectImplWithoutIdentity.run(
-      handler,
-      returns,
-    )) as TestConfect<ConfectSchema>["run"];
+  readonly run: TestConfect<ConfectSchema>["run"];
 
   readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
@@ -263,6 +263,6 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     () =>
       new TestConfectImpl(
         databaseSchema,
-        convexTest(convexSchemaDefinition, modules) as any,
+        convexTest(convexSchemaDefinition, modules),
       ),
   );

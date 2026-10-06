@@ -4,7 +4,7 @@ import * as SchemaGetter from "effect/SchemaGetter";
 import * as String from "effect/String";
 import * as Tuple from "effect/Tuple";
 import { describe, expect, expectTypeOf, test } from "@effect/vitest";
-import type { GenericId } from "@confect/core/GenericId";
+import { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
 
 describe("extendWithSystemFields", () => {
@@ -86,7 +86,7 @@ describe("extendWithSystemFields", () => {
     test("decodes a document carrying the system fields", () => {
       const extendedNote = {
         content: "Hello, world!",
-        _id: "abc123" as GenericId<"notes">,
+        _id: Schema.decodeUnknownSync(GenericId("notes"))("abc123"),
         _creationTime: 1234567890,
       };
 
@@ -138,12 +138,12 @@ describe("extendWithSystemFields", () => {
     test("decodes a document for each union member", () => {
       const extendedNote = {
         content: "Hello, world!",
-        _id: "abc123" as GenericId<"items">,
+        _id: Schema.decodeUnknownSync(GenericId("items"))("abc123"),
         _creationTime: 1234567890,
       };
       const extendedImage = {
         url: "https://example.com/image.jpg",
-        _id: "def456" as GenericId<"items">,
+        _id: Schema.decodeUnknownSync(GenericId("items"))("def456"),
         _creationTime: 1234567890,
       };
 
@@ -209,7 +209,7 @@ describe("extendWithSystemFields", () => {
     );
 
     const systemFields = {
-      _id: "abc123" as GenericId<"notes">,
+      _id: Schema.decodeUnknownSync(GenericId("notes"))("abc123"),
       _creationTime: 1234567890,
     };
 
@@ -258,7 +258,7 @@ describe("extendWithSystemFields", () => {
     );
 
     const systemFields = {
-      _id: "abc123" as GenericId<"notes">,
+      _id: Schema.decodeUnknownSync(GenericId("notes"))("abc123"),
       _creationTime: 1234567890,
     };
 
@@ -304,7 +304,7 @@ describe("extendWithSystemFields", () => {
     );
 
     const systemFields = {
-      _id: "abc123" as GenericId<"items">,
+      _id: Schema.decodeUnknownSync(GenericId("items"))("abc123"),
       _creationTime: 1234567890,
     };
 

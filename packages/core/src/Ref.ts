@@ -10,8 +10,10 @@ import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
+import * as Data from "effect/Data";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
@@ -338,8 +340,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
     Match.tag(
       "Convex",
       (): Any =>
-        ({
-          _tag: "Convex",
+        Object.assign(Data.taggedEnum<{ readonly _tag: "Convex" }>().Convex(), {
           convexFunctionName,
         }) as Any,
     ),
@@ -424,7 +425,7 @@ export const decodeReturns = <Ref_ extends Any>(
     Match.tag("Confect", (confectRef) =>
       Schema.decodeUnknownEffect(confectRef.returns)(returns),
     ),
-    Match.tag("Convex", () => Effect.succeed(returns as Returns<Ref_>)),
+    Match.tag("Convex", () => Effect.succeed(returns)),
     Match.exhaustive,
   );
 
@@ -480,9 +481,7 @@ const ConvexErrorIdentifier = Symbol.for("ConvexError");
 
 export const isConvexError = (error: unknown): error is ConvexError<Value> =>
   error instanceof ConvexError ||
-  (typeof error === "object" &&
-    error !== null &&
-    ConvexErrorIdentifier in error);
+  (Predicate.isObjectOrArray(error) && ConvexErrorIdentifier in error);
 
 /**
  * Build a callback-style handler that decodes the ref's typed error from a
@@ -540,9 +539,7 @@ export const decodeError = <Ref_ extends Any>(
   Option.match(errorSchemaOf(ref), {
     onNone: () => Effect.succeed(Option.none<Error<Ref_>>()),
     onSome: (schema) =>
-      Effect.asSome(
-        Schema.decodeUnknownEffect(schema)(encodedError),
-      ) as Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError>,
+      Effect.asSome(Schema.decodeUnknownEffect(schema)(encodedError)),
   });
 
 /**
@@ -563,12 +560,8 @@ export const decodeErrorOption = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
 ): Option.Option<Error<Ref_>> =>
-  Option.flatMap(
-    errorSchemaOf(ref),
-    (schema) =>
-      Schema.decodeUnknownOption(schema)(encodedError) as Option.Option<
-        Error<Ref_>
-      >,
+  Option.flatMap(errorSchemaOf(ref), (schema) =>
+    Schema.decodeUnknownOption(schema)(encodedError),
   );
 
 const missingPaginatedProvenanceError = (ref: Any) =>
@@ -629,7 +622,7 @@ export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
     ),
     Match.tag("Convex", () => encodedPage),
     Match.exhaustive,
-  ) as Returns<Ref_>["page"];
+  );
 
 /**
  * Encode args via the ref's args schema, invoke `call`, decode returns via the

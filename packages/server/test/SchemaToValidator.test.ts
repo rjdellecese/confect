@@ -1498,7 +1498,10 @@ describe(compileTableSchema, () => {
     Effect.gen(function* () {
       const exit = yield* Effect.try({
         try: () => compileTableSchema(Schema.String),
-        catch: (e) => e as TopLevelMustBeObjectOrUnionError,
+        catch: (e) => {
+          if (e instanceof TopLevelMustBeObjectOrUnionError) return e;
+          throw e;
+        },
       }).pipe(Effect.exit);
 
       expect(exit).toStrictEqual(
@@ -1548,7 +1551,10 @@ describe(compileArgsSchema, () => {
 
       const exit = yield* Effect.try({
         try: () => compileArgsSchema(structWithIndexSignatures),
-        catch: (e) => e as IndexSignaturesAreNotSupportedError,
+        catch: (e) => {
+          if (e instanceof IndexSignaturesAreNotSupportedError) return e;
+          throw e;
+        },
       }).pipe(Effect.exit);
 
       expect(exit).toStrictEqual(
@@ -1561,7 +1567,10 @@ describe(compileArgsSchema, () => {
     Effect.gen(function* () {
       const exit = yield* Effect.try({
         try: () => compileArgsSchema(Schema.String),
-        catch: (e) => e as TopLevelMustBeObjectError,
+        catch: (e) => {
+          if (e instanceof TopLevelMustBeObjectError) return e;
+          throw e;
+        },
       }).pipe(Effect.exit);
 
       expect(exit).toStrictEqual(Exit.fail(new TopLevelMustBeObjectError()));

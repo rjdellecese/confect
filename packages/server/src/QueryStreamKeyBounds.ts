@@ -93,7 +93,7 @@ const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
     Exact: () => 1 as const,
     Successor: () => 1 as const,
   });
-  return selfIsShorter ? shorterOrdering : (-shorterOrdering as -1 | 1);
+  return selfIsShorter ? shorterOrdering : shorterOrdering === -1 ? 1 : -1;
 });
 
 const lowerCut = (bound: KeyBound): KeyCut =>

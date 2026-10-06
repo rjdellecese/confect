@@ -741,7 +741,8 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
     Match.exhaustive,
   );
   const shouldSplit =
-    typeof splitCursor === "string" &&
+    splitCursor !== null &&
+    splitCursor !== undefined &&
     (splitSignaled || result.page.length > 2 * state.options.initialNumItems);
   const shouldRetreat =
     result.page.length === 0 && result.isDone && state.prevStack.length > 0;
@@ -939,32 +940,32 @@ type WithPhase<State_, Phase_> = Omit<State_, "phase"> & {
 
 export const isIdle = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
-): state is Idle => state._tag === "Idle";
+): state is Idle => State.$is("Idle")(state);
 
 export const isLoading = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): state is WithPhase<Active<Item_, UserArgs_, Error_>, Loading> =>
-  state._tag === "Active" && state.phase._tag === "Loading";
+  State.$is("Active")(state) && Phase.$is("Loading")(state.phase);
 
 export const isRefreshing = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): state is WithPhase<Active<Item_, UserArgs_, Error_>, Refreshing<Item_>> =>
-  state._tag === "Active" && state.phase._tag === "Refreshing";
+  State.$is("Active")(state) && Phase.$is("Refreshing")(state.phase);
 
 export const isSuccess = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): state is WithPhase<Active<Item_, UserArgs_, Error_>, Success<Item_>> =>
-  state._tag === "Active" && state.phase._tag === "Success";
+  State.$is("Active")(state) && Phase.$is("Success")(state.phase);
 
 export const isFailure = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): state is WithPhase<Active<Item_, UserArgs_, Error_>, Failure<Error_>> =>
-  state._tag === "Active" && state.phase._tag === "Failure";
+  State.$is("Active")(state) && Phase.$is("Failure")(state.phase);
 
 export const isStale = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): state is WithPhase<Active<Item_, UserArgs_, Error_>, Stale<Item_, Error_>> =>
-  state._tag === "Active" && state.phase._tag === "Stale";
+  State.$is("Active")(state) && Phase.$is("Stale")(state.phase);
 
 export const isPending = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,

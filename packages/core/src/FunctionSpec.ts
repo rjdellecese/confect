@@ -300,7 +300,11 @@ const Proto = {
     middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec,
     ...options: ReadonlyArray<unknown>
   ) {
-    if (this.functionProvenance._tag === "Convex") {
+    if (
+      FunctionProvenance.FunctionProvenance.$is("Convex")(
+        this.functionProvenance,
+      )
+    ) {
       throw new Error(
         `Plain Convex function "${this.name}" cannot have middleware`,
       );
@@ -581,7 +585,7 @@ const makeConvex =
         ExtractReturns<F>
       >(),
       middlewareAttachments: [],
-    }) as any;
+    });
   };
 
 export const convexPublicQuery = makeConvex(

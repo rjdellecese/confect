@@ -26,10 +26,13 @@ import * as Option from "effect/Option";
 import { pipe } from "effect/Function";
 import * as Record from "effect/Record";
 
+import * as Data from "effect/Data";
+import * as Predicate from "effect/Predicate";
+
 /**
  * The `paginationOpts` one subscribed page queries with.
  */
-export interface PageRequest {
+export type PageRequest = {
   readonly numItems: number;
   readonly cursor: string | null;
   /**
@@ -42,7 +45,7 @@ export interface PageRequest {
    */
   readonly maximumRowsRead?: number;
   readonly maximumBytesRead?: number;
-}
+};
 
 /**
  * The per-page read budgets every growing page is requested with.
@@ -59,16 +62,17 @@ const growingRequest = (
   numItems: number,
   cursor: string | null,
   budget: ReadBudget,
-): PageRequest => ({
-  numItems,
-  cursor,
-  ...(budget.maximumRowsRead === undefined
-    ? {}
-    : { maximumRowsRead: budget.maximumRowsRead }),
-  ...(budget.maximumBytesRead === undefined
-    ? {}
-    : { maximumBytesRead: budget.maximumBytesRead }),
-});
+): PageRequest => {
+  const request = { numItems, cursor };
+
+  if (budget.maximumRowsRead !== undefined)
+    Object.assign(request, { maximumRowsRead: budget.maximumRowsRead });
+
+  if (budget.maximumBytesRead !== undefined)
+    Object.assign(request, { maximumBytesRead: budget.maximumBytesRead });
+
+  return request;
+};
 
 export interface State {
   readonly nextPageKey: number;
@@ -312,11 +316,14 @@ export type Interpretation =
       readonly transitions: ReadonlyArray<(state: State) => State>;
     };
 
+const Interpretation = Data.taggedEnum<Interpretation>();
+
 const interpreted = (
   items: ReadonlyArray<unknown>,
   lastResult: Option.Option<PageResult>,
   transitions: ReadonlyArray<(state: State) => State>,
-): Interpretation => ({ _tag: "Interpreted", items, lastResult, transitions });
+): Interpretation =>
+  Interpretation.Interpreted({ items, lastResult, transitions });
 
 /**
  * Walk the pages in display order, concatenating their items and collecting the
@@ -353,8 +360,8 @@ export const interpret = (
         }
         if (result instanceof Error) {
           return options.isInvalidCursorError(result)
-            ? { _tag: "ResetRequired" }
-            : { _tag: "Failed", error: result, items };
+            ? Interpretation.ResetRequired()
+            : Interpretation.Failed({ error: result, items });
         }
 
         const hasResult = (key: string) =>
@@ -370,7 +377,7 @@ export const interpret = (
               ? Array.append(transitions, completeSplit(pageKey))
               : transitions,
           onNone: () =>
-            typeof result.splitCursor === "string" &&
+            Predicate.isString(result.splitCursor) &&
             (result.pageStatus === "SplitRecommended" ||
               result.pageStatus === "SplitRequired" ||
               result.page.length > options.initialNumItems)

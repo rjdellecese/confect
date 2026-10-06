@@ -109,7 +109,7 @@ export interface AnyConvex extends Convex<DefaultFunctionArgs, any> {}
 
 export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
 
-const Standard: Standard = { _tag: "Standard" };
+const Standard: Standard = Data.taggedEnum<Standard>().Standard();
 
 /**
  * Build a `Confect` provenance from lazy args-fields and schema thunks. `args`,

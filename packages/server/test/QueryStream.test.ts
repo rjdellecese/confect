@@ -209,11 +209,13 @@ describe("QueryStream key layouts", () => {
         expect(defect).toBeInstanceOf(
           QueryStream.InnerStreamLayoutMismatchError,
         );
-        expect(defect).toMatchObject({
-          _tag: "InnerStreamLayoutMismatchError",
-          expectedKeyLayout: explicitFirst,
-          actualKeyLayout: implicitFirst,
-        });
+        expect(defect).toHaveProperty("_tag", "InnerStreamLayoutMismatchError");
+        expect(defect).toMatchObject(
+          new QueryStream.InnerStreamLayoutMismatchError({
+            expectedKeyLayout: explicitFirst,
+            actualKeyLayout: implicitFirst,
+          }),
+        );
       }),
   );
 
@@ -237,11 +239,13 @@ describe("QueryStream key layouts", () => {
       const defect = yield* Stream.runCollect(joined).pipe(
         Effect.catchDefect(Effect.succeed),
       );
-      expect(defect).toMatchObject({
-        _tag: "InnerStreamLayoutMismatchError",
-        expectedKeyLayout: explicitFirst,
-        actualKeyLayout: implicitFirst,
-      });
+      expect(defect).toHaveProperty("_tag", "InnerStreamLayoutMismatchError");
+      expect(defect).toMatchObject(
+        new QueryStream.InnerStreamLayoutMismatchError({
+          expectedKeyLayout: explicitFirst,
+          actualKeyLayout: implicitFirst,
+        }),
+      );
     }),
   );
 
@@ -280,11 +284,13 @@ describe("QueryStream key layouts", () => {
         const defect = yield* Stream.runCollect(joined).pipe(
           Effect.catchDefect(Effect.succeed),
         );
-        expect(defect).toMatchObject({
-          _tag: "InnerStreamOrderMismatchError",
-          expectedOrderDirection: "asc",
-          actualOrderDirection: "desc",
-        });
+        expect(defect).toHaveProperty("_tag", "InnerStreamOrderMismatchError");
+        expect(defect).toMatchObject(
+          new QueryStream.InnerStreamOrderMismatchError({
+            expectedOrderDirection: "asc",
+            actualOrderDirection: "desc",
+          }),
+        );
       }),
   );
 
@@ -364,15 +370,16 @@ describe.each(["asc", "desc"] as const)(
               ),
             ),
           );
+          const endOptions = end
+            ? {
+                endCursor: yield* encodeCursor(source.keyLayout)([values[3]]),
+              }
+            : undefined;
           const result = yield* QueryStream.paginate(source, {
             cursor: start
               ? yield* encodeCursor(source.keyLayout)([values[1]])
               : null,
-            ...(end
-              ? {
-                  endCursor: yield* encodeCursor(source.keyLayout)([values[3]]),
-                }
-              : {}),
+            ...endOptions,
             numItems: 10,
           });
 

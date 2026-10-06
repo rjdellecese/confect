@@ -186,6 +186,12 @@ export type Outcome<Doc> = Data.TaggedEnum<{
   SplitRecommended: Split<Doc>;
 }>;
 
+interface OutcomeDefinition extends Data.TaggedEnum.WithGenerics<1> {
+  readonly taggedEnum: Outcome<this["A"]>;
+}
+
+const Outcome = Data.taggedEnum<OutcomeDefinition>();
+
 export class UnsafePageBoundaryError extends Data.TaggedError(
   "UnsafePageBoundaryError",
 )<{
@@ -242,21 +248,21 @@ export const finish = <Doc>(
         }
         const key = Chunk.lastNonEmpty(scanned);
         if (readLimit)
-          return Result.succeed({
-            _tag: "SplitRequired",
-            page,
-            continuation: Continuation.Key({ key }),
-            splitKey,
-          });
+          return Result.succeed(
+            Outcome.SplitRequired({
+              page,
+              continuation: Continuation.Key({ key }),
+              splitKey,
+            }),
+          );
         return Result.succeed(
           Chunk.size(scanned) >= SOFT_MAX_SCAN_LENGTH
-            ? {
-                _tag: "SplitRecommended",
+            ? Outcome.SplitRecommended({
                 page,
                 continuation: Continuation.Key({ key }),
                 splitKey,
-              }
-            : { _tag: "Continue", page, key },
+              })
+            : Outcome.Continue({ page, key }),
         );
       },
     );
@@ -273,20 +279,20 @@ export const finish = <Doc>(
             page.length > request.numItems + 1),
       );
       return Option.match(split, {
-        onSome: (scanned): Outcome<Doc> => ({
-          _tag: "SplitRecommended",
-          page,
-          continuation,
-          splitKey: midpoint(scanned),
-        }),
+        onSome: (scanned): Outcome<Doc> =>
+          Outcome.SplitRecommended({
+            page,
+            continuation,
+            splitKey: midpoint(scanned),
+          }),
         onNone: () =>
           Continuation.$match(continuation, {
-            End: (): Outcome<Doc> => ({ _tag: "Done", page }),
-            Key: ({ key }): Outcome<Doc> => ({
-              _tag: "Continue",
-              page,
-              key,
-            }),
+            End: (): Outcome<Doc> => Outcome.Done({ page }),
+            Key: ({ key }): Outcome<Doc> =>
+              Outcome.Continue({
+                page,
+                key,
+              }),
           }),
       });
     };

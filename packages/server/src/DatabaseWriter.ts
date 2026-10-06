@@ -1,9 +1,8 @@
 import type {
-  BetterOmit,
+  GenericDatabaseWriter,
   DocumentByName,
   Expand,
-  GenericDatabaseWriter,
-  WithoutSystemFields,
+  BetterOmit,
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import { pipe } from "effect/Function";
@@ -113,12 +112,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       const encodedDocument = yield* Document.encode(document, tableDef);
 
       const id = yield* Effect.promise(() =>
-        convexDatabaseWriter.insert(
-          tableName,
-          encodedDocument as WithoutSystemFields<
-            DocumentByName<DataModel.ToConvex<DataModel_>, TableName>
-          >,
-        ),
+        convexDatabaseWriter.insert(tableName, encodedDocument),
       );
 
       return id;
@@ -132,7 +126,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         Table.AnyWithProps,
         TableName
       >(
-        convexDatabaseWriter as any,
+        convexDatabaseWriter,
         tableDef,
       )(id);
 
@@ -168,15 +162,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       const updatedEncodedDoc = yield* Document.encode(value, tableDef);
 
       yield* Effect.promise(() =>
-        convexDatabaseWriter.replace(
-          id,
-          updatedEncodedDoc as Expand<
-            BetterOmit<
-              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
-              "_creationTime" | "_id"
-            >
-          >,
-        ),
+        convexDatabaseWriter.replace(id, updatedEncodedDoc),
       );
     });
 
@@ -193,7 +179,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
   return {
     table,
-  } as DatabaseWriterService<DatabaseSchema_>;
+  };
 };
 
 export const DatabaseWriter = <

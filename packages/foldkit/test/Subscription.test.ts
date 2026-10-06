@@ -1,5 +1,5 @@
 import { FunctionSpec, PaginationError, Ref } from "@confect/core";
-import { describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, it } from "@effect/vitest";
 import type { RegisteredQuery } from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
@@ -50,8 +50,10 @@ const { SucceededGetNote, FailedGetNote } = Message;
 type Message = typeof Message.Type;
 
 const noteHandlers = {
-  onSuccess: (note: unknown) => SucceededGetNote({ note }),
-  onError: (error: unknown) => FailedGetNote({ error }),
+  onSuccess: (note: Ref.Returns<typeof listQueryRef>) =>
+    SucceededGetNote({ note }),
+  onError: (error: Subscription.Error<typeof listQueryRef>) =>
+    FailedGetNote({ error }),
 };
 
 const makeNoteEntry = () =>
@@ -155,7 +157,7 @@ describe("Subscription", () => {
         // @ts-expect-error—only Confect-provenance refs are supported
         Subscription.reactiveQuery<Model>()(convexGetQueryRef, noteHandlers);
 
-      expect(typeof makeConvexEntry).toBe("function");
+      expect(makeConvexEntry).toBeTypeOf("function");
     });
 
     it("requires args and is accepted by Foldkit Subscription.make", () => {
@@ -168,8 +170,8 @@ describe("Subscription", () => {
         Client.Client
       >()(() => ({ note: makeNoteEntry() }));
 
-      expect(typeof requiresArgs).toBe("function");
-      expect(typeof subscriptions.note.dependenciesToStream).toBe("function");
+      expect(requiresArgs).toBeTypeOf("function");
+      expect(subscriptions.note.dependenciesToStream).toBeTypeOf("function");
     });
   });
 
@@ -204,7 +206,7 @@ describe("Subscription", () => {
         // @ts-expect-error—only Confect-provenance refs are supported
         Subscription.reactiveQueryStream(convexGetQueryRef, noteHandlers);
 
-      expect(typeof makeConvexStream).toBe("function");
+      expect(makeConvexStream).toBeTypeOf("function");
     });
   });
 });
@@ -286,8 +288,8 @@ const allocatedRequest = (
 const settlePage = (
   state: PaginatedActive,
   overrides: Partial<PaginatedQuery.PageResult<{ readonly text: string }>> = {},
-): PaginatedActive =>
-  PaginatedQuery.settle(state, {
+): PaginatedActive => {
+  const settled = PaginatedQuery.settle(state, {
     request: allocatedRequest(state),
     result: Result.succeed({
       page: [{ text: "a" }],
@@ -295,18 +297,28 @@ const settlePage = (
       continueCursor: "c1",
       ...overrides,
     }),
-  }) as PaginatedActive;
+  });
+
+  assert(!PaginatedQuery.isIdle(settled));
+
+  return settled;
+};
 
 const failPage = (
   state: PaginatedActive,
   error: PaginatedQuery.Error<
     typeof paginateRef
   > = new Client.WebSocketClientError({ cause: "offline" }),
-): PaginatedActive =>
-  PaginatedQuery.settle(state, {
+): PaginatedActive => {
+  const settled = PaginatedQuery.settle(state, {
     request: allocatedRequest(state),
     result: Result.fail(error),
-  }) as PaginatedActive;
+  });
+
+  assert(!PaginatedQuery.isIdle(settled));
+
+  return settled;
+};
 
 const streamFor = (
   entry: ReturnType<typeof makePaginatedEntry>,
@@ -686,8 +698,8 @@ describe("Subscription.paginatedQuery", () => {
         Client.Client
       >()(() => ({ notesPage: makePaginatedEntry() }));
 
-      expect(typeof invalid).toBe("function");
-      expect(typeof subscriptions.notesPage.dependenciesToStream).toBe(
+      expect(invalid).toBeTypeOf("function");
+      expect(subscriptions.notesPage.dependenciesToStream).toBeTypeOf(
         "function",
       );
     });

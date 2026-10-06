@@ -218,52 +218,54 @@ function makeDefinition<
       ...((args === undefined ? [] : [args]) as Ref.OptionalArgs<Ref_>),
     );
 
-  return Match.value(interrupt).pipe(
+  const definition = Match.value(interrupt).pipe(
     Match.withReturnType<
-      Definition<Name, Ref_, SuccessMessage | ErrorMessage>
-    >(),
-    Match.when(
-      undefined,
-      () =>
-        FoldkitCommand.define(name, {
-          args: fields,
-          messages,
-          execute,
-        }) as Definition<Name, Ref_, SuccessMessage | ErrorMessage>,
-    ),
-    Match.when(
-      true,
-      (nameKeyedInterrupt) =>
-        FoldkitCommand.define(name, {
-          args: fields,
-          messages,
-          interrupt: nameKeyedInterrupt,
-          execute,
-        }) as InterruptibleDefinition<
-          Name,
-          Ref_,
-          SuccessMessage | ErrorMessage
-        >,
-    ),
-    Match.when(Match.defined, (keyedInterrupt) => {
-      const definition: FoldkitCommand.CommandDefinitionWithArgs<
+      FoldkitCommand.CommandDefinitionWithArgs<
         Name,
         Fields,
         ReturnType<typeof execute>
-      > = FoldkitCommand.define(name, {
+      >
+    >(),
+    Match.when(undefined, () =>
+      FoldkitCommand.define(name, {
+        args: fields,
+        messages,
+        execute,
+      }),
+    ),
+    Match.when(true, (nameKeyedInterrupt) =>
+      FoldkitCommand.define(name, {
+        args: fields,
+        messages,
+        interrupt: nameKeyedInterrupt,
+        execute,
+      }),
+    ),
+    Match.when(Match.defined, (keyedInterrupt) =>
+      FoldkitCommand.define(name, {
         args: fields,
         messages,
         interrupt: keyedInterrupt,
         execute,
-      });
-      return definition as Definition<
-        Name,
-        Ref_,
-        SuccessMessage | ErrorMessage
-      >;
-    }),
+      }),
+    ),
     Match.exhaustive,
   );
+  const invoke = definition as (
+    args?: FoldkitArgs,
+  ) => Omit<ReturnType<typeof definition>, "args">;
+
+  const normalized = (args?: FoldkitArgs) => ({
+    ...invoke(args),
+    args: args ?? {},
+  });
+
+  Object.defineProperties(
+    normalized,
+    Object.getOwnPropertyDescriptors(definition),
+  );
+
+  return normalized as Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
 }
 
 type FactoryConfig<

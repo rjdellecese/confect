@@ -50,7 +50,7 @@ describe("buildForGroup", () => {
         functionTypes: { query: true, mutation: false, action: false },
       },
     ) {}
-    class SameShapePolicy extends MiddlewareSpec.MiddlewareSpec<SameShapePolicy>()(
+    class EquivalentPolicy extends MiddlewareSpec.MiddlewareSpec<EquivalentPolicy>()(
       "Policy",
       {
         options: () => Schema.Struct({ label: Schema.String }),
@@ -64,7 +64,7 @@ describe("buildForGroup", () => {
     }).middleware(Policy, { label: "internal" });
     const group = GroupSpec.make().addFunction(query);
 
-    for (const implementationSpec of [OtherPolicy, SameShapePolicy]) {
+    for (const implementationSpec of [OtherPolicy, EquivalentPolicy]) {
       const layer = GroupImpl.make(databaseSchema, group).pipe(
         Layer.provide(
           FunctionImpl.make(databaseSchema, group, "get", () =>
