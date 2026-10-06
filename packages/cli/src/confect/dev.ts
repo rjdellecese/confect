@@ -525,7 +525,9 @@ const esbuildOptions = (
                   return;
                 yield* Ref.update(pendingRef, (p) => ({
                   ...p,
-                  [entry.pendingKey]: true,
+                  [isInitial && initialSyncFailed
+                    ? "specDirty"
+                    : entry.pendingKey]: true,
                 }));
                 yield* Queue.offer(signal, undefined);
               }),

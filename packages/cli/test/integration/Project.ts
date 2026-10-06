@@ -84,10 +84,8 @@ export const make = Effect.gen(function* () {
       Effect.forkScoped,
     );
     const waitFor = (text: string) =>
-      Stream.fromQueue(lines).pipe(
-        Stream.filter((line) => line.includes(text)),
-        Stream.take(1),
-        Stream.runCollect,
+      Queue.take(lines).pipe(
+        Effect.repeat({ while: (line) => !line.includes(text) }),
         Effect.timeoutOption("15 seconds"),
         Effect.flatMap((result) =>
           Ref.get(output).pipe(

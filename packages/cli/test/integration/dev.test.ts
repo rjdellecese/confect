@@ -116,6 +116,34 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       { timeout: 30000 },
     );
 
+    it.effect(
+      "does not report an optional-only retry as a successful full generation",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* fs.remove(path.join(project.root, "confect/notes.spec.ts"));
+          yield* fs.remove(path.join(project.root, "confect/notes.impl.ts"));
+          yield* fs.remove(path.join(project.root, "confect/tables"), {
+            recursive: true,
+          });
+          yield* project.write("confect/schema.ts", "export default {};\n");
+          yield* project.write(
+            "confect/auth.ts",
+            "export default { providers: [] };\n",
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor("Found a legacy");
+          yield* watching.waitFor("Dependencies may have changed");
+          yield* Effect.sleep("2 seconds");
+          expect(yield* Ref.get(watching.output)).not.toContain(success);
+          yield* fs.remove(path.join(project.root, "confect/schema.ts"));
+          yield* watching.waitFor(success);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect.each(["immediately", "after watcher startup"] as const)(
       "watches spec dependencies while its implementation is missing (%s)",
       (when) =>
