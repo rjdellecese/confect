@@ -15,19 +15,19 @@ variable. Run all commands from your app's root directory.
 <CodeGroup>
 
 ```bash pnpm
-pnpm add effect@^4 convex @confect/core @confect/server @confect/cli @confect/react
+pnpm add effect convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 ```bash npm
-npm install effect@^4 convex @confect/core @confect/server @confect/cli @confect/react
+npm install effect convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 ```bash yarn
-yarn add effect@^4 convex @confect/core @confect/server @confect/cli @confect/react
+yarn add effect convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 ```bash bun
-bun add effect@^4 convex @confect/core @confect/server @confect/cli @confect/react
+bun add effect convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 </CodeGroup>
@@ -109,6 +109,10 @@ for how it affects optional properties and schema validation.
 
     This creates `confect/_generated/`, including `id.ts`, `tables/notes.ts`,
     `schema.ts`, and `services.ts`.
+
+    This tutorial generates table bindings before you write the functions. If
+    your table, spec, and implementation files are already complete, one codegen
+    run can generate everything without this separate step.
 
   </Step>
 
