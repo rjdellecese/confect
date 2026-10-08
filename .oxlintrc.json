@@ -42,6 +42,7 @@
     "**/.mintlify/**"
   ],
   "rules": {
+    "confect/require-query-stream-experimental": "error",
     "jsdoc-style/check-alignment": "error",
     "jsdoc-style/check-line-alignment": [
       "error",

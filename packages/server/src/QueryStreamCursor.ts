@@ -32,6 +32,9 @@ export const QueryStreamCursor = Schema.Struct({
   ),
 );
 
+/**
+ * @experimental
+ */
 export interface QueryStreamCursor extends Schema.Schema.Type<
   typeof QueryStreamCursor
 > {}

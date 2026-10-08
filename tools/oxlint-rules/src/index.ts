@@ -10,8 +10,9 @@
 import { Plugin } from "effect-oxlint";
 import { preferEffectVitest } from "./preferEffectVitest.ts";
 import { preferTestEach } from "./preferTestEach.ts";
+import { requireQueryStreamExperimental } from "./requireQueryStreamExperimental.ts";
 
-export { preferEffectVitest, preferTestEach };
+export { preferEffectVitest, preferTestEach, requireQueryStreamExperimental };
 
 export default Plugin.define({
   name: "confect",
@@ -19,5 +20,6 @@ export default Plugin.define({
   rules: {
     "prefer-effect-vitest": preferEffectVitest,
     "prefer-test-each": preferTestEach,
+    "require-query-stream-experimental": requireQueryStreamExperimental,
   },
 });

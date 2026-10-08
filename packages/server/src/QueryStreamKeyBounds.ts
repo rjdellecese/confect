@@ -232,6 +232,9 @@ export type NarrowBounds =
       readonly end: KeyBound;
     };
 
+/**
+ * @experimental
+ */
 export interface ParsedBound {
   readonly key: QueryStreamKey.Prefix;
   readonly inclusive: boolean;
@@ -241,6 +244,9 @@ export interface ParsedBound {
 // key space retain these values; coordinate changes construct new endpoints.
 const TypeId = "~@confect/server/QueryStreamKeyBounds";
 
+/**
+ * @experimental
+ */
 export interface ParsedBounds {
   readonly [TypeId]: typeof TypeId;
   readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
@@ -258,11 +264,17 @@ const make = (
   upper: endpoints.upper,
 });
 
+/**
+ * @experimental
+ */
 export const unbounded = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
 ): ParsedBounds =>
   make(keyLayout, { lower: Option.none(), upper: Option.none() });
 
+/**
+ * @experimental
+ */
 export const forLayout = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   parsedBounds: ParsedBounds,
@@ -277,6 +289,9 @@ export const forLayout = (
 
 // Combining existing parsed endpoints still needs a shared layout, including
 // when one or both endpoints are absent.
+/**
+ * @experimental
+ */
 export const fromParsed = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   endpoints: Pick<ParsedBounds, "lower" | "upper">,
@@ -310,6 +325,9 @@ const tighterUpper = (self: ParsedBound, that: ParsedBound): ParsedBound =>
     ? that
     : self;
 
+/**
+ * @experimental
+ */
 export const tightestParsedLower = (
   self: ParsedBound,
   that: ParsedBound,
@@ -322,6 +340,9 @@ export const tightestParsedLower = (
     return tighterLower(self, that);
   });
 
+/**
+ * @experimental
+ */
 export const tightestParsedUpper = (
   self: ParsedBound,
   that: ParsedBound,
@@ -334,6 +355,9 @@ export const tightestParsedUpper = (
     return tighterUpper(self, that);
   });
 
+/**
+ * @experimental
+ */
 export const parseBound = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   { keyValues, inclusive }: KeyBound,
@@ -343,6 +367,9 @@ export const parseBound = (
     inclusive,
   }));
 
+/**
+ * @experimental
+ */
 export const parse = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   keyBounds: KeyBounds,
@@ -359,6 +386,9 @@ export const parse = (
   });
 };
 
+/**
+ * @experimental
+ */
 export const toBounds = (parsedBounds: ParsedBounds): KeyBounds => ({
   lower: Option.map(parsedBounds.lower, rawBound),
   upper: Option.map(parsedBounds.upper, rawBound),

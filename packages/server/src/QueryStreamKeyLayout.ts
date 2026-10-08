@@ -163,6 +163,9 @@ export function fromIndex<const FieldPaths extends ReadonlyArray<string>>(
   QueryStreamKeyLayout<QueryStreamKeyLabels.QueryStreamKeyLabels<FieldPaths>>,
   InvalidEqualityPrefixError
 >;
+/**
+ * @experimental
+ */
 export function fromIndex<
   const FieldPaths extends ReadonlyArray<string>,
   const Count extends number,
@@ -281,6 +284,9 @@ const PositionsEquivalence = Equivalence_.Array<Position>((self, that) =>
 export const Equivalence: Equivalence_.Equivalence<QueryStreamKeyLayout> =
   Equivalence_.mapInput(PositionsEquivalence, positions);
 
+/**
+ * @experimental
+ */
 export class KeyLayoutMismatchError extends Data.TaggedError(
   "KeyLayoutMismatchError",
 )<{
@@ -292,6 +298,9 @@ export class KeyLayoutMismatchError extends Data.TaggedError(
   }
 }
 
+/**
+ * @experimental
+ */
 export const validateEquivalence = (
   expectedKeyLayout: QueryStreamKeyLayout,
   actualKeyLayout: QueryStreamKeyLayout,

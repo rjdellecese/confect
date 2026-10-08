@@ -168,7 +168,9 @@ export {
 } from "./QueryStreamPagination";
 
 /**
- * Invalid numeric read limits. @experimental.
+ * Invalid numeric read limits.
+ *
+ * @experimental
  */
 export { InvalidReadLimitError } from "./QueryStreamReadBudget";
 

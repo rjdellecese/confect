@@ -12,6 +12,9 @@ const PageSize = Schema.Natural.pipe(
 );
 type PageSize = typeof PageSize.Type;
 
+/**
+ * @experimental
+ */
 export class InvalidPageSizeError extends Data.TaggedError(
   "InvalidPageSizeError",
 )<{
@@ -22,6 +25,9 @@ export class InvalidPageSizeError extends Data.TaggedError(
   }
 }
 
+/**
+ * @experimental
+ */
 export class EmptyInitialPageError extends Data.TaggedError(
   "EmptyInitialPageError",
 ) {
@@ -30,13 +36,22 @@ export class EmptyInitialPageError extends Data.TaggedError(
   }
 }
 
+/**
+ * @experimental
+ */
 export type Range = Data.TaggedEnum<{
   Unpinned: {};
   ThroughKey: { readonly key: QueryStreamKey.Complete };
   ThroughEnd: {};
 }>;
+/**
+ * @experimental
+ */
 export const Range = Data.taggedEnum<Range>();
 
+/**
+ * @experimental
+ */
 export type Start = Data.TaggedEnum<{
   Beginning: {};
   After: {
@@ -44,20 +59,32 @@ export type Start = Data.TaggedEnum<{
     readonly cursor: string;
   };
 }>;
+/**
+ * @experimental
+ */
 export const Start = Data.taggedEnum<Start>();
 
+/**
+ * @experimental
+ */
 export interface ScanRequest {
   readonly numItems: PageSize;
   readonly after: Option.Option<QueryStreamKey.Complete>;
   readonly range: Range;
 }
 
+/**
+ * @experimental
+ */
 export type Request = Data.TaggedEnum<{
   Unchanged: { readonly cursor: string };
   Scan: ScanRequest;
 }>;
 const Request = Data.taggedEnum<Request>();
 
+/**
+ * @experimental
+ */
 export const parseRequest = (
   numItems: number,
   start: Start,
@@ -109,6 +136,9 @@ interface Stopped<Doc> {
   readonly progress: Progress;
 }
 
+/**
+ * @experimental
+ */
 export type QueryStreamPagination<Doc> = Data.TaggedEnum<{
   Reading: {
     readonly page: Chunk.Chunk<Doc>;
@@ -122,12 +152,18 @@ interface PaginationDefinition extends Data.TaggedEnum.WithGenerics<1> {
 }
 const QueryStreamPagination = Data.taggedEnum<PaginationDefinition>();
 
+/**
+ * @experimental
+ */
 export const initial = <Doc>(): QueryStreamPagination<Doc> =>
   QueryStreamPagination.Reading({
     page: Chunk.empty<Doc>(),
     progress: Option.none(),
   });
 
+/**
+ * @experimental
+ */
 export const record = <Doc>(
   request: ScanRequest,
   self: QueryStreamPagination<Doc>,
@@ -164,6 +200,9 @@ export const record = <Doc>(
     }),
   );
 
+/**
+ * @experimental
+ */
 export type Continuation = Data.TaggedEnum<{
   End: {};
   Key: { readonly key: QueryStreamKey.Complete };
@@ -176,6 +215,9 @@ interface Split<Doc> {
   readonly splitKey: QueryStreamKey.Complete;
 }
 
+/**
+ * @experimental
+ */
 export type Outcome<Doc> = Data.TaggedEnum<{
   Done: { readonly page: ReadonlyArray<Doc> };
   Continue: {
@@ -186,6 +228,9 @@ export type Outcome<Doc> = Data.TaggedEnum<{
   SplitRecommended: Split<Doc>;
 }>;
 
+/**
+ * @experimental
+ */
 export class UnsafePageBoundaryError extends Data.TaggedError(
   "UnsafePageBoundaryError",
 )<{
@@ -210,6 +255,8 @@ const SOFT_MAX_SCAN_LENGTH = 16000;
 
 /**
  * Decide the page result without reading a stream or serializing a cursor.
+ *
+ * @experimental
  */
 export const finish = <Doc>(
   request: ScanRequest,
