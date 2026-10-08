@@ -7,12 +7,12 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@effect/ai-openai-compat": "4.0.0",
-    "@effect/ai-openrouter": "4.0.0"
+    "@effect/ai-openai-compat": "4.0.1",
+    "@effect/ai-openrouter": "4.0.1"
   },
   "devDependencies": {
-    "@effect/platform-node": "4.0.0",
-    "@effect/vitest": "4.0.0",
+    "@effect/platform-node": "4.0.1",
+    "@effect/vitest": "4.0.1",
     "@swc/jest": "0.2.39",
     "@types/node": "26.6.4",
     "@vitest/coverage-v8": "5.0.3",
@@ -20,7 +20,7 @@
     "confect-test-types": "workspace:*",
     "convex-test": "0.0.60",
     "dotenv": "18.0.5",
-    "effect": "4.0.0",
+    "effect": "4.0.1",
     "tsdown": "0.23.0",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
@@ -69,7 +69,7 @@
     "@confect/core": "workspace:^",
     "@effect/platform-node": "^4.0.0",
     "convex": "^1.45.0",
-    "effect": "^4.0.0"
+    "effect": "^4.0.1"
   },
   "peerDependenciesMeta": {
     "@effect/platform-node": {

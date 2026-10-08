@@ -22,8 +22,8 @@ minimumReleaseAgeExclude:
   - foldkit@0.165.0
 
 overrides:
-  convex: 1.45.0
-  effect: 4.0.0
+  convex: 1.46.0
+  effect: 4.0.1
   react: 19.3.0
   react-dom: 19.3.0
 
