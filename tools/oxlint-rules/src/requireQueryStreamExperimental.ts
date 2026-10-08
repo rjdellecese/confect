@@ -23,6 +23,8 @@ export const requireQueryStreamExperimental = Rule.define({
         | ESTree.ExportAllDeclaration
         | ESTree.ExportDefaultDeclaration,
     ) => {
+      if (node.parent.type !== "Program") return Effect.void;
+
       if (
         !isModule &&
         !(
@@ -35,13 +37,15 @@ export const requireQueryStreamExperimental = Rule.define({
         return Effect.void;
 
       const declaration =
-        node.type === "ExportNamedDeclaration" ? node.declaration : undefined;
+        node.type === "ExportAllDeclaration" ? undefined : node.declaration;
       if (
         declaration?.type === "FunctionDeclaration" &&
         declaration.body &&
         ctx.sourceCode.ast.body.some(
           (statement) =>
-            statement.type === "ExportNamedDeclaration" &&
+            (statement.type === "ExportNamedDeclaration" ||
+              statement.type === "ExportDefaultDeclaration") &&
+            statement.type === node.type &&
             statement.declaration?.type === "TSDeclareFunction" &&
             statement.declaration.id?.name === declaration.id?.name,
         )

@@ -92,6 +92,28 @@ export function make(value = 0): number { return value; }
       missing: 1,
     },
     {
+      name: "checks namespace exports but not their members or private namespaces",
+      filename: "QueryStreamFixture.ts",
+      code: `
+namespace Private { export const member = 1; }
+/** @experimental */
+export namespace Tagged { export const member = 1; }
+export namespace Untagged { export const member = 1; }
+`,
+      missing: 1,
+    },
+    {
+      name: "exempts default overload implementations but checks every signature",
+      filename: "QueryStreamFixture.ts",
+      code: `
+/** @experimental */
+export default function make(): number;
+export default function make(value: number): number;
+export default function make(value = 0): number { return value; }
+`,
+      missing: 1,
+    },
+    {
       name: "does not require tags on members or unexported helpers",
       filename: "QueryStreamFixture.ts",
       code: `
