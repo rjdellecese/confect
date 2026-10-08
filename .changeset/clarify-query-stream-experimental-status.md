@@ -2,4 +2,4 @@
 "@confect/server": patch
 ---
 
-Remove obsolete prerelease wording from the `QueryStream` documentation while preserving its experimental status.
+Clarify in the published `QueryStream` documentation that stream querying remains experimental in stable releases, and consistently label its exports as experimental.
