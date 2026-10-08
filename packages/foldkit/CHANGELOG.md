@@ -1,5 +1,9 @@
 # @confect/foldkit
 
+## 10.1.0
+
+No changes in this release.
+
 ## 10.0.0
 
 ### Major Changes

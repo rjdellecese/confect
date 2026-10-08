@@ -1,5 +1,11 @@
 # @confect/core
 
+## 10.1.0
+
+### Patch Changes
+
+- 89daa88: Fix `Table.Doc` to enforce checks attached to table structs and unions when decoding and encoding documents, and preserve a union's `oneOf` mode.
+
 ## 10.0.0
 
 ### Major Changes
