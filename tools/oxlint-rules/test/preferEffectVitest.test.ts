@@ -95,6 +95,7 @@ describe("plugin", () => {
     expect(Object.keys(confectPlugin.rules)).toEqual([
       "prefer-effect-vitest",
       "prefer-test-each",
+      "require-query-stream-experimental",
     ]);
   });
 });

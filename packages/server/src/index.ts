@@ -35,13 +35,37 @@ export * as QueryTransactionContext from "./QueryTransactionContext";
  * @experimental
  */
 export * as QueryStream from "./QueryStream";
+/**
+ * @experimental
+ */
 export * as QueryStreamCursor from "./QueryStreamCursor";
+/**
+ * @experimental
+ */
 export * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
+/**
+ * @experimental
+ */
 export * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
+/**
+ * @experimental
+ */
 export * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
+/**
+ * @experimental
+ */
 export * as QueryStreamKeyValues from "./QueryStreamKeyValues";
+/**
+ * @experimental
+ */
 export * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
+/**
+ * @experimental
+ */
 export * as QueryStreamIndexRange from "./QueryStreamIndexRange";
+/**
+ * @experimental
+ */
 export * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 export * as RegisteredConvexFunction from "./RegisteredConvexFunction";
 export * as RegisteredFunction from "./RegisteredFunction";

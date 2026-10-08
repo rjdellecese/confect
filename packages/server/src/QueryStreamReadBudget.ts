@@ -34,12 +34,21 @@ const ReadLimit = Schema.Natural.pipe(
   Schema.brand("~@confect/server/QueryStreamReadBudget/ReadLimit"),
 );
 
+/**
+ * @experimental
+ */
 export const Limits = Schema.Struct({
   maximumRowsRead: Schema.OptionFromOptionalKey(ReadLimit),
   maximumBytesRead: Schema.OptionFromOptionalKey(ReadLimit),
 });
+/**
+ * @experimental
+ */
 export type Limits = typeof Limits.Type;
 
+/**
+ * @experimental
+ */
 export class InvalidReadLimitError extends Data.TaggedError(
   "InvalidReadLimitError",
 )<{
@@ -50,6 +59,9 @@ export class InvalidReadLimitError extends Data.TaggedError(
   }
 }
 
+/**
+ * @experimental
+ */
 export interface ReadCounts {
   readonly rowsRead: number;
   readonly bytesRead: number;
@@ -62,6 +74,9 @@ type State = Data.TaggedEnum<{
 
 const State = Data.taggedEnum<State>();
 
+/**
+ * @experimental
+ */
 export const QueryStreamReadBudget = Context.Service<QueryStreamReadBudget>(
   "@confect/server/QueryStreamReadBudget",
 );

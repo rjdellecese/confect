@@ -62,6 +62,8 @@ interface Constraints {
 
 /**
  * The equality prefix followed by at most one bounded field.
+ *
+ * @experimental
  */
 export interface QueryStreamIndexRange<
   out RemainingFieldPaths extends ReadonlyArray<string> = ReadonlyArray<string>,
@@ -207,6 +209,8 @@ export const builder = <
 
 /**
  * Number of index fields pinned by equality constraints.
+ *
+ * @experimental
  */
 export const equalityPrefixLength = (self: QueryStreamIndexRange): number =>
   self[TypeId].equalities.length;
@@ -239,6 +243,8 @@ interface ConvexRangeBuilder extends ConvexUpperBoundBuilder {
 
 /**
  * Apply one range to Convex's index-range builder.
+ *
+ * @experimental
  */
 export const apply = (
   self: QueryStreamIndexRange,
@@ -455,6 +461,8 @@ export const fromBounds = (
 
 /**
  * Derive full-index bounds directly from the structural range.
+ *
+ * @experimental
  */
 export const toBounds = (
   self: QueryStreamIndexRange,

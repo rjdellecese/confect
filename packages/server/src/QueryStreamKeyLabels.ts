@@ -15,6 +15,9 @@ export type QueryStreamKeyLabels<
 // directly can widen its fixed positions into an array of element unions.
 // Defer extraction and concatenation until both label types are known to avoid
 // expanding unresolved tuple types while checking generic stream operations.
+/**
+ * @experimental
+ */
 export type Concat<
   LeftKeyLabels extends QueryStreamKeyLabels,
   RightKeyLabels extends QueryStreamKeyLabels,
