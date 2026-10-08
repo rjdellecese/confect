@@ -55,7 +55,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/server": "workspace:^",
-    "effect": "^4.0.0"
+    "effect": "^4.0.1"
   },
   "repository": {
     "type": "git",

@@ -69,7 +69,7 @@
     "@confect/core": "workspace:^",
     "@effect/platform-node": "^4.0.0",
     "convex": "^1.45.0",
-    "effect": "^4.0.0"
+    "effect": "^4.0.1"
   },
   "peerDependenciesMeta": {
     "@effect/platform-node": {
