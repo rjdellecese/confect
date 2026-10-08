@@ -33,6 +33,8 @@ Diff hunks that change nothing on this list—internal helpers, type plumbing, c
 - **Empty list, no published package behavior touched** → no changeset (internal refactors, tests, tooling, comments).
 - **Empty list, but published code changed in a way that could conceivably surface** → one-sentence `patch` stating the observable risk area, without naming internals.
 
+Documentation-only edits, including JSDoc or comment wording, do not require a changeset or a package version bump when they change no runtime behavior, API, types, dependencies, or other eligible consumer behavior. If documentation accompanies an eligible package change, write the changeset for that change; accompanying documentation does not exempt it.
+
 ## 2. The public-surface test
 
 Confect's public API is what the documentation and example app teach. Every identifier you intend to name in the entry must pass one of:
@@ -60,7 +62,7 @@ Read `.changeset/config.json` for `baseBranch` and the fixed group. All `@confec
 
 - **`major`**—removed/renamed exports or behavior changes that break existing consumer code. One major bumps the whole fixed group; reserve for genuine breaks.
 - **`minor`**—new consumer-facing exports, new optional parameters, new capabilities, backward-compatible observable refinements, raised peer-dependency floors (consumers must upgrade the peer alongside).
-- **`patch`**—bug fixes, typing fixes that don't change call-site shape, performance, dependency bumps requiring no consumer action, docs/JSDoc fixes.
+- **`patch`**—bug fixes, typing fixes that don't change call-site shape, performance, dependency bumps requiring no consumer action. Documentation-only edits are excluded in section 1.
 
 When in doubt: minor for new things, patch for fixes; major only when consumers must change their code.
 
