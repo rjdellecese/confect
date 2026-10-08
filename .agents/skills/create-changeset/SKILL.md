@@ -21,19 +21,22 @@ You will usually have just made the change yourself. Write from your knowledge o
 
 ## 1. List the user-visible delta
 
-Before writing any prose, list what changed on the public surface. Only four kinds of things belong on this list:
+Before writing any prose, list what changed on the public surface. Only five kinds of things belong on this list:
 
 1. **Exports consumers call**—functions, hooks, services, classes, types they write in their own code (`useQuery`, `FunctionSpec.publicQuery`, `TestConfect.layer`).
 2. **Observable behavior**—results, type errors at consumer call sites, runtime errors and their messages, what `confect codegen`/`confect dev` print and their exit codes.
 3. **Authored artifacts**—file layouts the user writes (`confect/notes.spec.ts`), generated names they reference (`refs.notes.list`).
 4. **Dependency and peer range changes** on published packages.
+5. **Documentation shipped in npm packages**—for example, packaged READMEs or JSDoc included in source or declaration files.
 
 Diff hunks that change nothing on this list—internal helpers, type plumbing, codegen pipeline steps, test files—do not appear in the changeset at all, not even as an aside.
 
-- **Empty list, no published package behavior touched** → no changeset (internal refactors, tests, tooling, comments).
+- **Empty list, no published package surface or behavior touched** → no changeset (internal refactors, tests, tooling, non-shipped guidance or comments).
 - **Empty list, but published code changed in a way that could conceivably surface** → one-sentence `patch` stating the observable risk area, without naming internals.
 
-Documentation-only edits, including JSDoc or comment wording, do not require a changeset or a package version bump when they change no runtime behavior, API, types, dependencies, or other eligible consumer behavior. If documentation accompanies an eligible package change, write the changeset for that change; accompanying documentation does not exempt it.
+Documentation shipped in npm packages can have its own `patch` changeset even without runtime behavior changes. This is eligibility, not a requirement to release every published comment edit. Verify the publication surface using package metadata and built or packed artifacts. Website-only changes under `apps/docs` and internal guidance or comments that do not ship in npm packages do not warrant a changeset or package version bump.
+
+In mixed PRs, attribute changesets only to the affected published surface; do not include website-only or other non-shipped documentation changes. Documentation accompanying an eligible package behavior change does not exempt that change.
 
 ## 2. The public-surface test
 
@@ -58,11 +61,11 @@ The same test applies to _mechanics_, not just identifiers: a sentence narrating
 
 ## 3. Frontmatter and bump
 
-Read `.changeset/config.json` for `baseBranch` and the fixed group. All `@confect/*` packages version together, so the frontmatter's job is accuracy, not storytelling: list each published package whose _own surface or behavior_ changed. Don't add a package just because it contains supporting plumbing for another package's feature.
+Read `.changeset/config.json` for `baseBranch` and the fixed group. All `@confect/*` packages version together, so the frontmatter's job is accuracy, not storytelling: list each published package whose _own surface or behavior_, including shipped documentation, changed. Don't add a package just because it contains supporting plumbing for another package's feature.
 
 - **`major`**—removed/renamed exports or behavior changes that break existing consumer code. One major bumps the whole fixed group; reserve for genuine breaks.
 - **`minor`**—new consumer-facing exports, new optional parameters, new capabilities, backward-compatible observable refinements, raised peer-dependency floors (consumers must upgrade the peer alongside).
-- **`patch`**—bug fixes, typing fixes that don't change call-site shape, performance, dependency bumps requiring no consumer action. Documentation-only edits are excluded in section 1.
+- **`patch`**—bug fixes, typing fixes that don't change call-site shape, performance, dependency bumps requiring no consumer action, and fixes to documentation shipped in npm packages. Website-only and other non-shipped documentation are excluded in section 1.
 
 When in doubt: minor for new things, patch for fixes; major only when consumers must change their code.
 
@@ -119,5 +122,6 @@ Reread the entry as a consumer who knows the docs but has never seen Confect's s
 2. No sentence explains how the change was implemented—only what the consumer authors, calls, receives, or sees.
 3. The frontmatter lists only packages whose own surface or behavior changed.
 4. The summary alone tells a reader whether the release affects them.
+5. Any documentation-only entry describes documentation verified to ship in the named npm packages, not website-only or other non-shipped content.
 
 If any check fails, fix the entry before saving—don't ship it with a caveat.
