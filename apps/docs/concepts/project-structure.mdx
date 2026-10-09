@@ -71,7 +71,7 @@ Contains a named TypeScript `interface` for each table's document—`NotesDoc`, 
 
 #### `id.ts`
 
-Contains a type-constrained `Id` constructor whose only argument is the union of your table names—for example, `Id("users")` returns the `Schema` for an `_id` value in the `users` table. Use this when defining cross-table references (e.g. a `userId: Id("users")` field) and inside spec `args` fields or `returns` schemas. The type-level constraint catches typos at compile time, replacing the loosely-typed `GenericId.GenericId("users")` form.
+Exports an `Id` schema constructor and an `Id<TableName>` TypeScript type. Use `Id("users")` for a schema in table fields, spec `args`, or `returns`; use `Id<"users">` to annotate an ID value. Both accept your declared table names and Convex system table names (`"_storage"` and `"_scheduled_functions"`), catching unknown names at compile time. The exported `TableNames` union contains only your declared tables. See [Document IDs](/server/database/schema#document-ids) for import examples.
 
 #### `registeredFunctions/`
 

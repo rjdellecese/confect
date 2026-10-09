@@ -228,6 +228,9 @@ const idEffect = Effect.fnUntraced(function* ({
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
   yield* cbw.writeLine(`import { GenericId } from "@confect/core";`);
+  yield* cbw.writeLine(
+    `import type { SystemTableNames } from "convex/server";`,
+  );
   yield* cbw.blankLine();
 
   const union =
@@ -238,7 +241,12 @@ const idEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(
-    `export const Id = <const TableName extends TableNames>(`,
+    `export type Id<TableName extends TableNames | SystemTableNames> = GenericId.GenericId<TableName>;`,
+  );
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine(
+    `export const Id = <const TableName extends TableNames | SystemTableNames>(`,
   );
   yield* cbw.indent(cbw.writeLine(`tableName: TableName,`));
   yield* cbw.writeLine(`) => GenericId.GenericId(tableName);`);

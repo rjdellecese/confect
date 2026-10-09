@@ -11,13 +11,13 @@ import type { WorkId } from "@convex-dev/workpool";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
-import type { GenericId } from "convex/values";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import { useEffect, useState } from "react";
+import type { Id } from "../confect/_generated/id";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/NotesApi";
 
@@ -195,7 +195,7 @@ const ViewerDemo = () => {
 
 const NoteLookup = () => {
   const [input, setInput] = useState("");
-  const [noteId, setNoteId] = useState<GenericId<"notes"> | undefined>();
+  const [noteId, setNoteId] = useState<Id<"notes"> | undefined>();
 
   const lookup = useQuery(
     refs.public.notes_and_random.notes.getOrFail,
@@ -211,10 +211,7 @@ const NoteLookup = () => {
         placeholder="note id"
         style={{ fontFamily: "monospace" }}
       />
-      <button
-        type="button"
-        onClick={() => setNoteId(input as GenericId<"notes">)}
-      >
+      <button type="button" onClick={() => setNoteId(input as Id<"notes">)}>
         Look up
       </button>
       <div>
