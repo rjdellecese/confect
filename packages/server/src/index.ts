@@ -11,6 +11,7 @@ export * as ConvexLogger from "./ConvexLogger";
 export * as CronJob from "./CronJob";
 export * as CronJobs from "./CronJobs";
 export * as DatabaseReader from "./DatabaseReader";
+export * as DocumentIds from "./DocumentIds";
 export * as DatabaseSchema from "./DatabaseSchema";
 export * as DatabaseWriter from "./DatabaseWriter";
 export * as DataModel from "./DataModel";
