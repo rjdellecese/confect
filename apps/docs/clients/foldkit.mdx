@@ -572,9 +572,10 @@ displayed—from its cursor to its continuation cursor—so going back reloads
 exactly that range, however the data has moved since. This is what keeps
 consecutive pages gap-free and duplicate-free for
 [stream-paginated queries](/server/database/streams#paginating-a-stream), which have no
-query journal to remember page ranges. The page currently on screen is a live
-window of `initialNumItems` documents from its cursor, so it stays full as
-documents are inserted and deleted.
+query journal to remember page ranges. A newly requested, unpinned page is a
+live window requesting `initialNumItems` documents from its cursor. A page
+revisited through a pinned range, or pinned by a split, instead retains its
+boundaries and may contain more or fewer documents as data changes.
 
 <Note>
   Convex may signal that a page has grown too large by recommending or requiring

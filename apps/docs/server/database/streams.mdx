@@ -185,7 +185,7 @@ Fields must be used in the order the index declares them, and each method only o
 
 ### Keys, labels, and layouts
 
-An **key** contains the values that determine an element's position. Every element has its own key values; the stream has one shared **key layout** describing the positions in those keys: their sequence, their labels, and where implicit document-ID tiebreakers occur.
+A **key** contains the values that determine an element's position. Every element has its own key values; the stream has one shared **key layout** describing the positions in those keys: their sequence, their labels, and where implicit document-ID tiebreakers occur.
 
 For a note ordered by text:
 
@@ -214,18 +214,13 @@ Labels alone cannot describe the joined layout: the outer ID sits between the tw
 
 Layouts are **compatible** when they have the same total width, the same labels in the same positions, and the same implicit-ID positions. Direction is stored in `stream.orderDirection` and checked separately. A layout contains no key values, value-type schema, table identity, or equality-pinned values, so different indexes or tables can have compatible layouts. When merging them, choose positions whose values have the same meaning; matching layouts alone does not establish that.
 
-Reuse a stream's `keyLayout` when calling `empty` or supplying `flatMap`'s `innerKeyLayout`. Creating a stream to obtain its layout reads no documents. The type is normally inferred, but you can import the layout module directly when you need an annotation:
+Reuse a stream's `keyLayout` when calling `empty` or supplying `flatMap`'s `innerKeyLayout`. Creating a stream to obtain its layout reads no documents. Let TypeScript infer the layout type from that stream:
 
 ```ts
-import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
-import type * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
-
-const keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
-  QueryStreamKeyLabels.QueryStreamKeyLabels<["text", "_creationTime"]>
-> = reader.table("notes").stream("by_text").keyLayout;
+const keyLayout = reader.table("notes").stream("by_text").keyLayout;
 ```
 
-The type parameter tracks labels; implicit-ID positions are checked at runtime. For explicit `narrow` bounds, pass key **values**, including any intervening implicit IDs. For `distinct`, pass a prefix of the **labels**; for `renameKey`, pass replacement labels for every labeled position.
+The inferred type tracks labels; implicit-ID positions are checked at runtime. For explicit `narrow` bounds, pass key **values**, including any intervening implicit IDs. For `distinct`, pass a prefix of the **labels**; for `renameKey`, pass replacement labels for every labeled position.
 
 ### Empty streams
 
