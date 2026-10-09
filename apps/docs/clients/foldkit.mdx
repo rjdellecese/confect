@@ -24,13 +24,22 @@ accepted.
 
 ## Installation
 
+<Warning>
+  `foldkit@0.165.0` requires exactly `effect@4.0.0`, while
+  `@confect/server@10.1.0` and `@confect/cli@10.1.0` require `effect@^4.0.1`.
+  These versions cannot share one app manifest with all Effect peer requirements
+  satisfied. The client installation below is not a compatible same-package
+  addition to an app using those server or CLI versions.
+</Warning>
+
 ```bash
 pnpm add @confect/foldkit @confect/js @confect/core foldkit@^0.165.0 effect@4.0.0 @effect/platform-browser@4.0.0
 ```
 
 <Note>
-  Foldkit 0.165 requires `effect` and `@effect/platform-browser` 4.0.0. Install
-  those matching versions; no peer-dependency override is needed.
+  Foldkit 0.165 requires `effect` and `@effect/platform-browser` 4.0.0. Those
+  versions satisfy `@confect/foldkit@10.1.0`'s client-side peer requirements;
+  they do not resolve the server/CLI conflict above.
 </Note>
 
 ## Setup
