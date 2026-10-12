@@ -8,10 +8,6 @@ import type * as DataModel from "./DataModel";
 import * as DatabaseSchema from "./DatabaseSchema";
 import * as Table from "./Table";
 
-type TableNames<Schema extends DatabaseSchema.AnyWithProps> =
-  | DatabaseSchema.TableNames<Schema>
-  | Table.Name<Table.SystemTables>;
-
 export type IdentifiedId<TableName extends string> = {
   readonly [Name in TableName]: {
     readonly table: Name;
@@ -20,13 +16,15 @@ export type IdentifiedId<TableName extends string> = {
 }[TableName];
 
 export interface DocumentIds<Schema extends DatabaseSchema.AnyWithProps> {
-  readonly parse: <const Name extends TableNames<Schema>>(
+  readonly parse: <const Name extends DatabaseSchema.AllTableNames<Schema>>(
     table: Name,
     input: string,
   ) => Effect.Effect<Option.Option<GenericId<Name>>>;
   readonly identify: (
     input: string,
-  ) => Effect.Effect<Option.Option<IdentifiedId<TableNames<Schema>>>>;
+  ) => Effect.Effect<
+    Option.Option<IdentifiedId<DatabaseSchema.AllTableNames<Schema>>>
+  >;
 }
 
 export type DocumentIdsTag<Schema extends DatabaseSchema.AnyWithProps> =
@@ -53,7 +51,7 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
   schema: Schema,
   reader: NativeReader<Schema>,
 ): DocumentIds<Schema> => {
-  const normalize = <Name extends TableNames<Schema>>(
+  const normalize = <Name extends DatabaseSchema.AllTableNames<Schema>>(
     table: Name,
     input: string,
   ): GenericId<Name> | null =>
@@ -63,13 +61,16 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
           input,
         )
       : reader.normalizeId(
-          table as DatabaseSchema.TableNames<Schema>,
+          table as DatabaseSchema.UserTableNames<Schema>,
           input,
         )) as GenericId<Name> | null;
 
   return {
     parse: Effect.fn("DocumentIds.parse")(
-      <const Name extends TableNames<Schema>>(table: Name, input: string) =>
+      <const Name extends DatabaseSchema.AllTableNames<Schema>>(
+        table: Name,
+        input: string,
+      ) =>
         Effect.sync(() => {
           const id = normalize(table, input);
           return id === input ? Option.some(id) : Option.none();
@@ -80,12 +81,12 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
         const tables = [
           ...Object.keys(DatabaseSchema.tables(schema)),
           ...Object.keys(Table.systemTables),
-        ] as ReadonlyArray<TableNames<Schema>>;
+        ] as ReadonlyArray<DatabaseSchema.AllTableNames<Schema>>;
         for (const table of tables) {
           const id = normalize(table, input);
           if (id === input) {
             return Option.some({ table, id } as IdentifiedId<
-              TableNames<Schema>
+              DatabaseSchema.AllTableNames<Schema>
             >);
           }
         }
