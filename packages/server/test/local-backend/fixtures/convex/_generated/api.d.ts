@@ -47,7 +47,6 @@ export declare const api: {
         },
         {
           identified: { id: string; table: string } | null;
-          normalized: string | null;
           parsed: string | null;
         }
       >;
@@ -60,9 +59,17 @@ export declare const api: {
         },
         {
           identified: { id: string; table: string } | null;
-          normalized: string | null;
           parsed: string | null;
         }
+      >;
+      nativeSampleId: FunctionReference<
+        "query",
+        "public",
+        {
+          input: string;
+          table: "transactionNotes" | "_storage" | "_scheduled_functions";
+        },
+        string | null
       >;
     };
     metadata: {

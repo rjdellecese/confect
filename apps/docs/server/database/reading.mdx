@@ -47,15 +47,14 @@ from `confect/_generated/services`. Confect provides it in queries, mutations,
 and middleware that covers only those function types, not in actions or HTTP
 handlers. An action or HTTP handler can call a query to perform the check.
 
-All three methods return an `Effect` containing an `Option`. Table arguments
+Both methods return an `Effect` containing an `Option`. Table arguments
 are limited to your schema's table names plus `_storage` and
 `_scheduled_functions`.
 
-| Method                    | Use when                                                                | Result inside the `Effect`                                                               |
-| ------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `parse(table, input)`     | You know the expected table and require a current-format ID.            | `Option<GenericId<typeof table>>`                                                        |
-| `identify(input)`         | You need to determine which known table a current-format ID belongs to. | `Option` of correlated `{ readonly table: Name; readonly id: GenericId<Name> }` variants |
-| `normalize(table, input)` | You know the expected table and want to allow legacy ID conversion.     | `Option<GenericId<typeof table>>`                                                        |
+| Method                | Use when                                                                | Result inside the `Effect`                                                               |
+| --------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `parse(table, input)` | You know the expected table and require a current-format ID.            | `Option<GenericId<typeof table>>`                                                        |
+| `identify(input)`     | You need to determine which known table a current-format ID belongs to. | `Option` of correlated `{ readonly table: Name; readonly id: GenericId<Name> }` variants |
 
 ### Parse before reading
 
@@ -116,30 +115,13 @@ const findNoteFromUnknownId = (input: string) =>
 Identification is scoped to the current runtime and schema. It is not a
 frontend-only decoder or a way to discover tables across Convex components.
 
-### Normalize legacy IDs
-
-Use `normalize` only when accepting legacy IDs is intentional. Unlike `parse`,
-it accepts any non-null result from Convex's native normalizer, which may differ
-from the input string:
-
-```ts
-import * as Effect from "effect/Effect";
-import { DocumentIds } from "./confect/_generated/services";
-
-const normalizeNoteId = (input: string) =>
-  Effect.gen(function* () {
-    const ids = yield* DocumentIds;
-    return yield* ids.normalize("notes", input);
-  });
-```
-
-Legacy strings do not encode a table. Normalization supplies the table you
-choose, so a successful conversion does not identify the string's original table.
-Use `parse` or `identify` when you need strict membership checking.
+Confect does not provide legacy ID conversion. If you need it, use Convex's
+native `db.normalizeId` through `QueryCtx` or `MutationCtx`. Legacy strings do
+not encode a table, so conversion requires you to supply one.
 
 Invalid or mismatching IDs return `None`. Unexpected native runtime failures
 remain Effect defects; the service does not disguise them as invalid input.
-This failure behavior applies to all three methods.
+This failure behavior applies to both methods.
 
 ## Retrieve multiple documents
 
