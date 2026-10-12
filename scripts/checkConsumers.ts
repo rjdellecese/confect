@@ -66,6 +66,23 @@ export const cleanEnvironment = (
   NO_COLOR: "1",
 });
 
+export const packageManagerExecutable = Effect.fn(
+  "Consumer.packageManagerExecutable",
+)(function* (manager: Manager, executablePath: string, repository: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const executable = Bun.which(manager, { PATH: executablePath });
+  if (
+    !executable ||
+    (yield* fs.realPath(executable)).startsWith(`${repository}/`)
+  ) {
+    return yield* new ConsumerGateFailure({
+      phase: "package manager executable",
+      details: { manager, executable },
+    });
+  }
+  return executable;
+});
+
 const command = Effect.fn("Consumer.command")(
   function* (
     program: string,
@@ -238,6 +255,7 @@ const Listing = Schema.Array(
 const verifyProvenance = Effect.fn("Consumer.verifyProvenance")(function* (
   directory: string,
   manager: Manager,
+  executable: string,
   candidates: ReadonlyArray<Candidate>,
   env: Record<string, string>,
 ) {
@@ -269,7 +287,7 @@ const verifyProvenance = Effect.fn("Consumer.verifyProvenance")(function* (
         });
     }
     yield* command(
-      "npm",
+      executable,
       ["ls", "--all", "--json"],
       directory,
       env,
@@ -277,7 +295,7 @@ const verifyProvenance = Effect.fn("Consumer.verifyProvenance")(function* (
     );
   } else {
     const listing = yield* command(
-      "pnpm",
+      executable,
       ["list", "--json", "--depth", "0"],
       directory,
       env,
@@ -324,9 +342,15 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
       phase: "isolation",
       details: directory,
     });
+  const executablePath = yield* Config.String("PATH");
+  const executable = yield* packageManagerExecutable(
+    manager,
+    executablePath,
+    repository,
+  );
   const env = cleanEnvironment(
     directory,
-    yield* Config.String("PATH"),
+    executablePath,
     path.sep === "/" ? ":" : ";",
     repository,
   );
@@ -394,6 +418,7 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
       "packages: []\nallowBuilds:\n  esbuild: true\nstrictPeerDependencies: true\nminimumReleaseAge: 0\n",
     );
     result.tools = {
+      packageManagerExecutable: executable,
       node: (yield* command(
         "node",
         ["--version"],
@@ -402,7 +427,7 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
         "node version",
       )).trim(),
       [manager]: (yield* command(
-        manager,
+        executable,
         ["--version"],
         directory,
         env,
@@ -418,7 +443,7 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
       manager === "npm"
         ? ["install", "--strict-peer-deps", "--no-audit", "--no-fund"]
         : ["install", "--strict-peer-dependencies", "--reporter=append-only"];
-    const output = yield* command(manager, args, directory, env, "install");
+    const output = yield* command(executable, args, directory, env, "install");
     result.installOutput = output;
     const problems = installProblems(0, output);
     if (problems.length)
@@ -439,7 +464,7 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
         phase: "installed graph",
         details: invalid,
       });
-    yield* verifyProvenance(directory, manager, candidates, env);
+    yield* verifyProvenance(directory, manager, executable, candidates, env);
     result.codegen = yield* command(
       "node",
       [

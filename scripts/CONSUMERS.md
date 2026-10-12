@@ -23,6 +23,12 @@ or `NODE_PATH`. pnpm approves only esbuild builds in that disposable project;
 npm uses its normal install scripts. Neither installer uses force, legacy peers,
 or scripts-skipping.
 
+The package-manager executable is resolved explicitly before PATH is scrubbed.
+External toolchain installations (including GitHub's `setup-pnpm/node_modules`)
+remain usable without restoring workspace executable aliases or user settings.
+Consumer checks currently run on Linux with Node, Bun, pnpm, npm, and `tar`;
+the existing package suites retain their separate Windows coverage.
+
 The runner checks all reachable installed peer edges, physical package paths,
 the shared Effect instance, candidate versions, and package-manager tarball
 provenance. Every Confect package in the profile is a direct tarball dependency,
@@ -73,7 +79,7 @@ Foldkit row is the explicit blocker above, not evidence of full release coverage
 ## Reports and final candidate artifacts
 
 `--report FILE` writes the requested and selected versions, real paths, candidate
-tarball SHA-512 identities, tool versions, phase outputs, and failure details as
+tarball SHA-512 identities, tool versions and executable paths, phase outputs, and failure details as
 JSON. By default it writes `result.json` in the temporary consumer directory and
 prints that location. The directory is retained for diagnosis; remove it when
 finished. Do not commit reports, install trees, or lockfiles.
