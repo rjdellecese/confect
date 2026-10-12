@@ -12,6 +12,72 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
     it.effect(
+      "preserves optional outputs that are not owned by Confect",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const outputs = ["auth.config.ts", "http.ts", "crons.ts"];
+          const contents = "export default {};\n";
+          yield* Effect.forEach(outputs, (output) =>
+            project.write(`convex/${output}`, contents),
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          for (const output of outputs) {
+            expect(
+              yield* fs.readFileString(
+                path.join(project.root, "convex", output),
+              ),
+            ).toBe(contents);
+          }
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect.each([
+      {
+        source: "auth.ts",
+        output: "auth.config.ts",
+        contents: "export default { providers: [] };\n",
+      },
+      {
+        source: "http.ts",
+        output: "http.ts",
+        contents:
+          'import { httpRouter } from "convex/server"; export default httpRouter();\n',
+      },
+      {
+        source: "crons.ts",
+        output: "crons.ts",
+        contents:
+          'import { cronJobs } from "convex/server"; export default cronJobs();\n',
+      },
+    ])(
+      "retries removal of $output after impl validation recovers",
+      ({ source, output, contents }) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.write(`confect/${source}`, contents);
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const generated = path.join(project.root, "convex", output);
+          expect(yield* fs.exists(generated)).toBe(true);
+          yield* project.write("confect/notes.impl.ts", Project.emptyImpl);
+          yield* watching.waitFor("does not implement every function");
+          yield* fs.remove(path.join(project.root, "confect", source));
+          yield* watching.waitFor("does not implement every function");
+          yield* project.write("confect/notes.impl.ts", Project.impl);
+          yield* watching.waitFor(success);
+          expect(yield* fs.exists(generated)).toBe(false);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "removes optional output and the last group when their entry points disappear",
       () =>
         Effect.gen(function* () {

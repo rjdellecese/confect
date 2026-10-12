@@ -3,7 +3,9 @@ import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as Command from "effect/cli/Command";
 import * as Deferred from "effect/Deferred";
+import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as esbuild from "esbuild";
 import { dev } from "@confect/cli/confect/dev";
@@ -19,9 +21,119 @@ vi.mock("esbuild", (importOriginal) =>
   })),
 );
 
+vi.mock("effect/Console", (importOriginal) =>
+  importOriginal<typeof Console>().then((original) => ({
+    ...original,
+    log: vi.fn(original.log),
+  })),
+);
+
 layer(NodeServices.layer, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
+    it.effect.each(["confect/name.ts", "name.ts"])(
+      "reconciles a startup edit to %s before reporting readiness",
+      (dependency) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const importPath = dependency.startsWith("confect/")
+            ? "./name"
+            : "../name";
+          yield* project.write(dependency, 'export const name = "first";\n');
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+import { name } from "${importPath}";
+export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name, returns: () => Schema.Null }));
+`,
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            `import { FunctionImpl, GroupImpl } from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import databaseSchema from "./_generated/schema";
+import spec from "./notes.spec";
+import { name } from "${importPath}";
+export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionImpl.make(databaseSchema, spec, name, () => Effect.succeed(null))), GroupImpl.finalize);
+`,
+          );
+          const ready = yield* Deferred.make<void>();
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi.spyOn(Console, "log").mockImplementation((...args) =>
+                Effect.sync(() => {
+                  if (
+                    args.some(
+                      (arg) =>
+                        typeof arg === "string" &&
+                        arg.includes("Generated files are up-to-date"),
+                    )
+                  ) {
+                    Deferred.doneUnsafe(ready, Effect.void);
+                  }
+                }),
+              ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          const runPromise = Effect.runPromiseWith(yield* Effect.context());
+          const context = vi.mocked(esbuild.context);
+          const original = context.getMockImplementation();
+          assert(original);
+          let edited = false;
+          context.mockImplementation((options) =>
+            original({
+              ...options,
+              plugins: [
+                ...(options.plugins ?? []),
+                {
+                  name: "edit-before-first-watch-snapshot",
+                  setup(build) {
+                    build.onStart(() => {
+                      if (edited) return;
+                      edited = true;
+                      return runPromise(
+                        project.write(
+                          dependency,
+                          'export const name = "second";\n',
+                        ),
+                      );
+                    });
+                  },
+                },
+              ],
+            }),
+          );
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() => context.mockImplementation(original)),
+          );
+          yield* Command.runWith(dev, { version: "test" })([]).pipe(
+            Effect.provideService(ProjectRoot, {
+              get: Effect.succeed(project.root),
+            }),
+            Effect.provideService(ConfectDirectory, {
+              get: Effect.succeed(path.join(project.root, "confect")),
+            }),
+            Effect.provideService(ConvexDirectory, {
+              get: Effect.succeed(path.join(project.root, "convex")),
+            }),
+            Effect.forkScoped,
+          );
+          yield* Deferred.await(ready).pipe(Effect.timeout("15 seconds"));
+          expect(edited).toBe(true);
+          const generated = yield* fs.readFileString(
+            path.join(project.root, "convex/notes.ts"),
+          );
+          expect(generated).toContain("export const second =");
+          expect(generated).not.toContain("export const first =");
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect.each([1, 8])(
       "uses a bounded number of build contexts for %i groups",
       (groups) =>

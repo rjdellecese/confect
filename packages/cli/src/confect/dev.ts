@@ -72,8 +72,6 @@ const COALESCE_QUIESCENCE = Duration.millis(300);
 // signal stream can't pin the sync loop forever.
 const COALESCE_MAX_WAIT = Duration.seconds(5);
 
-const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
-
 type Pending = {
   readonly specDirty: boolean;
   readonly httpDirty: boolean;
@@ -185,16 +183,6 @@ export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
     const previousFunctionPaths = yield* loadPreviousFunctionPaths;
-    const initialResult = yield* codegenHandler.pipe(
-      Effect.tap(({ functionPaths }) =>
-        logFunctionPathDiff(previousFunctionPaths, functionPaths),
-      ),
-      CodegenError.catchAndLog,
-    );
-    const initialFunctionPaths = Option.match(initialResult, {
-      onNone: () => emptyFunctionPaths,
-      onSome: ({ functionPaths }) => functionPaths,
-    });
 
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
@@ -209,7 +197,6 @@ export const dev = Command.make("dev", {}, () =>
       [
         Effect.scoped(
           entryPointsWatcher(
-            Option.isNone(initialResult),
             signal,
             pendingRef,
             restartQueue,
@@ -223,8 +210,7 @@ export const dev = Command.make("dev", {}, () =>
         syncLoop(
           signal,
           pendingRef,
-          initialFunctionPaths,
-          Option.isNone(initialResult),
+          previousFunctionPaths,
           refreshWatcher,
           watcherErrorsRef,
           watcherWarningsRef,
@@ -306,7 +292,6 @@ const syncLoop = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
-  initialSyncFailed: boolean,
   refreshWatcher: Ref.Ref<Effect.Effect<void>>,
   watcherErrorsRef: Ref.Ref<WatcherMessages>,
   watcherWarningsRef: Ref.Ref<WatcherMessages>,
@@ -314,8 +299,15 @@ const syncLoop = Effect.fnUntraced(function* (
   const functionPathsRef = yield* Ref.make(initialFunctionPaths);
   const lastLoggedErrorsRef = yield* Ref.make<string>("");
   const lastLoggedWarningsRef = yield* Ref.make<string>("");
-  const fullSyncNeeded = yield* Ref.make(initialSyncFailed);
+  const fullSyncNeeded = yield* Ref.make(true);
+  const initialSync = yield* Ref.make(true);
   const failedImpls = yield* Ref.make<ReadonlySet<string>>(new Set());
+  const emptyOptional = {
+    httpDirty: false,
+    cronsDirty: false,
+    authDirty: false,
+  };
+  const optionalPendingRef = yield* Ref.make(emptyOptional);
 
   return yield* Effect.forever(
     Effect.gen(function* () {
@@ -327,16 +319,18 @@ const syncLoop = Effect.fnUntraced(function* (
         COALESCE_MAX_WAIT,
       );
 
-      yield* logChangedWatcherMessages(
-        watcherErrorsRef,
-        lastLoggedErrorsRef,
-        logCoalescedBuildErrors,
-      );
-      yield* logChangedWatcherMessages(
-        watcherWarningsRef,
-        lastLoggedWarningsRef,
-        logCoalescedBuildWarnings,
-      );
+      if (!(yield* Ref.get(initialSync))) {
+        yield* logChangedWatcherMessages(
+          watcherErrorsRef,
+          lastLoggedErrorsRef,
+          logCoalescedBuildErrors,
+        );
+        yield* logChangedWatcherMessages(
+          watcherWarningsRef,
+          lastLoggedWarningsRef,
+          logCoalescedBuildWarnings,
+        );
+      }
 
       const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
 
@@ -346,7 +340,17 @@ const syncLoop = Effect.fnUntraced(function* (
         return;
       }
 
-      yield* logPending("Dependencies may have changed, reloading…");
+      const firstSync = yield* Ref.getAndSet(initialSync, false);
+      const optional = yield* Ref.updateAndGet(
+        optionalPendingRef,
+        (previous) => ({
+          httpDirty: previous.httpDirty || pending.httpDirty,
+          cronsDirty: previous.cronsDirty || pending.cronsDirty,
+          authDirty: previous.authDirty || pending.authDirty,
+        }),
+      );
+      if (!firstSync)
+        yield* logPending("Dependencies may have changed, reloading…");
 
       if (pending.specDirty || (yield* Ref.get(fullSyncNeeded))) {
         const current = yield* codegenHandler.pipe(
@@ -361,6 +365,13 @@ const syncLoop = Effect.fnUntraced(function* (
         );
         if (Option.isNone(current)) {
           yield* Ref.set(fullSyncNeeded, true);
+          if (firstSync) {
+            yield* Ref.update(pendingRef, (next) => ({
+              ...next,
+              specDirty: true,
+            }));
+            yield* Queue.offer(signal, undefined);
+          }
           return;
         }
         yield* Ref.set(fullSyncNeeded, false);
@@ -386,13 +397,13 @@ const syncLoop = Effect.fnUntraced(function* (
       }
 
       const dirtyOptionalFiles = [
-        ...(pending.httpDirty
+        ...(optional.httpDirty
           ? [syncOptionalFile(generateHttp, "http.ts")]
           : []),
-        ...(pending.cronsDirty
+        ...(optional.cronsDirty
           ? [syncOptionalFile(generateCrons, "crons.ts")]
           : []),
-        ...(pending.authDirty
+        ...(optional.authDirty
           ? [syncOptionalFile(generateAuthConfig, "auth.config.ts")]
           : []),
       ];
@@ -400,6 +411,7 @@ const syncLoop = Effect.fnUntraced(function* (
       yield* Array.isReadonlyArrayNonEmpty(dirtyOptionalFiles)
         ? Effect.all(dirtyOptionalFiles, { concurrency: "unbounded" })
         : Effect.void;
+      yield* Ref.set(optionalPendingRef, emptyOptional);
 
       if (!isPendingDirty(yield* Ref.get(pendingRef))) {
         yield* logSuccess("Generated files are up-to-date");
@@ -494,7 +506,6 @@ const esbuildOptions = (
   notExternal: ReadonlyArray<RegExp>,
   stateRef: Ref.Ref<WatchState | undefined>,
   structuralChange: boolean,
-  initialSyncFailed: boolean,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   watcherErrorsRef: Ref.Ref<WatcherMessages>,
@@ -570,16 +581,6 @@ const esbuildOptions = (
                     ? new Map([["entries", result.warnings]])
                     : emptyWatcherMessages,
                 );
-                if (
-                  previous === undefined &&
-                  !structureChanged &&
-                  !initialSyncFailed &&
-                  result.errors.length === 0
-                ) {
-                  yield* logSuccess("Generated files are up-to-date");
-                  return;
-                }
-
                 const files = new Set([
                   ...(previous?.fingerprints.keys() ?? []),
                   ...fingerprints.keys(),
@@ -621,8 +622,7 @@ const esbuildOptions = (
                       next[entry.pendingKey] = true;
                     }
                   }
-                  if (structureChanged || (full && initialSyncFailed))
-                    next.specDirty = true;
+                  if (full) next.specDirty = true;
                   return next;
                 });
                 yield* Queue.offer(signal, undefined);
@@ -636,7 +636,6 @@ const esbuildOptions = (
 };
 
 const entryPointsWatcher = Effect.fnUntraced(function* (
-  initialSyncFailed: boolean,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
@@ -692,17 +691,16 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     yield* Ref.set(watcherErrorsRef, emptyWatcherMessages);
     yield* Ref.set(watcherWarningsRef, emptyWatcherMessages);
     if (entries.length === 0) {
-      if (structuralChange) {
-        yield* Queue.offer(signal, undefined);
-      }
+      yield* Ref.update(pendingRef, (pending) => ({
+        ...pending,
+        specDirty: true,
+      }));
+      yield* Queue.offer(signal, undefined);
       yield* Ref.set(stateRef, {
         fingerprints: new Map(),
         graph: new Map(),
         outputHash: "",
       });
-      if (!structuralChange && !initialSyncFailed) {
-        yield* logSuccess("Generated files are up-to-date");
-      }
       return;
     }
 
@@ -724,7 +722,6 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
             notExternal,
             stateRef,
             structuralChange,
-            initialSyncFailed,
             signal,
             pendingRef,
             watcherErrorsRef,
