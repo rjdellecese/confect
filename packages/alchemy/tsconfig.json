@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "isolatedDeclarations": false,
+    "skipLibCheck": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "paths": {
+      "@confect/alchemy": ["./src/index.ts"],
+      "@confect/alchemy/*": ["./src/*"]
+    }
+  },
+  "exclude": ["coverage", "dist", "node_modules"]
+}
