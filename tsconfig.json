@@ -29,6 +29,8 @@
       "@confect/cli/*": ["./packages/cli/src/*"],
       "@confect/test": ["./packages/test/src/index.ts"],
       "@confect/test/*": ["./packages/test/src/*"],
+      "@confect/alchemy": ["./packages/alchemy/src/index.ts"],
+      "@confect/alchemy/*": ["./packages/alchemy/src/*"],
       "~/*": ["./packages/server/test/mock-backend/fixtures/confect/*"]
     }
   },
