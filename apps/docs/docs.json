@@ -94,7 +94,7 @@
       },
       {
         "group": "Guides",
-        "pages": ["guides/testing"]
+        "pages": ["guides/testing", "guides/alchemy"]
       }
     ]
   },
@@ -257,6 +257,10 @@
       "destination": "/guides/testing"
     },
     {
+      "source": "/v9/guides/alchemy",
+      "destination": "/guides/alchemy"
+    },
+    {
       "source": "/v10/getting-started/introduction",
       "destination": "/getting-started/introduction"
     },
@@ -391,6 +395,10 @@
     {
       "source": "/v10/guides/testing",
       "destination": "/guides/testing"
+    },
+    {
+      "source": "/v10/guides/alchemy",
+      "destination": "/guides/alchemy"
     }
   ]
 }
