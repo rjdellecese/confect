@@ -27,10 +27,6 @@ export interface DocumentIds<Schema extends DatabaseSchema.AnyWithProps> {
   readonly identify: (
     input: string,
   ) => Effect.Effect<Option.Option<IdentifiedId<TableNames<Schema>>>>;
-  readonly normalize: <const Name extends TableNames<Schema>>(
-    table: Name,
-    input: string,
-  ) => Effect.Effect<Option.Option<GenericId<Name>>>;
 }
 
 export type DocumentIdsTag<Schema extends DatabaseSchema.AnyWithProps> =
@@ -95,10 +91,6 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
         }
         return Option.none();
       }),
-    ),
-    normalize: Effect.fn("DocumentIds.normalize")(
-      <const Name extends TableNames<Schema>>(table: Name, input: string) =>
-        Effect.sync(() => Option.fromNullishOr(normalize(table, input))),
     ),
   };
 };

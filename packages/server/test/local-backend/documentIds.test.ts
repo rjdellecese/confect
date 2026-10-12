@@ -21,7 +21,6 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
           );
           const expected = {
             parsed: id,
-            normalized: id,
             identified: { table: "transactionNotes", id },
           };
           expect(
@@ -47,42 +46,43 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
       "transactionNotes",
       "_storage",
       "_scheduled_functions",
-    ] as const)(
-      "keeps legacy conversion separate from strict %s membership",
-      (table) =>
-        Effect.gen(function* () {
-          const { client } = yield* LocalBackend.LocalBackend;
-          const inspect = Ref.getFunctionReference(
-            refs.public.groups.documentIds.inspect,
-          );
-          const legacy = yield* Effect.promise(() =>
-            client.query(inspect, { table, input: "LZ_YyWnYaZSFKTnOpihMPA" }),
-          );
-          expect(legacy.parsed).toBeNull();
-          expect(legacy.identified).toBeNull();
-          assert(legacy.normalized !== null);
-          const input = legacy.normalized;
-          expect(
-            yield* Effect.promise(() =>
-              client.query(inspect, { table, input }),
+    ] as const)("rejects legacy strings and validates modern %s IDs", (table) =>
+      Effect.gen(function* () {
+        const { client } = yield* LocalBackend.LocalBackend;
+        const inspect = Ref.getFunctionReference(
+          refs.public.groups.documentIds.inspect,
+        );
+        const legacy = yield* Effect.promise(() =>
+          client.query(inspect, { table, input: "LZ_YyWnYaZSFKTnOpihMPA" }),
+        );
+        expect(legacy.parsed).toBeNull();
+        expect(legacy.identified).toBeNull();
+        const input = yield* Effect.promise(() =>
+          client.query(
+            Ref.getFunctionReference(
+              refs.public.groups.documentIds.nativeSampleId,
             ),
-          ).toEqual({
-            parsed: input,
-            normalized: input,
-            identified: { table, id: input },
-          });
-          const wrongTable =
-            table === "_storage" ? "transactionNotes" : "_storage";
-          expect(
-            yield* Effect.promise(() =>
-              client.query(inspect, { table: wrongTable, input }),
-            ),
-          ).toEqual({
-            parsed: null,
-            normalized: null,
-            identified: { table, id: input },
-          });
-        }),
+            { table, input: "LZ_YyWnYaZSFKTnOpihMPA" },
+          ),
+        );
+        assert(input !== null);
+        expect(
+          yield* Effect.promise(() => client.query(inspect, { table, input })),
+        ).toEqual({
+          parsed: input,
+          identified: { table, id: input },
+        });
+        const wrongTable =
+          table === "_storage" ? "transactionNotes" : "_storage";
+        expect(
+          yield* Effect.promise(() =>
+            client.query(inspect, { table: wrongTable, input }),
+          ),
+        ).toEqual({
+          parsed: null,
+          identified: { table, id: input },
+        });
+      }),
     );
 
     it.effect.each(["", "not-an-id"])(
@@ -101,7 +101,6 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             ),
           ).toEqual({
             parsed: null,
-            normalized: null,
             identified: null,
           });
         }),

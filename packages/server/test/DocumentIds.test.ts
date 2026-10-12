@@ -51,7 +51,6 @@ describe("DocumentIds", () => {
         const ids = yield* DocumentIds.DocumentIds<typeof databaseSchema>();
         const parsed = ids.parse("notes", "notes:id");
         const identified = ids.identify("_storage:id");
-        const normalized = ids.normalize("_storage", "legacy");
         expect(native.normalizeId).not.toHaveBeenCalled();
         expect(native.system.normalizeId).not.toHaveBeenCalled();
         expect(yield* parsed).toEqual(Option.some("notes:id"));
@@ -60,7 +59,6 @@ describe("DocumentIds", () => {
         expect(yield* identified).toEqual(
           Option.some({ table: "_storage", id: "_storage:id" }),
         );
-        expect(yield* normalized).toEqual(Option.some("_storage:id"));
         expect(
           vi
             .mocked(native.normalizeId)
@@ -92,7 +90,6 @@ describe("DocumentIds", () => {
         expect(yield* ids.identify(input)).toEqual(
           Option.some({ table, id: input }),
         );
-        expect(yield* ids.normalize(table, input)).toEqual(Option.some(input));
       }),
   );
 
@@ -103,27 +100,17 @@ describe("DocumentIds", () => {
         const ids = DocumentIds.make(schema, makeNative());
         expect(yield* ids.parse("notes", input)).toEqual(Option.none());
         expect(yield* ids.identify(input)).toEqual(Option.none());
-        expect(yield* ids.normalize("notes", input)).toEqual(Option.none());
       }),
   );
 
   it.effect(
-    "rejects another table's ID and separates legacy conversion from membership",
+    "rejects another table's ID and legacy strings requiring conversion",
     () =>
       Effect.gen(function* () {
         const ids = DocumentIds.make(schema, makeNative());
         expect(yield* ids.parse("notes", "users:id")).toEqual(Option.none());
-        expect(yield* ids.normalize("notes", "users:id")).toEqual(
-          Option.none(),
-        );
         expect(yield* ids.parse("notes", "legacy")).toEqual(Option.none());
         expect(yield* ids.identify("legacy")).toEqual(Option.none());
-        expect(yield* ids.normalize("notes", "legacy")).toEqual(
-          Option.some("notes:id"),
-        );
-        expect(yield* ids.normalize("users", "legacy")).toEqual(
-          Option.some("users:id"),
-        );
       }),
   );
 
@@ -188,7 +175,7 @@ describe("DocumentIds", () => {
       ).toBe(failure);
       expect(
         yield* ids
-          .normalize("_storage", "legacy")
+          .parse("_storage", "_storage:id")
           .pipe(Effect.catchDefect(Effect.succeed)),
       ).toBe(failure);
     }),
@@ -202,15 +189,13 @@ describe("DocumentIds", () => {
         expectTypeOf(ids.parse("notes", "input")).toEqualTypeOf<
           Effect.Effect<Option.Option<GenericId<"notes">>>
         >();
-        expectTypeOf(ids.normalize("_storage", "input")).toEqualTypeOf<
+        expectTypeOf(ids.parse("_storage", "input")).toEqualTypeOf<
           Effect.Effect<Option.Option<GenericId<"_storage">>>
         >();
         expectTypeOf<"unknown">().not.toExtend<
           Parameters<typeof ids.parse>[0]
         >();
-        expectTypeOf<"unknown">().not.toExtend<
-          Parameters<typeof ids.normalize>[0]
-        >();
+        expectTypeOf<keyof typeof ids>().toEqualTypeOf<"parse" | "identify">();
         const identified = yield* ids.identify("users:id");
         expectTypeOf(identified).toEqualTypeOf<
           Option.Option<

@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import databaseSchema from "../_generated/schema";
-import { DatabaseWriter, DocumentIds } from "../_generated/services";
+import { DatabaseWriter, DocumentIds, QueryCtx } from "../_generated/services";
 import documentIds from "./documentIds.spec";
 
 const inspect = ({
@@ -17,7 +17,6 @@ const inspect = ({
     const ids = yield* DocumentIds;
     return {
       parsed: Option.getOrNull(yield* ids.parse(table, input)),
-      normalized: Option.getOrNull(yield* ids.normalize(table, input)),
       identified: Option.getOrNull(yield* ids.identify(input)),
     };
   });
@@ -40,6 +39,20 @@ const createAndDelete = FunctionImpl.make(
 );
 
 export default GroupImpl.make(databaseSchema, documentIds).pipe(
+  Layer.provide(
+    FunctionImpl.make(
+      databaseSchema,
+      documentIds,
+      "nativeSampleId",
+      ({ table, input }) =>
+        Effect.gen(function* () {
+          const { db } = yield* QueryCtx;
+          return table === "transactionNotes"
+            ? db.normalizeId(table, input)
+            : db.system.normalizeId(table, input);
+        }),
+    ),
+  ),
   Layer.provide(
     FunctionImpl.make(databaseSchema, documentIds, "inspect", inspect),
   ),

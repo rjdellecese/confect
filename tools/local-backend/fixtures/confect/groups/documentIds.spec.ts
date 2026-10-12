@@ -13,7 +13,6 @@ const inspection = {
   returns: () =>
     Schema.Struct({
       parsed: Schema.NullOr(Schema.String),
-      normalized: Schema.NullOr(Schema.String),
       identified: Schema.NullOr(
         Schema.Struct({ table: Schema.String, id: Schema.String }),
       ),
@@ -21,6 +20,13 @@ const inspection = {
 };
 
 export default GroupSpec.make()
+  .addFunction(
+    FunctionSpec.publicQuery({
+      name: "nativeSampleId",
+      args: inspection.args,
+      returns: () => Schema.NullOr(Schema.String),
+    }),
+  )
   .addFunction(FunctionSpec.publicQuery({ name: "inspect", ...inspection }))
   .addFunction(
     FunctionSpec.publicMutation({ name: "inspectFromMutation", ...inspection }),

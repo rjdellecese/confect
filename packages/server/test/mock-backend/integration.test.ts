@@ -106,13 +106,10 @@ describe("DocumentIds", () => {
               const ids =
                 yield* DocumentIds.DocumentIds<typeof confectSchema>();
               const parsed = yield* ids.parse("notes", input);
-              const normalized = yield* ids.normalize("notes", input);
               const identified = yield* ids.identify(input);
               return (
                 Option.isSome(parsed) &&
                 parsed.value === input &&
-                Option.isSome(normalized) &&
-                normalized.value === input &&
                 Option.isSome(identified) &&
                 identified.value.table === "notes" &&
                 identified.value.id === input &&
