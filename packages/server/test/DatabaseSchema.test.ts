@@ -28,6 +28,12 @@ describe("DatabaseSchema", () => {
     expectTypeOf<DatabaseSchema.TableNames<typeof schema>>().toEqualTypeOf<
       "notes" | "users"
     >();
+    expectTypeOf<DatabaseSchema.UserTableNames<typeof schema>>().toEqualTypeOf<
+      "notes" | "users"
+    >();
+    expectTypeOf<DatabaseSchema.AllTableNames<typeof schema>>().toEqualTypeOf<
+      "notes" | "users" | "_storage" | "_scheduled_functions"
+    >();
     expectTypeOf<
       DatabaseSchema.TableWithName<typeof schema, "notes">
     >().toEqualTypeOf<typeof notes>();
@@ -39,5 +45,9 @@ describe("DatabaseSchema", () => {
     expect(DatabaseSchema.tables(schema)).toEqual({});
     expectTypeOf<DatabaseSchema.Tables<typeof schema>>().toBeNever();
     expectTypeOf<DatabaseSchema.TableNames<typeof schema>>().toBeNever();
+    expectTypeOf<DatabaseSchema.UserTableNames<typeof schema>>().toBeNever();
+    expectTypeOf<DatabaseSchema.AllTableNames<typeof schema>>().toEqualTypeOf<
+      "_storage" | "_scheduled_functions"
+    >();
   });
 });

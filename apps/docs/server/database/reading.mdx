@@ -51,16 +51,18 @@ Both methods return an `Effect` containing an `Option`. Table arguments
 are limited to your schema's table names plus `_storage` and
 `_scheduled_functions`.
 
-| Method                | Use when                                                                | Result inside the `Effect`                                                               |
-| --------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `parse(table, input)` | You know the expected table and require a current-format ID.            | `Option<GenericId<typeof table>>`                                                        |
-| `identify(input)`     | You need to determine which known table a current-format ID belongs to. | `Option` of correlated `{ readonly table: Name; readonly id: GenericId<Name> }` variants |
+| Method                | Use when                                                                                     | Result inside the `Effect`                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `parse(table, input)` | You expect a string to be an ID for a particular table and need to validate that assumption. | `Option<GenericId<typeof table>>`                                                        |
+| `identify(input)`     | You need to determine which known table a current-format ID belongs to.                      | `Option` of correlated `{ readonly table: Name; readonly id: GenericId<Name> }` variants |
 
 ### Parse before reading
 
-`parse` returns `Some(id)` only when Convex's native `normalizeId(table, input)`
-returns the input unchanged. Invalid strings, IDs for a different table, and
-legacy strings that require conversion return `None`.
+Use `parse` to prove that an untrusted string is a valid ID for the expected table.
+On success, you receive the table-typed ID without a cast.
+
+`parse` returns `Some(id)` when the string is a valid ID for the specified table.
+Invalid strings and IDs for a different table return `None`.
 
 ```ts
 import * as Effect from "effect/Effect";
@@ -86,9 +88,9 @@ Check access before returning a document to the caller.
 ### Identify an unknown table
 
 `identify` tries the tables in your schema and both system tables using native
-runtime ID lookups, not document scans. It uses the same strict rule as `parse`,
-so a legacy string that needs conversion does not identify a table. An invalid
-string or an ID that matches none of the known tables returns `None`.
+runtime ID lookups, not document scans. It validates the input in the same way
+as `parse`. An invalid string or an ID that matches none of the known tables
+returns `None`.
 
 The result keeps each table name paired with its ID type. Narrow `table` to
 use `id` with a specific table:
@@ -114,10 +116,6 @@ const findNoteFromUnknownId = (input: string) =>
 
 Identification is scoped to the current runtime and schema. It is not a
 frontend-only decoder or a way to discover tables across Convex components.
-
-Confect does not provide legacy ID conversion. If you need it, use Convex's
-native `db.normalizeId` through `QueryCtx` or `MutationCtx`. Legacy strings do
-not encode a table, so conversion requires you to supply one.
 
 Invalid or mismatching IDs return `None`. Unexpected native runtime failures
 remain Effect defects; the service does not disguise them as invalid input.
