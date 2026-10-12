@@ -38,6 +38,7 @@
   "scripts": {
     "build": "vp run --cache --filter \"@confect/*\" build",
     "check": "bun run scripts/syncSkillIgnore.ts --check && bun run scripts/streamDiagrams.ts --check && vp check",
+    "check:consumers": "bun run scripts/checkConsumers.ts",
     "check:pack-contents": "bun run scripts/checkPackContents.ts",
     "circular": "dpdm --no-warning --no-tree --exit-code circular:1 -T \"packages/*/src/**/*.ts\"",
     "clean": "pnpm -r run clean && bun run scripts/clean.ts node_modules",
