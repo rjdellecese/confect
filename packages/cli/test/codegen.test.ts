@@ -1,4 +1,4 @@
-import { FunctionSpec, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec, Table } from "@confect/core";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
@@ -8,6 +8,8 @@ import { vi } from "vitest";
 import * as Bundler from "@confect/cli/Bundler";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
+import * as Fiber from "effect/Fiber";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -15,6 +17,7 @@ import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import {
   codegenHandler,
+  validateImplFiles,
   validateNoParentChildNameCollisions,
 } from "@confect/cli/confect/codegen";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -24,6 +27,7 @@ import {
   specImportPathFromGenerated,
   type LeafModule,
 } from "@confect/cli/LeafModule";
+import * as LeafModules from "@confect/cli/LeafModule";
 import {
   discover as discoverTables,
   validate as validateTables,
@@ -34,6 +38,70 @@ import * as Project from "./integration/Project";
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect("bounds spec and impl phases without overlapping them", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const project = yield* Project.make;
+        for (const index of Array.range(0, 7)) {
+          yield* project.write(
+            `confect/group${index}.spec.ts`,
+            'import { GroupSpec } from "@confect/core"; export default GroupSpec.make();',
+          );
+          yield* project.write(
+            `confect/group${index}.impl.ts`,
+            `import { GroupImpl } from "@confect/server";
+import databaseSchema from "./_generated/schema";
+import spec from "./group${index}.spec";
+export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
+          );
+        }
+        const active = { spec: 0, impl: 0 };
+        const maximum = { spec: 0, impl: 0 };
+        let completedSpecs = 0;
+        const original = Bundler.bundle;
+        yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            vi.spyOn(Bundler, "bundle").mockImplementation((entry) =>
+              Effect.gen(function* () {
+                const phase = entry.endsWith(".spec.ts")
+                  ? "spec"
+                  : entry.endsWith(".impl.ts")
+                    ? "impl"
+                    : undefined;
+                if (phase === undefined) return yield* original(entry);
+                if (phase === "impl") expect(completedSpecs).toBe(9);
+                active[phase]++;
+                maximum[phase] = Math.max(maximum[phase], active[phase]);
+                yield* Effect.yieldNow;
+                return yield* original(entry).pipe(
+                  Effect.ensuring(
+                    Effect.sync(() => {
+                      active[phase]--;
+                      if (phase === "spec") completedSpecs++;
+                    }),
+                  ),
+                );
+              }),
+            ),
+          ),
+          (spy) => Effect.sync(() => spy.mockRestore()),
+        );
+        yield* codegenHandler.pipe(
+          Effect.provideService(ProjectRoot, {
+            get: Effect.succeed(project.root),
+          }),
+          Effect.provideService(ConfectDirectory, {
+            get: Effect.succeed(path.join(project.root, "confect")),
+          }),
+          Effect.provideService(ConvexDirectory, {
+            get: Effect.succeed(path.join(project.root, "convex")),
+          }),
+        );
+        expect(maximum).toEqual({ spec: 4, impl: 4 });
+        expect(completedSpecs).toBe(9);
+      }).pipe(Effect.scoped),
+    );
+
     it.effect(
       "does not bundle the same spec twice during one codegen pass",
       () =>
@@ -104,6 +172,183 @@ const CodegenLayer = Layer.mergeAll(
     ConfectDirectory.of({ get: Effect.succeed(fixtureConfect) }),
   ),
 );
+
+layer(
+  Layer.mergeAll(
+    NodePath.layer,
+    FileSystem.layerNoop({ exists: () => Effect.succeed(true) }),
+    Layer.succeed(ConfectDirectory, { get: Effect.succeed("/confect") }),
+  ),
+)("validateImplFiles", (it) => {
+  it.effect(
+    "validates only supplied impls and reuses each validated spec",
+    () =>
+      Effect.gen(function* () {
+        const groupSpec = GroupSpec.make();
+        const spec = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            vi
+              .spyOn(LeafModules, "validateSpec")
+              .mockReturnValue(Effect.succeed(groupSpec)),
+          ),
+          (spy) => Effect.sync(() => spy.mockRestore()),
+        );
+        const impl = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            vi
+              .spyOn(LeafModules, "validateImpl")
+              .mockReturnValue(Effect.as(Effect.yieldNow, undefined)),
+          ),
+          (spy) => Effect.sync(() => spy.mockRestore()),
+        );
+        const paths = [
+          "nested/notes.impl.ts",
+          "node/tasks.impl.ts",
+          "notes.spec.ts",
+        ];
+        expect(yield* validateImplFiles(paths)).toBeUndefined();
+        expect(paths).toEqual([
+          "nested/notes.impl.ts",
+          "node/tasks.impl.ts",
+          "notes.spec.ts",
+        ]);
+        expect(spec.mock.calls.map(([leaf]) => leaf.relativePath)).toEqual([
+          "nested/notes.spec.ts",
+          "node/tasks.spec.ts",
+        ]);
+        expect(impl).toHaveBeenCalledTimes(2);
+        for (const [leaf, validatedSpec] of impl.mock.calls) {
+          expect(validatedSpec).toBe(groupSpec);
+          expect(
+            spec.mock.calls.some(([candidate]) => candidate === leaf),
+          ).toBe(true);
+        }
+        yield* validateImplFiles([]);
+        expect(spec).toHaveBeenCalledTimes(2);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect("bounds independent validations to four", () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      let active = 0;
+      let maximum = 0;
+      const spec = yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          vi.spyOn(LeafModules, "validateSpec").mockImplementation(() =>
+            Effect.gen(function* () {
+              active++;
+              maximum = Math.max(maximum, active);
+              if (active === 4) yield* Deferred.succeed(started, undefined);
+              yield* Deferred.await(release);
+              active--;
+              return GroupSpec.make();
+            }),
+          ),
+        ),
+        (spy) => Effect.sync(() => spy.mockRestore()),
+      );
+      const impl = yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          vi.spyOn(LeafModules, "validateImpl").mockImplementation(() =>
+            Effect.gen(function* () {
+              active++;
+              maximum = Math.max(maximum, active);
+              yield* Effect.yieldNow;
+              active--;
+              return undefined;
+            }),
+          ),
+        ),
+        (spy) => Effect.sync(() => spy.mockRestore()),
+      );
+      const fiber = yield* validateImplFiles(
+        Array.range(0, 8).map((index) => `group${index}.impl.ts`),
+      ).pipe(Effect.forkScoped);
+      yield* Deferred.await(started);
+      yield* Effect.yieldNow;
+      expect(active).toBe(4);
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(fiber);
+      expect(maximum).toBe(4);
+      expect(spec).toHaveBeenCalledTimes(9);
+      expect(impl).toHaveBeenCalledTimes(9);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect.each(["spec", "impl"] as const)(
+    "reports a missing sibling %s before bundling",
+    (missing) =>
+      Effect.gen(function* () {
+        const result = yield* validateImplFiles(["nested/notes.impl.ts"]).pipe(
+          Effect.provide(
+            FileSystem.layerNoop({
+              exists: (path) =>
+                Effect.succeed(!path.endsWith(`.${missing}.ts`)),
+            }),
+          ),
+          Effect.result,
+        );
+        assert(Result.isFailure(result));
+        if (missing === "spec") {
+          expect(result.failure).toMatchObject({
+            _tag: "MissingSpecFileError",
+            implPath: "nested/notes.impl.ts",
+            expectedSpecPath: "nested/notes.spec.ts",
+          });
+        } else {
+          expect(result.failure).toMatchObject({
+            _tag: "MissingImplFileError",
+            specPath: "nested/notes.spec.ts",
+            expectedImplPath: "nested/notes.impl.ts",
+          });
+        }
+      }),
+  );
+});
+
+layer(CodegenLayer)("TableModule.validate", (it) => {
+  it.effect("bounds table bundling to four concurrent builds", () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      let active = 0;
+      let maximum = 0;
+      const bundle = yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          vi.spyOn(Bundler, "bundle").mockImplementation(() =>
+            Effect.gen(function* () {
+              active++;
+              maximum = Math.max(maximum, active);
+              if (active === 4) yield* Deferred.succeed(started, undefined);
+              yield* Deferred.await(release);
+              active--;
+              return {
+                module: { default: Table.make(() => Schema.Struct({})) },
+                metafile: { inputs: {}, outputs: {} },
+              };
+            }),
+          ),
+        ),
+        (spy) => Effect.sync(() => spy.mockRestore()),
+      );
+      const fiber = yield* validateTables(
+        Array.range(0, 8).map((index) => ({
+          relativePath: `tables/t${index}.ts`,
+          tableName: `t${index}`,
+        })),
+      ).pipe(Effect.forkScoped);
+      yield* Deferred.await(started);
+      yield* Effect.yieldNow;
+      expect(active).toBe(4);
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(fiber);
+      expect(maximum).toBe(4);
+      expect(bundle).toHaveBeenCalledTimes(9);
+    }).pipe(Effect.scoped),
+  );
+});
 
 layer(CodegenLayer)("TableModule.discover", (it) => {
   it.effect("discovers the fixture tables", () =>

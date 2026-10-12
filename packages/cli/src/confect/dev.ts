@@ -1,3 +1,6 @@
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import * as Crypto from "effect/Crypto";
+import * as Hex from "effect/encoding/Hex";
 import * as Command from "effect/cli/Command";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -16,6 +19,7 @@ import * as Order from "effect/Order";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Scope from "effect/Scope";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as String from "effect/String";
 import {
@@ -26,6 +30,7 @@ import {
 import * as esbuild from "esbuild";
 import * as Ansi from "../Ansi";
 import * as Bundler from "../Bundler";
+import * as WatchGraph from "../WatchGraph";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { CONVEX_CONFIG_FILENAME } from "../ConvexConfig";
@@ -49,26 +54,23 @@ import {
 } from "../log";
 import { ProjectRoot } from "../ProjectRoot";
 import { discoverTableFiles, TABLES_DIRNAME } from "../TableModule";
-import { generateAuthConfig, generateCrons, generateHttp } from "../utils";
-import { codegenHandler, loadPreviousFunctionPaths } from "./codegen";
+import {
+  generateAuthConfig,
+  generateCrons,
+  generateHttp,
+  touchConvexSchema,
+} from "../utils";
+import {
+  codegenHandler,
+  loadPreviousFunctionPaths,
+  validateImplFiles,
+} from "./codegen";
 
-// Quiescence window: the sync loop waits this long for further signals
-// after each batch. One user edit fires `onEnd` on every esbuild
-// watcher that touches the file, and rebuild times vary across entry
-// points so the onEnds can be spread over hundreds of milliseconds.
-// The drain keeps extending its wait (bounded by `COALESCE_MAX_WAIT`)
-// until no new signals arrive within the window, collapsing the whole
-// burst into a single codegen cycle.
 const COALESCE_QUIESCENCE = Duration.millis(300);
 
 // Upper bound on `drainUntilQuiescent` so a pathological infinite
 // signal stream can't pin the sync loop forever.
 const COALESCE_MAX_WAIT = Duration.seconds(5);
-
-// How long to wait for esbuild watchers to react to codegen's own
-// writes (e.g. an updated `_generated/spec.ts`). Added on top of the
-// quiescence drain when codegen reported writes happened.
-const ECHO_COOLDOWN = Duration.millis(500);
 
 const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
 
@@ -77,19 +79,25 @@ type Pending = {
   readonly httpDirty: boolean;
   readonly cronsDirty: boolean;
   readonly authDirty: boolean;
+  readonly implPaths: ReadonlySet<string>;
 };
 
-type PendingKey = keyof Pending;
+type PendingKey = Exclude<keyof Pending, "implPaths">;
 
 const pendingInit: Pending = {
   specDirty: false,
   httpDirty: false,
   cronsDirty: false,
   authDirty: false,
+  implPaths: new Set(),
 };
 
 const isPendingDirty = (p: Pending): boolean =>
-  p.specDirty || p.httpDirty || p.cronsDirty || p.authDirty;
+  p.specDirty ||
+  p.httpDirty ||
+  p.cronsDirty ||
+  p.authDirty ||
+  p.implPaths.size > 0;
 
 type WatcherMessages = ReadonlyMap<string, readonly esbuild.Message[]>;
 
@@ -181,7 +189,6 @@ export const dev = Command.make("dev", {}, () =>
       Effect.tap(({ functionPaths }) =>
         logFunctionPathDiff(previousFunctionPaths, functionPaths),
       ),
-      Effect.tap(() => logSuccess("Generated files are up-to-date")),
       CodegenError.catchAndLog,
     );
     const initialFunctionPaths = Option.match(initialResult, {
@@ -192,6 +199,7 @@ export const dev = Command.make("dev", {}, () =>
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
     const restartQueue = yield* Queue.sliding<void>(1);
+    const refreshWatcher = yield* Ref.make<Effect.Effect<void>>(Effect.void);
     const watcherErrorsRef =
       yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
     const watcherWarningsRef =
@@ -205,16 +213,19 @@ export const dev = Command.make("dev", {}, () =>
             signal,
             pendingRef,
             restartQueue,
+            refreshWatcher,
             watcherErrorsRef,
             watcherWarningsRef,
           ),
         ),
         confectStructureWatcher(signal, pendingRef, restartQueue),
-        convexConfigStructureWatcher(signal, pendingRef, restartQueue),
+        convexConfigStructureWatcher(restartQueue),
         syncLoop(
           signal,
           pendingRef,
           initialFunctionPaths,
+          Option.isNone(initialResult),
+          refreshWatcher,
           watcherErrorsRef,
           watcherWarningsRef,
         ),
@@ -272,12 +283,6 @@ const logChangedWatcherMessages = Effect.fnUntraced(function* (
   yield* log(dedupeWatcherMessages(messages));
 });
 
-/**
- * Block until the signal queue has been quiet for `quiescence`. esbuild
- * watchers' `onEnd` events for a single user edit can be spread across hundreds
- * of milliseconds, so a fixed window misses late arrivals. Bounded by `maxWait`
- * so pathological signal floods can't pin the loop forever.
- */
 const drainUntilQuiescent = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   quiescence: Duration.Duration,
@@ -301,19 +306,20 @@ const syncLoop = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
+  initialSyncFailed: boolean,
+  refreshWatcher: Ref.Ref<Effect.Effect<void>>,
   watcherErrorsRef: Ref.Ref<WatcherMessages>,
   watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) {
   const functionPathsRef = yield* Ref.make(initialFunctionPaths);
   const lastLoggedErrorsRef = yield* Ref.make<string>("");
   const lastLoggedWarningsRef = yield* Ref.make<string>("");
+  const fullSyncNeeded = yield* Ref.make(initialSyncFailed);
+  const failedImpls = yield* Ref.make<ReadonlySet<string>>(new Set());
 
   return yield* Effect.forever(
     Effect.gen(function* () {
       yield* Effect.logDebug("Running sync loop…");
-      // Wait for the first signal of a burst, then keep absorbing
-      // follow-up signals from other watchers' onEnds until the queue
-      // stays quiet for `COALESCE_QUIESCENCE`.
       yield* Queue.take(signal);
       yield* drainUntilQuiescent(
         signal,
@@ -342,7 +348,7 @@ const syncLoop = Effect.fnUntraced(function* (
 
       yield* logPending("Dependencies may have changed, reloading…");
 
-      if (pending.specDirty) {
+      if (pending.specDirty || (yield* Ref.get(fullSyncNeeded))) {
         const current = yield* codegenHandler.pipe(
           Effect.tap(({ functionPaths: nextFunctionPaths }) =>
             Effect.gen(function* () {
@@ -354,22 +360,29 @@ const syncLoop = Effect.fnUntraced(function* (
           CodegenError.catchAndLog,
         );
         if (Option.isNone(current)) {
+          yield* Ref.set(fullSyncNeeded, true);
           return;
         }
-        // Drain any stragglers from this cycle's burst (slow watchers
-        // whose onEnd fired after the first quiescence) plus, when
-        // codegen wrote, the echo signals esbuild emits in response
-        // to our writes. Reset `pendingRef` so those drained signals
-        // don't carry a dirty flag into the next cycle.
-        if (current.value.anyWritesHappened) {
-          yield* Effect.sleep(ECHO_COOLDOWN);
-        }
-        yield* drainUntilQuiescent(
-          signal,
-          COALESCE_QUIESCENCE,
-          COALESCE_MAX_WAIT,
+        yield* Ref.set(fullSyncNeeded, false);
+        yield* Ref.set(failedImpls, new Set());
+        yield* Ref.get(refreshWatcher).pipe(Effect.flatten);
+      } else if (
+        pending.implPaths.size > 0 ||
+        (yield* Ref.get(failedImpls)).size > 0
+      ) {
+        const paths = new Set([
+          ...pending.implPaths,
+          ...(yield* Ref.get(failedImpls)),
+        ]);
+        const validated = yield* validateImplFiles([...paths]).pipe(
+          CodegenError.catchAndLog,
         );
-        yield* Ref.set(pendingRef, pendingInit);
+        if (Option.isNone(validated)) {
+          yield* Ref.set(failedImpls, paths);
+          return;
+        }
+        yield* Ref.set(failedImpls, new Set());
+        yield* touchConvexSchema;
       }
 
       const dirtyOptionalFiles = [
@@ -388,27 +401,22 @@ const syncLoop = Effect.fnUntraced(function* (
         ? Effect.all(dirtyOptionalFiles, { concurrency: "unbounded" })
         : Effect.void;
 
-      yield* logSuccess("Generated files are up-to-date");
+      if (!isPendingDirty(yield* Ref.get(pendingRef))) {
+        yield* logSuccess("Generated files are up-to-date");
+      }
     }),
   );
 });
 
 interface EntryPoint {
   readonly absolutePath: string;
-  readonly displayPath: string;
+  readonly inputPath: string;
   readonly pendingKey: PendingKey;
 }
 
-/**
- * Every file whose import graph codegen should react to. Each one becomes its
- * own scoped esbuild watcher; the union of their watches gives us
- * dependency-aware tracking of anything reachable from `confect/`, including
- * files outside `confect/`.
- */
 const discoverEntryPoints = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const projectRoot = yield* ProjectRoot.get;
   const confectDirectory = yield* ConfectDirectory.get;
 
   const tryEntry = Effect.fnUntraced(function* (
@@ -421,7 +429,9 @@ const discoverEntryPoints = Effect.gen(function* () {
     }
     return Option.some<EntryPoint>({
       absolutePath,
-      displayPath: path.relative(projectRoot, absolutePath),
+      inputPath: yield* fs
+        .realPath(absolutePath)
+        .pipe(Effect.orElseSucceed(() => absolutePath)),
       pendingKey,
     });
   });
@@ -453,7 +463,9 @@ const discoverEntryPoints = Effect.gen(function* () {
     }
     return Option.some<EntryPoint>({
       absolutePath,
-      displayPath: path.relative(projectRoot, absolutePath),
+      inputPath: yield* fs
+        .realPath(absolutePath)
+        .pipe(Effect.orElseSucceed(() => absolutePath)),
       pendingKey: "specDirty",
     });
   });
@@ -465,100 +477,253 @@ const discoverEntryPoints = Effect.gen(function* () {
   ]);
 });
 
+interface WatchState {
+  readonly fingerprints: ReadonlyMap<string, string>;
+  readonly graph: WatchGraph.WatchGraph;
+  readonly outputHash: string;
+}
+
 const esbuildOptions = (
   path: Path.Path,
   fs: FileSystem.FileSystem,
-  entry: EntryPoint,
+  crypto: Crypto.Crypto,
+  projectRoot: string,
+  confectDirectory: string,
+  generatedDirectory: string,
+  entries: ReadonlyArray<EntryPoint>,
   notExternal: ReadonlyArray<RegExp>,
+  stateRef: Ref.Ref<WatchState | undefined>,
+  structuralChange: boolean,
   initialSyncFailed: boolean,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   watcherErrorsRef: Ref.Ref<WatcherMessages>,
   watcherWarningsRef: Ref.Ref<WatcherMessages>,
-) => {
-  const initialBuildSeenRef = Ref.makeUnsafe(false);
+): esbuild.BuildOptions => {
+  let fingerprints = new Map<string, string>();
+  let firstBuild = true;
+  const encodeString = Schema.encodeSync(Schema.fromJsonString(Schema.String));
   return {
-    entryPoints: [entry.absolutePath],
+    absWorkingDir: projectRoot,
+    stdin: {
+      contents: entries
+        .map((entry) => `import ${encodeString(entry.absolutePath)};`)
+        .join("\n"),
+      resolveDir: projectRoot,
+      sourcefile: "confect-watch.ts",
+      loader: "ts",
+    },
     bundle: true,
     write: false,
     metafile: true,
-    platform: "node" as const,
-    format: "esm" as const,
-    logLevel: "silent" as const,
+    platform: "node",
+    format: "esm",
+    logLevel: "silent",
     plugins: [
       Bundler.bundleWorkspacePlugin(path, fs, notExternal),
       externalPlugin({ notExternal: [...notExternal] }),
       {
         name: "notify-rebuild",
-        setup(build: esbuild.PluginBuild) {
-          build.onEnd((result) => {
-            return Effect.runPromise(
+        setup(build) {
+          build.onStart(() => {
+            fingerprints = new Map();
+          });
+          build.onLoad({ filter: /.*/ }, (args) =>
+            Effect.runPromise(
               Effect.gen(function* () {
-                const wasInitial = yield* Ref.getAndSet(
-                  initialBuildSeenRef,
-                  true,
+                const contents = yield* fs.readFile(args.path);
+                fingerprints.set(
+                  args.path,
+                  Hex.encode(yield* crypto.digest("SHA-256", contents)),
                 );
-                const isInitial = !wasInitial;
-                yield* Ref.update(watcherErrorsRef, (current) => {
-                  const next = new Map(current);
-                  if (result.errors.length > 0) {
-                    next.set(entry.absolutePath, result.errors);
-                  } else {
-                    next.delete(entry.absolutePath);
-                  }
-                  return next;
-                });
-                yield* Ref.update(watcherWarningsRef, (current) => {
-                  const next = new Map(current);
-                  if (result.warnings.length > 0) {
-                    next.set(entry.absolutePath, result.warnings);
-                  } else {
-                    next.delete(entry.absolutePath);
-                  }
-                  return next;
-                });
+              }).pipe(Effect.orElseSucceed(() => undefined)),
+            ).then(() => undefined),
+          );
+          build.onEnd((result) =>
+            Effect.runPromise(
+              Effect.gen(function* () {
+                const previous = yield* Ref.get(stateRef);
+                const structureChanged = firstBuild && structuralChange;
+                firstBuild = false;
+                const outputHash = (yield* Effect.forEach(
+                  result.outputFiles ?? [],
+                  (file) =>
+                    crypto
+                      .digest("SHA-256", file.contents)
+                      .pipe(Effect.map(Hex.encode)),
+                )).join(":");
+                const graph = result.metafile
+                  ? WatchGraph.make(result.metafile, (file) =>
+                      path.resolve(projectRoot, file),
+                    )
+                  : (previous?.graph ?? new Map());
+                yield* Ref.set(stateRef, { fingerprints, graph, outputHash });
+                yield* Ref.set(
+                  watcherErrorsRef,
+                  result.errors.length > 0
+                    ? new Map([["entries", result.errors]])
+                    : emptyWatcherMessages,
+                );
+                yield* Ref.set(
+                  watcherWarningsRef,
+                  result.warnings.length > 0
+                    ? new Map([["entries", result.warnings]])
+                    : emptyWatcherMessages,
+                );
                 if (
-                  isInitial &&
+                  previous === undefined &&
+                  !structureChanged &&
                   !initialSyncFailed &&
                   result.errors.length === 0
-                )
+                ) {
+                  yield* logSuccess("Generated files are up-to-date");
                   return;
-                yield* Ref.update(pendingRef, (p) => ({
-                  ...p,
-                  [isInitial && initialSyncFailed
-                    ? "specDirty"
-                    : entry.pendingKey]: true,
-                }));
+                }
+
+                const files = new Set([
+                  ...(previous?.fingerprints.keys() ?? []),
+                  ...fingerprints.keys(),
+                ]);
+                const changed = [...files].filter(
+                  (file) =>
+                    previous?.fingerprints.get(file) !== fingerprints.get(file),
+                );
+                const sources = changed.filter(
+                  (file) => !file.startsWith(generatedDirectory + path.sep),
+                );
+                const affected = new Set([
+                  ...WatchGraph.affected(graph, sources),
+                  ...WatchGraph.affected(previous?.graph ?? new Map(), sources),
+                ]);
+                const unknownChange =
+                  changed.length === 0 && previous?.outputHash !== outputHash;
+                const full =
+                  structureChanged ||
+                  previous === undefined ||
+                  (sources.length > 0 && !result.metafile) ||
+                  unknownChange;
+                const dirtyEntries = full
+                  ? entries
+                  : entries.filter((entry) => affected.has(entry.inputPath));
+                yield* Ref.update(pendingRef, (pending) => {
+                  const next = {
+                    ...pending,
+                    implPaths: new Set(pending.implPaths),
+                  };
+                  for (const entry of dirtyEntries) {
+                    const relative = path.relative(
+                      confectDirectory,
+                      entry.absolutePath,
+                    );
+                    if (isLeafImplPath(relative) && !full) {
+                      next.implPaths.add(relative);
+                    } else {
+                      next[entry.pendingKey] = true;
+                    }
+                  }
+                  if (structureChanged || (full && initialSyncFailed))
+                    next.specDirty = true;
+                  return next;
+                });
                 yield* Queue.offer(signal, undefined);
               }),
-            );
-          });
+            ),
+          );
         },
       },
     ],
   };
 };
 
-const createEntryPointWatcher = (
-  path: Path.Path,
-  fs: FileSystem.FileSystem,
-  entry: EntryPoint,
-  notExternal: ReadonlyArray<RegExp>,
+const entryPointsWatcher = Effect.fnUntraced(function* (
   initialSyncFailed: boolean,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
+  restartQueue: Queue.Queue<void>,
+  refreshWatcher: Ref.Ref<Effect.Effect<void>>,
   watcherErrorsRef: Ref.Ref<WatcherMessages>,
   watcherWarningsRef: Ref.Ref<WatcherMessages>,
-) =>
-  Effect.acquireRelease(
-    Effect.gen(function* () {
-      const ctx = yield* Effect.promise(() =>
+) {
+  const parentScope = yield* Effect.scope;
+  const path = yield* Path.Path;
+  const fs = yield* FileSystem.FileSystem;
+  const projectRoot = yield* ProjectRoot.get;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const generatedDirectory = path.join(
+    yield* fs.realPath(confectDirectory),
+    "_generated",
+  );
+  const stateRef = yield* Ref.make<WatchState | undefined>(undefined);
+  const crypto = yield* Crypto.Crypto;
+  let current:
+    | {
+        readonly key: string;
+        readonly scope: Scope.Closeable;
+        readonly entries: ReadonlyArray<EntryPoint>;
+      }
+    | undefined;
+
+  const sync = Effect.gen(function* () {
+    const entries = yield* discoverEntryPoints;
+    const desiredPaths = new Set(entries.map((entry) => entry.absolutePath));
+    const key = [...desiredPaths].sort().join("\n");
+    if (current?.key === key) return;
+    const structuralChange = current !== undefined;
+    if (structuralChange)
+      yield* Ref.update(pendingRef, (pending) => ({
+        ...pending,
+        specDirty: true,
+      }));
+    const removedOptional =
+      current?.entries.filter(
+        (entry) =>
+          entry.pendingKey !== "specDirty" &&
+          !desiredPaths.has(entry.absolutePath),
+      ) ?? [];
+    yield* Ref.update(pendingRef, (pending) =>
+      removedOptional.reduce(
+        (next, entry) => ({ ...next, [entry.pendingKey]: true }),
+        pending,
+      ),
+    );
+    if (current) yield* Scope.close(current.scope, Exit.void);
+    const scope = yield* Scope.fork(parentScope, "sequential");
+    current = { key, scope, entries };
+    yield* Ref.set(watcherErrorsRef, emptyWatcherMessages);
+    yield* Ref.set(watcherWarningsRef, emptyWatcherMessages);
+    if (entries.length === 0) {
+      if (structuralChange) {
+        yield* Queue.offer(signal, undefined);
+      }
+      yield* Ref.set(stateRef, {
+        fingerprints: new Map(),
+        graph: new Map(),
+        outputHash: "",
+      });
+      if (!structuralChange && !initialSyncFailed) {
+        yield* logSuccess("Generated files are up-to-date");
+      }
+      return;
+    }
+
+    const tsconfig = loadTsConfig(projectRoot);
+    const notExternal = tsconfigPathsToRegExp(
+      tsconfig?.data.compilerOptions?.paths ?? {},
+    );
+    yield* Effect.acquireRelease(
+      Effect.promise(() =>
         esbuild.context(
           esbuildOptions(
             path,
             fs,
-            entry,
+            crypto,
+            projectRoot,
+            confectDirectory,
+            generatedDirectory,
+            entries,
             notExternal,
+            stateRef,
+            structuralChange,
             initialSyncFailed,
             signal,
             pendingRef,
@@ -566,123 +731,37 @@ const createEntryPointWatcher = (
             watcherWarningsRef,
           ),
         ),
-      );
-      yield* Effect.promise(() => ctx.watch());
-      return ctx;
-    }),
-    (ctx) =>
-      Effect.gen(function* () {
-        yield* Effect.promise(() => ctx.dispose());
-        // Clear any errors and warnings recorded by this watcher so a
-        // disposed watcher can't leave stale messages visible to the sync loop.
-        const clearEntry = (current: WatcherMessages) => {
-          if (!current.has(entry.absolutePath)) return current;
-          const next = new Map(current);
-          next.delete(entry.absolutePath);
-          return next;
-        };
-        yield* Ref.update(watcherErrorsRef, clearEntry);
-        yield* Ref.update(watcherWarningsRef, clearEntry);
-        yield* Effect.logDebug(
-          `esbuild watcher disposed: ${entry.displayPath}`,
-        );
-      }),
-  );
-
-/**
- * Holds one scoped esbuild watcher per entry point and reconciles the set
- * whenever something offers to `restartQueue`. Adding or removing an entry
- * point only spawns/disposes the affected watcher; unchanged entries keep their
- * existing context, so a structural change doesn't churn watchers for unrelated
- * files.
- */
-const entryPointsWatcher = Effect.fnUntraced(function* (
-  initialSyncFailed: boolean,
-  signal: Queue.Queue<void>,
-  pendingRef: Ref.Ref<Pending>,
-  restartQueue: Queue.Queue<void>,
-  watcherErrorsRef: Ref.Ref<WatcherMessages>,
-  watcherWarningsRef: Ref.Ref<WatcherMessages>,
-) {
-  const parentScope = yield* Effect.scope;
-  const scopesRef = yield* Ref.make(new Map<string, Scope.Closeable>());
-  const path = yield* Path.Path;
-  const fs = yield* FileSystem.FileSystem;
-  const projectRoot = yield* ProjectRoot.get;
-  // Discover the user's `tsconfig.json#paths` once at watcher startup so
-  // `~/...`-style aliases pointing into the user's source tree get bundled
-  // by esbuild instead of externalized via `bundle-require`'s `node_modules`
-  // heuristic. `loadTsConfig` walks up from `projectRoot` to find a
-  // `tsconfig.json`; if none exists, `paths` is empty and `notExternal` is
-  // `[]`, leaving the externalization rule unchanged.
-  const tsconfig = loadTsConfig(projectRoot);
-  const notExternal = tsconfigPathsToRegExp(
-    tsconfig?.data.compilerOptions?.paths ?? {},
-  );
-
-  const sync = Effect.gen(function* () {
-    const desired = yield* discoverEntryPoints;
-    const desiredByPath = new Map(
-      desired.map((entryPoint) => [entryPoint.absolutePath, entryPoint]),
-    );
-    const current = yield* Ref.get(scopesRef);
-
-    yield* Effect.forEach(
-      Array.fromIterable(current),
-      ([absolutePath, childScope]) =>
-        desiredByPath.has(absolutePath)
-          ? Effect.void
-          : Scope.close(childScope, Exit.void).pipe(
-              Effect.andThen(
-                Ref.update(scopesRef, (scopes) => {
-                  const updated = new Map(scopes);
-                  updated.delete(absolutePath);
-                  return updated;
-                }),
+      ),
+      (ctx) =>
+        Effect.promise(() => ctx.dispose()).pipe(
+          Effect.andThen(Ref.set(refreshWatcher, Effect.void)),
+        ),
+    ).pipe(
+      Effect.flatMap((ctx) =>
+        Ref.set(
+          refreshWatcher,
+          Effect.promise(() =>
+            ctx
+              .rebuild()
+              .catch(() => undefined)
+              .then(() => ctx.rebuild())
+              .then(
+                () => undefined,
+                () => undefined,
               ),
-            ),
-    );
-
-    yield* Effect.forEach(
-      desired,
-      Effect.fnUntraced(function* (entry: EntryPoint) {
-        const existing = yield* Ref.get(scopesRef);
-        if (existing.has(entry.absolutePath)) return;
-
-        const childScope = yield* Scope.fork(parentScope, "sequential");
-        yield* createEntryPointWatcher(
-          path,
-          fs,
-          entry,
-          notExternal,
-          initialSyncFailed,
-          signal,
-          pendingRef,
-          watcherErrorsRef,
-          watcherWarningsRef,
-        ).pipe(Scope.provide(childScope));
-        yield* Ref.update(scopesRef, (scopes) => {
-          const updated = new Map(scopes);
-          updated.set(entry.absolutePath, childScope);
-          return updated;
-        });
-      }),
+          ),
+        ).pipe(Effect.andThen(Effect.promise(() => ctx.watch()))),
+      ),
+      Scope.provide(scope),
     );
   });
 
   yield* sync;
-
   return yield* Effect.forever(
     Queue.take(restartQueue).pipe(Effect.andThen(sync)),
   );
-});
+}, Effect.provide(NodeCrypto.layer));
 
-/**
- * Single recursive `fs.watch` on `confect/`. Flips the matching dirty flag for
- * any change to an entry-point-shaped file (so codegen runs without waiting on
- * a newly spawned esbuild watcher), and offers to `restartQueue` when an entry
- * point is created or removed so the watcher manager picks up the new set.
- */
 const confectStructureWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
@@ -718,8 +797,6 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
  * watcher.
  */
 const convexConfigStructureWatcher = Effect.fnUntraced(function* (
-  signal: Queue.Queue<void>,
-  pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
 ) {
   const fs = yield* FileSystem.FileSystem;
@@ -728,25 +805,19 @@ const convexConfigStructureWatcher = Effect.fnUntraced(function* (
 
   yield* pipe(
     fs.watch(convexDirectory),
-    Stream.debounce(Duration.millis(200)),
     Stream.runForEach((event) =>
-      path.relative(convexDirectory, event.path) === CONVEX_CONFIG_FILENAME
-        ? flipDirtyAndSignal(
-            pendingRef,
-            signal,
-            "specDirty",
-            restartQueue,
-            event._tag !== "Update",
-          )
+      path.relative(convexDirectory, event.path) === CONVEX_CONFIG_FILENAME &&
+      event._tag !== "Update"
+        ? Queue.offer(restartQueue, undefined)
         : Effect.void,
     ),
   );
 });
 
-const TOP_LEVEL_OPTIONAL_KEYS: ReadonlyMap<string, PendingKey> = new Map([
-  ["http.ts", "httpDirty"],
-  ["crons.ts", "cronsDirty"],
-  ["auth.ts", "authDirty"],
+const TOP_LEVEL_OPTIONAL_FILES: ReadonlySet<string> = new Set([
+  "http.ts",
+  "crons.ts",
+  "auth.ts",
 ]);
 
 const flipDirtyAndSignal = (
@@ -787,15 +858,10 @@ const handleConfectChange = ({
 
   const isLifecycleChange = eventTag !== "Update";
 
-  const topLevelKey = TOP_LEVEL_OPTIONAL_KEYS.get(relativePath);
-  if (topLevelKey !== undefined) {
-    return flipDirtyAndSignal(
-      pendingRef,
-      signal,
-      topLevelKey,
-      restartQueue,
-      isLifecycleChange,
-    );
+  if (TOP_LEVEL_OPTIONAL_FILES.has(relativePath)) {
+    return isLifecycleChange
+      ? Queue.offer(restartQueue, undefined)
+      : Effect.void;
   }
 
   // A stray `confect/schema.ts` (now codegen-owned at
@@ -817,13 +883,9 @@ const handleConfectChange = ({
     isLeafImplPath(relativePath) ||
     relativePath.split(/[/\\]/)[0] === TABLES_DIRNAME
   ) {
-    return flipDirtyAndSignal(
-      pendingRef,
-      signal,
-      "specDirty",
-      restartQueue,
-      isLifecycleChange,
-    );
+    return isLifecycleChange
+      ? Queue.offer(restartQueue, undefined)
+      : Effect.void;
   }
 
   // Any other `.ts` under `confect/` (helpers like `tables/notes.ts`).

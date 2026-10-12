@@ -1,9 +1,11 @@
 import * as FileSystem from "effect/FileSystem";
+import { FunctionSpec, MiddlewareSpec } from "@confect/core";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
+import { vi } from "vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -11,6 +13,7 @@ import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as String from "effect/String";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import type { CodegenError } from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import * as Bundler from "@confect/cli/Bundler";
@@ -474,6 +477,59 @@ layer(LeafModuleLayer)("discovery", (it) => {
 });
 
 layer(LeafModuleLayer)("validateImpl", (it) => {
+  it.effect("reuses a supplied validated spec without bundling it again", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const leaf = yield* toLeafModule("groups/notes.spec.ts");
+      const groupSpec = yield* validateSpec(leaf);
+      const bundle = yield* Effect.acquireRelease(
+        Effect.sync(() => vi.spyOn(Bundler, "bundle")),
+        (spy) => Effect.sync(() => spy.mockRestore()),
+      );
+      yield* validateImpl(leaf, groupSpec);
+      expect(bundle.mock.calls.map(([entry]) => entry)).toEqual([
+        path.resolve(fixtureConfect, "groups/notes.impl.ts"),
+      ]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("checks function completeness against the supplied spec", () =>
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/notes.spec.ts");
+      const groupSpec = (yield* validateSpec(leaf)).addFunction(
+        FunctionSpec.publicQuery({
+          name: "missing",
+          returns: () => Schema.Null,
+        }),
+      );
+      const result = yield* Effect.result(validateImpl(leaf, groupSpec));
+      assert(Result.isFailure(result));
+      expect(result.failure).toMatchObject({
+        _tag: "ImplMissingFunctionsError",
+        missingFunctionNames: ["missing"],
+      });
+    }),
+  );
+
+  it.effect("checks middleware completeness against the supplied spec", () =>
+    Effect.gen(function* () {
+      class Required extends MiddlewareSpec.MiddlewareSpec<Required>()(
+        "Required",
+        {
+          functionTypes: { query: true, mutation: true, action: true },
+        },
+      ) {}
+      const leaf = yield* toLeafModule("groups/notes.spec.ts");
+      const groupSpec = (yield* validateSpec(leaf)).middleware(Required);
+      const result = yield* Effect.result(validateImpl(leaf, groupSpec));
+      assert(Result.isFailure(result));
+      expect(result.failure).toMatchObject({
+        _tag: "ImplMissingMiddlewareError",
+        missingMiddlewareKeys: ["Required"],
+      });
+    }),
+  );
+
   it.effect("accepts a valid leaf impl paired with its spec", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/notes.spec.ts");

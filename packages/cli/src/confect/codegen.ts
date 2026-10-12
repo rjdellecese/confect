@@ -28,6 +28,7 @@ import {
   discoverLeafImplFiles,
   discoverLeafSpecFiles,
   implPathForSpec,
+  isLeafImplPath,
   registeredFunctionsRelativePath,
   specPathForImpl,
   toLeafModule,
@@ -64,6 +65,7 @@ import {
 } from "../utils";
 
 const GENERATED_DIRNAME = "_generated";
+const VALIDATION_CONCURRENCY = 4;
 
 const GENERATED_SPEC_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "spec.ts"),
@@ -128,6 +130,37 @@ export const codegenHandler = Effect.gen(function* () {
   return { functionPaths, anyWritesHappened };
 }).pipe(Effect.withSpan("Cli.codegen"));
 
+export const validateImplFiles = Effect.fn("Cli.validateImplFiles")(function* (
+  relativePaths: ReadonlyArray<string>,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+
+  yield* Effect.forEach(
+    relativePaths.filter(isLeafImplPath),
+    Effect.fnUntraced(function* (implRelativePath: string) {
+      const specRelativePath = yield* specPathForImpl(implRelativePath);
+      if (!(yield* fs.exists(path.join(confectDirectory, specRelativePath)))) {
+        return yield* new MissingSpecFileError({
+          implPath: implRelativePath,
+          expectedSpecPath: specRelativePath,
+        });
+      }
+      if (!(yield* fs.exists(path.join(confectDirectory, implRelativePath)))) {
+        return yield* new MissingImplFileError({
+          specPath: specRelativePath,
+          expectedImplPath: implRelativePath,
+        });
+      }
+      const leaf = yield* toLeafModule(specRelativePath);
+      const groupSpec = yield* validateSpec(leaf);
+      yield* validateImpl(leaf, groupSpec);
+    }),
+    { concurrency: VALIDATION_CONCURRENCY, discard: true },
+  );
+});
+
 const runCodegen = Effect.gen(function* () {
   yield* generateConfectGeneratedDirectory;
   // Reject a legacy `confect/schema.ts` up front so the user-facing
@@ -175,7 +208,7 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
-  yield* validateImplModules(leaves);
+  yield* validateImplModules(leaves, groupSpecsByPosixRelativePath);
   yield* generateGroupRegisteredFunctions(leaves);
   yield* removeObsoleteRegisteredFunctions(leaves);
   const [functionPaths] = yield* Effect.all(
@@ -233,6 +266,7 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
 
       return { leaf, groupSpec };
     }),
+    { concurrency: VALIDATION_CONCURRENCY },
   );
 
   yield* validateOrphanImpls(specFiles);
@@ -418,8 +452,21 @@ const generateAssembledSpecs = Effect.fnUntraced(function* (
   );
 });
 
-const validateImplModules = (leaves: ReadonlyArray<LeafModule>) =>
-  Effect.forEach(leaves, validateImpl);
+const validateImplModules = Effect.fnUntraced(function* (
+  leaves: ReadonlyArray<LeafModule>,
+  groupSpecsByPosixRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
+) {
+  const path = yield* Path.Path;
+  yield* Effect.forEach(
+    leaves,
+    (leaf) =>
+      validateImpl(
+        leaf,
+        groupSpecsByPosixRelativePath.get(toPosixPath(path, leaf.relativePath)),
+      ),
+    { concurrency: VALIDATION_CONCURRENCY, discard: true },
+  );
+});
 
 const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
   leaves: ReadonlyArray<LeafModule>,

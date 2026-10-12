@@ -314,6 +314,7 @@ const buildImplLayer = Effect.fnUntraced(function* (
  */
 export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
   leaf: LeafModule,
+  validatedSpec?: GroupSpec.AnyWithProps,
 ) {
   const implRelativePath = yield* implPathForSpec(leaf.relativePath);
   const implAbsolutePath = yield* absoluteModulePath(implRelativePath);
@@ -342,10 +343,7 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
     });
   }
 
-  const { module: specModule } = yield* Bundler.bundle(specAbsolutePath).pipe(
-    Effect.mapError((error) => fromBundlerError(leaf.relativePath, error)),
-  );
-  const groupSpec = specModule.default as GroupSpec.AnyWithProps;
+  const groupSpec = validatedSpec ?? (yield* validateSpec(leaf));
   const expectedFunctionNames = Object.keys(groupSpec.functions);
 
   const context = yield* buildImplLayer(

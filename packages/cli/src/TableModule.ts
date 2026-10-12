@@ -156,6 +156,6 @@ export const validate = Effect.fnUntraced(function* (
   yield* Effect.forEach(
     tableModules,
     ({ relativePath }: TableModule) => validateRelativePath(relativePath),
-    { concurrency: "unbounded" },
+    { concurrency: 4 },
   );
 });

@@ -6,11 +6,13 @@ Each consumer has its own package and TypeScript configuration; dependencies res
 
 ## Performance regressions for issue #771
 
-The impl-only edit cases count module evaluations instead of asserting a machine-dependent duration. They require the edited impl to be evaluated, but no unrelated impls. The fixture first recovers from an invalid table to establish that watching is active: the initial success message alone precedes watcher startup.
+The impl-only edit cases count module evaluations instead of asserting a machine-dependent duration. They require the edited impl to be evaluated, but no unrelated impls. The fixture first recovers from an invalid table so it also exercises the transition from a failed initial sync to incremental validation.
+
+The readiness cases also cover edits received during validation. After full codegen writes generated files, the watcher joins any in-flight build and then performs a fresh rebuild before reporting success. This prevents a subsequent edit from being absorbed into an older dependency snapshot; queued user changes must remain pending rather than being discarded as generated-file echoes.
 
 Companion tests in `../dev.test.ts` count real esbuild contexts after all fixture modules appear in the watched graphs. Both one-group and eight-group fixtures have a budget of four contexts, allowing a small fixed set of shared graphs rather than one graph per entry point. `../codegen.test.ts` checks that a codegen pass does not request a second standalone bundle of an already validated spec.
 
-These are intentionally failing regression tests until the performance fixes are implemented. Run them after `pnpm build`:
+Run these regression tests after `pnpm build`:
 
 ```sh
 pnpm exec vitest run --project @confect/cli test/codegen.test.ts test/dev.test.ts test/integration/dev.test.ts --testNamePattern 'does not bundle the same spec|does not reevaluate|uses a bounded number'

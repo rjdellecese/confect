@@ -11,6 +11,167 @@ const success = "Generated files are up-to-date";
 layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
+    it.effect(
+      "removes optional output and the last group when their entry points disappear",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.write(
+            "confect/auth.ts",
+            "export default { providers: [] };\n",
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          expect(
+            yield* fs.exists(path.join(project.root, "convex/auth.config.ts")),
+          ).toBe(true);
+          yield* fs.remove(path.join(project.root, "confect/auth.ts"));
+          yield* watching.waitFor(success);
+          expect(
+            yield* fs.exists(path.join(project.root, "convex/auth.config.ts")),
+          ).toBe(false);
+          yield* fs.remove(path.join(project.root, "confect/notes.impl.ts"));
+          yield* fs.remove(path.join(project.root, "confect/notes.spec.ts"));
+          yield* fs.remove(path.join(project.root, "confect/tables"), {
+            recursive: true,
+          });
+          yield* watching.waitFor(success);
+          expect(
+            yield* fs.exists(path.join(project.root, "convex/notes.ts")),
+          ).toBe(false);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "does not hide a failing impl when an unrelated impl is edited",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write("confect/other.spec.ts", Project.spec);
+          const otherImpl = Project.impl.replace(
+            '"./notes.spec"',
+            '"./other.spec"',
+          );
+          yield* project.write("confect/other.impl.ts", otherImpl);
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          yield* project.write("confect/notes.impl.ts", Project.emptyImpl);
+          yield* watching.waitFor("does not implement every function");
+          const before = yield* Ref.get(watching.output);
+          yield* project.write(
+            "confect/other.impl.ts",
+            `${otherImpl}\n// unrelated edit\n`,
+          );
+          yield* watching.waitFor("does not implement every function");
+          expect(
+            (yield* Ref.get(watching.output)).slice(before.length),
+          ).not.toContain(success);
+          yield* project.write("confect/notes.impl.ts", Project.impl);
+          yield* watching.waitFor(success);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "preserves an edit received while another impl is being validated",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const gatedImpl = `${Project.impl}
+import { existsSync, watch, unlinkSync } from "node:fs";
+const block = new URL("../block", import.meta.url);
+if (existsSync(block)) {
+  await new Promise<void>((resolve) => {
+    const watcher = watch(new URL("../", import.meta.url), (_event, file) => {
+      if (file === "release") { watcher.close(); resolve(); }
+    });
+    process.stdout.write("VALIDATION_BLOCKED\\n");
+  });
+  unlinkSync(block);
+}
+`;
+          const otherImpl = `${Project.impl.replace('"./notes.spec"', '"./other.spec"')}\nprocess.stdout.write("SECOND:1\\n");\n`;
+          yield* project.write("confect/notes.impl.ts", gatedImpl);
+          yield* project.write("confect/other.spec.ts", Project.spec);
+          yield* project.write("confect/other.impl.ts", otherImpl);
+          yield* project.write(
+            "confect/tables/notes.ts",
+            "export default {};\n",
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor("must default-export a Table");
+          yield* watching.waitFor("must default-export a Table");
+          yield* project.write("confect/tables/notes.ts", Project.table);
+          yield* watching.waitFor(success);
+          yield* project.write("block", "");
+          yield* project.write(
+            "confect/notes.impl.ts",
+            `${gatedImpl}\n// first edit\n`,
+          );
+          yield* watching.waitFor("VALIDATION_BLOCKED");
+          yield* project.write(
+            "confect/other.impl.ts",
+            otherImpl.replace("SECOND:1", "SECOND:2"),
+          );
+          yield* project.write("release", "");
+          yield* watching.waitFor("SECOND:2");
+          yield* watching.waitFor(success);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "revalidates shared dependency importers and recovers after dependency deletion",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.write("shared.ts", "export const version = 1;\n");
+          for (const name of ["notes", "other", "unrelated"]) {
+            yield* project.write(`confect/${name}.spec.ts`, Project.spec);
+            yield* project.write(
+              `confect/${name}.impl.ts`,
+              [
+                name === "unrelated"
+                  ? "const version = 0;"
+                  : 'import { version } from "../shared";',
+                Project.impl.replace('"./notes.spec"', `"./${name}.spec"`),
+                `process.stdout.write("EVALUATED:${name}:" + version + "\\n");`,
+              ].join("\n"),
+            );
+          }
+          yield* project.write(
+            "confect/tables/notes.ts",
+            "export default {};\n",
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor("must default-export a Table");
+          yield* watching.waitFor("must default-export a Table");
+          yield* project.write("confect/tables/notes.ts", Project.table);
+          yield* watching.waitFor(success);
+          const initial = yield* Ref.get(watching.output);
+          yield* project.write("shared.ts", "export const version = 2;\n");
+          yield* watching.waitFor("Dependencies may have changed");
+          yield* watching.waitFor(success);
+          const reload = (yield* Ref.get(watching.output)).slice(
+            initial.length,
+          );
+          expect(reload).toContain("EVALUATED:notes:2");
+          expect(reload).toContain("EVALUATED:other:2");
+          expect(reload).not.toContain("EVALUATED:unrelated");
+          yield* fs.remove(path.join(project.root, "shared.ts"));
+          yield* watching.waitFor('Could not resolve "../shared"');
+          yield* project.write("shared.ts", "export const version = 3;\n");
+          yield* watching.waitFor("EVALUATED:notes:3");
+          yield* watching.waitFor(success);
+        }).pipe(Effect.scoped),
+      { timeout: 45000 },
+    );
+
     it.effect.each([1, 8])(
       "does not reevaluate %i unrelated impls after an impl-only edit",
       (unrelatedGroups) =>
