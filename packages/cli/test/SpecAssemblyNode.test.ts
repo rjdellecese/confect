@@ -40,9 +40,10 @@ describe("SpecAssemblyNode", () => {
         'import notesAndRandom_random from "../notesAndRandom/random.spec";',
       );
       expect(contents).toContain(
-        'GroupSpec.makeAt("notesAndRandom").addGroupAt("notes", notesAndRandom_notes).addGroupAt("random", notesAndRandom_random)',
+        '(GroupSpec.makeAt("notesAndRandom") as any).addGroupAt("notes", notesAndRandom_notes).addGroupAt("random", notesAndRandom_random)',
       );
       expect(contents).toContain('.addAt("env", env)');
+      expect(contents).toContain("= (Spec.make() as any).addAt(");
       // Group paths are resolved impl-side, so the assembled spec no longer
       // emits a `.addPath(...)` registration chain.
       expect(contents).not.toContain(".addPath(");
@@ -64,7 +65,7 @@ describe("SpecAssemblyNode", () => {
           'import notes_archived from "../notes/archived.spec";',
         );
         expect(contents).toContain(
-          '.addAt("notes", notes.addGroupAt("archived", notes_archived))',
+          '.addAt("notes", (notes as any).addGroupAt("archived", notes_archived))',
         );
         expect(contents).not.toContain('GroupSpec.makeAt("notes")');
       }),
@@ -122,7 +123,7 @@ describe("SpecAssemblyNode", () => {
           'import { GroupSpec, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
-          '.addAt("notes", notes.addGroupAt("archived", GroupSpec.makeAt("archived").addGroupAt("legacy", notes_archived_legacy)))',
+          '.addAt("notes", (notes as any).addGroupAt("archived", (GroupSpec.makeAt("archived") as any).addGroupAt("legacy", notes_archived_legacy)))',
         );
       }),
   );
@@ -251,7 +252,9 @@ describe("SpecAssemblyNode", () => {
         // Tree-assembly shape is preserved; the addGroupAt-wrapped parent leaf
         // still ends up in the tree, and its impl resolves its group path
         // impl-side rather than through a `.addPath(...)` registration.
-        expect(contents).toContain("remix_routes__app_catalog.addGroupAt(");
+        expect(contents).toContain(
+          "(remix_routes__app_catalog as any).addGroupAt(",
+        );
         expect(contents).not.toContain(".addPath(");
       }),
   );
