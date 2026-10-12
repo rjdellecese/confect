@@ -184,7 +184,10 @@ type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
   ? {
       -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
         ? IsOptional<Vl, K> extends true
-          ? VOptional<VAny>
+          ? // An index signature reads as optional, but a record's value is not.
+            string extends K
+            ? VAny
+            : VOptional<VAny>
           : VAny
         : UndefinedOrValueToValidator<Vl[K]>;
     } extends infer VdRecord extends Record<string, any>
