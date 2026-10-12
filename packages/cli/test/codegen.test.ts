@@ -4,6 +4,8 @@ import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
+import { vi } from "vitest";
+import * as Bundler from "@confect/cli/Bundler";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
@@ -32,6 +34,35 @@ import * as Project from "./integration/Project";
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect(
+      "does not bundle the same spec twice during one codegen pass",
+      () =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const bundle = yield* Effect.acquireRelease(
+            Effect.sync(() => vi.spyOn(Bundler, "bundle")),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          yield* codegenHandler.pipe(
+            Effect.provideService(ProjectRoot, {
+              get: Effect.succeed(project.root),
+            }),
+            Effect.provideService(ConfectDirectory, {
+              get: Effect.succeed(path.join(project.root, "confect")),
+            }),
+            Effect.provideService(ConvexDirectory, {
+              get: Effect.succeed(path.join(project.root, "convex")),
+            }),
+          );
+          const specBuilds = bundle.mock.calls.filter(
+            ([entry]) =>
+              entry === path.join(project.root, "confect/notes.spec.ts"),
+          );
+          expect(specBuilds).toHaveLength(1);
+        }).pipe(Effect.scoped),
+    );
+
     it.effect(
       "bootstraps dependent modules once without relying on stale output",
       () =>

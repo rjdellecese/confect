@@ -11,6 +11,54 @@ const success = "Generated files are up-to-date";
 layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
+    it.effect.each([1, 8])(
+      "does not reevaluate %i unrelated impls after an impl-only edit",
+      (unrelatedGroups) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const changedMarker = "ISSUE_771_CHANGED_IMPL";
+          const unrelatedMarker = "ISSUE_771_UNRELATED_IMPL";
+          const observedImpl = `${Project.impl}\nprocess.stdout.write("${changedMarker}\\n");\n`;
+          yield* project.write("confect/notes.impl.ts", observedImpl);
+          yield* Effect.forEach(
+            Array.from({ length: unrelatedGroups }, (_, i) => `other${i}`),
+            (name) =>
+              Effect.all([
+                project.write(`confect/${name}.spec.ts`, Project.spec),
+                project.write(
+                  `confect/${name}.impl.ts`,
+                  `${Project.impl.replace('"./notes.spec"', `"./${name}.spec"`)}\nprocess.stdout.write("${unrelatedMarker}\\n");\n`,
+                ),
+              ]),
+          );
+          yield* project.write(
+            "confect/tables/notes.ts",
+            "export default {};\n",
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor("must default-export a Table");
+          yield* watching.waitFor("must default-export a Table");
+          yield* project.write("confect/tables/notes.ts", Project.table);
+          yield* watching.waitFor(success);
+          const initial = yield* Ref.get(watching.output);
+          expect(initial.split(unrelatedMarker)).toHaveLength(
+            unrelatedGroups + 1,
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            `${observedImpl}\n// impl-only edit\n`,
+          );
+          yield* watching.waitFor("Dependencies may have changed");
+          yield* watching.waitFor(success);
+          const reload = (yield* Ref.get(watching.output)).slice(
+            initial.length,
+          );
+          expect(reload).toContain(changedMarker);
+          expect(reload.split(unrelatedMarker)).toHaveLength(1);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "bootstraps table-dependent specs and impls without generated output",
       () =>
