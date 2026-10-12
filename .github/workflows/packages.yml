@@ -58,7 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      - run: pnpm exec vitest run --project @confect/core --project @confect/foldkit --project @confect/js --project @confect/react --project @confect/server --coverage
+      - run: pnpm exec vitest run --project @confect/alchemy --project @confect/core --project @confect/foldkit --project @confect/js --project @confect/react --project @confect/server --coverage
 
   test-cli:
     name: Test (cli, ${{ matrix.os }}, ${{ matrix.shard }}/4)
