@@ -137,6 +137,26 @@ jobs:
       - run: pnpm build
       - run: pnpm check:pack-contents
 
+  packed-consumers:
+    name: Packed React app (${{ matrix.manager }}, ${{ matrix.lane }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        manager: [npm, pnpm]
+        lane: [baseline, fresh]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm check:consumers --profile react --lane ${{ matrix.lane }} --manager ${{ matrix.manager }} --report ${{ runner.temp }}/consumer-result.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: consumer-react-${{ matrix.manager }}-${{ matrix.lane }}
+          path: ${{ runner.temp }}/consumer-result.json
+          if-no-files-found: error
+
   build:
     name: Build (${{ matrix.package }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
