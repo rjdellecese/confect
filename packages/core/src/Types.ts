@@ -86,13 +86,32 @@ export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 
 type NonRecursiveLeaf = Brand.Brand<any> | GenericId<any> | ArrayBuffer;
 
+/**
+ * Whether `T` is one of the types already on the path, compared by identity.
+ * Assignability is not enough: a nested struct is assignable to an ancestor
+ * whenever the ancestor's extra fields are optional, and two structs whose
+ * fields are all optional can be assignable to each other in both directions.
+ * `DetectCycle` asks only once `T` is assignable to some type on the path,
+ * which keeps the identity comparisons off the common, non-recursive case.
+ */
+type InCache<T, Cache extends any[]> = Cache extends [infer Head, ...infer Rest]
+  ? IsSame<T, Head> extends true
+    ? true
+    : InCache<T, Rest>
+  : false;
+
+type IsSame<A, B> =
+  (<G>() => G extends A ? 1 : 2) extends <G>() => G extends B ? 1 : 2
+    ? true
+    : false;
+
 type DetectCycle<T, Cache extends any[] = []> =
   IsAny<T> extends true
     ? false
     : [T] extends [any]
       ? T extends NonRecursiveLeaf
         ? false
-        : T extends Cache[number]
+        : (T extends Cache[number] ? InCache<T, Cache> : false) extends true
           ? true
           : T extends Array<infer U>
             ? DetectCycle<U, [...Cache, T]>
