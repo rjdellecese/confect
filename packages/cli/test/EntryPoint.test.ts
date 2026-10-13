@@ -1,4 +1,4 @@
-import { assert, expect, it } from "@effect/vitest";
+import { assert, expect, expectTypeOf, it } from "@effect/vitest";
 import * as EntryPoint from "@confect/cli/EntryPoint";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import * as Option from "effect/Option";
@@ -9,6 +9,29 @@ import * as HashSet from "effect/HashSet";
 import * as Path from "effect/Path";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
+
+it("refines optional entries without including spec, impl, table, or config entries", () => {
+  const entries: Array<EntryPoint.Kind> = [
+    EntryPoint.Kind.Http({ relativePath: "http.ts" }),
+    EntryPoint.Kind.Crons({ relativePath: "crons.ts" }),
+    EntryPoint.Kind.Auth({ relativePath: "auth.ts" }),
+    EntryPoint.Kind.Spec({ relativePath: "notes.spec.ts" }),
+    EntryPoint.Kind.Impl({
+      relativePath: ImplModulePath.make("notes.impl.ts"),
+    }),
+    EntryPoint.Kind.Table({ relativePath: "tables/notes.ts" }),
+    EntryPoint.Kind.Config(),
+  ];
+  const optional = entries.filter(EntryPoint.isOptional);
+  expect(optional.map((entry) => entry._tag)).toEqual([
+    "Http",
+    "Crons",
+    "Auth",
+  ]);
+  expectTypeOf(optional).toEqualTypeOf<
+    Array<Extract<EntryPoint.Kind, { readonly _tag: EntryPoint.OptionalFile }>>
+  >();
+});
 
 it.effect("discovers typed entries with logical and canonical paths", () =>
   Effect.gen(function* () {

@@ -6,6 +6,37 @@ import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as SyncState from "@confect/cli/SyncState";
+import * as WatchBuild from "@confect/cli/WatchBuild";
+import * as HashMap from "effect/HashMap";
+
+it("allows readiness only for empty or successfully refreshed watchers", () => {
+  expect(Watcher.isRefreshSuccessful({ _tag: "Empty" })).toBe(true);
+  expect(
+    Watcher.isRefreshSuccessful({
+      _tag: "Observed",
+      outcome: WatchBuild.Outcome.Succeeded({
+        snapshot: {
+          fingerprints: HashMap.empty(),
+          graph: HashMap.empty(),
+          outputHash: "output",
+        },
+        warnings: [],
+      }),
+    }),
+  ).toBe(true);
+  expect(
+    Watcher.isRefreshSuccessful({
+      _tag: "Observed",
+      outcome: WatchBuild.Outcome.Failed({
+        fingerprints: HashMap.empty(),
+        failures: [
+          WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" }),
+        ],
+        warnings: [],
+      }),
+    }),
+  ).toBe(false);
+});
 
 it.effect("rejects refresh before the watcher has initialized", () =>
   Effect.gen(function* () {

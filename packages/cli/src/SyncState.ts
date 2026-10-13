@@ -1,6 +1,7 @@
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import * as HashSet from "effect/HashSet";
+import * as Match from "effect/Match";
 import type { Kind, OptionalFile } from "./EntryPoint";
 import type { ImplModulePath } from "./ImplModulePath";
 
@@ -18,7 +19,7 @@ export interface Pending {
 
 export const empty: Pending = { work: Work.None(), optional: HashSet.empty() };
 export const isDirty = (pending: Pending): boolean =>
-  pending.work._tag !== "None" || !HashSet.isEmpty(pending.optional);
+  !Work.$is("None")(pending.work) || !HashSet.isEmpty(pending.optional);
 export const full = (pending: Pending): Pending => ({
   ...pending,
   work: Work.Full(),
@@ -29,37 +30,42 @@ export const add = (
   entries: ReadonlyArray<Kind>,
   forceFull = false,
 ): Pending => {
-  let needsFull = forceFull || pending.work._tag === "Full";
-  let paths =
-    pending.work._tag === "Impls"
-      ? HashSet.fromIterable(pending.work.paths)
-      : HashSet.empty<ImplModulePath>();
-  let optional = pending.optional;
-  for (const entry of entries) {
-    switch (entry._tag) {
-      case "Impl":
-        paths = HashSet.add(paths, entry.relativePath);
-        break;
-      case "Http":
-      case "Crons":
-      case "Auth":
-        optional = HashSet.add(optional, entry._tag);
-        break;
-      case "Spec":
-      case "Table":
-      case "Config":
-        needsFull = true;
-        break;
-    }
-  }
-  const impls = Array.fromIterable(paths);
+  const next = Array.reduce(
+    entries,
+    {
+      needsFull: forceFull || Work.$is("Full")(pending.work),
+      paths: Work.$match(pending.work, {
+        None: () => HashSet.empty<ImplModulePath>(),
+        Full: () => HashSet.empty<ImplModulePath>(),
+        Impls: ({ paths }) => HashSet.fromIterable(paths),
+      }),
+      optional: pending.optional,
+    },
+    (state, entry) =>
+      Match.value(entry).pipe(
+        Match.tag("Impl", ({ relativePath }) => ({
+          ...state,
+          paths: HashSet.add(state.paths, relativePath),
+        })),
+        Match.tag("Http", "Crons", "Auth", ({ _tag }) => ({
+          ...state,
+          optional: HashSet.add(state.optional, _tag),
+        })),
+        Match.tag("Spec", "Table", "Config", () => ({
+          ...state,
+          needsFull: true,
+        })),
+        Match.exhaustive,
+      ),
+  );
+  const impls = Array.fromIterable(next.paths);
   return {
-    work: needsFull
+    work: next.needsFull
       ? Work.Full()
       : Array.isReadonlyArrayNonEmpty(impls)
         ? Work.Impls({ paths: impls })
         : Work.None(),
-    optional,
+    optional: next.optional,
   };
 };
 
@@ -71,7 +77,11 @@ export type Phase = Data.TaggedEnum<{
 export const Phase = Data.taggedEnum<Phase>();
 
 export const requiresFullSync = (phase: Phase, pending: Pending): boolean =>
-  phase._tag !== "Incremental" || pending.work._tag === "Full";
+  Phase.$match(phase, {
+    Bootstrapping: () => true,
+    NeedsFullSync: () => true,
+    Incremental: () => Work.$is("Full")(pending.work),
+  });
 
 export const implsToValidate = (
   phase: Phase,
@@ -79,11 +89,15 @@ export const implsToValidate = (
 ): ReadonlyArray<ImplModulePath> =>
   Array.fromIterable(
     HashSet.union(
-      phase._tag === "Incremental"
-        ? phase.failedImpls
-        : HashSet.empty<ImplModulePath>(),
-      pending.work._tag === "Impls"
-        ? HashSet.fromIterable(pending.work.paths)
-        : HashSet.empty<ImplModulePath>(),
+      Phase.$match(phase, {
+        Bootstrapping: () => HashSet.empty<ImplModulePath>(),
+        NeedsFullSync: () => HashSet.empty<ImplModulePath>(),
+        Incremental: ({ failedImpls }) => failedImpls,
+      }),
+      Work.$match(pending.work, {
+        None: () => HashSet.empty<ImplModulePath>(),
+        Full: () => HashSet.empty<ImplModulePath>(),
+        Impls: ({ paths }) => HashSet.fromIterable(paths),
+      }),
     ),
   );

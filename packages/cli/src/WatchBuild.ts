@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
 import * as HashMap from "effect/HashMap";
 import * as HashSet from "effect/HashSet";
+import * as Match from "effect/Match";
 import * as Hex from "effect/encoding/Hex";
 import * as Option from "effect/Option";
 import type { PlatformError } from "effect/PlatformError";
@@ -72,15 +73,15 @@ export const lastSuccessful = (state: State): Option.Option<Snapshot> =>
   });
 
 export const observe = (previous: State, outcome: Outcome): State =>
-  outcome._tag === "Succeeded"
-    ? State.Succeeded({
-        snapshot: outcome.snapshot,
-        warnings: outcome.warnings,
-      })
-    : State.Failed({
-        observation: outcome,
+  Outcome.$match(outcome, {
+    Succeeded: ({ snapshot, warnings }) =>
+      State.Succeeded({ snapshot, warnings }),
+    Failed: (observation) =>
+      State.Failed({
+        observation,
         lastSuccessful: lastSuccessful(previous),
-      });
+      }),
+  });
 
 export const fingerprints = (state: State): Fingerprints =>
   State.$match(state, {
@@ -90,9 +91,11 @@ export const fingerprints = (state: State): Fingerprints =>
   });
 
 export const outputHash = (state: State): Option.Option<string> =>
-  state._tag === "Succeeded"
-    ? Option.some(state.snapshot.outputHash)
-    : Option.none();
+  State.$match(state, {
+    Initial: () => Option.none(),
+    Succeeded: ({ snapshot }) => Option.some(snapshot.outputHash),
+    Failed: () => Option.none(),
+  });
 
 export type Change = Data.TaggedEnum<{
   Full: {};
@@ -122,8 +125,8 @@ export const diff = (
     (file) => !file.startsWith(generatedDirectoryPrefix),
   );
   if (
-    previous._tag === "Initial" ||
-    (sources.length > 0 && current._tag === "Failed") ||
+    State.$is("Initial")(previous) ||
+    (sources.length > 0 && State.$is("Failed")(current)) ||
     (changed.length === 0 &&
       !Equal.equals(outputHash(previous), outputHash(current)))
   )
@@ -207,22 +210,31 @@ export const failureMessage = (failure: Failure): string =>
   });
 
 export const messages = (outcome: Outcome): ReadonlyArray<esbuild.Message> =>
-  outcome._tag === "Succeeded"
-    ? []
-    : outcome.failures.flatMap((failure) =>
-        failure._tag === "BuildFailed"
-          ? failure.errors
-          : [
+  Outcome.$match(outcome, {
+    Succeeded: () => [],
+    Failed: ({ failures }) =>
+      failures.flatMap((failure) =>
+        Match.value(failure).pipe(
+          Match.tag("BuildFailed", ({ errors }) => errors),
+          Match.tag(
+            "InputCaptureFailed",
+            "OutputCaptureFailed",
+            "InvalidBuildResult",
+            (captureFailure) => [
               {
                 id: "confect-watch",
                 pluginName: "confect",
-                text: failureMessage(failure),
+                text: failureMessage(captureFailure),
                 location: null,
                 notes: [],
-                detail: failure,
+                detail: captureFailure,
               },
             ],
-      );
+          ),
+          Match.exhaustive,
+        ),
+      ),
+  });
 
 export const diagnostics = (
   state: State,

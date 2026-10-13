@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import { ImplModulePath } from "./ImplModulePath";
 import { ConfectDirectory } from "./ConfectDirectory";
@@ -28,6 +29,11 @@ export type EntryPoint = Kind & {
   readonly inputPath: string;
 };
 export type OptionalFile = "Http" | "Crons" | "Auth";
+
+export const isOptional = Predicate.or(
+  Kind.$is("Http"),
+  Predicate.or(Kind.$is("Crons"), Kind.$is("Auth")),
+);
 
 export const parse = (
   relativePath: string,

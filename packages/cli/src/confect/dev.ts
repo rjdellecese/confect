@@ -249,7 +249,7 @@ const syncLoop = Effect.fnUntraced(function* (
       );
 
       const phase = yield* Ref.get(phaseRef);
-      const firstSync = phase._tag === "Bootstrapping";
+      const firstSync = SyncState.Phase.$is("Bootstrapping")(phase);
       if (!firstSync) yield* logMessages;
 
       const pending = yield* Ref.getAndSet(pendingRef, SyncState.empty);
@@ -289,10 +289,7 @@ const syncLoop = Effect.fnUntraced(function* (
           yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
           return;
         }
-        if (
-          refreshed.success._tag === "Observed" &&
-          refreshed.success.outcome._tag === "Failed"
-        ) {
+        if (!Watcher.isRefreshSuccessful(refreshed.success)) {
           yield* logMessages;
           yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
           return;

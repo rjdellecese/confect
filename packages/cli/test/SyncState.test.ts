@@ -4,6 +4,24 @@ import * as EntryPoint from "@confect/cli/EntryPoint";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import * as HashSet from "effect/HashSet";
 
+it.each([
+  EntryPoint.Kind.Spec({ relativePath: "notes.spec.ts" }),
+  EntryPoint.Kind.Table({ relativePath: "tables/notes.ts" }),
+  EntryPoint.Kind.Config(),
+])("requests full generation for $_tag entries", (entry) => {
+  const optional = SyncState.add(SyncState.empty, [
+    EntryPoint.Kind.Http({ relativePath: "http.ts" }),
+    EntryPoint.Kind.Crons({ relativePath: "crons.ts" }),
+    EntryPoint.Kind.Auth({ relativePath: "auth.ts" }),
+  ]);
+  const pending = SyncState.add(optional, [entry]);
+  expect(pending.work._tag).toBe("Full");
+  expect(pending.optional).toEqual(HashSet.make("Http", "Crons", "Auth"));
+  expect(optional.work._tag).toBe("None");
+  expect(SyncState.isDirty(optional)).toBe(true);
+  expect(SyncState.isDirty(SyncState.empty)).toBe(false);
+});
+
 it("coalesces implementation work without mutating earlier requests", () => {
   const first = ImplModulePath.make("first.impl.ts");
   const second = ImplModulePath.make("second.impl.ts");

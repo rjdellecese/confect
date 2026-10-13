@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as HashSet from "effect/HashSet";
 import * as HashMap from "effect/HashMap";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Queue from "effect/Queue";
@@ -59,6 +60,16 @@ type RefreshOutcome = Data.TaggedEnum<{
   Observed: { readonly outcome: WatchBuild.Outcome };
 }>;
 const RefreshOutcome = Data.taggedEnum<RefreshOutcome>();
+
+export const isRefreshSuccessful = (outcome: RefreshOutcome): boolean =>
+  RefreshOutcome.$match(outcome, {
+    Empty: () => true,
+    Observed: ({ outcome: observed }) =>
+      WatchBuild.Outcome.$match(observed, {
+        Succeeded: () => true,
+        Failed: () => false,
+      }),
+  });
 
 export class OperationError extends Schema.TaggedError<OperationError>()(
   "WatcherOperationError",
@@ -206,14 +217,17 @@ const esbuildOptions = (
                   current,
                   generatedDirectory + path.sep,
                 );
-                const dirtyEntries =
-                  change._tag === "Full"
-                    ? entries
-                    : entries.filter((entry) =>
-                        HashSet.has(change.paths, entry.inputPath),
-                      );
                 yield* Ref.update(pendingRef, (pending) =>
-                  SyncState.add(pending, dirtyEntries, change._tag === "Full"),
+                  WatchBuild.Change.$match(change, {
+                    Full: () => SyncState.add(pending, entries, true),
+                    Affected: ({ paths }) =>
+                      SyncState.add(
+                        pending,
+                        entries.filter((entry) =>
+                          HashSet.has(paths, entry.inputPath),
+                        ),
+                      ),
+                  }),
                 );
                 yield* Queue.offer(signal, undefined);
               }),
@@ -253,27 +267,28 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
       Array.sort(Order.String),
       Array.join("\n"),
     );
-    if (
-      (current._tag === "Active" && current.key === key) ||
-      (current._tag === "Empty" && entries.length === 0)
-    )
-      return;
-    const structuralChange = current._tag !== "Uninitialized";
-    if (structuralChange) yield* Ref.update(pendingRef, SyncState.full);
-    const removedOptional =
-      current._tag === "Active"
-        ? current.entries.filter(
+    const unchanged = WatcherLifecycle.$match(current, {
+      Uninitialized: () => false,
+      Empty: () => entries.length === 0,
+      Active: ({ key: previousKey }) => previousKey === key,
+    });
+    if (unchanged) return;
+    yield* WatcherLifecycle.$match(current, {
+      Uninitialized: () => Effect.void,
+      Empty: () => Ref.update(pendingRef, SyncState.full),
+      Active: ({ entries: previousEntries, scope }) =>
+        Effect.gen(function* () {
+          const removedOptional = previousEntries.filter(
             (entry) =>
-              (entry._tag === "Http" ||
-                entry._tag === "Crons" ||
-                entry._tag === "Auth") &&
+              EntryPoint.isOptional(entry) &&
               !HashSet.has(desiredPaths, entry.absolutePath),
-          )
-        : [];
-    yield* Ref.update(pendingRef, (pending) =>
-      SyncState.add(pending, removedOptional),
-    );
-    if (current._tag === "Active") yield* Scope.close(current.scope, Exit.void);
+          );
+          yield* Ref.update(pendingRef, (pending) =>
+            SyncState.add(SyncState.full(pending), removedOptional),
+          );
+          yield* Scope.close(scope, Exit.void);
+        }),
+    });
     yield* Ref.set(watcher.lifecycle, WatcherLifecycle.Uninitialized());
     yield* Ref.set(watcher.observation, WatchBuild.State.Initial());
     if (!Array.isReadonlyArrayNonEmpty(entries)) {
@@ -335,40 +350,52 @@ const refresh = Effect.fnUntraced(function* (watcher: State) {
   return yield* watcher.lock.withPermit(
     Effect.gen(function* () {
       const current = yield* Ref.get(watcher.lifecycle);
-      if (current._tag === "Empty") return RefreshOutcome.Empty();
-      if (current._tag === "Uninitialized")
-        return yield* new OperationError({
-          operation: "refresh",
-          cause: "The dependency watcher is not initialized",
-        });
-      const rebuild = Effect.gen(function* () {
-        const built = yield* Effect.tryPromise({
-          try: () => current.context.rebuild(),
-          catch: (cause) => new OperationError({ operation: "rebuild", cause }),
-        }).pipe(Effect.result);
-        const state = yield* Ref.get(watcher.observation);
-        if (Result.isFailure(built)) {
-          const rejected = parseFailure(built.failure.cause);
-          if (Option.isNone(rejected)) return yield* built.failure;
-          if (state._tag !== "Failed")
-            return yield* new OperationError({
-              operation: "rebuild",
-              cause: rejected.value.errors,
+      return yield* WatcherLifecycle.$match(current, {
+        Empty: () => Effect.succeed(RefreshOutcome.Empty()),
+        Uninitialized: () =>
+          Effect.fail(
+            new OperationError({
+              operation: "refresh",
+              cause: "The dependency watcher is not initialized",
+            }),
+          ),
+        Active: ({ context }) =>
+          Effect.gen(function* () {
+            const rebuild = Effect.gen(function* () {
+              const built = yield* Effect.tryPromise({
+                try: () => context.rebuild(),
+                catch: (cause) =>
+                  new OperationError({ operation: "rebuild", cause }),
+              }).pipe(Effect.result);
+              const state = yield* Ref.get(watcher.observation);
+              if (Result.isFailure(built)) {
+                const rejected = parseFailure(built.failure.cause);
+                if (Option.isNone(rejected)) return yield* built.failure;
+                if (!WatchBuild.State.$is("Failed")(state))
+                  return yield* new OperationError({
+                    operation: "rebuild",
+                    cause: rejected.value.errors,
+                  });
+              }
+              return yield* WatchBuild.State.$match(state, {
+                Succeeded: ({ snapshot, warnings }) =>
+                  Effect.succeed(
+                    WatchBuild.Outcome.Succeeded({ snapshot, warnings }),
+                  ),
+                Failed: ({ observation }) => Effect.succeed(observation),
+                Initial: () =>
+                  Effect.fail(
+                    new OperationError({
+                      operation: "rebuild",
+                      cause: "esbuild completed without a build observation",
+                    }),
+                  ),
+              });
             });
-        }
-        if (state._tag === "Succeeded")
-          return WatchBuild.Outcome.Succeeded({
-            snapshot: state.snapshot,
-            warnings: state.warnings,
-          });
-        if (state._tag === "Failed") return state.observation;
-        return yield* new OperationError({
-          operation: "rebuild",
-          cause: "esbuild completed without a build observation",
-        });
+            yield* rebuild;
+            return RefreshOutcome.Observed({ outcome: yield* rebuild });
+          }),
       });
-      yield* rebuild;
-      return RefreshOutcome.Observed({ outcome: yield* rebuild });
     }),
   );
 });
@@ -416,12 +443,17 @@ const convexConfigStructureWatcher = Effect.fnUntraced(function* (
 
   yield* pipe(
     fs.watch(convexDirectory),
-    Stream.runForEach((event) =>
-      path.relative(convexDirectory, event.path) === CONVEX_CONFIG_FILENAME &&
-      event._tag !== "Update"
-        ? Queue.offer(restartQueue, undefined)
-        : Effect.void,
-    ),
+    Stream.runForEach((event) => {
+      if (path.relative(convexDirectory, event.path) !== CONVEX_CONFIG_FILENAME)
+        return Effect.void;
+      return Match.value(event).pipe(
+        Match.tag("Update", () => Effect.void),
+        Match.tag("Create", "Remove", () =>
+          Queue.offer(restartQueue, undefined),
+        ),
+        Match.exhaustive,
+      );
+    }),
   );
 });
 
@@ -460,7 +492,11 @@ const handleConfectChange = ({
     return Effect.void;
   }
 
-  const isLifecycleChange = eventTag !== "Update";
+  const isLifecycleChange = Match.value(eventTag).pipe(
+    Match.when("Update", () => false),
+    Match.whenOr("Create", "Remove", () => true),
+    Match.exhaustive,
+  );
 
   if (Option.isSome(EntryPoint.parse(relativePath))) {
     return isLifecycleChange
@@ -487,9 +523,11 @@ const handleConfectChange = ({
   // Creates are our safety net: when a previously-missing import is added,
   // esbuild may not have its parent directory on a poll path, so we
   // re-run codegen on Create here.
-  if (eventTag === "Create") {
-    return flipDirtyAndSignal(pendingRef, signal, restartQueue, false);
-  }
-
-  return Effect.void;
+  return Match.value(eventTag).pipe(
+    Match.when("Create", () =>
+      flipDirtyAndSignal(pendingRef, signal, restartQueue, false),
+    ),
+    Match.whenOr("Update", "Remove", () => Effect.void),
+    Match.exhaustive,
+  );
 };
