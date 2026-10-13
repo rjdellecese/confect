@@ -3,9 +3,11 @@ import * as WatchBuild from "@confect/cli/WatchBuild";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as HashMap from "effect/HashMap";
+import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
 import * as PlatformError from "effect/PlatformError";
 import type * as esbuild from "esbuild";
+import type * as WatchGraph from "@confect/cli/WatchGraph";
 
 const crypto = Crypto.make({
   randomBytes: (size) => new Uint8Array(size),
@@ -24,6 +26,144 @@ const result = (): esbuild.BuildResult => ({
       text: "output",
     },
   ],
+});
+
+const snapshot = (
+  fingerprints: WatchBuild.Fingerprints,
+  graph: WatchGraph.WatchGraph = HashMap.empty(),
+  outputHash = "output",
+): WatchBuild.State =>
+  WatchBuild.State.Succeeded({
+    snapshot: { fingerprints, graph, outputHash },
+    warnings: [],
+  });
+
+it("diffs transitive dependencies through both old and new graphs", () => {
+  const oldGraph = HashMap.make(
+    ["shared.ts", HashSet.make("old-helper.ts")],
+    ["old-helper.ts", HashSet.make("old.impl.ts")],
+  );
+  const newGraph = HashMap.make(
+    ["shared.ts", HashSet.make("new-helper.ts")],
+    ["new-helper.ts", HashSet.make("new.impl.ts")],
+  );
+  const previous = snapshot(HashMap.make(["shared.ts", "before"]), oldGraph);
+  const current = snapshot(HashMap.make(["shared.ts", "after"]), newGraph);
+  const change = WatchBuild.diff(previous, current, "_generated/");
+  assert(change._tag === "Affected");
+  expect(change.paths).toEqual(
+    HashSet.make(
+      "shared.ts",
+      "old-helper.ts",
+      "old.impl.ts",
+      "new-helper.ts",
+      "new.impl.ts",
+    ),
+  );
+  expect(WatchBuild.fingerprints(previous)).toEqual(
+    HashMap.make(["shared.ts", "before"]),
+  );
+  expect(WatchBuild.lastSuccessful(previous)).toEqual(
+    Option.some({
+      fingerprints: HashMap.make(["shared.ts", "before"]),
+      graph: oldGraph,
+      outputHash: "output",
+    }),
+  );
+});
+
+it("ignores generated-file echoes but not similarly named source directories", () => {
+  const previous = snapshot(
+    HashMap.make(
+      ["_generated/spec.ts", "before"],
+      ["_generatedOther/source.ts", "source"],
+    ),
+  );
+  const generatedOnly = snapshot(
+    HashMap.make(
+      ["_generated/spec.ts", "after"],
+      ["_generatedOther/source.ts", "source"],
+    ),
+    HashMap.empty(),
+    "new output",
+  );
+  expect(WatchBuild.diff(previous, generatedOnly, "_generated/")).toEqual(
+    WatchBuild.Change.Affected({ paths: HashSet.empty() }),
+  );
+  const sourceEdit = snapshot(
+    HashMap.make(
+      ["_generated/spec.ts", "after"],
+      ["_generatedOther/source.ts", "changed"],
+    ),
+  );
+  expect(WatchBuild.diff(generatedOnly, sourceEdit, "_generated/")).toEqual(
+    WatchBuild.Change.Affected({
+      paths: HashSet.make("_generatedOther/source.ts"),
+    }),
+  );
+});
+
+it("requires full work for the first snapshot, untracked output changes, and failed source edits", () => {
+  const previous = snapshot(HashMap.make(["source.ts", "before"]));
+  expect(
+    WatchBuild.diff(WatchBuild.State.Initial(), previous, "_generated/"),
+  ).toEqual(WatchBuild.Change.Full());
+  expect(
+    WatchBuild.diff(
+      previous,
+      snapshot(WatchBuild.fingerprints(previous), HashMap.empty(), "changed"),
+      "_generated/",
+    ),
+  ).toEqual(WatchBuild.Change.Full());
+  const failed = WatchBuild.observe(
+    previous,
+    WatchBuild.Outcome.Failed({
+      fingerprints: HashMap.empty(),
+      failures: [
+        WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" }),
+      ],
+      warnings: [],
+    }),
+  );
+  expect(WatchBuild.diff(previous, failed, "_generated/")).toEqual(
+    WatchBuild.Change.Full(),
+  );
+  expect(WatchBuild.diff(failed, failed, "_generated/")).toEqual(
+    WatchBuild.Change.Affected({ paths: HashSet.empty() }),
+  );
+});
+
+it("reads diagnostics without exposing historical errors as current errors", () => {
+  expect(WatchBuild.diagnostics(WatchBuild.State.Initial())).toEqual({
+    errors: [],
+    warnings: [],
+  });
+  const warning: esbuild.Message = {
+    id: "",
+    pluginName: "",
+    text: "warning",
+    location: null,
+    notes: [],
+    detail: undefined,
+  };
+  const failed = WatchBuild.observe(
+    WatchBuild.State.Initial(),
+    WatchBuild.Outcome.Failed({
+      fingerprints: HashMap.empty(),
+      failures: [
+        WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" }),
+      ],
+      warnings: [warning],
+    }),
+  );
+  expect(WatchBuild.diagnostics(failed).errors[0]?.text).toBe(
+    "esbuild completed without metafile",
+  );
+  expect(WatchBuild.diagnostics(failed).warnings).toEqual([warning]);
+  expect(WatchBuild.diagnostics(snapshot(HashMap.empty()))).toEqual({
+    errors: [],
+    warnings: [],
+  });
 });
 
 it.effect(
@@ -172,16 +312,3 @@ it.effect("carries esbuild diagnostics as a failed observation", () =>
     expect(input.errors).toEqual([error]);
   }),
 );
-
-it("parses reported build rejections without confusing operation errors or malformed diagnostics", () => {
-  expect(
-    WatchBuild.parseFailure({ errors: [{ text: "syntax error" }] }),
-  ).toEqual(Option.some({ errors: [{ text: "syntax error" }] }));
-  expect(WatchBuild.parseFailure({ errors: [] })).toEqual(Option.none());
-  expect(WatchBuild.parseFailure({ errors: ["invalid"] })).toEqual(
-    Option.none(),
-  );
-  expect(WatchBuild.parseFailure(new Error("service stopped"))).toEqual(
-    Option.none(),
-  );
-});

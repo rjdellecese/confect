@@ -9,7 +9,7 @@ import type { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as TableModule from "@confect/cli/TableModule";
 import { codegenHandler } from "@confect/cli/confect/codegen";
 import { dev } from "@confect/cli/confect/dev";
-import type { OperationError } from "@confect/cli/WatchBuild";
+import type { OperationError } from "@confect/cli/Watcher";
 import { generateFunctions, writeGroups } from "@confect/cli/utils";
 import type { Spec } from "@confect/core";
 import { expect, expectTypeOf, it } from "@effect/vitest";

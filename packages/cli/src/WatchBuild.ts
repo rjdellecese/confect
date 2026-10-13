@@ -2,12 +2,13 @@ import * as Array from "effect/Array";
 import type * as Crypto from "effect/Crypto";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import * as Equal from "effect/Equal";
 import * as HashMap from "effect/HashMap";
+import * as HashSet from "effect/HashSet";
 import * as Hex from "effect/encoding/Hex";
 import * as Option from "effect/Option";
 import type { PlatformError } from "effect/PlatformError";
 import * as Result from "effect/Result";
-import * as Schema from "effect/Schema";
 import type * as esbuild from "esbuild";
 import * as WatchGraph from "./WatchGraph";
 
@@ -93,6 +94,57 @@ export const outputHash = (state: State): Option.Option<string> =>
     ? Option.some(state.snapshot.outputHash)
     : Option.none();
 
+export type Change = Data.TaggedEnum<{
+  Full: {};
+  Affected: { readonly paths: HashSet.HashSet<string> };
+}>;
+export const Change = Data.taggedEnum<Change>();
+
+export const diff = (
+  previous: State,
+  current: State,
+  generatedDirectoryPrefix: string,
+): Change => {
+  const previousFingerprints = fingerprints(previous);
+  const currentFingerprints = fingerprints(current);
+  const files = HashSet.union(
+    HashSet.fromIterable(HashMap.keys(previousFingerprints)),
+    HashSet.fromIterable(HashMap.keys(currentFingerprints)),
+  );
+  const changed = Array.fromIterable(files).filter(
+    (file) =>
+      !Equal.equals(
+        HashMap.get(previousFingerprints, file),
+        HashMap.get(currentFingerprints, file),
+      ),
+  );
+  const sources = changed.filter(
+    (file) => !file.startsWith(generatedDirectoryPrefix),
+  );
+  if (
+    previous._tag === "Initial" ||
+    (sources.length > 0 && current._tag === "Failed") ||
+    (changed.length === 0 &&
+      !Equal.equals(outputHash(previous), outputHash(current)))
+  )
+    return Change.Full();
+
+  const graph = Option.match(lastSuccessful(current), {
+    onNone: () => HashMap.empty<string, HashSet.HashSet<string>>(),
+    onSome: (snapshot) => snapshot.graph,
+  });
+  const previousGraph = Option.match(lastSuccessful(previous), {
+    onNone: () => HashMap.empty<string, HashSet.HashSet<string>>(),
+    onSome: (snapshot) => snapshot.graph,
+  });
+  return Change.Affected({
+    paths: HashSet.union(
+      WatchGraph.affected(graph, sources),
+      WatchGraph.affected(previousGraph, sources),
+    ),
+  });
+};
+
 export const parse = Effect.fn("WatchBuild.parse")(function* (
   result: esbuild.BuildResult,
   capture: Capture,
@@ -144,25 +196,6 @@ export const parse = Effect.fn("WatchBuild.parse")(function* (
   });
 });
 
-export class OperationError extends Schema.TaggedError<OperationError>()(
-  "WatcherOperationError",
-  {
-    operation: Schema.Literals([
-      "create",
-      "watch",
-      "rebuild",
-      "dispose",
-      "refresh",
-    ]),
-    cause: Schema.Unknown,
-  },
-) {}
-
-const ReportedBuildFailure = Schema.Struct({
-  errors: Schema.NonEmptyArray(Schema.Struct({ text: Schema.String })),
-});
-export const parseFailure = Schema.decodeUnknownOption(ReportedBuildFailure);
-
 export const failureMessage = (failure: Failure): string =>
   Failure.$match(failure, {
     BuildFailed: ({ errors }) => errors.map((error) => error.text).join("\n"),
@@ -190,3 +223,18 @@ export const messages = (outcome: Outcome): ReadonlyArray<esbuild.Message> =>
               },
             ],
       );
+
+export const diagnostics = (
+  state: State,
+): {
+  readonly errors: ReadonlyArray<esbuild.Message>;
+  readonly warnings: ReadonlyArray<esbuild.Message>;
+} =>
+  State.$match(state, {
+    Initial: () => ({ errors: [], warnings: [] }),
+    Succeeded: ({ warnings }) => ({ errors: [], warnings }),
+    Failed: ({ observation }) => ({
+      errors: messages(observation),
+      warnings: observation.warnings,
+    }),
+  });

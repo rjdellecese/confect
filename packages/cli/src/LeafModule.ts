@@ -8,6 +8,7 @@ import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
+import * as HashMap from "effect/HashMap";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
@@ -16,6 +17,9 @@ import * as String from "effect/String";
 import { fromBundlerError } from "./BuildError";
 import * as Bundler from "./Bundler";
 import {
+  MissingImplFileError,
+  MissingSpecFileError,
+  ParentChildNameCollisionError,
   ImplMissingDefaultLayerError,
   ImplMissingFunctionsError,
   ImplMissingMiddlewareError,
@@ -42,6 +46,8 @@ export type LoadedLeafModule = LeafModule & {
 } & Brand.Brand<"@confect/cli/LoadedLeafModule">;
 
 const LoadedLeafModule = Brand.nominal<LoadedLeafModule>();
+
+const VALIDATION_CONCURRENCY = 4;
 
 export const SPEC_SUFFIX = ".spec.ts";
 export const IMPL_SUFFIX = ".impl.ts";
@@ -399,4 +405,154 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
       missingMiddlewareKeys: missingMiddleware,
     });
   }
+});
+
+export const validateImplFiles = Effect.fn("LeafModule.validateImplFiles")(
+  function* (relativePaths: ReadonlyArray<ImplModulePath>) {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+
+    yield* Effect.forEach(
+      relativePaths,
+      Effect.fnUntraced(function* (implRelativePath: ImplModulePath) {
+        const specRelativePath = yield* specPathForImpl(implRelativePath);
+        if (
+          !(yield* fs.exists(path.join(confectDirectory, specRelativePath)))
+        ) {
+          return yield* new MissingSpecFileError({
+            implPath: implRelativePath,
+            expectedSpecPath: specRelativePath,
+          });
+        }
+        if (
+          !(yield* fs.exists(path.join(confectDirectory, implRelativePath)))
+        ) {
+          return yield* new MissingImplFileError({
+            specPath: specRelativePath,
+            expectedImplPath: implRelativePath,
+          });
+        }
+        const leaf = yield* toLeafModule(specRelativePath);
+        yield* validateImpl(yield* loadSpec(leaf));
+      }),
+      { concurrency: VALIDATION_CONCURRENCY, discard: true },
+    );
+  },
+);
+
+export const loadAll = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const specFiles = yield* discoverLeafSpecFiles;
+
+  const results = yield* Effect.forEach(
+    specFiles,
+    Effect.fnUntraced(function* (specRelativePath: string) {
+      const discovered = yield* toLeafModule(specRelativePath);
+      const leaf = yield* loadSpec(discovered);
+
+      const implRelativePath = yield* implPathForSpec(specRelativePath);
+      const implAbsolutePath = path.join(confectDirectory, implRelativePath);
+      if (!(yield* fs.exists(implAbsolutePath))) {
+        return yield* new MissingImplFileError({
+          specPath: specRelativePath,
+          expectedImplPath: implRelativePath,
+        });
+      }
+
+      return leaf;
+    }),
+    { concurrency: VALIDATION_CONCURRENCY },
+  );
+
+  yield* validateOrphanImpls(specFiles);
+
+  return results;
+});
+
+/**
+ * Walk leaf ancestors and fail with a {@link ParentChildNameCollisionError} when
+ * a parent leaf declares a function or subgroup whose name matches a sibling
+ * subdirectory spec's segment. Without this check the colliding descendant
+ * would overwrite the parent's entry in the assembled `GroupSpec.groups` map at
+ * runtime, surfacing as a confusing `Refs.make` error rather than a
+ * codegen-time diagnostic.
+ */
+export const validateNoParentChildNameCollisions = Effect.fnUntraced(function* (
+  leaves: ReadonlyArray<LoadedLeafModule>,
+) {
+  const leavesBySegments = HashMap.fromIterable(
+    Array.map(leaves, (leaf) => [leaf.pathSegments.join("/"), leaf] as const),
+  );
+  for (const child of leaves) {
+    for (let depth = 1; depth < child.pathSegments.length; depth++) {
+      const parent = HashMap.get(
+        leavesBySegments,
+        child.pathSegments.slice(0, depth).join("/"),
+      );
+      if (Option.isNone(parent)) continue;
+      const collisionName = child.pathSegments[depth]!;
+      const collisionKind = Object.hasOwn(
+        parent.value.spec.functions,
+        collisionName,
+      )
+        ? "function"
+        : Object.hasOwn(parent.value.spec.groups, collisionName)
+          ? "group"
+          : undefined;
+      if (collisionKind !== undefined) {
+        return yield* new ParentChildNameCollisionError({
+          parentSpecPath: bindingToRelativeSpecPath(
+            parent.value.specImportPath,
+          ),
+          childSpecPath: bindingToRelativeSpecPath(child.specImportPath),
+          collisionName,
+          collisionKind,
+        });
+      }
+    }
+  }
+});
+
+/**
+ * `LeafModule.specImportPath` is the import path used from inside the generated
+ * `_generated/spec.ts` (e.g. `"../notes.spec"`). Strip the `../` prefix and
+ * re-add the `.ts` extension to recover the leaf's confect-relative spec path
+ * used in diagnostics.
+ */
+const bindingToRelativeSpecPath = (importPath: string): string => {
+  const withoutDotDot = importPath.startsWith("../")
+    ? importPath.slice(3)
+    : importPath;
+  return `${withoutDotDot}.ts`;
+};
+
+const validateOrphanImpls = Effect.fnUntraced(function* (
+  specFiles: ReadonlyArray<string>,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const implFiles = yield* discoverLeafImplFiles;
+  const specPaths = HashSet.fromIterable(specFiles);
+
+  yield* Effect.forEach(
+    implFiles,
+    Effect.fnUntraced(function* (implRelativePath: string) {
+      const specRelativePath = yield* specPathForImpl(implRelativePath);
+      if (HashSet.has(specPaths, specRelativePath)) {
+        return;
+      }
+
+      const specAbsolutePath = path.join(confectDirectory, specRelativePath);
+      if (!(yield* fs.exists(specAbsolutePath))) {
+        return yield* new MissingSpecFileError({
+          implPath: implRelativePath,
+          expectedSpecPath: specRelativePath,
+        });
+      }
+    }),
+  );
 });

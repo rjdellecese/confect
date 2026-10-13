@@ -1,47 +1,8 @@
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import * as HashSet from "effect/HashSet";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import { ImplModulePath } from "./ImplModulePath";
-
-export type EntryKind = Data.TaggedEnum<{
-  Spec: { readonly relativePath: string };
-  Impl: { readonly relativePath: ImplModulePath };
-  Table: { readonly relativePath: string };
-  Http: { readonly relativePath: "http.ts" };
-  Crons: { readonly relativePath: "crons.ts" };
-  Auth: { readonly relativePath: "auth.ts" };
-  Config: {};
-}>;
-
-export const EntryKind = Data.taggedEnum<EntryKind>();
-export type EntryPoint = EntryKind & {
-  readonly absolutePath: string;
-  readonly inputPath: string;
-};
-export type OptionalFile = "Http" | "Crons" | "Auth";
-
-export const parseEntry = (
-  relativePath: string,
-): Option.Option<Exclude<EntryKind, { readonly _tag: "Config" }>> => {
-  if (relativePath === "http.ts")
-    return Option.some(EntryKind.Http({ relativePath }));
-  if (relativePath === "crons.ts")
-    return Option.some(EntryKind.Crons({ relativePath }));
-  if (relativePath === "auth.ts")
-    return Option.some(EntryKind.Auth({ relativePath }));
-  if (
-    relativePath.split(/[/\\]/)[0] === "tables" &&
-    relativePath.endsWith(".ts")
-  )
-    return Option.some(EntryKind.Table({ relativePath }));
-  if (relativePath.endsWith(".spec.ts"))
-    return Option.some(EntryKind.Spec({ relativePath }));
-  return Schema.decodeOption(ImplModulePath)(relativePath).pipe(
-    Option.map((implPath) => EntryKind.Impl({ relativePath: implPath })),
-  );
-};
+import type { Kind, OptionalFile } from "./EntryPoint";
+import type { ImplModulePath } from "./ImplModulePath";
 
 export type Work = Data.TaggedEnum<{
   None: {};
@@ -65,7 +26,7 @@ export const full = (pending: Pending): Pending => ({
 
 export const add = (
   pending: Pending,
-  entries: ReadonlyArray<EntryKind>,
+  entries: ReadonlyArray<Kind>,
   forceFull = false,
 ): Pending => {
   let needsFull = forceFull || pending.work._tag === "Full";
