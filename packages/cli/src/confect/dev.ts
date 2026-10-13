@@ -9,15 +9,19 @@ import * as Array from "effect/Array";
 import * as Clock from "effect/Clock";
 import * as Console from "effect/Console";
 import * as Duration from "effect/Duration";
+import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
 import * as Exit from "effect/Exit";
 import * as HashSet from "effect/HashSet";
+import * as HashMap from "effect/HashMap";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Result from "effect/Result";
+import * as Semaphore from "effect/Semaphore";
 import * as Scope from "effect/Scope";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -31,6 +35,9 @@ import * as esbuild from "esbuild";
 import * as Ansi from "../Ansi";
 import * as Bundler from "../Bundler";
 import * as WatchGraph from "../WatchGraph";
+import * as WatchBuild from "../WatchBuild";
+import * as DevState from "../DevState";
+import type { EntryPoint, Pending } from "../DevState";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { CONVEX_CONFIG_FILENAME } from "../ConvexConfig";
@@ -38,12 +45,7 @@ import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
 import type * as GroupPath from "../GroupPath";
 import type * as GroupPaths from "../GroupPaths";
-import {
-  discoverLeafImplFiles,
-  discoverLeafSpecFiles,
-  isLeafImplPath,
-  isLeafSpecPath,
-} from "../LeafModule";
+import { discoverLeafImplFiles, discoverLeafSpecFiles } from "../LeafModule";
 import {
   logCoalescedBuildErrors,
   logCoalescedBuildWarnings,
@@ -53,7 +55,7 @@ import {
   logSuccess,
 } from "../log";
 import { ProjectRoot } from "../ProjectRoot";
-import { discoverTableFiles, TABLES_DIRNAME } from "../TableModule";
+import { discoverTableFiles } from "../TableModule";
 import {
   generateAuthConfig,
   generateCrons,
@@ -72,34 +74,29 @@ const COALESCE_QUIESCENCE = Duration.millis(300);
 // signal stream can't pin the sync loop forever.
 const COALESCE_MAX_WAIT = Duration.seconds(5);
 
-type Pending = {
-  readonly specDirty: boolean;
-  readonly httpDirty: boolean;
-  readonly cronsDirty: boolean;
-  readonly authDirty: boolean;
-  readonly implPaths: ReadonlySet<string>;
-};
+type WatcherLifecycle = Data.TaggedEnum<{
+  Uninitialized: {};
+  Empty: {};
+  Active: {
+    readonly key: string;
+    readonly scope: Scope.Closeable;
+    readonly entries: Array.NonEmptyReadonlyArray<EntryPoint>;
+    readonly context: esbuild.BuildContext;
+  };
+}>;
+const WatcherLifecycle = Data.taggedEnum<WatcherLifecycle>();
 
-type PendingKey = Exclude<keyof Pending, "implPaths">;
+interface Watcher {
+  readonly lifecycle: Ref.Ref<WatcherLifecycle>;
+  readonly observation: Ref.Ref<WatchBuild.State>;
+  readonly lock: Semaphore.Semaphore;
+}
 
-const pendingInit: Pending = {
-  specDirty: false,
-  httpDirty: false,
-  cronsDirty: false,
-  authDirty: false,
-  implPaths: new Set(),
-};
-
-const isPendingDirty = (p: Pending): boolean =>
-  p.specDirty ||
-  p.httpDirty ||
-  p.cronsDirty ||
-  p.authDirty ||
-  p.implPaths.size > 0;
-
-type WatcherMessages = ReadonlyMap<string, readonly esbuild.Message[]>;
-
-const emptyWatcherMessages: WatcherMessages = new Map();
+type RefreshOutcome = Data.TaggedEnum<{
+  Empty: {};
+  Observed: { readonly outcome: WatchBuild.Outcome };
+}>;
+const RefreshOutcome = Data.taggedEnum<RefreshOutcome>();
 
 const changeChar = (change: "Added" | "Removed" | "Modified") =>
   Match.value(change).pipe(
@@ -184,37 +181,27 @@ export const dev = Command.make("dev", {}, () =>
     yield* logPending("Performing initial sync…");
     const previousFunctionPaths = yield* loadPreviousFunctionPaths;
 
-    const pendingRef = yield* Ref.make<Pending>(pendingInit);
+    const pendingRef = yield* Ref.make<Pending>(DevState.empty);
     const signal = yield* Queue.sliding<void>(1);
     const restartQueue = yield* Queue.sliding<void>(1);
-    const refreshWatcher = yield* Ref.make<Effect.Effect<void>>(Effect.void);
-    const watcherErrorsRef =
-      yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
-    const watcherWarningsRef =
-      yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
+    const watcher: Watcher = {
+      lifecycle: yield* Ref.make<WatcherLifecycle>(
+        WatcherLifecycle.Uninitialized(),
+      ),
+      observation: yield* Ref.make<WatchBuild.State>(
+        WatchBuild.State.Initial(),
+      ),
+      lock: yield* Semaphore.make(1),
+    };
 
     yield* Effect.all(
       [
         Effect.scoped(
-          entryPointsWatcher(
-            signal,
-            pendingRef,
-            restartQueue,
-            refreshWatcher,
-            watcherErrorsRef,
-            watcherWarningsRef,
-          ),
+          entryPointsWatcher(signal, pendingRef, restartQueue, watcher),
         ),
         confectStructureWatcher(signal, pendingRef, restartQueue),
         convexConfigStructureWatcher(restartQueue),
-        syncLoop(
-          signal,
-          pendingRef,
-          previousFunctionPaths,
-          refreshWatcher,
-          watcherErrorsRef,
-          watcherWarningsRef,
-        ),
+        syncLoop(signal, pendingRef, previousFunctionPaths, watcher),
       ],
       { concurrency: "unbounded" },
     );
@@ -224,25 +211,22 @@ export const dev = Command.make("dev", {}, () =>
 const esbuildMessageKey = (m: esbuild.Message): string =>
   `${m.location?.file ?? ""}:${m.location?.line ?? ""}:${m.location?.column ?? ""}:${m.text}`;
 
-const allMessages = (
-  messages: WatcherMessages,
-): ReadonlyArray<esbuild.Message> =>
-  pipe(Array.fromIterable(messages.values()), Array.flatten);
-
 const dedupeWatcherMessages = (
-  messages: WatcherMessages,
+  messages: ReadonlyArray<esbuild.Message>,
 ): ReadonlyArray<esbuild.Message> =>
   pipe(
-    allMessages(messages),
+    messages,
     Array.dedupeWith(
       (messageA, messageB) =>
         esbuildMessageKey(messageA) === esbuildMessageKey(messageB),
     ),
   );
 
-const watcherMessagesSignature = (messages: WatcherMessages): string =>
+const watcherMessagesSignature = (
+  messages: ReadonlyArray<esbuild.Message>,
+): string =>
   pipe(
-    allMessages(messages),
+    messages,
     Array.map(esbuildMessageKey),
     Array.dedupe,
     Array.sort(Order.String),
@@ -256,16 +240,15 @@ const watcherMessagesSignature = (messages: WatcherMessages): string =>
  * point's build at the same source location.
  */
 const logChangedWatcherMessages = Effect.fnUntraced(function* (
-  messagesRef: Ref.Ref<WatcherMessages>,
+  messages: ReadonlyArray<esbuild.Message>,
   lastLoggedSignatureRef: Ref.Ref<string>,
   log: (messages: ReadonlyArray<esbuild.Message>) => Effect.Effect<void>,
 ) {
-  const messages = yield* Ref.get(messagesRef);
   const signature = watcherMessagesSignature(messages);
   const previous = yield* Ref.get(lastLoggedSignatureRef);
   if (signature === previous) return;
   yield* Ref.set(lastLoggedSignatureRef, signature);
-  if (messages.size === 0) return;
+  if (messages.length === 0) return;
   yield* log(dedupeWatcherMessages(messages));
 });
 
@@ -292,22 +275,37 @@ const syncLoop = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
-  refreshWatcher: Ref.Ref<Effect.Effect<void>>,
-  watcherErrorsRef: Ref.Ref<WatcherMessages>,
-  watcherWarningsRef: Ref.Ref<WatcherMessages>,
+  watcher: Watcher,
 ) {
   const functionPathsRef = yield* Ref.make(initialFunctionPaths);
   const lastLoggedErrorsRef = yield* Ref.make<string>("");
   const lastLoggedWarningsRef = yield* Ref.make<string>("");
-  const fullSyncNeeded = yield* Ref.make(true);
-  const initialSync = yield* Ref.make(true);
-  const failedImpls = yield* Ref.make<ReadonlySet<string>>(new Set());
-  const emptyOptional = {
-    httpDirty: false,
-    cronsDirty: false,
-    authDirty: false,
-  };
-  const optionalPendingRef = yield* Ref.make(emptyOptional);
+  const phaseRef = yield* Ref.make<DevState.Phase>(
+    DevState.Phase.Bootstrapping(),
+  );
+  const optionalPendingRef = yield* Ref.make(
+    HashSet.empty<DevState.OptionalFile>(),
+  );
+  const logMessages = Effect.gen(function* () {
+    const state = yield* Ref.get(watcher.observation);
+    const errors =
+      state._tag === "Failed" ? WatchBuild.messages(state.observation) : [];
+    const warnings = WatchBuild.State.$match(state, {
+      Initial: () => [],
+      Succeeded: (observation) => observation.warnings,
+      Failed: ({ observation }) => observation.warnings,
+    });
+    yield* logChangedWatcherMessages(
+      errors,
+      lastLoggedErrorsRef,
+      logCoalescedBuildErrors,
+    );
+    yield* logChangedWatcherMessages(
+      warnings,
+      lastLoggedWarningsRef,
+      logCoalescedBuildWarnings,
+    );
+  });
 
   return yield* Effect.forever(
     Effect.gen(function* () {
@@ -319,40 +317,21 @@ const syncLoop = Effect.fnUntraced(function* (
         COALESCE_MAX_WAIT,
       );
 
-      if (!(yield* Ref.get(initialSync))) {
-        yield* logChangedWatcherMessages(
-          watcherErrorsRef,
-          lastLoggedErrorsRef,
-          logCoalescedBuildErrors,
-        );
-        yield* logChangedWatcherMessages(
-          watcherWarningsRef,
-          lastLoggedWarningsRef,
-          logCoalescedBuildWarnings,
-        );
-      }
+      const phase = yield* Ref.get(phaseRef);
+      const firstSync = phase._tag === "Bootstrapping";
+      if (!firstSync) yield* logMessages;
 
-      const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
+      const pending = yield* Ref.getAndSet(pendingRef, DevState.empty);
+      if (!DevState.isDirty(pending)) return;
 
-      if (!isPendingDirty(pending)) {
-        // No-op signal (e.g. a late echo after a previous cycle
-        // already drained). Stay silent.
-        return;
-      }
-
-      const firstSync = yield* Ref.getAndSet(initialSync, false);
       const optional = yield* Ref.updateAndGet(
         optionalPendingRef,
-        (previous) => ({
-          httpDirty: previous.httpDirty || pending.httpDirty,
-          cronsDirty: previous.cronsDirty || pending.cronsDirty,
-          authDirty: previous.authDirty || pending.authDirty,
-        }),
+        HashSet.union(pending.optional),
       );
       if (!firstSync)
         yield* logPending("Dependencies may have changed, reloading…");
 
-      if (pending.specDirty || (yield* Ref.get(fullSyncNeeded))) {
+      if (DevState.requiresFullSync(phase, pending)) {
         const current = yield* codegenHandler.pipe(
           Effect.tap(({ functionPaths: nextFunctionPaths }) =>
             Effect.gen(function* () {
@@ -364,46 +343,64 @@ const syncLoop = Effect.fnUntraced(function* (
           CodegenError.catchAndLog,
         );
         if (Option.isNone(current)) {
-          yield* Ref.set(fullSyncNeeded, true);
+          yield* Ref.set(phaseRef, DevState.Phase.NeedsFullSync());
           if (firstSync) {
-            yield* Ref.update(pendingRef, (next) => ({
-              ...next,
-              specDirty: true,
-            }));
+            yield* Ref.update(pendingRef, DevState.full);
             yield* Queue.offer(signal, undefined);
           }
           return;
         }
-        yield* Ref.set(fullSyncNeeded, false);
-        yield* Ref.set(failedImpls, new Set());
-        yield* Ref.get(refreshWatcher).pipe(Effect.flatten);
-      } else if (
-        pending.implPaths.size > 0 ||
-        (yield* Ref.get(failedImpls)).size > 0
-      ) {
-        const paths = new Set([
-          ...pending.implPaths,
-          ...(yield* Ref.get(failedImpls)),
-        ]);
-        const validated = yield* validateImplFiles([...paths]).pipe(
-          CodegenError.catchAndLog,
-        );
-        if (Option.isNone(validated)) {
-          yield* Ref.set(failedImpls, paths);
+        const refreshed = yield* refreshWatcher(watcher).pipe(Effect.result);
+        if (Result.isFailure(refreshed)) {
+          yield* Console.error(
+            `Dependency watcher could not ${refreshed.failure.operation}: ${globalThis.String(refreshed.failure.cause)}`,
+          );
+          yield* Ref.set(phaseRef, DevState.Phase.NeedsFullSync());
           return;
         }
-        yield* Ref.set(failedImpls, new Set());
-        yield* touchConvexSchema;
+        if (
+          refreshed.success._tag === "Observed" &&
+          refreshed.success.outcome._tag === "Failed"
+        ) {
+          yield* logMessages;
+          yield* Ref.set(phaseRef, DevState.Phase.NeedsFullSync());
+          return;
+        }
+        yield* Ref.set(
+          phaseRef,
+          DevState.Phase.Incremental({ failedImpls: HashSet.empty() }),
+        );
+      } else {
+        const paths = DevState.implsToValidate(phase, pending);
+        if (Array.isReadonlyArrayNonEmpty(paths)) {
+          const validated = yield* validateImplFiles(paths).pipe(
+            CodegenError.catchAndLog,
+          );
+          if (Option.isNone(validated)) {
+            yield* Ref.set(
+              phaseRef,
+              DevState.Phase.Incremental({
+                failedImpls: HashSet.fromIterable(paths),
+              }),
+            );
+            return;
+          }
+          yield* Ref.set(
+            phaseRef,
+            DevState.Phase.Incremental({ failedImpls: HashSet.empty() }),
+          );
+          yield* touchConvexSchema;
+        }
       }
 
       const dirtyOptionalFiles = [
-        ...(optional.httpDirty
+        ...(HashSet.has(optional, "Http")
           ? [syncOptionalFile(generateHttp, "http.ts")]
           : []),
-        ...(optional.cronsDirty
+        ...(HashSet.has(optional, "Crons")
           ? [syncOptionalFile(generateCrons, "crons.ts")]
           : []),
-        ...(optional.authDirty
+        ...(HashSet.has(optional, "Auth")
           ? [syncOptionalFile(generateAuthConfig, "auth.config.ts")]
           : []),
       ];
@@ -411,20 +408,14 @@ const syncLoop = Effect.fnUntraced(function* (
       yield* Array.isReadonlyArrayNonEmpty(dirtyOptionalFiles)
         ? Effect.all(dirtyOptionalFiles, { concurrency: "unbounded" })
         : Effect.void;
-      yield* Ref.set(optionalPendingRef, emptyOptional);
+      yield* Ref.set(optionalPendingRef, HashSet.empty());
 
-      if (!isPendingDirty(yield* Ref.get(pendingRef))) {
+      if (!DevState.isDirty(yield* Ref.get(pendingRef))) {
         yield* logSuccess("Generated files are up-to-date");
       }
     }),
   );
 });
-
-interface EntryPoint {
-  readonly absolutePath: string;
-  readonly inputPath: string;
-  readonly pendingKey: PendingKey;
-}
 
 const discoverEntryPoints = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -432,26 +423,25 @@ const discoverEntryPoints = Effect.gen(function* () {
   const confectDirectory = yield* ConfectDirectory.get;
 
   const tryEntry = Effect.fnUntraced(function* (
-    relativePath: string,
-    pendingKey: PendingKey,
+    kind: Exclude<DevState.EntryKind, { readonly _tag: "Config" }>,
   ) {
-    const absolutePath = path.join(confectDirectory, relativePath);
+    const absolutePath = path.join(confectDirectory, kind.relativePath);
     if (!(yield* fs.exists(absolutePath))) {
       return Option.none<EntryPoint>();
     }
     return Option.some<EntryPoint>({
+      ...kind,
       absolutePath,
       inputPath: yield* fs
         .realPath(absolutePath)
         .pipe(Effect.orElseSucceed(() => absolutePath)),
-      pendingKey,
     });
   });
 
   const fixedEntryOptions = yield* Effect.all([
-    tryEntry("http.ts", "httpDirty"),
-    tryEntry("crons.ts", "cronsDirty"),
-    tryEntry("auth.ts", "authDirty"),
+    tryEntry(DevState.EntryKind.Http({ relativePath: "http.ts" })),
+    tryEntry(DevState.EntryKind.Crons({ relativePath: "crons.ts" })),
+    tryEntry(DevState.EntryKind.Auth({ relativePath: "auth.ts" })),
   ]);
 
   const moduleRelativePaths = yield* Effect.all([
@@ -460,8 +450,8 @@ const discoverEntryPoints = Effect.gen(function* () {
     discoverTableFiles,
   ]).pipe(Effect.map(Array.flatten));
   const moduleEntryOptions = yield* Effect.forEach(
-    moduleRelativePaths,
-    (relativePath) => tryEntry(relativePath, "specDirty"),
+    Array.getSomes(moduleRelativePaths.map(DevState.parseEntry)),
+    tryEntry,
   );
 
   // `convex/convex.config.ts` feeds the generated components registry, so
@@ -474,11 +464,11 @@ const discoverEntryPoints = Effect.gen(function* () {
       return Option.none<EntryPoint>();
     }
     return Option.some<EntryPoint>({
+      ...DevState.EntryKind.Config(),
       absolutePath,
       inputPath: yield* fs
         .realPath(absolutePath)
         .pipe(Effect.orElseSucceed(() => absolutePath)),
-      pendingKey: "specDirty",
     });
   });
 
@@ -489,30 +479,19 @@ const discoverEntryPoints = Effect.gen(function* () {
   ]);
 });
 
-interface WatchState {
-  readonly fingerprints: ReadonlyMap<string, string>;
-  readonly graph: WatchGraph.WatchGraph;
-  readonly outputHash: string;
-}
-
 const esbuildOptions = (
   path: Path.Path,
   fs: FileSystem.FileSystem,
   crypto: Crypto.Crypto,
   projectRoot: string,
-  confectDirectory: string,
   generatedDirectory: string,
   entries: ReadonlyArray<EntryPoint>,
   notExternal: ReadonlyArray<RegExp>,
-  stateRef: Ref.Ref<WatchState | undefined>,
-  structuralChange: boolean,
+  stateRef: Ref.Ref<WatchBuild.State>,
+  captureRef: Ref.Ref<WatchBuild.Capture>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-  watcherErrorsRef: Ref.Ref<WatcherMessages>,
-  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ): esbuild.BuildOptions => {
-  let fingerprints = new Map<string, string>();
-  let firstBuild = true;
   const encodeString = Schema.encodeSync(Schema.fromJsonString(Schema.String));
   return {
     absWorkingDir: projectRoot,
@@ -536,95 +515,111 @@ const esbuildOptions = (
       {
         name: "notify-rebuild",
         setup(build) {
-          build.onStart(() => {
-            fingerprints = new Map();
-          });
+          build.onStart(() =>
+            Effect.runPromise(
+              Ref.set(captureRef, WatchBuild.emptyCapture).pipe(
+                Effect.as(undefined),
+              ),
+            ),
+          );
           build.onLoad({ filter: /.*/ }, (args) =>
             Effect.runPromise(
               Effect.gen(function* () {
-                const contents = yield* fs.readFile(args.path);
-                fingerprints.set(
-                  args.path,
-                  Hex.encode(yield* crypto.digest("SHA-256", contents)),
+                const fingerprint = yield* fs.readFile(args.path).pipe(
+                  Effect.flatMap((contents) =>
+                    crypto.digest("SHA-256", contents),
+                  ),
+                  Effect.map(Hex.encode),
+                  Effect.result,
                 );
-              }).pipe(Effect.orElseSucceed(() => undefined)),
-            ).then(() => undefined),
+                yield* Ref.update(captureRef, (capture) =>
+                  Result.isSuccess(fingerprint)
+                    ? {
+                        ...capture,
+                        fingerprints: HashMap.set(
+                          capture.fingerprints,
+                          args.path,
+                          fingerprint.success,
+                        ),
+                      }
+                    : {
+                        ...capture,
+                        failures: HashMap.set(
+                          capture.failures,
+                          args.path,
+                          WatchBuild.Failure.InputCaptureFailed({
+                            file: args.path,
+                            cause: fingerprint.failure,
+                          }),
+                        ),
+                      },
+                );
+              }).pipe(Effect.as(undefined)),
+            ),
           );
           build.onEnd((result) =>
             Effect.runPromise(
               Effect.gen(function* () {
                 const previous = yield* Ref.get(stateRef);
-                const structureChanged = firstBuild && structuralChange;
-                firstBuild = false;
-                const outputHash = (yield* Effect.forEach(
-                  result.outputFiles ?? [],
-                  (file) =>
-                    crypto
-                      .digest("SHA-256", file.contents)
-                      .pipe(Effect.map(Hex.encode)),
-                )).join(":");
-                const graph = result.metafile
-                  ? WatchGraph.make(result.metafile, (file) =>
-                      path.resolve(projectRoot, file),
-                    )
-                  : (previous?.graph ?? new Map());
-                yield* Ref.set(stateRef, { fingerprints, graph, outputHash });
-                yield* Ref.set(
-                  watcherErrorsRef,
-                  result.errors.length > 0
-                    ? new Map([["entries", result.errors]])
-                    : emptyWatcherMessages,
+                const outcome = yield* WatchBuild.parse(
+                  result,
+                  yield* Ref.get(captureRef),
+                  (file) => path.resolve(projectRoot, file),
+                  crypto,
                 );
-                yield* Ref.set(
-                  watcherWarningsRef,
-                  result.warnings.length > 0
-                    ? new Map([["entries", result.warnings]])
-                    : emptyWatcherMessages,
+                const current = WatchBuild.observe(previous, outcome);
+                yield* Ref.set(stateRef, current);
+                const previousFingerprints = WatchBuild.fingerprints(previous);
+                const fingerprints = WatchBuild.fingerprints(current);
+                const graph = Option.match(WatchBuild.lastSuccessful(current), {
+                  onNone: () =>
+                    HashMap.empty<string, HashSet.HashSet<string>>(),
+                  onSome: (snapshot) => snapshot.graph,
+                });
+                const previousGraph = Option.match(
+                  WatchBuild.lastSuccessful(previous),
+                  {
+                    onNone: () =>
+                      HashMap.empty<string, HashSet.HashSet<string>>(),
+                    onSome: (snapshot) => snapshot.graph,
+                  },
                 );
-                const files = new Set([
-                  ...(previous?.fingerprints.keys() ?? []),
-                  ...fingerprints.keys(),
-                ]);
-                const changed = [...files].filter(
+                const files = HashSet.union(
+                  HashSet.fromIterable(HashMap.keys(previousFingerprints)),
+                  HashSet.fromIterable(HashMap.keys(fingerprints)),
+                );
+                const changed = Array.fromIterable(files).filter(
                   (file) =>
-                    previous?.fingerprints.get(file) !== fingerprints.get(file),
+                    !Equal.equals(
+                      HashMap.get(previousFingerprints, file),
+                      HashMap.get(fingerprints, file),
+                    ),
                 );
                 const sources = changed.filter(
                   (file) => !file.startsWith(generatedDirectory + path.sep),
                 );
-                const affected = new Set([
-                  ...WatchGraph.affected(graph, sources),
-                  ...WatchGraph.affected(previous?.graph ?? new Map(), sources),
-                ]);
+                const affected = HashSet.union(
+                  WatchGraph.affected(graph, sources),
+                  WatchGraph.affected(previousGraph, sources),
+                );
                 const unknownChange =
-                  changed.length === 0 && previous?.outputHash !== outputHash;
+                  changed.length === 0 &&
+                  !Equal.equals(
+                    WatchBuild.outputHash(previous),
+                    WatchBuild.outputHash(current),
+                  );
                 const full =
-                  structureChanged ||
-                  previous === undefined ||
-                  (sources.length > 0 && !result.metafile) ||
+                  previous._tag === "Initial" ||
+                  (sources.length > 0 && outcome._tag === "Failed") ||
                   unknownChange;
                 const dirtyEntries = full
                   ? entries
-                  : entries.filter((entry) => affected.has(entry.inputPath));
-                yield* Ref.update(pendingRef, (pending) => {
-                  const next = {
-                    ...pending,
-                    implPaths: new Set(pending.implPaths),
-                  };
-                  for (const entry of dirtyEntries) {
-                    const relative = path.relative(
-                      confectDirectory,
-                      entry.absolutePath,
+                  : entries.filter((entry) =>
+                      HashSet.has(affected, entry.inputPath),
                     );
-                    if (isLeafImplPath(relative) && !full) {
-                      next.implPaths.add(relative);
-                    } else {
-                      next[entry.pendingKey] = true;
-                    }
-                  }
-                  if (full) next.specDirty = true;
-                  return next;
-                });
+                yield* Ref.update(pendingRef, (pending) =>
+                  DevState.add(pending, dirtyEntries, full),
+                );
                 yield* Queue.offer(signal, undefined);
               }),
             ),
@@ -639,9 +634,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
-  refreshWatcher: Ref.Ref<Effect.Effect<void>>,
-  watcherErrorsRef: Ref.Ref<WatcherMessages>,
-  watcherWarningsRef: Ref.Ref<WatcherMessages>,
+  watcher: Watcher,
 ) {
   const parentScope = yield* Effect.scope;
   const path = yield* Path.Path;
@@ -652,112 +645,142 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     yield* fs.realPath(confectDirectory),
     "_generated",
   );
-  const stateRef = yield* Ref.make<WatchState | undefined>(undefined);
   const crypto = yield* Crypto.Crypto;
-  let current:
-    | {
-        readonly key: string;
-        readonly scope: Scope.Closeable;
-        readonly entries: ReadonlyArray<EntryPoint>;
-      }
-    | undefined;
 
   const sync = Effect.gen(function* () {
+    const current = yield* Ref.get(watcher.lifecycle);
     const entries = yield* discoverEntryPoints;
-    const desiredPaths = new Set(entries.map((entry) => entry.absolutePath));
-    const key = [...desiredPaths].sort().join("\n");
-    if (current?.key === key) return;
-    const structuralChange = current !== undefined;
-    if (structuralChange)
-      yield* Ref.update(pendingRef, (pending) => ({
-        ...pending,
-        specDirty: true,
-      }));
-    const removedOptional =
-      current?.entries.filter(
-        (entry) =>
-          entry.pendingKey !== "specDirty" &&
-          !desiredPaths.has(entry.absolutePath),
-      ) ?? [];
-    yield* Ref.update(pendingRef, (pending) =>
-      removedOptional.reduce(
-        (next, entry) => ({ ...next, [entry.pendingKey]: true }),
-        pending,
-      ),
+    const desiredPaths = HashSet.fromIterable(
+      entries.map((entry) => entry.absolutePath),
     );
-    if (current) yield* Scope.close(current.scope, Exit.void);
-    const scope = yield* Scope.fork(parentScope, "sequential");
-    current = { key, scope, entries };
-    yield* Ref.set(watcherErrorsRef, emptyWatcherMessages);
-    yield* Ref.set(watcherWarningsRef, emptyWatcherMessages);
-    if (entries.length === 0) {
-      yield* Ref.update(pendingRef, (pending) => ({
-        ...pending,
-        specDirty: true,
-      }));
+    const key = pipe(
+      Array.fromIterable(desiredPaths),
+      Array.sort(Order.String),
+      Array.join("\n"),
+    );
+    if (
+      (current._tag === "Active" && current.key === key) ||
+      (current._tag === "Empty" && entries.length === 0)
+    )
+      return;
+    const structuralChange = current._tag !== "Uninitialized";
+    if (structuralChange) yield* Ref.update(pendingRef, DevState.full);
+    const removedOptional =
+      current._tag === "Active"
+        ? current.entries.filter(
+            (entry) =>
+              (entry._tag === "Http" ||
+                entry._tag === "Crons" ||
+                entry._tag === "Auth") &&
+              !HashSet.has(desiredPaths, entry.absolutePath),
+          )
+        : [];
+    yield* Ref.update(pendingRef, (pending) =>
+      DevState.add(pending, removedOptional),
+    );
+    if (current._tag === "Active") yield* Scope.close(current.scope, Exit.void);
+    yield* Ref.set(watcher.lifecycle, WatcherLifecycle.Uninitialized());
+    yield* Ref.set(watcher.observation, WatchBuild.State.Initial());
+    if (!Array.isReadonlyArrayNonEmpty(entries)) {
+      yield* Ref.set(watcher.lifecycle, WatcherLifecycle.Empty());
+      yield* Ref.update(pendingRef, DevState.full);
       yield* Queue.offer(signal, undefined);
-      yield* Ref.set(stateRef, {
-        fingerprints: new Map(),
-        graph: new Map(),
-        outputHash: "",
-      });
       return;
     }
 
+    const scope = yield* Scope.fork(parentScope, "sequential");
+    const captureRef = yield* Ref.make(WatchBuild.emptyCapture);
     const tsconfig = loadTsConfig(projectRoot);
     const notExternal = tsconfigPathsToRegExp(
       tsconfig?.data.compilerOptions?.paths ?? {},
     );
-    yield* Effect.acquireRelease(
-      Effect.promise(() =>
-        esbuild.context(
-          esbuildOptions(
-            path,
-            fs,
-            crypto,
-            projectRoot,
-            confectDirectory,
-            generatedDirectory,
-            entries,
-            notExternal,
-            stateRef,
-            structuralChange,
-            signal,
-            pendingRef,
-            watcherErrorsRef,
-            watcherWarningsRef,
+    const context = yield* Effect.acquireRelease(
+      Effect.tryPromise({
+        try: () =>
+          esbuild.context(
+            esbuildOptions(
+              path,
+              fs,
+              crypto,
+              projectRoot,
+              generatedDirectory,
+              entries,
+              notExternal,
+              watcher.observation,
+              captureRef,
+              signal,
+              pendingRef,
+            ),
           ),
-        ),
-      ),
+        catch: (cause) =>
+          new WatchBuild.OperationError({ operation: "create", cause }),
+      }),
       (ctx) =>
-        Effect.promise(() => ctx.dispose()).pipe(
-          Effect.andThen(Ref.set(refreshWatcher, Effect.void)),
-        ),
-    ).pipe(
-      Effect.flatMap((ctx) =>
-        Ref.set(
-          refreshWatcher,
-          Effect.promise(() =>
-            ctx
-              .rebuild()
-              .catch(() => undefined)
-              .then(() => ctx.rebuild())
-              .then(
-                () => undefined,
-                () => undefined,
-              ),
-          ),
-        ).pipe(Effect.andThen(Effect.promise(() => ctx.watch()))),
-      ),
-      Scope.provide(scope),
+        Effect.tryPromise({
+          try: () => ctx.dispose(),
+          catch: (cause) =>
+            new WatchBuild.OperationError({ operation: "dispose", cause }),
+        }).pipe(Effect.orDie),
+    ).pipe(Scope.provide(scope));
+    yield* Ref.set(
+      watcher.lifecycle,
+      WatcherLifecycle.Active({ key, scope, entries, context }),
     );
-  });
+    yield* Effect.tryPromise({
+      try: () => context.watch(),
+      catch: (cause) =>
+        new WatchBuild.OperationError({ operation: "watch", cause }),
+    });
+  }).pipe(Semaphore.withPermit(watcher.lock));
 
   yield* sync;
   return yield* Effect.forever(
     Queue.take(restartQueue).pipe(Effect.andThen(sync)),
   );
 }, Effect.provide(NodeCrypto.layer));
+
+const refreshWatcher = Effect.fnUntraced(function* (watcher: Watcher) {
+  return yield* watcher.lock.withPermit(
+    Effect.gen(function* () {
+      const current = yield* Ref.get(watcher.lifecycle);
+      if (current._tag === "Empty") return RefreshOutcome.Empty();
+      if (current._tag === "Uninitialized")
+        return yield* new WatchBuild.OperationError({
+          operation: "refresh",
+          cause: "The dependency watcher is not initialized",
+        });
+      const rebuild = Effect.gen(function* () {
+        const built = yield* Effect.tryPromise({
+          try: () => current.context.rebuild(),
+          catch: (cause) =>
+            new WatchBuild.OperationError({ operation: "rebuild", cause }),
+        }).pipe(Effect.result);
+        const state = yield* Ref.get(watcher.observation);
+        if (Result.isFailure(built)) {
+          const rejected = WatchBuild.parseFailure(built.failure.cause);
+          if (Option.isNone(rejected)) return yield* built.failure;
+          if (state._tag !== "Failed")
+            return yield* new WatchBuild.OperationError({
+              operation: "rebuild",
+              cause: rejected.value.errors,
+            });
+        }
+        if (state._tag === "Succeeded")
+          return WatchBuild.Outcome.Succeeded({
+            snapshot: state.snapshot,
+            warnings: state.warnings,
+          });
+        if (state._tag === "Failed") return state.observation;
+        return yield* new WatchBuild.OperationError({
+          operation: "rebuild",
+          cause: "esbuild completed without a build observation",
+        });
+      });
+      yield* rebuild;
+      return RefreshOutcome.Observed({ outcome: yield* rebuild });
+    }),
+  );
+});
 
 const confectStructureWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
@@ -811,21 +834,14 @@ const convexConfigStructureWatcher = Effect.fnUntraced(function* (
   );
 });
 
-const TOP_LEVEL_OPTIONAL_FILES: ReadonlySet<string> = new Set([
-  "http.ts",
-  "crons.ts",
-  "auth.ts",
-]);
-
 const flipDirtyAndSignal = (
   pendingRef: Ref.Ref<Pending>,
   signal: Queue.Queue<void>,
-  key: PendingKey,
   restartQueue: Queue.Queue<void>,
   restart: boolean,
 ) =>
   pipe(
-    Ref.update(pendingRef, (p) => ({ ...p, [key]: true })),
+    Ref.update(pendingRef, DevState.full),
     Effect.andThen(Queue.offer(signal, undefined)),
     Effect.andThen(
       restart ? Queue.offer(restartQueue, undefined) : Effect.void,
@@ -855,7 +871,7 @@ const handleConfectChange = ({
 
   const isLifecycleChange = eventTag !== "Update";
 
-  if (TOP_LEVEL_OPTIONAL_FILES.has(relativePath)) {
+  if (Option.isSome(DevState.parseEntry(relativePath))) {
     return isLifecycleChange
       ? Queue.offer(restartQueue, undefined)
       : Effect.void;
@@ -869,20 +885,9 @@ const handleConfectChange = ({
     return flipDirtyAndSignal(
       pendingRef,
       signal,
-      "specDirty",
       restartQueue,
       isLifecycleChange,
     );
-  }
-
-  if (
-    isLeafSpecPath(relativePath) ||
-    isLeafImplPath(relativePath) ||
-    relativePath.split(/[/\\]/)[0] === TABLES_DIRNAME
-  ) {
-    return isLifecycleChange
-      ? Queue.offer(restartQueue, undefined)
-      : Effect.void;
   }
 
   // Any other `.ts` under `confect/` (helpers like `tables/notes.ts`).
@@ -892,13 +897,7 @@ const handleConfectChange = ({
   // esbuild may not have its parent directory on a poll path, so we
   // re-run codegen on Create here.
   if (eventTag === "Create") {
-    return flipDirtyAndSignal(
-      pendingRef,
-      signal,
-      "specDirty",
-      restartQueue,
-      false,
-    );
+    return flipDirtyAndSignal(pendingRef, signal, restartQueue, false);
   }
 
   return Effect.void;

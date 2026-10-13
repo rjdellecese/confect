@@ -132,7 +132,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           expect(passes).toHaveLength(2);
           expect(passes[0]).not.toBe(passes[1]);
           for (const name of [
-            "LeafModule.validateSpec",
+            "LeafModule.loadSpec",
             "LeafModule.validateImpl",
             "ConvexConfig.discoverInstalledComponents",
           ]) {
@@ -151,7 +151,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             assert(parent?._tag === "Span");
             expect([
               "Cli.codegen",
-              "LeafModule.validateSpec",
+              "LeafModule.loadSpec",
               "LeafModule.validateImpl",
               "ConvexConfig.discoverInstalledComponents",
             ]).toContain(parent.name);
@@ -164,7 +164,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
     );
 
     it.effect.each([
-      { kind: "spec", name: "LeafModule.validateSpec" },
+      { kind: "spec", name: "LeafModule.loadSpec" },
       { kind: "impl", name: "LeafModule.validateImpl" },
       { kind: "config", name: "ConvexConfig.discoverInstalledComponents" },
     ] as const)(

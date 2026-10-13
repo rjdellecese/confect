@@ -1,21 +1,28 @@
 import type * as esbuild from "esbuild";
+import * as HashMap from "effect/HashMap";
+import * as HashSet from "effect/HashSet";
+import * as Option from "effect/Option";
 
-export type WatchGraph = ReadonlyMap<string, ReadonlySet<string>>;
+export type WatchGraph = HashMap.HashMap<string, HashSet.HashSet<string>>;
 
 export const make = (
   metafile: esbuild.Metafile,
   resolve: (file: string) => string,
 ): WatchGraph => {
-  const importers = new Map<string, Set<string>>();
+  let importers = HashMap.empty<string, HashSet.HashSet<string>>();
   for (const [file, input] of Object.entries(metafile.inputs)) {
     const importer = resolve(file);
-    if (!importers.has(importer)) importers.set(importer, new Set());
     for (const dependency of input.imports) {
       if (dependency.external) continue;
       const imported = resolve(dependency.path);
-      const parents = importers.get(imported) ?? new Set<string>();
-      parents.add(importer);
-      importers.set(imported, parents);
+      const parents = Option.getOrElse(HashMap.get(importers, imported), () =>
+        HashSet.empty<string>(),
+      );
+      importers = HashMap.set(
+        importers,
+        imported,
+        HashSet.add(parents, importer),
+      );
     }
   }
   return importers;
@@ -24,15 +31,17 @@ export const make = (
 export const affected = (
   graph: WatchGraph,
   changed: ReadonlyArray<string>,
-): ReadonlySet<string> => {
-  const visited = new Set(changed);
+): HashSet.HashSet<string> => {
+  let visited = HashSet.fromIterable(changed);
   const pending = [...changed];
   while (pending.length > 0) {
     const file = pending.pop();
     if (file === undefined) break;
-    for (const importer of graph.get(file) ?? []) {
-      if (visited.has(importer)) continue;
-      visited.add(importer);
+    for (const importer of Option.getOrElse(HashMap.get(graph, file), () =>
+      HashSet.empty<string>(),
+    )) {
+      if (HashSet.has(visited, importer)) continue;
+      visited = HashSet.add(visited, importer);
       pending.push(importer);
     }
   }

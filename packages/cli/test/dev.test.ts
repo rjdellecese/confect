@@ -25,12 +25,123 @@ vi.mock("effect/Console", (importOriginal) =>
   importOriginal<typeof Console>().then((original) => ({
     ...original,
     log: vi.fn(original.log),
+    error: vi.fn(original.error),
   })),
 );
 
 layer(NodeServices.layer, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
+    it.effect.each(["operation", "metadata"] as const)(
+      "does not report readiness after a watcher %s failure and recovers on edit",
+      (failureKind) =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const failure = yield* Deferred.make<void>();
+          const ready = yield* Deferred.make<void>();
+          let broken = true;
+          let readyCount = 0;
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi.spyOn(Console, "log").mockImplementation((...args) =>
+                Effect.sync(() => {
+                  if (
+                    args.some(
+                      (arg) =>
+                        typeof arg === "string" &&
+                        arg.includes("Generated files are up-to-date"),
+                    )
+                  ) {
+                    readyCount++;
+                    Deferred.doneUnsafe(ready, Effect.void);
+                  }
+                }),
+              ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi.spyOn(Console, "error").mockImplementation((...args) =>
+                Effect.sync(() => {
+                  const message =
+                    failureKind === "operation"
+                      ? "watcher service unavailable"
+                      : "esbuild completed without metafile";
+                  if (
+                    args.some(
+                      (arg) => typeof arg === "string" && arg.includes(message),
+                    )
+                  )
+                    Deferred.doneUnsafe(failure, Effect.void);
+                }),
+              ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          const context = vi.mocked(esbuild.context);
+          const original = context.getMockImplementation();
+          assert(original);
+          const runPromise = Effect.runPromiseWith(yield* Effect.context());
+          context.mockImplementation((options) =>
+            runPromise(
+              Effect.gen(function* () {
+                const actual = yield* Effect.tryPromise(() =>
+                  original({
+                    ...options,
+                    plugins: [
+                      {
+                        name: "inject-watcher-failure",
+                        setup(build) {
+                          build.onEnd((built) => {
+                            if (broken && failureKind === "metadata")
+                              built.metafile = undefined;
+                          });
+                        },
+                      },
+                      ...(options.plugins ?? []),
+                    ],
+                  }),
+                );
+                return {
+                  ...actual,
+                  rebuild: () =>
+                    broken && failureKind === "operation"
+                      ? Promise.reject(new Error("watcher service unavailable"))
+                      : actual.rebuild(),
+                };
+              }),
+            ),
+          );
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() => context.mockImplementation(original)),
+          );
+          yield* Command.runWith(dev, { version: "test" })([]).pipe(
+            Effect.provideService(ProjectRoot, {
+              get: Effect.succeed(project.root),
+            }),
+            Effect.provideService(ConfectDirectory, {
+              get: Effect.succeed(path.join(project.root, "confect")),
+            }),
+            Effect.provideService(ConvexDirectory, {
+              get: Effect.succeed(path.join(project.root, "convex")),
+            }),
+            Effect.forkScoped,
+          );
+          yield* Deferred.await(failure).pipe(Effect.timeout("15 seconds"));
+          expect(readyCount).toBe(0);
+          broken = false;
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `${Project.spec}\n// recovered watcher\n`,
+          );
+          yield* Deferred.await(ready).pipe(Effect.timeout("15 seconds"));
+          expect(readyCount).toBe(1);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect.each(["confect/name.ts", "name.ts"])(
       "reconciles a startup edit to %s before reporting readiness",
       (dependency) =>
