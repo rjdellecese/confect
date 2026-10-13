@@ -1104,6 +1104,21 @@ describe("ValueToValidator", () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
+    test("{ badge: string; rows?: { badge: string }[] | undefined }", () => {
+      const _expectedValidator = v.object({
+        badge: v.string(),
+        rows: v.optional(v.array(v.object({ badge: v.string() }))),
+      });
+      type ExpectedValidator = typeof _expectedValidator;
+
+      type CompiledValidator = ValueToValidator<{
+        badge: string;
+        rows?: { badge: string }[] | undefined;
+      }>;
+
+      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+    });
+
     test("{ foo: { bar?: number | undefined } }", () => {
       const _expectedValidator = v.object({
         foo: v.object({ bar: v.optional(v.float64()) }),

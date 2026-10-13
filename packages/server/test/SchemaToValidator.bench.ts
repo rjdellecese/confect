@@ -148,13 +148,13 @@ type RecursiveObj = { foo: RecursiveObj };
 
 bench("ValueToValidator<RecursiveObj> (recursive object)", () => {
   return {} as ValueToValidator<RecursiveObj>;
-}).types([174, "instantiations"]);
+}).types([309, "instantiations"]);
 
 type RecursiveArr = RecursiveArr[];
 
 bench("ValueToValidator<RecursiveArr> (recursive array)", () => {
   return {} as ValueToValidator<RecursiveArr>;
-}).types([142, "instantiations"]);
+}).types([278, "instantiations"]);
 
 // --- TableSchemaToTableValidator ---
 

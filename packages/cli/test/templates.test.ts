@@ -1,13 +1,29 @@
 import { fileURLToPath } from "node:url";
+import type { LeafModule } from "@confect/cli/LeafModule";
+import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it, layer } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
+
+const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
+  const relativePath = `${pathSegments.join("/")}.spec.ts`;
+  return {
+    relativePath,
+    pathSegments,
+    groupPathDot: pathSegments.join("."),
+    exportName: pathSegments[pathSegments.length - 1]!,
+    runtime: Option.none(),
+    specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
+  };
+};
 
 layer(NodeServices.layer)("id", (test) => {
   test.effect.each([{ tableNames: [] }, { tableNames: ["notes", "users"] }])(
@@ -90,6 +106,100 @@ export const plainString: Id<"_storage"> = "not-an-id";
         expect(yield* compiler.exitCode, output).toBe(0);
       }).pipe(Effect.scoped),
     { timeout: 30000 },
+  );
+});
+
+layer(NodeServices.layer)("assembledSpec", (test) => {
+  test.effect(
+    "typechecks with more groups than an inferred builder chain allows",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const spawner = yield* ChildProcessSpawner;
+        const directory = yield* fs.makeTempDirectoryScoped({
+          directory: import.meta.dirname,
+          prefix: "spec-",
+        });
+        // An inferred chain fails with TS2589 from 48 top-level groups, and
+        // from about 90 children of one group.
+        const names = (prefix: string, count: number) =>
+          Array.makeBy(
+            count,
+            (index) => `${prefix}${String(index + 1).padStart(3, "0")}`,
+          );
+        const leaves: LeafModule[] = [
+          ...names("g", 60).map((name) => leafAt([name])),
+          ...names("c", 100).map((name) => leafAt(["nested", name])),
+        ];
+        const groupSpec = `import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+
+export default GroupSpec.make().addFunction(
+  FunctionSpec.publicQuery({ name: "get", returns: () => Schema.Null }),
+);
+`;
+        yield* fs.makeDirectory(path.join(directory, "nested"));
+        yield* fs.makeDirectory(path.join(directory, "_generated"));
+        yield* Effect.forEach(leaves, (leaf) =>
+          fs.writeFileString(
+            path.join(directory, leaf.relativePath),
+            groupSpec,
+          ),
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "_generated", "spec.ts"),
+          yield* templates.assembledSpec({
+            nodes: assemblyNodesFromLeaves(leaves),
+          }),
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "consumer.ts"),
+          `import { Refs } from "@confect/core";
+import spec from "./_generated/spec";
+
+const refs = Refs.make(spec);
+
+export const last = refs.public.g060.get;
+export const nested = refs.public.nested.c100.get;
+// @ts-expect-error
+export const missing = refs.public.g061;
+`,
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "tsconfig.json"),
+          `{
+            "compilerOptions": {
+              "strict": true,
+              "noEmit": true,
+              "skipLibCheck": true,
+              "module": "ESNext",
+              "moduleResolution": "Bundler",
+              "target": "ESNext",
+              "verbatimModuleSyntax": true
+            },
+            "include": ["**/*.ts"]
+          }`,
+        );
+        const compiler = yield* spawner.spawn(
+          ChildProcess.make(process.execPath, [
+            fileURLToPath(
+              new URL(
+                "bin/tsc",
+                import.meta.resolve("typescript/package.json"),
+              ),
+            ),
+            "-p",
+            directory,
+          ]),
+        );
+        const output = yield* compiler.all.pipe(
+          Stream.decodeText(),
+          Stream.mkString,
+        );
+        expect(yield* compiler.exitCode, output).toBe(0);
+      }).pipe(Effect.scoped),
+    { timeout: 60000 },
   );
 });
 

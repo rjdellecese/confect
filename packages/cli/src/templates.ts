@@ -814,10 +814,11 @@ const writeGroupFactoryCall = Effect.fnUntraced(function* (
   node: SpecAssemblyNode,
   groupFactory: string,
 ): Effect.fn.Return<void> {
+  yield* cbw.write("(");
   yield* cbw.write(groupFactory);
   yield* cbw.write("(");
   yield* cbw.quote(node.segment);
-  yield* cbw.write(")");
+  yield* cbw.write(") as any)");
 
   yield* Effect.forEach(node.children, (child) =>
     writeChildAddGroupAt(cbw, child, groupFactory),
@@ -833,7 +834,7 @@ const writeGroupAssembly: (
     onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
     onSome: (binding) =>
       Effect.gen(function* () {
-        yield* cbw.write(binding.localName);
+        yield* cbw.write(`(${binding.localName} as any)`);
         yield* Effect.forEach(node.children, (child) =>
           writeChildAddGroupAt(cbw, child, groupFactory),
         );
@@ -917,7 +918,7 @@ const assembledSpecEffect = Effect.fnUntraced(function* ({
   // already baked into its imported leaf spec, so the root is always
   // `Spec.make()` and binding-less container groups always use
   // `GroupSpec.makeAt` (containers register no functions and carry no runtime).
-  yield* cbw.write(` = Spec.make()`);
+  yield* cbw.write(" = (Spec.make() as any)");
   yield* Effect.forEach(nodes, (node) =>
     writeRootAddAt(cbw, node, "GroupSpec.makeAt"),
   );
