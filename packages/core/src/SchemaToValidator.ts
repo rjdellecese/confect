@@ -166,7 +166,7 @@ export type ValueToValidator<Vl> = [Vl] extends [never]
                       ? Vl extends ReadonlyArray<ReadonlyValue>
                         ? ArrayValueToValidator<Vl>
                         : Vl extends ReadonlyRecordValue
-                          ? RecordValueToValidator<Vl>
+                          ? ObjectValueToValidator<Vl>
                           : TypeError<"Unexpected value", Vl>
                       : TypeError<
                           "Provided value is not a valid Convex value",
@@ -180,22 +180,26 @@ type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
       : never
     : never;
 
-type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
-  ? {
-      -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
-        ? IsOptional<Vl, K> extends true
-          ? // An index signature reads as optional, but a record's value is not.
-            string extends K
+type ObjectValueToValidator<Vl> = Vl extends ReadonlyRecordValue
+  ? MutableValue<Vl> extends infer VlObject extends Record<string, any>
+    ? IsRecord<VlObject> extends true
+      ? // A record's value is never optional, even when it is `any`.
+        (
+          IsAny<Vl[keyof Vl]> extends true
             ? VAny
-            : VOptional<VAny>
-          : VAny
-        : UndefinedOrValueToValidator<Vl[K]>;
-    } extends infer VdRecord extends Record<string, any>
-    ? MutableValue<Vl> extends infer VlRecord extends Record<string, any>
-      ? IsRecord<VlRecord> extends true
-        ? VRecord<VlRecord, VString, VdRecord[keyof VdRecord]>
-        : VObject<VlRecord, VdRecord>
-      : never
+            : UndefinedOrValueToValidator<Vl[keyof Vl]>
+        ) extends infer VdValue extends Validator<any, any, any>
+        ? VRecord<VlObject, VString, VdValue>
+        : never
+      : {
+            -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
+              ? IsOptional<Vl, K> extends true
+                ? VOptional<VAny>
+                : VAny
+              : UndefinedOrValueToValidator<Vl[K]>;
+          } extends infer VdObject extends Record<string, any>
+        ? VObject<VlObject, VdObject>
+        : never
     : never
   : never;
 
