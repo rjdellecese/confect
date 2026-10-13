@@ -20,10 +20,16 @@ minimumReleaseAgeExclude:
   - effect-oxlint@0.3.4
   - eslint-plugin-jsdoc@64.3.10
   - foldkit@0.165.0
+  - "@effect/ai-openai-compat@4.0.4"
+  - "@effect/ai-openrouter@4.0.4"
+  - "@effect/platform-node-shared@4.0.4"
+  - "@effect/platform-node@4.0.4"
+  - "@effect/vitest@4.0.4"
+  - effect@4.0.4
 
 overrides:
   convex: 1.46.0
-  effect: 4.0.1
+  effect: 4.0.4
   react: 19.3.0
   react-dom: 19.3.0
 
