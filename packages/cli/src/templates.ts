@@ -809,12 +809,6 @@ const writeChildAddGroupAt = Effect.fnUntraced(function* (
   yield* cbw.write(")");
 });
 
-// The assembled spec's annotation carries its whole type, so the initializer
-// casts the root and every group to `any` and infers nothing. Inferred, each
-// `addAt`/`addGroupAt` nests the accumulated groups one level deeper, and past
-// a few dozen groups that exceeds TypeScript's instantiation depth (TS2589).
-const untypedReceiver = (expression: string) => `(${expression} as any)`;
-
 const writeGroupFactoryCall = Effect.fnUntraced(function* (
   cbw: CodeBlockWriter,
   node: SpecAssemblyNode,
@@ -840,7 +834,7 @@ const writeGroupAssembly: (
     onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
     onSome: (binding) =>
       Effect.gen(function* () {
-        yield* cbw.write(untypedReceiver(binding.localName));
+        yield* cbw.write(`(${binding.localName} as any)`);
         yield* Effect.forEach(node.children, (child) =>
           writeChildAddGroupAt(cbw, child, groupFactory),
         );
@@ -924,7 +918,7 @@ const assembledSpecEffect = Effect.fnUntraced(function* ({
   // already baked into its imported leaf spec, so the root is always
   // `Spec.make()` and binding-less container groups always use
   // `GroupSpec.makeAt` (containers register no functions and carry no runtime).
-  yield* cbw.write(` = ${untypedReceiver("Spec.make()")}`);
+  yield* cbw.write(" = (Spec.make() as any)");
   yield* Effect.forEach(nodes, (node) =>
     writeRootAddAt(cbw, node, "GroupSpec.makeAt"),
   );
