@@ -809,10 +809,10 @@ const writeChildAddGroupAt = Effect.fnUntraced(function* (
   yield* cbw.write(")");
 });
 
-// The assembled spec's annotation carries its whole type, so every builder
-// chain in the initializer is cast to `any` before it is extended. Inferred,
-// each `addAt`/`addGroupAt` nests the accumulated groups one level deeper, and
-// past a few dozen groups that exceeds TypeScript's instantiation depth (TS2589).
+// The assembled spec's annotation carries its whole type, so the initializer
+// casts the root and every group to `any` and infers nothing. Inferred, each
+// `addAt`/`addGroupAt` nests the accumulated groups one level deeper, and past
+// a few dozen groups that exceeds TypeScript's instantiation depth (TS2589).
 const untypedReceiver = (expression: string) => `(${expression} as any)`;
 
 const writeGroupFactoryCall = Effect.fnUntraced(function* (
@@ -820,12 +820,11 @@ const writeGroupFactoryCall = Effect.fnUntraced(function* (
   node: SpecAssemblyNode,
   groupFactory: string,
 ): Effect.fn.Return<void> {
-  const untyped = node.children.length > 0;
-  if (untyped) yield* cbw.write("(");
+  yield* cbw.write("(");
   yield* cbw.write(groupFactory);
   yield* cbw.write("(");
   yield* cbw.quote(node.segment);
-  yield* cbw.write(untyped ? ") as any)" : ")");
+  yield* cbw.write(") as any)");
 
   yield* Effect.forEach(node.children, (child) =>
     writeChildAddGroupAt(cbw, child, groupFactory),
@@ -841,11 +840,7 @@ const writeGroupAssembly: (
     onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
     onSome: (binding) =>
       Effect.gen(function* () {
-        yield* cbw.write(
-          node.children.length === 0
-            ? binding.localName
-            : untypedReceiver(binding.localName),
-        );
+        yield* cbw.write(untypedReceiver(binding.localName));
         yield* Effect.forEach(node.children, (child) =>
           writeChildAddGroupAt(cbw, child, groupFactory),
         );
@@ -929,11 +924,7 @@ const assembledSpecEffect = Effect.fnUntraced(function* ({
   // already baked into its imported leaf spec, so the root is always
   // `Spec.make()` and binding-less container groups always use
   // `GroupSpec.makeAt` (containers register no functions and carry no runtime).
-  yield* cbw.write(
-    nodes.length === 0
-      ? ` = Spec.make()`
-      : ` = ${untypedReceiver("Spec.make()")}`,
-  );
+  yield* cbw.write(` = ${untypedReceiver("Spec.make()")}`);
   yield* Effect.forEach(nodes, (node) =>
     writeRootAddAt(cbw, node, "GroupSpec.makeAt"),
   );

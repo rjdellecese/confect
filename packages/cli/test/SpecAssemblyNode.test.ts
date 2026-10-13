@@ -40,9 +40,9 @@ describe("SpecAssemblyNode", () => {
         'import notesAndRandom_random from "../notesAndRandom/random.spec";',
       );
       expect(contents).toContain(
-        '(GroupSpec.makeAt("notesAndRandom") as any).addGroupAt("notes", notesAndRandom_notes).addGroupAt("random", notesAndRandom_random)',
+        '(GroupSpec.makeAt("notesAndRandom") as any).addGroupAt("notes", (notesAndRandom_notes as any)).addGroupAt("random", (notesAndRandom_random as any))',
       );
-      expect(contents).toContain('.addAt("env", env)');
+      expect(contents).toContain('.addAt("env", (env as any))');
       expect(contents).toContain("= (Spec.make() as any).addAt(");
       // Group paths are resolved impl-side, so the assembled spec no longer
       // emits a `.addPath(...)` registration chain.
@@ -65,7 +65,7 @@ describe("SpecAssemblyNode", () => {
           'import notes_archived from "../notes/archived.spec";',
         );
         expect(contents).toContain(
-          '.addAt("notes", (notes as any).addGroupAt("archived", notes_archived))',
+          '.addAt("notes", (notes as any).addGroupAt("archived", (notes_archived as any)))',
         );
         expect(contents).not.toContain('GroupSpec.makeAt("notes")');
       }),
@@ -100,7 +100,9 @@ describe("SpecAssemblyNode", () => {
         expect(contents).not.toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
         );
-        expect(contents).toContain("const spec: Spec.Spec = Spec.make();");
+        expect(contents).toContain(
+          "const spec: Spec.Spec = (Spec.make() as any);",
+        );
         expect(contents).toContain("export default spec;");
       }),
   );
@@ -123,7 +125,7 @@ describe("SpecAssemblyNode", () => {
           'import { GroupSpec, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
-          '.addAt("notes", (notes as any).addGroupAt("archived", (GroupSpec.makeAt("archived") as any).addGroupAt("legacy", notes_archived_legacy)))',
+          '.addAt("notes", (notes as any).addGroupAt("archived", (GroupSpec.makeAt("archived") as any).addGroupAt("legacy", (notes_archived_legacy as any))))',
         );
       }),
   );
@@ -191,19 +193,19 @@ describe("SpecAssemblyNode", () => {
         expect(importLines).toHaveLength(leaves.length);
 
         expect(contents).toContain(
-          '.addGroupAt("mutations", scripts_operational_inviteUser_mutations)',
+          '.addGroupAt("mutations", (scripts_operational_inviteUser_mutations as any))',
         );
         expect(contents).toContain(
-          '.addGroupAt("queries", scripts_operational_inviteUser_queries)',
+          '.addGroupAt("queries", (scripts_operational_inviteUser_queries as any))',
         );
         expect(contents).toContain(
-          '.addGroupAt("mutations", scripts_operational_seed_mutations)',
+          '.addGroupAt("mutations", (scripts_operational_seed_mutations as any))',
         );
         expect(contents).toContain(
-          '.addGroupAt("mutations", scripts_operational_seedTestUser_mutations)',
+          '.addGroupAt("mutations", (scripts_operational_seedTestUser_mutations as any))',
         );
         expect(contents).toContain(
-          '.addGroupAt("queries", scripts_operational_seedTestUser_queries)',
+          '.addGroupAt("queries", (scripts_operational_seedTestUser_queries as any))',
         );
       }),
   );
