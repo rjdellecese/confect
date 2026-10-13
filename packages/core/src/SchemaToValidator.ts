@@ -183,12 +183,11 @@ type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
 type ObjectValueToValidator<Vl> = Vl extends ReadonlyRecordValue
   ? MutableValue<Vl> extends infer VlObject extends Record<string, any>
     ? IsRecord<VlObject> extends true
-      ? // A record's value is never optional, even when it is `any`.
-        (
-          IsAny<Vl[keyof Vl]> extends true
-            ? VAny
-            : UndefinedOrValueToValidator<Vl[keyof Vl]>
-        ) extends infer VdValue extends Validator<any, any, any>
+      ? ValueToValidator<Vl[keyof Vl]> extends infer VdValue extends Validator<
+          any,
+          "required",
+          any
+        >
         ? VRecord<VlObject, VString, VdValue>
         : never
       : {
