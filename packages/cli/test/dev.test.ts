@@ -155,7 +155,7 @@ export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionI
           );
           const unseen = new Set([
             ...names.flatMap((name) => [`${name}.spec.ts`, `${name}.impl.ts`]),
-            "tables/notes.ts",
+            path.join("tables", "notes.ts"),
           ]);
           const ready = yield* Deferred.make<void>();
           const original = vi.mocked(esbuild.context).getMockImplementation();

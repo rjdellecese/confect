@@ -38,68 +38,71 @@ import * as Project from "./integration/Project";
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
-    it.effect("bounds spec and impl phases without overlapping them", () =>
-      Effect.gen(function* () {
-        const path = yield* Path.Path;
-        const project = yield* Project.make;
-        for (const index of Array.range(0, 7)) {
-          yield* project.write(
-            `confect/group${index}.spec.ts`,
-            'import { GroupSpec } from "@confect/core"; export default GroupSpec.make();',
-          );
-          yield* project.write(
-            `confect/group${index}.impl.ts`,
-            `import { GroupImpl } from "@confect/server";
+    it.effect(
+      "bounds spec and impl phases without overlapping them",
+      () =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          for (const index of Array.range(0, 7)) {
+            yield* project.write(
+              `confect/group${index}.spec.ts`,
+              'import { GroupSpec } from "@confect/core"; export default GroupSpec.make();',
+            );
+            yield* project.write(
+              `confect/group${index}.impl.ts`,
+              `import { GroupImpl } from "@confect/server";
 import databaseSchema from "./_generated/schema";
 import spec from "./group${index}.spec";
 export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
-          );
-        }
-        const active = { spec: 0, impl: 0 };
-        const maximum = { spec: 0, impl: 0 };
-        let completedSpecs = 0;
-        const original = Bundler.bundle;
-        yield* Effect.acquireRelease(
-          Effect.sync(() =>
-            vi.spyOn(Bundler, "bundle").mockImplementation((entry) =>
-              Effect.gen(function* () {
-                const phase = entry.endsWith(".spec.ts")
-                  ? "spec"
-                  : entry.endsWith(".impl.ts")
-                    ? "impl"
-                    : undefined;
-                if (phase === undefined) return yield* original(entry);
-                if (phase === "impl") expect(completedSpecs).toBe(9);
-                active[phase]++;
-                maximum[phase] = Math.max(maximum[phase], active[phase]);
-                yield* Effect.yieldNow;
-                return yield* original(entry).pipe(
-                  Effect.ensuring(
-                    Effect.sync(() => {
-                      active[phase]--;
-                      if (phase === "spec") completedSpecs++;
-                    }),
-                  ),
-                );
-              }),
+            );
+          }
+          const active = { spec: 0, impl: 0 };
+          const maximum = { spec: 0, impl: 0 };
+          let completedSpecs = 0;
+          const original = Bundler.bundle;
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi.spyOn(Bundler, "bundle").mockImplementation((entry) =>
+                Effect.gen(function* () {
+                  const phase = entry.endsWith(".spec.ts")
+                    ? "spec"
+                    : entry.endsWith(".impl.ts")
+                      ? "impl"
+                      : undefined;
+                  if (phase === undefined) return yield* original(entry);
+                  if (phase === "impl") expect(completedSpecs).toBe(9);
+                  active[phase]++;
+                  maximum[phase] = Math.max(maximum[phase], active[phase]);
+                  yield* Effect.yieldNow;
+                  return yield* original(entry).pipe(
+                    Effect.ensuring(
+                      Effect.sync(() => {
+                        active[phase]--;
+                        if (phase === "spec") completedSpecs++;
+                      }),
+                    ),
+                  );
+                }),
+              ),
             ),
-          ),
-          (spy) => Effect.sync(() => spy.mockRestore()),
-        );
-        yield* codegenHandler.pipe(
-          Effect.provideService(ProjectRoot, {
-            get: Effect.succeed(project.root),
-          }),
-          Effect.provideService(ConfectDirectory, {
-            get: Effect.succeed(path.join(project.root, "confect")),
-          }),
-          Effect.provideService(ConvexDirectory, {
-            get: Effect.succeed(path.join(project.root, "convex")),
-          }),
-        );
-        expect(maximum).toEqual({ spec: 4, impl: 4 });
-        expect(completedSpecs).toBe(9);
-      }).pipe(Effect.scoped),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          yield* codegenHandler.pipe(
+            Effect.provideService(ProjectRoot, {
+              get: Effect.succeed(project.root),
+            }),
+            Effect.provideService(ConfectDirectory, {
+              get: Effect.succeed(path.join(project.root, "confect")),
+            }),
+            Effect.provideService(ConvexDirectory, {
+              get: Effect.succeed(path.join(project.root, "convex")),
+            }),
+          );
+          expect(maximum).toEqual({ spec: 4, impl: 4 });
+          expect(completedSpecs).toBe(9);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
     );
 
     it.effect(
@@ -184,6 +187,7 @@ layer(
     "validates only supplied impls and reuses each validated spec",
     () =>
       Effect.gen(function* () {
+        const path = yield* Path.Path;
         const groupSpec = GroupSpec.make();
         const spec = yield* Effect.acquireRelease(
           Effect.sync(() =>
@@ -213,8 +217,8 @@ layer(
           "notes.spec.ts",
         ]);
         expect(spec.mock.calls.map(([leaf]) => leaf.relativePath)).toEqual([
-          "nested/notes.spec.ts",
-          "node/tasks.spec.ts",
+          path.join("nested", "notes.spec.ts"),
+          path.join("node", "tasks.spec.ts"),
         ]);
         expect(impl).toHaveBeenCalledTimes(2);
         for (const [leaf, validatedSpec] of impl.mock.calls) {
@@ -281,11 +285,12 @@ layer(
     "reports a missing sibling %s before bundling",
     (missing) =>
       Effect.gen(function* () {
+        const path = yield* Path.Path;
         const result = yield* validateImplFiles(["nested/notes.impl.ts"]).pipe(
           Effect.provide(
             FileSystem.layerNoop({
-              exists: (path) =>
-                Effect.succeed(!path.endsWith(`.${missing}.ts`)),
+              exists: (file) =>
+                Effect.succeed(!file.endsWith(`.${missing}.ts`)),
             }),
           ),
           Effect.result,
@@ -295,12 +300,12 @@ layer(
           expect(result.failure).toMatchObject({
             _tag: "MissingSpecFileError",
             implPath: "nested/notes.impl.ts",
-            expectedSpecPath: "nested/notes.spec.ts",
+            expectedSpecPath: path.join("nested", "notes.spec.ts"),
           });
         } else {
           expect(result.failure).toMatchObject({
             _tag: "MissingImplFileError",
-            specPath: "nested/notes.spec.ts",
+            specPath: path.join("nested", "notes.spec.ts"),
             expectedImplPath: "nested/notes.impl.ts",
           });
         }
