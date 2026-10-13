@@ -166,7 +166,7 @@ export type ValueToValidator<Vl> = [Vl] extends [never]
                       ? Vl extends ReadonlyArray<ReadonlyValue>
                         ? ArrayValueToValidator<Vl>
                         : Vl extends ReadonlyRecordValue
-                          ? RecordValueToValidator<Vl>
+                          ? ObjectValueToValidator<Vl>
                           : TypeError<"Unexpected value", Vl>
                       : TypeError<
                           "Provided value is not a valid Convex value",
@@ -180,19 +180,25 @@ type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
       : never
     : never;
 
-type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
-  ? {
-      -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
-        ? IsOptional<Vl, K> extends true
-          ? VOptional<VAny>
-          : VAny
-        : UndefinedOrValueToValidator<Vl[K]>;
-    } extends infer VdRecord extends Record<string, any>
-    ? MutableValue<Vl> extends infer VlRecord extends Record<string, any>
-      ? IsRecord<VlRecord> extends true
-        ? VRecord<VlRecord, VString, VdRecord[keyof VdRecord]>
-        : VObject<VlRecord, VdRecord>
-      : never
+type ObjectValueToValidator<Vl> = Vl extends ReadonlyRecordValue
+  ? MutableValue<Vl> extends infer VlObject extends Record<string, any>
+    ? IsRecord<VlObject> extends true
+      ? ValueToValidator<Vl[keyof Vl]> extends infer VdValue extends Validator<
+          any,
+          "required",
+          any
+        >
+        ? VRecord<VlObject, VString, VdValue>
+        : never
+      : {
+            -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
+              ? IsOptional<Vl, K> extends true
+                ? VOptional<VAny>
+                : VAny
+              : UndefinedOrValueToValidator<Vl[K]>;
+          } extends infer VdObject extends Record<string, any>
+        ? VObject<VlObject, VdObject>
+        : never
     : never
   : never;
 

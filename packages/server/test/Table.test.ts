@@ -138,6 +138,29 @@ describe("Table.tableDefinition", () => {
     );
   });
 
+  it("supports a record of any", () => {
+    const confectResultsTableDefinition = Table.tableDefinition(
+      Table.make(() =>
+        Schema.Struct({
+          name: Schema.String,
+          payload: Schema.Record(Schema.String, Schema.Any),
+        }),
+      ).index("by_name", ["name"])("results"),
+    );
+
+    const convexResultsTableDefinition = defineTable({
+      name: v.string(),
+      payload: v.record(v.string(), v.any()),
+    }).index("by_name", ["name"]);
+
+    expectTypeOf(confectResultsTableDefinition).toEqualTypeOf(
+      convexResultsTableDefinition,
+    );
+    expect(convexResultsTableDefinition).toStrictEqual(
+      confectResultsTableDefinition,
+    );
+  });
+
   it("supports indexes when a nested struct is assignable to its parent", () => {
     const confectSettingsTableDefinition = Table.tableDefinition(
       Table.make(() =>

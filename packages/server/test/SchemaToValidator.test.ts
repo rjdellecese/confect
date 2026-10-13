@@ -717,6 +717,19 @@ describe(compileSchema, () => {
         expect(compiledValidator).toStrictEqual(expectedValidator);
         expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
       });
+
+      test("record of any", () => {
+        const expectedValidator = v.record(v.string(), v.any());
+        type ExpectedValidator = typeof expectedValidator;
+
+        const compiledValidator = compileSchema(
+          Schema.Record(Schema.String, Schema.Any),
+        );
+        type CompiledValidator = typeof compiledValidator;
+
+        expect(compiledValidator).toStrictEqual(expectedValidator);
+        expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+      });
     });
   });
 
