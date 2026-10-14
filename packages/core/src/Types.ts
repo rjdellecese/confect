@@ -86,6 +86,13 @@ export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 
 type NonRecursiveLeaf = Brand.Brand<any> | GenericId<any> | ArrayBuffer;
 
+type IsSame<A, B> =
+  (<G>() => G extends A ? 1 : 2) extends <G>() => G extends B ? 1 : 2
+    ? true
+    : false;
+
+type IsObject<T> = T extends object ? true : false;
+
 /**
  * Whether `T` is one of the types already on the path, compared by identity.
  * Assignability is not enough: a nested struct is assignable to an ancestor
@@ -94,38 +101,39 @@ type NonRecursiveLeaf = Brand.Brand<any> | GenericId<any> | ArrayBuffer;
  * `DetectCycle` asks only once `T` is assignable to some type on the path,
  * which keeps the identity comparisons off the common, non-recursive case.
  */
-type InCache<T, Cache extends any[]> = Cache extends [infer Head, ...infer Rest]
-  ? IsSame<T, Head> extends true
-    ? true
-    : InCache<T, Rest>
-  : false;
+type IsAncestor<T, Ancestors> = Ancestors extends unknown
+  ? IsSame<T, Ancestors>
+  : never;
 
-type IsSame<A, B> =
-  (<G>() => G extends A ? 1 : 2) extends <G>() => G extends B ? 1 : 2
-    ? true
-    : false;
-
-type DetectCycle<T, Cache extends any[] = []> =
+type DetectCycle<T, Ancestors = never> =
   IsAny<T> extends true
     ? false
     : [T] extends [any]
       ? T extends NonRecursiveLeaf
         ? false
-        : (T extends Cache[number] ? InCache<T, Cache> : false) extends true
-          ? true
-          : T extends Array<infer U>
-            ? DetectCycle<U, [...Cache, T]>
-            : T extends Map<infer _U, infer V>
-              ? DetectCycle<V, [...Cache, T]>
-              : T extends Set<infer U>
-                ? DetectCycle<U, [...Cache, T]>
-                : T extends object
-                  ? true extends {
-                      [K in keyof T]: DetectCycle<T[K], [...Cache, T]>;
-                    }[keyof T]
+        : IsObject<T> extends false
+          ? false
+          : (
+                T extends Ancestors
+                  ? true extends IsAncestor<T, Ancestors>
                     ? true
                     : false
                   : false
+              ) extends true
+            ? true
+            : T extends Array<infer U>
+              ? DetectCycle<U, Ancestors | T>
+              : T extends Map<infer _U, infer V>
+                ? DetectCycle<V, Ancestors | T>
+                : T extends Set<infer U>
+                  ? DetectCycle<U, Ancestors | T>
+                  : T extends object
+                    ? true extends {
+                        [K in keyof T]: DetectCycle<T[K], Ancestors | T>;
+                      }[keyof T]
+                      ? true
+                      : false
+                    : false
       : never;
 
 //////////////////////////////////
