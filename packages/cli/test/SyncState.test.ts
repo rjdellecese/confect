@@ -8,6 +8,29 @@ import * as Result from "effect/Result";
 import { SpecModulePath } from "@confect/cli/SpecModulePath";
 import { TableModulePath } from "@confect/cli/TableModulePath";
 
+it("requires deployment notification only for bootstrap and recovery", () => {
+  const snapshot = Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves([]));
+  expect(
+    SyncState.needsDeploymentNotification(SyncState.Phase.Bootstrapping()),
+  ).toBe(true);
+  expect(
+    SyncState.needsDeploymentNotification(SyncState.Phase.NeedsFullSync()),
+  ).toBe(true);
+  expect(
+    SyncState.needsDeploymentNotification(
+      SyncState.Phase.Incremental({
+        snapshot,
+        failedImpls: HashSet.make(ImplModulePath.make("notes.impl.ts")),
+      }),
+    ),
+  ).toBe(true);
+  expect(
+    SyncState.needsDeploymentNotification(
+      SyncState.transition(SyncState.Outcome.Succeeded({ snapshot })),
+    ),
+  ).toBe(false);
+});
+
 it("transitions successful operations to incremental work with no failed implementations", () => {
   const snapshot = Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves([]));
   const next = SyncState.transition(SyncState.Outcome.Succeeded({ snapshot }));

@@ -10,6 +10,9 @@ import * as Bundler from "@confect/cli/Bundler";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
+import * as DateTime from "effect/DateTime";
+import * as Option from "effect/Option";
+import * as TestClock from "effect/testing/TestClock";
 import * as Fiber from "effect/Fiber";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
@@ -43,6 +46,30 @@ vi.mock("esbuild", (importOriginal) =>
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect(
+      "notifies Convex after explicit codegen even when generated contents are unchanged",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.provide(codegenHandler);
+          const before = yield* project.generatedFiles;
+          const schema = path.join(project.root, "convex/schema.ts");
+          const timestamp = DateTime.toDateUtc(DateTime.makeUnsafe(1000));
+          yield* fs.utimes(schema, timestamp, timestamp);
+          yield* TestClock.setTime(2000);
+          expect(
+            (yield* project.provide(codegenHandler)).anyWritesHappened,
+          ).toBe(false);
+          expect(yield* project.generatedFiles).toEqual(before);
+          expect(
+            Option.getOrThrow((yield* fs.stat(schema)).mtime).getTime(),
+          ).toBe(2000);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "updates a spec without evaluating unrelated modules and matches full generation",
       () =>

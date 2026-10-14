@@ -304,7 +304,6 @@ const syncLoop = Effect.fnUntraced(function* (
             if (Option.isNone(validated)) {
               return SyncState.Outcome.ValidationFailed({ paths, snapshot });
             }
-            yield* touchConvexSchema;
           }
           return SyncState.Outcome.Succeeded({ snapshot });
         });
@@ -342,6 +341,9 @@ const syncLoop = Effect.fnUntraced(function* (
         ? Effect.all(dirtyOptionalFiles, { concurrency: "unbounded" })
         : Effect.void;
       yield* Ref.set(optionalPendingRef, HashSet.empty());
+
+      if (SyncState.needsDeploymentNotification(phase))
+        yield* touchConvexSchema;
 
       if (!SyncState.isDirty(yield* Ref.get(pendingRef))) {
         yield* logSuccess("Generated files are up-to-date");

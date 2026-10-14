@@ -145,10 +145,11 @@ export const removePathIfExists = Effect.fnUntraced(function* (
 
 /**
  * Bump the mtime of `convex/schema.ts` so the Convex CLI's chokidar watcher
- * emits a `change` event after every successful Confect codegen run. Without
- * this, a codegen that doesn't change any file content (for example, recovering
- * from a transient broken state in `confect/`) leaves Convex stuck on its
- * previous error because nothing it observes has changed.
+ * emits a `change` event after explicit codegen, bootstrap, or recovery.
+ * Recovery can leave generated contents unchanged, so it needs an explicit
+ * notification to release Convex from a previous error. Ordinary successful
+ * watch updates rely on their source/output changes instead of invalidating a
+ * Convex push that may already be processing those changes.
  */
 export const touchConvexSchema = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;

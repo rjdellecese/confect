@@ -139,6 +139,13 @@ export const transition = (outcome: Outcome): Phase =>
 export const shouldRetry = (phase: Phase, outcome: Outcome): boolean =>
   Phase.$is("Bootstrapping")(phase) && Outcome.$is("GenerationFailed")(outcome);
 
+export const needsDeploymentNotification = (phase: Phase): boolean =>
+  Phase.$match(phase, {
+    Bootstrapping: () => true,
+    NeedsFullSync: () => true,
+    Incremental: ({ failedImpls }) => !HashSet.isEmpty(failedImpls),
+  });
+
 export const implsToValidate = (
   phase: Phase,
   pending: Pending,

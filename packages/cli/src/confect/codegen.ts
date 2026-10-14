@@ -124,6 +124,7 @@ export const generateWithSnapshot = Effect.gen(function* () {
 }).pipe(Effect.withSpan("Cli.codegen"));
 
 export const codegenHandler = generateWithSnapshot.pipe(
+  Effect.tap(() => touchConvexSchema),
   Effect.map(({ functionPaths, anyWritesHappened }) => ({
     functionPaths,
     anyWritesHappened,
@@ -188,7 +189,6 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
-  yield* touchConvexSchema;
   return {
     functionPaths,
     snapshot,
@@ -250,7 +250,6 @@ export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
             );
           }),
         );
-        yield* touchConvexSchema;
         return next;
       }),
     );
