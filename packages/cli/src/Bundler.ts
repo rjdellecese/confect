@@ -10,14 +10,16 @@ import {
   tsconfigPathsToRegExp,
 } from "bundle-require";
 import { resolveModulePath } from "exsolve";
-import { pipe } from "effect/Function";
+import { identity, pipe } from "effect/Function";
 import * as Array from "effect/Array";
+import * as Chunk from "effect/Chunk";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as HashMap from "effect/HashMap";
 import * as HashSet from "effect/HashSet";
+import * as Iterable from "effect/Iterable";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
@@ -451,37 +453,77 @@ export const withBatch = <A, E, R>(
     }),
   );
 
+interface MetafileTraversal {
+  readonly pending: Chunk.Chunk<string>;
+  readonly visited: HashSet.HashSet<string>;
+}
+
+const reachableMetafileEntries = <
+  Metadata extends {
+    readonly imports: ReadonlyArray<{
+      readonly path: string;
+      readonly external?: boolean;
+    }>;
+  },
+>(
+  entries: Readonly<Record<string, Metadata>>,
+  root: string,
+  resolveImport: (path: string) => string,
+): Record<string, Metadata> =>
+  Object.fromEntries(
+    pipe(
+      Iterable.unfold<
+        MetafileTraversal,
+        Option.Option<readonly [string, Metadata]>
+      >(
+        { pending: Chunk.of(root), visited: HashSet.empty() },
+        ({ pending, visited }) => {
+          if (!Chunk.isNonEmpty(pending)) return Option.none();
+          const key = Chunk.headNonEmpty(pending);
+          const remaining = Chunk.tailNonEmpty(pending);
+          const metadata = entries[key];
+          if (HashSet.has(visited, key) || metadata === undefined)
+            return Option.some([
+              Option.none(),
+              { pending: remaining, visited },
+            ]);
+          return Option.some([
+            Option.some([key, metadata] as const),
+            {
+              pending: Array.reduce(
+                metadata.imports,
+                remaining,
+                (queue, imported) =>
+                  imported.external
+                    ? queue
+                    : Chunk.append(queue, resolveImport(imported.path)),
+              ),
+              visited: HashSet.add(visited, key),
+            },
+          ]);
+        },
+      ),
+      Iterable.getSomes,
+    ),
+  );
+
 const entryMetafile = (
   path: Path.Path,
   compilation: BatchCompilation,
   source: string,
   output: string,
-): esbuild.Metafile => {
-  const inputs: esbuild.Metafile["inputs"] = {};
-  const pendingInputs = [source];
-  for (const key of pendingInputs) {
-    if (inputs[key]) continue;
-    const input = compilation.metafile.inputs[key];
-    if (!input) continue;
-    inputs[key] = input;
-    for (const imported of input.imports) {
-      if (!imported.external) pendingInputs.push(imported.path);
-    }
-  }
-  const outputs: esbuild.Metafile["outputs"] = {};
-  const pendingOutputs = [output];
-  for (const key of pendingOutputs) {
-    if (outputs[key]) continue;
-    const artifact = compilation.metafile.outputs[key];
-    if (!artifact) continue;
-    outputs[key] = artifact;
-    for (const imported of artifact.imports) {
-      if (!imported.external)
-        pendingOutputs.push(path.resolve(compilation.cwd, imported.path));
-    }
-  }
-  return { inputs, outputs };
-};
+): esbuild.Metafile => ({
+  inputs: reachableMetafileEntries(
+    compilation.metafile.inputs,
+    source,
+    identity,
+  ),
+  outputs: reachableMetafileEntries(
+    compilation.metafile.outputs,
+    output,
+    (key) => path.resolve(compilation.cwd, key),
+  ),
+});
 
 /**
  * Bundle a TypeScript entry point with esbuild via {@link bundleRequire} and

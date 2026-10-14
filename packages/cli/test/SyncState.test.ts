@@ -4,6 +4,68 @@ import * as EntryPoint from "@confect/cli/EntryPoint";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import * as HashSet from "effect/HashSet";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
+import * as Result from "effect/Result";
+import { SpecModulePath } from "@confect/cli/SpecModulePath";
+import { TableModulePath } from "@confect/cli/TableModulePath";
+
+it("transitions successful operations to incremental work with no failed implementations", () => {
+  const snapshot = Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves([]));
+  const next = SyncState.transition(SyncState.Outcome.Succeeded({ snapshot }));
+  assert(SyncState.Phase.$is("Incremental")(next));
+  expect(next.snapshot).toBe(snapshot);
+  expect(HashSet.isEmpty(next.failedImpls)).toBe(true);
+});
+
+it("preserves snapshot and failed paths after implementation validation fails", () => {
+  const snapshot = Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves([]));
+  const first = ImplModulePath.make("first.impl.ts");
+  const second = ImplModulePath.make("second.impl.ts");
+  const next = SyncState.transition(
+    SyncState.Outcome.ValidationFailed({
+      snapshot,
+      paths: [first, second],
+    }),
+  );
+  assert(SyncState.Phase.$is("Incremental")(next));
+  expect(next.snapshot).toBe(snapshot);
+  expect(next.failedImpls).toEqual(HashSet.make(first, second));
+});
+
+it.each([
+  SyncState.Outcome.GenerationFailed(),
+  SyncState.Outcome.ReconciliationFailed(),
+])("requires full synchronization after $_tag", (outcome) => {
+  expect(SyncState.transition(outcome)).toEqual(
+    SyncState.Phase.NeedsFullSync(),
+  );
+});
+
+it("automatically retries only failed bootstrap generation", () => {
+  const snapshot = Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves([]));
+  const outcomes = [
+    SyncState.Outcome.Succeeded({ snapshot }),
+    SyncState.Outcome.ReconciliationFailed(),
+    SyncState.Outcome.ValidationFailed({
+      snapshot,
+      paths: [ImplModulePath.make("notes.impl.ts")],
+    }),
+  ];
+  const bootstrapping = SyncState.Phase.Bootstrapping();
+  expect(
+    SyncState.shouldRetry(bootstrapping, SyncState.Outcome.GenerationFailed()),
+  ).toBe(true);
+  for (const outcome of outcomes) {
+    expect(SyncState.shouldRetry(bootstrapping, outcome)).toBe(false);
+  }
+  for (const phase of [
+    SyncState.Phase.NeedsFullSync(),
+    SyncState.Phase.Incremental({ snapshot, failedImpls: HashSet.empty() }),
+  ]) {
+    for (const outcome of [...outcomes, SyncState.Outcome.GenerationFailed()]) {
+      expect(SyncState.shouldRetry(phase, outcome)).toBe(false);
+    }
+  }
+});
 
 it.each([EntryPoint.Kind.Config()])(
   "requests full generation for $_tag entries",
@@ -73,7 +135,7 @@ it("requires full generation until bootstrap or full-sync recovery succeeds", ()
   ).toBe(true);
   const incremental = SyncState.Phase.Incremental({
     failedImpls: HashSet.empty(),
-    snapshot: GenerationSnapshot.fromLoadedLeaves([]),
+    snapshot: Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves([])),
   });
   expect(SyncState.plan(incremental, SyncState.empty)._tag).toBe("Validate");
   expect(
@@ -88,7 +150,7 @@ it("revalidates failed implementations alongside new work", () => {
   const second = ImplModulePath.make("second.impl.ts");
   const phase = SyncState.Phase.Incremental({
     failedImpls: HashSet.make(first),
-    snapshot: GenerationSnapshot.fromLoadedLeaves([]),
+    snapshot: Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves([])),
   });
   const pending = SyncState.add(SyncState.empty, [
     EntryPoint.Kind.Impl({ relativePath: second }),
@@ -107,8 +169,12 @@ it("revalidates failed implementations alongside new work", () => {
 });
 
 it("coalesces dependency-aware declarations and impls without mutating previous work", () => {
-  const spec = EntryPoint.Kind.Spec({ relativePath: "notes.spec.ts" });
-  const table = EntryPoint.Kind.Table({ relativePath: "tables/notes.ts" });
+  const spec = EntryPoint.Kind.Spec({
+    relativePath: SpecModulePath.make("notes.spec.ts"),
+  });
+  const table = EntryPoint.Kind.Table({
+    relativePath: TableModulePath.make("tables/notes.ts"),
+  });
   const impl = ImplModulePath.make("notes.impl.ts");
   const first = SyncState.add(SyncState.empty, [spec]);
   const pending = SyncState.add(first, [
@@ -126,7 +192,7 @@ it("coalesces dependency-aware declarations and impls without mutating previous 
   expect(HashSet.has(pending.optional, "Http")).toBe(true);
   const ready = SyncState.Phase.Incremental({
     failedImpls: HashSet.empty(),
-    snapshot: GenerationSnapshot.fromLoadedLeaves([]),
+    snapshot: Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves([])),
   });
   const operation = SyncState.plan(ready, pending);
   assert(SyncState.Operation.$is("Update")(operation));

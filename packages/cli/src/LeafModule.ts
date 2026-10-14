@@ -15,7 +15,6 @@ import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import { fromBundlerError } from "./BuildError";
 import * as Bundler from "./Bundler";
-import * as GenerationSnapshot from "./GenerationSnapshot";
 import {
   MissingImplFileError,
   MissingSpecFileError,
@@ -527,16 +526,6 @@ export const loadAll = Effect.gen(function* () {
  * runtime, surfacing as a confusing `Refs.make` error rather than a
  * codegen-time diagnostic.
  */
-export const validateNoParentChildNameCollisions = Effect.fnUntraced(function* (
-  leaves: ReadonlyArray<LoadedLeafModule>,
-) {
-  yield* Effect.fromResult(
-    GenerationSnapshot.validateNoParentChildNameCollisions(
-      GenerationSnapshot.fromLoadedLeaves(leaves),
-    ),
-  );
-});
-
 const validateOrphanImpls = Effect.fnUntraced(function* (
   specFiles: ReadonlyArray<string>,
 ) {

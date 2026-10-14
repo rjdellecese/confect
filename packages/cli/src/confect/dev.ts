@@ -277,34 +277,20 @@ const syncLoop = Effect.fnUntraced(function* (
             Evaluation.catchAndLog,
           );
           if (Option.isNone(current)) {
-            yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
-            if (firstSync) {
-              yield* Ref.update(pendingRef, SyncState.full);
-              yield* Queue.offer(signal, undefined);
-            }
-            return false;
+            return SyncState.Outcome.GenerationFailed();
           }
           const refreshed = yield* watcher.refresh.pipe(Effect.result);
           if (Result.isFailure(refreshed)) {
             yield* Console.error(
               `Dependency watcher could not ${refreshed.failure.operation}: ${globalThis.String(refreshed.failure.cause)}`,
             );
-            yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
-            return false;
+            return SyncState.Outcome.ReconciliationFailed();
           }
           if (!Watcher.isRefreshSuccessful(refreshed.success)) {
             yield* logMessages;
-            yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
-            return false;
+            return SyncState.Outcome.ReconciliationFailed();
           }
-          yield* Ref.set(
-            phaseRef,
-            SyncState.Phase.Incremental({
-              failedImpls: HashSet.empty(),
-              snapshot: current.value,
-            }),
-          );
-          return true;
+          return SyncState.Outcome.Succeeded({ snapshot: current.value });
         });
       const validate = (
         paths: ReadonlyArray<ImplModulePath>,
@@ -316,27 +302,13 @@ const syncLoop = Effect.fnUntraced(function* (
               Evaluation.catchAndLog,
             );
             if (Option.isNone(validated)) {
-              yield* Ref.set(
-                phaseRef,
-                SyncState.Phase.Incremental({
-                  failedImpls: HashSet.fromIterable(paths),
-                  snapshot,
-                }),
-              );
-              return false;
+              return SyncState.Outcome.ValidationFailed({ paths, snapshot });
             }
-            yield* Ref.set(
-              phaseRef,
-              SyncState.Phase.Incremental({
-                failedImpls: HashSet.empty(),
-                snapshot,
-              }),
-            );
             yield* touchConvexSchema;
           }
-          return true;
+          return SyncState.Outcome.Succeeded({ snapshot });
         });
-      const completed = yield* SyncState.Operation.$match(
+      const outcome = yield* SyncState.Operation.$match(
         SyncState.plan(phase, pending),
         {
           Generate: () => regenerate(Evaluation.generateSnapshot),
@@ -347,7 +319,12 @@ const syncLoop = Effect.fnUntraced(function* (
             ),
         },
       );
-      if (!completed) return;
+      yield* Ref.set(phaseRef, SyncState.transition(outcome));
+      if (SyncState.shouldRetry(phase, outcome)) {
+        yield* Ref.update(pendingRef, SyncState.full);
+        yield* Queue.offer(signal, undefined);
+      }
+      if (!SyncState.Outcome.$is("Succeeded")(outcome)) return;
 
       const dirtyOptionalFiles = [
         ...(HashSet.has(optional, "Http")

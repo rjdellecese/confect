@@ -21,6 +21,8 @@ import {
   updateDeclarations,
 } from "@confect/cli/confect/codegen";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
+import { SpecModulePath } from "@confect/cli/SpecModulePath";
+import { TableModulePath } from "@confect/cli/TableModulePath";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
@@ -68,7 +70,12 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           const next = yield* project.provide(
             updateDeclarations(
               snapshot,
-              [{ _tag: "Spec", relativePath: "notes.spec.ts" }],
+              [
+                {
+                  _tag: "Spec",
+                  relativePath: SpecModulePath.make("notes.spec.ts"),
+                },
+              ],
               [],
             ),
           );
@@ -127,7 +134,12 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             .provide(
               updateDeclarations(
                 snapshot,
-                [{ _tag: "Spec", relativePath: "notes.spec.ts" }],
+                [
+                  {
+                    _tag: "Spec",
+                    relativePath: SpecModulePath.make("notes.spec.ts"),
+                  },
+                ],
                 [],
               ),
             )
@@ -173,7 +185,12 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
           snapshot = yield* project.provide(
             updateDeclarations(
               snapshot,
-              [{ _tag: "Spec", relativePath: "notes.spec.ts" }],
+              [
+                {
+                  _tag: "Spec",
+                  relativePath: SpecModulePath.make("notes.spec.ts"),
+                },
+              ],
               [],
             ),
           );
@@ -193,7 +210,12 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
           const empty = yield* project.provide(
             updateDeclarations(
               snapshot,
-              [{ _tag: "Spec", relativePath: "notes.spec.ts" }],
+              [
+                {
+                  _tag: "Spec",
+                  relativePath: SpecModulePath.make("notes.spec.ts"),
+                },
+              ],
               [],
             ),
           );
@@ -224,7 +246,12 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
             .provide(
               updateDeclarations(
                 snapshot,
-                [{ _tag: "Table", relativePath: "tables/notes.ts" }],
+                [
+                  {
+                    _tag: "Table",
+                    relativePath: TableModulePath.make("tables/notes.ts"),
+                  },
+                ],
                 [ImplModulePath.make("notes.impl.ts")],
               ),
             )
@@ -242,7 +269,12 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
           yield* project.provide(
             updateDeclarations(
               snapshot,
-              [{ _tag: "Table", relativePath: "tables/notes.ts" }],
+              [
+                {
+                  _tag: "Table",
+                  relativePath: TableModulePath.make("tables/notes.ts"),
+                },
+              ],
               [ImplModulePath.make("notes.impl.ts")],
             ),
           );

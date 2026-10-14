@@ -18,6 +18,7 @@ import { FunctionPaths } from "@confect/cli/FunctionPaths";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
+import { SpecModulePath } from "@confect/cli/SpecModulePath";
 import * as Project from "./integration/Project";
 
 vi.mock("node:child_process", (importOriginal) =>
@@ -75,7 +76,12 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
         const next = yield* project.provide(
           Evaluation.updateDeclarations(
             snapshot,
-            [{ _tag: "Spec", relativePath: "notes.spec.ts" }],
+            [
+              {
+                _tag: "Spec",
+                relativePath: SpecModulePath.make("notes.spec.ts"),
+              },
+            ],
             [],
           ),
         );
@@ -91,7 +97,12 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           .provide(
             Evaluation.updateDeclarations(
               next,
-              [{ _tag: "Spec", relativePath: "notes.spec.ts" }],
+              [
+                {
+                  _tag: "Spec",
+                  relativePath: SpecModulePath.make("notes.spec.ts"),
+                },
+              ],
               [],
             ),
           )
@@ -104,7 +115,12 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
         const repaired = yield* project.provide(
           Evaluation.updateDeclarations(
             next,
-            [{ _tag: "Spec", relativePath: "notes.spec.ts" }],
+            [
+              {
+                _tag: "Spec",
+                relativePath: SpecModulePath.make("notes.spec.ts"),
+              },
+            ],
             [],
           ),
         );

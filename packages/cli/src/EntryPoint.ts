@@ -1,22 +1,26 @@
 import * as Array from "effect/Array";
+import * as Chunk from "effect/Chunk";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import { ImplModulePath } from "./ImplModulePath";
+import * as SpecModulePath from "./SpecModulePath";
+import { TableModulePath } from "./TableModulePath";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import { CONVEX_CONFIG_FILENAME } from "./ConvexConfig";
 import { discoverLeafImplFiles, discoverLeafSpecFiles } from "./LeafModule";
-import { discoverTableFiles } from "./TableModule";
+import { discoverTableFiles, type TableModule } from "./TableModule";
 
 export type Kind = Data.TaggedEnum<{
-  Spec: { readonly relativePath: string };
+  Spec: { readonly relativePath: SpecModulePath.SpecModulePath };
   Impl: { readonly relativePath: ImplModulePath };
-  Table: { readonly relativePath: string };
+  Table: { readonly relativePath: TableModulePath };
   Http: { readonly relativePath: "http.ts" };
   Crons: { readonly relativePath: "crons.ts" };
   Auth: { readonly relativePath: "auth.ts" };
@@ -25,10 +29,45 @@ export type Kind = Data.TaggedEnum<{
 
 export const Kind = Data.taggedEnum<Kind>();
 export const Declaration = Schema.TaggedUnion({
-  Spec: { relativePath: Schema.String.check(Schema.isEndingWith(".spec.ts")) },
-  Table: { relativePath: Schema.String.check(Schema.isEndingWith(".ts")) },
+  Spec: { relativePath: SpecModulePath.SpecModulePath },
+  Table: { relativePath: TableModulePath },
 });
 export type Declaration = typeof Declaration.Type;
+
+export const planDeclarations = (
+  declarations: Array.NonEmptyReadonlyArray<Declaration>,
+  affectedImpls: ReadonlyArray<ImplModulePath>,
+  path: Path.Path,
+): {
+  readonly tables: ReadonlyArray<TableModule>;
+  readonly paths: ReadonlyArray<ImplModulePath>;
+} => {
+  const plan = Array.reduce(
+    declarations,
+    {
+      tables: Chunk.empty<TableModule>(),
+      paths: HashSet.fromIterable(affectedImpls),
+    },
+    (state, declaration) =>
+      Declaration.match(declaration, {
+        Spec: ({ relativePath }) => ({
+          ...state,
+          paths: HashSet.add(state.paths, SpecModulePath.toImpl(relativePath)),
+        }),
+        Table: ({ relativePath }) => ({
+          ...state,
+          tables: Chunk.append(state.tables, {
+            relativePath,
+            tableName: path.parse(relativePath).name,
+          }),
+        }),
+      }),
+  );
+  return {
+    tables: Chunk.toReadonlyArray(plan.tables),
+    paths: Array.fromIterable(plan.paths),
+  };
+};
 
 export type EntryPoint = Kind & {
   readonly absolutePath: string;
@@ -50,13 +89,14 @@ export const parse = (
     return Option.some(Kind.Crons({ relativePath }));
   if (relativePath === "auth.ts")
     return Option.some(Kind.Auth({ relativePath }));
-  if (
-    relativePath.split(/[/\\]/)[0] === "tables" &&
-    relativePath.endsWith(".ts")
-  )
-    return Option.some(Kind.Table({ relativePath }));
-  if (relativePath.endsWith(".spec.ts"))
-    return Option.some(Kind.Spec({ relativePath }));
+  const tablePath = Schema.decodeOption(TableModulePath)(relativePath);
+  if (Option.isSome(tablePath))
+    return Option.some(Kind.Table({ relativePath: tablePath.value }));
+  const specPath = Schema.decodeOption(SpecModulePath.SpecModulePath)(
+    relativePath,
+  );
+  if (Option.isSome(specPath))
+    return Option.some(Kind.Spec({ relativePath: specPath.value }));
   return Schema.decodeOption(ImplModulePath)(relativePath).pipe(
     Option.map((implPath) => Kind.Impl({ relativePath: implPath })),
   );

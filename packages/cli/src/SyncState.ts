@@ -109,6 +109,36 @@ export type Phase = Data.TaggedEnum<{
 }>;
 export const Phase = Data.taggedEnum<Phase>();
 
+export type Outcome = Data.TaggedEnum<{
+  Succeeded: { readonly snapshot: GenerationSnapshot };
+  GenerationFailed: {};
+  ReconciliationFailed: {};
+  ValidationFailed: {
+    readonly snapshot: GenerationSnapshot;
+    readonly paths: Array.NonEmptyReadonlyArray<ImplModulePath>;
+  };
+}>;
+export const Outcome = Data.taggedEnum<Outcome>();
+
+export const transition = (outcome: Outcome): Phase =>
+  Outcome.$match(outcome, {
+    Succeeded: ({ snapshot }) =>
+      Phase.Incremental({
+        snapshot,
+        failedImpls: HashSet.empty(),
+      }),
+    GenerationFailed: () => Phase.NeedsFullSync(),
+    ReconciliationFailed: () => Phase.NeedsFullSync(),
+    ValidationFailed: ({ snapshot, paths }) =>
+      Phase.Incremental({
+        snapshot,
+        failedImpls: HashSet.fromIterable(paths),
+      }),
+  });
+
+export const shouldRetry = (phase: Phase, outcome: Outcome): boolean =>
+  Phase.$is("Bootstrapping")(phase) && Outcome.$is("GenerationFailed")(outcome);
+
 export const implsToValidate = (
   phase: Phase,
   pending: Pending,

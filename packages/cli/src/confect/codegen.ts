@@ -22,11 +22,10 @@ import * as FunctionPaths from "../FunctionPaths";
 import * as GenerationSnapshot from "../GenerationSnapshot";
 import * as GroupPath from "../GroupPath";
 import * as EntryPoint from "../EntryPoint";
-import { ImplModulePath } from "../ImplModulePath";
+import type { ImplModulePath } from "../ImplModulePath";
 import {
   implPathForSpec,
   loadAll,
-  validateNoParentChildNameCollisions,
   registeredFunctionsRelativePath,
   validateAllImpls,
   withImplFiles,
@@ -154,7 +153,9 @@ const runCodegen = Effect.gen(function* () {
   yield* generateRuntimeSchema(tableModules);
   const leaves = yield* loadAll;
   yield* removeLegacyFiles;
-  yield* validateNoParentChildNameCollisions(leaves);
+  const snapshot = yield* Effect.fromResult(
+    GenerationSnapshot.fromLoadedLeaves(leaves),
+  );
   yield* generateAssembledSpecs(leaves);
   // `_generated/api.ts`/`nodeApi.ts` are no longer imported by generated or
   // impl code (impls take the database schema from `_generated/schema`
@@ -190,7 +191,7 @@ const runCodegen = Effect.gen(function* () {
   yield* touchConvexSchema;
   return {
     functionPaths,
-    snapshot: GenerationSnapshot.fromLoadedLeaves(leaves),
+    snapshot,
   };
 });
 
@@ -202,31 +203,16 @@ export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
   ) {
     const path = yield* Path.Path;
     const convexDirectory = yield* ConvexDirectory.get;
-    let paths = HashSet.fromIterable(affectedImpls);
-    const tables: Array<TableModule.TableModule> = [];
-    for (const declaration of declarations) {
-      yield* EntryPoint.Declaration.match(declaration, {
-        Spec: ({ relativePath }) =>
-          implPathForSpec(relativePath).pipe(
-            Effect.map((implPath) => {
-              paths = HashSet.add(paths, ImplModulePath.make(implPath));
-            }),
-          ),
-        Table: ({ relativePath }) =>
-          Effect.sync(() => {
-            tables.push({
-              relativePath,
-              tableName: path.parse(relativePath).name,
-            });
-          }),
-      });
-    }
+    const { paths, tables } = EntryPoint.planDeclarations(
+      declarations,
+      affectedImpls,
+      path,
+    );
     yield* TableModule.validate(tables);
-    return yield* withImplFiles(Array.fromIterable(paths), (leaves) =>
+    return yield* withImplFiles(paths, (leaves) =>
       Effect.gen(function* () {
-        const next = GenerationSnapshot.update(snapshot, leaves);
-        yield* Effect.fromResult(
-          GenerationSnapshot.validateNoParentChildNameCollisions(next),
+        const next = yield* Effect.fromResult(
+          GenerationSnapshot.update(snapshot, leaves),
         );
         yield* validateAllImpls(leaves);
         yield* generateGroupRegisteredFunctions(leaves);

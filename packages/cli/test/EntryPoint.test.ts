@@ -1,6 +1,8 @@
 import { assert, expect, expectTypeOf, it } from "@effect/vitest";
 import * as EntryPoint from "@confect/cli/EntryPoint";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
+import { SpecModulePath } from "@confect/cli/SpecModulePath";
+import { TableModulePath } from "@confect/cli/TableModulePath";
 import * as Option from "effect/Option";
 import * as NodePath from "@effect/platform-node/NodePath";
 import * as Effect from "effect/Effect";
@@ -10,6 +12,7 @@ import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 
@@ -18,11 +21,15 @@ it("refines optional entries without including spec, impl, table, or config entr
     EntryPoint.Kind.Http({ relativePath: "http.ts" }),
     EntryPoint.Kind.Crons({ relativePath: "crons.ts" }),
     EntryPoint.Kind.Auth({ relativePath: "auth.ts" }),
-    EntryPoint.Kind.Spec({ relativePath: "notes.spec.ts" }),
+    EntryPoint.Kind.Spec({
+      relativePath: SpecModulePath.make("notes.spec.ts"),
+    }),
     EntryPoint.Kind.Impl({
       relativePath: ImplModulePath.make("notes.impl.ts"),
     }),
-    EntryPoint.Kind.Table({ relativePath: "tables/notes.ts" }),
+    EntryPoint.Kind.Table({
+      relativePath: TableModulePath.make("tables/notes.ts"),
+    }),
     EntryPoint.Kind.Config(),
   ];
   const optional = entries.filter(EntryPoint.isOptional);
@@ -211,7 +218,11 @@ it.each(["tables/notes.impl.ts", "tables\\notes.impl.ts"])(
   "classifies %s as a table rather than an implementation",
   (relativePath) => {
     expect(EntryPoint.parse(relativePath)).toEqual(
-      Option.some(EntryPoint.Kind.Table({ relativePath })),
+      Option.some(
+        EntryPoint.Kind.Table({
+          relativePath: TableModulePath.make(relativePath),
+        }),
+      ),
     );
   },
 );
@@ -220,3 +231,110 @@ it("keeps unrelated files out of the entry-point domain", () => {
   expect(EntryPoint.parse("helpers.ts")).toEqual(Option.none());
   expect(EntryPoint.parse("notes.impl.js")).toEqual(Option.none());
 });
+
+it.each(["notes.spec.ts", "groups/notes.spec.ts", "groups\\notes.spec.ts"])(
+  "uses the same parsed spec path for entry and declaration %s",
+  (relativePath) => {
+    const entry = EntryPoint.Kind.Spec({
+      relativePath: SpecModulePath.make(relativePath),
+    });
+    expect(EntryPoint.parse(relativePath)).toEqual(Option.some(entry));
+    expect(Schema.decodeOption(EntryPoint.Declaration)(entry)).toEqual(
+      Option.some(entry),
+    );
+  },
+);
+
+it.each([
+  "tables/notes.ts",
+  "tables\\nested\\notes.ts",
+  "tables/notes.spec.ts",
+])(
+  "uses the same parsed table path for entry and declaration %s",
+  (relativePath) => {
+    const entry = EntryPoint.Kind.Table({
+      relativePath: TableModulePath.make(relativePath),
+    });
+    expect(EntryPoint.parse(relativePath)).toEqual(Option.some(entry));
+    expect(Schema.decodeOption(EntryPoint.Declaration)(entry)).toEqual(
+      Option.some(entry),
+    );
+  },
+);
+
+it.each([
+  ["Spec", ".spec.ts"],
+  ["Spec", "groups/.spec.ts"],
+  ["Spec", "../notes.spec.ts"],
+  ["Spec", "/notes.spec.ts"],
+  ["Spec", "groups//notes.spec.ts"],
+  ["Table", "notes.ts"],
+  ["Table", "tables/.ts"],
+  ["Table", "tables/../notes.ts"],
+  ["Table", "tables//notes.ts"],
+  ["Table", "/tables/notes.ts"],
+])(
+  "rejects malformed %s declaration %s at both boundaries",
+  (_tag, relativePath) => {
+    expect(EntryPoint.parse(relativePath)).toEqual(Option.none());
+    expect(
+      Schema.decodeUnknownOption(EntryPoint.Declaration)({
+        _tag,
+        relativePath,
+      }),
+    ).toEqual(Option.none());
+  },
+);
+
+it("shares declaration brands with entry-point kinds", () => {
+  expectTypeOf<EntryPoint.Declaration>().toEqualTypeOf<
+    Extract<EntryPoint.Kind, { readonly _tag: "Spec" | "Table" }>
+  >();
+});
+
+it.effect.each([
+  { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
+  { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
+])("plans declarations immutably with $name paths", ({ pathLayer, sep }) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const spec = EntryPoint.Kind.Spec({
+      relativePath: SpecModulePath.make(`groups${sep}notes.spec.ts`),
+    });
+    const table = EntryPoint.Kind.Table({
+      relativePath: TableModulePath.make(`tables${sep}groups${sep}notes.ts`),
+    });
+    const anotherTable = EntryPoint.Kind.Table({
+      relativePath: TableModulePath.make(`tables${sep}users.ts`),
+    });
+    const declarations = [spec, table, spec, anotherTable] as const;
+    const impl = ImplModulePath.make(`groups${sep}notes.impl.ts`);
+    const anotherImpl = ImplModulePath.make("other.impl.ts");
+    const affectedImpls = [impl, anotherImpl, impl] as const;
+    const planned = EntryPoint.planDeclarations(
+      declarations,
+      affectedImpls,
+      path,
+    );
+    expect(planned.tables).toEqual([
+      { relativePath: table.relativePath, tableName: "notes" },
+      { relativePath: anotherTable.relativePath, tableName: "users" },
+    ]);
+    expect(planned.paths).toHaveLength(2);
+    expect(planned.paths).toEqual(expect.arrayContaining([impl, anotherImpl]));
+    expect(
+      EntryPoint.planDeclarations(declarations, affectedImpls, path),
+    ).toEqual(planned);
+    expect(declarations).toEqual([spec, table, spec, anotherTable]);
+    expect(affectedImpls).toEqual([impl, anotherImpl, impl]);
+    expect(EntryPoint.planDeclarations([spec], [], path)).toEqual({
+      tables: [],
+      paths: [impl],
+    });
+    expect(EntryPoint.planDeclarations([table], [], path)).toEqual({
+      tables: [{ relativePath: table.relativePath, tableName: "notes" }],
+      paths: [],
+    });
+    expectTypeOf(planned.paths).toEqualTypeOf<ReadonlyArray<ImplModulePath>>();
+  }).pipe(Effect.provide(pathLayer)),
+);

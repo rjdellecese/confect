@@ -1,13 +1,21 @@
 import { FunctionSpec, GroupSpec, Table } from "@confect/core";
 import * as Bundler from "@confect/cli/Bundler";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
+import { ParentChildNameCollisionError } from "@confect/cli/CodegenError";
 import * as FunctionPaths from "@confect/cli/FunctionPaths";
 import * as FunctionPath from "@confect/cli/FunctionPath";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import * as LeafModule from "@confect/cli/LeafModule";
 import * as NodePath from "@effect/platform-node/NodePath";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
-import { assert, expect, layer } from "@effect/vitest";
+import {
+  assert,
+  describe,
+  expect,
+  expectTypeOf,
+  it as test,
+  layer,
+} from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as HashMap from "effect/HashMap";
 import * as Layer from "effect/Layer";
@@ -51,7 +59,15 @@ const nodeAction = (name: string) =>
 const getLeaf = (
   snapshot: GenerationSnapshot.GenerationSnapshot,
   path: string,
-) => Option.getOrThrow(HashMap.get(snapshot, path));
+) =>
+  Option.getOrThrow(HashMap.get(snapshot.leaves, path.replaceAll("\\", "/")));
+
+const fromLoadedLeaves = (leaves: ReadonlyArray<LeafModule.LoadedLeafModule>) =>
+  Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves(leaves));
+const update = (
+  snapshot: GenerationSnapshot.GenerationSnapshot,
+  leaves: ReadonlyArray<LeafModule.LoadedLeafModule>,
+) => Result.getOrThrow(GenerationSnapshot.update(snapshot, leaves));
 
 const codec = Schema.toCodecJson(GenerationSnapshot.GenerationSnapshot);
 const roundtrip = (snapshot: GenerationSnapshot.GenerationSnapshot) =>
@@ -66,9 +82,268 @@ const baseLayer = Layer.merge(
   }),
 );
 
+const metadataGroup = (
+  pathSegments: ReadonlyArray<string>,
+  functionNames: ReadonlyArray<string> = [],
+) => ({ path: { pathSegments }, runtime: "Convex", functionNames });
+
+const metadataLeaf = (
+  root = metadataGroup(["notes"]),
+  descendants: ReadonlyArray<ReturnType<typeof metadataGroup>> = [],
+) => ({ relativePath: "notes.spec.ts", root, descendants });
+
+describe("GenerationSnapshot parsing", () => {
+  test.each([
+    {
+      reason: "NoncanonicalFunctionNames",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"], ["nested/name"])),
+        ],
+      ],
+    },
+    {
+      reason: "NoncanonicalFunctionNames",
+      entries: [
+        ["notes.spec.ts", metadataLeaf(metadataGroup(["notes"], ["default"]))],
+      ],
+    },
+    {
+      reason: "NoncanonicalPath",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"]), [
+            metadataGroup(["notes", "not-an-identifier"]),
+          ]),
+        ],
+      ],
+    },
+    { reason: "InvalidShape", entries: {} },
+    {
+      reason: "InvalidShape",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf({ ...metadataGroup(["notes"]), runtime: "Other" }),
+        ],
+      ],
+    },
+    {
+      reason: "InvalidShape",
+      entries: [["notes.spec.ts", metadataLeaf(metadataGroup([]))]],
+    },
+    {
+      reason: "InvalidShape",
+      entries: [
+        ["notes.spec.ts", metadataLeaf(metadataGroup(["notes"], [""]))],
+      ],
+    },
+    { reason: "KeyMismatch", entries: [["other.spec.ts", metadataLeaf()]] },
+    {
+      reason: "RootMismatch",
+      entries: [["notes.spec.ts", metadataLeaf(metadataGroup(["other"]))]],
+    },
+    {
+      reason: "RootMismatch",
+      entries: [
+        [
+          "notes\\nested.spec.ts",
+          {
+            ...metadataLeaf(metadataGroup(["notes", "nested"])),
+            relativePath: "notes\\nested.spec.ts",
+          },
+        ],
+      ],
+    },
+    {
+      reason: "NoncanonicalPath",
+      entries: [
+        [
+          "../notes.spec.ts",
+          {
+            ...metadataLeaf(metadataGroup(["..", "notes"])),
+            relativePath: "../notes.spec.ts",
+          },
+        ],
+      ],
+    },
+    {
+      reason: "NoncanonicalPath",
+      entries: [["notes.spec.ts", metadataLeaf(metadataGroup(["C:notes"]))]],
+    },
+    {
+      reason: "NoncanonicalPath",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"]), [
+            metadataGroup(["notes", "nested/child"]),
+          ]),
+        ],
+      ],
+    },
+    {
+      reason: "DuplicateLeaf",
+      entries: [
+        ["notes.spec.ts", metadataLeaf()],
+        ["notes.spec.ts", metadataLeaf()],
+      ],
+    },
+    {
+      reason: "DuplicateGroup",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"]), [
+            metadataGroup(["notes", "child"]),
+            metadataGroup(["notes", "child"]),
+          ]),
+        ],
+      ],
+    },
+    {
+      reason: "DescendantOutsideRoot",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"]), [
+            metadataGroup(["other", "child"]),
+          ]),
+        ],
+      ],
+    },
+    {
+      reason: "DescendantOutsideRoot",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"]), [metadataGroup(["notes"])]),
+        ],
+      ],
+    },
+    {
+      reason: "MissingParent",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"]), [
+            metadataGroup(["notes", "missing", "child"]),
+          ]),
+        ],
+      ],
+    },
+    {
+      reason: "NoncanonicalDescendants",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"]), [
+            metadataGroup(["notes", "zebra"]),
+            metadataGroup(["notes", "alpha"]),
+          ]),
+        ],
+      ],
+    },
+    {
+      reason: "NoncanonicalFunctionNames",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"], ["list", "list"])),
+        ],
+      ],
+    },
+    {
+      reason: "NoncanonicalFunctionNames",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"], ["zebra", "alpha"])),
+        ],
+      ],
+    },
+    {
+      reason: "NoncanonicalFunctionNames",
+      entries: [
+        [
+          "notes.spec.ts",
+          metadataLeaf(metadataGroup(["notes"]), [
+            metadataGroup(["notes", "child"], ["zebra", "alpha"]),
+          ]),
+        ],
+      ],
+    },
+  ])("rejects malformed metadata: $reason", ({ reason, entries }) => {
+    const result = GenerationSnapshot.parse(entries);
+    assert(Result.isFailure(result));
+    expect(result.failure).toMatchObject({ _tag: "SnapshotError", reason });
+    expect(Result.isFailure(Schema.decodeResult(codec)(entries))).toBe(true);
+  });
+
+  test("does not accept structural maps as proof of validity", () => {
+    expectTypeOf<
+      HashMap.HashMap<string, GenerationSnapshot.LeafSummary>
+    >().not.toExtend<GenerationSnapshot.GenerationSnapshot>();
+    const structural = { leaves: HashMap.empty() };
+    expect(Schema.is(GenerationSnapshot.GenerationSnapshot)(structural)).toBe(
+      false,
+    );
+    expect(
+      Result.isFailure(Schema.encodeUnknownResult(codec)(structural)),
+    ).toBe(true);
+  });
+});
+
 layer(Layer.merge(baseLayer, NodePath.layerPosix))(
   "GenerationSnapshot",
   (it) => {
+    it.effect(
+      "reports malformed loaded metadata as failures rather than throwing",
+      () =>
+        Effect.gen(function* () {
+          const leaf = yield* loadLeaf("notes.spec.ts");
+          const mismatch = GenerationSnapshot.fromLoadedLeaves([
+            { ...leaf, pathSegments: ["other"] },
+          ]);
+          assert(Result.isFailure(mismatch));
+          expect(mismatch.failure).toMatchObject({
+            _tag: "SnapshotError",
+            reason: "RootMismatch",
+            relativePath: "notes.spec.ts",
+          });
+          const result = GenerationSnapshot.fromLoadedLeaves([
+            { ...leaf, pathSegments: [""] },
+          ]);
+          assert(Result.isFailure(result));
+          expect(result.failure).toMatchObject({
+            _tag: "SnapshotError",
+            reason: "InvalidShape",
+          });
+        }),
+    );
+
+    it.effect(
+      "rejects duplicate loaded leaves without changing the previous snapshot",
+      () =>
+        Effect.gen(function* () {
+          const leaf = yield* loadLeaf("notes.spec.ts");
+          const snapshot = fromLoadedLeaves([leaf]);
+          const duplicated = GenerationSnapshot.fromLoadedLeaves([leaf, leaf]);
+          assert(Result.isFailure(duplicated));
+          expect(duplicated.failure).toMatchObject({
+            _tag: "SnapshotError",
+            reason: "DuplicateLeaf",
+            relativePath: "notes.spec.ts",
+          });
+          expect(GenerationSnapshot.update(snapshot, [leaf, leaf])).toEqual(
+            duplicated,
+          );
+          expect(HashMap.size(snapshot.leaves)).toBe(1);
+        }),
+    );
+
     it.effect(
       "roundtrips only metadata without forcing schemas or changing inputs",
       () =>
@@ -99,7 +374,7 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           const authoredGroups = spec.groups;
           const leaf = yield* loadLeaf("nested/notes.spec.ts", spec);
           const leaves = [leaf];
-          const snapshot = GenerationSnapshot.fromLoadedLeaves(leaves);
+          const snapshot = fromLoadedLeaves(leaves);
           const summary = getLeaf(snapshot, leaf.relativePath);
           expect(summary.root.path.pathSegments).toEqual(["nested", "notes"]);
           expect(summary.root.functionNames).toEqual(["alpha", "zebra"]);
@@ -170,8 +445,8 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
             changed: [],
           });
           expect(
-            GenerationSnapshot.validateNoParentChildNameCollisions(decoded),
-          ).toEqual(Result.succeed(undefined));
+            Schema.is(GenerationSnapshot.GenerationSnapshot)(decoded),
+          ).toBe(true);
           expect(leaves).toEqual([leaf]);
           expect(leaf.spec).toBe(spec);
           expect(spec.functions).toBe(functions);
@@ -197,18 +472,15 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
             "other.spec.ts",
             GroupSpec.make().addFunction(query("get")),
           );
-          const before = GenerationSnapshot.fromLoadedLeaves([
-            first,
-            untouched,
-          ]);
+          const before = fromLoadedLeaves([first, untouched]);
           const replacement = yield* loadLeaf(
             "notes.spec.ts",
             GroupSpec.makeNode().addFunction(nodeAction("run")),
           );
           const added = yield* loadLeaf("new.spec.ts");
-          const after = GenerationSnapshot.update(before, [replacement, added]);
-          expect(HashMap.size(before)).toBe(2);
-          expect(HashMap.size(after)).toBe(3);
+          const after = update(before, [replacement, added]);
+          expect(HashMap.size(before.leaves)).toBe(2);
+          expect(HashMap.size(after.leaves)).toBe(3);
           expect(getLeaf(after, "other.spec.ts")).toBe(
             getLeaf(before, "other.spec.ts"),
           );
@@ -219,7 +491,7 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
             runtime: "Node",
             functionNames: ["run"],
           });
-          expect(GenerationSnapshot.update(before, [])).toBe(before);
+          expect(update(before, [])).toBe(before);
         }),
     );
 
@@ -231,16 +503,14 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
             "old.spec.ts",
             GroupSpec.make().addFunction(query("list")),
           );
-          const before = GenerationSnapshot.fromLoadedLeaves([old]);
+          const before = fromLoadedLeaves([old]);
           const renamed = yield* loadLeaf("new.spec.ts", old.spec);
-          const after = GenerationSnapshot.fromLoadedLeaves([renamed]);
+          const after = fromLoadedLeaves([renamed]);
           expect(GenerationSnapshot.diff(before, after)).toEqual({
             removed: [getLeaf(before, "old.spec.ts").root],
             changed: [getLeaf(after, "new.spec.ts").root],
           });
-          const empty = GenerationSnapshot.fromLoadedLeaves([
-            yield* loadLeaf("old.spec.ts"),
-          ]);
+          const empty = fromLoadedLeaves([yield* loadLeaf("old.spec.ts")]);
           expect(GenerationSnapshot.diff(before, empty)).toEqual({
             removed: [getLeaf(before, "old.spec.ts").root],
             changed: [],
@@ -249,15 +519,12 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
             removed: [],
             changed: [getLeaf(before, "old.spec.ts").root],
           });
-          expect(
-            GenerationSnapshot.diff(
-              before,
-              GenerationSnapshot.fromLoadedLeaves([]),
-            ),
-          ).toEqual({
-            removed: [getLeaf(before, "old.spec.ts").root],
-            changed: [],
-          });
+          expect(GenerationSnapshot.diff(before, fromLoadedLeaves([]))).toEqual(
+            {
+              removed: [getLeaf(before, "old.spec.ts").root],
+              changed: [],
+            },
+          );
         }),
     );
 
@@ -269,7 +536,7 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
             GroupSpec.make().addFunction(query("b")).addFunction(query("a")),
             { ["nested"]: GroupSpec.make().addFunction(query("run")) },
           );
-          const before = GenerationSnapshot.fromLoadedLeaves([
+          const before = fromLoadedLeaves([
             yield* loadLeaf("notes.spec.ts", original),
           ]);
           const equivalent = GroupSpec.addGroupsAt(
@@ -279,7 +546,7 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
             ),
             { ["empty"]: GroupSpec.makeNode() },
           );
-          const reevaluated = GenerationSnapshot.fromLoadedLeaves([
+          const reevaluated = fromLoadedLeaves([
             yield* loadLeaf("notes.spec.ts", equivalent),
           ]);
           expect(
@@ -291,7 +558,7 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
               .addFunction(query("renamed")),
             { ["nested"]: GroupSpec.makeNode().addFunction(nodeAction("run")) },
           );
-          const after = GenerationSnapshot.update(before, [
+          const after = update(before, [
             yield* loadLeaf("notes.spec.ts", changed),
           ]);
           const result = GenerationSnapshot.diff(before, after);
@@ -342,17 +609,15 @@ for (const { name, pathLayer, sep } of [
               GroupSpec.makeNode().addFunction(nodeAction("run")),
             );
             const leaves = [child, parent];
-            const expected = yield* Effect.result(
-              LeafModule.validateNoParentChildNameCollisions(leaves),
-            );
-            const snapshot = roundtrip(
-              GenerationSnapshot.fromLoadedLeaves(leaves),
-            );
-            const actual =
-              GenerationSnapshot.validateNoParentChildNameCollisions(snapshot);
+            const expected = new ParentChildNameCollisionError({
+              parentSpecPath: "nested/notes.spec.ts",
+              childSpecPath: childSegments.join("/"),
+              collisionKind: kind,
+              collisionName: "archived",
+            });
+            const actual = GenerationSnapshot.fromLoadedLeaves(leaves);
             assert(Result.isFailure(actual));
-            assert(Result.isFailure(expected));
-            expect(actual.failure).toEqual(expected.failure);
+            expect(actual.failure).toEqual(expected);
             expect(actual.failure).toMatchObject({
               _tag: "ParentChildNameCollisionError",
               parentSpecPath: "nested/notes.spec.ts",
@@ -360,7 +625,14 @@ for (const { name, pathLayer, sep } of [
               collisionKind: kind,
               collisionName: "archived",
             });
-            expect(HashMap.has(snapshot, child.relativePath)).toBe(true);
+            const entries = [child, parent].flatMap((leaf) =>
+              Schema.encodeSync(codec)(fromLoadedLeaves([leaf])),
+            );
+            expect(GenerationSnapshot.parse(entries)).toEqual(actual);
+            const decoded = Schema.decodeResult(codec)(entries);
+            assert(Result.isFailure(decoded));
+            expect(decoded.failure.message).toContain("nested/notes.spec.ts");
+            expect(decoded.failure.message).toContain(childSegments.join("/"));
           }),
       );
 
@@ -372,29 +644,25 @@ for (const { name, pathLayer, sep } of [
             const child = yield* loadLeaf(
               ["notes", "archived", "deep.spec.ts"].join(sep),
             );
-            const before = GenerationSnapshot.fromLoadedLeaves([parent, child]);
+            const before = fromLoadedLeaves([parent, child]);
             const replacement = yield* loadLeaf(
               "notes.spec.ts",
               GroupSpec.makeNode().addFunction(nodeAction("archived")),
             );
-            const after = GenerationSnapshot.update(before, [replacement]);
-            const result =
-              GenerationSnapshot.validateNoParentChildNameCollisions(after);
+            const result = GenerationSnapshot.update(before, [replacement]);
             assert(Result.isFailure(result));
+            assert(result.failure._tag === "ParentChildNameCollisionError");
             expect(result.failure.collisionKind).toBe("function");
+            expect(getLeaf(before, "notes.spec.ts").root.functionNames).toEqual(
+              [],
+            );
             expect(
-              Result.isSuccess(
-                GenerationSnapshot.validateNoParentChildNameCollisions(before),
-              ),
+              Schema.is(GenerationSnapshot.GenerationSnapshot)(before),
             ).toBe(true);
-            const parentOnly = GenerationSnapshot.fromLoadedLeaves([
-              replacement,
-            ]);
-            expect(
-              GenerationSnapshot.validateNoParentChildNameCollisions(
-                GenerationSnapshot.update(parentOnly, [child]),
-              ),
-            ).toEqual(result);
+            const parentOnly = fromLoadedLeaves([replacement]);
+            expect(GenerationSnapshot.update(parentOnly, [child])).toEqual(
+              result,
+            );
           }),
       );
 
@@ -421,15 +689,9 @@ for (const { name, pathLayer, sep } of [
               ["missing", "archived.spec.ts"].join(sep),
             );
             const leaves = [parent, child, orphan];
-            const expected = yield* Effect.result(
-              LeafModule.validateNoParentChildNameCollisions(leaves),
-            );
-            expect(
-              GenerationSnapshot.validateNoParentChildNameCollisions(
-                GenerationSnapshot.fromLoadedLeaves(leaves),
-              ),
-            ).toEqual(expected);
-            expect(Result.isSuccess(expected)).toBe(true);
+            const result = GenerationSnapshot.fromLoadedLeaves(leaves);
+            assert(Result.isSuccess(result));
+            expect(HashMap.size(roundtrip(result.success).leaves)).toBe(3);
           }),
       );
     },

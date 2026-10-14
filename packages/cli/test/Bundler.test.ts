@@ -412,6 +412,100 @@ layer(BundlerLayer)("withBatch", (it) => {
   );
 
   it.effect(
+    "traverses cyclic diamond input and output graphs without including unrelated entries",
+    () =>
+      Effect.gen(function* () {
+        const { file, fs, path } = yield* fixture({
+          "first.ts":
+            'export const root = {}; export const left = () => import("./left"); export const right = () => import("./right");',
+          "left.ts":
+            'export { shared, cycle, basename } from "./shared"; export const side = "left";',
+          "right.ts":
+            'export { shared, cycle, basename } from "./shared"; export const side = "right";',
+          "shared.ts":
+            'export const shared = {}; export const cycle = () => import("./first"); export { basename } from "node:path";',
+          "unrelated.ts": 'export { platform } from "node:os";',
+        });
+        const entries = [file("first.ts"), file("unrelated.ts")] as const;
+        yield* Bundler.withBatch(
+          entries,
+          Effect.gen(function* () {
+            const first = yield* Bundler.bundle(entries[0]);
+            const snapshot = structuredClone(first.metafile);
+            const unrelated = yield* Bundler.bundle(entries[1]);
+            const repeated = yield* Bundler.bundle(entries[0]);
+
+            expect(Object.keys(first.metafile.inputs)).toEqual(
+              yield* Effect.forEach(
+                ["first.ts", "left.ts", "right.ts", "shared.ts"],
+                (name) => fs.realPath(file(name)),
+              ),
+            );
+            expect(Object.keys(unrelated.metafile.inputs)).toEqual([
+              yield* fs.realPath(file("unrelated.ts")),
+            ]);
+            expect(
+              Object.values(first.metafile.outputs)
+                .map((output) =>
+                  output.entryPoint
+                    ? path.basename(output.entryPoint)
+                    : "shared",
+                )
+                .sort(),
+            ).toEqual(["first.ts", "left.ts", "right.ts", "shared"]);
+            expect(Object.keys(unrelated.metafile.outputs)).toHaveLength(1);
+            expect(
+              Object.keys(first.metafile.outputs).some(
+                (key) => key in unrelated.metafile.outputs,
+              ),
+            ).toBe(false);
+            for (const output of Object.values(first.metafile.outputs)) {
+              for (const imported of output.imports) {
+                if (!imported.external)
+                  expect(first.metafile.outputs).toHaveProperty([
+                    path.resolve(path.dirname(entries[0]), imported.path),
+                  ]);
+              }
+            }
+            expect(
+              Object.values(first.metafile.outputs).find(
+                (output) => !output.entryPoint,
+              ),
+            ).toMatchObject({
+              imports: expect.arrayContaining([
+                expect.objectContaining({
+                  path: expect.stringMatching(/[/\\]0\.mjs$/),
+                  kind: "dynamic-import",
+                }),
+                expect.objectContaining({ path: "node:path", external: true }),
+              ]),
+            });
+            expect(
+              Bundler.importersOfPackage(first, "node:path", () => true),
+            ).toEqual([yield* fs.realPath(file("shared.ts"))]);
+            expect(
+              Bundler.importersOfPackage(first, "node:os", () => true),
+            ).toEqual([]);
+            const left = yield* Effect.promise(() =>
+              Promise.resolve(first.module.left()),
+            );
+            const right = yield* Effect.promise(() =>
+              Promise.resolve(first.module.right()),
+            );
+            expect(left.shared).toBe(right.shared);
+            const cycle = yield* Effect.promise(() =>
+              Promise.resolve(left.cycle()),
+            );
+            expect(cycle.root).toBe(first.module.root);
+            expect(first.metafile).toEqual(snapshot);
+            expect(repeated.metafile).toEqual(snapshot);
+            expect(entries).toEqual([file("first.ts"), file("unrelated.ts")]);
+          }),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
     "keeps evaluation ordered by callers and removes all artifacts when the batch closes",
     () =>
       Effect.gen(function* () {

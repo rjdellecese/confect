@@ -17,6 +17,7 @@ import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as LeafModules from "@confect/cli/LeafModule";
+import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import { DatabaseSchema, GroupImpl } from "@confect/server";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
@@ -24,7 +25,10 @@ import * as Result from "effect/Result";
 import * as String from "effect/String";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import type { CodegenError } from "@confect/cli/CodegenError";
+import {
+  ParentChildNameCollisionError,
+  type CodegenError,
+} from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import * as Bundler from "@confect/cli/Bundler";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
@@ -39,7 +43,6 @@ import {
   toLeafModule,
   validateImpl,
   validateImplFiles,
-  validateNoParentChildNameCollisions,
   loadSpec,
   type LeafModule,
   type LoadedLeafModule,
@@ -1013,6 +1016,10 @@ const loadLeaf = Effect.fnUntraced(function* (
   return yield* LeafModules.loadSpec(discovered);
 }, Effect.scoped);
 
+const validateNoParentChildNameCollisions = (
+  leaves: ReadonlyArray<LoadedLeafModule>,
+) => Effect.fromResult(GenerationSnapshot.fromLoadedLeaves(leaves));
+
 layer(LeafModuleLayer)("validateNoParentChildNameCollisions", (it) => {
   it.effect("accepts non-colliding parent-with-children layouts", () =>
     Effect.gen(function* () {
@@ -1059,6 +1066,7 @@ layer(LeafModuleLayer)("validateNoParentChildNameCollisions", (it) => {
         );
 
         assert(Result.isFailure(result));
+        assert(Schema.is(ParentChildNameCollisionError)(result.failure));
         expect(result.failure._tag).toBe("ParentChildNameCollisionError");
         expect(result.failure.collisionKind).toBe("function");
         expect(result.failure.collisionName).toBe("archived");
@@ -1094,6 +1102,7 @@ layer(LeafModuleLayer)("validateNoParentChildNameCollisions", (it) => {
         );
 
         assert(Result.isFailure(result));
+        assert(Schema.is(ParentChildNameCollisionError)(result.failure));
         expect(result.failure._tag).toBe("ParentChildNameCollisionError");
         expect(result.failure.collisionKind).toBe("group");
         expect(result.failure.collisionName).toBe("archived");
@@ -1218,6 +1227,7 @@ for (const { name, pathLayer, sep } of [
           );
 
           assert(Result.isFailure(result));
+          assert(Schema.is(ParentChildNameCollisionError)(result.failure));
           expect(result.failure._tag).toBe("ParentChildNameCollisionError");
           expect(result.failure.collisionName).toBe("archived");
         }),
