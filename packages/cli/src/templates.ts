@@ -524,7 +524,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   const specType = `typeof import("${specImportPath}")["default"]`;
   const makeFn = useNode
     ? "RegisteredNodeFunction.make"
-    : "RegisteredConvexFunction.make";
+    : "(schema, item, middlewares) => RegisteredConvexFunction.make(schema, item, middlewares, (handler) => (ctx, args) => handler(ctx, args))";
   yield* cbw.writeLine(
     `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
   );

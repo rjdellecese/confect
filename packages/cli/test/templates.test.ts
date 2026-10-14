@@ -28,6 +28,33 @@ const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
   };
 };
 
+it.effect.each([false, true])(
+  "keeps handler forwarding local only for isolate groups (useNode=%s)",
+  (useNode) =>
+    Effect.gen(function* () {
+      const code = yield* templates.registeredFunctionsForGroup({
+        schemaImportPath: "../schema",
+        specImportPath: "../../notes.spec",
+        implImportPath: "../../notes.impl",
+        layerExportName: "notes",
+        useNode,
+      });
+      expect(code).toContain('import notes from "../../notes.impl";');
+      expect(code).toContain('typeof import("../../notes.spec")["default"]');
+      if (useNode) {
+        expect(code).toContain("RegisteredNodeFunction.make");
+        expect(code).not.toContain(
+          "(handler) => (ctx, args) => handler(ctx, args)",
+        );
+      } else {
+        expect(code).toContain(
+          "(handler) => (ctx, args) => handler(ctx, args)",
+        );
+        expect(code).not.toContain("RegisteredNodeFunction");
+      }
+    }),
+);
+
 layer(NodeServices.layer)("id", (test) => {
   test.effect.each([{ tableNames: [] }, { tableNames: ["notes", "users"] }])(
     "exports matching ID types and schemas for $tableNames and system tables",

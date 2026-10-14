@@ -46,10 +46,29 @@ import * as Storage from "./Storage";
 import type { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 
+export interface HandlerWrapper {
+  <Ctx, Args, Returns>(
+    handler: (ctx: Ctx, args: Args) => Promise<Returns>,
+  ): (ctx: Ctx, args: Args) => Promise<Returns>;
+}
+
+const withHandlerWrapper = <Ctx, Args, Returns>(
+  definition: {
+    readonly args: ReturnType<typeof compileArgsSchema>;
+    readonly returns: ReturnType<typeof compileReturnsSchema>;
+    readonly handler: (ctx: Ctx, args: Args) => Promise<Returns>;
+  },
+  wrapHandler: HandlerWrapper | undefined,
+) =>
+  wrapHandler === undefined
+    ? definition
+    : { ...definition, handler: wrapHandler(definition.handler) };
+
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
+  wrapHandler?: HandlerWrapper,
 ): RegisteredFunction.Any => {
   const { name, functionVisibility, handler } = item;
 
@@ -62,16 +81,19 @@ export const make = (
       );
 
       return genericFunction(
-        queryFunction({
-          databaseSchema,
-          name,
-          functionVisibility,
-          args: item.args,
-          returns: item.returns,
-          error: item.error,
-          handler,
-          resolvedMiddlewares,
-        }),
+        withHandlerWrapper(
+          queryFunction({
+            databaseSchema,
+            name,
+            functionVisibility,
+            args: item.args,
+            returns: item.returns,
+            error: item.error,
+            handler,
+            resolvedMiddlewares,
+          }),
+          wrapHandler,
+        ),
       );
     }),
     Match.when("mutation", () => {
@@ -82,16 +104,19 @@ export const make = (
       );
 
       return genericFunction(
-        mutationFunction({
-          databaseSchema,
-          name,
-          functionVisibility,
-          args: item.args,
-          returns: item.returns,
-          error: item.error,
-          handler,
-          resolvedMiddlewares,
-        }),
+        withHandlerWrapper(
+          mutationFunction({
+            databaseSchema,
+            name,
+            functionVisibility,
+            args: item.args,
+            returns: item.returns,
+            error: item.error,
+            handler,
+            resolvedMiddlewares,
+          }),
+          wrapHandler,
+        ),
       );
     }),
     Match.when("action", () => {
@@ -102,15 +127,18 @@ export const make = (
       );
 
       return genericFunction(
-        convexActionFunction(databaseSchema, {
-          name,
-          functionVisibility,
-          args: item.args,
-          returns: item.returns,
-          error: item.error,
-          handler,
-          resolvedMiddlewares,
-        }),
+        withHandlerWrapper(
+          convexActionFunction(databaseSchema, {
+            name,
+            functionVisibility,
+            args: item.args,
+            returns: item.returns,
+            error: item.error,
+            handler,
+            resolvedMiddlewares,
+          }),
+          wrapHandler,
+        ),
       );
     }),
     Match.exhaustive,
