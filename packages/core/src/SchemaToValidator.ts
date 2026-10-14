@@ -189,7 +189,11 @@ type ConvertValueToValidator<
                   : IsRecursive<Vl> extends true
                     ? VAny<any, Optionality>
                     : Vl extends ReadonlyArray<infer El>
-                      ? ArrayValueToValidator<El, Optionality>
+                      ? VArray<
+                          OptionalValue<MutableValue<El[]>, Optionality>,
+                          ConvertValueToValidator<El>,
+                          Optionality
+                        >
                       : Vl extends object
                         ? IsRecord<MutableValue<Vl>> extends true
                           ? ValueToValidator<
@@ -241,48 +245,14 @@ type ValueTupleToValidatorTuple<VlTuple extends readonly unknown[]> =
     | [false, true, ...infer VlRest]
     ? [VBoolean, ...ValueTupleToValidatorTuple<VlRest>]
     : VlTuple extends [infer Vl, ...infer VlRest]
-      ? true extends HasInvalidRequiredValidator<ConvertValueToValidator<Vl>>
-        ? never
-        : [ConvertValueToValidator<Vl>, ...ValueTupleToValidatorTuple<VlRest>]
+      ? [ConvertValueToValidator<Vl>, ...ValueTupleToValidatorTuple<VlRest>]
       : [];
 
 type OptionalValueToValidator<Vl> = [Vl] extends [
   (infer Val extends ReadonlyValue) | undefined,
 ]
-  ? true extends HasInvalidRequiredValidator<ConvertValueToValidator<Val>>
-    ? never
-    : ConvertValueToValidator<Val, "optional">
+  ? ConvertValueToValidator<Val, "optional">
   : never;
-
-type HasInvalidRequiredValidator<Vd> = Vd extends { isOptional: "required" }
-  ? HasInvalidValidator<Vd>
-  : [Vd] extends [never]
-    ? false
-    : true;
-
-type HasInvalidValidator<Vd> =
-  IsAny<Vd> extends true
-    ? false
-    : Vd extends { kind: "record"; value: infer Value }
-      ? HasInvalidRequiredValidator<Value>
-      : Vd extends { kind: "array"; element: infer Element }
-        ? HasInvalidRequiredValidator<Element>
-        : Vd extends { kind: "union"; members: infer Members extends unknown[] }
-          ? HasInvalidRequiredValidator<Members[number]>
-          : Vd extends { kind: "object"; fields: infer Fields }
-            ? {
-                [K in keyof Fields]: HasInvalidValidator<Fields[K]>;
-              }[keyof Fields]
-            : false;
-
-type ArrayValueToValidator<El, Optionality extends "required" | "optional"> =
-  true extends HasInvalidRequiredValidator<ConvertValueToValidator<El>>
-    ? never
-    : VArray<
-        OptionalValue<MutableValue<El[]>, Optionality>,
-        ConvertValueToValidator<El>,
-        Optionality
-      >;
 
 export const compileSchema = <T, E>(
   schema: Schema.Codec<T, E>,

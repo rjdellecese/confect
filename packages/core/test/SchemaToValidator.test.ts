@@ -61,6 +61,37 @@ describe("ValueToValidator", () => {
     >().toEqualTypeOf<typeof expected>();
   });
 
+  it("keeps collection children required when their containing fields are optional", () => {
+    type Converted = ValueToValidator<{
+      rows?: ReadonlyArray<Record<string, { label?: string }>>;
+      metadata?: Record<string, readonly number[]>;
+      choice?:
+        | { kind: "text"; text: string }
+        | { kind: "number"; value: number };
+    }>;
+    type Rows = Converted["fields"]["rows"];
+    type Metadata = Converted["fields"]["metadata"];
+    type Choice = Converted["fields"]["choice"];
+
+    expectTypeOf<Rows["isOptional"]>().toEqualTypeOf<"optional">();
+    expectTypeOf<Rows["element"]["isOptional"]>().toEqualTypeOf<"required">();
+    expectTypeOf<
+      Rows["element"]["value"]["isOptional"]
+    >().toEqualTypeOf<"required">();
+    expectTypeOf<
+      Rows["element"]["value"]["fields"]["label"]["isOptional"]
+    >().toEqualTypeOf<"optional">();
+    expectTypeOf<Metadata["isOptional"]>().toEqualTypeOf<"optional">();
+    expectTypeOf<Metadata["value"]["isOptional"]>().toEqualTypeOf<"required">();
+    expectTypeOf<
+      Metadata["value"]["element"]["isOptional"]
+    >().toEqualTypeOf<"required">();
+    expectTypeOf<Choice["isOptional"]>().toEqualTypeOf<"optional">();
+    expectTypeOf<
+      Choice["members"][number]["isOptional"]
+    >().toEqualTypeOf<"required">();
+  });
+
   it("rejects undefined record values without absorbing a never array element", () => {
     expectTypeOf<
       ValueToValidator<Record<string, number | undefined>>
