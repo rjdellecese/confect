@@ -2,8 +2,11 @@ import * as NodeWorker from "@effect/platform-node/NodeWorker";
 import { fork } from "node:child_process";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcClient from "effect/rpc/RpcClient";
@@ -98,9 +101,19 @@ const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
   );
 });
 
-export const loadPreviousFunctionPaths = withWorker((client, directories) =>
-  client.Previous(directories),
-);
+export const loadPreviousFunctionPaths = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  if (
+    !(yield* fs.exists(path.join(confectDirectory, "_generated", "spec.ts")))
+  ) {
+    return FunctionPaths.make(HashSet.empty());
+  }
+  return yield* withWorker((client, directories) =>
+    client.Previous(directories),
+  );
+});
 
 export const generate = withWorker((client, directories) =>
   client.Generate(directories),

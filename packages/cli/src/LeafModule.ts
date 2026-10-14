@@ -412,34 +412,68 @@ export const validateImplFiles = Effect.fn("LeafModule.validateImplFiles")(
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const confectDirectory = yield* ConfectDirectory.get;
+    const pairs = yield* Effect.forEach(relativePaths, (implRelativePath) =>
+      specPathForImpl(implRelativePath).pipe(
+        Effect.map((specRelativePath) => ({
+          implRelativePath,
+          specRelativePath,
+        })),
+      ),
+    );
 
-    yield* Effect.forEach(
-      relativePaths,
-      Effect.fnUntraced(function* (implRelativePath: ImplModulePath) {
-        const specRelativePath = yield* specPathForImpl(implRelativePath);
-        if (
-          !(yield* fs.exists(path.join(confectDirectory, specRelativePath)))
-        ) {
-          return yield* new MissingSpecFileError({
-            implPath: implRelativePath,
-            expectedSpecPath: specRelativePath,
-          });
-        }
-        if (
-          !(yield* fs.exists(path.join(confectDirectory, implRelativePath)))
-        ) {
-          return yield* new MissingImplFileError({
-            specPath: specRelativePath,
-            expectedImplPath: implRelativePath,
-          });
-        }
-        const leaf = yield* toLeafModule(specRelativePath);
-        yield* validateImpl(yield* loadSpec(leaf));
-      }),
-      { concurrency: VALIDATION_CONCURRENCY, discard: true },
+    yield* Bundler.withBatch(
+      pairs.flatMap(({ implRelativePath, specRelativePath }) => [
+        path.resolve(confectDirectory, implRelativePath),
+        path.resolve(confectDirectory, specRelativePath),
+      ]),
+      Effect.forEach(
+        pairs,
+        Effect.fnUntraced(function* ({ implRelativePath, specRelativePath }) {
+          if (
+            !(yield* fs.exists(path.join(confectDirectory, specRelativePath)))
+          ) {
+            return yield* new MissingSpecFileError({
+              implPath: implRelativePath,
+              expectedSpecPath: specRelativePath,
+            });
+          }
+          if (
+            !(yield* fs.exists(path.join(confectDirectory, implRelativePath)))
+          ) {
+            return yield* new MissingImplFileError({
+              specPath: specRelativePath,
+              expectedImplPath: implRelativePath,
+            });
+          }
+          const leaf = yield* toLeafModule(specRelativePath);
+          yield* validateImpl(yield* loadSpec(leaf));
+        }),
+        { concurrency: VALIDATION_CONCURRENCY, discard: true },
+      ),
     );
   },
 );
+
+export const validateAllImpls = Effect.fnUntraced(function* (
+  leaves: ReadonlyArray<LoadedLeafModule>,
+) {
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const implementationPaths = yield* Effect.forEach(
+    leaves,
+    ({ relativePath }) =>
+      implPathForSpec(relativePath).pipe(
+        Effect.map((implPath) => path.resolve(confectDirectory, implPath)),
+      ),
+  );
+  yield* Bundler.withBatch(
+    implementationPaths,
+    Effect.forEach(leaves, validateImpl, {
+      concurrency: VALIDATION_CONCURRENCY,
+      discard: true,
+    }),
+  );
+});
 
 export const loadAll = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -447,24 +481,29 @@ export const loadAll = Effect.gen(function* () {
   const confectDirectory = yield* ConfectDirectory.get;
   const specFiles = yield* discoverLeafSpecFiles;
 
-  const results = yield* Effect.forEach(
-    specFiles,
-    Effect.fnUntraced(function* (specRelativePath: string) {
-      const discovered = yield* toLeafModule(specRelativePath);
-      const leaf = yield* loadSpec(discovered);
+  const results = yield* Bundler.withBatch(
+    specFiles.map((relativePath) =>
+      path.resolve(confectDirectory, relativePath),
+    ),
+    Effect.forEach(
+      specFiles,
+      Effect.fnUntraced(function* (specRelativePath: string) {
+        const discovered = yield* toLeafModule(specRelativePath);
+        const leaf = yield* loadSpec(discovered);
 
-      const implRelativePath = yield* implPathForSpec(specRelativePath);
-      const implAbsolutePath = path.join(confectDirectory, implRelativePath);
-      if (!(yield* fs.exists(implAbsolutePath))) {
-        return yield* new MissingImplFileError({
-          specPath: specRelativePath,
-          expectedImplPath: implRelativePath,
-        });
-      }
+        const implRelativePath = yield* implPathForSpec(specRelativePath);
+        const implAbsolutePath = path.join(confectDirectory, implRelativePath);
+        if (!(yield* fs.exists(implAbsolutePath))) {
+          return yield* new MissingImplFileError({
+            specPath: specRelativePath,
+            expectedImplPath: implRelativePath,
+          });
+        }
 
-      return leaf;
-    }),
-    { concurrency: VALIDATION_CONCURRENCY },
+        return leaf;
+      }),
+      { concurrency: VALIDATION_CONCURRENCY },
+    ),
   );
 
   yield* validateOrphanImpls(specFiles);

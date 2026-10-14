@@ -24,7 +24,7 @@ import {
   loadAll,
   validateNoParentChildNameCollisions,
   registeredFunctionsRelativePath,
-  validateImpl,
+  validateAllImpls,
   type LeafModule,
   type LoadedLeafModule,
 } from "../LeafModule";
@@ -53,7 +53,6 @@ import {
 } from "../utils";
 
 const GENERATED_DIRNAME = "_generated";
-const VALIDATION_CONCURRENCY = 4;
 
 const GENERATED_SPEC_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "spec.ts"),
@@ -161,10 +160,7 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
-  yield* Effect.forEach(leaves, validateImpl, {
-    concurrency: VALIDATION_CONCURRENCY,
-    discard: true,
-  });
+  yield* validateAllImpls(leaves);
   yield* generateGroupRegisteredFunctions(leaves);
   yield* removeObsoleteRegisteredFunctions(leaves);
   const [functionPaths] = yield* Effect.all(

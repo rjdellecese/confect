@@ -5,6 +5,7 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
+import * as esbuild from "esbuild";
 import * as Bundler from "@confect/cli/Bundler";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -24,9 +25,96 @@ import {
 } from "@confect/cli/TableModule";
 import * as Project from "./integration/Project";
 
+vi.mock("esbuild", (importOriginal) =>
+  importOriginal<typeof esbuild>().then((original) => ({
+    ...original,
+    build: vi.fn(original.build),
+  })),
+);
+
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect(
+      "shares one build per evaluation phase without changing generated output",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.write("confect/tables/labels.ts", Project.table);
+          for (const name of ["other", "another"]) {
+            yield* project.write(`confect/${name}.spec.ts`, Project.spec);
+            yield* project.write(
+              `confect/${name}.impl.ts`,
+              Project.impl.replace('"./notes.spec"', `"./${name}.spec"`),
+            );
+          }
+          const run = codegenHandler.pipe(
+            Effect.provideService(ProjectRoot, {
+              get: Effect.succeed(project.root),
+            }),
+            Effect.provideService(ConfectDirectory, {
+              get: Effect.succeed(path.join(project.root, "confect")),
+            }),
+            Effect.provideService(ConvexDirectory, {
+              get: Effect.succeed(path.join(project.root, "convex")),
+            }),
+          );
+          const outputs = Effect.gen(function* () {
+            const files = yield* Effect.forEach(
+              ["confect/_generated", "convex"],
+              (directory) =>
+                fs
+                  .readDirectory(path.join(project.root, directory), {
+                    recursive: true,
+                  })
+                  .pipe(
+                    Effect.map((entries) =>
+                      entries
+                        .filter((entry) => entry.endsWith(".ts"))
+                        .map((entry) => path.join(directory, entry)),
+                    ),
+                  ),
+            );
+            return Object.fromEntries(
+              yield* Effect.forEach(files.flat(), (file) =>
+                fs
+                  .readFileString(path.join(project.root, file))
+                  .pipe(Effect.map((contents) => [file, contents] as const)),
+              ),
+            );
+          });
+          vi.mocked(esbuild.build).mockClear();
+          expect((yield* run).anyWritesHappened).toBe(true);
+          const batchedOutputs = yield* outputs;
+          expect(
+            vi
+              .mocked(esbuild.build)
+              .mock.calls.map(
+                ([options]) => Object.keys(options?.entryPoints ?? {}).length,
+              )
+              .filter((count) => count > 1),
+          ).toEqual([2, 3, 3]);
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi
+                .spyOn(Bundler, "withBatch")
+                .mockImplementation(
+                  <A, E, R>(
+                    _entries: ReadonlyArray<string>,
+                    effect: Effect.Effect<A, E, R>,
+                  ) => effect,
+                ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          expect((yield* run).anyWritesHappened).toBe(false);
+          expect(yield* outputs).toEqual(batchedOutputs);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "bounds spec and impl phases without overlapping them",
       () =>

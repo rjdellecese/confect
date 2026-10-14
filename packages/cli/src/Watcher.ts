@@ -19,6 +19,7 @@ import * as Result from "effect/Result";
 import * as Semaphore from "effect/Semaphore";
 import * as Scope from "effect/Scope";
 import * as Schema from "effect/Schema";
+import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
 import {
   externalPlugin,
@@ -408,6 +409,11 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
+  const removedDirectory = Schema.Struct({
+    code: Schema.Literal("ENOENT"),
+    syscall: Schema.Literal("scandir"),
+    path: Schema.String,
+  });
 
   yield* pipe(
     fs.watch(confectDirectory, { recursive: true }),
@@ -423,6 +429,33 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
         restartQueue,
       }),
     ),
+    Effect.retry({
+      schedule: Schedule.spaced("10 millis"),
+      while: (error) =>
+        Effect.gen(function* () {
+          const removed = Schema.decodeUnknownOption(removedDirectory)(
+            error.reason.cause,
+          );
+          if (Option.isNone(removed)) return false;
+          const relative = path.relative(confectDirectory, removed.value.path);
+          if (
+            relative === "" ||
+            relative === ".." ||
+            relative.startsWith(`..${path.sep}`) ||
+            path.isAbsolute(relative)
+          )
+            return false;
+          if (
+            !(yield* fs
+              .exists(confectDirectory)
+              .pipe(Effect.orElseSucceed(() => false)))
+          ) {
+            return false;
+          }
+          yield* Queue.offer(restartQueue, undefined);
+          return true;
+        }),
+    }),
   );
 });
 

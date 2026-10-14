@@ -58,6 +58,19 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
   };
 
   it.effect(
+    "does not start an evaluator when no previous generated spec exists",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const previous = yield* project.provide(
+          Evaluation.loadPreviousFunctionPaths,
+        );
+        expect(HashSet.size(previous)).toBe(0);
+        expect(vi.mocked(fork)).not.toHaveBeenCalled();
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
     "returns branded metadata without retaining an evaluation worker",
     () =>
       Effect.gen(function* () {
