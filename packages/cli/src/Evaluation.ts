@@ -12,6 +12,9 @@ import * as Rpc from "effect/rpc/Rpc";
 import * as RpcClient from "effect/rpc/RpcClient";
 import type { RpcClientError } from "effect/rpc/RpcClientError";
 import * as RpcGroup from "effect/rpc/RpcGroup";
+import type * as Array from "effect/Array";
+import * as EntryPoint from "./EntryPoint";
+import * as GenerationSnapshot from "./GenerationSnapshot";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import { FunctionPaths } from "./FunctionPaths";
@@ -38,7 +41,7 @@ export const requests = RpcGroup.make(
   }),
   Rpc.make("Generate", {
     payload: Directories,
-    success: FunctionPaths,
+    success: GenerationSnapshot.GenerationSnapshot,
     error: EvaluationError,
   }),
   Rpc.make("Validate", {
@@ -47,6 +50,16 @@ export const requests = RpcGroup.make(
       paths: Schema.Array(ImplModulePath),
     }),
     success: Schema.Void,
+    error: EvaluationError,
+  }),
+  Rpc.make("Update", {
+    payload: Schema.Struct({
+      ...Directories.fields,
+      snapshot: GenerationSnapshot.GenerationSnapshot,
+      declarations: Schema.NonEmptyArray(EntryPoint.Declaration),
+      paths: Schema.Array(ImplModulePath),
+    }),
+    success: GenerationSnapshot.GenerationSnapshot,
     error: EvaluationError,
   }),
 );
@@ -115,9 +128,27 @@ export const loadPreviousFunctionPaths = Effect.gen(function* () {
   );
 });
 
-export const generate = withWorker((client, directories) =>
+export const generateSnapshot = withWorker((client, directories) =>
   client.Generate(directories),
 );
+
+export const generate = generateSnapshot.pipe(
+  Effect.map(GenerationSnapshot.functionPaths),
+);
+
+export const updateDeclarations = (
+  snapshot: GenerationSnapshot.GenerationSnapshot,
+  declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
+  paths: ReadonlyArray<ImplModulePath>,
+) =>
+  withWorker((client, directories) =>
+    client.Update({
+      ...directories,
+      snapshot,
+      declarations,
+      paths,
+    }),
+  );
 
 export const validate = (paths: ReadonlyArray<ImplModulePath>) =>
   withWorker((client, directories) =>

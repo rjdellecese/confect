@@ -25,6 +25,8 @@ import * as Watcher from "../Watcher";
 import * as Evaluation from "../Evaluation";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
+import * as GenerationSnapshot from "../GenerationSnapshot";
+import type { ImplModulePath } from "../ImplModulePath";
 import type * as GroupPath from "../GroupPath";
 import type * as GroupPaths from "../GroupPaths";
 import {
@@ -260,64 +262,92 @@ const syncLoop = Effect.fnUntraced(function* (
       if (!firstSync)
         yield* logPending("Dependencies may have changed, reloading…");
 
-      if (SyncState.requiresFullSync(phase, pending)) {
-        const current = yield* Evaluation.generate.pipe(
-          Effect.tap((nextFunctionPaths) =>
-            Effect.gen(function* () {
-              const previous = yield* Ref.get(functionPathsRef);
-              yield* logFunctionPathDiff(previous, nextFunctionPaths);
-              yield* Ref.set(functionPathsRef, nextFunctionPaths);
-            }),
-          ),
-          Evaluation.catchAndLog,
-        );
-        if (Option.isNone(current)) {
-          yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
-          if (firstSync) {
-            yield* Ref.update(pendingRef, SyncState.full);
-            yield* Queue.offer(signal, undefined);
-          }
-          return;
-        }
-        const refreshed = yield* watcher.refresh.pipe(Effect.result);
-        if (Result.isFailure(refreshed)) {
-          yield* Console.error(
-            `Dependency watcher could not ${refreshed.failure.operation}: ${globalThis.String(refreshed.failure.cause)}`,
-          );
-          yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
-          return;
-        }
-        if (!Watcher.isRefreshSuccessful(refreshed.success)) {
-          yield* logMessages;
-          yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
-          return;
-        }
-        yield* Ref.set(
-          phaseRef,
-          SyncState.Phase.Incremental({ failedImpls: HashSet.empty() }),
-        );
-      } else {
-        const paths = SyncState.implsToValidate(phase, pending);
-        if (Array.isReadonlyArrayNonEmpty(paths)) {
-          const validated = yield* Evaluation.validate(paths).pipe(
+      const regenerate = (generation: typeof Evaluation.generateSnapshot) =>
+        Effect.gen(function* () {
+          const current = yield* generation.pipe(
+            Effect.tap((snapshot) =>
+              Effect.gen(function* () {
+                const nextFunctionPaths =
+                  GenerationSnapshot.functionPaths(snapshot);
+                const previous = yield* Ref.get(functionPathsRef);
+                yield* logFunctionPathDiff(previous, nextFunctionPaths);
+                yield* Ref.set(functionPathsRef, nextFunctionPaths);
+              }),
+            ),
             Evaluation.catchAndLog,
           );
-          if (Option.isNone(validated)) {
-            yield* Ref.set(
-              phaseRef,
-              SyncState.Phase.Incremental({
-                failedImpls: HashSet.fromIterable(paths),
-              }),
+          if (Option.isNone(current)) {
+            yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
+            if (firstSync) {
+              yield* Ref.update(pendingRef, SyncState.full);
+              yield* Queue.offer(signal, undefined);
+            }
+            return false;
+          }
+          const refreshed = yield* watcher.refresh.pipe(Effect.result);
+          if (Result.isFailure(refreshed)) {
+            yield* Console.error(
+              `Dependency watcher could not ${refreshed.failure.operation}: ${globalThis.String(refreshed.failure.cause)}`,
             );
-            return;
+            yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
+            return false;
+          }
+          if (!Watcher.isRefreshSuccessful(refreshed.success)) {
+            yield* logMessages;
+            yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
+            return false;
           }
           yield* Ref.set(
             phaseRef,
-            SyncState.Phase.Incremental({ failedImpls: HashSet.empty() }),
+            SyncState.Phase.Incremental({
+              failedImpls: HashSet.empty(),
+              snapshot: current.value,
+            }),
           );
-          yield* touchConvexSchema;
-        }
-      }
+          return true;
+        });
+      const validate = (
+        paths: ReadonlyArray<ImplModulePath>,
+        snapshot: GenerationSnapshot.GenerationSnapshot,
+      ) =>
+        Effect.gen(function* () {
+          if (Array.isReadonlyArrayNonEmpty(paths)) {
+            const validated = yield* Evaluation.validate(paths).pipe(
+              Evaluation.catchAndLog,
+            );
+            if (Option.isNone(validated)) {
+              yield* Ref.set(
+                phaseRef,
+                SyncState.Phase.Incremental({
+                  failedImpls: HashSet.fromIterable(paths),
+                  snapshot,
+                }),
+              );
+              return false;
+            }
+            yield* Ref.set(
+              phaseRef,
+              SyncState.Phase.Incremental({
+                failedImpls: HashSet.empty(),
+                snapshot,
+              }),
+            );
+            yield* touchConvexSchema;
+          }
+          return true;
+        });
+      const completed = yield* SyncState.Operation.$match(
+        SyncState.plan(phase, pending),
+        {
+          Generate: () => regenerate(Evaluation.generateSnapshot),
+          Validate: ({ paths, snapshot }) => validate(paths, snapshot),
+          Update: ({ snapshot, declarations, paths }) =>
+            regenerate(
+              Evaluation.updateDeclarations(snapshot, declarations, paths),
+            ),
+        },
+      );
+      if (!completed) return;
 
       const dirtyOptionalFiles = [
         ...(HashSet.has(optional, "Http")

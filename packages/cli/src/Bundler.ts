@@ -432,6 +432,12 @@ export const withBatch = <A, E, R>(
 ): Effect.Effect<A, E, R> =>
   Effect.scopedWith((scope) =>
     Effect.gen(function* () {
+      const current = yield* Effect.serviceOption(Batch);
+      if (
+        Option.isSome(current) &&
+        entryPoints.every((entry) => current.value.entryPoints.includes(entry))
+      )
+        return yield* effect;
       const compilation = yield* Effect.cached(
         compileBatch(entryPoints).pipe(
           Effect.provideService(Scope.Scope, scope),

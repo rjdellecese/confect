@@ -184,7 +184,7 @@ const generateGroupModuleEffect = Effect.fnUntraced(function* ({
   useNode = false,
 }: {
   groupPath: GroupPath.GroupPath;
-  functionNames: string[];
+  functionNames: ReadonlyArray<string>;
   registeredFunctionsImportPath: string;
   useNode?: boolean;
 }) {
@@ -228,25 +228,24 @@ const generateGroupModuleEffect = Effect.fnUntraced(function* ({
  * Node groups. Centralizing this here keeps the "overlapping" and "new" group
  * branches of `generateFunctions` from drifting apart.
  */
-const registeredFunctionsImportPathForGroup = Effect.fnUntraced(function* (
-  groupPath: GroupPath.GroupPath,
-  modulePath: string,
-) {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+export const registeredFunctionsImportPathForGroup = Effect.fnUntraced(
+  function* (groupPath: GroupPath.GroupPath, modulePath: string) {
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
 
-  const registeredFunctionsPath =
-    path.join(
-      confectDirectory,
-      "_generated",
-      "registeredFunctions",
-      ...groupPath.pathSegments,
-    ) + ".ts";
+    const registeredFunctionsPath =
+      path.join(
+        confectDirectory,
+        "_generated",
+        "registeredFunctions",
+        ...groupPath.pathSegments,
+      ) + ".ts";
 
-  return yield* toModuleImportPath(
-    path.relative(path.dirname(modulePath), registeredFunctionsPath),
-  );
-});
+    return yield* toModuleImportPath(
+      path.relative(path.dirname(modulePath), registeredFunctionsPath),
+    );
+  },
+);
 
 const logGroupPaths = Effect.fnUntraced(function* <R>(
   groupPaths: GroupPaths.GroupPaths,

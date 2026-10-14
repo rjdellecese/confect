@@ -17,6 +17,7 @@ import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { FunctionPaths } from "@confect/cli/FunctionPaths";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
+import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import * as Project from "./integration/Project";
 
 vi.mock("node:child_process", (importOriginal) =>
@@ -56,6 +57,64 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
       ).toBe(true);
     }
   };
+
+  it.effect(
+    "roundtrips incremental snapshots and disposes failed declaration updates",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const snapshot = yield* project.provide(Evaluation.generateSnapshot);
+        yield* project.write(
+          "confect/notes.spec.ts",
+          Project.spec.replace('name: "list"', 'name: "latest"'),
+        );
+        yield* project.write(
+          "confect/notes.impl.ts",
+          Project.impl.replace('"list"', '"latest"'),
+        );
+        const next = yield* project.provide(
+          Evaluation.updateDeclarations(
+            snapshot,
+            [{ _tag: "Spec", relativePath: "notes.spec.ts" }],
+            [],
+          ),
+        );
+        expect(Schema.is(GenerationSnapshot.GenerationSnapshot)(next)).toBe(
+          true,
+        );
+        expect(
+          [...GenerationSnapshot.functionPaths(next)].map((fn) => fn.name),
+        ).toEqual(["latest"]);
+        expectWorkersExited();
+        yield* project.write("confect/notes.spec.ts", "export default {};\n");
+        const failed = yield* project
+          .provide(
+            Evaluation.updateDeclarations(
+              next,
+              [{ _tag: "Spec", relativePath: "notes.spec.ts" }],
+              [],
+            ),
+          )
+          .pipe(Effect.result);
+        assert(Result.isFailure(failed));
+        expect(failed.failure.diagnostic).toContain("GroupSpec");
+        expectWorkersExited();
+        yield* project.write("confect/notes.spec.ts", Project.spec);
+        yield* project.write("confect/notes.impl.ts", Project.impl);
+        const repaired = yield* project.provide(
+          Evaluation.updateDeclarations(
+            next,
+            [{ _tag: "Spec", relativePath: "notes.spec.ts" }],
+            [],
+          ),
+        );
+        expect(
+          [...GenerationSnapshot.functionPaths(repaired)].map((fn) => fn.name),
+        ).toEqual(["list"]);
+        expectWorkersExited();
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
 
   it.effect(
     "does not start an evaluator when no previous generated spec exists",

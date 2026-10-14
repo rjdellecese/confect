@@ -1,16 +1,22 @@
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import * as HashSet from "effect/HashSet";
+import * as HashMap from "effect/HashMap";
 import * as Match from "effect/Match";
-import type { Kind, OptionalFile } from "./EntryPoint";
+import type { Declaration, Kind, OptionalFile } from "./EntryPoint";
 import type { ImplModulePath } from "./ImplModulePath";
+import type { GenerationSnapshot } from "./GenerationSnapshot";
 
 export type Work = Data.TaggedEnum<{
   None: {};
   Full: {};
   Impls: { readonly paths: Array.NonEmptyReadonlyArray<ImplModulePath> };
+  Declarations: {
+    readonly entries: Array.NonEmptyReadonlyArray<Declaration>;
+    readonly paths: ReadonlyArray<ImplModulePath>;
+  };
 }>;
-const Work = Data.taggedEnum<Work>();
+export const Work = Data.taggedEnum<Work>();
 
 export interface Pending {
   readonly work: Work;
@@ -38,6 +44,19 @@ export const add = (
         None: () => HashSet.empty<ImplModulePath>(),
         Full: () => HashSet.empty<ImplModulePath>(),
         Impls: ({ paths }) => HashSet.fromIterable(paths),
+        Declarations: ({ paths }) => HashSet.fromIterable(paths),
+      }),
+      declarations: Work.$match(pending.work, {
+        None: () => HashMap.empty<string, Declaration>(),
+        Full: () => HashMap.empty<string, Declaration>(),
+        Impls: () => HashMap.empty<string, Declaration>(),
+        Declarations: ({ entries: declarations }) =>
+          HashMap.fromIterable(
+            declarations.map(
+              (entry) =>
+                [`${entry._tag}:${entry.relativePath}`, entry] as const,
+            ),
+          ),
       }),
       optional: pending.optional,
     },
@@ -51,7 +70,15 @@ export const add = (
           ...state,
           optional: HashSet.add(state.optional, _tag),
         })),
-        Match.tag("Spec", "Table", "Config", () => ({
+        Match.tag("Spec", "Table", (declaration) => ({
+          ...state,
+          declarations: HashMap.set(
+            state.declarations,
+            `${declaration._tag}:${declaration.relativePath}`,
+            declaration,
+          ),
+        })),
+        Match.tag("Config", () => ({
           ...state,
           needsFull: true,
         })),
@@ -59,12 +86,15 @@ export const add = (
       ),
   );
   const impls = Array.fromIterable(next.paths);
+  const declarations = Array.fromIterable(HashMap.values(next.declarations));
   return {
     work: next.needsFull
       ? Work.Full()
-      : Array.isReadonlyArrayNonEmpty(impls)
-        ? Work.Impls({ paths: impls })
-        : Work.None(),
+      : Array.isReadonlyArrayNonEmpty(declarations)
+        ? Work.Declarations({ entries: declarations, paths: impls })
+        : Array.isReadonlyArrayNonEmpty(impls)
+          ? Work.Impls({ paths: impls })
+          : Work.None(),
     optional: next.optional,
   };
 };
@@ -72,16 +102,12 @@ export const add = (
 export type Phase = Data.TaggedEnum<{
   Bootstrapping: {};
   NeedsFullSync: {};
-  Incremental: { readonly failedImpls: HashSet.HashSet<ImplModulePath> };
+  Incremental: {
+    readonly failedImpls: HashSet.HashSet<ImplModulePath>;
+    readonly snapshot: GenerationSnapshot;
+  };
 }>;
 export const Phase = Data.taggedEnum<Phase>();
-
-export const requiresFullSync = (phase: Phase, pending: Pending): boolean =>
-  Phase.$match(phase, {
-    Bootstrapping: () => true,
-    NeedsFullSync: () => true,
-    Incremental: () => Work.$is("Full")(pending.work),
-  });
 
 export const implsToValidate = (
   phase: Phase,
@@ -98,6 +124,45 @@ export const implsToValidate = (
         None: () => HashSet.empty<ImplModulePath>(),
         Full: () => HashSet.empty<ImplModulePath>(),
         Impls: ({ paths }) => HashSet.fromIterable(paths),
+        Declarations: ({ paths }) => HashSet.fromIterable(paths),
       }),
     ),
   );
+
+export type Operation = Data.TaggedEnum<{
+  Generate: {};
+  Validate: {
+    readonly snapshot: GenerationSnapshot;
+    readonly paths: ReadonlyArray<ImplModulePath>;
+  };
+  Update: {
+    readonly snapshot: GenerationSnapshot;
+    readonly declarations: Array.NonEmptyReadonlyArray<Declaration>;
+    readonly paths: ReadonlyArray<ImplModulePath>;
+  };
+}>;
+export const Operation = Data.taggedEnum<Operation>();
+
+export const plan = (phase: Phase, pending: Pending): Operation =>
+  Phase.$match(phase, {
+    Bootstrapping: () => Operation.Generate(),
+    NeedsFullSync: () => Operation.Generate(),
+    Incremental: (ready) =>
+      Match.value(pending.work).pipe(
+        Match.tag("Full", () => Operation.Generate()),
+        Match.tag("None", "Impls", () =>
+          Operation.Validate({
+            snapshot: ready.snapshot,
+            paths: implsToValidate(ready, pending),
+          }),
+        ),
+        Match.tag("Declarations", ({ entries }) =>
+          Operation.Update({
+            snapshot: ready.snapshot,
+            declarations: entries,
+            paths: implsToValidate(ready, pending),
+          }),
+        ),
+        Match.exhaustive,
+      ),
+  });

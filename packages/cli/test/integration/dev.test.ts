@@ -12,6 +12,120 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
     it.effect(
+      "updates only dependency-affected declarations and preserves full-generation output",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `${Project.spec}\nconsole.log("SPEC:notes");\n`,
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            `${Project.impl}\nconsole.log("IMPL:notes");\n`,
+          );
+          yield* project.write(
+            "confect/other.spec.ts",
+            `${Project.spec}\nconsole.log("SPEC:other");\n`,
+          );
+          yield* project.write(
+            "confect/other.impl.ts",
+            `${Project.impl.replace('"./notes.spec"', '"./other.spec"')}\nconsole.log("IMPL:other");\n`,
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          yield* Ref.set(watching.output, "");
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `${Project.spec.replace('name: "list"', 'name: "latest"')}\nconsole.log("SPEC:notes");\n`,
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            `${Project.impl.replace('"list"', '"latest"')}\nconsole.log("IMPL:notes");\n`,
+          );
+          yield* watching.waitFor("IMPL:notes");
+          yield* watching.waitFor(success);
+          const updated = yield* Ref.get(watching.output);
+          expect(updated.match(/SPEC:notes/g)).toHaveLength(1);
+          expect(updated).not.toContain("SPEC:other");
+          expect(updated).not.toContain("IMPL:other");
+          const incremental = yield* project.generatedFiles;
+          const fresh = yield* project.start("codegen");
+          yield* fresh.waitFor(success);
+          expect(Number(yield* fresh.handle.exitCode)).toBe(0);
+          expect(yield* project.generatedFiles).toEqual(incremental);
+          yield* Ref.set(watching.output, "");
+          yield* project.write(
+            "confect/tables/notes.ts",
+            Project.table.replace(
+              "text: Schema.String",
+              "text: Schema.String, archived: Schema.Boolean",
+            ),
+          );
+          yield* watching.waitFor("IMPL:other");
+          yield* watching.waitFor(success);
+          const tableUpdate = yield* Ref.get(watching.output);
+          expect(tableUpdate).toContain("IMPL:notes");
+          expect(tableUpdate).toContain("IMPL:other");
+          expect(yield* project.generatedFiles).toEqual(incremental);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "reconciles a declaration edit received during validation before reporting readiness",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const gate = `
+import { existsSync, watch, unlinkSync } from "node:fs";
+const block = new URL("../block", import.meta.url);
+if (existsSync(block)) {
+  await new Promise<void>((resolve) => {
+    const watcher = watch(new URL("../", import.meta.url), (_event, file) => {
+      if (file === "release") { watcher.close(); resolve(); }
+    });
+    process.stdout.write("DECLARATION_BLOCKED\\n");
+  });
+  unlinkSync(block);
+}
+`;
+          yield* project.write("confect/notes.impl.ts", Project.impl + gate);
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          yield* project.write("block", "");
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `${Project.spec}\n// first declaration edit\n`,
+          );
+          yield* watching.waitFor("DECLARATION_BLOCKED");
+          yield* project.write(
+            "confect/notes.spec.ts",
+            Project.spec.replace('name: "list"', 'name: "latest"'),
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace('"list"', '"latest"') + gate,
+          );
+          yield* project.write("release", "");
+          yield* watching.waitFor(success);
+          const output = yield* fs.readFileString(
+            path.join(project.root, "convex", "notes.ts"),
+          );
+          expect(output).toContain("export const latest");
+          expect(output).not.toContain("export const list");
+          const incremental = yield* project.generatedFiles;
+          const fresh = yield* project.start("codegen");
+          yield* fresh.waitFor(success);
+          expect(Number(yield* fresh.handle.exitCode)).toBe(0);
+          expect(yield* project.generatedFiles).toEqual(incremental);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "preserves optional outputs that are not owned by Confect",
       () =>
         Effect.gen(function* () {

@@ -3,24 +3,24 @@ import * as SyncState from "@confect/cli/SyncState";
 import * as EntryPoint from "@confect/cli/EntryPoint";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import * as HashSet from "effect/HashSet";
+import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 
-it.each([
-  EntryPoint.Kind.Spec({ relativePath: "notes.spec.ts" }),
-  EntryPoint.Kind.Table({ relativePath: "tables/notes.ts" }),
-  EntryPoint.Kind.Config(),
-])("requests full generation for $_tag entries", (entry) => {
-  const optional = SyncState.add(SyncState.empty, [
-    EntryPoint.Kind.Http({ relativePath: "http.ts" }),
-    EntryPoint.Kind.Crons({ relativePath: "crons.ts" }),
-    EntryPoint.Kind.Auth({ relativePath: "auth.ts" }),
-  ]);
-  const pending = SyncState.add(optional, [entry]);
-  expect(pending.work._tag).toBe("Full");
-  expect(pending.optional).toEqual(HashSet.make("Http", "Crons", "Auth"));
-  expect(optional.work._tag).toBe("None");
-  expect(SyncState.isDirty(optional)).toBe(true);
-  expect(SyncState.isDirty(SyncState.empty)).toBe(false);
-});
+it.each([EntryPoint.Kind.Config()])(
+  "requests full generation for $_tag entries",
+  (entry) => {
+    const optional = SyncState.add(SyncState.empty, [
+      EntryPoint.Kind.Http({ relativePath: "http.ts" }),
+      EntryPoint.Kind.Crons({ relativePath: "crons.ts" }),
+      EntryPoint.Kind.Auth({ relativePath: "auth.ts" }),
+    ]);
+    const pending = SyncState.add(optional, [entry]);
+    expect(pending.work._tag).toBe("Full");
+    expect(pending.optional).toEqual(HashSet.make("Http", "Crons", "Auth"));
+    expect(optional.work._tag).toBe("None");
+    expect(SyncState.isDirty(optional)).toBe(true);
+    expect(SyncState.isDirty(SyncState.empty)).toBe(false);
+  },
+);
 
 it("coalesces implementation work without mutating earlier requests", () => {
   const first = ImplModulePath.make("first.impl.ts");
@@ -47,9 +47,7 @@ it("full work subsumes impl work but preserves independent optional cleanup", ()
       relativePath: ImplModulePath.make("notes.impl.ts"),
     }),
   ]);
-  const full = SyncState.add(pending, [
-    EntryPoint.Kind.Spec({ relativePath: "notes.spec.ts" }),
-  ]);
+  const full = SyncState.add(pending, [EntryPoint.Kind.Config()]);
   expect(full.work._tag).toBe("Full");
   expect(HashSet.has(full.optional, "Http")).toBe(true);
   expect(
@@ -64,23 +62,24 @@ it("full work subsumes impl work but preserves independent optional cleanup", ()
 
 it("requires full generation until bootstrap or full-sync recovery succeeds", () => {
   expect(
-    SyncState.requiresFullSync(
-      SyncState.Phase.Bootstrapping(),
-      SyncState.empty,
+    SyncState.Operation.$is("Generate")(
+      SyncState.plan(SyncState.Phase.Bootstrapping(), SyncState.empty),
     ),
   ).toBe(true);
   expect(
-    SyncState.requiresFullSync(
-      SyncState.Phase.NeedsFullSync(),
-      SyncState.empty,
+    SyncState.Operation.$is("Generate")(
+      SyncState.plan(SyncState.Phase.NeedsFullSync(), SyncState.empty),
     ),
   ).toBe(true);
   const incremental = SyncState.Phase.Incremental({
     failedImpls: HashSet.empty(),
+    snapshot: GenerationSnapshot.fromLoadedLeaves([]),
   });
-  expect(SyncState.requiresFullSync(incremental, SyncState.empty)).toBe(false);
+  expect(SyncState.plan(incremental, SyncState.empty)._tag).toBe("Validate");
   expect(
-    SyncState.requiresFullSync(incremental, SyncState.full(SyncState.empty)),
+    SyncState.Operation.$is("Generate")(
+      SyncState.plan(incremental, SyncState.full(SyncState.empty)),
+    ),
   ).toBe(true);
 });
 
@@ -89,6 +88,7 @@ it("revalidates failed implementations alongside new work", () => {
   const second = ImplModulePath.make("second.impl.ts");
   const phase = SyncState.Phase.Incremental({
     failedImpls: HashSet.make(first),
+    snapshot: GenerationSnapshot.fromLoadedLeaves([]),
   });
   const pending = SyncState.add(SyncState.empty, [
     EntryPoint.Kind.Impl({ relativePath: second }),
@@ -104,4 +104,37 @@ it("revalidates failed implementations alongside new work", () => {
       ]),
     ),
   ).toBe(true);
+});
+
+it("coalesces dependency-aware declarations and impls without mutating previous work", () => {
+  const spec = EntryPoint.Kind.Spec({ relativePath: "notes.spec.ts" });
+  const table = EntryPoint.Kind.Table({ relativePath: "tables/notes.ts" });
+  const impl = ImplModulePath.make("notes.impl.ts");
+  const first = SyncState.add(SyncState.empty, [spec]);
+  const pending = SyncState.add(first, [
+    spec,
+    table,
+    EntryPoint.Kind.Impl({ relativePath: impl }),
+    EntryPoint.Kind.Http({ relativePath: "http.ts" }),
+  ]);
+  assert(SyncState.Work.$is("Declarations")(first.work));
+  assert(SyncState.Work.$is("Declarations")(pending.work));
+  expect(first.work.entries).toEqual([spec]);
+  expect(pending.work.entries).toHaveLength(2);
+  expect(pending.work.entries).toEqual(expect.arrayContaining([spec, table]));
+  expect(pending.work.paths).toEqual([impl]);
+  expect(HashSet.has(pending.optional, "Http")).toBe(true);
+  const ready = SyncState.Phase.Incremental({
+    failedImpls: HashSet.empty(),
+    snapshot: GenerationSnapshot.fromLoadedLeaves([]),
+  });
+  const operation = SyncState.plan(ready, pending);
+  assert(SyncState.Operation.$is("Update")(operation));
+  expect(operation.declarations).toEqual(pending.work.entries);
+  expect(operation.snapshot).toBe(ready.snapshot);
+  expect(operation.paths).toEqual([impl]);
+  expect(SyncState.implsToValidate(ready, pending)).toEqual([impl]);
+  expect(SyncState.full(pending).work._tag).toBe("Full");
+  expect(SyncState.add(SyncState.full(pending), [spec]).work._tag).toBe("Full");
+  expect(SyncState.add(pending, [], true).work._tag).toBe("Full");
 });

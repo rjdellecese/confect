@@ -8,7 +8,6 @@ import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
-import * as HashMap from "effect/HashMap";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
@@ -16,10 +15,10 @@ import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import { fromBundlerError } from "./BuildError";
 import * as Bundler from "./Bundler";
+import * as GenerationSnapshot from "./GenerationSnapshot";
 import {
   MissingImplFileError,
   MissingSpecFileError,
-  ParentChildNameCollisionError,
   ImplMissingDefaultLayerError,
   ImplMissingFunctionsError,
   ImplMissingMiddlewareError,
@@ -407,26 +406,29 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
   }
 });
 
-export const validateImplFiles = Effect.fn("LeafModule.validateImplFiles")(
-  function* (relativePaths: ReadonlyArray<ImplModulePath>) {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const confectDirectory = yield* ConfectDirectory.get;
-    const pairs = yield* Effect.forEach(relativePaths, (implRelativePath) =>
-      specPathForImpl(implRelativePath).pipe(
-        Effect.map((specRelativePath) => ({
-          implRelativePath,
-          specRelativePath,
-        })),
-      ),
-    );
+export const withImplFiles = Effect.fnUntraced(function* <A, E, R>(
+  relativePaths: ReadonlyArray<ImplModulePath>,
+  use: (leaves: ReadonlyArray<LoadedLeafModule>) => Effect.Effect<A, E, R>,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const pairs = yield* Effect.forEach(relativePaths, (implRelativePath) =>
+    specPathForImpl(implRelativePath).pipe(
+      Effect.map((specRelativePath) => ({
+        implRelativePath,
+        specRelativePath,
+      })),
+    ),
+  );
 
-    yield* Bundler.withBatch(
-      pairs.flatMap(({ implRelativePath, specRelativePath }) => [
-        path.resolve(confectDirectory, implRelativePath),
-        path.resolve(confectDirectory, specRelativePath),
-      ]),
-      Effect.forEach(
+  return yield* Bundler.withBatch(
+    pairs.flatMap(({ implRelativePath, specRelativePath }) => [
+      path.resolve(confectDirectory, implRelativePath),
+      path.resolve(confectDirectory, specRelativePath),
+    ]),
+    Effect.gen(function* () {
+      const leaves = yield* Effect.forEach(
         pairs,
         Effect.fnUntraced(function* ({ implRelativePath, specRelativePath }) {
           if (
@@ -445,13 +447,19 @@ export const validateImplFiles = Effect.fn("LeafModule.validateImplFiles")(
               expectedImplPath: implRelativePath,
             });
           }
-          const leaf = yield* toLeafModule(specRelativePath);
-          yield* validateImpl(yield* loadSpec(leaf));
+          const leaf = yield* loadSpec(yield* toLeafModule(specRelativePath));
+          return leaf;
         }),
-        { concurrency: VALIDATION_CONCURRENCY, discard: true },
-      ),
-    );
-  },
+        { concurrency: VALIDATION_CONCURRENCY },
+      );
+      return yield* use(leaves);
+    }),
+  );
+});
+
+export const validateImplFiles = Effect.fn("LeafModule.validateImplFiles")(
+  (relativePaths: ReadonlyArray<ImplModulePath>) =>
+    withImplFiles(relativePaths, validateAllImpls),
 );
 
 export const validateAllImpls = Effect.fnUntraced(function* (
@@ -522,51 +530,12 @@ export const loadAll = Effect.gen(function* () {
 export const validateNoParentChildNameCollisions = Effect.fnUntraced(function* (
   leaves: ReadonlyArray<LoadedLeafModule>,
 ) {
-  const leavesBySegments = HashMap.fromIterable(
-    Array.map(leaves, (leaf) => [leaf.pathSegments.join("/"), leaf] as const),
+  yield* Effect.fromResult(
+    GenerationSnapshot.validateNoParentChildNameCollisions(
+      GenerationSnapshot.fromLoadedLeaves(leaves),
+    ),
   );
-  for (const child of leaves) {
-    for (let depth = 1; depth < child.pathSegments.length; depth++) {
-      const parent = HashMap.get(
-        leavesBySegments,
-        child.pathSegments.slice(0, depth).join("/"),
-      );
-      if (Option.isNone(parent)) continue;
-      const collisionName = child.pathSegments[depth]!;
-      const collisionKind = Object.hasOwn(
-        parent.value.spec.functions,
-        collisionName,
-      )
-        ? "function"
-        : Object.hasOwn(parent.value.spec.groups, collisionName)
-          ? "group"
-          : undefined;
-      if (collisionKind !== undefined) {
-        return yield* new ParentChildNameCollisionError({
-          parentSpecPath: bindingToRelativeSpecPath(
-            parent.value.specImportPath,
-          ),
-          childSpecPath: bindingToRelativeSpecPath(child.specImportPath),
-          collisionName,
-          collisionKind,
-        });
-      }
-    }
-  }
 });
-
-/**
- * `LeafModule.specImportPath` is the import path used from inside the generated
- * `_generated/spec.ts` (e.g. `"../notes.spec"`). Strip the `../` prefix and
- * re-add the `.ts` extension to recover the leaf's confect-relative spec path
- * used in diagnostics.
- */
-const bindingToRelativeSpecPath = (importPath: string): string => {
-  const withoutDotDot = importPath.startsWith("../")
-    ? importPath.slice(3)
-    : importPath;
-  return `${withoutDotDot}.ts`;
-};
 
 const validateOrphanImpls = Effect.fnUntraced(function* (
   specFiles: ReadonlyArray<string>,

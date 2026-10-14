@@ -7,6 +7,9 @@ import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import { expect } from "@effect/vitest";
+import { ProjectRoot } from "@confect/cli/ProjectRoot";
+import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
+import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 
 export const table = `import { Table } from "@confect/core";
 import * as Schema from "effect/Schema";
@@ -97,5 +100,37 @@ export const make = Effect.gen(function* () {
       );
     return { handle, output, waitFor };
   });
-  return { root, write, start };
+  const generatedFiles = Effect.gen(function* () {
+    const files = yield* Effect.forEach(
+      ["confect/_generated", "convex"],
+      (directory) =>
+        fs
+          .readDirectory(path.join(root, directory), { recursive: true })
+          .pipe(
+            Effect.map((entries) =>
+              entries
+                .filter((entry) => entry.endsWith(".ts"))
+                .map((entry) => path.join(directory, entry)),
+            ),
+          ),
+    );
+    return Object.fromEntries(
+      yield* Effect.forEach(files.flat(), (file) =>
+        fs
+          .readFileString(path.join(root, file))
+          .pipe(Effect.map((contents) => [file, contents] as const)),
+      ),
+    );
+  });
+  const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    effect.pipe(
+      Effect.provideService(ProjectRoot, { get: Effect.succeed(root) }),
+      Effect.provideService(ConfectDirectory, {
+        get: Effect.succeed(path.join(root, "confect")),
+      }),
+      Effect.provideService(ConvexDirectory, {
+        get: Effect.succeed(path.join(root, "convex")),
+      }),
+    );
+  return { root, write, start, generatedFiles, provide };
 });

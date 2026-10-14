@@ -14,7 +14,11 @@ import type { Directories } from "./Evaluation";
 import { EvaluationError, requests } from "./Evaluation";
 import { validateImplFiles } from "./LeafModule";
 import { ProjectRoot } from "./ProjectRoot";
-import { codegenHandler, loadPreviousFunctionPaths } from "./confect/codegen";
+import {
+  generateWithSnapshot,
+  loadPreviousFunctionPaths,
+  updateDeclarations,
+} from "./confect/codegen";
 
 const evaluate = <A, E, R>(
   directories: Directories,
@@ -48,9 +52,14 @@ const handlers = requests.toLayer({
   Generate: (directories) =>
     evaluate(
       directories,
-      codegenHandler.pipe(Effect.map(({ functionPaths }) => functionPaths)),
+      generateWithSnapshot.pipe(Effect.map(({ snapshot }) => snapshot)),
     ),
   Validate: (request) => evaluate(request, validateImplFiles(request.paths)),
+  Update: (request) =>
+    evaluate(
+      request,
+      updateDeclarations(request.snapshot, request.declarations, request.paths),
+    ),
 });
 
 RpcServer.layer(requests).pipe(

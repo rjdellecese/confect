@@ -19,12 +19,17 @@ import * as ConvexConfig from "../ConvexConfig";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as DocName from "../DocName";
 import * as FunctionPaths from "../FunctionPaths";
+import * as GenerationSnapshot from "../GenerationSnapshot";
+import * as GroupPath from "../GroupPath";
+import * as EntryPoint from "../EntryPoint";
+import { ImplModulePath } from "../ImplModulePath";
 import {
   implPathForSpec,
   loadAll,
   validateNoParentChildNameCollisions,
   registeredFunctionsRelativePath,
   validateAllImpls,
+  withImplFiles,
   type LeafModule,
   type LoadedLeafModule,
 } from "../LeafModule";
@@ -44,6 +49,8 @@ import {
   generateAuthConfig,
   generateCrons,
   generateFunctions,
+  generateGroupModule,
+  registeredFunctionsImportPathForGroup,
   generateHttp,
   removePathIfExists,
   toModuleImportPath,
@@ -106,16 +113,23 @@ export const codegen = Command.make("codegen", {}, () =>
   ),
 );
 
-export const codegenHandler = Effect.gen(function* () {
+export const generateWithSnapshot = Effect.gen(function* () {
   const tracker = yield* Ref.make(false);
 
-  const functionPaths = yield* runCodegen.pipe(
+  const result = yield* runCodegen.pipe(
     Effect.provideService(WriteTracker, tracker),
   );
 
   const anyWritesHappened = yield* Ref.get(tracker);
-  return { functionPaths, anyWritesHappened };
+  return { ...result, anyWritesHappened };
 }).pipe(Effect.withSpan("Cli.codegen"));
+
+export const codegenHandler = generateWithSnapshot.pipe(
+  Effect.map(({ functionPaths, anyWritesHappened }) => ({
+    functionPaths,
+    anyWritesHappened,
+  })),
+);
 
 const runCodegen = Effect.gen(function* () {
   yield* generateConfectGeneratedDirectory;
@@ -174,8 +188,88 @@ const runCodegen = Effect.gen(function* () {
     { concurrency: "unbounded" },
   );
   yield* touchConvexSchema;
-  return functionPaths;
+  return {
+    functionPaths,
+    snapshot: GenerationSnapshot.fromLoadedLeaves(leaves),
+  };
 });
+
+export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
+  function* (
+    snapshot: GenerationSnapshot.GenerationSnapshot,
+    declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
+    affectedImpls: ReadonlyArray<ImplModulePath>,
+  ) {
+    const path = yield* Path.Path;
+    const convexDirectory = yield* ConvexDirectory.get;
+    let paths = HashSet.fromIterable(affectedImpls);
+    const tables: Array<TableModule.TableModule> = [];
+    for (const declaration of declarations) {
+      yield* EntryPoint.Declaration.match(declaration, {
+        Spec: ({ relativePath }) =>
+          implPathForSpec(relativePath).pipe(
+            Effect.map((implPath) => {
+              paths = HashSet.add(paths, ImplModulePath.make(implPath));
+            }),
+          ),
+        Table: ({ relativePath }) =>
+          Effect.sync(() => {
+            tables.push({
+              relativePath,
+              tableName: path.parse(relativePath).name,
+            });
+          }),
+      });
+    }
+    yield* TableModule.validate(tables);
+    return yield* withImplFiles(Array.fromIterable(paths), (leaves) =>
+      Effect.gen(function* () {
+        const next = GenerationSnapshot.update(snapshot, leaves);
+        yield* Effect.fromResult(
+          GenerationSnapshot.validateNoParentChildNameCollisions(next),
+        );
+        yield* validateAllImpls(leaves);
+        yield* generateGroupRegisteredFunctions(leaves);
+        const changed = GenerationSnapshot.diff(snapshot, next);
+        yield* Effect.forEach(
+          changed.removed,
+          Effect.fnUntraced(function* (group) {
+            const file = path.join(
+              convexDirectory,
+              yield* GroupPath.modulePath(group.path),
+            );
+            yield* removePathIfExists(file);
+            yield* logFileRemoved(file);
+          }),
+        );
+        yield* Effect.forEach(
+          changed.changed,
+          Effect.fnUntraced(function* (group) {
+            const file = path.join(
+              convexDirectory,
+              yield* GroupPath.modulePath(group.path),
+            );
+            const change = yield* generateGroupModule({
+              groupPath: group.path,
+              functionNames: group.functionNames,
+              registeredFunctionsImportPath:
+                yield* registeredFunctionsImportPathForGroup(group.path, file),
+              useNode: group.runtime === "Node",
+            });
+            yield* Match.value(change).pipe(
+              Match.when("Added", () => logFileAdded(file)),
+              Match.when("Modified", () => logFileModified(file)),
+              Match.when("Unchanged", () => Effect.void),
+              Match.exhaustive,
+            );
+          }),
+        );
+        yield* touchConvexSchema;
+        return next;
+      }),
+    );
+  },
+);
 
 const generateConfectGeneratedDirectory = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;

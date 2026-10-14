@@ -24,6 +24,12 @@ export type Kind = Data.TaggedEnum<{
 }>;
 
 export const Kind = Data.taggedEnum<Kind>();
+export const Declaration = Schema.TaggedUnion({
+  Spec: { relativePath: Schema.String.check(Schema.isEndingWith(".spec.ts")) },
+  Table: { relativePath: Schema.String.check(Schema.isEndingWith(".ts")) },
+});
+export type Declaration = typeof Declaration.Type;
+
 export type EntryPoint = Kind & {
   readonly absolutePath: string;
   readonly inputPath: string;

@@ -324,6 +324,27 @@ const fixture = Effect.fn("Bundler.test.fixture")(function* (
 });
 
 layer(BundlerLayer)("withBatch", (it) => {
+  it.effect("reuses an enclosing batch for a nested subset", () =>
+    Effect.gen(function* () {
+      const { file } = yield* fixture({
+        "shared.ts": "export const shared = {};",
+        "first.ts": 'export { shared } from "./shared";',
+        "second.ts": 'export { shared } from "./shared";',
+      });
+      yield* Bundler.withBatch(
+        [file("first.ts"), file("second.ts")],
+        Effect.gen(function* () {
+          const first = yield* Bundler.bundle(file("first.ts"));
+          const second = yield* Bundler.withBatch(
+            [file("second.ts")],
+            Bundler.bundle(file("second.ts")),
+          );
+          expect(first.module.shared).toBe(second.module.shared);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
   it.effect("does not touch unused entries and preserves the inner error", () =>
     Effect.gen(function* () {
       expect(
