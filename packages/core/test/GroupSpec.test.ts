@@ -5,8 +5,6 @@ import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Schema from "effect/Schema";
 import * as Result from "effect/Result";
-import type * as Refs from "@confect/core/Refs";
-import type * as Spec from "@confect/core/Spec";
 
 describe("isGroupSpec", () => {
   it("checks whether a value is a function spec", () => {
@@ -106,23 +104,9 @@ describe("addGroupsAt", () => {
     const parent = GroupSpec.withName(
       "parent",
       GroupSpec.addGroupsAt(leaf, { keep: leaf, replace: leaf }),
-    ) as GroupSpec.NamedAt<
-      GroupSpec.AddGroups<
-        typeof leaf,
-        | GroupSpec.NamedAt<typeof leaf, "keep">
-        | GroupSpec.NamedAt<typeof leaf, "replace">
-      >,
-      "parent"
-    >;
+    );
     const input = { replace: node, extra: leaf };
-    const assembled = GroupSpec.addGroupsAt(
-      parent,
-      input,
-    ) as GroupSpec.AddGroups<
-      typeof parent,
-      | GroupSpec.NamedAt<typeof node, "replace">
-      | GroupSpec.NamedAt<typeof leaf, "extra">
-    >;
+    const assembled = GroupSpec.addGroupsAt(parent, input);
 
     expect(evaluated).toBe(0);
     expect(assembled).not.toBe(parent);
@@ -138,16 +122,9 @@ describe("addGroupsAt", () => {
     expect(input).toEqual({ replace: node, extra: leaf });
     expect(leaf.name).toBe("");
     expect(node.name).toBe("");
-    expectTypeOf(assembled.name).toEqualTypeOf<"parent">();
-    expectTypeOf(assembled.groups.replace.runtime).toEqualTypeOf<"Node">();
-    expectTypeOf(assembled.groups.replace.name).toEqualTypeOf<"replace">();
-    type PublicRefs = Refs.Refs<Spec.Spec<{ parent: typeof assembled }>>;
-    expectTypeOf<keyof PublicRefs["parent"]>().toEqualTypeOf<
-      "get" | "keep" | "replace" | "extra"
-    >();
-    expectTypeOf<
-      keyof PublicRefs["parent"]["replace"]
-    >().toEqualTypeOf<"send">();
+    expect(Object.keys(assembled.functions)).toEqual(["get"]);
+    expect(Object.keys(assembled.groups)).toEqual(["keep", "replace", "extra"]);
+    expect(Object.keys(assembled.groups.replace.functions)).toEqual(["send"]);
   });
 
   it("accepts Convex children under Node parents and empty child records", () => {
@@ -155,19 +132,15 @@ describe("addGroupsAt", () => {
     const child = GroupSpec.make();
     const assembled = GroupSpec.addGroupsAt(parent, {
       child,
-    }) as GroupSpec.AddGroups<
-      typeof parent,
-      GroupSpec.NamedAt<typeof child, "child">
-    >;
-    const empty = GroupSpec.addGroupsAt(assembled, {}) as GroupSpec.AddGroups<
-      typeof assembled,
-      never
-    >;
+    });
+    const empty = GroupSpec.addGroupsAt(assembled, {});
     expect(assembled.runtime).toBe("Node");
     expect(assembled.groups.child.runtime).toBe("Convex");
     expect(empty.groups.child).toBe(assembled.groups.child);
     expect(parent.groups).toEqual({});
-    expectTypeOf(empty).toEqualTypeOf<typeof assembled>();
+    expect(empty.functions).toBe(assembled.functions);
+    expect(empty.middlewareAttachments).toBe(assembled.middlewareAttachments);
+    expect(Object.keys(empty.groups)).toEqual(["child"]);
   });
 
   it("validates child names without modifying inputs on failure", () => {
@@ -206,6 +179,60 @@ describe("addGroupsAt", () => {
     expectTypeOf<{ bad: GroupSpec.Any }>().not.toExtend<
       Parameters<typeof GroupSpec.addGroupsAt>[1]
     >();
+  });
+});
+
+describe("AddGroups", () => {
+  it("models replacement, renaming, mixed runtimes, and empty additions", () => {
+    const get = FunctionSpec.publicQuery({
+      name: "get",
+      returns: () => Schema.String,
+    });
+    const send = FunctionSpec.publicNodeAction({
+      name: "send",
+      returns: () => Schema.Null,
+    });
+    type Leaf = GroupSpec.GroupSpec<"Convex", "", typeof get>;
+    type Node = GroupSpec.GroupSpec<"Node", "", typeof send>;
+    type Parent = GroupSpec.NamedAt<
+      GroupSpec.GroupSpec<
+        "Convex",
+        "",
+        typeof get,
+        GroupSpec.NamedAt<Leaf, "keep"> | GroupSpec.NamedAt<Leaf, "replace">
+      >,
+      "parent"
+    >;
+    type Combined = GroupSpec.AddGroups<
+      Parent,
+      GroupSpec.NamedAt<Node, "replace"> | GroupSpec.NamedAt<Leaf, "extra">
+    >;
+    expectTypeOf<Combined["name"]>().toEqualTypeOf<"parent">();
+    expectTypeOf<Combined["runtime"]>().toEqualTypeOf<"Convex">();
+    expectTypeOf<GroupSpec.Functions<Combined>>().toEqualTypeOf<typeof get>();
+    expectTypeOf<GroupSpec.GroupNames<Combined>>().toEqualTypeOf<
+      "keep" | "replace" | "extra"
+    >();
+    expectTypeOf<Combined["groups"]["replace"]>().toEqualTypeOf<
+      GroupSpec.NamedAt<Node, "replace">
+    >();
+    expectTypeOf<
+      FunctionSpec.Name<GroupSpec.Functions<Combined["groups"]["replace"]>>
+    >().toEqualTypeOf<"send">();
+    expectTypeOf<Parent["groups"]["replace"]>().toEqualTypeOf<
+      GroupSpec.NamedAt<Leaf, "replace">
+    >();
+    expectTypeOf<
+      GroupSpec.AddGroups<Combined, never>
+    >().toEqualTypeOf<Combined>();
+    type NodeWithChild = GroupSpec.AddGroups<
+      Node,
+      GroupSpec.NamedAt<Leaf, "child">
+    >;
+    expectTypeOf<NodeWithChild["runtime"]>().toEqualTypeOf<"Node">();
+    expectTypeOf<
+      NodeWithChild["groups"]["child"]["runtime"]
+    >().toEqualTypeOf<"Convex">();
   });
 });
 

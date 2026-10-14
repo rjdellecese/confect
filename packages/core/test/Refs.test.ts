@@ -19,9 +19,9 @@ describe("make", () => {
     });
 
     const notes = GroupSpec.make().addFunction(list);
-    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
-      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
-    }>;
+    const spec = {
+      [Spec.TypeId]: { notes: GroupSpec.withName("notes", notes) },
+    } satisfies Spec.AnyWithProps;
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
@@ -34,6 +34,73 @@ describe("make", () => {
     expectTypeOf(actualRef).toEqualTypeOf(expectedRef);
   });
 
+  it("derives nested and top-level refs without a separate Node namespace", () => {
+    const list = FunctionSpec.publicQuery({
+      name: "list",
+      returns: () => Schema.Array(Schema.String),
+    });
+    const listNotes = FunctionSpec.publicQuery({
+      name: "listNotes",
+      returns: () => Schema.Array(Schema.String),
+    });
+    const send = FunctionSpec.publicNodeAction({
+      name: "send",
+      returns: () => Schema.Null,
+    });
+    const spec = Spec.fromGroups({
+      databaseReader: GroupSpec.make().addFunction(listNotes),
+      groups: GroupSpec.addGroupsAt(GroupSpec.make(), {
+        notes: GroupSpec.make().addFunction(list),
+      }),
+      email: GroupSpec.makeNode().addFunction(send),
+    });
+    const refs = Refs.make(spec);
+    const expectedRef = Ref.make("groups/notes", list);
+
+    expect(Object.keys(refs.public).sort()).toEqual([
+      "databaseReader",
+      "email",
+      "groups",
+    ]);
+    expect(refs.public).toHaveProperty("groups.notes.list", expectedRef);
+    expect(refs.public).toHaveProperty(
+      "groups.notes.list.convexFunctionName",
+      "groups/notes:list",
+    );
+    expect(refs.public).toHaveProperty(
+      "databaseReader.listNotes.convexFunctionName",
+      "databaseReader:listNotes",
+    );
+    expect(refs.public).toHaveProperty(
+      "email.send.convexFunctionName",
+      "email:send",
+    );
+    expect("node" in refs.public).toBe(false);
+
+    type Model = Spec.Spec<{
+      databaseReader: GroupSpec.GroupSpec<
+        "Convex",
+        "databaseReader",
+        typeof listNotes
+      >;
+      groups: GroupSpec.GroupSpec<
+        "Convex",
+        "groups",
+        never,
+        GroupSpec.GroupSpec<"Convex", "notes", typeof list>
+      >;
+      email: GroupSpec.GroupSpec<"Node", "email", typeof send>;
+    }>;
+    type PublicRefs = Refs.Refs<Model, Ref.AnyPublic>;
+    expectTypeOf<keyof PublicRefs>().toEqualTypeOf<
+      "databaseReader" | "groups" | "email"
+    >();
+    expectTypeOf<PublicRefs["groups"]["notes"]["list"]>().toEqualTypeOf<
+      typeof expectedRef
+    >();
+    expectTypeOf<PublicRefs["email"]["send"]>().toExtend<Ref.AnyAction>();
+  });
+
   it("throws an error if a group and function have the same name", () => {
     const list = GroupSpec.make();
     const parent = GroupSpec.make().addFunction(
@@ -44,13 +111,8 @@ describe("make", () => {
     );
     const notes = GroupSpec.addGroupsAt(parent, {
       list,
-    }) as GroupSpec.AddGroups<
-      typeof parent,
-      GroupSpec.NamedAt<typeof list, "list">
-    >;
-    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
-      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
-    }>;
+    });
+    const spec = Spec.fromGroups({ notes });
     expect(() => Refs.make(spec)).toThrowErrorMatchingInlineSnapshot(
       `[Error: Group and function at same level have same name ('notes:list')]`,
     );
@@ -72,9 +134,9 @@ describe("make", () => {
           returns: () => FnReturns,
         }),
       );
-    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
-      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
-    }>;
+    const spec = {
+      [Spec.TypeId]: { notes: GroupSpec.withName("notes", notes) },
+    } satisfies Spec.AnyWithProps;
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.internal.notes.internalList).toEqualTypeOf<
@@ -105,13 +167,12 @@ describe("make", () => {
         returns: () => FnReturns,
       }),
     );
-    const spec = Spec.fromGroups({ publicOnly, internalOnly }) as Spec.Spec<{
-      readonly publicOnly: GroupSpec.NamedAt<typeof publicOnly, "publicOnly">;
-      readonly internalOnly: GroupSpec.NamedAt<
-        typeof internalOnly,
-        "internalOnly"
-      >;
-    }>;
+    const spec = {
+      [Spec.TypeId]: {
+        publicOnly: GroupSpec.withName("publicOnly", publicOnly),
+        internalOnly: GroupSpec.withName("internalOnly", internalOnly),
+      },
+    } satisfies Spec.AnyWithProps;
 
     const refs = Refs.make(spec);
 
@@ -144,9 +205,9 @@ describe("make", () => {
           returns: () => FnReturns,
         }),
       );
-    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
-      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
-    }>;
+    const spec = {
+      [Spec.TypeId]: { notes: GroupSpec.withName("notes", notes) },
+    } satisfies Spec.AnyWithProps;
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.publicList).toEqualTypeOf<
@@ -172,9 +233,9 @@ describe("make", () => {
       >()("list");
 
     const notes = GroupSpec.make().addFunction(listSpec);
-    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
-      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
-    }>;
+    const spec = {
+      [Spec.TypeId]: { notes: GroupSpec.withName("notes", notes) },
+    } satisfies Spec.AnyWithProps;
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
@@ -218,9 +279,9 @@ describe("make", () => {
           >
         >()("remove"),
       );
-    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
-      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
-    }>;
+    const spec = {
+      [Spec.TypeId]: { notes: GroupSpec.withName("notes", notes) },
+    } satisfies Spec.AnyWithProps;
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.get).toEqualTypeOf<
@@ -275,9 +336,9 @@ describe("make", () => {
           >
         >()("search"),
       );
-    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
-      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
-    }>;
+    const spec = {
+      [Spec.TypeId]: { notes: GroupSpec.withName("notes", notes) },
+    } satisfies Spec.AnyWithProps;
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.list).toEqualTypeOf<
@@ -325,9 +386,9 @@ describe("middleware error unions", () => {
           RegisteredQuery<"public", { cursor: string }, Promise<string[]>>
         >()("search"),
       );
-    const spec = Spec.fromGroups({ mixed }) as Spec.Spec<{
-      readonly mixed: GroupSpec.NamedAt<typeof mixed, "mixed">;
-    }>;
+    const spec = {
+      [Spec.TypeId]: { mixed: GroupSpec.withName("mixed", mixed) },
+    } satisfies Spec.AnyWithProps;
     const refs = Refs.make(spec);
 
     expectTypeOf<
@@ -372,7 +433,8 @@ describe("make with middleware options", () => {
     const child = GroupSpec.make().addFunction(query);
     const alias = GroupSpec.make().addFunction(query);
     const group = GroupSpec.addGroupsAt(parent, { child, alias });
-    const spec = Spec.fromGroups({ roles: group }) as Spec.Spec<{
+    const spec = Spec.fromGroups({ roles: group });
+    type Fixture = Spec.Spec<{
       readonly roles: GroupSpec.NamedAt<
         GroupSpec.AddGroups<
           typeof parent,
@@ -383,24 +445,32 @@ describe("make with middleware options", () => {
       >;
     }>;
     const refs = Refs.make(spec);
-    expect(refs.public.roles.get.middlewareAttachments[0]?.options).toBe(
-      options,
+    expect(refs.public).toHaveProperty(
+      "roles.get.middlewareAttachments.0.options",
+      expect.toSatisfy((actual: unknown) => actual === options),
     );
-    expect(refs.public.roles.child.get.middlewareAttachments).toEqual([]);
-    expect(refs.public.roles.alias.get.middlewareAttachments).toEqual([]);
+    expect(refs.public).toHaveProperty(
+      "roles.child.get.middlewareAttachments",
+      [],
+    );
+    expect(refs.public).toHaveProperty(
+      "roles.alias.get.middlewareAttachments",
+      [],
+    );
+    type FixtureRefs = Refs.FromSpec<Fixture>;
     expectTypeOf<
-      Ref.Error<typeof refs.public.roles.get>
+      Ref.Error<FixtureRefs["public"]["roles"]["get"]>
     >().toEqualTypeOf<AccessDenied>();
-    expectTypeOf<Ref.Error<typeof refs.public.roles.child.get>>().toBeNever();
+    expectTypeOf<
+      Ref.Error<FixtureRefs["public"]["roles"]["child"]["get"]>
+    >().toBeNever();
 
     const functionGroup = GroupSpec.make().addFunction(
       query.middleware(RequireRole, options),
     );
-    const functionSpec = Spec.fromGroups({
-      roles: functionGroup,
-    }) as Spec.Spec<{
-      readonly roles: GroupSpec.NamedAt<typeof functionGroup, "roles">;
-    }>;
+    const functionSpec = {
+      [Spec.TypeId]: { roles: GroupSpec.withName("roles", functionGroup) },
+    } satisfies Spec.AnyWithProps;
     const functionRefs = Refs.make(functionSpec);
     expect(
       functionRefs.public.roles.get.middlewareAttachments[0]?.options,
@@ -425,15 +495,14 @@ describe("make with middleware options", () => {
     const group = GroupSpec.make()
       .middleware(LazyPolicy, { enabled: true })
       .addFunction(query.middleware(LazyPolicy, { enabled: false }));
-    const spec = Spec.fromGroups({ lazy: group }) as Spec.Spec<{
-      readonly lazy: GroupSpec.NamedAt<typeof group, "lazy">;
-    }>;
+    const spec = Spec.fromGroups({ lazy: group });
     const refs = Refs.make(spec);
     expect(group.middlewareSpecs).toEqual([LazyPolicy]);
     expect(group.functions.get.middlewareSpecs).toEqual([LazyPolicy]);
-    expect(
-      refs.public.lazy.get.middlewareAttachments.map(({ options }) => options),
-    ).toEqual([{ enabled: true }, { enabled: false }]);
+    expect(refs.public).toHaveProperty("lazy.get.middlewareAttachments", [
+      expect.objectContaining({ options: { enabled: true } }),
+      expect.objectContaining({ options: { enabled: false } }),
+    ]);
     expect(evaluations).toBe(0);
     expect(Result.isSuccess(GroupSpec.validateMiddleware(group))).toBe(true);
     expect(evaluations).toBe(1);

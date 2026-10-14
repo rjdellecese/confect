@@ -1,14 +1,17 @@
 import { fileURLToPath } from "node:url";
+import * as Bundler from "@confect/cli/Bundler";
 import type { LeafModule } from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
+import { Refs, Spec } from "@confect/core";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { expect, it, layer } from "@effect/vitest";
+import { assert, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
@@ -142,28 +145,35 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
           ),
           leafAt(["jobs"]),
         ];
-        const groupSpec = `import { FunctionSpec, GroupSpec } from "@confect/core";
-import * as Schema from "effect/Schema";
-
-export default GroupSpec.make().addFunction(
-  FunctionSpec.publicQuery({ name: "get", args: () => ({ id: Schema.String }), returns: () => Schema.String }),
-);
-`;
         yield* fs.makeDirectory(path.join(directory, "_generated"));
+        yield* fs.writeFileString(
+          path.join(directory, "schemaReads.ts"),
+          "export const schemaReads = { args: 0, returns: 0, error: 0 };\n",
+        );
         yield* Effect.forEach(leaves, (leaf) =>
           Effect.gen(function* () {
             const target = path.join(directory, leaf.relativePath);
+            const isNode = leaf.groupPathDot === "jobs";
+            const schemaReadsImport =
+              leaf.pathSegments.length === 1
+                ? "./schemaReads"
+                : `${"../".repeat(leaf.pathSegments.length - 1)}schemaReads`;
             yield* fs.makeDirectory(path.dirname(target), { recursive: true });
             yield* fs.writeFileString(
               target,
-              leaf.exportName === "jobs"
-                ? groupSpec
-                    .replace("GroupSpec.make()", "GroupSpec.makeNode()")
-                    .replace(
-                      "FunctionSpec.publicQuery",
-                      "FunctionSpec.internalNodeAction",
-                    )
-                : groupSpec,
+              `import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+import { schemaReads } from "${schemaReadsImport}";
+
+export default GroupSpec.${isNode ? "makeNode" : "make"}().addFunction(
+  FunctionSpec.${isNode ? "internalNodeAction" : "publicQuery"}({
+    name: "get",
+    args: () => { schemaReads.args++; return { id: Schema.String }; },
+    returns: () => { schemaReads.returns++; return Schema.String; },
+    ${isNode ? "error: () => { schemaReads.error++; return Schema.String; }," : ""}
+  }),
+);
+`,
             );
           }),
         );
@@ -195,6 +205,7 @@ expectTypeOf(deep["~Returns"]).toEqualTypeOf<string>();
 expectTypeOf(deep["~FunctionVisibility"]).toEqualTypeOf<"public">();
 expectTypeOf(deep["~Error"]).toEqualTypeOf<never>();
 expectTypeOf(node["~RuntimeAndFunctionType"]).toEqualTypeOf<{ readonly runtime: "Node"; readonly functionType: "action" }>();
+expectTypeOf(node["~Error"]).toEqualTypeOf<string>();
 expectTypeOf(Spec.groups(spec).${lastRoot}.name).toEqualTypeOf<"${lastRoot}">();
 // @ts-expect-error
 const missing = refs.public.missing;
@@ -287,6 +298,113 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
           Stream.mkString,
         );
         expect(yield* declarationConsumer.exitCode, declarationOutput).toBe(0);
+        const runtimeEntry = path.join(directory, "runtime.ts");
+        yield* fs.writeFileString(
+          runtimeEntry,
+          `export { default } from "./_generated/spec";
+export { schemaReads } from "./schemaReads";
+`,
+        );
+        const bundled = yield* Bundler.bundle(runtimeEntry);
+        const assembled: unknown = bundled.module.default;
+        assert(Spec.isSpec(assembled));
+        expect(bundled.module.schemaReads).toEqual({
+          args: 0,
+          returns: 0,
+          error: 0,
+        });
+
+        const pending = Object.entries(Spec.groups(assembled)).map(
+          ([name, group]) => ({ path: [name], group }),
+        );
+        const actualGroups = [];
+        while (pending.length > 0) {
+          const current = pending.pop()!;
+          actualGroups.push({
+            path: current.path,
+            name: current.group.name,
+            runtime: current.group.runtime,
+            functions: Object.values(current.group.functions).map((fn) => ({
+              name: fn.name,
+              runtimeAndFunctionType: fn.runtimeAndFunctionType,
+              visibility: fn.functionVisibility,
+            })),
+          });
+          pending.push(
+            ...Object.entries(current.group.groups).map(([name, group]) => ({
+              path: [...current.path, name],
+              group,
+            })),
+          );
+        }
+        const expectedGroups = leaves.map((leaf) => ({
+          path: leaf.pathSegments,
+          name: leaf.exportName,
+          runtime: leaf.groupPathDot === "jobs" ? "Node" : "Convex",
+          functions: [
+            {
+              name: "get",
+              runtimeAndFunctionType:
+                leaf.groupPathDot === "jobs"
+                  ? { runtime: "Node", functionType: "action" }
+                  : { runtime: "Convex", functionType: "query" },
+              visibility: leaf.groupPathDot === "jobs" ? "internal" : "public",
+            },
+          ],
+        }));
+        expectedGroups.push({
+          path: ["nested", lastChild, "level3", "level4"],
+          name: "level4",
+          runtime: "Convex",
+          functions: [],
+        });
+        expect(
+          actualGroups.sort((a, b) =>
+            a.path.join("/").localeCompare(b.path.join("/")),
+          ),
+        ).toEqual(
+          expectedGroups.sort((a, b) =>
+            a.path.join("/").localeCompare(b.path.join("/")),
+          ),
+        );
+
+        const refs = Refs.make(assembled);
+        expect(bundled.module.schemaReads).toEqual({
+          args: 0,
+          returns: 0,
+          error: 0,
+        });
+        let nodeRef: unknown;
+        for (const leaf of leaves) {
+          let ref: unknown =
+            refs[leaf.groupPathDot === "jobs" ? "internal" : "public"];
+          for (const segment of [...leaf.pathSegments, "get"]) {
+            assert(Predicate.isObject(ref));
+            ref = ref[segment];
+          }
+          assert(Predicate.isObject(ref));
+          expect(ref.convexFunctionName).toBe(
+            `${leaf.pathSegments.join("/")}:get`,
+          );
+          expect(ref._tag).toBe("Confect");
+          if (leaf.groupPathDot === "jobs") {
+            nodeRef = ref;
+          }
+        }
+        expect(bundled.module.schemaReads).toEqual({
+          args: 0,
+          returns: 0,
+          error: 0,
+        });
+        assert(Predicate.isObject(nodeRef));
+        expect(nodeRef.args).toBe(nodeRef.args);
+        expect(nodeRef.returns).toBe(nodeRef.returns);
+        expect(nodeRef.error).toBe(nodeRef.error);
+        expect(bundled.module.schemaReads).toEqual({
+          args: 1,
+          returns: 1,
+          error: 1,
+        });
       }).pipe(Effect.scoped),
     { timeout: 60000 },
   );

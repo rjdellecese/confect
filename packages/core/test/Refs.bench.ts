@@ -4,7 +4,7 @@ import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as GroupSpec from "@confect/core/GroupSpec";
 import type * as Ref from "@confect/core/Ref";
 import type * as Refs from "@confect/core/Refs";
-import * as Spec from "@confect/core/Spec";
+import type * as Spec from "@confect/core/Spec";
 
 const Args = { id: Schema.String };
 const Returns = Schema.String;
@@ -25,14 +25,13 @@ const SmallGroups = {
       }),
     ),
 };
-const SmallSpec = Spec.fromGroups(SmallGroups) as Spec.Spec<{
+type SmallSpec = Spec.Spec<{
   readonly auth: GroupSpec.GroupSpec<
     "Convex",
     "auth",
     GroupSpec.Functions<typeof SmallGroups.auth>
   >;
 }>;
-type SmallSpec = typeof SmallSpec;
 
 // --- Medium spec (original): 4 groups, 12 functions ---
 const MediumGroups = {
@@ -125,7 +124,7 @@ const MediumGroups = {
       }),
     ),
 };
-const MediumSpec = Spec.fromGroups(MediumGroups) as Spec.Spec<{
+type MediumSpec = Spec.Spec<{
   readonly users: GroupSpec.GroupSpec<
     "Convex",
     "users",
@@ -147,8 +146,6 @@ const MediumSpec = Spec.fromGroups(MediumGroups) as Spec.Spec<{
     GroupSpec.Functions<typeof MediumGroups.analytics>
   >;
 }>;
-
-type MediumSpec = typeof MediumSpec;
 
 // --- Large spec: 8 groups, 28 functions ---
 const LargeGroups = {
@@ -343,7 +340,7 @@ const LargeGroups = {
       }),
     ),
 };
-const LargeSpec = Spec.fromGroups(LargeGroups) as Spec.Spec<{
+type LargeSpec = Spec.Spec<{
   readonly users: GroupSpec.GroupSpec<
     "Convex",
     "users",
@@ -385,8 +382,6 @@ const LargeSpec = Spec.fromGroups(LargeGroups) as Spec.Spec<{
     GroupSpec.Functions<typeof LargeGroups.settings>
   >;
 }>;
-
-type LargeSpec = typeof LargeSpec;
 
 // Baseline expression: force the Refs module types to load so module-level
 // instantiations are not counted in individual benchmarks.
