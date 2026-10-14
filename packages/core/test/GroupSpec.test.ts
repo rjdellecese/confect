@@ -5,30 +5,38 @@ import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Schema from "effect/Schema";
 import * as Result from "effect/Result";
+import type * as Refs from "@confect/core/Refs";
+import type * as Spec from "@confect/core/Spec";
 
 describe("isGroupSpec", () => {
   it("checks whether a value is a function spec", () => {
-    const groupSpec: unknown = GroupSpec.makeAt("notes");
+    const groupSpec: unknown = GroupSpec.make();
 
     expect(GroupSpec.isGroupSpec(groupSpec)).toStrictEqual(true);
   });
 });
 
-describe("makeAt", () => {
+describe("name validation", () => {
   it("disallows invalid JS identifiers as function names", () => {
-    expect(() => GroupSpec.makeAt("123")).toThrowErrorMatchingInlineSnapshot(
+    expect(() =>
+      GroupSpec.withName("123", GroupSpec.make()),
+    ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Expected a valid Confect function identifier, but received: "123". Valid identifiers must start with a letter, underscore, or dollar sign, and can only contain letters, numbers, underscores, or dollar signs.]`,
     );
   });
 
   it("disallows reserved keywords as function names", () => {
-    expect(() => GroupSpec.makeAt("if")).toThrowErrorMatchingInlineSnapshot(
+    expect(() =>
+      GroupSpec.withName("if", GroupSpec.make()),
+    ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Expected a valid Confect function identifier, but received: "if". "if" is a reserved JavaScript identifier.]`,
     );
   });
 
   it("disallows reserved Convex file names as function names", () => {
-    expect(() => GroupSpec.makeAt("schema")).toThrowErrorMatchingInlineSnapshot(
+    expect(() =>
+      GroupSpec.withName("schema", GroupSpec.make()),
+    ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Expected a valid Confect function identifier, but received: "schema". "schema" is a reserved Convex file name.]`,
     );
   });
@@ -36,7 +44,7 @@ describe("makeAt", () => {
 
 describe("withName", () => {
   it("returns the input unchanged when the name already matches", () => {
-    const group = GroupSpec.makeAt("notes");
+    const group = GroupSpec.withName("notes", GroupSpec.make());
 
     const renamed = GroupSpec.withName("notes", group);
 
@@ -44,7 +52,7 @@ describe("withName", () => {
   });
 
   it("returns a fresh copy with the new name and does not mutate the input", () => {
-    const group = GroupSpec.makeAt("notes");
+    const group = GroupSpec.withName("notes", GroupSpec.make());
     const originalName = group.name;
 
     const renamed = GroupSpec.withName("renamed", group);
@@ -56,13 +64,148 @@ describe("withName", () => {
   });
 
   it("preserves functions and groups in the copy", () => {
-    const child = GroupSpec.makeAt("child");
-    const group = GroupSpec.makeAt("parent").addGroup(child);
+    const child = GroupSpec.make();
+    const group = GroupSpec.withName(
+      "parent",
+      GroupSpec.addGroupsAt(GroupSpec.make(), { child }),
+    );
 
     const renamed = GroupSpec.withName("renamed", group);
 
     expect(renamed.groups).toBe(group.groups);
     expect(renamed.functions).toBe(group.functions);
+  });
+});
+
+describe("addGroupsAt", () => {
+  it("preserves the parent while replacing only matching children", () => {
+    let evaluated = 0;
+    const leaf = GroupSpec.make().addFunction(
+      FunctionSpec.publicQuery({
+        name: "get",
+        args: () => {
+          evaluated++;
+          return { id: Schema.String };
+        },
+        returns: () => {
+          evaluated++;
+          return Schema.String;
+        },
+        error: () => {
+          evaluated++;
+          return Schema.String;
+        },
+      }),
+    );
+    const node = GroupSpec.makeNode().addFunction(
+      FunctionSpec.publicNodeAction({
+        name: "send",
+        returns: () => Schema.Null,
+      }),
+    );
+    const parent = GroupSpec.withName(
+      "parent",
+      GroupSpec.addGroupsAt(leaf, { keep: leaf, replace: leaf }),
+    ) as GroupSpec.NamedAt<
+      GroupSpec.AddGroups<
+        typeof leaf,
+        | GroupSpec.NamedAt<typeof leaf, "keep">
+        | GroupSpec.NamedAt<typeof leaf, "replace">
+      >,
+      "parent"
+    >;
+    const input = { replace: node, extra: leaf };
+    const assembled = GroupSpec.addGroupsAt(
+      parent,
+      input,
+    ) as GroupSpec.AddGroups<
+      typeof parent,
+      | GroupSpec.NamedAt<typeof node, "replace">
+      | GroupSpec.NamedAt<typeof leaf, "extra">
+    >;
+
+    expect(evaluated).toBe(0);
+    expect(assembled).not.toBe(parent);
+    expect(assembled.name).toBe("parent");
+    expect(assembled.runtime).toBe("Convex");
+    expect(assembled.functions).toBe(parent.functions);
+    expect(assembled.middlewareAttachments).toBe(parent.middlewareAttachments);
+    expect(assembled.groups.keep).toBe(parent.groups.keep);
+    expect(assembled.groups.replace.runtime).toBe("Node");
+    expect(assembled.groups.replace.name).toBe("replace");
+    expect(parent.groups.replace.runtime).toBe("Convex");
+    expect(Object.keys(parent.groups)).toEqual(["keep", "replace"]);
+    expect(input).toEqual({ replace: node, extra: leaf });
+    expect(leaf.name).toBe("");
+    expect(node.name).toBe("");
+    expectTypeOf(assembled.name).toEqualTypeOf<"parent">();
+    expectTypeOf(assembled.groups.replace.runtime).toEqualTypeOf<"Node">();
+    expectTypeOf(assembled.groups.replace.name).toEqualTypeOf<"replace">();
+    type PublicRefs = Refs.Refs<Spec.Spec<{ parent: typeof assembled }>>;
+    expectTypeOf<keyof PublicRefs["parent"]>().toEqualTypeOf<
+      "get" | "keep" | "replace" | "extra"
+    >();
+    expectTypeOf<
+      keyof PublicRefs["parent"]["replace"]
+    >().toEqualTypeOf<"send">();
+  });
+
+  it("accepts Convex children under Node parents and empty child records", () => {
+    const parent = GroupSpec.makeNode();
+    const child = GroupSpec.make();
+    const assembled = GroupSpec.addGroupsAt(parent, {
+      child,
+    }) as GroupSpec.AddGroups<
+      typeof parent,
+      GroupSpec.NamedAt<typeof child, "child">
+    >;
+    const empty = GroupSpec.addGroupsAt(assembled, {}) as GroupSpec.AddGroups<
+      typeof assembled,
+      never
+    >;
+    expect(assembled.runtime).toBe("Node");
+    expect(assembled.groups.child.runtime).toBe("Convex");
+    expect(empty.groups.child).toBe(assembled.groups.child);
+    expect(parent.groups).toEqual({});
+    expectTypeOf(empty).toEqualTypeOf<typeof assembled>();
+  });
+
+  it("validates child names without modifying inputs on failure", () => {
+    const parent = GroupSpec.make();
+    const child = GroupSpec.make();
+    for (const name of ["123", "if", "schema"]) {
+      expect(() =>
+        GroupSpec.addGroupsAt(parent, { valid: child, [name]: child }),
+      ).toThrow("Expected a valid Confect function identifier");
+    }
+    expect(parent.groups).toEqual({});
+    expect(child.name).toBe("");
+  });
+
+  it("preserves special property names as own child bindings", () => {
+    const group = GroupSpec.addGroupsAt(GroupSpec.make(), {
+      ["__proto__"]: GroupSpec.make(),
+      constructor: GroupSpec.make(),
+    });
+    expect(Object.hasOwn(group.groups, "__proto__")).toBe(true);
+    expect(group.groups.__proto__.name).toBe("__proto__");
+    expect(group.groups.constructor.name).toBe("constructor");
+    expect(Object.getPrototypeOf(group.groups)).toBe(Object.prototype);
+  });
+
+  it("checks group inputs without accumulating their types", () => {
+    expectTypeOf(
+      GroupSpec.addGroupsAt,
+    ).returns.toEqualTypeOf<GroupSpec.AnyWithProps>();
+    expectTypeOf<GroupSpec.Any>().not.toExtend<
+      Parameters<typeof GroupSpec.addGroupsAt>[0]
+    >();
+    expectTypeOf<{ bad: number }>().not.toExtend<
+      Parameters<typeof GroupSpec.addGroupsAt>[1]
+    >();
+    expectTypeOf<{ bad: GroupSpec.Any }>().not.toExtend<
+      Parameters<typeof GroupSpec.addGroupsAt>[1]
+    >();
   });
 });
 
@@ -143,8 +286,8 @@ describe("middleware options", () => {
     for (const copy of [
       group,
       group.addFunction(query),
-      group.addGroup(GroupSpec.makeAt("child")),
-      group.addGroupAt("alias", GroupSpec.make()),
+      GroupSpec.addGroupsAt(group, { child: GroupSpec.make() }),
+      GroupSpec.addGroupsAt(group, { alias: GroupSpec.make() }),
       GroupSpec.withName("renamed", group),
     ]) {
       expect(copy.middlewareAttachments).toBe(group.middlewareAttachments);
@@ -227,14 +370,14 @@ describe("middleware options", () => {
         functionTypes: { query: true, mutation: false, action: false },
       },
     ) {}
-    const invalid = GroupSpec.makeAt("invalid")
+    const invalid = GroupSpec.make()
       .middleware(RequireRole, { roles: ["Internal"] })
       .middleware(RequireRole, { roles: ["Internal"] });
-    const later = GroupSpec.makeAt("later").middleware(Unreachable, "value");
+    const later = GroupSpec.make().middleware(Unreachable, "value");
 
     expect(
       GroupSpec.validateMiddleware(
-        GroupSpec.make().addGroup(invalid).addGroup(later),
+        GroupSpec.addGroupsAt(GroupSpec.make(), { invalid, later }),
       ),
     ).toEqual(
       Result.fail(

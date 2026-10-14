@@ -40,10 +40,17 @@ describe("SpecAssemblyNode", () => {
         'import notesAndRandom_random from "../notesAndRandom/random.spec";',
       );
       expect(contents).toContain(
-        '(GroupSpec.makeAt("notesAndRandom") as any).addGroupAt("notes", (notesAndRandom_notes as any)).addGroupAt("random", (notesAndRandom_random as any))',
+        `"notesAndRandom": GroupSpec.addGroupsAt(GroupSpec.make(), {
+    "notes": notesAndRandom_notes,
+    "random": notesAndRandom_random,
+  })`,
       );
-      expect(contents).toContain('.addAt("env", (env as any))');
-      expect(contents).toContain("= (Spec.make() as any).addAt(");
+      expect(contents).toContain('"env": env,');
+      expect(contents).toContain("}> = Spec.fromGroups({");
+      expect(contents).not.toContain("as any");
+      expect(contents).toContain("const spec: Spec.Spec<");
+      expect(contents.match(/\bas\b/g)).toEqual(["as"]);
+      expect(contents).toContain("}) as typeof spec;");
       // Group paths are resolved impl-side, so the assembled spec no longer
       // emits a `.addPath(...)` registration chain.
       expect(contents).not.toContain(".addPath(");
@@ -65,14 +72,16 @@ describe("SpecAssemblyNode", () => {
           'import notes_archived from "../notes/archived.spec";',
         );
         expect(contents).toContain(
-          '.addAt("notes", (notes as any).addGroupAt("archived", (notes_archived as any)))',
+          `"notes": GroupSpec.addGroupsAt(notes, {
+    "archived": notes_archived,
+  })`,
         );
-        expect(contents).not.toContain('GroupSpec.makeAt("notes")');
+        expect(contents).not.toContain("GroupSpec.make()");
       }),
   );
 
   it.effect(
-    "assembledSpec imports GroupSpec whenever there are groups (for the annotation's NamedAt references)",
+    "assembledSpec preserves leaf types in compact explicit annotations",
     () =>
       Effect.gen(function* () {
         const nodes = assemblyNodesFromLeaves([
@@ -84,9 +93,11 @@ describe("SpecAssemblyNode", () => {
         expect(contents).toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
         );
+        expect(contents).toContain("GroupSpec.addGroupsAt(notes, {");
         expect(contents).toContain(
           'GroupSpec.AddGroups<typeof notes, GroupSpec.NamedAt<typeof notes_archived, "archived">>',
         );
+        expect(contents).toContain("const spec: Spec.Spec<");
       }),
   );
 
@@ -101,14 +112,14 @@ describe("SpecAssemblyNode", () => {
           'import { GroupSpec, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
-          "const spec: Spec.Spec = (Spec.make() as any);",
+          "const spec: Spec.Spec = Spec.fromGroups({\n}) as typeof spec;",
         );
         expect(contents).toContain("export default spec;");
       }),
   );
 
   it.effect(
-    "assembledSpec keeps GroupSpec.makeAt when a leafless descendant has children",
+    "assembledSpec uses GroupSpec.make when a leafless descendant has children",
     () =>
       Effect.gen(function* () {
         const nodes = assemblyNodesFromLeaves([
@@ -125,7 +136,11 @@ describe("SpecAssemblyNode", () => {
           'import { GroupSpec, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
-          '.addAt("notes", (notes as any).addGroupAt("archived", (GroupSpec.makeAt("archived") as any).addGroupAt("legacy", (notes_archived_legacy as any))))',
+          `"notes": GroupSpec.addGroupsAt(notes, {
+    "archived": GroupSpec.addGroupsAt(GroupSpec.make(), {
+      "legacy": notes_archived_legacy,
+    }),
+  })`,
         );
       }),
   );
@@ -193,19 +208,19 @@ describe("SpecAssemblyNode", () => {
         expect(importLines).toHaveLength(leaves.length);
 
         expect(contents).toContain(
-          '.addGroupAt("mutations", (scripts_operational_inviteUser_mutations as any))',
+          '"mutations": scripts_operational_inviteUser_mutations,',
         );
         expect(contents).toContain(
-          '.addGroupAt("queries", (scripts_operational_inviteUser_queries as any))',
+          '"queries": scripts_operational_inviteUser_queries,',
         );
         expect(contents).toContain(
-          '.addGroupAt("mutations", (scripts_operational_seed_mutations as any))',
+          '"mutations": scripts_operational_seed_mutations,',
         );
         expect(contents).toContain(
-          '.addGroupAt("mutations", (scripts_operational_seedTestUser_mutations as any))',
+          '"mutations": scripts_operational_seedTestUser_mutations,',
         );
         expect(contents).toContain(
-          '.addGroupAt("queries", (scripts_operational_seedTestUser_queries as any))',
+          '"queries": scripts_operational_seedTestUser_queries,',
         );
       }),
   );
@@ -214,9 +229,6 @@ describe("SpecAssemblyNode", () => {
     "assembledSpec assembles every leaf for a deep catalog layout",
     () =>
       Effect.gen(function* () {
-        // A parent leaf alongside subdirectory children at multiple nesting
-        // depths. Each impl resolves its own group path impl-side, so the
-        // assembled tree only needs the addAt/addGroupAt shape.
         const nodes = assemblyNodesFromLeaves([
           leaf("remix/routes/_app/catalog.spec.ts", [
             "remix",
@@ -251,11 +263,8 @@ describe("SpecAssemblyNode", () => {
         ]);
         const contents = yield* templates.assembledSpec({ nodes });
 
-        // Tree-assembly shape is preserved; the addGroupAt-wrapped parent leaf
-        // still ends up in the tree, and its impl resolves its group path
-        // impl-side rather than through a `.addPath(...)` registration.
         expect(contents).toContain(
-          "(remix_routes__app_catalog as any).addGroupAt(",
+          "GroupSpec.addGroupsAt(remix_routes__app_catalog, {",
         );
         expect(contents).not.toContain(".addPath(");
       }),

@@ -1,4 +1,3 @@
-import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { CodeBlockWriter } from "./CodeBlockWriter";
@@ -797,73 +796,49 @@ const servicesEffect = Effect.fnUntraced(function* ({
   return yield* cbw.toString();
 });
 
-const writeChildAddGroupAt = Effect.fnUntraced(function* (
-  cbw: CodeBlockWriter,
-  child: SpecAssemblyNode,
-  groupFactory: string,
-): Effect.fn.Return<void> {
-  yield* cbw.write(".addGroupAt(");
-  yield* cbw.quote(child.segment);
-  yield* cbw.write(", ");
-  yield* writeGroupAssembly(cbw, child, groupFactory);
-  yield* cbw.write(")");
-});
-
-const writeGroupFactoryCall = Effect.fnUntraced(function* (
+const writeGroupEntry = Effect.fnUntraced(function* (
   cbw: CodeBlockWriter,
   node: SpecAssemblyNode,
-  groupFactory: string,
 ): Effect.fn.Return<void> {
-  yield* cbw.write("(");
-  yield* cbw.write(groupFactory);
-  yield* cbw.write("(");
   yield* cbw.quote(node.segment);
-  yield* cbw.write(") as any)");
-
-  yield* Effect.forEach(node.children, (child) =>
-    writeChildAddGroupAt(cbw, child, groupFactory),
-  );
+  yield* cbw.write(": ");
+  yield* writeGroupAssembly(cbw, node);
+  yield* cbw.write(",\n");
 });
 
 const writeGroupAssembly: (
   cbw: CodeBlockWriter,
   node: SpecAssemblyNode,
-  groupFactory: string,
-) => Effect.Effect<void> = (cbw, node, groupFactory) =>
-  Option.match(node.importBinding, {
-    onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
-    onSome: (binding) =>
-      Effect.gen(function* () {
-        yield* cbw.write(`(${binding.localName} as any)`);
-        yield* Effect.forEach(node.children, (child) =>
-          writeChildAddGroupAt(cbw, child, groupFactory),
-        );
-      }),
-  });
-
-const writeRootAddAt = Effect.fnUntraced(function* (
-  cbw: CodeBlockWriter,
-  node: SpecAssemblyNode,
-  groupFactory: string,
-): Effect.fn.Return<void> {
-  yield* cbw.write(".addAt(");
-  yield* cbw.quote(node.segment);
-  yield* cbw.write(", ");
-
-  yield* writeGroupAssembly(cbw, node, groupFactory);
-
-  yield* cbw.write(")");
+) => Effect.Effect<void> = Effect.fnUntraced(function* (cbw, node) {
+  if (node.children.length > 0) {
+    yield* cbw.write("GroupSpec.addGroupsAt(");
+  }
+  yield* cbw.write(
+    Option.match(node.importBinding, {
+      onNone: () => "GroupSpec.make()",
+      onSome: (binding) => binding.localName,
+    }),
+  );
+  if (node.children.length > 0) {
+    yield* cbw.write(", {\n");
+    yield* cbw.indent(
+      Effect.forEach(node.children, (child) => writeGroupEntry(cbw, child)),
+    );
+    yield* cbw.write("})");
+  }
 });
 
 const groupTypeExpr = (node: SpecAssemblyNode): string => {
-  const childUnion = Array.map(
-    node.children,
-    (child) => `GroupSpec.NamedAt<${groupTypeExpr(child)}, "${child.segment}">`,
-  ).join(" | ");
+  const childUnion = node.children
+    .map(
+      (child) =>
+        `GroupSpec.NamedAt<${groupTypeExpr(child)}, "${child.segment}">`,
+    )
+    .join(" | ");
 
   return Option.match(node.importBinding, {
     onNone: () =>
-      `GroupSpec.GroupSpec<"Convex", "${node.segment}", never, ${childUnion}>`,
+      `GroupSpec.GroupSpec<"Convex", "${node.segment}", never, ${childUnion || "never"}>`,
     onSome: (binding) =>
       node.children.length === 0
         ? `typeof ${binding.localName}`
@@ -897,12 +872,11 @@ const assembledSpecEffect = Effect.fnUntraced(function* ({
 
   yield* cbw.blankLine();
 
-  yield* cbw.write(`const spec: `);
+  yield* cbw.write("const spec: ");
   if (nodes.length === 0) {
-    yield* cbw.write(`Spec.Spec`);
+    yield* cbw.write("Spec.Spec");
   } else {
-    yield* cbw.write(`Spec.Spec<{`);
-    yield* cbw.newLine();
+    yield* cbw.write("Spec.Spec<{\n");
     yield* cbw.indent(
       Effect.gen(function* () {
         for (const node of nodes) {
@@ -912,18 +886,13 @@ const assembledSpecEffect = Effect.fnUntraced(function* ({
         }
       }),
     );
-    yield* cbw.write(`}>`);
+    yield* cbw.write("}>");
   }
-  // The assembled spec is runtime-agnostic: a Node group's `makeNode()` is
-  // already baked into its imported leaf spec, so the root is always
-  // `Spec.make()` and binding-less container groups always use
-  // `GroupSpec.makeAt` (containers register no functions and carry no runtime).
-  yield* cbw.write(" = (Spec.make() as any)");
-  yield* Effect.forEach(nodes, (node) =>
-    writeRootAddAt(cbw, node, "GroupSpec.makeAt"),
+  yield* cbw.write(" = Spec.fromGroups({\n");
+  yield* cbw.indent(
+    Effect.forEach(nodes, (node) => writeGroupEntry(cbw, node)),
   );
-  yield* cbw.write(";");
-  yield* cbw.newLine();
+  yield* cbw.writeLine("}) as typeof spec;");
   yield* cbw.blankLine();
   yield* cbw.writeLine(`export default spec;`);
 

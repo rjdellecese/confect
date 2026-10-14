@@ -110,9 +110,9 @@ export const plainString: Id<"_storage"> = "not-an-id";
 });
 
 layer(NodeServices.layer)("assembledSpec", (test) => {
-  test.effect(
-    "typechecks with more groups than an inferred builder chain allows",
-    () =>
+  test.effect.each([true, false])(
+    "typechecks and emits precise declarations at scale with exactOptionalPropertyTypes=%s",
+    (exactOptionalPropertyTypes) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
@@ -121,31 +121,51 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
           directory: import.meta.dirname,
           prefix: "spec-",
         });
-        // An inferred chain fails with TS2589 from 48 top-level groups, and
-        // from about 90 children of one group.
         const names = (prefix: string, count: number) =>
           Array.makeBy(
             count,
             (index) => `${prefix}${String(index + 1).padStart(3, "0")}`,
           );
+        const rootNames = names("g", 600);
+        const childNames = names("c", 300);
+        const deepNames = names("d", 100);
+        const lastRoot = rootNames[rootNames.length - 1]!;
+        const lastChild = childNames[childNames.length - 1]!;
+        const lastDeep = deepNames[deepNames.length - 1]!;
         const leaves: LeafModule[] = [
-          ...names("g", 60).map((name) => leafAt([name])),
-          ...names("c", 100).map((name) => leafAt(["nested", name])),
+          ...rootNames.map((name) => leafAt([name])),
+          leafAt(["nested"]),
+          ...childNames.map((name) => leafAt(["nested", name])),
+          leafAt(["nested", lastChild, "level3"]),
+          ...deepNames.map((name) =>
+            leafAt(["nested", lastChild, "level3", "level4", name]),
+          ),
+          leafAt(["jobs"]),
         ];
         const groupSpec = `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
 export default GroupSpec.make().addFunction(
-  FunctionSpec.publicQuery({ name: "get", returns: () => Schema.Null }),
+  FunctionSpec.publicQuery({ name: "get", args: () => ({ id: Schema.String }), returns: () => Schema.String }),
 );
 `;
-        yield* fs.makeDirectory(path.join(directory, "nested"));
         yield* fs.makeDirectory(path.join(directory, "_generated"));
         yield* Effect.forEach(leaves, (leaf) =>
-          fs.writeFileString(
-            path.join(directory, leaf.relativePath),
-            groupSpec,
-          ),
+          Effect.gen(function* () {
+            const target = path.join(directory, leaf.relativePath);
+            yield* fs.makeDirectory(path.dirname(target), { recursive: true });
+            yield* fs.writeFileString(
+              target,
+              leaf.exportName === "jobs"
+                ? groupSpec
+                    .replace("GroupSpec.make()", "GroupSpec.makeNode()")
+                    .replace(
+                      "FunctionSpec.publicQuery",
+                      "FunctionSpec.internalNodeAction",
+                    )
+                : groupSpec,
+            );
+          }),
         );
         yield* fs.writeFileString(
           path.join(directory, "_generated", "spec.ts"),
@@ -153,25 +173,51 @@ export default GroupSpec.make().addFunction(
             nodes: assemblyNodesFromLeaves(leaves),
           }),
         );
-        yield* fs.writeFileString(
-          path.join(directory, "consumer.ts"),
-          `import { Refs } from "@confect/core";
+        const consumer = `import { Refs, Spec } from "@confect/core";
+import { expectTypeOf } from "vitest";
 import spec from "./_generated/spec";
 
 const refs = Refs.make(spec);
 
-export const last = refs.public.g060.get;
-export const nested = refs.public.nested.c100.get;
+const last = refs.public.${lastRoot}.get;
+const nested = refs.public.nested.${lastChild}.get;
+const deep = refs.public.nested.${lastChild}.level3.level4.${lastDeep}.get;
+const parent = refs.public.nested.get;
+const middle = refs.public.nested.${lastChild}.level3.get;
+const node = refs.internal.jobs.get;
+expectTypeOf<keyof typeof refs.public>().toEqualTypeOf<${[...rootNames, "nested"].map((name) => `"${name}"`).join(" | ")}>();
+expectTypeOf<keyof typeof refs.public.nested>().toEqualTypeOf<${[...childNames, "get"].map((name) => `"${name}"`).join(" | ")}>();
+expectTypeOf(last["~Args"]).toEqualTypeOf<{ readonly id: string }>();
+expectTypeOf(nested).toEqualTypeOf<typeof last>();
+expectTypeOf(parent).toEqualTypeOf<typeof last>();
+expectTypeOf(middle).toEqualTypeOf<typeof last>();
+expectTypeOf(deep["~Returns"]).toEqualTypeOf<string>();
+expectTypeOf(deep["~FunctionVisibility"]).toEqualTypeOf<"public">();
+expectTypeOf(deep["~Error"]).toEqualTypeOf<never>();
+expectTypeOf(node["~RuntimeAndFunctionType"]).toEqualTypeOf<{ readonly runtime: "Node"; readonly functionType: "action" }>();
+expectTypeOf(Spec.groups(spec).${lastRoot}.name).toEqualTypeOf<"${lastRoot}">();
 // @ts-expect-error
-export const missing = refs.public.g061;
-`,
+const missing = refs.public.missing;
+// @ts-expect-error
+const missingDeep = refs.public.nested.${lastChild}.level3.level4.missing;
+// @ts-expect-error
+const privateNode = refs.public.jobs;
+// @ts-expect-error
+const wrongArgs: typeof deep["~Args"] = { id: 1 };
+`;
+        yield* fs.writeFileString(
+          path.join(directory, "consumer.ts"),
+          consumer,
         );
         yield* fs.writeFileString(
           path.join(directory, "tsconfig.json"),
           `{
             "compilerOptions": {
               "strict": true,
-              "noEmit": true,
+              "declaration": true,
+              "emitDeclarationOnly": true,
+              "outDir": "declarations",
+              "exactOptionalPropertyTypes": ${exactOptionalPropertyTypes},
               "skipLibCheck": true,
               "module": "ESNext",
               "moduleResolution": "Bundler",
@@ -198,6 +244,49 @@ export const missing = refs.public.g061;
           Stream.mkString,
         );
         expect(yield* compiler.exitCode, output).toBe(0);
+        const declaration = yield* fs.readFileString(
+          path.join(directory, "declarations", "_generated", "spec.d.ts"),
+        );
+        expect(declaration).toContain("declare const spec:");
+        expect(declaration).toContain(
+          `GroupSpec.NamedAt<typeof ${lastRoot}, "${lastRoot}">`,
+        );
+        expect(declaration).toContain(
+          `typeof nested_${lastChild}_level3_level4_${lastDeep}`,
+        );
+        expect(declaration.match(/typeof /g)).toHaveLength(leaves.length);
+        expect(declaration).not.toContain("effect/Schema");
+        expect(declaration.split("\n").length).toBeLessThan(
+          leaves.length * 2 + 10,
+        );
+        expect(declaration.length).toBeLessThan(leaves.length * 240);
+        yield* fs.writeFileString(
+          path.join(directory, "consumer.ts"),
+          consumer.replace(
+            '"./_generated/spec"',
+            '"./declarations/_generated/spec"',
+          ),
+        );
+        const declarationConsumer = yield* spawner.spawn(
+          ChildProcess.make(process.execPath, [
+            fileURLToPath(
+              new URL(
+                "bin/tsc",
+                import.meta.resolve("typescript/package.json"),
+              ),
+            ),
+            "-p",
+            directory,
+            "--noEmit",
+            "--emitDeclarationOnly",
+            "false",
+          ]),
+        );
+        const declarationOutput = yield* declarationConsumer.all.pipe(
+          Stream.decodeText(),
+          Stream.mkString,
+        );
+        expect(yield* declarationConsumer.exitCode, declarationOutput).toBe(0);
       }).pipe(Effect.scoped),
     { timeout: 60000 },
   );

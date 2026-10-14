@@ -8,22 +8,38 @@ import * as Spec from "@confect/core/Spec";
 
 describe("isSpec", () => {
   it("checks whether a value is a spec", () => {
-    const spec: unknown = Spec.make();
+    const spec: unknown = Spec.fromGroups({});
 
     expect(Spec.isSpec(spec)).toStrictEqual(true);
   });
 });
 
 it("derives group types from the payload and replaces an existing group immutably", () => {
-  const original = GroupSpec.makeAt("notes").addFunction(
-    FunctionSpec.publicQuery({ name: "old", returns: () => Schema.String }),
+  const original = GroupSpec.withName(
+    "notes",
+    GroupSpec.make().addFunction(
+      FunctionSpec.publicQuery({ name: "old", returns: () => Schema.String }),
+    ),
   );
-  const replacement = GroupSpec.makeAt("notes").addFunction(
-    FunctionSpec.publicQuery({ name: "current", returns: () => Schema.Finite }),
+  const replacement = GroupSpec.withName(
+    "notes",
+    GroupSpec.make().addFunction(
+      FunctionSpec.publicQuery({
+        name: "current",
+        returns: () => Schema.Finite,
+      }),
+    ),
   );
-  const empty = Spec.make();
-  const before = empty.add(original);
-  const after = before.add(replacement);
+  const empty = Spec.fromGroups({}) as Spec.Spec;
+  const before = Spec.fromGroups({ notes: original }) as Spec.Spec<{
+    notes: typeof original;
+  }>;
+  const after = Spec.fromGroups({
+    ...Spec.groups(before),
+    notes: replacement,
+  }) as Spec.Spec<{
+    notes: typeof replacement;
+  }>;
   expect(Spec.groups(empty)).toEqual({});
   expect(Spec.groups(before).notes).toBe(original);
   expect(Spec.groups(after).notes).toBe(replacement);
@@ -35,7 +51,7 @@ it("derives group types from the payload and replaces an existing group immutabl
   >().toEqualTypeOf<"current">();
 });
 
-it("replaces an addAt binding without changing the source group or forcing its schemas", () => {
+it("replaces a bulk binding without changing the source group or forcing its schemas", () => {
   let evaluated = 0;
   const original = GroupSpec.make().addFunction(
     FunctionSpec.publicQuery({
@@ -55,8 +71,17 @@ it("replaces an addAt binding without changing the source group or forcing its s
       },
     }),
   );
-  const before = Spec.make().addAt("service", original);
-  const after = before.addAt("service", replacement);
+  const input = { service: original };
+  const before = Spec.fromGroups(input) as Spec.Spec<{
+    service: GroupSpec.NamedAt<typeof original, "service">;
+  }>;
+  const after = Spec.fromGroups({
+    ...Spec.groups(before),
+    service: replacement,
+  }) as Spec.Spec<{
+    service: GroupSpec.NamedAt<typeof replacement, "service">;
+  }>;
+  expect(input.service).toBe(original);
   expect(evaluated).toBe(0);
   expect(original.name).toBe("");
   expect(replacement.name).toBe("");
@@ -70,7 +95,7 @@ it("replaces an addAt binding without changing the source group or forcing its s
   >().toEqualTypeOf<"current">();
 });
 
-it("infers refs from addAt-assembled spec", () => {
+it("derives refs from the declared bulk-assembled spec", () => {
   const FnReturns = Schema.Array(Schema.String);
 
   const notes = GroupSpec.make().addFunction(
@@ -87,9 +112,18 @@ it("infers refs from addAt-assembled spec", () => {
     }),
   );
 
-  const _spec = Spec.make()
-    .addAt("databaseReader", databaseReader)
-    .addAt("groups", GroupSpec.makeAt("groups").addGroupAt("notes", notes));
+  const _spec = Spec.fromGroups({
+    databaseReader,
+    groups: GroupSpec.addGroupsAt(GroupSpec.make(), { notes }),
+  }) as Spec.Spec<{
+    databaseReader: GroupSpec.NamedAt<typeof databaseReader, "databaseReader">;
+    groups: GroupSpec.GroupSpec<
+      "Convex",
+      "groups",
+      never,
+      GroupSpec.NamedAt<typeof notes, "notes">
+    >;
+  }>;
 
   type SpecGroups = Spec.Groups<typeof _spec>;
   type TopLevelNames = GroupSpec.Name<SpecGroups>;
@@ -119,7 +153,10 @@ it("places a Node group alongside Convex groups, with no `node` namespace", () =
     }),
   );
 
-  const spec = Spec.make().addAt("notes", notes).addAt("email", email);
+  const spec = Spec.fromGroups({ notes, email }) as Spec.Spec<{
+    notes: GroupSpec.NamedAt<typeof notes, "notes">;
+    email: GroupSpec.NamedAt<typeof email, "email">;
+  }>;
 
   expect(Object.keys(Spec.groups(spec)).sort()).toEqual(["email", "notes"]);
 
@@ -132,4 +169,37 @@ it("places a Node group alongside Convex groups, with no `node` namespace", () =
   type PublicRefs = Refs.Refs<typeof spec, RefMod.AnyPublic>;
   expectTypeOf<keyof PublicRefs>().toEqualTypeOf<"notes" | "email">();
   expectTypeOf<PublicRefs["email"]["send"]>().toExtend<RefMod.AnyAction>();
+});
+
+it("validates every bulk binding name", () => {
+  const group = GroupSpec.make();
+  for (const name of ["123", "if", "schema"]) {
+    expect(() => Spec.fromGroups({ [name]: group })).toThrow(
+      "Expected a valid Confect function identifier",
+    );
+  }
+  expect(group.name).toBe("");
+});
+
+it("preserves special property names as own group bindings", () => {
+  const group = GroupSpec.make().addFunction(
+    FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }),
+  );
+  const spec = Spec.fromGroups({ ["__proto__"]: group, constructor: group });
+  const groups = Spec.groups(spec);
+  expect(Object.hasOwn(groups, "__proto__")).toBe(true);
+  expect(groups.__proto__.name).toBe("__proto__");
+  expect(groups.constructor.name).toBe("constructor");
+  expect(Object.getPrototypeOf(groups)).toBe(Object.prototype);
+  expect(group.name).toBe("");
+});
+
+it("checks group inputs without accumulating their types", () => {
+  expectTypeOf(Spec.fromGroups).returns.toEqualTypeOf<Spec.AnyWithProps>();
+  expectTypeOf<{ bad: number }>().not.toExtend<
+    Parameters<typeof Spec.fromGroups>[0]
+  >();
+  expectTypeOf<{ bad: GroupSpec.Any }>().not.toExtend<
+    Parameters<typeof Spec.fromGroups>[0]
+  >();
 });

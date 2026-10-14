@@ -145,7 +145,7 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
   // path. Exercised from a clean tree, so it also guards the `writeGroups` path.
   it.effect("generates a top-level Node module with `use node`", () =>
     Effect.gen(function* () {
-      const spec = Spec.make().addAt("typedErrorsNode", nodeGroup());
+      const spec = Spec.fromGroups({ typedErrorsNode: nodeGroup() });
 
       const { contents, resolves } = yield* runGenerateForNodeGroup({
         spec,
@@ -166,10 +166,11 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
   // resolves at the matching nested path.
   it.effect("generates a nested Node module preserving its path", () =>
     Effect.gen(function* () {
-      const spec = Spec.make().addAt(
-        "notes",
-        GroupSpec.makeAt("notes").addGroupAt("archived", nodeGroup()),
-      );
+      const spec = Spec.fromGroups({
+        notes: GroupSpec.addGroupsAt(GroupSpec.make(), {
+          archived: nodeGroup(),
+        }),
+      });
 
       const { contents, resolves } = yield* runGenerateForNodeGroup({
         spec,

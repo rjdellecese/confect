@@ -18,7 +18,10 @@ describe("make", () => {
       returns: () => FnReturns,
     });
 
-    const spec = Spec.make().add(GroupSpec.makeAt("notes").addFunction(list));
+    const notes = GroupSpec.make().addFunction(list);
+    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
+      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
+    }>;
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
@@ -32,16 +35,22 @@ describe("make", () => {
   });
 
   it("throws an error if a group and function have the same name", () => {
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("notes")
-        .addGroup(GroupSpec.makeAt("list"))
-        .addFunction(
-          FunctionSpec.publicQuery({
-            name: "list",
-            returns: () => Schema.Array(Schema.String),
-          }),
-        ),
+    const list = GroupSpec.make();
+    const parent = GroupSpec.make().addFunction(
+      FunctionSpec.publicQuery({
+        name: "list",
+        returns: () => Schema.Array(Schema.String),
+      }),
     );
+    const notes = GroupSpec.addGroupsAt(parent, {
+      list,
+    }) as GroupSpec.AddGroups<
+      typeof parent,
+      GroupSpec.NamedAt<typeof list, "list">
+    >;
+    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
+      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
+    }>;
     expect(() => Refs.make(spec)).toThrowErrorMatchingInlineSnapshot(
       `[Error: Group and function at same level have same name ('notes:list')]`,
     );
@@ -50,21 +59,22 @@ describe("make", () => {
   it("filters internal refs to only internal functions", () => {
     const FnReturns = Schema.String;
 
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("notes")
-        .addFunction(
-          FunctionSpec.publicQuery({
-            name: "publicList",
-            returns: () => FnReturns,
-          }),
-        )
-        .addFunction(
-          FunctionSpec.internalQuery({
-            name: "internalList",
-            returns: () => FnReturns,
-          }),
-        ),
-    );
+    const notes = GroupSpec.make()
+      .addFunction(
+        FunctionSpec.publicQuery({
+          name: "publicList",
+          returns: () => FnReturns,
+        }),
+      )
+      .addFunction(
+        FunctionSpec.internalQuery({
+          name: "internalList",
+          returns: () => FnReturns,
+        }),
+      );
+    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
+      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
+    }>;
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.internal.notes.internalList).toEqualTypeOf<
@@ -83,23 +93,25 @@ describe("make", () => {
   it("filters out groups with no matching functions", () => {
     const FnReturns = Schema.String;
 
-    const spec = Spec.make()
-      .add(
-        GroupSpec.makeAt("publicOnly").addFunction(
-          FunctionSpec.publicQuery({
-            name: "list",
-            returns: () => FnReturns,
-          }),
-        ),
-      )
-      .add(
-        GroupSpec.makeAt("internalOnly").addFunction(
-          FunctionSpec.internalQuery({
-            name: "list",
-            returns: () => FnReturns,
-          }),
-        ),
-      );
+    const publicOnly = GroupSpec.make().addFunction(
+      FunctionSpec.publicQuery({
+        name: "list",
+        returns: () => FnReturns,
+      }),
+    );
+    const internalOnly = GroupSpec.make().addFunction(
+      FunctionSpec.internalQuery({
+        name: "list",
+        returns: () => FnReturns,
+      }),
+    );
+    const spec = Spec.fromGroups({ publicOnly, internalOnly }) as Spec.Spec<{
+      readonly publicOnly: GroupSpec.NamedAt<typeof publicOnly, "publicOnly">;
+      readonly internalOnly: GroupSpec.NamedAt<
+        typeof internalOnly,
+        "internalOnly"
+      >;
+    }>;
 
     const refs = Refs.make(spec);
 
@@ -119,21 +131,22 @@ describe("make", () => {
   it("filters public refs to only public functions", () => {
     const FnReturns = Schema.String;
 
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("notes")
-        .addFunction(
-          FunctionSpec.publicQuery({
-            name: "publicList",
-            returns: () => FnReturns,
-          }),
-        )
-        .addFunction(
-          FunctionSpec.internalQuery({
-            name: "internalList",
-            returns: () => FnReturns,
-          }),
-        ),
-    );
+    const notes = GroupSpec.make()
+      .addFunction(
+        FunctionSpec.publicQuery({
+          name: "publicList",
+          returns: () => FnReturns,
+        }),
+      )
+      .addFunction(
+        FunctionSpec.internalQuery({
+          name: "internalList",
+          returns: () => FnReturns,
+        }),
+      );
+    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
+      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
+    }>;
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.publicList).toEqualTypeOf<
@@ -158,9 +171,10 @@ describe("make", () => {
         RegisteredQuery<"public", ListQueryArgs, Promise<ListQueryReturns>>
       >()("list");
 
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("notes").addFunction(listSpec),
-    );
+    const notes = GroupSpec.make().addFunction(listSpec);
+    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
+      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
+    }>;
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
@@ -189,23 +203,24 @@ describe("make", () => {
     type RemoveMutationArgs = { id: string };
     type RemoveMutationReturns = void;
 
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("notes")
-        .addFunction(
-          FunctionSpec.convexPublicQuery<
-            RegisteredQuery<"public", GetQueryArgs, Promise<GetQueryReturns>>
-          >()("get"),
-        )
-        .addFunction(
-          FunctionSpec.convexInternalMutation<
-            RegisteredMutation<
-              "internal",
-              RemoveMutationArgs,
-              Promise<RemoveMutationReturns>
-            >
-          >()("remove"),
-        ),
-    );
+    const notes = GroupSpec.make()
+      .addFunction(
+        FunctionSpec.convexPublicQuery<
+          RegisteredQuery<"public", GetQueryArgs, Promise<GetQueryReturns>>
+        >()("get"),
+      )
+      .addFunction(
+        FunctionSpec.convexInternalMutation<
+          RegisteredMutation<
+            "internal",
+            RemoveMutationArgs,
+            Promise<RemoveMutationReturns>
+          >
+        >()("remove"),
+      );
+    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
+      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
+    }>;
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.get).toEqualTypeOf<
@@ -249,19 +264,20 @@ describe("make", () => {
       returns: () => ConfectQueryReturns,
     });
 
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("notes")
-        .addFunction(ConfectQuery)
-        .addFunction(
-          FunctionSpec.convexPublicQuery<
-            RegisteredQuery<
-              "public",
-              ConvexQueryArgs,
-              Promise<ConvexQueryReturns>
-            >
-          >()("search"),
-        ),
-    );
+    const notes = GroupSpec.make()
+      .addFunction(ConfectQuery)
+      .addFunction(
+        FunctionSpec.convexPublicQuery<
+          RegisteredQuery<
+            "public",
+            ConvexQueryArgs,
+            Promise<ConvexQueryReturns>
+          >
+        >()("search"),
+      );
+    const spec = Spec.fromGroups({ notes }) as Spec.Spec<{
+      readonly notes: GroupSpec.NamedAt<typeof notes, "notes">;
+    }>;
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.list).toEqualTypeOf<
@@ -296,21 +312,22 @@ describe("middleware error unions", () => {
       },
     ) {}
 
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("mixed")
-        .middleware(GateMutations)
-        .addFunction(
-          FunctionSpec.publicMutation({
-            name: "update",
-            returns: () => Schema.Null,
-          }),
-        )
-        .addFunction(
-          FunctionSpec.convexPublicQuery<
-            RegisteredQuery<"public", { cursor: string }, Promise<string[]>>
-          >()("search"),
-        ),
-    );
+    const mixed = GroupSpec.make()
+      .middleware(GateMutations)
+      .addFunction(
+        FunctionSpec.publicMutation({
+          name: "update",
+          returns: () => Schema.Null,
+        }),
+      )
+      .addFunction(
+        FunctionSpec.convexPublicQuery<
+          RegisteredQuery<"public", { cursor: string }, Promise<string[]>>
+        >()("search"),
+      );
+    const spec = Spec.fromGroups({ mixed }) as Spec.Spec<{
+      readonly mixed: GroupSpec.NamedAt<typeof mixed, "mixed">;
+    }>;
     const refs = Refs.make(spec);
 
     expectTypeOf<
@@ -349,12 +366,23 @@ describe("make with middleware options", () => {
 
   it("preserves options through group builders and refs without inheriting into children", () => {
     const options = { roles: ["Internal"] as const };
-    const group = GroupSpec.make()
+    const parent = GroupSpec.make()
       .middleware(RequireRole, options)
-      .addFunction(query.middleware(Observe))
-      .addGroup(GroupSpec.makeAt("child").addFunction(query))
-      .addGroupAt("alias", GroupSpec.make().addFunction(query));
-    const refs = Refs.make(Spec.make().addAt("roles", group));
+      .addFunction(query.middleware(Observe));
+    const child = GroupSpec.make().addFunction(query);
+    const alias = GroupSpec.make().addFunction(query);
+    const group = GroupSpec.addGroupsAt(parent, { child, alias });
+    const spec = Spec.fromGroups({ roles: group }) as Spec.Spec<{
+      readonly roles: GroupSpec.NamedAt<
+        GroupSpec.AddGroups<
+          typeof parent,
+          | GroupSpec.NamedAt<typeof child, "child">
+          | GroupSpec.NamedAt<typeof alias, "alias">
+        >,
+        "roles"
+      >;
+    }>;
+    const refs = Refs.make(spec);
     expect(refs.public.roles.get.middlewareAttachments[0]?.options).toBe(
       options,
     );
@@ -365,12 +393,15 @@ describe("make with middleware options", () => {
     >().toEqualTypeOf<AccessDenied>();
     expectTypeOf<Ref.Error<typeof refs.public.roles.child.get>>().toBeNever();
 
-    const functionRefs = Refs.make(
-      Spec.make().addAt(
-        "roles",
-        GroupSpec.make().addFunction(query.middleware(RequireRole, options)),
-      ),
+    const functionGroup = GroupSpec.make().addFunction(
+      query.middleware(RequireRole, options),
     );
+    const functionSpec = Spec.fromGroups({
+      roles: functionGroup,
+    }) as Spec.Spec<{
+      readonly roles: GroupSpec.NamedAt<typeof functionGroup, "roles">;
+    }>;
+    const functionRefs = Refs.make(functionSpec);
     expect(
       functionRefs.public.roles.get.middlewareAttachments[0]?.options,
     ).toBe(options);
@@ -394,7 +425,10 @@ describe("make with middleware options", () => {
     const group = GroupSpec.make()
       .middleware(LazyPolicy, { enabled: true })
       .addFunction(query.middleware(LazyPolicy, { enabled: false }));
-    const refs = Refs.make(Spec.make().addAt("lazy", group));
+    const spec = Spec.fromGroups({ lazy: group }) as Spec.Spec<{
+      readonly lazy: GroupSpec.NamedAt<typeof group, "lazy">;
+    }>;
+    const refs = Refs.make(spec);
     expect(group.middlewareSpecs).toEqual([LazyPolicy]);
     expect(group.functions.get.middlewareSpecs).toEqual([LazyPolicy]);
     expect(

@@ -9,7 +9,7 @@ describe("GroupPath.getGroupSpec", () => {
     GroupPath.make(pathSegments);
 
   test("returns none for empty spec", () => {
-    const spec = Spec.make();
+    const spec = Spec.fromGroups({});
 
     const result = GroupPath.getGroupSpec(
       spec,
@@ -20,7 +20,7 @@ describe("GroupPath.getGroupSpec", () => {
   });
 
   test("returns none when group does not exist", () => {
-    const spec = Spec.make().add(GroupSpec.makeAt("myGroup"));
+    const spec = Spec.fromGroups({ myGroup: GroupSpec.make() });
 
     const result = GroupPath.getGroupSpec(
       spec,
@@ -31,8 +31,8 @@ describe("GroupPath.getGroupSpec", () => {
   });
 
   test("returns the group for a single-element path", () => {
-    const myGroup = GroupSpec.makeAt("myGroup");
-    const spec = Spec.make().add(myGroup);
+    const myGroup = GroupSpec.make();
+    const spec = Spec.fromGroups({ myGroup });
 
     const result = GroupPath.getGroupSpec(spec, makeGroupPathObj(["myGroup"]));
 
@@ -41,8 +41,8 @@ describe("GroupPath.getGroupSpec", () => {
   });
 
   test("returns none when nested group does not exist", () => {
-    const outer = GroupSpec.makeAt("outer");
-    const spec = Spec.make().add(outer);
+    const outer = GroupSpec.make();
+    const spec = Spec.fromGroups({ outer });
 
     const result = GroupPath.getGroupSpec(
       spec,
@@ -53,9 +53,9 @@ describe("GroupPath.getGroupSpec", () => {
   });
 
   test("returns the nested group for a two-element path", () => {
-    const inner = GroupSpec.makeAt("inner");
-    const outer = GroupSpec.makeAt("outer").addGroup(inner);
-    const spec = Spec.make().add(outer);
+    const inner = GroupSpec.make();
+    const outer = GroupSpec.addGroupsAt(GroupSpec.make(), { inner });
+    const spec = Spec.fromGroups({ outer });
 
     const result = GroupPath.getGroupSpec(
       spec,
@@ -67,10 +67,10 @@ describe("GroupPath.getGroupSpec", () => {
   });
 
   test("returns the deeply nested group for a three-element path", () => {
-    const level3 = GroupSpec.makeAt("level3");
-    const level2 = GroupSpec.makeAt("level2").addGroup(level3);
-    const level1 = GroupSpec.makeAt("level1").addGroup(level2);
-    const spec = Spec.make().add(level1);
+    const level3 = GroupSpec.make();
+    const level2 = GroupSpec.addGroupsAt(GroupSpec.make(), { level3 });
+    const level1 = GroupSpec.addGroupsAt(GroupSpec.make(), { level2 });
+    const spec = Spec.fromGroups({ level1 });
 
     const result = GroupPath.getGroupSpec(
       spec,
@@ -82,9 +82,9 @@ describe("GroupPath.getGroupSpec", () => {
   });
 
   test("returns none when path is partially valid but final segment does not exist", () => {
-    const level2 = GroupSpec.makeAt("level2");
-    const level1 = GroupSpec.makeAt("level1").addGroup(level2);
-    const spec = Spec.make().add(level1);
+    const level2 = GroupSpec.make();
+    const level1 = GroupSpec.addGroupsAt(GroupSpec.make(), { level2 });
+    const spec = Spec.fromGroups({ level1 });
 
     const result = GroupPath.getGroupSpec(
       spec,
@@ -95,9 +95,9 @@ describe("GroupPath.getGroupSpec", () => {
   });
 
   test("returns none when intermediate path segment does not exist", () => {
-    const level2 = GroupSpec.makeAt("level2");
-    const level1 = GroupSpec.makeAt("level1").addGroup(level2);
-    const spec = Spec.make().add(level1);
+    const level2 = GroupSpec.make();
+    const level1 = GroupSpec.addGroupsAt(GroupSpec.make(), { level2 });
+    const spec = Spec.fromGroups({ level1 });
 
     const result = GroupPath.getGroupSpec(
       spec,
@@ -108,12 +108,13 @@ describe("GroupPath.getGroupSpec", () => {
   });
 
   test("returns correct group when multiple groups exist at the same level", () => {
-    const notes = GroupSpec.makeAt("notes");
-    const random = GroupSpec.makeAt("random");
-    const notesAndRandom = GroupSpec.makeAt("notesAndRandom")
-      .addGroup(notes)
-      .addGroup(random);
-    const spec = Spec.make().add(notesAndRandom);
+    const notes = GroupSpec.make();
+    const random = GroupSpec.make();
+    const notesAndRandom = GroupSpec.addGroupsAt(GroupSpec.make(), {
+      notes,
+      random,
+    });
+    const spec = Spec.fromGroups({ notesAndRandom });
 
     const notesResult = GroupPath.getGroupSpec(
       spec,
@@ -131,9 +132,9 @@ describe("GroupPath.getGroupSpec", () => {
   });
 
   test("returns correct group when multiple top-level groups exist", () => {
-    const users = GroupSpec.makeAt("users");
-    const posts = GroupSpec.makeAt("posts");
-    const spec = Spec.make().add(users).add(posts);
+    const users = GroupSpec.make();
+    const posts = GroupSpec.make();
+    const spec = Spec.fromGroups({ users, posts });
 
     const usersResult = GroupPath.getGroupSpec(
       spec,
