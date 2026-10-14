@@ -2,10 +2,12 @@ import { assert, expect, it } from "@effect/vitest";
 import * as WatchBuild from "@confect/cli/WatchBuild";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as HashMap from "effect/HashMap";
 import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
 import * as PlatformError from "effect/PlatformError";
+import * as Result from "effect/Result";
 import type * as esbuild from "esbuild";
 import type * as WatchGraph from "@confect/cli/WatchGraph";
 
@@ -37,6 +39,152 @@ const snapshot = (
     snapshot: { fingerprints, graph, outputHash },
     warnings: [],
   });
+
+const successfulOutcome = WatchBuild.Outcome.Succeeded({
+  snapshot: {
+    fingerprints: HashMap.empty(),
+    graph: HashMap.empty(),
+    outputHash: "output",
+  },
+  warnings: [],
+});
+
+const request = (progress: WatchBuild.Progress) =>
+  WatchBuild.request(progress, WatchBuild.makeRequestId());
+
+it.effect(
+  "checks captured inputs against current files without changing the snapshot",
+  () =>
+    Effect.gen(function* () {
+      const captured = {
+        fingerprints: HashMap.make(["input.ts", "0102"]),
+        graph: HashMap.empty<string, HashSet.HashSet<string>>(),
+        outputHash: "output",
+      };
+      const fs = FileSystem.makeNoop({
+        readFile: () => Effect.succeed(new Uint8Array([1, 2])),
+      });
+      const hashing = Crypto.make({
+        randomBytes: (size) => new Uint8Array(size),
+        digest: (_algorithm, contents) => Effect.succeed(contents),
+      });
+      expect(yield* WatchBuild.verifyInputs(captured, fs, hashing)).toBe(true);
+      expect(
+        yield* WatchBuild.verifyInputs(
+          captured,
+          FileSystem.makeNoop({
+            readFile: () => Effect.succeed(new Uint8Array([3])),
+          }),
+          hashing,
+        ),
+      ).toBe(false);
+      expect(captured.fingerprints).toEqual(HashMap.make(["input.ts", "0102"]));
+    }),
+);
+
+it.effect.each(["read", "digest"] as const)(
+  "retains the structured %s failure during input verification",
+  (operation) =>
+    Effect.gen(function* () {
+      const cause = PlatformError.badArgument({
+        module: "FileSystem",
+        method: "readFile",
+        description: "unavailable",
+      });
+      const captured = {
+        ...successfulOutcome.snapshot,
+        fingerprints: HashMap.make(["input.ts", "0102"]),
+      };
+      const verified = yield* WatchBuild.verifyInputs(
+        captured,
+        FileSystem.makeNoop({
+          readFile: () =>
+            operation === "read"
+              ? Effect.fail(cause)
+              : Effect.succeed(new Uint8Array([1, 2])),
+        }),
+        Crypto.make({
+          randomBytes: (size) => new Uint8Array(size),
+          digest: () => Effect.fail(cause),
+        }),
+      ).pipe(Effect.result);
+      assert(Result.isFailure(verified));
+      expect(verified.failure).toEqual(
+        WatchBuild.Failure.InputCaptureFailed({ file: "input.ts", cause }),
+      );
+    }),
+);
+
+it("recognizes a joined request after its earlier observer was canceled", () => {
+  const id = WatchBuild.makeRequestId();
+  const requested = WatchBuild.request(WatchBuild.initialProgress, id);
+  const ended = WatchBuild.endRequest(requested);
+  const joined = WatchBuild.request(ended, id);
+  expect(WatchBuild.joinedWithoutCompletion(joined)).toBe(true);
+  expect(WatchBuild.getCompletion(joined)).toEqual(Option.none());
+  expect(WatchBuild.joinedWithoutCompletion(request(ended))).toBe(false);
+  const completed = WatchBuild.complete(joined, {
+    generation: joined.generation,
+    outcome: successfulOutcome,
+  });
+  expect(WatchBuild.joinedWithoutCompletion(completed)).toBe(false);
+  expect(WatchBuild.getCompletion(completed)._tag).toBe("Some");
+});
+
+it("requires a completion from beyond the refresh barrier, not just a newer start", () => {
+  const started = WatchBuild.start(WatchBuild.initialProgress);
+  const barrier = WatchBuild.captureBarrier(started);
+  const requested = request(started);
+  const stale = {
+    generation: started.generation,
+    outcome: successfulOutcome,
+  };
+  const completed = WatchBuild.complete(requested, stale);
+  const newer = WatchBuild.start(completed);
+  expect(WatchBuild.getCompletion(newer)).toEqual(Option.some(stale));
+  expect(WatchBuild.isFresh(barrier, stale)).toBe(false);
+  const fresh = {
+    generation: newer.generation,
+    outcome: successfulOutcome,
+  };
+  expect(WatchBuild.getCompletion(WatchBuild.complete(newer, fresh))).toEqual(
+    Option.some(stale),
+  );
+  const retried = request(WatchBuild.endRequest(newer));
+  expect(WatchBuild.getCompletion(WatchBuild.complete(retried, fresh))).toEqual(
+    Option.some(fresh),
+  );
+  expect(WatchBuild.isFresh(barrier, fresh)).toBe(true);
+  expect(WatchBuild.getCompletion(requested)).toEqual(Option.none());
+  expect(WatchBuild.getCompletion(started)).toEqual(Option.none());
+  expect(WatchBuild.captureBarrier(started)).toBe(barrier);
+});
+
+it("does not retain unrelated completions after ending a request or across contexts", () => {
+  const requested = request(WatchBuild.start(WatchBuild.initialProgress));
+  const completion = {
+    generation: requested.generation,
+    outcome: successfulOutcome,
+  };
+  const ended = WatchBuild.endRequest(requested);
+  expect(
+    WatchBuild.getCompletion(WatchBuild.complete(ended, completion)),
+  ).toEqual(Option.none());
+  expect(WatchBuild.getCompletion(WatchBuild.initialProgress)).toEqual(
+    Option.none(),
+  );
+  const replacement = WatchBuild.start(request(WatchBuild.initialProgress));
+  const fresh = { ...completion, generation: replacement.generation };
+  expect(
+    WatchBuild.isFresh(
+      WatchBuild.captureBarrier(WatchBuild.initialProgress),
+      fresh,
+    ),
+  ).toBe(true);
+  expect(
+    WatchBuild.getCompletion(WatchBuild.complete(replacement, fresh)),
+  ).toEqual(Option.some(fresh));
+});
 
 it("diffs transitive dependencies through both old and new graphs", () => {
   const oldGraph = HashMap.make(

@@ -46,6 +46,13 @@ type WatcherLifecycle = Data.TaggedEnum<{
     readonly scope: Scope.Closeable;
     readonly entries: Array.NonEmptyReadonlyArray<Entry>;
     readonly context: esbuild.BuildContext;
+    readonly identifyRequest: (
+      promise: Promise<esbuild.BuildResult>,
+    ) => WatchBuild.RequestId;
+    readonly progress: Ref.Ref<WatchBuild.Progress>;
+    readonly verifyInputs: (
+      snapshot: WatchBuild.Snapshot,
+    ) => ReturnType<typeof WatchBuild.verifyInputs>;
   };
 }>;
 const WatcherLifecycle = Data.taggedEnum<WatcherLifecycle>();
@@ -110,7 +117,7 @@ export const make = Effect.fnUntraced(function* (
           entryPointsWatcher(signal, pendingRef, restartQueue, state),
         ),
         confectStructureWatcher(signal, pendingRef, restartQueue),
-        convexConfigStructureWatcher(restartQueue),
+        convexConfigStructureWatcher(restartQueue, pendingRef),
       ],
       { concurrency: "unbounded" },
     ).pipe(Effect.asVoid),
@@ -133,6 +140,7 @@ const esbuildOptions = (
   notExternal: ReadonlyArray<RegExp>,
   stateRef: Ref.Ref<WatchBuild.State>,
   captureRef: Ref.Ref<WatchBuild.Capture>,
+  progressRef: Ref.Ref<WatchBuild.Progress>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
 ): esbuild.BuildOptions => {
@@ -161,9 +169,10 @@ const esbuildOptions = (
         setup(build) {
           build.onStart(() =>
             Effect.runPromise(
-              Ref.set(captureRef, WatchBuild.emptyCapture).pipe(
-                Effect.as(undefined),
-              ),
+              Effect.gen(function* () {
+                yield* Ref.update(progressRef, WatchBuild.start);
+                yield* Ref.set(captureRef, WatchBuild.emptyCapture);
+              }).pipe(Effect.as(undefined)),
             ),
           );
           build.onLoad({ filter: /.*/ }, (args) =>
@@ -204,6 +213,7 @@ const esbuildOptions = (
           build.onEnd((result) =>
             Effect.runPromise(
               Effect.gen(function* () {
+                const { generation } = yield* Ref.get(progressRef);
                 const previous = yield* Ref.get(stateRef);
                 const outcome = yield* WatchBuild.parse(
                   result,
@@ -231,6 +241,9 @@ const esbuildOptions = (
                   }),
                 );
                 yield* Queue.offer(signal, undefined);
+                yield* Ref.update(progressRef, (progress) =>
+                  WatchBuild.complete(progress, { generation, outcome }),
+                );
               }),
             ),
           );
@@ -301,6 +314,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
 
     const scope = yield* Scope.fork(parentScope, "sequential");
     const captureRef = yield* Ref.make(WatchBuild.emptyCapture);
+    const progress = yield* Ref.make(WatchBuild.initialProgress);
     const tsconfig = loadTsConfig(projectRoot);
     const notExternal = tsconfigPathsToRegExp(
       tsconfig?.data.compilerOptions?.paths ?? {},
@@ -319,6 +333,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
               notExternal,
               watcher.observation,
               captureRef,
+              progress,
               signal,
               pendingRef,
             ),
@@ -331,9 +346,28 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
           catch: (cause) => new OperationError({ operation: "dispose", cause }),
         }).pipe(Effect.orDie),
     ).pipe(Scope.provide(scope));
+    const requestIds = new WeakMap<
+      Promise<esbuild.BuildResult>,
+      WatchBuild.RequestId
+    >();
     yield* Ref.set(
       watcher.lifecycle,
-      WatcherLifecycle.Active({ key, scope, entries, context }),
+      WatcherLifecycle.Active({
+        key,
+        scope,
+        entries,
+        context,
+        identifyRequest: (promise) => {
+          const existing = requestIds.get(promise);
+          if (existing !== undefined) return existing;
+          const id = WatchBuild.makeRequestId();
+          requestIds.set(promise, id);
+          return id;
+        },
+        progress,
+        verifyInputs: (snapshot) =>
+          WatchBuild.verifyInputs(snapshot, fs, crypto),
+      }),
     );
     yield* Effect.tryPromise({
       try: () => context.watch(),
@@ -360,41 +394,83 @@ const refresh = Effect.fnUntraced(function* (watcher: State) {
               cause: "The dependency watcher is not initialized",
             }),
           ),
-        Active: ({ context }) =>
+        Active: ({ context, identifyRequest, progress, verifyInputs }) =>
           Effect.gen(function* () {
+            const runSync = Effect.runSyncWith(yield* Effect.context());
+            const barrier = WatchBuild.captureBarrier(yield* Ref.get(progress));
             const rebuild = Effect.gen(function* () {
               const built = yield* Effect.tryPromise({
-                try: () => context.rebuild(),
+                try: () => {
+                  const promise = context.rebuild();
+                  runSync(
+                    Ref.update(progress, (currentProgress) =>
+                      WatchBuild.request(
+                        currentProgress,
+                        identifyRequest(promise),
+                      ),
+                    ),
+                  );
+                  return promise;
+                },
                 catch: (cause) =>
                   new OperationError({ operation: "rebuild", cause }),
               }).pipe(Effect.result);
-              const state = yield* Ref.get(watcher.observation);
+              const currentProgress = yield* Ref.get(progress);
+              const completed = WatchBuild.getCompletion(currentProgress);
               if (Result.isFailure(built)) {
                 const rejected = parseFailure(built.failure.cause);
                 if (Option.isNone(rejected)) return yield* built.failure;
-                if (!WatchBuild.State.$is("Failed")(state))
+                if (WatchBuild.joinedWithoutCompletion(currentProgress))
+                  return Option.none<WatchBuild.Completion>();
+                if (
+                  Option.isNone(completed) ||
+                  !WatchBuild.Outcome.$is("Failed")(completed.value.outcome)
+                )
                   return yield* new OperationError({
                     operation: "rebuild",
                     cause: rejected.value.errors,
                   });
               }
-              return yield* WatchBuild.State.$match(state, {
-                Succeeded: ({ snapshot, warnings }) =>
-                  Effect.succeed(
-                    WatchBuild.Outcome.Succeeded({ snapshot, warnings }),
-                  ),
-                Failed: ({ observation }) => Effect.succeed(observation),
-                Initial: () =>
-                  Effect.fail(
+              if (WatchBuild.joinedWithoutCompletion(currentProgress))
+                return Option.none<WatchBuild.Completion>();
+              const observed = yield* Effect.fromOption(completed).pipe(
+                Effect.mapError(
+                  () =>
                     new OperationError({
                       operation: "rebuild",
                       cause: "esbuild completed without a build observation",
                     }),
+                ),
+              );
+              if (
+                WatchBuild.isFresh(barrier, observed) &&
+                WatchBuild.Outcome.$is("Succeeded")(observed.outcome)
+              ) {
+                const unchanged = yield* verifyInputs(
+                  observed.outcome.snapshot,
+                ).pipe(
+                  Effect.mapError(
+                    ({ cause }) =>
+                      new OperationError({ operation: "refresh", cause }),
                   ),
-              });
-            });
-            yield* rebuild;
-            return RefreshOutcome.Observed({ outcome: yield* rebuild });
+                );
+                if (!unchanged) return Option.none<WatchBuild.Completion>();
+              }
+              return Option.some(observed);
+            }).pipe(
+              Effect.ensuring(Ref.update(progress, WatchBuild.endRequest)),
+            );
+            const completed = yield* rebuild.pipe(
+              Effect.repeat({
+                while: (observed) =>
+                  Option.isNone(observed) ||
+                  !WatchBuild.isFresh(barrier, observed.value),
+              }),
+              Effect.flatMap((observed) =>
+                Effect.fromOption(observed).pipe(Effect.orDie),
+              ),
+            );
+            return RefreshOutcome.Observed({ outcome: completed.outcome });
           }),
       });
     }),
@@ -469,6 +545,7 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
  */
 const convexConfigStructureWatcher = Effect.fnUntraced(function* (
   restartQueue: Queue.Queue<void>,
+  pendingRef: Ref.Ref<Pending>,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -482,7 +559,9 @@ const convexConfigStructureWatcher = Effect.fnUntraced(function* (
       return Match.value(event).pipe(
         Match.tag("Update", () => Effect.void),
         Match.tag("Create", "Remove", () =>
-          Queue.offer(restartQueue, undefined),
+          Ref.update(pendingRef, SyncState.full).pipe(
+            Effect.andThen(Queue.offer(restartQueue, undefined)),
+          ),
         ),
         Match.exhaustive,
       );
@@ -533,7 +612,9 @@ const handleConfectChange = ({
 
   if (Option.isSome(EntryPoint.parse(relativePath))) {
     return isLifecycleChange
-      ? Queue.offer(restartQueue, undefined)
+      ? Ref.update(pendingRef, SyncState.full).pipe(
+          Effect.andThen(Queue.offer(restartQueue, undefined)),
+        )
       : Effect.void;
   }
 

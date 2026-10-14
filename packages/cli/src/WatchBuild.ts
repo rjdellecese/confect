@@ -1,7 +1,9 @@
 import * as Array from "effect/Array";
+import * as Brand from "effect/Brand";
 import type * as Crypto from "effect/Crypto";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import type * as FileSystem from "effect/FileSystem";
 import * as Equal from "effect/Equal";
 import * as HashMap from "effect/HashMap";
 import * as HashSet from "effect/HashSet";
@@ -51,6 +53,109 @@ export type Outcome = Data.TaggedEnum<{
   };
 }>;
 export const Outcome = Data.taggedEnum<Outcome>();
+
+export type Generation = number & Brand.Brand<"WatchBuild.Generation">;
+const Generation = Brand.nominal<Generation>();
+
+export type Barrier = number & Brand.Brand<"WatchBuild.Barrier">;
+const Barrier = Brand.nominal<Barrier>();
+
+export type RequestId = object & Brand.Brand<"WatchBuild.RequestId">;
+const RequestId = Brand.nominal<RequestId>();
+
+export const makeRequestId = (): RequestId => RequestId({});
+
+export interface Completion {
+  readonly generation: Generation;
+  readonly outcome: Outcome;
+}
+
+type Request = Data.TaggedEnum<{
+  Idle: {};
+  Pending: {};
+  Joined: {};
+  Completed: { readonly completion: Completion };
+}>;
+const Request = Data.taggedEnum<Request>();
+
+export interface Progress {
+  readonly generation: Generation;
+  readonly request: Request;
+  readonly lastRequest: Option.Option<RequestId>;
+}
+
+export const initialProgress: Progress = {
+  generation: Generation(0),
+  request: Request.Idle(),
+  lastRequest: Option.none(),
+};
+
+export const start = (progress: Progress): Progress => ({
+  ...progress,
+  generation: Generation(progress.generation + 1),
+});
+
+export const captureBarrier = (progress: Progress): Barrier =>
+  Barrier(progress.generation);
+
+export const request = (progress: Progress, id: RequestId): Progress => ({
+  ...progress,
+  request:
+    Option.isSome(progress.lastRequest) && progress.lastRequest.value === id
+      ? Request.Joined()
+      : Request.Pending(),
+  lastRequest: Option.some(id),
+});
+
+export const complete = (
+  progress: Progress,
+  completion: Completion,
+): Progress => ({
+  ...progress,
+  request: Request.$match(progress.request, {
+    Idle: (idle) => idle,
+    Pending: () => Request.Completed({ completion }),
+    Joined: () => Request.Completed({ completion }),
+    Completed: (completed) => completed,
+  }),
+});
+
+export const getCompletion = (progress: Progress): Option.Option<Completion> =>
+  Request.$match(progress.request, {
+    Idle: () => Option.none(),
+    Pending: () => Option.none(),
+    Joined: () => Option.none(),
+    Completed: ({ completion }) => Option.some(completion),
+  });
+
+export const joinedWithoutCompletion = (progress: Progress): boolean =>
+  Request.$is("Joined")(progress.request);
+
+export const endRequest = (progress: Progress): Progress => ({
+  ...progress,
+  request: Request.Idle(),
+});
+
+export const isFresh = (barrier: Barrier, completion: Completion): boolean =>
+  completion.generation > barrier;
+
+export const verifyInputs = Effect.fn("WatchBuild.verifyInputs")(function* (
+  snapshot: Snapshot,
+  fs: FileSystem.FileSystem,
+  crypto: Crypto.Crypto,
+) {
+  const matches = yield* Effect.forEach(
+    snapshot.fingerprints,
+    ([file, expected]) =>
+      fs.readFile(file).pipe(
+        Effect.flatMap((contents) => crypto.digest("SHA-256", contents)),
+        Effect.map((digest) => Hex.encode(digest) === expected),
+        Effect.mapError((cause) => Failure.InputCaptureFailed({ file, cause })),
+      ),
+    { concurrency: 8 },
+  );
+  return Array.every(matches, (matchesInput) => matchesInput);
+});
 
 export type State = Data.TaggedEnum<{
   Initial: {};
