@@ -42,13 +42,13 @@ it.effect.each([false, true])(
       expect(code).toContain('import notes from "../../notes.impl";');
       expect(code).toContain('typeof import("../../notes.spec")["default"]');
       if (useNode) {
-        expect(code).toContain("RegisteredNodeFunction.make");
+        expect(code).toContain("RegisteredNodeFunction.buildForGroup");
         expect(code).not.toContain(
-          "(handler) => (ctx, args) => handler(ctx, args)",
+          "handler: (ctx, args) => definition.handler(ctx, args)",
         );
       } else {
         expect(code).toContain(
-          "(handler) => (ctx, args) => handler(ctx, args)",
+          "handler: (ctx, args) => definition.handler(ctx, args)",
         );
         expect(code).not.toContain("RegisteredNodeFunction");
       }

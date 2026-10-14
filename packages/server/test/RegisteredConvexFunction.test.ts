@@ -2,7 +2,7 @@ import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
-import { assert, describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Convex from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -21,6 +21,21 @@ vi.mock("convex/server", (importOriginal) =>
 );
 
 describe("make", () => {
+  it("limits preparation to the six isolate registration kinds", () => {
+    expectTypeOf<
+      ReturnType<typeof RegisteredConvexFunction.prepare>["_tag"]
+    >().toEqualTypeOf<
+      | "PublicQuery"
+      | "InternalQuery"
+      | "PublicMutation"
+      | "InternalMutation"
+      | "PublicAction"
+      | "InternalAction"
+    >();
+    expectTypeOf<
+      Parameters<typeof RegisteredConvexFunction.make>["length"]
+    >().toEqualTypeOf<2 | 3>();
+  });
   const options = {
     name: "get",
     args: () => ({ value: Schema.String }),
@@ -58,7 +73,7 @@ describe("make", () => {
       register: Convex.internalActionGeneric,
     },
   ])(
-    "preserves validators and registration when wrapping a $name handler",
+    "prepares a closed definition and registers a $name handler",
     ({ spec, register }) => {
       const handler = () => Effect.succeed("ok");
       const item = FunctionRegistryItem.make({
@@ -70,26 +85,19 @@ describe("make", () => {
       const database = DatabaseSchema.make({});
       const registration = vi.mocked(register);
       registration.mockClear();
-      const wrappedHandlers =
-        vi.fn<(original: unknown, wrapped: unknown) => void>();
-      const wrapper: RegisteredConvexFunction.HandlerWrapper = (original) => {
-        const forward: typeof original = (ctx, args) => original(ctx, args);
-        wrappedHandlers(original, forward);
-        return forward;
-      };
+      const prepared = RegisteredConvexFunction.prepare(database, item);
+      expect(registration).not.toHaveBeenCalled();
+      expect(prepared._tag.toLowerCase()).toBe(
+        `${spec.functionVisibility}${spec.runtimeAndFunctionType.functionType}`,
+      );
       RegisteredConvexFunction.make(database, item);
-      RegisteredConvexFunction.make(database, item, [], wrapper);
-      expect(registration).toHaveBeenCalledTimes(2);
-      expect(wrappedHandlers).toHaveBeenCalledOnce();
-      const [plainCall, wrappedCall] = registration.mock.calls;
-      assert(plainCall && wrappedCall);
-      const [plain] = plainCall;
-      const [wrapped] = wrappedCall;
-      assert(typeof plain !== "function" && typeof wrapped !== "function");
-      expect(wrapped.args).toEqual(plain.args);
-      expect(wrapped.returns).toEqual(plain.returns);
-      expect(wrapped.handler).toBe(wrappedHandlers.mock.calls[0]?.[1]);
-      expect(wrapped.handler).not.toBe(wrappedHandlers.mock.calls[0]?.[0]);
+      expect(registration).toHaveBeenCalledOnce();
+      const [call] = registration.mock.calls;
+      assert(call);
+      const [definition] = call;
+      assert(typeof definition !== "function");
+      expect(definition.args).toEqual(prepared.definition.args);
+      expect(definition.returns).toEqual(prepared.definition.returns);
       expect(item.handler).toBe(handler);
     },
   );
