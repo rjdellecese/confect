@@ -155,13 +155,7 @@ type ConvertValueToValidator<
           ? VBoolean<OptionalValue<boolean, Optionality>, Optionality>
           : VLiteral<OptionalValue<Vl, Optionality>, Optionality>
         : IsUnion<Vl> extends true
-          ? IsRecursive<Vl> extends true
-            ? VAny<any, Optionality>
-            : VUnion<
-                OptionalValue<MutableValue<Vl>, Optionality>,
-                ValueTupleToValidatorTuple<UnionToTuple<Vl>>,
-                Optionality
-              >
+          ? UnionValueToValidator<Vl, Optionality>
           : [Vl] extends [number]
             ? [number] extends [Vl]
               ? VFloat64<OptionalValue<number, Optionality>, Optionality>
@@ -171,19 +165,7 @@ type ConvertValueToValidator<
                 ? VInt64<OptionalValue<bigint, Optionality>, Optionality>
                 : VLiteral<OptionalValue<Vl, Optionality>, Optionality>
               : [Vl] extends [string]
-                ? Vl extends {
-                    __tableName: infer TableName extends string;
-                  }
-                  ? VId<
-                      OptionalValue<
-                        GenericId.GenericId<TableName>,
-                        Optionality
-                      >,
-                      Optionality
-                    >
-                  : [string] extends [Vl]
-                    ? VString<OptionalValue<string, Optionality>, Optionality>
-                    : VLiteral<OptionalValue<Vl, Optionality>, Optionality>
+                ? StringValueToValidator<Vl, Optionality>
                 : [Vl] extends [ArrayBuffer]
                   ? VBytes<OptionalValue<ArrayBuffer, Optionality>, Optionality>
                   : IsRecursive<Vl> extends true
@@ -195,30 +177,42 @@ type ConvertValueToValidator<
                           Optionality
                         >
                       : Vl extends object
-                        ? IsRecord<MutableValue<Vl>> extends true
-                          ? ValueToValidator<
-                              Vl[keyof Vl]
-                            > extends infer VdValue extends Validator<
-                              any,
-                              "required",
-                              any
-                            >
-                            ? VRecord<
-                                OptionalValue<MutableValue<Vl>, Optionality>,
-                                VString,
-                                VdValue,
-                                Optionality
-                              >
-                            : never
-                          : ObjectFieldsToValidators<Vl> extends infer VdFields extends
-                                Record<string, any>
-                            ? VObject<
-                                OptionalValue<MutableValue<Vl>, Optionality>,
-                                VdFields,
-                                Optionality
-                              >
-                            : never
+                        ? ObjectValueToValidator<Vl, Optionality>
                         : never;
+
+type StringValueToValidator<
+  Vl,
+  Optionality extends "required" | "optional",
+> = Vl extends { __tableName: infer TableName extends string }
+  ? VId<OptionalValue<GenericId.GenericId<TableName>, Optionality>, Optionality>
+  : [string] extends [Vl]
+    ? VString<OptionalValue<string, Optionality>, Optionality>
+    : VLiteral<OptionalValue<Vl, Optionality>, Optionality>;
+
+type ObjectValueToValidator<Vl, Optionality extends "required" | "optional"> =
+  IsRecord<MutableValue<Vl>> extends true
+    ? ValueToValidator<Vl[keyof Vl]> extends infer VdValue extends Validator<
+        any,
+        "required",
+        any
+      >
+      ? VRecord<
+          OptionalValue<MutableValue<Vl>, Optionality>,
+          VString,
+          VdValue,
+          Optionality
+        >
+      : never
+    : ObjectFieldsToValidators<Vl> extends infer VdFields extends Record<
+          string,
+          any
+        >
+      ? VObject<
+          OptionalValue<MutableValue<Vl>, Optionality>,
+          VdFields,
+          Optionality
+        >
+      : never;
 
 type ObjectFieldsToValidators<Vl> = {
   -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
@@ -238,6 +232,15 @@ export type UndefinedOrValueToValidator<Vl extends ReadonlyValue | undefined> =
     : [Vl] extends [ReadonlyValue]
       ? ValueToValidator<Vl>
       : never;
+
+type UnionValueToValidator<Vl, Optionality extends "required" | "optional"> =
+  IsRecursive<Vl> extends true
+    ? VAny<any, Optionality>
+    : VUnion<
+        OptionalValue<MutableValue<Vl>, Optionality>,
+        ValueTupleToValidatorTuple<UnionToTuple<Vl>>,
+        Optionality
+      >;
 
 type ValueTupleToValidatorTuple<VlTuple extends readonly unknown[]> =
   VlTuple extends
