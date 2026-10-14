@@ -2,6 +2,7 @@ import type { BuildError, BundlerError } from "@confect/cli/BuildError";
 import type * as CodegenError from "@confect/cli/CodegenError";
 import type { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import type { ConvexDirectory } from "@confect/cli/ConvexDirectory";
+import type { EvaluationError } from "@confect/cli/Evaluation";
 import type * as FunctionPaths from "@confect/cli/FunctionPaths";
 import type * as GroupPath from "@confect/cli/GroupPath";
 import type * as GroupPaths from "@confect/cli/GroupPaths";
@@ -87,11 +88,7 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
       "dev",
       {},
       {},
-      | OperationError
-      | BundlerError
-      | GroupPath.GroupModulePathIsNotATypeScriptFileError
-      | NoSuchElementError
-      | PlatformError,
+      OperationError | EvaluationError | PlatformError,
       GenerationServices | ProjectRoot
     >
   >();

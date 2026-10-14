@@ -22,9 +22,8 @@ import * as SyncState from "../SyncState";
 import type { Pending } from "../SyncState";
 import type { OptionalFile } from "../EntryPoint";
 import * as Watcher from "../Watcher";
-import * as CodegenError from "../CodegenError";
+import * as Evaluation from "../Evaluation";
 import { ConvexDirectory } from "../ConvexDirectory";
-import { validateImplFiles } from "../LeafModule";
 import * as FunctionPaths from "../FunctionPaths";
 import type * as GroupPath from "../GroupPath";
 import type * as GroupPaths from "../GroupPaths";
@@ -43,7 +42,6 @@ import {
   generateHttp,
   touchConvexSchema,
 } from "../utils";
-import { codegenHandler, loadPreviousFunctionPaths } from "./codegen";
 
 const COALESCE_QUIESCENCE = Duration.millis(300);
 
@@ -132,7 +130,7 @@ const logFunctionPathDiff = Effect.fnUntraced(function* (
 export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
-    const previousFunctionPaths = yield* loadPreviousFunctionPaths;
+    const previousFunctionPaths = yield* Evaluation.loadPreviousFunctionPaths;
 
     const pendingRef = yield* Ref.make<Pending>(SyncState.empty);
     const signal = yield* Queue.sliding<void>(1);
@@ -263,15 +261,15 @@ const syncLoop = Effect.fnUntraced(function* (
         yield* logPending("Dependencies may have changed, reloading…");
 
       if (SyncState.requiresFullSync(phase, pending)) {
-        const current = yield* codegenHandler.pipe(
-          Effect.tap(({ functionPaths: nextFunctionPaths }) =>
+        const current = yield* Evaluation.generate.pipe(
+          Effect.tap((nextFunctionPaths) =>
             Effect.gen(function* () {
               const previous = yield* Ref.get(functionPathsRef);
               yield* logFunctionPathDiff(previous, nextFunctionPaths);
               yield* Ref.set(functionPathsRef, nextFunctionPaths);
             }),
           ),
-          CodegenError.catchAndLog,
+          Evaluation.catchAndLog,
         );
         if (Option.isNone(current)) {
           yield* Ref.set(phaseRef, SyncState.Phase.NeedsFullSync());
@@ -301,8 +299,8 @@ const syncLoop = Effect.fnUntraced(function* (
       } else {
         const paths = SyncState.implsToValidate(phase, pending);
         if (Array.isReadonlyArrayNonEmpty(paths)) {
-          const validated = yield* validateImplFiles(paths).pipe(
-            CodegenError.catchAndLog,
+          const validated = yield* Evaluation.validate(paths).pipe(
+            Evaluation.catchAndLog,
           );
           if (Option.isNone(validated)) {
             yield* Ref.set(
