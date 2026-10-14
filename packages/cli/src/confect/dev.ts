@@ -252,7 +252,7 @@ const syncLoop = Effect.fnUntraced(function* (
       const firstSync = SyncState.Phase.$is("Bootstrapping")(phase);
       if (!firstSync) yield* logMessages;
 
-      const pending = yield* Ref.getAndSet(pendingRef, SyncState.empty);
+      const pending = yield* watcher.takePending;
       if (!SyncState.isDirty(pending)) return;
 
       const optional = yield* Ref.updateAndGet(

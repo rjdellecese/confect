@@ -6,6 +6,7 @@ import * as Path from "effect/Path";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as HashSet from "effect/HashSet";
@@ -29,6 +30,7 @@ import {
 import * as esbuild from "esbuild";
 import * as Bundler from "./Bundler";
 import * as WatchBuild from "./WatchBuild";
+import * as WatchTopology from "./WatchTopology";
 import * as SyncState from "./SyncState";
 import type { Pending } from "./SyncState";
 import * as EntryPoint from "./EntryPoint";
@@ -42,6 +44,7 @@ type WatcherLifecycle = Data.TaggedEnum<{
   Uninitialized: {};
   Empty: {};
   Active: {
+    readonly initial: Deferred.Deferred<void>;
     readonly key: string;
     readonly scope: Scope.Closeable;
     readonly entries: Array.NonEmptyReadonlyArray<Entry>;
@@ -61,6 +64,7 @@ interface State {
   readonly lifecycle: Ref.Ref<WatcherLifecycle>;
   readonly observation: Ref.Ref<WatchBuild.State>;
   readonly lock: Semaphore.Semaphore;
+  readonly topology: WatchTopology.WatchTopology;
 }
 
 type RefreshOutcome = Data.TaggedEnum<{
@@ -109,19 +113,25 @@ export const make = Effect.fnUntraced(function* (
     ),
     observation: yield* Ref.make<WatchBuild.State>(WatchBuild.State.Initial()),
     lock: yield* Semaphore.make(1),
+    topology: yield* WatchTopology.make(pendingRef),
   };
+  const restart = state.topology.invalidate.pipe(
+    Effect.andThen(Queue.offer(restartQueue, undefined)),
+    Effect.andThen(Queue.offer(signal, undefined)),
+  );
   return {
     run: Effect.all(
       [
         Effect.scoped(
           entryPointsWatcher(signal, pendingRef, restartQueue, state),
         ),
-        confectStructureWatcher(signal, pendingRef, restartQueue),
-        convexConfigStructureWatcher(restartQueue, pendingRef),
+        confectStructureWatcher(signal, pendingRef, restart),
+        convexConfigStructureWatcher(restart),
       ],
       { concurrency: "unbounded" },
     ).pipe(Effect.asVoid),
     refresh: refresh(state),
+    takePending: state.topology.takePending,
     diagnostics: Ref.get(state.observation).pipe(
       Effect.map(WatchBuild.diagnostics),
     ),
@@ -143,6 +153,7 @@ const esbuildOptions = (
   progressRef: Ref.Ref<WatchBuild.Progress>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
+  initial: Deferred.Deferred<void>,
 ): esbuild.BuildOptions => {
   const encodeString = Schema.encodeSync(Schema.fromJsonString(Schema.String));
   return {
@@ -244,6 +255,7 @@ const esbuildOptions = (
                 yield* Ref.update(progressRef, (progress) =>
                   WatchBuild.complete(progress, { generation, outcome }),
                 );
+                yield* Deferred.succeed(initial, undefined);
               }),
             ),
           );
@@ -269,8 +281,12 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     "_generated",
   );
   const crypto = yield* Crypto.Crypto;
+  const completedInitial = Deferred.make<void>().pipe(
+    Effect.tap((initial) => Deferred.succeed(initial, undefined)),
+  );
 
   const sync = Effect.gen(function* () {
+    const revision = yield* watcher.topology.revision;
     const current = yield* Ref.get(watcher.lifecycle);
     const entries = yield* EntryPoint.discover;
     const desiredPaths = HashSet.fromIterable(
@@ -286,7 +302,15 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
       Empty: () => entries.length === 0,
       Active: ({ key: previousKey }) => previousKey === key,
     });
-    if (unchanged) return;
+    if (unchanged) {
+      const initial = yield* WatcherLifecycle.$match(current, {
+        Uninitialized: () => completedInitial,
+        Empty: () => completedInitial,
+        Active: ({ initial: activeInitial }) => Effect.succeed(activeInitial),
+      });
+      yield* watcher.topology.reconcile(revision, initial);
+      return;
+    }
     yield* WatcherLifecycle.$match(current, {
       Uninitialized: () => Effect.void,
       Empty: () => Ref.update(pendingRef, SyncState.full),
@@ -309,12 +333,15 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
       yield* Ref.set(watcher.lifecycle, WatcherLifecycle.Empty());
       yield* Ref.update(pendingRef, SyncState.full);
       yield* Queue.offer(signal, undefined);
+      const initial = yield* completedInitial;
+      yield* watcher.topology.reconcile(revision, initial);
       return;
     }
 
     const scope = yield* Scope.fork(parentScope, "sequential");
     const captureRef = yield* Ref.make(WatchBuild.emptyCapture);
     const progress = yield* Ref.make(WatchBuild.initialProgress);
+    const initial = yield* Deferred.make<void>();
     const tsconfig = loadTsConfig(projectRoot);
     const notExternal = tsconfigPathsToRegExp(
       tsconfig?.data.compilerOptions?.paths ?? {},
@@ -336,6 +363,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
               progress,
               signal,
               pendingRef,
+              initial,
             ),
           ),
         catch: (cause) => new OperationError({ operation: "create", cause }),
@@ -353,6 +381,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     yield* Ref.set(
       watcher.lifecycle,
       WatcherLifecycle.Active({
+        initial,
         key,
         scope,
         entries,
@@ -373,6 +402,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
       try: () => context.watch(),
       catch: (cause) => new OperationError({ operation: "watch", cause }),
     });
+    yield* watcher.topology.reconcile(revision, initial);
   }).pipe(Semaphore.withPermit(watcher.lock));
 
   yield* sync;
@@ -480,7 +510,7 @@ const refresh = Effect.fnUntraced(function* (watcher: State) {
 const confectStructureWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-  restartQueue: Queue.Queue<void>,
+  restart: Effect.Effect<unknown>,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -502,7 +532,7 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
         eventTag: event._tag,
         signal,
         pendingRef,
-        restartQueue,
+        restart,
       }),
     ),
     Effect.retry({
@@ -528,7 +558,7 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
           ) {
             return false;
           }
-          yield* Queue.offer(restartQueue, undefined);
+          yield* restart;
           return true;
         }),
     }),
@@ -544,8 +574,7 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
  * watcher.
  */
 const convexConfigStructureWatcher = Effect.fnUntraced(function* (
-  restartQueue: Queue.Queue<void>,
-  pendingRef: Ref.Ref<Pending>,
+  restart: Effect.Effect<unknown>,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -558,11 +587,7 @@ const convexConfigStructureWatcher = Effect.fnUntraced(function* (
         return Effect.void;
       return Match.value(event).pipe(
         Match.tag("Update", () => Effect.void),
-        Match.tag("Create", "Remove", () =>
-          Ref.update(pendingRef, SyncState.full).pipe(
-            Effect.andThen(Queue.offer(restartQueue, undefined)),
-          ),
-        ),
+        Match.tag("Create", "Remove", () => restart),
         Match.exhaustive,
       );
     }),
@@ -572,29 +597,27 @@ const convexConfigStructureWatcher = Effect.fnUntraced(function* (
 const flipDirtyAndSignal = (
   pendingRef: Ref.Ref<Pending>,
   signal: Queue.Queue<void>,
-  restartQueue: Queue.Queue<void>,
-  restart: boolean,
+  restart: Effect.Effect<unknown>,
+  isLifecycleChange: boolean,
 ) =>
-  pipe(
-    Ref.update(pendingRef, SyncState.full),
-    Effect.andThen(Queue.offer(signal, undefined)),
-    Effect.andThen(
-      restart ? Queue.offer(restartQueue, undefined) : Effect.void,
-    ),
-  );
+  isLifecycleChange
+    ? restart
+    : Ref.update(pendingRef, SyncState.full).pipe(
+        Effect.andThen(Queue.offer(signal, undefined)),
+      );
 
 const handleConfectChange = ({
   relativePath,
   eventTag,
   signal,
   pendingRef,
-  restartQueue,
+  restart,
 }: {
   relativePath: string;
   eventTag: "Create" | "Update" | "Remove";
   signal: Queue.Queue<void>;
   pendingRef: Ref.Ref<Pending>;
-  restartQueue: Queue.Queue<void>;
+  restart: Effect.Effect<unknown>;
 }) => {
   if (relativePath.split(/[/\\]/).includes("_generated")) {
     return Effect.void;
@@ -611,11 +634,7 @@ const handleConfectChange = ({
   );
 
   if (Option.isSome(EntryPoint.parse(relativePath))) {
-    return isLifecycleChange
-      ? Ref.update(pendingRef, SyncState.full).pipe(
-          Effect.andThen(Queue.offer(restartQueue, undefined)),
-        )
-      : Effect.void;
+    return isLifecycleChange ? restart : Effect.void;
   }
 
   // A stray `confect/schema.ts` (now codegen-owned at
@@ -623,12 +642,7 @@ const handleConfectChange = ({
   // next codegen pass surfaces the migration error
   // (`LegacySchemaFileError`) instead of silently ignoring the file.
   if (relativePath === "schema.ts") {
-    return flipDirtyAndSignal(
-      pendingRef,
-      signal,
-      restartQueue,
-      isLifecycleChange,
-    );
+    return flipDirtyAndSignal(pendingRef, signal, restart, isLifecycleChange);
   }
 
   // Any other `.ts` under `confect/` (helpers like `tables/notes.ts`).
@@ -639,7 +653,7 @@ const handleConfectChange = ({
   // re-run codegen on Create here.
   return Match.value(eventTag).pipe(
     Match.when("Create", () =>
-      flipDirtyAndSignal(pendingRef, signal, restartQueue, false),
+      flipDirtyAndSignal(pendingRef, signal, restart, false),
     ),
     Match.whenOr("Update", "Remove", () => Effect.void),
     Match.exhaustive,

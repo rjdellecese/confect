@@ -11,6 +11,7 @@ import * as Result from "effect/Result";
 import * as SyncState from "@confect/cli/SyncState";
 import * as WatchBuild from "@confect/cli/WatchBuild";
 import * as HashMap from "effect/HashMap";
+import * as HashSet from "effect/HashSet";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
@@ -31,6 +32,7 @@ vi.mock("esbuild", (importOriginal) =>
 
 const controlledWatcher = Effect.fnUntraced(function* (
   options: {
+    readonly files?: ReadonlyArray<string>;
     readonly plugins?: ReadonlyArray<esbuild.Plugin>;
     readonly afterPlugins?: ReadonlyArray<esbuild.Plugin>;
     readonly rebuild?: (
@@ -41,7 +43,15 @@ const controlledWatcher = Effect.fnUntraced(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const project = yield* Project.make;
-  for (const file of ["notes.spec.ts", "notes.impl.ts", "tables/notes.ts"])
+  if (options.files)
+    for (const file of ["notes.spec.ts", "notes.impl.ts", "tables/notes.ts"])
+      if (!options.files.includes(file))
+        yield* fs.remove(path.join(project.root, "confect", file));
+  for (const file of options.files ?? [
+    "notes.spec.ts",
+    "notes.impl.ts",
+    "tables/notes.ts",
+  ])
     yield* project.write(`confect/${file}`, "export const value = 1;");
   const signal = yield* Queue.unbounded<void>();
   const pending = yield* Ref.make(SyncState.empty);
@@ -185,6 +195,218 @@ it("parses reported build rejections without confusing operation errors or malfo
     Option.none(),
   );
 });
+
+layer(NodeServices.layer, { excludeTestServices: true })(
+  "topology pending consumption",
+  (test) => {
+    test.effect.each(["success", "failure"] as const)(
+      "coalesces an old-context removal failure with the replacement's initial %s",
+      (initialOutcome) =>
+        Effect.gen(function* () {
+          const oldBlocked = yield* Deferred.make<void>();
+          const releaseOld = yield* Deferred.make<void>();
+          const initialBlocked = yield* Deferred.make<void>();
+          const releaseInitial = yield* Deferred.make<void>();
+          const taken = yield* Deferred.make<void>();
+          const runPromise = Effect.runPromiseWith(yield* Effect.context());
+          let contextsCreated = 0;
+          const { watcher, first, project, events, contexts, pending } =
+            yield* controlledWatcher({
+              plugins: [
+                {
+                  name: "gate-removal-observations",
+                  setup(build) {
+                    const context = ++contextsCreated;
+                    let builds = 0;
+                    build.onEnd((result) =>
+                      runPromise(
+                        Effect.gen(function* () {
+                          builds++;
+                          if (context === 1 && builds === 2) {
+                            expect(result.errors.length).toBeGreaterThan(0);
+                            yield* Deferred.succeed(oldBlocked, undefined);
+                            yield* Deferred.await(releaseOld);
+                          } else if (context === 2 && builds === 1) {
+                            expect(result.errors.length > 0).toBe(
+                              initialOutcome === "failure",
+                            );
+                            yield* Deferred.succeed(initialBlocked, undefined);
+                            yield* Deferred.await(releaseInitial);
+                          }
+                        }),
+                      ),
+                    );
+                  },
+                },
+              ],
+            });
+          yield* Effect.addFinalizer(() =>
+            Effect.all([
+              Deferred.succeed(releaseOld, undefined),
+              Deferred.succeed(releaseInitial, undefined),
+            ]),
+          );
+          yield* watcher.refresh;
+          yield* watcher.takePending;
+          const fs = yield* FileSystem.FileSystem;
+          const removed = `${project.root}/confect/notes.spec.ts`;
+          yield* fs.remove(removed);
+          if (initialOutcome === "failure")
+            yield* project.write(
+              "confect/notes.impl.ts",
+              "export const value = ;",
+            );
+          const oldBuild = yield* Effect.promise(() =>
+            first.actual.rebuild(),
+          ).pipe(Effect.exit, Effect.forkScoped);
+          yield* Deferred.await(oldBlocked);
+          yield* Queue.offer(events, { _tag: "Remove", path: removed });
+          yield* Deferred.await(first.disposing);
+          const consumer = yield* watcher.takePending.pipe(
+            Effect.tap(() => Deferred.succeed(taken, undefined)),
+            Effect.forkScoped,
+          );
+          yield* Effect.yieldNow;
+          expect(yield* Deferred.isDone(taken)).toBe(false);
+          yield* Deferred.succeed(releaseOld, undefined);
+          yield* Fiber.join(oldBuild);
+          const replacement = yield* Queue.take(contexts);
+          const newBuild = yield* Effect.promise(() =>
+            replacement.actual.rebuild(),
+          ).pipe(Effect.exit, Effect.forkScoped);
+          yield* Deferred.await(initialBlocked);
+          expect((yield* Ref.get(pending)).work._tag).toBe("Full");
+          expect(yield* Deferred.isDone(taken)).toBe(false);
+          yield* Deferred.succeed(releaseInitial, undefined);
+          yield* Fiber.join(newBuild);
+          expect((yield* Fiber.join(consumer)).work._tag).toBe("Full");
+          yield* watcher.refresh;
+          expect((yield* watcher.takePending).work._tag).toBe("None");
+          yield* project.write(
+            "confect/notes.impl.ts",
+            "export const value = 3;",
+          );
+          yield* watcher.refresh;
+          expect((yield* watcher.takePending).work._tag).toBe("Impls");
+          expect((yield* watcher.takePending).work._tag).toBe("None");
+        }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+      { timeout: 15000 },
+    );
+
+    test.effect(
+      "abandons an unobserved context when another topology revision replaces it",
+      () =>
+        Effect.gen(function* () {
+          const { watcher, project, events, contexts } =
+            yield* controlledWatcher();
+          yield* watcher.refresh;
+          yield* watcher.takePending;
+          yield* project.write(
+            "confect/first.impl.ts",
+            "export const value = 1;",
+          );
+          yield* Queue.offer(events, {
+            _tag: "Create",
+            path: `${project.root}/confect/first.impl.ts`,
+          });
+          const abandoned = yield* Queue.take(contexts);
+          const taken = yield* Deferred.make<void>();
+          const consumer = yield* watcher.takePending.pipe(
+            Effect.tap(() => Deferred.succeed(taken, undefined)),
+            Effect.forkScoped,
+          );
+          yield* Effect.yieldNow;
+          expect(yield* Deferred.isDone(taken)).toBe(false);
+          yield* project.write(
+            "confect/second.impl.ts",
+            "export const value = 2;",
+          );
+          yield* Queue.offer(events, {
+            _tag: "Create",
+            path: `${project.root}/confect/second.impl.ts`,
+          });
+          const replacement = yield* Queue.take(contexts);
+          expect(yield* Deferred.isDone(abandoned.disposed)).toBe(true);
+          expect(yield* Deferred.isDone(taken)).toBe(false);
+          yield* Effect.promise(() => replacement.actual.rebuild());
+          expect((yield* Fiber.join(consumer)).work._tag).toBe("Full");
+          expect((yield* watcher.takePending).work._tag).toBe("None");
+        }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+      { timeout: 15000 },
+    );
+
+    test.effect(
+      "settles no-op reconfiguration without replacing the context",
+      () =>
+        Effect.gen(function* () {
+          const { watcher, project, events, contexts, signal } =
+            yield* controlledWatcher();
+          yield* watcher.refresh;
+          yield* watcher.takePending;
+          yield* Queue.poll(signal).pipe(
+            Effect.repeat({ while: (message) => Option.isSome(message) }),
+          );
+          yield* Queue.offer(events, {
+            _tag: "Create",
+            path: `${project.root}/confect/notes.spec.ts`,
+          });
+          yield* Queue.take(signal);
+          expect((yield* watcher.takePending).work._tag).toBe("Full");
+          expect(yield* Queue.poll(contexts)).toEqual(Option.none());
+          expect((yield* watcher.takePending).work._tag).toBe("None");
+        }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+      { timeout: 15000 },
+    );
+
+    test.effect(
+      "settles last-entry removal, preserves optional cleanup, and observes the first new entry",
+      () =>
+        Effect.gen(function* () {
+          const { watcher, first, project, events, contexts, signal } =
+            yield* controlledWatcher({ files: ["http.ts"] });
+          yield* watcher.refresh;
+          yield* watcher.takePending;
+          yield* Queue.poll(signal).pipe(
+            Effect.repeat({ while: (message) => Option.isSome(message) }),
+          );
+          const fs = yield* FileSystem.FileSystem;
+          const file = `${project.root}/confect/http.ts`;
+          yield* fs.remove(file);
+          yield* Queue.offer(events, { _tag: "Remove", path: file });
+          yield* Queue.take(signal);
+          const removed = yield* watcher.takePending;
+          expect(removed.work._tag).toBe("Full");
+          expect(HashSet.has(removed.optional, "Http")).toBe(true);
+          expect(yield* Deferred.isDone(first.disposed)).toBe(true);
+          expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(
+            true,
+          );
+          yield* Queue.poll(signal).pipe(
+            Effect.repeat({ while: (message) => Option.isSome(message) }),
+          );
+          yield* Queue.offer(events, { _tag: "Remove", path: file });
+          yield* Queue.take(signal);
+          expect((yield* watcher.takePending).work._tag).toBe("Full");
+          yield* project.write("confect/http.ts", "export const value = 2;");
+          yield* Queue.offer(events, { _tag: "Create", path: file });
+          const replacement = yield* Queue.take(contexts);
+          const taken = yield* Deferred.make<void>();
+          const consumer = yield* watcher.takePending.pipe(
+            Effect.tap(() => Deferred.succeed(taken, undefined)),
+            Effect.forkScoped,
+          );
+          yield* Effect.yieldNow;
+          expect(yield* Deferred.isDone(taken)).toBe(false);
+          yield* Effect.promise(() => replacement.actual.rebuild());
+          const created = yield* Fiber.join(consumer);
+          expect(created.work._tag).toBe("Full");
+          expect(HashSet.has(created.optional, "Http")).toBe(true);
+          expect((yield* watcher.takePending).work._tag).toBe("None");
+        }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+      { timeout: 15000 },
+    );
+  },
+);
 
 layer(NodeServices.layer, { excludeTestServices: true })(
   "refresh reconciliation",
@@ -788,6 +1010,70 @@ layer(NodeServices.layer, { excludeTestServices: true })(
 layer(NodeServices.layer, { excludeTestServices: true })(
   "directory watch recovery",
   (test) => {
+    test.effect(
+      "settles initially empty topology and acknowledges a recursive-watch rescan",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const confect = path.join(project.root, "confect");
+          for (const file of [
+            "notes.spec.ts",
+            "notes.impl.ts",
+            "tables/notes.ts",
+          ])
+            yield* fs.remove(path.join(confect, file));
+          const error = PlatformError.systemError({
+            _tag: "Unknown",
+            module: "FileSystem",
+            method: "watch",
+            pathOrDescriptor: confect,
+            cause: {
+              code: "ENOENT",
+              syscall: "scandir",
+              path: path.join(confect, "removed"),
+            },
+          });
+          const fail = yield* Deferred.make<void>();
+          const restored = yield* Deferred.make<void>();
+          let subscriptions = 0;
+          const signal = yield* Queue.sliding<void>(1);
+          const pending = yield* Ref.make(SyncState.empty);
+          const watcher = yield* Watcher.make(signal, pending);
+          yield* watcher.run.pipe(
+            project.provide,
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              watch: (directory) =>
+                directory === confect
+                  ? Stream.suspend(() => {
+                      subscriptions++;
+                      return subscriptions === 1
+                        ? Stream.fromEffect(Deferred.await(fail)).pipe(
+                            Stream.flatMap(() => Stream.fail(error)),
+                          )
+                        : Stream.fromEffect(
+                            Deferred.succeed(restored, undefined),
+                          ).pipe(Stream.drain, Stream.concat(Stream.never));
+                    })
+                  : Stream.never,
+            }),
+            Effect.forkScoped,
+          );
+          expect((yield* watcher.takePending).work._tag).toBe("Full");
+          expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(
+            true,
+          );
+          yield* Deferred.succeed(fail, undefined);
+          yield* Deferred.await(restored);
+          expect((yield* watcher.takePending).work._tag).toBe("Full");
+          expect((yield* watcher.takePending).work._tag).toBe("None");
+          expect(subscriptions).toBe(2);
+        }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+      { timeout: 15000 },
+    );
+
     test.effect.each([
       {
         name: "removed child directory",
