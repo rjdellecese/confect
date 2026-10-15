@@ -46,6 +46,57 @@ vi.mock("esbuild", (importOriginal) =>
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect.each([
+      "schema.spec.ts",
+      "http.spec.ts",
+      "crons.spec.ts",
+      "bad-dir/notes.spec.ts",
+      "notes/bad-name.spec.ts",
+      "notes/..spec.ts",
+      "notes/...spec.ts",
+    ])(
+      "rejects invalid group path %s before replacing the Convex schema",
+      (file) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* fs.makeDirectory(
+            path.dirname(path.join(project.root, "confect", file)),
+            { recursive: true },
+          );
+          const prefix = "../".repeat(file.split("/").length - 1) || "./";
+          const name = path.basename(file, ".spec.ts");
+          yield* project.write(
+            `confect/${file}`,
+            Project.spec.replaceAll('"./_generated/', `"${prefix}_generated/`),
+          );
+          yield* project.write(
+            `confect/${file.replace(/\.spec\.ts$/, ".impl.ts")}`,
+            Project.impl
+              .replaceAll('"./_generated/', `"${prefix}_generated/`)
+              .replace('"./notes.spec"', `"./${name}.spec"`),
+          );
+          const previousSchema = "export default {};\n";
+          yield* project.write("convex/schema.ts", previousSchema);
+          const result = yield* project
+            .provide(codegenHandler)
+            .pipe(Effect.result);
+          assert(Result.isFailure(result));
+          expect(result.failure).toMatchObject({
+            _tag: "SnapshotError",
+            reason: "NoncanonicalPath",
+            relativePath: file,
+          });
+          expect(
+            yield* fs.readFileString(
+              path.join(project.root, "convex/schema.ts"),
+            ),
+          ).toBe(previousSchema);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "notifies Convex after explicit codegen even when generated contents are unchanged",
       () =>

@@ -477,7 +477,7 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
             "notes.spec.ts",
             GroupSpec.makeNode().addFunction(nodeAction("run")),
           );
-          const added = yield* loadLeaf("new.spec.ts");
+          const added = yield* loadLeaf("renamed.spec.ts");
           const after = update(before, [replacement, added]);
           expect(HashMap.size(before.leaves)).toBe(2);
           expect(HashMap.size(after.leaves)).toBe(3);
@@ -504,11 +504,11 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
             GroupSpec.make().addFunction(query("list")),
           );
           const before = fromLoadedLeaves([old]);
-          const renamed = yield* loadLeaf("new.spec.ts", old.spec);
+          const renamed = yield* loadLeaf("renamed.spec.ts", old.spec);
           const after = fromLoadedLeaves([renamed]);
           expect(GenerationSnapshot.diff(before, after)).toEqual({
             removed: [getLeaf(before, "old.spec.ts").root.path],
-            changed: [getLeaf(after, "new.spec.ts").root],
+            changed: [getLeaf(after, "renamed.spec.ts").root],
           });
           const empty = fromLoadedLeaves([yield* loadLeaf("old.spec.ts")]);
           expect(GenerationSnapshot.diff(before, empty)).toEqual({

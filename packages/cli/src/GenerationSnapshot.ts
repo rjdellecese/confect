@@ -81,6 +81,18 @@ const parseLeaf = (key: string, leaf: LeafSummary) =>
     }
     if (key !== `${Array.join(root, "/")}.spec.ts`)
       return yield* failure("RootMismatch");
+    yield* Result.try({
+      try: () => {
+        for (const segment of root)
+          Identifier.validateConfectFunctionIdentifier(segment);
+      },
+      catch: () =>
+        new SnapshotError({
+          reason: "NoncanonicalPath",
+          relativePath: key,
+          pathSegments: root,
+        }),
+    });
     const initial: Result.Result<
       HashSet.HashSet<string>,
       SnapshotError
