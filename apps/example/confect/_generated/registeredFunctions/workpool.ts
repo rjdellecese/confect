@@ -1,5 +1,5 @@
 import { RegisteredFunctions } from "@confect/server";
 import databaseSchema from "../schema";
-import workpool from "../../workpool.impl";
+import groupLayer from "../../workpool.impl";
 
-export default RegisteredFunctions.buildForGroup<typeof import("../../workpool.spec")["default"]>(databaseSchema, workpool);
+export default RegisteredFunctions.buildForGroup<typeof import("../../workpool.spec")["default"]>(databaseSchema, groupLayer);

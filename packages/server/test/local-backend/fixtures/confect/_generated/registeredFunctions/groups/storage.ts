@@ -1,10 +1,10 @@
 import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";
 import databaseSchema from "../../schema";
-import storage from "../../../groups/storage.impl";
+import groupLayer from "../../../groups/storage.impl";
 
 const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
 
-const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/storage.spec")["default"]>(databaseSchema, storage);
+const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/storage.spec")["default"]>(databaseSchema, groupLayer);
 
 export default {
 ["generateUploadUrl"]: RegisteredConvexFunction.register({ ...definitions["generateUploadUrl"], handler: forward(definitions["generateUploadUrl"].handler) }),

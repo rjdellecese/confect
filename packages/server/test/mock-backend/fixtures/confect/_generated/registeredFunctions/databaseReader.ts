@@ -1,10 +1,10 @@
 import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";
 import databaseSchema from "../schema";
-import databaseReader from "../../databaseReader.impl";
+import groupLayer from "../../databaseReader.impl";
 
 const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
 
-const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../databaseReader.spec")["default"]>(databaseSchema, databaseReader);
+const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../databaseReader.spec")["default"]>(databaseSchema, groupLayer);
 
 export default {
 ["getNote"]: RegisteredConvexFunction.register({ ...definitions["getNote"], handler: forward(definitions["getNote"].handler) }),

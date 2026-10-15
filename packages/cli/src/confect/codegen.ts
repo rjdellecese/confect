@@ -354,7 +354,6 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
         schemaImportPath,
         specImportPath,
         implImportPath,
-        layerExportName: leaf.exportName,
       });
 
       yield* writeFileStringAndLog(registryPath, contents);

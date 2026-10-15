@@ -476,14 +476,12 @@ export const registeredFunctionsForGroup = ({
   schemaImportPath,
   specImportPath,
   implImportPath,
-  layerExportName,
 }: Parameters<typeof registeredFunctionsForGroupEffect>[0]) =>
   registeredFunctionsForGroupEffect({
     spec,
     schemaImportPath,
     specImportPath,
     implImportPath,
-    layerExportName,
   });
 
 const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
@@ -491,13 +489,11 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   schemaImportPath,
   specImportPath,
   implImportPath,
-  layerExportName,
 }: {
   spec: GroupSpec.AnyWithProps;
   schemaImportPath: string;
   specImportPath: string;
   implImportPath: string;
-  layerExportName: string;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
   const useNode = spec.runtime === "Node";
@@ -523,7 +519,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   }
 
   yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
-  yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
+  yield* cbw.writeLine(`import groupLayer from "${implImportPath}";`);
   yield* cbw.blankLine();
   // The group's own leaf spec is referenced type-only (`typeof import(...)`),
   // so the spec module is erased at transpile time and never enters the
@@ -533,11 +529,11 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   const specType = `typeof import("${specImportPath}")["default"]`;
   if (useNode) {
     yield* cbw.writeLine(
-      `export default RegisteredNodeFunction.buildForGroup<${specType}>(databaseSchema, ${layerExportName});`,
+      `export default RegisteredNodeFunction.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
     );
   } else if (!forwarding) {
     yield* cbw.writeLine(
-      `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName});`,
+      `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
     );
   } else {
     const bindings = (group: GroupSpec.AnyWithProps, path: string): string =>
@@ -560,7 +556,7 @@ ${[
 }`;
     yield* cbw.writeLine(`const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
 
-const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(databaseSchema, ${layerExportName});
+const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(databaseSchema, groupLayer);
 
 export default ${bindings(spec, "definitions")} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
   }
