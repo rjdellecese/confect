@@ -72,9 +72,7 @@ it.effect(
       });
       const first = yield* render;
       expect(yield* render).toBe(first);
-      expect(first).toContain(
-        '.addGroupAt("child", (GroupSpec.makeAt("child") as any))',
-      );
+      expect(first).toContain('["child"]: GroupSpec.make(),');
     }),
 );
 

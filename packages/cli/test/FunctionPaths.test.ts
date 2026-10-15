@@ -22,7 +22,7 @@ const makeFunctionPath = (
 
 describe("FunctionPaths.make", () => {
   test("empty spec", () => {
-    const spec = Spec.make();
+    const spec = Spec.fromGroups({});
 
     const result = FunctionPaths.make(spec);
 
@@ -30,7 +30,7 @@ describe("FunctionPaths.make", () => {
   });
 
   test("spec with one group with no functions", () => {
-    const spec = Spec.make().add(GroupSpec.makeAt("myGroup"));
+    const spec = Spec.fromGroups({ myGroup: GroupSpec.make() });
 
     const result = FunctionPaths.make(spec);
 
@@ -38,14 +38,14 @@ describe("FunctionPaths.make", () => {
   });
 
   test("spec with one group with one function", () => {
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("myGroup").addFunction(
+    const spec = Spec.fromGroups({
+      myGroup: GroupSpec.make().addFunction(
         FunctionSpec.publicQuery({
           name: "myQuery",
           returns: () => Schema.Null,
         }),
       ),
-    );
+    });
 
     const result = FunctionPaths.make(spec);
 
@@ -58,8 +58,8 @@ describe("FunctionPaths.make", () => {
   });
 
   test("spec with one group with multiple functions", () => {
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("myGroup")
+    const spec = Spec.fromGroups({
+      myGroup: GroupSpec.make()
         .addFunction(
           FunctionSpec.publicQuery({
             name: "list",
@@ -79,7 +79,7 @@ describe("FunctionPaths.make", () => {
             returns: () => Schema.Void,
           }),
         ),
-    );
+    });
 
     const result = FunctionPaths.make(spec);
 
@@ -96,24 +96,21 @@ describe("FunctionPaths.make", () => {
   });
 
   test("spec with multiple top-level groups", () => {
-    const spec = Spec.make()
-      .add(
-        GroupSpec.makeAt("users").addFunction(
-          FunctionSpec.publicQuery({
-            name: "getById",
-            args: () => ({ id: Schema.String }),
-            returns: () => Schema.Unknown,
-          }),
-        ),
-      )
-      .add(
-        GroupSpec.makeAt("posts").addFunction(
-          FunctionSpec.publicQuery({
-            name: "list",
-            returns: () => Schema.Array(Schema.Unknown),
-          }),
-        ),
-      );
+    const spec = Spec.fromGroups({
+      users: GroupSpec.make().addFunction(
+        FunctionSpec.publicQuery({
+          name: "getById",
+          args: () => ({ id: Schema.String }),
+          returns: () => Schema.Unknown,
+        }),
+      ),
+      posts: GroupSpec.make().addFunction(
+        FunctionSpec.publicQuery({
+          name: "list",
+          returns: () => Schema.Array(Schema.Unknown),
+        }),
+      ),
+    });
 
     const result = FunctionPaths.make(spec);
 
@@ -129,23 +126,23 @@ describe("FunctionPaths.make", () => {
   });
 
   test("spec with nested groups", () => {
-    const innerGroup = GroupSpec.makeAt("inner").addFunction(
+    const innerGroup = GroupSpec.make().addFunction(
       FunctionSpec.publicQuery({
         name: "innerQuery",
         returns: () => Schema.Null,
       }),
     );
 
-    const outerGroup = GroupSpec.makeAt("outer")
-      .addGroup(innerGroup)
-      .addFunction(
-        FunctionSpec.publicMutation({
-          name: "outerMutation",
-          returns: () => Schema.Null,
-        }),
-      );
+    const outerGroup = GroupSpec.addGroupsAt(GroupSpec.make(), {
+      inner: innerGroup,
+    }).addFunction(
+      FunctionSpec.publicMutation({
+        name: "outerMutation",
+        returns: () => Schema.Null,
+      }),
+    );
 
-    const spec = Spec.make().add(outerGroup);
+    const spec = Spec.fromGroups({ outer: outerGroup });
 
     const result = FunctionPaths.make(spec);
 
@@ -161,18 +158,18 @@ describe("FunctionPaths.make", () => {
   });
 
   test("spec with deeply nested groups", () => {
-    const level3 = GroupSpec.makeAt("level3").addFunction(
+    const level3 = GroupSpec.make().addFunction(
       FunctionSpec.publicQuery({
         name: "deepQuery",
         returns: () => Schema.Finite,
       }),
     );
 
-    const level2 = GroupSpec.makeAt("level2").addGroup(level3);
+    const level2 = GroupSpec.addGroupsAt(GroupSpec.make(), { level3 });
 
-    const level1 = GroupSpec.makeAt("level1").addGroup(level2);
+    const level1 = GroupSpec.addGroupsAt(GroupSpec.make(), { level2 });
 
-    const spec = Spec.make().add(level1);
+    const spec = Spec.fromGroups({ level1 });
 
     const result = FunctionPaths.make(spec);
 
@@ -187,7 +184,7 @@ describe("FunctionPaths.make", () => {
   });
 
   test("spec with multiple nested groups at same level", () => {
-    const notes = GroupSpec.makeAt("notes")
+    const notes = GroupSpec.make()
       .addFunction(
         FunctionSpec.publicMutation({
           name: "insert",
@@ -202,18 +199,19 @@ describe("FunctionPaths.make", () => {
         }),
       );
 
-    const random = GroupSpec.makeAt("random").addFunction(
+    const random = GroupSpec.make().addFunction(
       FunctionSpec.publicAction({
         name: "getNumber",
         returns: () => Schema.Finite,
       }),
     );
 
-    const notesAndRandom = GroupSpec.makeAt("notesAndRandom")
-      .addGroup(notes)
-      .addGroup(random);
+    const notesAndRandom = GroupSpec.addGroupsAt(GroupSpec.make(), {
+      notes,
+      random,
+    });
 
-    const spec = Spec.make().add(notesAndRandom);
+    const spec = Spec.fromGroups({ notesAndRandom });
 
     const result = FunctionPaths.make(spec);
 
@@ -230,8 +228,8 @@ describe("FunctionPaths.make", () => {
   });
 
   test("includes all function types (query, mutation, action)", () => {
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("api")
+    const spec = Spec.fromGroups({
+      api: GroupSpec.make()
         .addFunction(
           FunctionSpec.publicQuery({
             name: "publicQuery",
@@ -268,7 +266,7 @@ describe("FunctionPaths.make", () => {
             returns: () => Schema.Null,
           }),
         ),
-    );
+    });
 
     const result = FunctionPaths.make(spec);
 

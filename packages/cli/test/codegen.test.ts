@@ -315,18 +315,20 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
   );
 
   it.effect(
-    "fails when a parent addGroupAt name matches a sibling subdirectory segment",
+    "fails when a parent addGroupsAt name matches a sibling subdirectory segment",
     () =>
       Effect.gen(function* () {
         const parent = leaf("notes.spec.ts", ["notes"]);
         const child = leaf("notes/archived.spec.ts", ["notes", "archived"]);
-        const inner = GroupSpec.makeAt("inner").addFunction(
+        const inner = GroupSpec.make().addFunction(
           FunctionSpec.publicQuery({
             name: "list",
             returns: () => emptyReturns,
           }),
         );
-        const parentGroupSpec = GroupSpec.make().addGroupAt("archived", inner);
+        const parentGroupSpec = GroupSpec.addGroupsAt(GroupSpec.make(), {
+          archived: inner,
+        });
 
         const result = yield* Effect.result(
           validateNoParentChildNameCollisions(
