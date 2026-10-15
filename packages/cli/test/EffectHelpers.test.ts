@@ -1,4 +1,5 @@
 import { CodeBlockWriter } from "@confect/cli/CodeBlockWriter";
+import * as FunctionModule from "@confect/cli/FunctionModule";
 import * as templates from "@confect/cli/templates";
 import { assert, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Context from "effect/Context";
@@ -21,7 +22,7 @@ it.effect(
           return false;
         },
       };
-      const render = templates.functions(options);
+      const render = FunctionModule.render(options);
       expect(MutableRef.get(reads)).toBe(1);
       options.functionNames = ["replacement"];
       options.registeredFunctionsImportPath = "./replacement";
@@ -34,15 +35,15 @@ it.effect(
       expect(first).not.toContain("replacement");
       expect(first).not.toContain('"use node"');
       expect(MutableRef.get(reads)).toBe(1);
-      const defaultOptions: Parameters<typeof templates.functions>[0] = {
+      const defaultOptions: Parameters<typeof FunctionModule.render>[0] = {
         functionNames: ["defaulted"],
         registeredFunctionsImportPath: "./defaulted",
       };
-      const defaultRender = templates.functions(defaultOptions);
+      const defaultRender = FunctionModule.render(defaultOptions);
       defaultOptions.useNode = true;
       expect(yield* defaultRender).not.toContain('"use node"');
       expect(
-        yield* templates.functions({
+        yield* FunctionModule.render({
           functionNames: ["next"],
           registeredFunctionsImportPath: "./next",
           useNode: true,

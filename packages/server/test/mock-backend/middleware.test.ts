@@ -4,7 +4,6 @@ import {
   FunctionImpl,
   GroupImpl,
   MiddlewareImpl,
-  RegisteredConvexFunction,
   RegisteredFunctions,
 } from "@confect/server";
 import { TestConfect as TestConfect_ } from "../../../test/src";
@@ -447,7 +446,6 @@ describe("middleware", () => {
           const registered = RegisteredFunctions.buildForGroup<typeof group>(
             databaseSchema,
             groupLayer,
-            RegisteredConvexFunction.make,
           );
           const c = yield* Effect.service(TestConfect.TestConfect).pipe(
             Effect.provide(
@@ -510,7 +508,6 @@ describe("middleware", () => {
         const registered = RegisteredFunctions.buildForGroup<typeof group>(
           databaseSchema,
           groupLayer,
-          RegisteredConvexFunction.make,
         );
         const c = yield* Effect.service(TestConfect.TestConfect).pipe(
           Effect.provide(

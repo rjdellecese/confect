@@ -1,5 +1,12 @@
-import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";
+import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";
 import databaseSchema from "../../schema";
-import scheduling from "../../../groups/scheduling.impl";
+import groupLayer from "../../../groups/scheduling.impl";
 
-export default RegisteredFunctions.buildForGroup<typeof import("../../../groups/scheduling.spec")["default"]>(databaseSchema, scheduling, RegisteredConvexFunction.make);
+const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
+
+const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/scheduling.spec")["default"]>(databaseSchema, groupLayer);
+
+export default {
+["manyOpsQuery"]: RegisteredConvexFunction.register({ ...definitions["manyOpsQuery"], handler: forward(definitions["manyOpsQuery"].handler) }),
+["manyOpsMutation"]: RegisteredConvexFunction.register({ ...definitions["manyOpsMutation"], handler: forward(definitions["manyOpsMutation"].handler) }),
+} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<typeof import("../../../groups/scheduling.spec")["default"]>;

@@ -82,6 +82,15 @@
   },
   "overrides": [
     {
+      "files": [
+        "packages/cli/src/Evaluation.ts",
+        "packages/cli/test/Evaluation.test.ts"
+      ],
+      "rules": {
+        "effecttsgo/node-builtin-import": "off"
+      }
+    },
+    {
       "files": ["**/*.{ts,tsx,mts,cts}"],
       "rules": {
         "typescript/consistent-type-imports": "error",

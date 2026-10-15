@@ -1,35 +1,62 @@
 import * as FileSystem from "effect/FileSystem";
+import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
-import { assert, expect, layer } from "@effect/vitest";
+import {
+  assert,
+  expect,
+  expectTypeOf,
+  it as test,
+  layer,
+} from "@effect/vitest";
+import { vi } from "vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
+import * as Fiber from "effect/Fiber";
+import * as LeafModules from "@confect/cli/LeafModule";
+import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
+import { DatabaseSchema, GroupImpl } from "@confect/server";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as String from "effect/String";
 import * as Layer from "effect/Layer";
-import type { CodegenError } from "@confect/cli/CodegenError";
+import * as Schema from "effect/Schema";
+import {
+  ParentChildNameCollisionError,
+  type CodegenError,
+} from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import * as Bundler from "@confect/cli/Bundler";
+import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import {
   discoverLeafImplFiles,
   discoverLeafSpecFiles,
   groupPathFromRelativeModulePath,
   implPathForSpec,
-  isLeafImplPath,
   isLeafSpecPath,
   specImportPathFromGenerated,
   specPathForImpl,
   toLeafModule,
   validateImpl,
-  validateSpec,
+  validateImplFiles,
+  loadSpec,
   type LeafModule,
+  type LoadedLeafModule,
 } from "@confect/cli/LeafModule";
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
+
+test("requires a loaded leaf rather than an arbitrary leaf/spec pair", () => {
+  expectTypeOf(validateImpl).parameters.toEqualTypeOf<[LoadedLeafModule]>();
+  expectTypeOf<LeafModule>().not.toExtend<LoadedLeafModule>();
+  expectTypeOf<
+    LeafModule & { readonly spec: GroupSpec.AnyWithProps }
+  >().not.toExtend<LoadedLeafModule>();
+});
 
 const LeafModuleLayer = Layer.mergeAll(
   NodePath.layer,
@@ -104,7 +131,7 @@ const withTempLeaf = Effect.fnUntraced(function* (
   stem: string,
   implContents: string,
   use: (
-    leaf: LeafModule,
+    leaf: LoadedLeafModule,
   ) => Effect.Effect<
     void,
     CodegenError,
@@ -118,7 +145,7 @@ const withTempLeaf = Effect.fnUntraced(function* (
       { relativePath: `groups/${stem}.spec.ts`, contents: specContents },
       { relativePath: `groups/${stem}.impl.ts`, contents: implContents },
     ],
-    use(leaf),
+    loadSpec(leaf).pipe(Effect.flatMap(use)),
   );
 });
 
@@ -176,20 +203,57 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
         }),
     );
 
-    it.effect(
-      "isLeafSpecPath and isLeafImplPath detect leaf module suffixes",
-      () =>
-        Effect.sync(() => {
-          expect(isLeafSpecPath("notes.spec.ts")).toBe(true);
-          expect(isLeafSpecPath("notes.impl.ts")).toBe(false);
-          expect(isLeafImplPath("notes.impl.ts")).toBe(true);
-          expect(isLeafImplPath("notes.spec.ts")).toBe(false);
-        }),
+    it.effect("isLeafSpecPath detects spec module suffixes", () =>
+      Effect.sync(() => {
+        expect(isLeafSpecPath("notes.spec.ts")).toBe(true);
+        expect(isLeafSpecPath("notes.impl.ts")).toBe(false);
+      }),
     );
   });
 }
 
-layer(LeafModuleLayer)("validateSpec", (it) => {
+layer(LeafModuleLayer)("loadSpec", (it) => {
+  it.effect(
+    "pairs the validated spec with its leaf without forcing schemas or mutating inputs",
+    () =>
+      Effect.gen(function* () {
+        const schema = vi.fn(() => Schema.Null);
+        const args = vi.fn(() => ({}));
+        const spec = GroupSpec.makeNode().addFunction(
+          FunctionSpec.publicNodeAction({
+            name: "get",
+            args,
+            returns: schema,
+            error: schema,
+          }),
+        );
+        const leaf = yield* toLeafModule("groups/lazy.spec.ts");
+        yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            vi.spyOn(Bundler, "bundle").mockReturnValue(
+              Effect.succeed({
+                module: { default: spec },
+                metafile: { inputs: {}, outputs: {} },
+              }),
+            ),
+          ),
+          (spy) => Effect.sync(() => spy.mockRestore()),
+        );
+        const loaded = yield* loadSpec(leaf);
+        expect(loaded).toMatchObject(leaf);
+        expect(loaded.spec).toBe(spec);
+        expect(loaded.spec.runtime).toBe("Node");
+        expect(loaded.pathSegments).toBe(leaf.pathSegments);
+        expect(loaded).not.toBe(leaf);
+        expect("runtime" in leaf).toBe(false);
+        expect("runtime" in loaded).toBe(false);
+        expect("spec" in leaf).toBe(false);
+        expect(spec.name).toBe("");
+        expect(schema).not.toHaveBeenCalled();
+        expect(args).not.toHaveBeenCalled();
+      }).pipe(Effect.scoped),
+  );
+
   it.effect(
     "rejects equivalent middleware options with a spec-scoped codegen error",
     () =>
@@ -207,7 +271,7 @@ class Policy extends MiddlewareSpec.MiddlewareSpec()("Policy", {
 export default GroupSpec.make().middleware(Policy, { roles: ["Internal"] }).addFunction(
   FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }).middleware(Policy, { roles: ["Internal"] }),
 );`,
-            validateSpec(leaf),
+            loadSpec(leaf),
           ),
         );
         assert(Result.isFailure(result));
@@ -222,7 +286,7 @@ export default GroupSpec.make().middleware(Policy, { roles: ["Internal"] }).addF
   it.effect("accepts non-equivalent options for the same middleware key", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/middlewareOptions.spec.ts");
-      yield* validateSpec(leaf);
+      yield* loadSpec(leaf);
     }),
   );
 
@@ -243,7 +307,7 @@ class Policy extends MiddlewareSpec.MiddlewareSpec()("Policy", {
   functionTypes: { query: true, mutation: false, action: false },
 }) {}
 export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "second");`,
-            validateSpec(leaf),
+            loadSpec(leaf),
           ),
         );
         expect(Exit.hasDies(exit)).toBe(true);
@@ -255,7 +319,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
   it.effect("accepts a valid leaf spec", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/notes.spec.ts");
-      yield* validateSpec(leaf);
+      yield* loadSpec(leaf);
     }),
   );
 
@@ -264,8 +328,8 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
   it.effect("accepts a valid node leaf spec at a non-`node/` path", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("typedErrorsNode.spec.ts");
-      const groupSpec = yield* validateSpec(leaf);
-      expect(groupSpec.runtime).toBe("Node");
+      const groupSpec = yield* loadSpec(leaf);
+      expect(groupSpec.spec.runtime).toBe("Node");
     }),
   );
 
@@ -276,7 +340,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
         withTempFile(
           "groups/_invalid.spec.ts",
           "export default {};\n",
-          validateSpec(leaf),
+          loadSpec(leaf),
         ),
       );
 
@@ -292,7 +356,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
         withTempFile(
           "groups/_brokenSyntax.spec.ts",
           "export default GroupSpec.make(\n",
-          validateSpec(leaf),
+          loadSpec(leaf),
         ),
       );
 
@@ -311,7 +375,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
     () =>
       Effect.gen(function* () {
         const leaf = yield* toLeafModule("groups/notes.spec.ts");
-        yield* validateSpec(leaf);
+        yield* loadSpec(leaf);
       }),
   );
 
@@ -336,7 +400,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
                 contents: `import { FunctionSpec, GroupSpec } from "@confect/core";\nimport leaky from "../_generated/tables/_leaky";\nexport default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "get", returns: () => leaky.Doc }));\n`,
               },
             ],
-            validateSpec(leaf),
+            loadSpec(leaf),
           ),
         );
 
@@ -356,7 +420,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
         withTempFile(
           "groups/_leaky.spec.ts",
           `import { MiddlewareImpl } from "@confect/server";\nexport { default } from "./notes.spec";\nexport const leaked = MiddlewareImpl;\n`,
-          validateSpec(leaf),
+          loadSpec(leaf),
         ),
       );
 
@@ -389,7 +453,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
                 contents: `import { leaked } from "../middleware/_Leaky.spec";\nexport { default } from "./notes.spec";\nexport const used = leaked;\n`,
               },
             ],
-            validateSpec(leaf),
+            loadSpec(leaf),
           ),
         );
 
@@ -412,7 +476,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
       yield* withTempFile(
         "groups/_typeOnly.spec.ts",
         `import type * as MiddlewareImpl from "@confect/server/MiddlewareImpl";\nexport { default } from "./notes.spec";\nexport type Make = typeof MiddlewareImpl.make;\n`,
-        validateSpec(leaf),
+        loadSpec(leaf),
       );
     }),
   );
@@ -437,6 +501,34 @@ layer(LeafModuleLayer)("refs import graph", (it) => {
 // path segment rather than against POSIX literals—a substring check for
 // "middleware/" is vacuously true on Windows and asserts nothing there.
 layer(LeafModuleLayer)("discovery", (it) => {
+  it.effect(
+    "returns parsed impl paths and discards non-impl files at discovery",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const files = [
+          "notes.impl.ts",
+          "notes.spec.ts",
+          "notes.impl.tsx",
+          path.join("_generated", "notes.impl.ts"),
+          path.join("groups", "nested.impl.ts"),
+        ];
+        const implFiles = yield* discoverLeafImplFiles.pipe(
+          Effect.provide(
+            FileSystem.layerNoop({
+              readDirectory: () => Effect.succeed(files),
+            }),
+          ),
+        );
+        expect(implFiles).toEqual([
+          "notes.impl.ts",
+          path.join("groups", "nested.impl.ts"),
+        ]);
+        expectTypeOf(implFiles).toEqualTypeOf<ImplModulePath[]>();
+        expect(files).toHaveLength(5);
+      }),
+  );
+
   it.effect("excludes `middleware/` from leaf spec discovery", () =>
     Effect.gen(function* () {
       const path = yield* Path.Path;
@@ -474,17 +566,98 @@ layer(LeafModuleLayer)("discovery", (it) => {
 });
 
 layer(LeafModuleLayer)("validateImpl", (it) => {
+  it.effect("reuses a supplied validated spec without bundling it again", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const leaf = yield* toLeafModule("groups/notes.spec.ts");
+      const loaded = yield* loadSpec(leaf);
+      const bundle = yield* Effect.acquireRelease(
+        Effect.sync(() => vi.spyOn(Bundler, "bundle")),
+        (spy) => Effect.sync(() => spy.mockRestore()),
+      );
+      yield* validateImpl(loaded);
+      expect(bundle.mock.calls.map(([entry]) => entry)).toEqual([
+        path.resolve(fixtureConfect, "groups/notes.impl.ts"),
+      ]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("checks function completeness against the loaded spec", () =>
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/notes.spec.ts");
+      const groupSpec = (yield* loadSpec(leaf)).spec.addFunction(
+        FunctionSpec.publicQuery({
+          name: "missing",
+          returns: () => Schema.Null,
+        }),
+      );
+      const original = Bundler.bundle;
+      yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          vi.spyOn(Bundler, "bundle").mockImplementation((entry) =>
+            entry.endsWith(".spec.ts")
+              ? Effect.succeed({
+                  module: { default: groupSpec },
+                  metafile: { inputs: {}, outputs: {} },
+                })
+              : original(entry),
+          ),
+        ),
+        (spy) => Effect.sync(() => spy.mockRestore()),
+      );
+      const result = yield* Effect.result(validateImpl(yield* loadSpec(leaf)));
+      assert(Result.isFailure(result));
+      expect(result.failure).toMatchObject({
+        _tag: "ImplMissingFunctionsError",
+        missingFunctionNames: ["missing"],
+      });
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("checks middleware completeness against the loaded spec", () =>
+    Effect.gen(function* () {
+      class Required extends MiddlewareSpec.MiddlewareSpec<Required>()(
+        "Required",
+        {
+          functionTypes: { query: true, mutation: true, action: true },
+        },
+      ) {}
+      const leaf = yield* toLeafModule("groups/notes.spec.ts");
+      const groupSpec = (yield* loadSpec(leaf)).spec.middleware(Required);
+      const original = Bundler.bundle;
+      yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          vi.spyOn(Bundler, "bundle").mockImplementation((entry) =>
+            entry.endsWith(".spec.ts")
+              ? Effect.succeed({
+                  module: { default: groupSpec },
+                  metafile: { inputs: {}, outputs: {} },
+                })
+              : original(entry),
+          ),
+        ),
+        (spy) => Effect.sync(() => spy.mockRestore()),
+      );
+      const result = yield* Effect.result(validateImpl(yield* loadSpec(leaf)));
+      assert(Result.isFailure(result));
+      expect(result.failure).toMatchObject({
+        _tag: "ImplMissingMiddlewareError",
+        missingMiddlewareKeys: ["Required"],
+      });
+    }).pipe(Effect.scoped),
+  );
+
   it.effect("accepts a valid leaf impl paired with its spec", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/notes.spec.ts");
-      yield* validateImpl(leaf);
+      yield* validateImpl(yield* loadSpec(leaf));
     }),
   );
 
   it.effect("accepts a leaf impl that imports a CJS package", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/cjsImporter.spec.ts");
-      yield* validateImpl(leaf);
+      yield* validateImpl(yield* loadSpec(leaf));
     }),
   );
 
@@ -660,3 +833,404 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
       }),
   );
 });
+
+const emptyLeafBundle = (
+  entry: string,
+  spec = GroupSpec.make(),
+): Bundler.Bundled => {
+  if (entry.endsWith(".spec.ts"))
+    return { module: { default: spec }, metafile: { inputs: {}, outputs: {} } };
+  const specPath = entry.slice(0, -".impl.ts".length) + ".spec.ts";
+  return {
+    module: {
+      default: GroupImpl.make(DatabaseSchema.make({}), GroupSpec.make()).pipe(
+        GroupImpl.finalize,
+      ),
+    },
+    metafile: {
+      inputs: {
+        [entry]: {
+          bytes: 0,
+          imports: [{ path: specPath, kind: "import-statement" }],
+        },
+        [specPath]: { bytes: 0, imports: [] },
+      },
+      outputs: {},
+    },
+  };
+};
+
+layer(
+  Layer.mergeAll(
+    NodePath.layer,
+    FileSystem.layerNoop({ exists: () => Effect.succeed(true) }),
+    Layer.succeed(ConfectDirectory, { get: Effect.succeed("/confect") }),
+  ),
+)("validateImplFiles", (it) => {
+  it.effect("validates every supplied impl and reuses each loaded leaf", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const groupSpec = GroupSpec.make();
+      const bundle = yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          vi
+            .spyOn(Bundler, "bundle")
+            .mockImplementation((entry) =>
+              Effect.succeed(emptyLeafBundle(entry, groupSpec)),
+            ),
+        ),
+        (spy) => Effect.sync(() => spy.mockRestore()),
+      );
+      const paths = [
+        ImplModulePath.make("nested/notes.impl.ts"),
+        ImplModulePath.make("node/tasks.impl.ts"),
+      ];
+      expect(yield* validateImplFiles(paths)).toBeUndefined();
+      expect(paths).toEqual(["nested/notes.impl.ts", "node/tasks.impl.ts"]);
+      expect(
+        bundle.mock.calls
+          .filter(([entry]) => entry.endsWith(".spec.ts"))
+          .map(([entry]) => entry),
+      ).toEqual([
+        path.resolve("/confect", "nested", "notes.spec.ts"),
+        path.resolve("/confect", "node", "tasks.spec.ts"),
+      ]);
+      expect(
+        bundle.mock.calls
+          .filter(([entry]) => entry.endsWith(".impl.ts"))
+          .map(([entry]) => entry),
+      ).toEqual([
+        path.resolve("/confect", "nested", "notes.impl.ts"),
+        path.resolve("/confect", "node", "tasks.impl.ts"),
+      ]);
+      expect(bundle).toHaveBeenCalledTimes(4);
+      yield* validateImplFiles([]);
+      expect(bundle).toHaveBeenCalledTimes(4);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("bounds independent validations to four", () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      let active = 0;
+      let maximum = 0;
+      const bundle = yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          vi.spyOn(Bundler, "bundle").mockImplementation((entry) =>
+            Effect.gen(function* () {
+              active++;
+              maximum = Math.max(maximum, active);
+              if (active === 4) yield* Deferred.succeed(started, undefined);
+              yield* Deferred.await(release);
+              yield* Effect.yieldNow;
+              active--;
+              return emptyLeafBundle(entry);
+            }),
+          ),
+        ),
+        (spy) => Effect.sync(() => spy.mockRestore()),
+      );
+      const fiber = yield* validateImplFiles(
+        Array.range(0, 8).map((index) =>
+          ImplModulePath.make(`group${index}.impl.ts`),
+        ),
+      ).pipe(Effect.forkScoped);
+      yield* Deferred.await(started);
+      yield* Effect.yieldNow;
+      expect(active).toBe(4);
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(fiber);
+      expect(maximum).toBe(4);
+      expect(
+        bundle.mock.calls.filter(([entry]) => entry.endsWith(".spec.ts")),
+      ).toHaveLength(9);
+      expect(
+        bundle.mock.calls.filter(([entry]) => entry.endsWith(".impl.ts")),
+      ).toHaveLength(9);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect.each(["spec", "impl"] as const)(
+    "reports a missing sibling %s before bundling",
+    (missing) =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const result = yield* validateImplFiles([
+          ImplModulePath.make("nested/notes.impl.ts"),
+        ]).pipe(
+          Effect.provide(
+            FileSystem.layerNoop({
+              exists: (file) =>
+                Effect.succeed(!file.endsWith(`.${missing}.ts`)),
+            }),
+          ),
+          Effect.result,
+        );
+        assert(Result.isFailure(result));
+        if (missing === "spec") {
+          expect(result.failure).toMatchObject({
+            _tag: "MissingSpecFileError",
+            implPath: "nested/notes.impl.ts",
+            expectedSpecPath: path.join("nested", "notes.spec.ts"),
+          });
+        } else {
+          expect(result.failure).toMatchObject({
+            _tag: "MissingImplFileError",
+            specPath: path.join("nested", "notes.spec.ts"),
+            expectedImplPath: "nested/notes.impl.ts",
+          });
+        }
+      }),
+  );
+});
+
+const collisionLeaf = (
+  relativePath: string,
+  pathSegments: [string, ...string[]],
+): LeafModule => ({
+  relativePath,
+  pathSegments,
+  groupPathDot: pathSegments.join("."),
+  exportName: pathSegments[pathSegments.length - 1]!,
+  specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
+});
+
+const emptyReturns = Schema.Null;
+
+const loadLeaf = Effect.fnUntraced(function* (
+  discovered: LeafModule,
+  spec: GroupSpec.AnyWithProps = GroupSpec.make(),
+) {
+  yield* Effect.acquireRelease(
+    Effect.sync(() =>
+      vi.spyOn(Bundler, "bundle").mockReturnValue(
+        Effect.succeed({
+          module: { default: spec },
+          metafile: { inputs: {}, outputs: {} },
+        }),
+      ),
+    ),
+    (spy) => Effect.sync(() => spy.mockRestore()),
+  );
+  return yield* LeafModules.loadSpec(discovered);
+}, Effect.scoped);
+
+const validateNoParentChildNameCollisions = (
+  leaves: ReadonlyArray<LoadedLeafModule>,
+) => Effect.fromResult(GenerationSnapshot.fromLoadedLeaves(leaves));
+
+layer(LeafModuleLayer)("validateNoParentChildNameCollisions", (it) => {
+  it.effect("accepts non-colliding parent-with-children layouts", () =>
+    Effect.gen(function* () {
+      const parent = collisionLeaf("notes.spec.ts", ["notes"]);
+      const child = collisionLeaf("notes/archived.spec.ts", [
+        "notes",
+        "archived",
+      ]);
+      const parentGroupSpec = GroupSpec.make().addFunction(
+        FunctionSpec.publicQuery({
+          name: "list",
+          returns: () => emptyReturns,
+        }),
+      );
+
+      yield* validateNoParentChildNameCollisions([
+        yield* loadLeaf(parent, parentGroupSpec),
+        yield* loadLeaf(child),
+      ]);
+    }),
+  );
+
+  it.effect(
+    "fails when a parent function name matches a sibling subdirectory segment",
+    () =>
+      Effect.gen(function* () {
+        const parent = collisionLeaf("notes.spec.ts", ["notes"]);
+        const child = collisionLeaf("notes/archived.spec.ts", [
+          "notes",
+          "archived",
+        ]);
+        const parentGroupSpec = GroupSpec.make().addFunction(
+          FunctionSpec.publicQuery({
+            name: "archived",
+            returns: () => emptyReturns,
+          }),
+        );
+
+        const result = yield* Effect.result(
+          validateNoParentChildNameCollisions([
+            yield* loadLeaf(parent, parentGroupSpec),
+            yield* loadLeaf(child),
+          ]),
+        );
+
+        assert(Result.isFailure(result));
+        assert(Schema.is(ParentChildNameCollisionError)(result.failure));
+        expect(result.failure._tag).toBe("ParentChildNameCollisionError");
+        expect(result.failure.collisionKind).toBe("function");
+        expect(result.failure.collisionName).toBe("archived");
+        expect(result.failure.parentSpecPath).toBe("notes.spec.ts");
+        expect(result.failure.childSpecPath).toBe("notes/archived.spec.ts");
+      }),
+  );
+
+  it.effect(
+    "fails when a parent addGroupsAt name matches a sibling subdirectory segment",
+    () =>
+      Effect.gen(function* () {
+        const parent = collisionLeaf("notes.spec.ts", ["notes"]);
+        const child = collisionLeaf("notes/archived.spec.ts", [
+          "notes",
+          "archived",
+        ]);
+        const inner = GroupSpec.make().addFunction(
+          FunctionSpec.publicQuery({
+            name: "list",
+            returns: () => emptyReturns,
+          }),
+        );
+        const parentGroupSpec = GroupSpec.addGroupsAt(GroupSpec.make(), {
+          archived: inner,
+        });
+
+        const result = yield* Effect.result(
+          validateNoParentChildNameCollisions([
+            yield* loadLeaf(parent, parentGroupSpec),
+            yield* loadLeaf(child),
+          ]),
+        );
+
+        assert(Result.isFailure(result));
+        assert(Schema.is(ParentChildNameCollisionError)(result.failure));
+        expect(result.failure._tag).toBe("ParentChildNameCollisionError");
+        expect(result.failure.collisionKind).toBe("group");
+        expect(result.failure.collisionName).toBe("archived");
+      }),
+  );
+
+  it.effect("ignores collisions when there is no parent leaf", () =>
+    Effect.gen(function* () {
+      const child = collisionLeaf("notes/archived.spec.ts", [
+        "notes",
+        "archived",
+      ]);
+
+      yield* validateNoParentChildNameCollisions([yield* loadLeaf(child)]);
+    }),
+  );
+
+  it.effect(
+    "checks ancestors across intermediate directories and runtimes",
+    () =>
+      Effect.gen(function* () {
+        const parent = yield* loadLeaf(
+          collisionLeaf("notes.spec.ts", ["notes"]),
+          GroupSpec.make().addFunction(
+            FunctionSpec.publicQuery({
+              name: "archived",
+              returns: () => emptyReturns,
+            }),
+          ),
+        );
+        const child = yield* loadLeaf(
+          collisionLeaf("notes/archived/old.spec.ts", [
+            "notes",
+            "archived",
+            "old",
+          ]),
+          GroupSpec.makeNode(),
+        );
+        const result = yield* Effect.result(
+          validateNoParentChildNameCollisions([child, parent]),
+        );
+        assert(Result.isFailure(result));
+        expect(result.failure).toMatchObject({
+          collisionKind: "function",
+          collisionName: "archived",
+          parentSpecPath: "notes.spec.ts",
+          childSpecPath: "notes/archived/old.spec.ts",
+        });
+      }),
+  );
+
+  it.effect(
+    "does not confuse similarly prefixed sibling directories with ancestors",
+    () =>
+      Effect.gen(function* () {
+        const parent = yield* loadLeaf(
+          collisionLeaf("notes.spec.ts", ["notes"]),
+          GroupSpec.make().addFunction(
+            FunctionSpec.publicQuery({
+              name: "archived",
+              returns: () => emptyReturns,
+            }),
+          ),
+        );
+        const sibling = yield* loadLeaf(
+          collisionLeaf("notesAndMore/archived.spec.ts", [
+            "notesAndMore",
+            "archived",
+          ]),
+        );
+        yield* validateNoParentChildNameCollisions([parent, sibling]);
+      }),
+  );
+});
+
+const leafFor = Effect.fnUntraced(function* (
+  relativePath: string,
+  pathSegments: [string, ...string[]],
+) {
+  const specImportPath = yield* specImportPathFromGenerated(relativePath);
+  return {
+    relativePath,
+    pathSegments,
+    groupPathDot: Array.join(pathSegments, "."),
+    exportName: pathSegments[pathSegments.length - 1]!,
+    specImportPath,
+  } satisfies LeafModule;
+});
+
+for (const { name, pathLayer, sep } of [
+  { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
+  { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
+] as const) {
+  layer(
+    Layer.mergeAll(
+      pathLayer,
+      NodeFileSystem.layer,
+      Layer.succeed(ConfectDirectory, { get: Effect.succeed(fixtureConfect) }),
+    ),
+  )(`validateNoParentChildNameCollisions, discovered as ${name}`, (it) => {
+    it.effect(
+      "detects a collision when the leaf path and its specifier differ in separator",
+      () =>
+        Effect.gen(function* () {
+          const parent = yield* leafFor("notes.spec.ts", ["notes"]);
+          const child = yield* leafFor(`notes${sep}archived.spec.ts`, [
+            "notes",
+            "archived",
+          ]);
+          const parentGroupSpec = GroupSpec.make().addFunction(
+            FunctionSpec.publicQuery({
+              name: "archived",
+              returns: () => emptyReturns,
+            }),
+          );
+
+          const result = yield* Effect.result(
+            validateNoParentChildNameCollisions([
+              yield* loadLeaf(parent, parentGroupSpec),
+              yield* loadLeaf(child),
+            ]),
+          );
+
+          assert(Result.isFailure(result));
+          assert(Schema.is(ParentChildNameCollisionError)(result.failure));
+          expect(result.failure._tag).toBe("ParentChildNameCollisionError");
+          expect(result.failure.collisionName).toBe("archived");
+        }),
+    );
+  });
+}

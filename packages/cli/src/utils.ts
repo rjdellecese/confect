@@ -1,42 +1,16 @@
-import type { FunctionSpec, Spec } from "@confect/core";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as DateTime from "effect/DateTime";
-import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
-import * as Order from "effect/Order";
-import * as Record from "effect/Record";
-import * as Ref from "effect/Ref";
 import * as String from "effect/String";
-import * as FunctionPaths from "./FunctionPaths";
-import * as GroupPath from "./GroupPath";
-import * as GroupPaths from "./GroupPaths";
-import { logFileAdded, logFileModified, logFileRemoved } from "./log";
+import { logFileAdded, logFileModified } from "./log";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import * as templates from "./templates";
-
-/**
- * Tracks whether the current codegen run wrote anything to disk. Set to `true`
- * by every helper that actually overwrites a file (skipping the
- * content-unchanged case). `codegenHandler` provides a fresh `Ref` per run and
- * reads it back to report `anyWritesHappened`; callers outside a codegen pass
- * hit the cached default `Ref` and need not interact with the tracker.
- */
-export const WriteTracker = Context.Reference<Ref.Ref<boolean>>(
-  "@confect/cli/WriteTracker",
-  { defaultValue: () => Ref.makeUnsafe(false) },
-);
-
-const markWritten = Effect.gen(function* () {
-  const tracker = yield* WriteTracker;
-  yield* Ref.set(tracker, true);
-});
 
 export const removePathExtension = Effect.fnUntraced(function* (
   pathStr: string,
@@ -71,14 +45,12 @@ export const writeFileStringAndLog = Effect.fnUntraced(function* (
   const fs = yield* FileSystem.FileSystem;
   if (!(yield* fs.exists(filePath))) {
     yield* fs.writeFileString(filePath, contents);
-    yield* markWritten;
     yield* logFileAdded(filePath);
     return;
   }
   const existing = yield* fs.readFileString(filePath);
   if (existing !== contents) {
     yield* fs.writeFileString(filePath, contents);
-    yield* markWritten;
     yield* logFileModified(filePath);
   }
 });
@@ -113,13 +85,11 @@ export const writeFileString = Effect.fnUntraced(function* (
 
   if (!(yield* fs.exists(filePath))) {
     yield* fs.writeFileString(filePath, contents);
-    yield* markWritten;
     return "Added";
   }
   const existing = yield* fs.readFileString(filePath);
   if (existing !== contents) {
     yield* fs.writeFileString(filePath, contents);
-    yield* markWritten;
     return "Modified";
   }
   return "Unchanged";
@@ -145,10 +115,11 @@ export const removePathIfExists = Effect.fnUntraced(function* (
 
 /**
  * Bump the mtime of `convex/schema.ts` so the Convex CLI's chokidar watcher
- * emits a `change` event after every successful Confect codegen run. Without
- * this, a codegen that doesn't change any file content (for example, recovering
- * from a transient broken state in `confect/`) leaves Convex stuck on its
- * previous error because nothing it observes has changed.
+ * emits a `change` event after explicit codegen, bootstrap, or recovery.
+ * Recovery can leave generated contents unchanged, so it needs an explicit
+ * notification to release Convex from a previous error. Ordinary successful
+ * watch updates rely on their source/output changes instead of invalidating a
+ * Convex push that may already be processing those changes.
  */
 export const touchConvexSchema = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -163,265 +134,6 @@ export const touchConvexSchema = Effect.gen(function* () {
   const now = yield* DateTime.nowAsDate;
   yield* fs.utimes(schemaPath, now, now);
 });
-
-export const generateGroupModule = ({
-  groupPath,
-  functionNames,
-  registeredFunctionsImportPath,
-  useNode = false,
-}: Parameters<typeof generateGroupModuleEffect>[0]) =>
-  generateGroupModuleEffect({
-    groupPath,
-    functionNames,
-    registeredFunctionsImportPath,
-    useNode,
-  });
-
-const generateGroupModuleEffect = Effect.fnUntraced(function* ({
-  groupPath,
-  functionNames,
-  registeredFunctionsImportPath,
-  useNode = false,
-}: {
-  groupPath: GroupPath.GroupPath;
-  functionNames: string[];
-  registeredFunctionsImportPath: string;
-  useNode?: boolean;
-}) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const convexDirectory = yield* ConvexDirectory.get;
-
-  const relativeModulePath = yield* GroupPath.modulePath(groupPath);
-  const modulePath = path.join(convexDirectory, relativeModulePath);
-
-  const directoryPath = path.dirname(modulePath);
-  if (!(yield* fs.exists(directoryPath))) {
-    yield* fs.makeDirectory(directoryPath, { recursive: true });
-  }
-
-  const functionsContentsString = yield* templates.functions({
-    functionNames,
-    registeredFunctionsImportPath,
-    useNode,
-  });
-
-  if (!(yield* fs.exists(modulePath))) {
-    yield* fs.writeFileString(modulePath, functionsContentsString);
-    yield* markWritten;
-    return "Added" as const;
-  }
-  const existing = yield* fs.readFileString(modulePath);
-  if (existing !== functionsContentsString) {
-    yield* fs.writeFileString(modulePath, functionsContentsString);
-    yield* markWritten;
-    return "Modified" as const;
-  }
-  return "Unchanged" as const;
-});
-
-/**
- * Compute the module import specifier (relative to `modulePath`) for a group's
- * registry file under `confect/_generated/registeredFunctions/`. The registry
- * path mirrors the group's path one-to-one (see
- * `registeredFunctionsRelativePath` in `LeafModule.ts`) for both Convex and
- * Node groups. Centralizing this here keeps the "overlapping" and "new" group
- * branches of `generateFunctions` from drifting apart.
- */
-const registeredFunctionsImportPathForGroup = Effect.fnUntraced(function* (
-  groupPath: GroupPath.GroupPath,
-  modulePath: string,
-) {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-
-  const registeredFunctionsPath =
-    path.join(
-      confectDirectory,
-      "_generated",
-      "registeredFunctions",
-      ...groupPath.pathSegments,
-    ) + ".ts";
-
-  return yield* toModuleImportPath(
-    path.relative(path.dirname(modulePath), registeredFunctionsPath),
-  );
-});
-
-const logGroupPaths = Effect.fnUntraced(function* <R>(
-  groupPaths: GroupPaths.GroupPaths,
-  logFn: (fullPath: string) => Effect.Effect<void, never, R>,
-): Effect.fn.Return<void, never, R | Path.Path | ConvexDirectory> {
-  const path = yield* Path.Path;
-  const convexDirectory = yield* ConvexDirectory.get;
-
-  yield* Effect.forEach(
-    groupPaths,
-    Effect.fnUntraced(function* (gp: GroupPath.GroupPath) {
-      const relativeModulePath = yield* GroupPath.modulePath(gp);
-      yield* logFn(path.join(convexDirectory, relativeModulePath));
-    }),
-  );
-});
-
-export const generateFunctions = Effect.fnUntraced(function* (
-  spec: Spec.AnyWithProps,
-) {
-  const path = yield* Path.Path;
-  const convexDirectory = yield* ConvexDirectory.get;
-
-  const groupPathsFromFs = yield* getGroupPathsFromFs;
-  const functionPaths = FunctionPaths.make(spec);
-  const groupPathsFromSpec = FunctionPaths.groupPaths(functionPaths);
-
-  const overlappingGroupPaths = GroupPaths.GroupPaths.make(
-    HashSet.intersection(groupPathsFromFs, groupPathsFromSpec),
-  );
-  yield* Effect.forEach(
-    overlappingGroupPaths,
-    Effect.fnUntraced(function* (groupPath: GroupPath.GroupPath) {
-      const group = yield* Effect.fromOption(
-        GroupPath.getGroupSpec(spec, groupPath),
-      );
-      const functionNames = pipe(
-        group.functions,
-        Record.values,
-        Array.sortBy(
-          Order.mapInput(
-            Order.String,
-            (fn: FunctionSpec.AnyWithProps) => fn.name,
-          ),
-        ),
-        Array.map((fn) => fn.name),
-      );
-      const relativeModulePath = yield* GroupPath.modulePath(groupPath);
-      const modulePath = path.join(convexDirectory, relativeModulePath);
-      const registeredFunctionsImportPath =
-        yield* registeredFunctionsImportPathForGroup(groupPath, modulePath);
-      const result = yield* generateGroupModule({
-        groupPath,
-        functionNames,
-        registeredFunctionsImportPath,
-        useNode: group.runtime === "Node",
-      });
-      if (result === "Modified") {
-        yield* logFileModified(modulePath);
-      }
-    }),
-  );
-
-  const extinctGroupPaths = GroupPaths.GroupPaths.make(
-    HashSet.difference(groupPathsFromFs, groupPathsFromSpec),
-  );
-  yield* removeGroups(extinctGroupPaths);
-  yield* logGroupPaths(extinctGroupPaths, logFileRemoved);
-
-  const newGroupPaths = GroupPaths.GroupPaths.make(
-    HashSet.difference(groupPathsFromSpec, groupPathsFromFs),
-  );
-  yield* writeGroups(spec, newGroupPaths);
-  yield* logGroupPaths(newGroupPaths, logFileAdded);
-
-  return functionPaths;
-});
-
-const getGroupPathsFromFs = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const convexDirectory = yield* ConvexDirectory.get;
-
-  const RESERVED_CONVEX_TS_FILE_NAMES = new Set([
-    "schema.ts",
-    "http.ts",
-    "crons.ts",
-    "auth.config.ts",
-    "convex.config.ts",
-  ]);
-
-  const allConvexPaths = yield* fs.readDirectory(convexDirectory, {
-    recursive: true,
-  });
-  const groupPathArray = yield* pipe(
-    allConvexPaths,
-    Array.filter(
-      (convexPath) =>
-        path.extname(convexPath) === ".ts" &&
-        !RESERVED_CONVEX_TS_FILE_NAMES.has(path.basename(convexPath)) &&
-        path.basename(path.dirname(convexPath)) !== "_generated",
-    ),
-    Effect.forEach((groupModulePath) =>
-      GroupPath.fromGroupModulePath(groupModulePath),
-    ),
-  );
-  return GroupPaths.GroupPaths.make(HashSet.fromIterable(groupPathArray));
-});
-
-export const removeGroups = Effect.fnUntraced(function* (
-  groupPaths: GroupPaths.GroupPaths,
-) {
-  const path = yield* Path.Path;
-  const convexDirectory = yield* ConvexDirectory.get;
-
-  yield* Effect.all(
-    HashSet.map(groupPaths, (groupPath) =>
-      Effect.gen(function* () {
-        const relativeModulePath = yield* GroupPath.modulePath(groupPath);
-        const modulePath = path.join(convexDirectory, relativeModulePath);
-
-        yield* Effect.logDebug(`Removing group '${relativeModulePath}'...`);
-
-        yield* removePathIfExists(modulePath);
-        yield* Effect.logDebug(`Group '${relativeModulePath}' removed`);
-      }),
-    ),
-    { concurrency: "unbounded" },
-  );
-});
-
-export const writeGroups = (
-  spec: Spec.AnyWithProps,
-  groupPaths: GroupPaths.GroupPaths,
-) =>
-  Effect.forEach(
-    groupPaths,
-    Effect.fnUntraced(function* (groupPath: GroupPath.GroupPath) {
-      const path = yield* Path.Path;
-      const convexDirectory = yield* ConvexDirectory.get;
-      const group = yield* Effect.fromOption(
-        GroupPath.getGroupSpec(spec, groupPath),
-      );
-
-      const functionNames = pipe(
-        group.functions,
-        Record.values,
-        Array.sortBy(
-          Order.mapInput(
-            Order.String,
-            (fn: FunctionSpec.AnyWithProps) => fn.name,
-          ),
-        ),
-        Array.map((fn) => fn.name),
-      );
-
-      const relativeModulePath = yield* GroupPath.modulePath(groupPath);
-      const modulePath = path.join(convexDirectory, relativeModulePath);
-      const registeredFunctionsImportPath =
-        yield* registeredFunctionsImportPathForGroup(groupPath, modulePath);
-
-      yield* Effect.logDebug(
-        `Generating group ${GroupPath.toString(groupPath)}...`,
-      );
-      yield* generateGroupModule({
-        groupPath,
-        functionNames,
-        registeredFunctionsImportPath,
-        useNode: group.runtime === "Node",
-      });
-      yield* Effect.logDebug(
-        `Group ${GroupPath.toString(groupPath)} generated`,
-      );
-    }),
-  );
 
 const generateOptionalFile = Effect.fnUntraced(function* (
   confectFile: string,
