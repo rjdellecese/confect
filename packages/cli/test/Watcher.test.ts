@@ -18,6 +18,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
 import * as Stream from "effect/Stream";
+import * as Clock from "effect/Clock";
+import * as TestClock from "effect/testing/TestClock";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
@@ -53,8 +55,7 @@ const controlledWatcher = Effect.fnUntraced(function* (
     "tables/notes.ts",
   ])
     yield* project.write(`confect/${file}`, "export const value = 1;");
-  const signal = yield* Queue.unbounded<void>();
-  const pending = yield* Ref.make(SyncState.empty);
+
   const events = yield* Queue.unbounded<FileSystem.WatchEvent>();
   const configEvents = yield* Queue.unbounded<FileSystem.WatchEvent>();
   const contexts = yield* Queue.unbounded<{
@@ -114,7 +115,7 @@ const controlledWatcher = Effect.fnUntraced(function* (
   yield* Effect.addFinalizer(() =>
     Effect.sync(() => context.mockImplementation(original)),
   );
-  const watcher = yield* Watcher.make(signal, pending);
+  const watcher = yield* Watcher.make();
   yield* watcher.run.pipe(
     project.provide,
     Effect.provideService(FileSystem.FileSystem, {
@@ -129,11 +130,26 @@ const controlledWatcher = Effect.fnUntraced(function* (
     Effect.forkScoped,
   );
   const first = yield* Queue.take(contexts);
+  const clock = yield* Clock.Clock;
+  const withoutCoalescing: Clock.Clock = {
+    currentTimeMillisUnsafe: () => clock.currentTimeMillisUnsafe(),
+    currentTimeMillis: clock.currentTimeMillis,
+    currentTimeNanosUnsafe: () => clock.currentTimeNanosUnsafe(),
+    currentTimeNanos: clock.currentTimeNanos,
+    monotonicTimeNanosUnsafe: () => clock.monotonicTimeNanosUnsafe(),
+    monotonicTimeNanos: clock.monotonicTimeNanos,
+    sleep: () => Effect.void,
+  };
   return {
-    watcher,
+    watcher: {
+      ...watcher,
+      next: watcher.next.pipe(
+        Effect.repeat({ until: SyncState.isDirty }),
+        Effect.provideService(Clock.Clock, withoutCoalescing),
+      ),
+    },
+    coalescedNext: watcher.next,
     project,
-    signal,
-    pending,
     events,
     configEvents,
     contexts,
@@ -172,9 +188,7 @@ it("allows readiness only for empty or successfully refreshed watchers", () => {
 
 it.effect("rejects refresh before the watcher has initialized", () =>
   Effect.gen(function* () {
-    const signal = yield* Queue.sliding<void>(1);
-    const pending = yield* Ref.make(SyncState.empty);
-    const watcher = yield* Watcher.make(signal, pending);
+    const watcher = yield* Watcher.make();
     const refreshed = yield* watcher.refresh.pipe(Effect.result);
     assert(Result.isFailure(refreshed));
     expect(refreshed.failure).toMatchObject({
@@ -184,6 +198,39 @@ it.effect("rejects refresh before the watcher has initialized", () =>
     expect(yield* watcher.diagnostics).toEqual({ errors: [], warnings: [] });
   }),
 );
+
+it.effect("owns independent pending work for each watcher", () =>
+  Effect.gen(function* () {
+    const first = yield* Watcher.make();
+    const second = yield* Watcher.make();
+    yield* first.requestRetry;
+    expect((yield* first.pending).work._tag).toBe("Full");
+    expect(yield* second.pending).toEqual(SyncState.empty);
+  }),
+);
+
+layer(NodeServices.layer)("pending work ownership", (test) => {
+  test.effect(
+    "requeues work when its consumer is interrupted during coalescing",
+    () =>
+      Effect.gen(function* () {
+        const { watcher, coalescedNext } = yield* controlledWatcher();
+        yield* watcher.refresh;
+        const initial = yield* coalescedNext.pipe(Effect.forkScoped);
+        yield* TestClock.adjust("300 millis");
+        expect((yield* Fiber.join(initial)).work._tag).toBe("Full");
+        yield* watcher.requestRetry;
+        const cancelled = yield* coalescedNext.pipe(Effect.forkScoped);
+        yield* TestClock.adjust("100 millis");
+        yield* Fiber.interrupt(cancelled);
+        expect((yield* watcher.pending).work._tag).toBe("Full");
+        const retried = yield* coalescedNext.pipe(Effect.forkScoped);
+        yield* TestClock.adjust("300 millis");
+        expect((yield* Fiber.join(retried)).work._tag).toBe("Full");
+        expect(yield* watcher.pending).toEqual(SyncState.empty);
+      }).pipe(Effect.scoped),
+  );
+});
 
 it("parses reported build rejections without confusing operation errors or malformed diagnostics", () => {
   expect(Watcher.parseFailure({ errors: [{ text: "syntax error" }] })).toEqual(
@@ -210,7 +257,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const taken = yield* Deferred.make<void>();
           const runPromise = Effect.runPromiseWith(yield* Effect.context());
           let contextsCreated = 0;
-          const { watcher, first, project, events, contexts, pending } =
+          const { watcher, first, project, events, contexts } =
             yield* controlledWatcher({
               plugins: [
                 {
@@ -247,7 +294,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             ]),
           );
           yield* watcher.refresh;
-          yield* watcher.takePending;
+          yield* watcher.next;
           const fs = yield* FileSystem.FileSystem;
           const removed = `${project.root}/confect/notes.spec.ts`;
           yield* fs.remove(removed);
@@ -262,7 +309,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* Deferred.await(oldBlocked);
           yield* Queue.offer(events, { _tag: "Remove", path: removed });
           yield* Deferred.await(first.disposing);
-          const consumer = yield* watcher.takePending.pipe(
+          const consumer = yield* watcher.next.pipe(
             Effect.tap(() => Deferred.succeed(taken, undefined)),
             Effect.forkScoped,
           );
@@ -275,20 +322,20 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             replacement.actual.rebuild(),
           ).pipe(Effect.exit, Effect.forkScoped);
           yield* Deferred.await(initialBlocked);
-          expect((yield* Ref.get(pending)).work._tag).toBe("Full");
+          expect((yield* watcher.pending).work._tag).toBe("Full");
           expect(yield* Deferred.isDone(taken)).toBe(false);
           yield* Deferred.succeed(releaseInitial, undefined);
           yield* Fiber.join(newBuild);
           expect((yield* Fiber.join(consumer)).work._tag).toBe("Full");
           yield* watcher.refresh;
-          expect((yield* watcher.takePending).work._tag).toBe("None");
+          expect((yield* watcher.pending).work._tag).toBe("None");
           yield* project.write(
             "confect/notes.impl.ts",
             "export const value = 3;",
           );
           yield* watcher.refresh;
-          expect((yield* watcher.takePending).work._tag).toBe("Impls");
-          expect((yield* watcher.takePending).work._tag).toBe("None");
+          expect((yield* watcher.next).work._tag).toBe("Impls");
+          expect((yield* watcher.pending).work._tag).toBe("None");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
       { timeout: 15000 },
     );
@@ -300,7 +347,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const { watcher, project, events, contexts } =
             yield* controlledWatcher();
           yield* watcher.refresh;
-          yield* watcher.takePending;
+          yield* watcher.next;
           yield* project.write(
             "confect/first.impl.ts",
             "export const value = 1;",
@@ -311,7 +358,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           });
           const abandoned = yield* Queue.take(contexts);
           const taken = yield* Deferred.make<void>();
-          const consumer = yield* watcher.takePending.pipe(
+          const consumer = yield* watcher.next.pipe(
             Effect.tap(() => Deferred.succeed(taken, undefined)),
             Effect.forkScoped,
           );
@@ -330,7 +377,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(yield* Deferred.isDone(taken)).toBe(false);
           yield* Effect.promise(() => replacement.actual.rebuild());
           expect((yield* Fiber.join(consumer)).work._tag).toBe("Full");
-          expect((yield* watcher.takePending).work._tag).toBe("None");
+          expect((yield* watcher.pending).work._tag).toBe("None");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
       { timeout: 15000 },
     );
@@ -339,21 +386,17 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       "settles no-op reconfiguration without replacing the context",
       () =>
         Effect.gen(function* () {
-          const { watcher, project, events, contexts, signal } =
+          const { watcher, project, events, contexts } =
             yield* controlledWatcher();
           yield* watcher.refresh;
-          yield* watcher.takePending;
-          yield* Queue.poll(signal).pipe(
-            Effect.repeat({ while: (message) => Option.isSome(message) }),
-          );
+          yield* watcher.next;
           yield* Queue.offer(events, {
             _tag: "Create",
             path: `${project.root}/confect/notes.spec.ts`,
           });
-          yield* Queue.take(signal);
-          expect((yield* watcher.takePending).work._tag).toBe("Full");
+          expect((yield* watcher.next).work._tag).toBe("Full");
           expect(yield* Queue.poll(contexts)).toEqual(Option.none());
-          expect((yield* watcher.takePending).work._tag).toBe("None");
+          expect((yield* watcher.pending).work._tag).toBe("None");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
       { timeout: 15000 },
     );
@@ -362,36 +405,28 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       "settles last-entry removal, preserves optional cleanup, and observes the first new entry",
       () =>
         Effect.gen(function* () {
-          const { watcher, first, project, events, contexts, signal } =
+          const { watcher, first, project, events, contexts } =
             yield* controlledWatcher({ files: ["http.ts"] });
           yield* watcher.refresh;
-          yield* watcher.takePending;
-          yield* Queue.poll(signal).pipe(
-            Effect.repeat({ while: (message) => Option.isSome(message) }),
-          );
+          yield* watcher.next;
           const fs = yield* FileSystem.FileSystem;
           const file = `${project.root}/confect/http.ts`;
           yield* fs.remove(file);
           yield* Queue.offer(events, { _tag: "Remove", path: file });
-          yield* Queue.take(signal);
-          const removed = yield* watcher.takePending;
+          const removed = yield* watcher.next;
           expect(removed.work._tag).toBe("Full");
           expect(HashSet.has(removed.optional, "Http")).toBe(true);
           expect(yield* Deferred.isDone(first.disposed)).toBe(true);
           expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(
             true,
           );
-          yield* Queue.poll(signal).pipe(
-            Effect.repeat({ while: (message) => Option.isSome(message) }),
-          );
           yield* Queue.offer(events, { _tag: "Remove", path: file });
-          yield* Queue.take(signal);
-          expect((yield* watcher.takePending).work._tag).toBe("Full");
+          expect((yield* watcher.next).work._tag).toBe("Full");
           yield* project.write("confect/http.ts", "export const value = 2;");
           yield* Queue.offer(events, { _tag: "Create", path: file });
           const replacement = yield* Queue.take(contexts);
           const taken = yield* Deferred.make<void>();
-          const consumer = yield* watcher.takePending.pipe(
+          const consumer = yield* watcher.next.pipe(
             Effect.tap(() => Deferred.succeed(taken, undefined)),
             Effect.forkScoped,
           );
@@ -401,7 +436,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const created = yield* Fiber.join(consumer);
           expect(created.work._tag).toBe("Full");
           expect(HashSet.has(created.optional, "Http")).toBe(true);
-          expect((yield* watcher.takePending).work._tag).toBe("None");
+          expect((yield* watcher.pending).work._tag).toBe("None");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
       { timeout: 15000 },
     );
@@ -415,13 +450,12 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       "requests only one rebuild when quiescent and preserves queued edits",
       () =>
         Effect.gen(function* () {
-          const { watcher, first, pending, project } =
-            yield* controlledWatcher();
+          const { watcher, first, project } = yield* controlledWatcher();
           expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(
             true,
           );
           expect(yield* Ref.get(first.rebuilds)).toBe(1);
-          yield* Ref.set(pending, SyncState.empty);
+          yield* watcher.next;
           yield* project.write(
             "confect/notes.spec.ts",
             "export const value = 2;",
@@ -430,10 +464,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             true,
           );
           expect(yield* Ref.get(first.rebuilds)).toBe(2);
-          expect((yield* Ref.get(pending)).work._tag).toBe("Declarations");
+          expect((yield* watcher.pending).work._tag).toBe("Declarations");
           yield* watcher.refresh;
           expect(yield* Ref.get(first.rebuilds)).toBe(3);
-          expect((yield* Ref.get(pending)).work._tag).toBe("Declarations");
+          expect((yield* watcher.pending).work._tag).toBe("Declarations");
         }).pipe(Effect.scoped),
     );
 
@@ -452,49 +486,46 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           let builds = 0;
           let requests = 0;
           let newerBuild: Promise<esbuild.BuildResult> | undefined;
-          const { watcher, first, project, pending } = yield* controlledWatcher(
-            {
-              plugins: [
-                {
-                  name: "gate-build-completions",
-                  setup(build) {
-                    build.onEnd(() =>
-                      runPromise(
-                        Effect.gen(function* () {
-                          builds++;
-                          if (builds === 2) {
-                            yield* Deferred.succeed(staleBlocked, undefined);
-                            yield* Deferred.await(releaseStale);
-                          } else if (builds === 3) {
-                            yield* Deferred.succeed(freshBlocked, undefined);
-                            yield* Deferred.await(releaseFresh);
-                          }
-                        }),
-                      ),
-                    );
-                  },
+          const { watcher, first, project } = yield* controlledWatcher({
+            plugins: [
+              {
+                name: "gate-build-completions",
+                setup(build) {
+                  build.onEnd(() =>
+                    runPromise(
+                      Effect.gen(function* () {
+                        builds++;
+                        if (builds === 2) {
+                          yield* Deferred.succeed(staleBlocked, undefined);
+                          yield* Deferred.await(releaseStale);
+                        } else if (builds === 3) {
+                          yield* Deferred.succeed(freshBlocked, undefined);
+                          yield* Deferred.await(releaseFresh);
+                        }
+                      }),
+                    ),
+                  );
                 },
-              ],
-              rebuild: (actual) =>
-                runPromise(
-                  Effect.gen(function* () {
-                    requests++;
-                    if (requests === 3)
-                      yield* Deferred.succeed(joinedFresh, undefined);
-                    const built = actual.rebuild();
-                    if (requests !== 2)
-                      return yield* Effect.promise(() => built);
-                    yield* Deferred.succeed(joinedStale, undefined);
-                    const stale = yield* Effect.promise(() => built);
-                    newerBuild = actual.rebuild();
-                    yield* Deferred.await(freshBlocked);
-                    return stale;
-                  }),
-                ),
-            },
-          );
+              },
+            ],
+            rebuild: (actual) =>
+              runPromise(
+                Effect.gen(function* () {
+                  requests++;
+                  if (requests === 3)
+                    yield* Deferred.succeed(joinedFresh, undefined);
+                  const built = actual.rebuild();
+                  if (requests !== 2) return yield* Effect.promise(() => built);
+                  yield* Deferred.succeed(joinedStale, undefined);
+                  const stale = yield* Effect.promise(() => built);
+                  newerBuild = actual.rebuild();
+                  yield* Deferred.await(freshBlocked);
+                  return stale;
+                }),
+              ),
+          });
           yield* watcher.refresh;
-          yield* Ref.set(pending, SyncState.empty);
+          yield* watcher.next;
           const active = yield* Effect.promise(() =>
             first.actual.rebuild(),
           ).pipe(Effect.forkScoped);
@@ -511,7 +542,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* Deferred.succeed(releaseStale, undefined);
           yield* Deferred.await(joinedFresh);
           const prematurelyRefreshed = yield* Deferred.isDone(refreshed);
-          const prematurePending = yield* Ref.get(pending);
+          const prematurePending = yield* watcher.pending;
           yield* Deferred.succeed(releaseFresh, undefined);
           expect(
             Watcher.isRefreshSuccessful(yield* Fiber.join(refreshing)),
@@ -524,7 +555,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* Effect.promise(() => advanced);
           expect(yield* Ref.get(first.rebuilds)).toBe(3);
           expect(builds).toBe(3);
-          expect((yield* Ref.get(pending)).work._tag).toBe("Declarations");
+          expect((yield* watcher.pending).work._tag).toBe("Declarations");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
       { timeout: 15000 },
     );
@@ -654,29 +685,27 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const release = yield* Deferred.make<void>();
           const runPromise = Effect.runPromiseWith(yield* Effect.context());
           let shouldBlock = false;
-          const { watcher, first, project, pending } = yield* controlledWatcher(
-            {
-              plugins: [
-                {
-                  name: "gate-fresh-build-completion",
-                  setup(build) {
-                    build.onEnd(() =>
-                      shouldBlock
-                        ? runPromise(
-                            Effect.gen(function* () {
-                              yield* Deferred.succeed(blocked, undefined);
-                              yield* Deferred.await(release);
-                            }),
-                          )
-                        : undefined,
-                    );
-                  },
+          const { watcher, first, project } = yield* controlledWatcher({
+            plugins: [
+              {
+                name: "gate-fresh-build-completion",
+                setup(build) {
+                  build.onEnd(() =>
+                    shouldBlock
+                      ? runPromise(
+                          Effect.gen(function* () {
+                            yield* Deferred.succeed(blocked, undefined);
+                            yield* Deferred.await(release);
+                          }),
+                        )
+                      : undefined,
+                  );
                 },
-              ],
-            },
-          );
+              },
+            ],
+          });
           yield* watcher.refresh;
-          yield* Ref.set(pending, SyncState.empty);
+          yield* watcher.next;
           shouldBlock = true;
           const refreshing = yield* watcher.refresh.pipe(Effect.forkScoped);
           yield* Deferred.await(blocked);
@@ -689,7 +718,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(
             Watcher.isRefreshSuccessful(yield* Fiber.join(refreshing)),
           ).toBe(true);
-          expect((yield* Ref.get(pending)).work._tag).toBe("Declarations");
+          expect((yield* watcher.pending).work._tag).toBe("Declarations");
           expect(yield* Ref.get(first.rebuilds)).toBe(3);
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
       { timeout: 15000 },
@@ -889,36 +918,29 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const release = yield* Deferred.make<void>();
           const runPromise = Effect.runPromiseWith(yield* Effect.context());
           let shouldBlock = false;
-          const {
-            watcher,
-            first,
-            project,
-            events,
-            configEvents,
-            contexts,
-            pending,
-          } = yield* controlledWatcher({
-            plugins: [
-              {
-                name: "gate-context-replacement",
-                setup(build) {
-                  build.onEnd(() =>
-                    shouldBlock
-                      ? runPromise(
-                          Effect.gen(function* () {
-                            yield* Deferred.succeed(blocked, undefined);
-                            yield* Deferred.await(release);
-                          }),
-                        )
-                      : undefined,
-                  );
+          const { watcher, first, project, events, configEvents, contexts } =
+            yield* controlledWatcher({
+              plugins: [
+                {
+                  name: "gate-context-replacement",
+                  setup(build) {
+                    build.onEnd(() =>
+                      shouldBlock
+                        ? runPromise(
+                            Effect.gen(function* () {
+                              yield* Deferred.succeed(blocked, undefined);
+                              yield* Deferred.await(release);
+                            }),
+                          )
+                        : undefined,
+                    );
+                  },
                 },
-              },
-            ],
-          });
+              ],
+            });
           yield* watcher.refresh;
           yield* watcher.refresh;
-          yield* Ref.set(pending, SyncState.empty);
+          yield* watcher.next;
           shouldBlock = true;
           const refreshing = yield* watcher.refresh.pipe(Effect.forkScoped);
           yield* Deferred.await(blocked);
@@ -932,7 +954,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           );
           yield* Effect.yieldNow;
           const prematurelyDisposed = yield* Deferred.isDone(first.disposing);
-          const queued = yield* Ref.get(pending);
+          const queued = yield* watcher.pending;
           shouldBlock = false;
           yield* Deferred.succeed(release, undefined);
           expect(
@@ -959,7 +981,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const release = yield* Deferred.make<void>();
           const runPromise = Effect.runPromiseWith(yield* Effect.context());
           let shouldBlock = true;
-          const { watcher, first, signal, project } = yield* controlledWatcher({
+          const { watcher, first, project } = yield* controlledWatcher({
             plugins: [
               {
                 name: "gate-interrupted-refresh",
@@ -983,7 +1005,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* Fiber.interrupt(refreshing);
           shouldBlock = false;
           yield* Deferred.succeed(release, undefined);
-          yield* Queue.take(signal);
+          yield* watcher.next;
           yield* Effect.promise(() => first.actual.rebuild());
           yield* project.write(
             "confect/notes.spec.ts",
@@ -1038,9 +1060,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const fail = yield* Deferred.make<void>();
           const restored = yield* Deferred.make<void>();
           let subscriptions = 0;
-          const signal = yield* Queue.sliding<void>(1);
-          const pending = yield* Ref.make(SyncState.empty);
-          const watcher = yield* Watcher.make(signal, pending);
+
+          const watcher = yield* Watcher.make();
           yield* watcher.run.pipe(
             project.provide,
             Effect.provideService(FileSystem.FileSystem, {
@@ -1061,14 +1082,14 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             }),
             Effect.forkScoped,
           );
-          expect((yield* watcher.takePending).work._tag).toBe("Full");
+          expect((yield* watcher.next).work._tag).toBe("Full");
           expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(
             true,
           );
           yield* Deferred.succeed(fail, undefined);
           yield* Deferred.await(restored);
-          expect((yield* watcher.takePending).work._tag).toBe("Full");
-          expect((yield* watcher.takePending).work._tag).toBe("None");
+          expect((yield* watcher.next).work._tag).toBe("Full");
+          expect((yield* watcher.pending).work._tag).toBe("None");
           expect(subscriptions).toBe(2);
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
       { timeout: 15000 },
@@ -1114,9 +1135,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           });
           const restored = yield* Deferred.make<void>();
           let subscriptions = 0;
-          const signal = yield* Queue.sliding<void>(1);
-          const pending = yield* Ref.make(SyncState.empty);
-          const watcher = yield* Watcher.make(signal, pending);
+
+          const watcher = yield* Watcher.make();
           const running = watcher.run.pipe(
             Effect.provideService(ProjectRoot, {
               get: Effect.succeed(project.root),

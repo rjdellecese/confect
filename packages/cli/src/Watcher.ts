@@ -1,3 +1,5 @@
+import * as Clock from "effect/Clock";
+import * as Duration from "effect/Duration";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as Crypto from "effect/Crypto";
 import * as Hex from "effect/encoding/Hex";
@@ -39,6 +41,12 @@ import { ConfectDirectory } from "./ConfectDirectory";
 import { CONVEX_CONFIG_FILENAME } from "./ConvexConfig";
 import { ConvexDirectory } from "./ConvexDirectory";
 import { ProjectRoot } from "./ProjectRoot";
+
+const COALESCE_QUIESCENCE = Duration.millis(300);
+
+// Upper bound on `drainUntilQuiescent` so a pathological infinite
+// signal stream can't pin the sync loop forever.
+const COALESCE_MAX_WAIT = Duration.seconds(5);
 
 type WatcherLifecycle = Data.TaggedEnum<{
   Uninitialized: {};
@@ -102,10 +110,9 @@ const ReportedBuildFailure = Schema.Struct({
 });
 export const parseFailure = Schema.decodeUnknownOption(ReportedBuildFailure);
 
-export const make = Effect.fnUntraced(function* (
-  signal: Queue.Queue<void>,
-  pendingRef: Ref.Ref<Pending>,
-) {
+export const make = Effect.fnUntraced(function* () {
+  const signal = yield* Queue.sliding<void>(1);
+  const pendingRef = yield* Ref.make<Pending>(SyncState.empty);
   const restartQueue = yield* Queue.sliding<void>(1);
   const state: State = {
     lifecycle: yield* Ref.make<WatcherLifecycle>(
@@ -131,7 +138,18 @@ export const make = Effect.fnUntraced(function* (
       { concurrency: "unbounded" },
     ).pipe(Effect.asVoid),
     refresh: refresh(state),
-    takePending: state.topology.takePending,
+    next: Queue.take(signal).pipe(
+      Effect.andThen(
+        drainUntilQuiescent(signal, COALESCE_QUIESCENCE, COALESCE_MAX_WAIT),
+      ),
+      Effect.andThen(state.topology.takePending),
+      Effect.onInterrupt(() => Queue.offer(signal, undefined)),
+    ),
+    pending: Ref.get(pendingRef),
+    requestRetry: Ref.update(pendingRef, SyncState.full).pipe(
+      Effect.andThen(Queue.offer(signal, undefined)),
+      Effect.asVoid,
+    ),
     diagnostics: Ref.get(state.observation).pipe(
       Effect.map(WatchBuild.diagnostics),
     ),
@@ -139,6 +157,25 @@ export const make = Effect.fnUntraced(function* (
 });
 
 export type Watcher = Effect.Success<ReturnType<typeof make>>;
+
+const drainUntilQuiescent = Effect.fnUntraced(function* (
+  signal: Queue.Queue<void>,
+  quiescence: Duration.Duration,
+  maxWait: Duration.Duration,
+) {
+  const start = yield* Clock.currentTimeMillis;
+  const maxMillis = Duration.toMillis(maxWait);
+  const loop: Effect.Effect<void> = Effect.gen(function* () {
+    yield* Effect.sleep(quiescence);
+    const drained = yield* Queue.clear(signal);
+    if (drained.length === 0) return;
+    const now = yield* Clock.currentTimeMillis;
+    if (now - start < maxMillis) {
+      yield* loop;
+    }
+  });
+  yield* loop;
+});
 
 const esbuildOptions = (
   path: Path.Path,

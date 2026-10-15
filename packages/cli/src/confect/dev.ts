@@ -3,23 +3,19 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as Clock from "effect/Clock";
 import * as Console from "effect/Console";
-import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
 import * as HashSet from "effect/HashSet";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
-import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as String from "effect/String";
 import type * as esbuild from "esbuild";
 import * as Ansi from "../Ansi";
 import * as SyncState from "../SyncState";
-import type { Pending } from "../SyncState";
 import type { OptionalFile } from "../EntryPoint";
 import * as Watcher from "../Watcher";
 import * as Evaluation from "../Evaluation";
@@ -44,12 +40,6 @@ import {
   generateHttp,
   touchConvexSchema,
 } from "../utils";
-
-const COALESCE_QUIESCENCE = Duration.millis(300);
-
-// Upper bound on `drainUntilQuiescent` so a pathological infinite
-// signal stream can't pin the sync loop forever.
-const COALESCE_MAX_WAIT = Duration.seconds(5);
 
 const changeChar = (change: "Added" | "Removed" | "Modified") =>
   Match.value(change).pipe(
@@ -134,17 +124,11 @@ export const dev = Command.make("dev", {}, () =>
     yield* logPending("Performing initial sync…");
     const previousFunctionPaths = yield* Evaluation.loadPreviousFunctionPaths;
 
-    const pendingRef = yield* Ref.make<Pending>(SyncState.empty);
-    const signal = yield* Queue.sliding<void>(1);
-    const watcher = yield* Watcher.make(signal, pendingRef);
+    const watcher = yield* Watcher.make();
 
-    yield* Effect.all(
-      [
-        watcher.run,
-        syncLoop(signal, pendingRef, previousFunctionPaths, watcher),
-      ],
-      { concurrency: "unbounded" },
-    );
+    yield* Effect.all([watcher.run, syncLoop(previousFunctionPaths, watcher)], {
+      concurrency: "unbounded",
+    });
   }),
 ).pipe(Command.withDescription("Start the Confect development server"));
 
@@ -192,28 +176,7 @@ const logChangedWatcherMessages = Effect.fnUntraced(function* (
   yield* log(dedupeWatcherMessages(messages));
 });
 
-const drainUntilQuiescent = Effect.fnUntraced(function* (
-  signal: Queue.Queue<void>,
-  quiescence: Duration.Duration,
-  maxWait: Duration.Duration,
-) {
-  const start = yield* Clock.currentTimeMillis;
-  const maxMillis = Duration.toMillis(maxWait);
-  const loop: Effect.Effect<void> = Effect.gen(function* () {
-    yield* Effect.sleep(quiescence);
-    const drained = yield* Queue.clear(signal);
-    if (drained.length === 0) return;
-    const now = yield* Clock.currentTimeMillis;
-    if (now - start < maxMillis) {
-      yield* loop;
-    }
-  });
-  yield* loop;
-});
-
 const syncLoop = Effect.fnUntraced(function* (
-  signal: Queue.Queue<void>,
-  pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
   watcher: Watcher.Watcher,
 ) {
@@ -241,18 +204,12 @@ const syncLoop = Effect.fnUntraced(function* (
   return yield* Effect.forever(
     Effect.gen(function* () {
       yield* Effect.logDebug("Running sync loop…");
-      yield* Queue.take(signal);
-      yield* drainUntilQuiescent(
-        signal,
-        COALESCE_QUIESCENCE,
-        COALESCE_MAX_WAIT,
-      );
+      const pending = yield* watcher.next;
 
       const phase = yield* Ref.get(phaseRef);
       const firstSync = SyncState.Phase.$is("Bootstrapping")(phase);
       if (!firstSync) yield* logMessages;
 
-      const pending = yield* watcher.takePending;
       if (!SyncState.isDirty(pending)) return;
 
       const optional = yield* Ref.updateAndGet(
@@ -320,8 +277,7 @@ const syncLoop = Effect.fnUntraced(function* (
       );
       yield* Ref.set(phaseRef, SyncState.transition(outcome));
       if (SyncState.shouldRetry(phase, outcome)) {
-        yield* Ref.update(pendingRef, SyncState.full);
-        yield* Queue.offer(signal, undefined);
+        yield* watcher.requestRetry;
       }
       if (!SyncState.Outcome.$is("Succeeded")(outcome)) return;
 
@@ -345,7 +301,7 @@ const syncLoop = Effect.fnUntraced(function* (
       if (SyncState.needsDeploymentNotification(phase))
         yield* touchConvexSchema;
 
-      if (!SyncState.isDirty(yield* Ref.get(pendingRef))) {
+      if (!SyncState.isDirty(yield* watcher.pending)) {
         yield* logSuccess("Generated files are up-to-date");
       }
     }),
