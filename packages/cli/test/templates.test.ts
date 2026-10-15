@@ -9,7 +9,6 @@ import { assert, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
@@ -25,7 +24,6 @@ const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
     pathSegments,
     groupPathDot: pathSegments.join("."),
     exportName: pathSegments[pathSegments.length - 1]!,
-    runtime: Option.none(),
     specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
   };
 };
