@@ -18,6 +18,7 @@ import * as ConvexConfig from "../ConvexConfig";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as DocName from "../DocName";
 import * as FunctionPaths from "../FunctionPaths";
+import * as FunctionModule from "../FunctionModule";
 import * as GenerationSnapshot from "../GenerationSnapshot";
 import * as EntryPoint from "../EntryPoint";
 import type { ImplModulePath } from "../ImplModulePath";
@@ -45,8 +46,6 @@ import * as templates from "../templates";
 import {
   generateAuthConfig,
   generateCrons,
-  generateFunctions,
-  applyFunctionPlan,
   generateHttp,
   removePathIfExists,
   toModuleImportPath,
@@ -158,7 +157,7 @@ const runCodegen = Effect.gen(function* () {
   yield* removeObsoleteRegisteredFunctions(leaves);
   const [functionPaths] = yield* Effect.all(
     [
-      generateFunctions(snapshot),
+      FunctionModule.generateFunctions(snapshot),
       generateConvexSchemaReexport,
       logGenerated(generateHttp),
       logGenerated(generateCrons),
@@ -201,7 +200,9 @@ export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
         );
         yield* validateAllImpls(leaves);
         yield* generateGroupRegisteredFunctions(leaves);
-        yield* applyFunctionPlan(GenerationSnapshot.diff(snapshot, next));
+        yield* FunctionModule.applyFunctionPlan(
+          GenerationSnapshot.diff(snapshot, next),
+        );
         return next;
       }),
     );

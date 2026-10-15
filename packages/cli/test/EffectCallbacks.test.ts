@@ -11,7 +11,7 @@ import * as TableModule from "@confect/cli/TableModule";
 import { codegenHandler } from "@confect/cli/confect/codegen";
 import { dev } from "@confect/cli/confect/dev";
 import type { OperationError } from "@confect/cli/Watcher";
-import { generateFunctions, writeGroups } from "@confect/cli/utils";
+import { generateFunctions, writeGroups } from "@confect/cli/FunctionModule";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";

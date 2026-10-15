@@ -6,40 +6,6 @@ import {
   type SpecAssemblyNode,
 } from "./SpecAssemblyNode";
 
-export const functions = ({
-  functionNames,
-  registeredFunctionsImportPath,
-  useNode = false,
-}: Parameters<typeof functionsEffect>[0]) =>
-  functionsEffect({ functionNames, registeredFunctionsImportPath, useNode });
-
-const functionsEffect = Effect.fnUntraced(function* ({
-  functionNames,
-  registeredFunctionsImportPath,
-  useNode = false,
-}: {
-  functionNames: ReadonlyArray<string>;
-  registeredFunctionsImportPath: string;
-  useNode?: boolean;
-}) {
-  const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-  if (useNode) {
-    yield* cbw.writeLine(`"use node";`);
-    yield* cbw.blankLine();
-  }
-
-  yield* cbw.writeLine(
-    `import registeredFunctions from "${registeredFunctionsImportPath}";`,
-  );
-  yield* cbw.newLine();
-  yield* Effect.forEach(functionNames, (name) =>
-    cbw.writeLine(`export const ${name} = registeredFunctions.${name};`),
-  );
-
-  return yield* cbw.toString();
-});
-
 /**
  * Emit `convex/schema.ts` as a one-line re-export of the codegen-emitted deploy
  * schema in `confect/_generated/convexSchema.ts`. Deploy-time consumers (the
