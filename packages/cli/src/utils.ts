@@ -1,4 +1,3 @@
-import type { FunctionSpec, Spec } from "@confect/core";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
@@ -9,11 +8,10 @@ import * as Effect from "effect/Effect";
 import * as DateTime from "effect/DateTime";
 import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
-import * as Order from "effect/Order";
-import * as Record from "effect/Record";
+import * as Match from "effect/Match";
 import * as Ref from "effect/Ref";
 import * as String from "effect/String";
-import * as FunctionPaths from "./FunctionPaths";
+import * as GenerationSnapshot from "./GenerationSnapshot";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";
 import { logFileAdded, logFileModified, logFileRemoved } from "./log";
@@ -265,64 +263,22 @@ const logGroupPaths = Effect.fnUntraced(function* <R>(
 });
 
 export const generateFunctions = Effect.fnUntraced(function* (
-  spec: Spec.AnyWithProps,
+  snapshot: GenerationSnapshot.GenerationSnapshot,
 ) {
-  const path = yield* Path.Path;
-  const convexDirectory = yield* ConvexDirectory.get;
-
   const groupPathsFromFs = yield* getGroupPathsFromFs;
-  const functionPaths = FunctionPaths.make(spec);
-  const groupPathsFromSpec = FunctionPaths.groupPaths(functionPaths);
+  yield* applyFunctionPlan(GenerationSnapshot.plan(snapshot, groupPathsFromFs));
+  return GenerationSnapshot.functionPaths(snapshot);
+});
 
-  const overlappingGroupPaths = GroupPaths.GroupPaths.make(
-    HashSet.intersection(groupPathsFromFs, groupPathsFromSpec),
+export const applyFunctionPlan = Effect.fnUntraced(function* (
+  plan: GenerationSnapshot.ModulePlan,
+) {
+  const removed = GroupPaths.GroupPaths.make(
+    HashSet.fromIterable(plan.removed),
   );
-  yield* Effect.forEach(
-    overlappingGroupPaths,
-    Effect.fnUntraced(function* (groupPath: GroupPath.GroupPath) {
-      const group = yield* Effect.fromOption(
-        GroupPath.getGroupSpec(spec, groupPath),
-      );
-      const functionNames = pipe(
-        group.functions,
-        Record.values,
-        Array.sortBy(
-          Order.mapInput(
-            Order.String,
-            (fn: FunctionSpec.AnyWithProps) => fn.name,
-          ),
-        ),
-        Array.map((fn) => fn.name),
-      );
-      const relativeModulePath = yield* GroupPath.modulePath(groupPath);
-      const modulePath = path.join(convexDirectory, relativeModulePath);
-      const registeredFunctionsImportPath =
-        yield* registeredFunctionsImportPathForGroup(groupPath, modulePath);
-      const result = yield* generateGroupModule({
-        groupPath,
-        functionNames,
-        registeredFunctionsImportPath,
-        useNode: group.runtime === "Node",
-      });
-      if (result === "Modified") {
-        yield* logFileModified(modulePath);
-      }
-    }),
-  );
-
-  const extinctGroupPaths = GroupPaths.GroupPaths.make(
-    HashSet.difference(groupPathsFromFs, groupPathsFromSpec),
-  );
-  yield* removeGroups(extinctGroupPaths);
-  yield* logGroupPaths(extinctGroupPaths, logFileRemoved);
-
-  const newGroupPaths = GroupPaths.GroupPaths.make(
-    HashSet.difference(groupPathsFromSpec, groupPathsFromFs),
-  );
-  yield* writeGroups(spec, newGroupPaths);
-  yield* logGroupPaths(newGroupPaths, logFileAdded);
-
-  return functionPaths;
+  yield* removeGroups(removed);
+  yield* logGroupPaths(removed, logFileRemoved);
+  yield* writeGroups(plan.changed);
 });
 
 const getGroupPathsFromFs = Effect.gen(function* () {
@@ -379,46 +335,28 @@ export const removeGroups = Effect.fnUntraced(function* (
 });
 
 export const writeGroups = (
-  spec: Spec.AnyWithProps,
-  groupPaths: GroupPaths.GroupPaths,
+  groups: ReadonlyArray<GenerationSnapshot.GroupSummary>,
 ) =>
   Effect.forEach(
-    groupPaths,
-    Effect.fnUntraced(function* (groupPath: GroupPath.GroupPath) {
+    groups,
+    Effect.fnUntraced(function* (group: GenerationSnapshot.GroupSummary) {
       const path = yield* Path.Path;
       const convexDirectory = yield* ConvexDirectory.get;
-      const group = yield* Effect.fromOption(
-        GroupPath.getGroupSpec(spec, groupPath),
-      );
-
-      const functionNames = pipe(
-        group.functions,
-        Record.values,
-        Array.sortBy(
-          Order.mapInput(
-            Order.String,
-            (fn: FunctionSpec.AnyWithProps) => fn.name,
-          ),
-        ),
-        Array.map((fn) => fn.name),
-      );
-
-      const relativeModulePath = yield* GroupPath.modulePath(groupPath);
+      const relativeModulePath = yield* GroupPath.modulePath(group.path);
       const modulePath = path.join(convexDirectory, relativeModulePath);
       const registeredFunctionsImportPath =
-        yield* registeredFunctionsImportPathForGroup(groupPath, modulePath);
-
-      yield* Effect.logDebug(
-        `Generating group ${GroupPath.toString(groupPath)}...`,
-      );
-      yield* generateGroupModule({
-        groupPath,
-        functionNames,
+        yield* registeredFunctionsImportPathForGroup(group.path, modulePath);
+      const change = yield* generateGroupModule({
+        groupPath: group.path,
+        functionNames: group.functionNames,
         registeredFunctionsImportPath,
         useNode: group.runtime === "Node",
       });
-      yield* Effect.logDebug(
-        `Group ${GroupPath.toString(groupPath)} generated`,
+      yield* Match.value(change).pipe(
+        Match.when("Added", () => logFileAdded(modulePath)),
+        Match.when("Modified", () => logFileModified(modulePath)),
+        Match.when("Unchanged", () => Effect.void),
+        Match.exhaustive,
       );
     }),
   );

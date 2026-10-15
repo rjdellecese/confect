@@ -326,19 +326,34 @@ const generatedGroups = (snapshot: GenerationSnapshot) =>
 
 const equivalentGroup = Schema.toEquivalence(GroupSummary);
 
+export interface ModulePlan {
+  readonly removed: ReadonlyArray<GroupPath.GroupPath>;
+  readonly changed: ReadonlyArray<GroupSummary>;
+}
+
+export const plan = (
+  snapshot: GenerationSnapshot,
+  existing: Iterable<GroupPath.GroupPath>,
+): ModulePlan => {
+  const current = generatedGroups(snapshot);
+  return {
+    removed: Array.fromIterable(existing).filter(
+      (path) => !HashMap.has(current, path),
+    ),
+    changed: Array.fromIterable(HashMap.values(current)),
+  };
+};
+
 export const diff = (
   before: GenerationSnapshot,
   after: GenerationSnapshot,
-): {
-  readonly removed: ReadonlyArray<GroupSummary>;
-  readonly changed: ReadonlyArray<GroupSummary>;
-} => {
+): ModulePlan => {
   const previous = generatedGroups(before);
   const current = generatedGroups(after);
   return {
     removed: Array.filter(
-      HashMap.values(previous),
-      (group) => !HashMap.has(current, group.path),
+      HashMap.keys(previous),
+      (path) => !HashMap.has(current, path),
     ),
     changed: Array.filter(HashMap.values(current), (group) => {
       const old = HashMap.get(previous, group.path);

@@ -507,12 +507,12 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           const renamed = yield* loadLeaf("new.spec.ts", old.spec);
           const after = fromLoadedLeaves([renamed]);
           expect(GenerationSnapshot.diff(before, after)).toEqual({
-            removed: [getLeaf(before, "old.spec.ts").root],
+            removed: [getLeaf(before, "old.spec.ts").root.path],
             changed: [getLeaf(after, "new.spec.ts").root],
           });
           const empty = fromLoadedLeaves([yield* loadLeaf("old.spec.ts")]);
           expect(GenerationSnapshot.diff(before, empty)).toEqual({
-            removed: [getLeaf(before, "old.spec.ts").root],
+            removed: [getLeaf(before, "old.spec.ts").root.path],
             changed: [],
           });
           expect(GenerationSnapshot.diff(empty, before)).toEqual({
@@ -521,10 +521,15 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           });
           expect(GenerationSnapshot.diff(before, fromLoadedLeaves([]))).toEqual(
             {
-              removed: [getLeaf(before, "old.spec.ts").root],
+              removed: [getLeaf(before, "old.spec.ts").root.path],
               changed: [],
             },
           );
+          expect(
+            GenerationSnapshot.plan(after, [
+              getLeaf(before, "old.spec.ts").root.path,
+            ]),
+          ).toEqual(GenerationSnapshot.diff(before, after));
         }),
     );
 

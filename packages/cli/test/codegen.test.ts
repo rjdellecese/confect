@@ -462,6 +462,9 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
               entry === path.join(project.root, "confect/notes.spec.ts"),
           );
           expect(specBuilds).toHaveLength(1);
+          expect(bundle.mock.calls.map(([entry]) => entry)).not.toContain(
+            path.join(project.root, "confect/_generated/spec.ts"),
+          );
         }).pipe(Effect.scoped),
     );
 

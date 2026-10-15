@@ -1,4 +1,4 @@
-import { FunctionSpec, GroupSpec, Spec } from "@confect/core";
+import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
@@ -8,7 +8,6 @@ import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import * as GroupPath from "@confect/cli/GroupPath";
@@ -59,40 +58,23 @@ const GenerateFunctionsLayer = Layer.mergeAll(
   NodeFileSystem.layer,
 );
 
-const emptyReturns = Schema.Null;
-
-const nodeGroup = () =>
-  GroupSpec.makeNode().addFunction(
-    FunctionSpec.publicNodeAction({
-      name: "failingNodeAction",
-      returns: () => emptyReturns,
-    }),
-  );
-
-/**
- * Run `generateFunctions(spec)` against a clean convex tree (no pre-existing
- * `convex/` modules—every group takes the `writeGroups` "new group" branch),
- * with a registry file pre-seeded at `registryRelativePath` so the generated
- * module's import can be resolved on disk. Returns the generated module's
- * contents plus whether its registry import resolves to a real file.
- */
 const runGenerateForNodeGroup = ({
-  spec,
+  snapshot,
   moduleRelativePath,
   registryRelativePath,
 }: Parameters<typeof runGenerateForNodeGroupEffect>[0]) =>
   runGenerateForNodeGroupEffect({
-    spec,
+    snapshot,
     moduleRelativePath,
     registryRelativePath,
   });
 
 const runGenerateForNodeGroupEffect = Effect.fnUntraced(function* ({
-  spec,
+  snapshot,
   moduleRelativePath,
   registryRelativePath,
 }: {
-  spec: Spec.AnyWithProps;
+  snapshot: GenerationSnapshot.GenerationSnapshot;
   moduleRelativePath: string;
   registryRelativePath: string;
 }) {
@@ -125,7 +107,7 @@ const runGenerateForNodeGroupEffect = Effect.fnUntraced(function* ({
     ),
   );
 
-  yield* generateFunctions(spec).pipe(Effect.provide(TempDirsLayer));
+  yield* generateFunctions(snapshot).pipe(Effect.provide(TempDirsLayer));
 
   const modulePath = path.join(convexDir, moduleRelativePath);
   const contents = yield* fs.readFileString(modulePath);
@@ -145,10 +127,25 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
   // path. Exercised from a clean tree, so it also guards the `writeGroups` path.
   it.effect("generates a top-level Node module with `use node`", () =>
     Effect.gen(function* () {
-      const spec = Spec.fromGroups({ typedErrorsNode: nodeGroup() });
+      const snapshot = yield* Effect.fromResult(
+        GenerationSnapshot.parse([
+          [
+            "typedErrorsNode.spec.ts",
+            {
+              relativePath: "typedErrorsNode.spec.ts",
+              root: {
+                path: { pathSegments: ["typedErrorsNode"] },
+                runtime: "Node",
+                functionNames: ["failingNodeAction"],
+              },
+              descendants: [],
+            },
+          ],
+        ]),
+      );
 
       const { contents, resolves } = yield* runGenerateForNodeGroup({
-        spec,
+        snapshot,
         moduleRelativePath: "typedErrorsNode.ts",
         registryRelativePath: "typedErrorsNode.ts",
       });
@@ -166,14 +163,31 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
   // resolves at the matching nested path.
   it.effect("generates a nested Node module preserving its path", () =>
     Effect.gen(function* () {
-      const spec = Spec.fromGroups({
-        notes: GroupSpec.addGroupsAt(GroupSpec.make(), {
-          archived: nodeGroup(),
-        }),
-      });
+      const snapshot = yield* Effect.fromResult(
+        GenerationSnapshot.parse([
+          [
+            "notes.spec.ts",
+            {
+              relativePath: "notes.spec.ts",
+              root: {
+                path: { pathSegments: ["notes"] },
+                runtime: "Convex",
+                functionNames: [],
+              },
+              descendants: [
+                {
+                  path: { pathSegments: ["notes", "archived"] },
+                  runtime: "Node",
+                  functionNames: ["failingNodeAction"],
+                },
+              ],
+            },
+          ],
+        ]),
+      );
 
       const { contents, resolves } = yield* runGenerateForNodeGroup({
-        spec,
+        snapshot,
         moduleRelativePath: "notes/archived.ts",
         registryRelativePath: "notes/archived.ts",
       });

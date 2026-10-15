@@ -20,7 +20,6 @@ import { ConvexDirectory } from "../ConvexDirectory";
 import * as DocName from "../DocName";
 import * as FunctionPaths from "../FunctionPaths";
 import * as GenerationSnapshot from "../GenerationSnapshot";
-import * as GroupPath from "../GroupPath";
 import * as EntryPoint from "../EntryPoint";
 import type { ImplModulePath } from "../ImplModulePath";
 import {
@@ -48,8 +47,7 @@ import {
   generateAuthConfig,
   generateCrons,
   generateFunctions,
-  generateGroupModule,
-  registeredFunctionsImportPathForGroup,
+  applyFunctionPlan,
   generateHttp,
   removePathIfExists,
   toModuleImportPath,
@@ -181,7 +179,7 @@ const runCodegen = Effect.gen(function* () {
   yield* removeObsoleteRegisteredFunctions(leaves);
   const [functionPaths] = yield* Effect.all(
     [
-      generateFunctionModules,
+      generateFunctions(snapshot),
       generateConvexSchemaReexport,
       logGenerated(generateHttp),
       logGenerated(generateCrons),
@@ -202,7 +200,6 @@ export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
     affectedImpls: ReadonlyArray<ImplModulePath>,
   ) {
     const path = yield* Path.Path;
-    const convexDirectory = yield* ConvexDirectory.get;
     const { paths, tables } = EntryPoint.planDeclarations(
       declarations,
       affectedImpls,
@@ -216,40 +213,7 @@ export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
         );
         yield* validateAllImpls(leaves);
         yield* generateGroupRegisteredFunctions(leaves);
-        const changed = GenerationSnapshot.diff(snapshot, next);
-        yield* Effect.forEach(
-          changed.removed,
-          Effect.fnUntraced(function* (group) {
-            const file = path.join(
-              convexDirectory,
-              yield* GroupPath.modulePath(group.path),
-            );
-            yield* removePathIfExists(file);
-            yield* logFileRemoved(file);
-          }),
-        );
-        yield* Effect.forEach(
-          changed.changed,
-          Effect.fnUntraced(function* (group) {
-            const file = path.join(
-              convexDirectory,
-              yield* GroupPath.modulePath(group.path),
-            );
-            const change = yield* generateGroupModule({
-              groupPath: group.path,
-              functionNames: group.functionNames,
-              registeredFunctionsImportPath:
-                yield* registeredFunctionsImportPathForGroup(group.path, file),
-              useNode: group.runtime === "Node",
-            });
-            yield* Match.value(change).pipe(
-              Match.when("Added", () => logFileAdded(file)),
-              Match.when("Modified", () => logFileModified(file)),
-              Match.when("Unchanged", () => Effect.void),
-              Match.exhaustive,
-            );
-          }),
-        );
+        yield* applyFunctionPlan(GenerationSnapshot.diff(snapshot, next));
         return next;
       }),
     );
@@ -466,11 +430,6 @@ const removeGeneratedApi = removeObsoleteGeneratedFile("api.ts");
 
 // `_generated/nodeApi.ts` is obsolete for the same reason.
 const removeGeneratedNodeApi = removeObsoleteGeneratedFile("nodeApi.ts");
-
-const generateFunctionModules = Effect.gen(function* () {
-  const spec = yield* loadGeneratedSpec;
-  return yield* generateFunctions(spec);
-});
 
 /**
  * The user-authored `confect/schema.ts` is no longer supported: codegen now
