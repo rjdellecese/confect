@@ -11,8 +11,39 @@ import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as RegisteredFunction from "./RegisteredFunction";
-import type * as FunctionRegistryItem from "./FunctionRegistryItem";
-import type * as ResolvedMiddleware from "./ResolvedMiddleware";
+import * as FunctionRegistryItem from "./FunctionRegistryItem";
+import * as ResolvedMiddleware from "./ResolvedMiddleware";
+import * as GroupRegistry from "./GroupRegistry";
+import type * as GroupSpec from "@confect/core/GroupSpec";
+import type * as GroupImpl from "./GroupImpl";
+import type * as RegisteredFunctions from "./RegisteredFunctions";
+import { mapLeaves } from "./internal/utils";
+
+export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
+  databaseSchema: DatabaseSchema.AnyWithProps,
+  groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
+): RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group> => {
+  const { functionRegistryItems, middlewareRegistryItems } =
+    GroupRegistry.make(groupLayer);
+  return mapLeaves<FunctionRegistryItem.AnyWithProps, RegisteredFunction.Any>(
+    functionRegistryItems as {
+      [key: string]: FunctionRegistryItem.AnyWithProps;
+    },
+    FunctionRegistryItem.isFunctionRegistryItem,
+    (item) =>
+      Match.value(item).pipe(
+        Match.tag("Convex", ({ handler }) => handler),
+        Match.tag("Confect", (confect) =>
+          make(
+            databaseSchema,
+            confect,
+            ResolvedMiddleware.resolve(confect, middlewareRegistryItems),
+          ),
+        ),
+        Match.exhaustive,
+      ),
+  ) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>;
+};
 
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,

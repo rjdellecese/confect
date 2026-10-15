@@ -2,13 +2,11 @@ import * as NodePath from "@effect/platform-node/NodePath";
 import { describe, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
 import {
   specImportPathFromGenerated,
   type LeafModule,
 } from "@confect/cli/LeafModule";
-import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
-import * as templates from "@confect/cli/templates";
+import { assemblyNodesFromLeaves, render } from "@confect/cli/SpecAssemblyNode";
 
 const leaf = (
   relativePath: string,
@@ -18,7 +16,6 @@ const leaf = (
   pathSegments,
   groupPathDot: pathSegments.join("."),
   exportName: pathSegments[pathSegments.length - 1]!,
-  runtime: Option.none(),
   specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
 });
 
@@ -30,7 +27,7 @@ describe("SpecAssemblyNode", () => {
         leaf("notesAndRandom/random.spec.ts", ["notesAndRandom", "random"]),
         leaf("env.spec.ts", ["env"]),
       ]);
-      const contents = yield* templates.assembledSpec({ nodes });
+      const contents = yield* render(nodes);
 
       expect(contents).toContain('import env from "../env.spec";');
       expect(contents).toContain(
@@ -40,9 +37,17 @@ describe("SpecAssemblyNode", () => {
         'import notesAndRandom_random from "../notesAndRandom/random.spec";',
       );
       expect(contents).toContain(
-        'GroupSpec.makeAt("notesAndRandom").addGroupAt("notes", notesAndRandom_notes).addGroupAt("random", notesAndRandom_random)',
+        `["notesAndRandom"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
+    ["notes"]: notesAndRandom_notes,
+    ["random"]: notesAndRandom_random,
+  })`,
       );
-      expect(contents).toContain('.addAt("env", env)');
+      expect(contents).toContain('["env"]: env,');
+      expect(contents).toContain("}> = Spec.fromGroups({");
+      expect(contents).not.toContain("as any");
+      expect(contents).toContain("const spec: Spec.Spec<");
+      expect(contents.match(/\bas\b/g)).toEqual(["as"]);
+      expect(contents).toContain("}) as typeof spec;");
       // Group paths are resolved impl-side, so the assembled spec no longer
       // emits a `.addPath(...)` registration chain.
       expect(contents).not.toContain(".addPath(");
@@ -57,35 +62,39 @@ describe("SpecAssemblyNode", () => {
           leaf("notes.spec.ts", ["notes"]),
           leaf("notes/archived.spec.ts", ["notes", "archived"]),
         ]);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain('import notes from "../notes.spec";');
         expect(contents).toContain(
           'import notes_archived from "../notes/archived.spec";',
         );
         expect(contents).toContain(
-          '.addAt("notes", notes.addGroupAt("archived", notes_archived))',
+          `["notes"]: GroupSpec.addGroupsAt(notes, {
+    ["archived"]: notes_archived,
+  })`,
         );
-        expect(contents).not.toContain('GroupSpec.makeAt("notes")');
+        expect(contents).not.toContain("GroupSpec.make()");
       }),
   );
 
   it.effect(
-    "assembledSpec imports GroupSpec whenever there are groups (for the annotation's NamedAt references)",
+    "assembledSpec preserves leaf types in compact explicit annotations",
     () =>
       Effect.gen(function* () {
         const nodes = assemblyNodesFromLeaves([
           leaf("notes.spec.ts", ["notes"]),
           leaf("notes/archived.spec.ts", ["notes", "archived"]),
         ]);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
         );
+        expect(contents).toContain("GroupSpec.addGroupsAt(notes, {");
         expect(contents).toContain(
           'GroupSpec.AddGroups<typeof notes, GroupSpec.NamedAt<typeof notes_archived, "archived">>',
         );
+        expect(contents).toContain("const spec: Spec.Spec<");
       }),
   );
 
@@ -93,19 +102,21 @@ describe("SpecAssemblyNode", () => {
     "assembledSpec imports only Spec (not GroupSpec) for an empty spec",
     () =>
       Effect.gen(function* () {
-        const contents = yield* templates.assembledSpec({ nodes: [] });
+        const contents = yield* render([]);
 
         expect(contents).toContain('import { Spec } from "@confect/core";');
         expect(contents).not.toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
         );
-        expect(contents).toContain("const spec: Spec.Spec = Spec.make();");
+        expect(contents).toContain(
+          "const spec: Spec.Spec = Spec.fromGroups({\n}) as typeof spec;",
+        );
         expect(contents).toContain("export default spec;");
       }),
   );
 
   it.effect(
-    "assembledSpec keeps GroupSpec.makeAt when a leafless descendant has children",
+    "assembledSpec uses GroupSpec.make when a leafless descendant has children",
     () =>
       Effect.gen(function* () {
         const nodes = assemblyNodesFromLeaves([
@@ -116,13 +127,17 @@ describe("SpecAssemblyNode", () => {
             "legacy",
           ]),
         ]);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
-          '.addAt("notes", notes.addGroupAt("archived", GroupSpec.makeAt("archived").addGroupAt("legacy", notes_archived_legacy)))',
+          `["notes"]: GroupSpec.addGroupsAt(notes, {
+    ["archived"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
+      ["legacy"]: notes_archived_legacy,
+    }),
+  })`,
         );
       }),
   );
@@ -164,7 +179,7 @@ describe("SpecAssemblyNode", () => {
           ]),
         ];
         const nodes = assemblyNodesFromLeaves(leaves);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain(
           'import scripts_operational_inviteUser_mutations from "../scripts/operational/inviteUser/mutations.spec";',
@@ -190,19 +205,19 @@ describe("SpecAssemblyNode", () => {
         expect(importLines).toHaveLength(leaves.length);
 
         expect(contents).toContain(
-          '.addGroupAt("mutations", scripts_operational_inviteUser_mutations)',
+          '["mutations"]: scripts_operational_inviteUser_mutations,',
         );
         expect(contents).toContain(
-          '.addGroupAt("queries", scripts_operational_inviteUser_queries)',
+          '["queries"]: scripts_operational_inviteUser_queries,',
         );
         expect(contents).toContain(
-          '.addGroupAt("mutations", scripts_operational_seed_mutations)',
+          '["mutations"]: scripts_operational_seed_mutations,',
         );
         expect(contents).toContain(
-          '.addGroupAt("mutations", scripts_operational_seedTestUser_mutations)',
+          '["mutations"]: scripts_operational_seedTestUser_mutations,',
         );
         expect(contents).toContain(
-          '.addGroupAt("queries", scripts_operational_seedTestUser_queries)',
+          '["queries"]: scripts_operational_seedTestUser_queries,',
         );
       }),
   );
@@ -211,9 +226,6 @@ describe("SpecAssemblyNode", () => {
     "assembledSpec assembles every leaf for a deep catalog layout",
     () =>
       Effect.gen(function* () {
-        // A parent leaf alongside subdirectory children at multiple nesting
-        // depths. Each impl resolves its own group path impl-side, so the
-        // assembled tree only needs the addAt/addGroupAt shape.
         const nodes = assemblyNodesFromLeaves([
           leaf("remix/routes/_app/catalog.spec.ts", [
             "remix",
@@ -246,12 +258,11 @@ describe("SpecAssemblyNode", () => {
             "details",
           ]),
         ]);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
-        // Tree-assembly shape is preserved; the addGroupAt-wrapped parent leaf
-        // still ends up in the tree, and its impl resolves its group path
-        // impl-side rather than through a `.addPath(...)` registration.
-        expect(contents).toContain("remix_routes__app_catalog.addGroupAt(");
+        expect(contents).toContain(
+          "GroupSpec.addGroupsAt(remix_routes__app_catalog, {",
+        );
         expect(contents).not.toContain(".addPath(");
       }),
   );
@@ -275,7 +286,6 @@ for (const { name, pathLayer, sep } of [
               pathSegments,
               groupPathDot: Array.join(pathSegments, "."),
               exportName: pathSegments[pathSegments.length - 1]!,
-              runtime: Option.none(),
               specImportPath,
             }),
           );
@@ -291,7 +301,7 @@ for (const { name, pathLayer, sep } of [
           ),
           yield* discovered("env.spec.ts", ["env"]),
         ]);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain(
           'import notesAndRandom_notes from "../notesAndRandom/notes.spec";',

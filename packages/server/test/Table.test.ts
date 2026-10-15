@@ -138,6 +138,60 @@ describe("Table.tableDefinition", () => {
     );
   });
 
+  it("supports a record of any", () => {
+    const confectResultsTableDefinition = Table.tableDefinition(
+      Table.make(() =>
+        Schema.Struct({
+          name: Schema.String,
+          payload: Schema.Record(Schema.String, Schema.Any),
+        }),
+      ).index("by_name", ["name"])("results"),
+    );
+
+    const convexResultsTableDefinition = defineTable({
+      name: v.string(),
+      payload: v.record(v.string(), v.any()),
+    }).index("by_name", ["name"]);
+
+    expectTypeOf(confectResultsTableDefinition).toEqualTypeOf(
+      convexResultsTableDefinition,
+    );
+    expect(convexResultsTableDefinition).toStrictEqual(
+      confectResultsTableDefinition,
+    );
+  });
+
+  it("supports indexes when a nested struct is assignable to its parent", () => {
+    const confectSettingsTableDefinition = Table.tableDefinition(
+      Table.make(() =>
+        Schema.Struct({
+          userId: Schema.String,
+          sidebar: Schema.Struct({
+            badge: Schema.String,
+            rows: Schema.optionalKey(
+              Schema.Array(Schema.Struct({ badge: Schema.String })),
+            ),
+          }),
+        }),
+      ).index("by_userId", ["userId"])("settings"),
+    );
+
+    const convexSettingsTableDefinition = defineTable({
+      userId: v.string(),
+      sidebar: v.object({
+        badge: v.string(),
+        rows: v.optional(v.array(v.object({ badge: v.string() }))),
+      }),
+    }).index("by_userId", ["userId"]);
+
+    expectTypeOf(confectSettingsTableDefinition).toEqualTypeOf(
+      convexSettingsTableDefinition,
+    );
+    expect(convexSettingsTableDefinition).toStrictEqual(
+      confectSettingsTableDefinition,
+    );
+  });
+
   it("supports indexes on name fields when the schema includes optional bytes", () => {
     const confectImagesTableDefinition = Table.tableDefinition(
       Table.make(() =>

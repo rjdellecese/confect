@@ -1,4 +1,4 @@
-import { Spec, type GroupSpec } from "@confect/core";
+import { Spec } from "@confect/core";
 import * as Command from "effect/cli/Command";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -10,30 +10,26 @@ import * as HashSet from "effect/HashSet";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
-import * as Ref from "effect/Ref";
 import * as Bundler from "../Bundler";
 import * as CodegenError from "../CodegenError";
-import {
-  LegacySchemaFileError,
-  MissingImplFileError,
-  MissingSpecFileError,
-  ParentChildNameCollisionError,
-} from "../CodegenError";
+import { LegacySchemaFileError } from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import * as ConvexConfig from "../ConvexConfig";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as DocName from "../DocName";
 import * as FunctionPaths from "../FunctionPaths";
+import * as FunctionModule from "../FunctionModule";
+import * as GenerationSnapshot from "../GenerationSnapshot";
+import * as EntryPoint from "../EntryPoint";
+import type { ImplModulePath } from "../ImplModulePath";
 import {
-  discoverLeafImplFiles,
-  discoverLeafSpecFiles,
   implPathForSpec,
+  loadAll,
   registeredFunctionsRelativePath,
-  specPathForImpl,
-  toLeafModule,
-  validateImpl,
-  validateSpec,
+  validateAllImpls,
+  withImplFiles,
   type LeafModule,
+  type LoadedLeafModule,
 } from "../LeafModule";
 import {
   logFileAdded,
@@ -44,23 +40,17 @@ import {
   logWarn,
 } from "../log";
 import { ProjectRoot } from "../ProjectRoot";
-import {
-  assemblyNodesFromLeaves,
-  type SpecAssemblyNode,
-} from "../SpecAssemblyNode";
+import { assemblyNodesFromLeaves } from "../SpecAssemblyNode";
 import * as TableModule from "../TableModule";
 import * as templates from "../templates";
 import {
   generateAuthConfig,
   generateCrons,
-  generateFunctions,
   generateHttp,
   removePathIfExists,
   toModuleImportPath,
-  toPosixPath,
   touchConvexSchema,
   writeFileStringAndLog,
-  WriteTracker,
 } from "../utils";
 
 const GENERATED_DIRNAME = "_generated";
@@ -117,17 +107,6 @@ export const codegen = Command.make("codegen", {}, () =>
   ),
 );
 
-export const codegenHandler = Effect.gen(function* () {
-  const tracker = yield* Ref.make(false);
-
-  const functionPaths = yield* runCodegen.pipe(
-    Effect.provideService(WriteTracker, tracker),
-  );
-
-  const anyWritesHappened = yield* Ref.get(tracker);
-  return { functionPaths, anyWritesHappened };
-}).pipe(Effect.withSpan("Cli.codegen"));
-
 const runCodegen = Effect.gen(function* () {
   yield* generateConfectGeneratedDirectory;
   // Reject a legacy `confect/schema.ts` up front so the user-facing
@@ -149,12 +128,10 @@ const runCodegen = Effect.gen(function* () {
   yield* generateTableWrappers(tableModules);
   yield* removeObsoleteTableWrappers(tableModules);
   yield* generateRuntimeSchema(tableModules);
-  const { leaves, groupSpecsByPosixRelativePath } =
-    yield* loadAndValidateLeafModules;
+  const leaves = yield* loadAll;
   yield* removeLegacyFiles;
-  yield* validateNoParentChildNameCollisions(
-    leaves,
-    groupSpecsByPosixRelativePath,
+  const snapshot = yield* Effect.fromResult(
+    GenerationSnapshot.fromLoadedLeaves(leaves),
   );
   yield* generateAssembledSpecs(leaves);
   // `_generated/api.ts`/`nodeApi.ts` are no longer imported by generated or
@@ -175,12 +152,12 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
-  yield* validateImplModules(leaves);
+  yield* validateAllImpls(leaves);
   yield* generateGroupRegisteredFunctions(leaves);
   yield* removeObsoleteRegisteredFunctions(leaves);
   const [functionPaths] = yield* Effect.all(
     [
-      generateFunctionModules,
+      FunctionModule.generateFunctions(snapshot),
       generateConvexSchemaReexport,
       logGenerated(generateHttp),
       logGenerated(generateCrons),
@@ -188,9 +165,49 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
-  yield* touchConvexSchema;
-  return functionPaths;
+  return {
+    functionPaths,
+    snapshot,
+  };
 });
+
+export const generateWithSnapshot = runCodegen.pipe(
+  Effect.withSpan("Cli.codegen"),
+);
+
+export const codegenHandler = generateWithSnapshot.pipe(
+  Effect.tap(() => touchConvexSchema),
+  Effect.map(({ functionPaths }) => ({ functionPaths })),
+);
+
+export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
+  function* (
+    snapshot: GenerationSnapshot.GenerationSnapshot,
+    declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
+    affectedImpls: ReadonlyArray<ImplModulePath>,
+  ) {
+    const path = yield* Path.Path;
+    const { paths, tables } = EntryPoint.planDeclarations(
+      declarations,
+      affectedImpls,
+      path,
+    );
+    yield* TableModule.validate(tables);
+    return yield* withImplFiles(paths, (leaves) =>
+      Effect.gen(function* () {
+        const next = yield* Effect.fromResult(
+          GenerationSnapshot.update(snapshot, leaves),
+        );
+        yield* validateAllImpls(leaves);
+        yield* generateGroupRegisteredFunctions(leaves);
+        yield* FunctionModule.applyFunctionPlan(
+          GenerationSnapshot.diff(snapshot, next),
+        );
+        return next;
+      }),
+    );
+  },
+);
 
 const generateConfectGeneratedDirectory = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -203,182 +220,6 @@ const generateConfectGeneratedDirectory = Effect.gen(function* () {
     });
     yield* logFileAdded(path.join(confectDirectory, "_generated") + "/");
   }
-});
-
-const loadAndValidateLeafModules = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const specFiles = yield* discoverLeafSpecFiles;
-
-  const results = yield* Effect.forEach(
-    specFiles,
-    Effect.fnUntraced(function* (specRelativePath: string) {
-      const discovered = yield* toLeafModule(specRelativePath);
-      const groupSpec = yield* validateSpec(discovered);
-      // Fill in the runtime now that the spec is bundled; discovery left it `None`.
-      const leaf = {
-        ...discovered,
-        runtime: Option.some(groupSpec.runtime),
-      };
-
-      const implRelativePath = yield* implPathForSpec(specRelativePath);
-      const implAbsolutePath = path.join(confectDirectory, implRelativePath);
-      if (!(yield* fs.exists(implAbsolutePath))) {
-        return yield* new MissingImplFileError({
-          specPath: specRelativePath,
-          expectedImplPath: implRelativePath,
-        });
-      }
-
-      return { leaf, groupSpec };
-    }),
-  );
-
-  yield* validateOrphanImpls(specFiles);
-
-  const leaves = Array.map(results, ({ leaf }) => leaf);
-  const groupSpecsByPosixRelativePath = new Map(
-    Array.map(results, ({ leaf, groupSpec }) => [
-      toPosixPath(path, leaf.relativePath),
-      groupSpec,
-    ]),
-  );
-
-  return { leaves, groupSpecsByPosixRelativePath };
-});
-
-/**
- * Walk the assembly tree and fail with a {@link ParentChildNameCollisionError}
- * when a parent leaf declares a function or subgroup whose name matches a
- * sibling subdirectory spec's segment. Without this check the colliding
- * descendant would overwrite the parent's entry in the assembled
- * `GroupSpec.groups` map at runtime, surfacing as a confusing `Refs.make` error
- * rather than a codegen-time diagnostic.
- */
-export const validateNoParentChildNameCollisions = Effect.fnUntraced(function* (
-  leaves: ReadonlyArray<LeafModule>,
-  groupSpecsByPosixRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
-) {
-  // Convex and Node groups share one namespace, so they assemble into a
-  // single tree. A Node group nested under a Convex parent (or vice versa) is
-  // caught here by the parent/child collision check.
-  const nodes = assemblyNodesFromLeaves(leaves);
-  yield* Effect.forEach(nodes, (n) =>
-    checkAssemblyNodeForCollisions(n, groupSpecsByPosixRelativePath),
-  );
-});
-
-const checkAssemblyNodeForCollisions = Effect.fnUntraced(function* (
-  node: SpecAssemblyNode,
-  groupSpecsByPosixRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
-): Effect.fn.Return<void, ParentChildNameCollisionError> {
-  yield* Option.match(node.importBinding, {
-    onNone: () => Effect.void,
-    onSome: (binding) =>
-      Effect.gen(function* () {
-        if (node.children.length === 0) return;
-        const parentRelativePath = bindingToRelativeSpecPath(
-          binding.importPath,
-        );
-        const parentGroupSpec =
-          groupSpecsByPosixRelativePath.get(parentRelativePath);
-        if (parentGroupSpec === undefined) return;
-        yield* Effect.forEach(node.children, (child) => {
-          if (
-            Object.prototype.hasOwnProperty.call(
-              parentGroupSpec.functions,
-              child.segment,
-            )
-          ) {
-            return Effect.fail(
-              new ParentChildNameCollisionError({
-                parentSpecPath: parentRelativePath,
-                childSpecPath: childRepresentativeSpecPath(child),
-                collisionName: child.segment,
-                collisionKind: "function",
-              }),
-            );
-          }
-          if (
-            Object.prototype.hasOwnProperty.call(
-              parentGroupSpec.groups,
-              child.segment,
-            )
-          ) {
-            return Effect.fail(
-              new ParentChildNameCollisionError({
-                parentSpecPath: parentRelativePath,
-                childSpecPath: childRepresentativeSpecPath(child),
-                collisionName: child.segment,
-                collisionKind: "group",
-              }),
-            );
-          }
-          return Effect.void;
-        });
-      }),
-  });
-  yield* Effect.forEach(node.children, (child) =>
-    checkAssemblyNodeForCollisions(child, groupSpecsByPosixRelativePath),
-  );
-});
-
-/**
- * `LeafModule.specImportPath` is the import path used from inside the generated
- * `_generated/spec.ts` (e.g. `"../notes.spec"`). Strip the `../` prefix and
- * re-add the `.ts` extension to recover the leaf's confect-relative spec path
- * used as the key in `groupSpecsByPosixRelativePath`.
- */
-const bindingToRelativeSpecPath = (importPath: string): string => {
-  const withoutDotDot = importPath.startsWith("../")
-    ? importPath.slice(3)
-    : importPath;
-  return `${withoutDotDot}.ts`;
-};
-
-/**
- * A child assembly node may itself be a parent without a leaf (when the actual
- * leaves live only in deeper subdirectories). In that case we surface the first
- * descendant leaf as a representative path so the error message points at
- * something the user actually wrote.
- */
-const childRepresentativeSpecPath = (node: SpecAssemblyNode): string => {
-  if (Option.isSome(node.importBinding)) {
-    return bindingToRelativeSpecPath(node.importBinding.value.importPath);
-  }
-  for (const child of node.children) {
-    return childRepresentativeSpecPath(child);
-  }
-  return node.segment;
-};
-
-const validateOrphanImpls = Effect.fnUntraced(function* (
-  specFiles: ReadonlyArray<string>,
-) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const implFiles = yield* discoverLeafImplFiles;
-  const specPaths = new Set(specFiles);
-
-  yield* Effect.forEach(
-    implFiles,
-    Effect.fnUntraced(function* (implRelativePath: string) {
-      const specRelativePath = yield* specPathForImpl(implRelativePath);
-      if (specPaths.has(specRelativePath)) {
-        return;
-      }
-
-      const specAbsolutePath = path.join(confectDirectory, specRelativePath);
-      if (!(yield* fs.exists(specAbsolutePath))) {
-        return yield* new MissingSpecFileError({
-          implPath: implRelativePath,
-          expectedSpecPath: specRelativePath,
-        });
-      }
-    }),
-  );
 });
 
 const removeLegacyFiles = Effect.gen(function* () {
@@ -418,18 +259,15 @@ const generateAssembledSpecs = Effect.fnUntraced(function* (
   );
 });
 
-const validateImplModules = (leaves: ReadonlyArray<LeafModule>) =>
-  Effect.forEach(leaves, validateImpl);
-
 const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
-  leaves: ReadonlyArray<LeafModule>,
+  leaves: ReadonlyArray<LoadedLeafModule>,
 ) {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
   yield* Effect.forEach(
     leaves,
-    Effect.fnUntraced(function* (leaf: LeafModule) {
+    Effect.fnUntraced(function* (leaf: LoadedLeafModule) {
       const registryRelativePath = yield* registeredFunctionsRelativePath(leaf);
       const registryPath = path.join(
         confectDirectory,
@@ -464,25 +302,11 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
         ),
       );
 
-      // Every leaf reaching this point came through
-      // `loadAndValidateLeafModules`, which stamps the runtime from the
-      // validated spec—so `None` here means that invariant was broken.
-      const runtime = yield* Option.match(leaf.runtime, {
-        onNone: () =>
-          Effect.die(
-            new Error(
-              `Runtime for '${leaf.relativePath}' was not resolved before registry generation.`,
-            ),
-          ),
-        onSome: Effect.succeed,
-      });
-
       const contents = yield* templates.registeredFunctionsForGroup({
+        spec: leaf.spec,
         schemaImportPath,
         specImportPath,
         implImportPath,
-        layerExportName: leaf.exportName,
-        useNode: runtime === "Node",
       });
 
       yield* writeFileStringAndLog(registryPath, contents);
@@ -595,11 +419,6 @@ const removeGeneratedApi = removeObsoleteGeneratedFile("api.ts");
 
 // `_generated/nodeApi.ts` is obsolete for the same reason.
 const removeGeneratedNodeApi = removeObsoleteGeneratedFile("nodeApi.ts");
-
-const generateFunctionModules = Effect.gen(function* () {
-  const spec = yield* loadGeneratedSpec;
-  return yield* generateFunctions(spec);
-});
 
 /**
  * The user-authored `confect/schema.ts` is no longer supported: codegen now
