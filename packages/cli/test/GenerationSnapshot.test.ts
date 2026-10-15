@@ -4,6 +4,8 @@ import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ParentChildNameCollisionError } from "@confect/cli/CodegenError";
 import * as FunctionPaths from "@confect/cli/FunctionPaths";
 import * as FunctionPath from "@confect/cli/FunctionPath";
+import * as GroupPath from "@confect/cli/GroupPath";
+import { SpecModulePath } from "@confect/cli/SpecModulePath";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import * as LeafModule from "@confect/cli/LeafModule";
 import * as NodePath from "@effect/platform-node/NodePath";
@@ -60,7 +62,12 @@ const getLeaf = (
   snapshot: GenerationSnapshot.GenerationSnapshot,
   path: string,
 ) =>
-  Option.getOrThrow(HashMap.get(snapshot.leaves, path.replaceAll("\\", "/")));
+  Option.getOrThrow(
+    HashMap.get(
+      snapshot.leaves,
+      SpecModulePath.make(path.replaceAll("\\", "/")),
+    ),
+  );
 
 const fromLoadedLeaves = (leaves: ReadonlyArray<LeafModule.LoadedLeafModule>) =>
   Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves(leaves));
@@ -83,195 +90,114 @@ const baseLayer = Layer.merge(
 );
 
 const metadataGroup = (
-  pathSegments: ReadonlyArray<string>,
   functionNames: ReadonlyArray<string> = [],
-) => ({ path: { pathSegments }, runtime: "Convex", functionNames });
-
-const metadataLeaf = (
-  root = metadataGroup(["notes"]),
-  descendants: ReadonlyArray<ReturnType<typeof metadataGroup>> = [],
-) => ({ relativePath: "notes.spec.ts", root, descendants });
+  groups: GenerationSnapshot.GroupTree["groups"] = {},
+): GenerationSnapshot.GroupTree => ({
+  runtime: "Convex",
+  functionNames,
+  groups,
+});
 
 describe("GenerationSnapshot parsing", () => {
   test.each([
-    {
-      reason: "NoncanonicalFunctionNames",
-      entries: [
-        [
-          "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"], ["nested/name"])),
-        ],
-      ],
-    },
-    {
-      reason: "NoncanonicalFunctionNames",
-      entries: [
-        ["notes.spec.ts", metadataLeaf(metadataGroup(["notes"], ["default"]))],
-      ],
-    },
-    {
-      reason: "NoncanonicalPath",
-      entries: [
-        [
-          "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"]), [
-            metadataGroup(["notes", "not-an-identifier"]),
-          ]),
-        ],
-      ],
-    },
     { reason: "InvalidShape", entries: {} },
     {
       reason: "InvalidShape",
       entries: [
+        ["notes.spec.ts", { runtime: "Other", functionNames: [], groups: {} }],
+      ],
+    },
+    {
+      reason: "InvalidShape",
+      entries: [
+        ["notes.spec.ts", { runtime: "Convex", functionNames: [], groups: [] }],
+      ],
+    },
+    {
+      reason: "InvalidShape",
+      entries: [
         [
           "notes.spec.ts",
-          metadataLeaf({ ...metadataGroup(["notes"]), runtime: "Other" }),
+          { runtime: "Convex", functionNames: [""], groups: {} },
         ],
       ],
     },
     {
       reason: "InvalidShape",
-      entries: [["notes.spec.ts", metadataLeaf(metadataGroup([]))]],
-    },
-    {
-      reason: "InvalidShape",
-      entries: [
-        ["notes.spec.ts", metadataLeaf(metadataGroup(["notes"], [""]))],
-      ],
-    },
-    { reason: "KeyMismatch", entries: [["other.spec.ts", metadataLeaf()]] },
-    {
-      reason: "RootMismatch",
-      entries: [["notes.spec.ts", metadataLeaf(metadataGroup(["other"]))]],
-    },
-    {
-      reason: "RootMismatch",
-      entries: [
-        [
-          "notes\\nested.spec.ts",
-          {
-            ...metadataLeaf(metadataGroup(["notes", "nested"])),
-            relativePath: "notes\\nested.spec.ts",
-          },
-        ],
-      ],
-    },
-    {
-      reason: "NoncanonicalPath",
-      entries: [
-        [
-          "../notes.spec.ts",
-          {
-            ...metadataLeaf(metadataGroup(["..", "notes"])),
-            relativePath: "../notes.spec.ts",
-          },
-        ],
-      ],
-    },
-    {
-      reason: "NoncanonicalPath",
-      entries: [["notes.spec.ts", metadataLeaf(metadataGroup(["C:notes"]))]],
-    },
-    {
-      reason: "NoncanonicalPath",
       entries: [
         [
           "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"]), [
-            metadataGroup(["notes", "nested/child"]),
-          ]),
+          {
+            relativePath: "other.spec.ts",
+            root: {
+              path: { pathSegments: ["notes"] },
+              runtime: "Convex",
+              functionNames: [],
+            },
+            descendants: [],
+          },
         ],
       ],
     },
+    ...[
+      "",
+      "notes.ts",
+      ".spec.ts",
+      "../notes.spec.ts",
+      "/notes.spec.ts",
+      "notes//child.spec.ts",
+      "notes/./child.spec.ts",
+      "notes/../child.spec.ts",
+      "notes\\child.spec.ts",
+      "C:notes.spec.ts",
+      "C:/notes.spec.ts",
+      "notes\0.spec.ts",
+      "schema.spec.ts",
+      "http.spec.ts",
+      "crons.spec.ts",
+      "default.spec.ts",
+      "bad-dir/notes.spec.ts",
+      "notes/bad-name.spec.ts",
+      "notes/..spec.ts",
+      "notes/...spec.ts",
+    ].map((path) => ({
+      reason: "NoncanonicalPath",
+      entries: [[path, metadataGroup()]],
+    })),
     {
       reason: "DuplicateLeaf",
       entries: [
-        ["notes.spec.ts", metadataLeaf()],
-        ["notes.spec.ts", metadataLeaf()],
+        ["notes.spec.ts", metadataGroup()],
+        ["notes.spec.ts", metadataGroup()],
       ],
     },
+    ...["nested/name", "default", "not-an-identifier"].map((name) => ({
+      reason: "NoncanonicalFunctionNames",
+      entries: [["notes.spec.ts", metadataGroup([name])]],
+    })),
     {
-      reason: "DuplicateGroup",
-      entries: [
-        [
-          "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"]), [
-            metadataGroup(["notes", "child"]),
-            metadataGroup(["notes", "child"]),
-          ]),
-        ],
-      ],
+      reason: "NoncanonicalFunctionNames",
+      entries: [["notes.spec.ts", metadataGroup(["list", "list"])]],
     },
-    {
-      reason: "DescendantOutsideRoot",
+    ...[
+      "not-an-identifier",
+      "nested/child",
+      "../other",
+      "missing/child",
+      "",
+      "default",
+    ].map((name) => ({
+      reason: "NoncanonicalPath",
       entries: [
-        [
-          "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"]), [
-            metadataGroup(["other", "child"]),
-          ]),
-        ],
+        ["notes.spec.ts", metadataGroup([], { [name]: metadataGroup() })],
       ],
-    },
-    {
-      reason: "DescendantOutsideRoot",
-      entries: [
-        [
-          "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"]), [metadataGroup(["notes"])]),
-        ],
-      ],
-    },
-    {
-      reason: "MissingParent",
-      entries: [
-        [
-          "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"]), [
-            metadataGroup(["notes", "missing", "child"]),
-          ]),
-        ],
-      ],
-    },
-    {
-      reason: "NoncanonicalDescendants",
-      entries: [
-        [
-          "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"]), [
-            metadataGroup(["notes", "zebra"]),
-            metadataGroup(["notes", "alpha"]),
-          ]),
-        ],
-      ],
-    },
+    })),
     {
       reason: "NoncanonicalFunctionNames",
       entries: [
         [
           "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"], ["list", "list"])),
-        ],
-      ],
-    },
-    {
-      reason: "NoncanonicalFunctionNames",
-      entries: [
-        [
-          "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"], ["zebra", "alpha"])),
-        ],
-      ],
-    },
-    {
-      reason: "NoncanonicalFunctionNames",
-      entries: [
-        [
-          "notes.spec.ts",
-          metadataLeaf(metadataGroup(["notes"]), [
-            metadataGroup(["notes", "child"], ["zebra", "alpha"]),
-          ]),
+          metadataGroup([], { child: metadataGroup(["list", "list"]) }),
         ],
       ],
     },
@@ -279,12 +205,64 @@ describe("GenerationSnapshot parsing", () => {
     const result = GenerationSnapshot.parse(entries);
     assert(Result.isFailure(result));
     expect(result.failure).toMatchObject({ _tag: "SnapshotError", reason });
-    expect(Result.isFailure(Schema.decodeResult(codec)(entries))).toBe(true);
+    expect(Result.isFailure(Schema.decodeUnknownResult(codec)(entries))).toBe(
+      true,
+    );
   });
+
+  test("derives ancestry and deterministic outputs from the tree without changing inputs", () => {
+    const tree = metadataGroup(["zebra", "alpha"], {
+      zebra: metadataGroup(["z", "a"]),
+      alpha: metadataGroup([], { child: metadataGroup(["run"]) }),
+    });
+    const snapshot = Result.getOrThrow(
+      GenerationSnapshot.parse([["nested/notes.spec.ts", tree]]),
+    );
+    expect(
+      GenerationSnapshot.plan(snapshot, [])
+        .changed.map((group) => ({
+          path: group.path.pathSegments,
+          names: group.functionNames,
+        }))
+        .toSorted((left, right) =>
+          left.path.join("/").localeCompare(right.path.join("/")),
+        ),
+    ).toEqual([
+      { path: ["nested", "notes"], names: ["alpha", "zebra"] },
+      { path: ["nested", "notes", "alpha", "child"], names: ["run"] },
+      { path: ["nested", "notes", "zebra"], names: ["a", "z"] },
+    ]);
+    expect(tree.functionNames).toEqual(["zebra", "alpha"]);
+    expect(Object.keys(tree.groups)).toEqual(["zebra", "alpha"]);
+    expect(GenerationSnapshot.diff(snapshot, roundtrip(snapshot))).toEqual({
+      removed: [],
+      changed: [],
+    });
+  });
+
+  test.each(["__proto__", "constructor", "prototype", "toString"])(
+    "preserves special root and child name %s through JSON",
+    (name) => {
+      const tree = metadataGroup([], { [name]: metadataGroup(["run"]) });
+      const snapshot = Result.getOrThrow(
+        GenerationSnapshot.parse([[`${name}.spec.ts`, tree]]),
+      );
+      const decoded = roundtrip(snapshot);
+      expect(
+        [...GenerationSnapshot.functionPaths(decoded)].map(
+          FunctionPath.toString,
+        ),
+      ).toEqual([`${name}.${name}.run`]);
+      expect(Object.keys(getLeaf(decoded, `${name}.spec.ts`).groups)).toEqual([
+        name,
+      ]);
+      expect(Object.getPrototypeOf(tree.groups)).toBe(Object.prototype);
+    },
+  );
 
   test("does not accept structural maps as proof of validity", () => {
     expectTypeOf<
-      HashMap.HashMap<string, GenerationSnapshot.LeafSummary>
+      HashMap.HashMap<string, GenerationSnapshot.GroupTree>
     >().not.toExtend<GenerationSnapshot.GenerationSnapshot>();
     const structural = { leaves: HashMap.empty() };
     expect(Schema.is(GenerationSnapshot.GenerationSnapshot)(structural)).toBe(
@@ -305,21 +283,21 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
         Effect.gen(function* () {
           const leaf = yield* loadLeaf("notes.spec.ts");
           const mismatch = GenerationSnapshot.fromLoadedLeaves([
-            { ...leaf, pathSegments: ["other"] },
+            { ...leaf, relativePath: "../notes.spec.ts" },
           ]);
           assert(Result.isFailure(mismatch));
           expect(mismatch.failure).toMatchObject({
             _tag: "SnapshotError",
-            reason: "RootMismatch",
-            relativePath: "notes.spec.ts",
+            reason: "NoncanonicalPath",
+            relativePath: "../notes.spec.ts",
           });
           const result = GenerationSnapshot.fromLoadedLeaves([
-            { ...leaf, pathSegments: [""] },
+            { ...leaf, relativePath: "" },
           ]);
           assert(Result.isFailure(result));
           expect(result.failure).toMatchObject({
             _tag: "SnapshotError",
-            reason: "InvalidShape",
+            reason: "NoncanonicalPath",
           });
         }),
     );
@@ -376,51 +354,36 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           const leaves = [leaf];
           const snapshot = fromLoadedLeaves(leaves);
           const summary = getLeaf(snapshot, leaf.relativePath);
-          expect(summary.root.path.pathSegments).toEqual(["nested", "notes"]);
-          expect(summary.root.functionNames).toEqual(["alpha", "zebra"]);
-          expect(
-            summary.descendants.map((group) => ({
-              path: group.path.pathSegments,
-              runtime: group.runtime,
-              names: group.functionNames,
-            })),
-          ).toEqual([
-            {
-              path: ["nested", "notes", "empty"],
+          expect(summary.functionNames).toEqual(["zebra", "alpha"]);
+          expect(summary.groups).toEqual({
+            empty: {
               runtime: "Convex",
-              names: [],
+              functionNames: [],
+              groups: {
+                node: { runtime: "Node", functionNames: ["run"], groups: {} },
+              },
             },
-            {
-              path: ["nested", "notes", "empty", "node"],
-              runtime: "Node",
-              names: ["run"],
-            },
-          ]);
+          });
           const encoded = yield* Schema.encodeEffect(codec)(snapshot);
           expect(encoded).toEqual([
             [
               "nested/notes.spec.ts",
               {
-                relativePath: "nested/notes.spec.ts",
-                root: {
-                  path: { pathSegments: ["nested", "notes"] },
-                  runtime: "Convex",
-                  functionNames: ["alpha", "zebra"],
-                },
-                descendants: [
-                  {
-                    path: { pathSegments: ["nested", "notes", "empty"] },
+                runtime: "Convex",
+                functionNames: ["zebra", "alpha"],
+                groups: {
+                  empty: {
                     runtime: "Convex",
                     functionNames: [],
-                  },
-                  {
-                    path: {
-                      pathSegments: ["nested", "notes", "empty", "node"],
+                    groups: {
+                      node: {
+                        runtime: "Node",
+                        functionNames: ["run"],
+                        groups: {},
+                      },
                     },
-                    runtime: "Node",
-                    functionNames: ["run"],
                   },
-                ],
+                },
               },
             ],
           ]);
@@ -484,10 +447,10 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           expect(getLeaf(after, "other.spec.ts")).toBe(
             getLeaf(before, "other.spec.ts"),
           );
-          expect(getLeaf(before, "notes.spec.ts").root.functionNames).toEqual([
+          expect(getLeaf(before, "notes.spec.ts").functionNames).toEqual([
             "list",
           ]);
-          expect(getLeaf(after, "notes.spec.ts").root).toMatchObject({
+          expect(getLeaf(after, "notes.spec.ts")).toMatchObject({
             runtime: "Node",
             functionNames: ["run"],
           });
@@ -507,28 +470,38 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           const renamed = yield* loadLeaf("renamed.spec.ts", old.spec);
           const after = fromLoadedLeaves([renamed]);
           expect(GenerationSnapshot.diff(before, after)).toEqual({
-            removed: [getLeaf(before, "old.spec.ts").root.path],
-            changed: [getLeaf(after, "renamed.spec.ts").root],
+            removed: [GroupPath.make(["old"])],
+            changed: [
+              {
+                path: GroupPath.make(["renamed"]),
+                runtime: "Convex",
+                functionNames: ["list"],
+              },
+            ],
           });
           const empty = fromLoadedLeaves([yield* loadLeaf("old.spec.ts")]);
           expect(GenerationSnapshot.diff(before, empty)).toEqual({
-            removed: [getLeaf(before, "old.spec.ts").root.path],
+            removed: [GroupPath.make(["old"])],
             changed: [],
           });
           expect(GenerationSnapshot.diff(empty, before)).toEqual({
             removed: [],
-            changed: [getLeaf(before, "old.spec.ts").root],
+            changed: [
+              {
+                path: GroupPath.make(["old"]),
+                runtime: "Convex",
+                functionNames: ["list"],
+              },
+            ],
           });
           expect(GenerationSnapshot.diff(before, fromLoadedLeaves([]))).toEqual(
             {
-              removed: [getLeaf(before, "old.spec.ts").root.path],
+              removed: [GroupPath.make(["old"])],
               changed: [],
             },
           );
           expect(
-            GenerationSnapshot.plan(after, [
-              getLeaf(before, "old.spec.ts").root.path,
-            ]),
+            GenerationSnapshot.plan(after, [GroupPath.make(["old"])]),
           ).toEqual(GenerationSnapshot.diff(before, after));
         }),
     );
@@ -571,8 +544,16 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           expect(result.changed).toHaveLength(2);
           expect(result.changed).toEqual(
             expect.arrayContaining([
-              getLeaf(after, "notes.spec.ts").root,
-              getLeaf(after, "notes.spec.ts").descendants[0],
+              {
+                path: GroupPath.make(["notes"]),
+                runtime: "Convex",
+                functionNames: ["a", "renamed"],
+              },
+              {
+                path: GroupPath.make(["notes", "nested"]),
+                runtime: "Node",
+                functionNames: ["run"],
+              },
             ]),
           );
         }),
@@ -658,9 +639,7 @@ for (const { name, pathLayer, sep } of [
             assert(Result.isFailure(result));
             assert(result.failure._tag === "ParentChildNameCollisionError");
             expect(result.failure.collisionKind).toBe("function");
-            expect(getLeaf(before, "notes.spec.ts").root.functionNames).toEqual(
-              [],
-            );
+            expect(getLeaf(before, "notes.spec.ts").functionNames).toEqual([]);
             expect(
               Schema.is(GenerationSnapshot.GenerationSnapshot)(before),
             ).toBe(true);

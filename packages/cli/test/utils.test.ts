@@ -132,13 +132,9 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
           [
             "typedErrorsNode.spec.ts",
             {
-              relativePath: "typedErrorsNode.spec.ts",
-              root: {
-                path: { pathSegments: ["typedErrorsNode"] },
-                runtime: "Node",
-                functionNames: ["failingNodeAction"],
-              },
-              descendants: [],
+              runtime: "Node",
+              functionNames: ["failingNodeAction"],
+              groups: {},
             },
           ],
         ]),
@@ -168,19 +164,15 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
           [
             "notes.spec.ts",
             {
-              relativePath: "notes.spec.ts",
-              root: {
-                path: { pathSegments: ["notes"] },
-                runtime: "Convex",
-                functionNames: [],
-              },
-              descendants: [
-                {
-                  path: { pathSegments: ["notes", "archived"] },
+              runtime: "Convex",
+              functionNames: [],
+              groups: {
+                archived: {
                   runtime: "Node",
                   functionNames: ["failingNodeAction"],
+                  groups: {},
                 },
-              ],
+              },
             },
           ],
         ]),

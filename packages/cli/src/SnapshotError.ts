@@ -6,13 +6,7 @@ export class SnapshotError extends Schema.TaggedError<SnapshotError>()(
     reason: Schema.Literals([
       "InvalidShape",
       "NoncanonicalPath",
-      "KeyMismatch",
-      "RootMismatch",
       "DuplicateLeaf",
-      "DuplicateGroup",
-      "DescendantOutsideRoot",
-      "MissingParent",
-      "NoncanonicalDescendants",
       "NoncanonicalFunctionNames",
     ]),
     relativePath: Schema.String,
