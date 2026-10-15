@@ -1,5 +1,5 @@
 import * as Predicate from "effect/Predicate";
-import type * as Record from "effect/Record";
+import * as Record from "effect/Record";
 import * as GroupSpec from "./GroupSpec";
 
 export const TypeId = "~@confect/core/Spec";
@@ -42,10 +42,7 @@ export const groups = <Spec_ extends AnyWithProps>(
 export const fromGroups = (
   record: Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
 ): AnyWithProps => ({
-  [TypeId]: Object.fromEntries(
-    Object.entries(record).map(([name, group]) => [
-      name,
-      GroupSpec.withName(name, group),
-    ]),
+  [TypeId]: Record.map(record, (group, name) =>
+    GroupSpec.withName(name, group),
   ),
 });

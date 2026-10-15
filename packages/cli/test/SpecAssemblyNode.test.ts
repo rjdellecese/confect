@@ -7,8 +7,7 @@ import {
   specImportPathFromGenerated,
   type LeafModule,
 } from "@confect/cli/LeafModule";
-import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
-import * as templates from "@confect/cli/templates";
+import { assemblyNodesFromLeaves, render } from "@confect/cli/SpecAssemblyNode";
 
 const leaf = (
   relativePath: string,
@@ -30,7 +29,7 @@ describe("SpecAssemblyNode", () => {
         leaf("notesAndRandom/random.spec.ts", ["notesAndRandom", "random"]),
         leaf("env.spec.ts", ["env"]),
       ]);
-      const contents = yield* templates.assembledSpec({ nodes });
+      const contents = yield* render(nodes);
 
       expect(contents).toContain('import env from "../env.spec";');
       expect(contents).toContain(
@@ -65,7 +64,7 @@ describe("SpecAssemblyNode", () => {
           leaf("notes.spec.ts", ["notes"]),
           leaf("notes/archived.spec.ts", ["notes", "archived"]),
         ]);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain('import notes from "../notes.spec";');
         expect(contents).toContain(
@@ -88,7 +87,7 @@ describe("SpecAssemblyNode", () => {
           leaf("notes.spec.ts", ["notes"]),
           leaf("notes/archived.spec.ts", ["notes", "archived"]),
         ]);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
@@ -105,7 +104,7 @@ describe("SpecAssemblyNode", () => {
     "assembledSpec imports only Spec (not GroupSpec) for an empty spec",
     () =>
       Effect.gen(function* () {
-        const contents = yield* templates.assembledSpec({ nodes: [] });
+        const contents = yield* render([]);
 
         expect(contents).toContain('import { Spec } from "@confect/core";');
         expect(contents).not.toContain(
@@ -130,7 +129,7 @@ describe("SpecAssemblyNode", () => {
             "legacy",
           ]),
         ]);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
@@ -182,7 +181,7 @@ describe("SpecAssemblyNode", () => {
           ]),
         ];
         const nodes = assemblyNodesFromLeaves(leaves);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain(
           'import scripts_operational_inviteUser_mutations from "../scripts/operational/inviteUser/mutations.spec";',
@@ -261,7 +260,7 @@ describe("SpecAssemblyNode", () => {
             "details",
           ]),
         ]);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain(
           "GroupSpec.addGroupsAt(remix_routes__app_catalog, {",
@@ -305,7 +304,7 @@ for (const { name, pathLayer, sep } of [
           ),
           yield* discovered("env.spec.ts", ["env"]),
         ]);
-        const contents = yield* templates.assembledSpec({ nodes });
+        const contents = yield* render(nodes);
 
         expect(contents).toContain(
           'import notesAndRandom_notes from "../notesAndRandom/notes.spec";',

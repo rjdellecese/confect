@@ -3,15 +3,17 @@ import * as Bundler from "@confect/cli/Bundler";
 import type { LeafModule } from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
-import { Refs, Spec } from "@confect/core";
+import { type FunctionSpec, type GroupSpec, Refs, Spec } from "@confect/core";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
+import * as Order from "effect/Order";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
@@ -113,6 +115,54 @@ export const plainString: Id<"_storage"> = "not-an-id";
 });
 
 layer(NodeServices.layer)("assembledSpec", (test) => {
+  interface GroupSnapshot {
+    readonly path: ReadonlyArray<string>;
+    readonly name: string;
+    readonly runtime: GroupSpec.AnyWithProps["runtime"];
+    readonly functions: ReadonlyArray<{
+      readonly name: string;
+      readonly runtimeAndFunctionType: FunctionSpec.AnyWithProps["runtimeAndFunctionType"];
+      readonly visibility: FunctionSpec.AnyWithProps["functionVisibility"];
+    }>;
+  }
+
+  const groupSnapshots = (
+    groups: Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
+    parentPath: ReadonlyArray<string> = [],
+  ): ReadonlyArray<GroupSnapshot> =>
+    Array.flatMap(Record.toEntries(groups), ([name, group]) => {
+      const path = Array.append(parentPath, name);
+      const snapshot: GroupSnapshot = {
+        path,
+        name: group.name,
+        runtime: group.runtime,
+        functions: Array.map(Record.values(group.functions), (fn) => ({
+          name: fn.name,
+          runtimeAndFunctionType: fn.runtimeAndFunctionType,
+          visibility: fn.functionVisibility,
+        })),
+      };
+      return Array.prepend(groupSnapshots(group.groups, path), snapshot);
+    });
+
+  const sortSnapshots = Array.sortBy<ReadonlyArray<GroupSnapshot>>(
+    Order.mapInput(Order.String, (group: GroupSnapshot) =>
+      Array.join(group.path, "/"),
+    ),
+  );
+
+  const lookupRef = (
+    refs: unknown,
+    path: ReadonlyArray<string>,
+  ): Record.ReadonlyRecord<string, unknown> => {
+    const ref = Array.reduce(path, refs, (parent, segment) => {
+      assert(Predicate.isObject(parent));
+      return parent[segment];
+    });
+    assert(Predicate.isObject(ref));
+    return ref;
+  };
+
   test.effect.each([true, false])(
     "typechecks and emits precise declarations at scale with exactOptionalPropertyTypes=%s",
     (exactOptionalPropertyTypes) =>
@@ -323,58 +373,32 @@ export { schemaReads } from "./schemaReads";
           error: 0,
         });
 
-        const pending = Object.entries(Spec.groups(assembled)).map(
-          ([name, group]) => ({ path: [name], group }),
+        const expectedGroups = Array.append(
+          Array.map(leaves, (leaf): GroupSnapshot => ({
+            path: leaf.pathSegments,
+            name: leaf.exportName,
+            runtime: leaf.groupPathDot === "jobs" ? "Node" : "Convex",
+            functions: [
+              {
+                name: "get",
+                runtimeAndFunctionType:
+                  leaf.groupPathDot === "jobs"
+                    ? { runtime: "Node", functionType: "action" }
+                    : { runtime: "Convex", functionType: "query" },
+                visibility:
+                  leaf.groupPathDot === "jobs" ? "internal" : "public",
+              },
+            ],
+          })),
+          {
+            path: ["nested", lastChild, "level3", "level4"],
+            name: "level4",
+            runtime: "Convex",
+            functions: [],
+          } satisfies GroupSnapshot,
         );
-        const actualGroups = [];
-        while (pending.length > 0) {
-          const current = pending.pop()!;
-          actualGroups.push({
-            path: current.path,
-            name: current.group.name,
-            runtime: current.group.runtime,
-            functions: Object.values(current.group.functions).map((fn) => ({
-              name: fn.name,
-              runtimeAndFunctionType: fn.runtimeAndFunctionType,
-              visibility: fn.functionVisibility,
-            })),
-          });
-          pending.push(
-            ...Object.entries(current.group.groups).map(([name, group]) => ({
-              path: [...current.path, name],
-              group,
-            })),
-          );
-        }
-        const expectedGroups = leaves.map((leaf) => ({
-          path: leaf.pathSegments,
-          name: leaf.exportName,
-          runtime: leaf.groupPathDot === "jobs" ? "Node" : "Convex",
-          functions: [
-            {
-              name: "get",
-              runtimeAndFunctionType:
-                leaf.groupPathDot === "jobs"
-                  ? { runtime: "Node", functionType: "action" }
-                  : { runtime: "Convex", functionType: "query" },
-              visibility: leaf.groupPathDot === "jobs" ? "internal" : "public",
-            },
-          ],
-        }));
-        expectedGroups.push({
-          path: ["nested", lastChild, "level3", "level4"],
-          name: "level4",
-          runtime: "Convex",
-          functions: [],
-        });
-        expect(
-          actualGroups.sort((a, b) =>
-            a.path.join("/").localeCompare(b.path.join("/")),
-          ),
-        ).toEqual(
-          expectedGroups.sort((a, b) =>
-            a.path.join("/").localeCompare(b.path.join("/")),
-          ),
+        expect(sortSnapshots(groupSnapshots(groups))).toEqual(
+          sortSnapshots(expectedGroups),
         );
 
         const refs = Refs.make(assembled);
@@ -383,29 +407,22 @@ export { schemaReads } from "./schemaReads";
           returns: 0,
           error: 0,
         });
-        let nodeRef: unknown;
         for (const leaf of leaves) {
-          let ref: unknown =
-            refs[leaf.groupPathDot === "jobs" ? "internal" : "public"];
-          for (const segment of [...leaf.pathSegments, "get"]) {
-            assert(Predicate.isObject(ref));
-            ref = ref[segment];
-          }
-          assert(Predicate.isObject(ref));
+          const ref = lookupRef(
+            refs[leaf.groupPathDot === "jobs" ? "internal" : "public"],
+            Array.append(leaf.pathSegments, "get"),
+          );
           expect(ref.convexFunctionName).toBe(
             `${leaf.pathSegments.join("/")}:get`,
           );
           expect(ref._tag).toBe("Confect");
-          if (leaf.groupPathDot === "jobs") {
-            nodeRef = ref;
-          }
         }
         expect(bundled.module.schemaReads).toEqual({
           args: 0,
           returns: 0,
           error: 0,
         });
-        assert(Predicate.isObject(nodeRef));
+        const nodeRef = lookupRef(refs.internal, ["jobs", "get"]);
         expect(nodeRef.args).toBe(nodeRef.args);
         expect(nodeRef.returns).toBe(nodeRef.returns);
         expect(nodeRef.error).toBe(nodeRef.error);

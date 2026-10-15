@@ -302,15 +302,11 @@ export const addGroupsAt = (
     runtime: group.runtime,
     name: group.name,
     functions: group.functions,
-    groups: {
-      ...group.groups,
-      ...Object.fromEntries(
-        Object.entries(children).map(([name, child]) => [
-          name,
-          withName(name, child),
-        ]),
-      ),
-    },
+    groups: Record.union(
+      group.groups,
+      Record.map(children, (child, name) => withName(name, child)),
+      (_existing, incoming) => incoming,
+    ),
     middlewareAttachments: group.middlewareAttachments,
   });
 
