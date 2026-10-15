@@ -350,11 +350,11 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
       );
 
       const contents = yield* templates.registeredFunctionsForGroup({
+        spec: leaf.spec,
         schemaImportPath,
         specImportPath,
         implImportPath,
         layerExportName: leaf.exportName,
-        useNode: leaf.spec.runtime === "Node",
       });
 
       yield* writeFileStringAndLog(registryPath, contents);

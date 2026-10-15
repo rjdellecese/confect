@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import type * as GroupSpec from "@confect/core/GroupSpec";
 import { CodeBlockWriter } from "./CodeBlockWriter";
 import {
   render as renderSpecAssembly,
@@ -471,48 +472,54 @@ const docsEffect = Effect.fnUntraced(function* ({
 });
 
 export const registeredFunctionsForGroup = ({
+  spec,
   schemaImportPath,
   specImportPath,
   implImportPath,
   layerExportName,
-  useNode = false,
 }: Parameters<typeof registeredFunctionsForGroupEffect>[0]) =>
   registeredFunctionsForGroupEffect({
+    spec,
     schemaImportPath,
     specImportPath,
     implImportPath,
     layerExportName,
-    useNode,
   });
 
 const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
+  spec,
   schemaImportPath,
   specImportPath,
   implImportPath,
   layerExportName,
-  useNode = false,
 }: {
+  spec: GroupSpec.AnyWithProps;
   schemaImportPath: string;
   specImportPath: string;
   implImportPath: string;
   layerExportName: string;
-  useNode?: boolean;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+  const useNode = spec.runtime === "Node";
+
+  const hasConfectFunctions = (group: GroupSpec.AnyWithProps): boolean =>
+    Object.values(group.functions).some(
+      (functionSpec) => functionSpec.functionProvenance._tag === "Confect",
+    ) || Object.values(group.groups).some(hasConfectFunctions);
+  const forwarding = !useNode && hasConfectFunctions(spec);
 
   if (useNode) {
     yield* cbw.writeLine(
       `import { RegisteredNodeFunction } from "@confect/server/node";`,
     );
+  } else if (!forwarding) {
+    yield* cbw.writeLine(
+      `import { RegisteredFunctions } from "@confect/server";`,
+    );
   } else {
     yield* cbw.writeLine(
-      `import { ConvexFunctionDefinitions } from "@confect/server";`,
+      `import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";`,
     );
-  }
-
-  if (!useNode) {
-    yield* cbw.writeLine(`import * as Match from "effect/Match";`);
-    yield* cbw.writeLine(`import * as Record from "effect/Record";`);
   }
 
   yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
@@ -528,22 +535,34 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
     yield* cbw.writeLine(
       `export default RegisteredNodeFunction.buildForGroup<${specType}>(databaseSchema, ${layerExportName});`,
     );
+  } else if (!forwarding) {
+    yield* cbw.writeLine(
+      `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName});`,
+    );
   } else {
+    const bindings = (group: GroupSpec.AnyWithProps, path: string): string =>
+      `{
+${[
+  ...Object.entries(group.functions).map(([name, functionSpec]) => {
+    const key = JSON.stringify(name);
+    const definition = `${path}[${key}]`;
+    return `[${key}]: ${
+      functionSpec.functionProvenance._tag === "Convex"
+        ? `${definition}.handler`
+        : `RegisteredConvexFunction.register({ ...${definition}, handler: forward(${definition}.handler) })`
+    },`;
+  }),
+  ...Object.entries(group.groups).map(([name, child]) => {
+    const key = JSON.stringify(name);
+    return `[${key}]: ${bindings(child, `${path}[${key}]`)},`;
+  }),
+].join("\n")}
+}`;
     yield* cbw.writeLine(`const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
 
-const forwardHandlers = (definitions: ConvexFunctionDefinitions.Definitions): ConvexFunctionDefinitions.Definitions => Record.map(definitions, (value) =>
-  ConvexFunctionDefinitions.isDefinition(value)
-    ? Match.value(value).pipe(
-        Match.tag("PublicQuery", "InternalQuery", (query) => ({ ...query, definition: { ...query.definition, handler: forward(query.definition.handler) } })),
-        Match.tag("PublicMutation", "InternalMutation", (mutation) => ({ ...mutation, definition: { ...mutation.definition, handler: forward(mutation.definition.handler) } })),
-        Match.tag("PublicAction", "InternalAction", (action) => ({ ...action, definition: { ...action.definition, handler: forward(action.definition.handler) } })),
-        Match.tag("Registered", (registered) => registered),
-        Match.exhaustive,
-      )
-    : forwardHandlers(value),
-);
+const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(databaseSchema, ${layerExportName});
 
-export default ConvexFunctionDefinitions.register<${specType}>(forwardHandlers(ConvexFunctionDefinitions.buildForGroup(databaseSchema, ${layerExportName})));`);
+export default ${bindings(spec, "definitions")} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
   }
 
   return yield* cbw.toString();

@@ -1,21 +1,21 @@
-import { ConvexFunctionDefinitions } from "@confect/server";
-import * as Match from "effect/Match";
-import * as Record from "effect/Record";
+import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";
 import databaseSchema from "../../schema";
 import notes from "../../../notes_and_random/notes.impl";
 
 const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
 
-const forwardHandlers = (definitions: ConvexFunctionDefinitions.Definitions): ConvexFunctionDefinitions.Definitions => Record.map(definitions, (value) =>
-  ConvexFunctionDefinitions.isDefinition(value)
-    ? Match.value(value).pipe(
-        Match.tag("PublicQuery", "InternalQuery", (query) => ({ ...query, definition: { ...query.definition, handler: forward(query.definition.handler) } })),
-        Match.tag("PublicMutation", "InternalMutation", (mutation) => ({ ...mutation, definition: { ...mutation.definition, handler: forward(mutation.definition.handler) } })),
-        Match.tag("PublicAction", "InternalAction", (action) => ({ ...action, definition: { ...action.definition, handler: forward(action.definition.handler) } })),
-        Match.tag("Registered", (registered) => registered),
-        Match.exhaustive,
-      )
-    : forwardHandlers(value),
-);
+const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../notes_and_random/notes.spec")["default"]>(databaseSchema, notes);
 
-export default ConvexFunctionDefinitions.register<typeof import("../../../notes_and_random/notes.spec")["default"]>(forwardHandlers(ConvexFunctionDefinitions.buildForGroup(databaseSchema, notes)));
+export default {
+["insert"]: RegisteredConvexFunction.register({ ...definitions["insert"], handler: forward(definitions["insert"].handler) }),
+["list"]: RegisteredConvexFunction.register({ ...definitions["list"], handler: forward(definitions["list"].handler) }),
+["delete_"]: RegisteredConvexFunction.register({ ...definitions["delete_"], handler: forward(definitions["delete_"].handler) }),
+["listPaginated"]: RegisteredConvexFunction.register({ ...definitions["listPaginated"], handler: forward(definitions["listPaginated"].handler) }),
+["insertAuthored"]: RegisteredConvexFunction.register({ ...definitions["insertAuthored"], handler: forward(definitions["insertAuthored"].handler) }),
+["feed"]: RegisteredConvexFunction.register({ ...definitions["feed"], handler: forward(definitions["feed"].handler) }),
+["getOrFail"]: RegisteredConvexFunction.register({ ...definitions["getOrFail"], handler: forward(definitions["getOrFail"].handler) }),
+["getFirst"]: RegisteredConvexFunction.register({ ...definitions["getFirst"], handler: forward(definitions["getFirst"].handler) }),
+["internalGetFirst"]: RegisteredConvexFunction.register({ ...definitions["internalGetFirst"], handler: forward(definitions["internalGetFirst"].handler) }),
+["clearAll"]: RegisteredConvexFunction.register({ ...definitions["clearAll"], handler: forward(definitions["clearAll"].handler) }),
+["insertDefault"]: RegisteredConvexFunction.register({ ...definitions["insertDefault"], handler: forward(definitions["insertDefault"].handler) }),
+} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<typeof import("../../../notes_and_random/notes.spec")["default"]>;

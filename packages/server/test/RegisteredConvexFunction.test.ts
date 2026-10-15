@@ -91,10 +91,10 @@ describe("make", () => {
         `${spec.functionVisibility}${spec.runtimeAndFunctionType.functionType}`,
       );
       RegisteredConvexFunction.register(prepared);
-      expect(registration).toHaveBeenCalledExactlyOnceWith(prepared.definition);
+      expect(registration).toHaveBeenCalledExactlyOnceWith(prepared);
       const [preparedCall] = registration.mock.calls;
       assert(preparedCall);
-      expect(preparedCall[0]).toBe(prepared.definition);
+      expect(preparedCall[0]).toBe(prepared);
       registration.mockClear();
       RegisteredConvexFunction.make(database, item);
       expect(registration).toHaveBeenCalledOnce();
@@ -102,8 +102,8 @@ describe("make", () => {
       assert(call);
       const [definition] = call;
       assert(typeof definition !== "function");
-      expect(definition.args).toEqual(prepared.definition.args);
-      expect(definition.returns).toEqual(prepared.definition.returns);
+      expect(definition.args).toEqual(prepared.args);
+      expect(definition.returns).toEqual(prepared.returns);
       expect(item.handler).toBe(handler);
     },
   );

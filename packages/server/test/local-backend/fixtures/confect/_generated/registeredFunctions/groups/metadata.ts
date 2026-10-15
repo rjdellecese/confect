@@ -1,21 +1,13 @@
-import { ConvexFunctionDefinitions } from "@confect/server";
-import * as Match from "effect/Match";
-import * as Record from "effect/Record";
+import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";
 import databaseSchema from "../../schema";
 import metadata from "../../../groups/metadata.impl";
 
 const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
 
-const forwardHandlers = (definitions: ConvexFunctionDefinitions.Definitions): ConvexFunctionDefinitions.Definitions => Record.map(definitions, (value) =>
-  ConvexFunctionDefinitions.isDefinition(value)
-    ? Match.value(value).pipe(
-        Match.tag("PublicQuery", "InternalQuery", (query) => ({ ...query, definition: { ...query.definition, handler: forward(query.definition.handler) } })),
-        Match.tag("PublicMutation", "InternalMutation", (mutation) => ({ ...mutation, definition: { ...mutation.definition, handler: forward(mutation.definition.handler) } })),
-        Match.tag("PublicAction", "InternalAction", (action) => ({ ...action, definition: { ...action.definition, handler: forward(action.definition.handler) } })),
-        Match.tag("Registered", (registered) => registered),
-        Match.exhaustive,
-      )
-    : forwardHandlers(value),
-);
+const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/metadata.spec")["default"]>(databaseSchema, metadata);
 
-export default ConvexFunctionDefinitions.register<typeof import("../../../groups/metadata.spec")["default"]>(forwardHandlers(ConvexFunctionDefinitions.buildForGroup(databaseSchema, metadata)));
+export default {
+["queryMetadata"]: RegisteredConvexFunction.register({ ...definitions["queryMetadata"], handler: forward(definitions["queryMetadata"].handler) }),
+["mutationMetadata"]: RegisteredConvexFunction.register({ ...definitions["mutationMetadata"], handler: forward(definitions["mutationMetadata"].handler) }),
+["actionMetadata"]: RegisteredConvexFunction.register({ ...definitions["actionMetadata"], handler: forward(definitions["actionMetadata"].handler) }),
+} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<typeof import("../../../groups/metadata.spec")["default"]>;

@@ -48,18 +48,12 @@ import type { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 
 export type Definition = Data.TaggedEnum<{
-  PublicQuery: { readonly definition: ReturnType<typeof queryFunction> };
-  InternalQuery: { readonly definition: ReturnType<typeof queryFunction> };
-  PublicMutation: { readonly definition: ReturnType<typeof mutationFunction> };
-  InternalMutation: {
-    readonly definition: ReturnType<typeof mutationFunction>;
-  };
-  PublicAction: {
-    readonly definition: ReturnType<typeof convexActionFunction>;
-  };
-  InternalAction: {
-    readonly definition: ReturnType<typeof convexActionFunction>;
-  };
+  PublicQuery: ReturnType<typeof queryFunction>;
+  InternalQuery: ReturnType<typeof queryFunction>;
+  PublicMutation: ReturnType<typeof mutationFunction>;
+  InternalMutation: ReturnType<typeof mutationFunction>;
+  PublicAction: ReturnType<typeof convexActionFunction>;
+  InternalAction: ReturnType<typeof convexActionFunction>;
   Registered: { readonly handler: RegisteredFunction.Any };
 }>;
 export const Definition = Data.taggedEnum<Definition>();
@@ -82,8 +76,8 @@ export const prepare = (
         resolvedMiddlewares,
       });
       return Match.value(item.functionVisibility).pipe(
-        Match.when("public", () => Definition.PublicQuery({ definition })),
-        Match.when("internal", () => Definition.InternalQuery({ definition })),
+        Match.when("public", () => Definition.PublicQuery(definition)),
+        Match.when("internal", () => Definition.InternalQuery(definition)),
         Match.exhaustive,
       );
     }),
@@ -99,10 +93,8 @@ export const prepare = (
         resolvedMiddlewares,
       });
       return Match.value(item.functionVisibility).pipe(
-        Match.when("public", () => Definition.PublicMutation({ definition })),
-        Match.when("internal", () =>
-          Definition.InternalMutation({ definition }),
-        ),
+        Match.when("public", () => Definition.PublicMutation(definition)),
+        Match.when("internal", () => Definition.InternalMutation(definition)),
         Match.exhaustive,
       );
     }),
@@ -117,8 +109,8 @@ export const prepare = (
         resolvedMiddlewares,
       });
       return Match.value(item.functionVisibility).pipe(
-        Match.when("public", () => Definition.PublicAction({ definition })),
-        Match.when("internal", () => Definition.InternalAction({ definition })),
+        Match.when("public", () => Definition.PublicAction(definition)),
+        Match.when("internal", () => Definition.InternalAction(definition)),
         Match.exhaustive,
       );
     }),
@@ -134,12 +126,12 @@ export const make = (
 
 export const register = (self: Definition): RegisteredFunction.Any =>
   Definition.$match(self, {
-    PublicQuery: ({ definition }) => queryGeneric(definition),
-    InternalQuery: ({ definition }) => internalQueryGeneric(definition),
-    PublicMutation: ({ definition }) => mutationGeneric(definition),
-    InternalMutation: ({ definition }) => internalMutationGeneric(definition),
-    PublicAction: ({ definition }) => actionGeneric(definition),
-    InternalAction: ({ definition }) => internalActionGeneric(definition),
+    PublicQuery: (definition) => queryGeneric(definition),
+    InternalQuery: (definition) => internalQueryGeneric(definition),
+    PublicMutation: (definition) => mutationGeneric(definition),
+    InternalMutation: (definition) => internalMutationGeneric(definition),
+    PublicAction: (definition) => actionGeneric(definition),
+    InternalAction: (definition) => internalActionGeneric(definition),
     Registered: ({ handler }) => handler,
   });
 

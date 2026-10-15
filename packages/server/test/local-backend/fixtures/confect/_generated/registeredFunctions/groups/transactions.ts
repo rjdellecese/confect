@@ -1,21 +1,18 @@
-import { ConvexFunctionDefinitions } from "@confect/server";
-import * as Match from "effect/Match";
-import * as Record from "effect/Record";
+import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";
 import databaseSchema from "../../schema";
 import transactions from "../../../groups/transactions.impl";
 
 const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
 
-const forwardHandlers = (definitions: ConvexFunctionDefinitions.Definitions): ConvexFunctionDefinitions.Definitions => Record.map(definitions, (value) =>
-  ConvexFunctionDefinitions.isDefinition(value)
-    ? Match.value(value).pipe(
-        Match.tag("PublicQuery", "InternalQuery", (query) => ({ ...query, definition: { ...query.definition, handler: forward(query.definition.handler) } })),
-        Match.tag("PublicMutation", "InternalMutation", (mutation) => ({ ...mutation, definition: { ...mutation.definition, handler: forward(mutation.definition.handler) } })),
-        Match.tag("PublicAction", "InternalAction", (action) => ({ ...action, definition: { ...action.definition, handler: forward(action.definition.handler) } })),
-        Match.tag("Registered", (registered) => registered),
-        Match.exhaustive,
-      )
-    : forwardHandlers(value),
-);
+const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/transactions.spec")["default"]>(databaseSchema, transactions);
 
-export default ConvexFunctionDefinitions.register<typeof import("../../../groups/transactions.spec")["default"]>(forwardHandlers(ConvexFunctionDefinitions.buildForGroup(databaseSchema, transactions)));
+export default {
+["read"]: RegisteredConvexFunction.register({ ...definitions["read"], handler: forward(definitions["read"].handler) }),
+["write"]: RegisteredConvexFunction.register({ ...definitions["write"], handler: forward(definitions["write"].handler) }),
+["seed"]: RegisteredConvexFunction.register({ ...definitions["seed"], handler: forward(definitions["seed"].handler) }),
+["limitedRead"]: RegisteredConvexFunction.register({ ...definitions["limitedRead"], handler: forward(definitions["limitedRead"].handler) }),
+["limitedReadFromMutation"]: RegisteredConvexFunction.register({ ...definitions["limitedReadFromMutation"], handler: forward(definitions["limitedReadFromMutation"].handler) }),
+["limitedWrite"]: RegisteredConvexFunction.register({ ...definitions["limitedWrite"], handler: forward(definitions["limitedWrite"].handler) }),
+["rollback"]: RegisteredConvexFunction.register({ ...definitions["rollback"], handler: forward(definitions["rollback"].handler) }),
+["staleRead"]: RegisteredConvexFunction.register({ ...definitions["staleRead"], handler: forward(definitions["staleRead"].handler) }),
+} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<typeof import("../../../groups/transactions.spec")["default"]>;

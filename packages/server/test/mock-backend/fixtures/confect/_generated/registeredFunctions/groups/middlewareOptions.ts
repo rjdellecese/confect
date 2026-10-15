@@ -1,21 +1,14 @@
-import { ConvexFunctionDefinitions } from "@confect/server";
-import * as Match from "effect/Match";
-import * as Record from "effect/Record";
+import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";
 import databaseSchema from "../../schema";
 import middlewareOptions from "../../../groups/middlewareOptions.impl";
 
 const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
 
-const forwardHandlers = (definitions: ConvexFunctionDefinitions.Definitions): ConvexFunctionDefinitions.Definitions => Record.map(definitions, (value) =>
-  ConvexFunctionDefinitions.isDefinition(value)
-    ? Match.value(value).pipe(
-        Match.tag("PublicQuery", "InternalQuery", (query) => ({ ...query, definition: { ...query.definition, handler: forward(query.definition.handler) } })),
-        Match.tag("PublicMutation", "InternalMutation", (mutation) => ({ ...mutation, definition: { ...mutation.definition, handler: forward(mutation.definition.handler) } })),
-        Match.tag("PublicAction", "InternalAction", (action) => ({ ...action, definition: { ...action.definition, handler: forward(action.definition.handler) } })),
-        Match.tag("Registered", (registered) => registered),
-        Match.exhaustive,
-      )
-    : forwardHandlers(value),
-);
+const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/middlewareOptions.spec")["default"]>(databaseSchema, middlewareOptions);
 
-export default ConvexFunctionDefinitions.register<typeof import("../../../groups/middlewareOptions.spec")["default"]>(forwardHandlers(ConvexFunctionDefinitions.buildForGroup(databaseSchema, middlewareOptions)));
+export default {
+["shortName"]: RegisteredConvexFunction.register({ ...definitions["shortName"], handler: forward(definitions["shortName"].handler) }),
+["longName"]: RegisteredConvexFunction.register({ ...definitions["longName"], handler: forward(definitions["longName"].handler) }),
+["mutation"]: RegisteredConvexFunction.register({ ...definitions["mutation"], handler: forward(definitions["mutation"].handler) }),
+["action"]: RegisteredConvexFunction.register({ ...definitions["action"], handler: forward(definitions["action"].handler) }),
+} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<typeof import("../../../groups/middlewareOptions.spec")["default"]>;

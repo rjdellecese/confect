@@ -1,9 +1,10 @@
 import { fileURLToPath } from "node:url";
 import * as Bundler from "@confect/cli/Bundler";
+import * as Schema from "effect/Schema";
 import type { LeafModule } from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
-import { type FunctionSpec, type GroupSpec, Refs, Spec } from "@confect/core";
+import { FunctionSpec, GroupSpec, Refs, Spec } from "@confect/core";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
@@ -16,6 +17,7 @@ import * as Record from "effect/Record";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
+import { queryGeneric } from "convex/server";
 
 const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
   const relativePath = `${pathSegments.join("/")}.spec.ts`;
@@ -33,11 +35,18 @@ it.effect.each([false, true])(
   (useNode) =>
     Effect.gen(function* () {
       const code = yield* templates.registeredFunctionsForGroup({
+        spec: useNode
+          ? GroupSpec.makeNode()
+          : GroupSpec.make().addFunction(
+              FunctionSpec.publicQuery({
+                name: "get",
+                returns: () => Schema.String,
+              }),
+            ),
         schemaImportPath: "../schema",
         specImportPath: "../../notes.spec",
         implImportPath: "../../notes.impl",
         layerExportName: "notes",
-        useNode,
       });
       expect(code).toContain('import notes from "../../notes.impl";');
       expect(code).toContain('typeof import("../../notes.spec")["default"]');
@@ -50,12 +59,80 @@ it.effect.each([false, true])(
         expect(code).toContain(
           "=> (ctx: Ctx, args: Args) => handler(ctx, args)",
         );
-        expect(code).toContain("ConvexFunctionDefinitions.register<");
+        expect(code).toContain(
+          'RegisteredConvexFunction.register({ ...definitions["get"], handler: forward(definitions["get"].handler) })',
+        );
+        expect(code).not.toContain("forwardHandlers");
+        expect(code).not.toContain("Match");
+        expect(code).not.toContain("Record");
         expect(code).not.toContain("queryGeneric");
         expect(code).not.toContain('from "convex/server"');
         expect(code).not.toContain("const register =");
         expect(code).not.toContain("RegisteredNodeFunction");
       }
+    }),
+);
+
+it.effect(
+  "emits nested direct bindings without evaluating schemas or wrapping native handlers",
+  () =>
+    Effect.gen(function* () {
+      let evaluations = 0;
+      const native = queryGeneric(() => "native");
+      const spec = GroupSpec.addGroupsAt(GroupSpec.make(), {
+        _tag: GroupSpec.make()
+          .addFunction(
+            FunctionSpec.internalMutation({
+              name: "set",
+              returns: () => {
+                evaluations++;
+                return Schema.String;
+              },
+            }),
+          )
+          .addFunction(
+            FunctionSpec.convexPublicQuery<typeof native>()("native"),
+          ),
+      });
+      const code = yield* templates.registeredFunctionsForGroup({
+        spec,
+        schemaImportPath: "../schema",
+        specImportPath: "../../notes.spec",
+        implImportPath: "../../notes.impl",
+        layerExportName: "notes",
+      });
+      expect(evaluations).toBe(0);
+      expect(code).toContain('["_tag"]: {');
+      expect(code).toContain(
+        '["set"]: RegisteredConvexFunction.register({ ...definitions["_tag"]["set"], handler: forward(definitions["_tag"]["set"].handler) })',
+      );
+      expect(code).toContain(
+        '["native"]: definitions["_tag"]["native"].handler',
+      );
+      expect(code).not.toContain('forward(definitions["_tag"]["native"]');
+      expect(code).not.toContain("effect/");
+    }),
+);
+
+it.effect.each([
+  GroupSpec.make(),
+  GroupSpec.make().addFunction(
+    FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()("native"),
+  ),
+])(
+  "uses the fixed builder when there are no Confect handlers to forward",
+  (spec) =>
+    Effect.gen(function* () {
+      const code = yield* templates.registeredFunctionsForGroup({
+        spec,
+        schemaImportPath: "../schema",
+        specImportPath: "../../notes.spec",
+        implImportPath: "../../notes.impl",
+        layerExportName: "notes",
+      });
+      expect(code).toContain("RegisteredFunctions.buildForGroup<");
+      expect(code).not.toContain("const forward");
+      expect(code).not.toContain("RegisteredConvexFunction");
     }),
 );
 
