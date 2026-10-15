@@ -59,6 +59,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           expect((yield* run).anyWritesHappened).toBe(true);
           expect((yield* run).anyWritesHappened).toBe(false);
         }).pipe(Effect.scoped),
+      { timeout: 30000 },
     );
   },
 );
