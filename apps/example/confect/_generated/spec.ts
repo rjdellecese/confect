@@ -14,6 +14,16 @@ const spec: Spec.Spec<{
   readonly users: GroupSpec.NamedAt<typeof users, "users">;
   readonly viewer: GroupSpec.NamedAt<typeof viewer, "viewer">;
   readonly workpool: GroupSpec.NamedAt<typeof workpool, "workpool">;
-}> = Spec.make().addAt("email", email).addAt("env", env).addAt("notes_and_random", GroupSpec.makeAt("notes_and_random").addGroupAt("notes", notes_and_random_notes).addGroupAt("random", notes_and_random_random)).addAt("users", users).addAt("viewer", viewer).addAt("workpool", workpool);
+}> = Spec.fromGroups({
+  ["email"]: email,
+  ["env"]: env,
+  ["notes_and_random"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
+    ["notes"]: notes_and_random_notes,
+    ["random"]: notes_and_random_random,
+  }),
+  ["users"]: users,
+  ["viewer"]: viewer,
+  ["workpool"]: workpool,
+}) as typeof spec;
 
 export default spec;

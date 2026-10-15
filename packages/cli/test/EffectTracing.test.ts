@@ -1,3 +1,4 @@
+import * as Project from "./integration/Project";
 import * as Bundler from "@confect/cli/Bundler";
 import * as CodegenError from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -123,16 +124,16 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           );
 
           expect(spans).toEqual([]);
-          const first = yield* pass;
-          const second = yield* pass;
-          expect(first.anyWritesHappened).toBe(true);
-          expect(second.anyWritesHappened).toBe(false);
+          const first = yield* Project.writtenFiles(pass);
+          const second = yield* Project.writtenFiles(pass);
+          expect(first).not.toEqual([]);
+          expect(second).toEqual([]);
 
           const passes = spans.filter((span) => span.name === "Cli.codegen");
           expect(passes).toHaveLength(2);
           expect(passes[0]).not.toBe(passes[1]);
           for (const name of [
-            "LeafModule.validateSpec",
+            "LeafModule.loadSpec",
             "LeafModule.validateImpl",
             "ConvexConfig.discoverInstalledComponents",
           ]) {
@@ -151,7 +152,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             assert(parent?._tag === "Span");
             expect([
               "Cli.codegen",
-              "LeafModule.validateSpec",
+              "LeafModule.loadSpec",
               "LeafModule.validateImpl",
               "ConvexConfig.discoverInstalledComponents",
             ]).toContain(parent.name);
@@ -164,7 +165,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
     );
 
     it.effect.each([
-      { kind: "spec", name: "LeafModule.validateSpec" },
+      { kind: "spec", name: "LeafModule.loadSpec" },
       { kind: "impl", name: "LeafModule.validateImpl" },
       { kind: "config", name: "ConvexConfig.discoverInstalledComponents" },
     ] as const)(

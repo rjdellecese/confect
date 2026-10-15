@@ -18,6 +18,24 @@ const spec: Spec.Spec<{
   readonly databaseReader: GroupSpec.NamedAt<typeof databaseReader, "databaseReader">;
   readonly groups: GroupSpec.NamedAt<GroupSpec.GroupSpec<"Convex", "groups", never, GroupSpec.NamedAt<typeof groups_aliasImporter, "aliasImporter"> | GroupSpec.NamedAt<typeof groups_cjsImporter, "cjsImporter"> | GroupSpec.NamedAt<typeof groups_middleware, "middleware"> | GroupSpec.NamedAt<typeof groups_middlewareHelpers, "middlewareHelpers"> | GroupSpec.NamedAt<typeof groups_middlewareOptions, "middlewareOptions"> | GroupSpec.NamedAt<typeof groups_middlewareOrder, "middlewareOrder"> | GroupSpec.NamedAt<typeof groups_notes, "notes"> | GroupSpec.NamedAt<GroupSpec.AddGroups<typeof groups_random, GroupSpec.NamedAt<typeof groups_random_stats, "stats">>, "random"> | GroupSpec.NamedAt<typeof groups_runners, "runners"> | GroupSpec.NamedAt<typeof groups_scheduling, "scheduling"> | GroupSpec.NamedAt<typeof groups_typedErrors, "typedErrors">>, "groups">;
   readonly typedErrorsNode: GroupSpec.NamedAt<typeof typedErrorsNode, "typedErrorsNode">;
-}> = Spec.make().addAt("databaseReader", databaseReader).addAt("groups", GroupSpec.makeAt("groups").addGroupAt("aliasImporter", groups_aliasImporter).addGroupAt("cjsImporter", groups_cjsImporter).addGroupAt("middleware", groups_middleware).addGroupAt("middlewareHelpers", groups_middlewareHelpers).addGroupAt("middlewareOptions", groups_middlewareOptions).addGroupAt("middlewareOrder", groups_middlewareOrder).addGroupAt("notes", groups_notes).addGroupAt("random", groups_random.addGroupAt("stats", groups_random_stats)).addGroupAt("runners", groups_runners).addGroupAt("scheduling", groups_scheduling).addGroupAt("typedErrors", groups_typedErrors)).addAt("typedErrorsNode", typedErrorsNode);
+}> = Spec.fromGroups({
+  ["databaseReader"]: databaseReader,
+  ["groups"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
+    ["aliasImporter"]: groups_aliasImporter,
+    ["cjsImporter"]: groups_cjsImporter,
+    ["middleware"]: groups_middleware,
+    ["middlewareHelpers"]: groups_middlewareHelpers,
+    ["middlewareOptions"]: groups_middlewareOptions,
+    ["middlewareOrder"]: groups_middlewareOrder,
+    ["notes"]: groups_notes,
+    ["random"]: GroupSpec.addGroupsAt(groups_random, {
+      ["stats"]: groups_random_stats,
+    }),
+    ["runners"]: groups_runners,
+    ["scheduling"]: groups_scheduling,
+    ["typedErrors"]: groups_typedErrors,
+  }),
+  ["typedErrorsNode"]: typedErrorsNode,
+}) as typeof spec;
 
 export default spec;

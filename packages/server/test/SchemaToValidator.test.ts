@@ -717,6 +717,19 @@ describe(compileSchema, () => {
         expect(compiledValidator).toStrictEqual(expectedValidator);
         expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
       });
+
+      test("record of any", () => {
+        const expectedValidator = v.record(v.string(), v.any());
+        type ExpectedValidator = typeof expectedValidator;
+
+        const compiledValidator = compileSchema(
+          Schema.Record(Schema.String, Schema.Any),
+        );
+        type CompiledValidator = typeof compiledValidator;
+
+        expect(compiledValidator).toStrictEqual(expectedValidator);
+        expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+      });
     });
   });
 
@@ -1086,6 +1099,21 @@ describe("ValueToValidator", () => {
 
       type CompiledValidator = ValueToValidator<{
         foo: { bar: number };
+      }>;
+
+      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+    });
+
+    test("{ badge: string; rows?: { badge: string }[] | undefined }", () => {
+      const _expectedValidator = v.object({
+        badge: v.string(),
+        rows: v.optional(v.array(v.object({ badge: v.string() }))),
+      });
+      type ExpectedValidator = typeof _expectedValidator;
+
+      type CompiledValidator = ValueToValidator<{
+        badge: string;
+        rows?: { badge: string }[] | undefined;
       }>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();

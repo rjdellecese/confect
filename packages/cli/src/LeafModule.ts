@@ -5,14 +5,19 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type { Context } from "effect";
 import * as Array from "effect/Array";
+import * as Brand from "effect/Brand";
 import * as Effect from "effect/Effect";
+import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import { fromBundlerError } from "./BuildError";
 import * as Bundler from "./Bundler";
 import {
+  MissingImplFileError,
+  MissingSpecFileError,
   ImplMissingDefaultLayerError,
   ImplMissingFunctionsError,
   ImplMissingMiddlewareError,
@@ -23,6 +28,7 @@ import {
   SpecMissingDefaultGroupSpecError,
 } from "./CodegenError";
 import { ConfectDirectory } from "./ConfectDirectory";
+import { ImplModulePath } from "./ImplModulePath";
 import { removePathExtension, toPosixPath } from "./utils";
 
 export interface LeafModule {
@@ -30,16 +36,16 @@ export interface LeafModule {
   readonly pathSegments: readonly [string, ...string[]];
   readonly groupPathDot: string;
   readonly exportName: string;
-  /**
-   * The runtime declared by the group's spec—`"Node"` for
-   * `GroupSpec.makeNode()`, `"Convex"` for `GroupSpec.make()`. `None` while the
-   * runtime is unknown: discovery (`toLeafModule`) works from the file path
-   * alone, which does not determine the runtime, so this is filled in once the
-   * spec has been bundled and validated (see `validateSpec`).
-   */
-  readonly runtime: Option.Option<"Convex" | "Node">;
   readonly specImportPath: string;
 }
+
+export type LoadedLeafModule = LeafModule & {
+  readonly spec: GroupSpec.AnyWithProps;
+} & Brand.Brand<"@confect/cli/LoadedLeafModule">;
+
+const LoadedLeafModule = Brand.nominal<LoadedLeafModule>();
+
+const VALIDATION_CONCURRENCY = 4;
 
 export const SPEC_SUFFIX = ".spec.ts";
 export const IMPL_SUFFIX = ".impl.ts";
@@ -64,9 +70,6 @@ const swapModuleSuffix = Effect.fnUntraced(function* (
 
 export const isLeafSpecPath = (relativePath: string) =>
   relativePath.endsWith(SPEC_SUFFIX);
-
-export const isLeafImplPath = (relativePath: string) =>
-  relativePath.endsWith(IMPL_SUFFIX);
 
 export const exportNameFromModulePath = Effect.fnUntraced(function* (
   relativePath: string,
@@ -128,8 +131,8 @@ export const discoverLeafSpecFiles = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
-  const excludedDirs = new Set(["_generated", "tables", "middleware"]);
-  const excludedFiles = new Set(["nodeSpec.ts", "spec.ts"]);
+  const excludedDirs = HashSet.make("_generated", "tables", "middleware");
+  const excludedFiles = HashSet.make("nodeSpec.ts", "spec.ts");
 
   const allPaths = yield* fs.readDirectory(confectDirectory, {
     recursive: true,
@@ -140,12 +143,14 @@ export const discoverLeafSpecFiles = Effect.gen(function* () {
       return false;
     }
 
-    if (excludedFiles.has(relativePath)) {
+    if (HashSet.has(excludedFiles, relativePath)) {
       return false;
     }
 
     const segments = String.split(relativePath, path.sep);
-    return !Array.some(segments, (segment) => excludedDirs.has(segment));
+    return !Array.some(segments, (segment) =>
+      HashSet.has(excludedDirs, segment),
+    );
   });
 });
 
@@ -154,20 +159,23 @@ export const discoverLeafImplFiles = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
-  const excludedDirs = new Set(["_generated", "tables", "middleware"]);
+  const excludedDirs = HashSet.make("_generated", "tables", "middleware");
 
   const allPaths = yield* fs.readDirectory(confectDirectory, {
     recursive: true,
   });
 
-  return Array.filter(allPaths, (relativePath) => {
-    if (!isLeafImplPath(relativePath)) {
-      return false;
-    }
-
-    const segments = String.split(relativePath, path.sep);
-    return !Array.some(segments, (segment) => excludedDirs.has(segment));
-  });
+  return Array.filter(
+    Array.filterMap(allPaths, (relativePath) =>
+      Schema.decodeResult(ImplModulePath)(relativePath),
+    ),
+    (relativePath) => {
+      const segments = String.split(relativePath, path.sep);
+      return !Array.some(segments, (segment) =>
+        HashSet.has(excludedDirs, segment),
+      );
+    },
+  );
 });
 
 export const toLeafModule = Effect.fnUntraced(function* (
@@ -183,8 +191,6 @@ export const toLeafModule = Effect.fnUntraced(function* (
     pathSegments,
     groupPathDot,
     exportName,
-    // Unknown until the spec is bundled; see `LeafModule.runtime`.
-    runtime: Option.none(),
     specImportPath,
   } satisfies LeafModule;
 });
@@ -243,13 +249,11 @@ const validateClientSafety = Effect.fnUntraced(function* (
 /**
  * Validate that the leaf's spec file default-exports a `GroupSpec`, and that
  * nothing it reaches drags server code into the client (see
- * {@link validateClientSafety}). Returns the validated `GroupSpec` so callers
- * can read its runtime and avoid re-bundling for later inspection (e.g.
- * stamping `leaf.runtime` and parent/child name-collision checks at codegen
- * time). The group's runtime (`Convex` vs `Node`) is whatever the spec
- * declares—it is not constrained by the file's location.
+ * {@link validateClientSafety}). Returns the leaf paired with its validated
+ * spec, so subsequent operations reuse that association without re-bundling.
+ * The runtime is declared by the spec, not its file location.
  */
-export const validateSpec = Effect.fn("LeafModule.validateSpec")(function* (
+export const loadSpec = Effect.fn("LeafModule.loadSpec")(function* (
   leaf: LeafModule,
 ) {
   const absolutePath = yield* absoluteModulePath(leaf.relativePath);
@@ -277,7 +281,10 @@ export const validateSpec = Effect.fn("LeafModule.validateSpec")(function* (
     ),
   );
 
-  return groupSpec;
+  return LoadedLeafModule({
+    ...leaf,
+    spec: groupSpec,
+  });
 });
 
 /**
@@ -313,7 +320,7 @@ const buildImplLayer = Effect.fnUntraced(function* (
  * function declared by the spec.
  */
 export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
-  leaf: LeafModule,
+  leaf: LoadedLeafModule,
 ) {
   const implRelativePath = yield* implPathForSpec(leaf.relativePath);
   const implAbsolutePath = yield* absoluteModulePath(implRelativePath);
@@ -342,10 +349,7 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
     });
   }
 
-  const { module: specModule } = yield* Bundler.bundle(specAbsolutePath).pipe(
-    Effect.mapError((error) => fromBundlerError(leaf.relativePath, error)),
-  );
-  const groupSpec = specModule.default as GroupSpec.AnyWithProps;
+  const groupSpec = leaf.spec;
   const expectedFunctionNames = Object.keys(groupSpec.functions);
 
   const context = yield* buildImplLayer(
@@ -359,9 +363,11 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
     },
   );
 
-  const registeredSet = new Set(finalizedGroupImpl.registeredFunctionNames);
+  const registeredSet = HashSet.fromIterable(
+    finalizedGroupImpl.registeredFunctionNames,
+  );
   const missing = expectedFunctionNames.filter(
-    (name) => !registeredSet.has(name),
+    (name) => !HashSet.has(registeredSet, name),
   );
 
   if (missing.length > 0) {
@@ -372,23 +378,22 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
     });
   }
 
-  const expectedMiddlewareKeys = [
-    ...new Set([
-      ...(groupSpec.middlewareSpecs ?? []).map(
+  const expectedMiddlewareKeys = Array.dedupe([
+    ...(groupSpec.middlewareSpecs ?? []).map(
+      (middlewareSpec) => middlewareSpec.key,
+    ),
+    ...Object.values(groupSpec.functions).flatMap((function_) =>
+      (function_.middlewareSpecs ?? []).map(
         (middlewareSpec) => middlewareSpec.key,
       ),
-      ...Object.values(groupSpec.functions).flatMap((function_) =>
-        (function_.middlewareSpecs ?? []).map(
-          (middlewareSpec) => middlewareSpec.key,
-        ),
-      ),
-    ]),
-  ];
-  const registeredMiddlewareKeys = new Set(
+    ),
+  ]);
+  const registeredMiddlewareKeys = HashSet.fromIterable(
     finalizedGroupImpl.registeredMiddlewareKeys ?? [],
   );
-  const missingMiddleware = expectedMiddlewareKeys.filter(
-    (key) => !registeredMiddlewareKeys.has(key),
+  const missingMiddleware = Array.filter(
+    expectedMiddlewareKeys,
+    (key) => !HashSet.has(registeredMiddlewareKeys, key),
   );
 
   if (missingMiddleware.length > 0) {
@@ -398,4 +403,153 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
       missingMiddlewareKeys: missingMiddleware,
     });
   }
+});
+
+export const withImplFiles = Effect.fnUntraced(function* <A, E, R>(
+  relativePaths: ReadonlyArray<ImplModulePath>,
+  use: (leaves: ReadonlyArray<LoadedLeafModule>) => Effect.Effect<A, E, R>,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const pairs = yield* Effect.forEach(relativePaths, (implRelativePath) =>
+    specPathForImpl(implRelativePath).pipe(
+      Effect.map((specRelativePath) => ({
+        implRelativePath,
+        specRelativePath,
+      })),
+    ),
+  );
+
+  return yield* Bundler.withBatch(
+    pairs.flatMap(({ implRelativePath, specRelativePath }) => [
+      path.resolve(confectDirectory, implRelativePath),
+      path.resolve(confectDirectory, specRelativePath),
+    ]),
+    Effect.gen(function* () {
+      const leaves = yield* Effect.forEach(
+        pairs,
+        Effect.fnUntraced(function* ({ implRelativePath, specRelativePath }) {
+          if (
+            !(yield* fs.exists(path.join(confectDirectory, specRelativePath)))
+          ) {
+            return yield* new MissingSpecFileError({
+              implPath: implRelativePath,
+              expectedSpecPath: specRelativePath,
+            });
+          }
+          if (
+            !(yield* fs.exists(path.join(confectDirectory, implRelativePath)))
+          ) {
+            return yield* new MissingImplFileError({
+              specPath: specRelativePath,
+              expectedImplPath: implRelativePath,
+            });
+          }
+          const leaf = yield* loadSpec(yield* toLeafModule(specRelativePath));
+          return leaf;
+        }),
+        { concurrency: VALIDATION_CONCURRENCY },
+      );
+      return yield* use(leaves);
+    }),
+  );
+});
+
+export const validateImplFiles = Effect.fn("LeafModule.validateImplFiles")(
+  (relativePaths: ReadonlyArray<ImplModulePath>) =>
+    withImplFiles(relativePaths, validateAllImpls),
+);
+
+export const validateAllImpls = Effect.fnUntraced(function* (
+  leaves: ReadonlyArray<LoadedLeafModule>,
+) {
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const implementationPaths = yield* Effect.forEach(
+    leaves,
+    ({ relativePath }) =>
+      implPathForSpec(relativePath).pipe(
+        Effect.map((implPath) => path.resolve(confectDirectory, implPath)),
+      ),
+  );
+  yield* Bundler.withBatch(
+    implementationPaths,
+    Effect.forEach(leaves, validateImpl, {
+      concurrency: VALIDATION_CONCURRENCY,
+      discard: true,
+    }),
+  );
+});
+
+export const loadAll = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const specFiles = yield* discoverLeafSpecFiles;
+
+  const results = yield* Bundler.withBatch(
+    specFiles.map((relativePath) =>
+      path.resolve(confectDirectory, relativePath),
+    ),
+    Effect.forEach(
+      specFiles,
+      Effect.fnUntraced(function* (specRelativePath: string) {
+        const discovered = yield* toLeafModule(specRelativePath);
+        const leaf = yield* loadSpec(discovered);
+
+        const implRelativePath = yield* implPathForSpec(specRelativePath);
+        const implAbsolutePath = path.join(confectDirectory, implRelativePath);
+        if (!(yield* fs.exists(implAbsolutePath))) {
+          return yield* new MissingImplFileError({
+            specPath: specRelativePath,
+            expectedImplPath: implRelativePath,
+          });
+        }
+
+        return leaf;
+      }),
+      { concurrency: VALIDATION_CONCURRENCY },
+    ),
+  );
+
+  yield* validateOrphanImpls(specFiles);
+
+  return results;
+});
+
+/**
+ * Walk leaf ancestors and fail with a {@link ParentChildNameCollisionError} when
+ * a parent leaf declares a function or subgroup whose name matches a sibling
+ * subdirectory spec's segment. Without this check the colliding descendant
+ * would overwrite the parent's entry in the assembled `GroupSpec.groups` map at
+ * runtime, surfacing as a confusing `Refs.make` error rather than a
+ * codegen-time diagnostic.
+ */
+const validateOrphanImpls = Effect.fnUntraced(function* (
+  specFiles: ReadonlyArray<string>,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const implFiles = yield* discoverLeafImplFiles;
+  const specPaths = HashSet.fromIterable(specFiles);
+
+  yield* Effect.forEach(
+    implFiles,
+    Effect.fnUntraced(function* (implRelativePath: string) {
+      const specRelativePath = yield* specPathForImpl(implRelativePath);
+      if (HashSet.has(specPaths, specRelativePath)) {
+        return;
+      }
+
+      const specAbsolutePath = path.join(confectDirectory, specRelativePath);
+      if (!(yield* fs.exists(specAbsolutePath))) {
+        return yield* new MissingSpecFileError({
+          implPath: implRelativePath,
+          expectedSpecPath: specRelativePath,
+        });
+      }
+    }),
+  );
 });

@@ -1,6 +1,5 @@
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
-import * as Struct from "effect/Struct";
 import * as GroupSpec from "./GroupSpec";
 
 export const TypeId = "~@confect/core/Spec";
@@ -20,22 +19,6 @@ export interface Spec<
   Groups_ extends Record.ReadonlyRecord<string, GroupSpec.AnyWithProps> = {},
 > {
   readonly [TypeId]: Readonly<Groups_>;
-
-  add<Group extends GroupSpec.AnyWithProps>(
-    group: Group,
-  ): Spec<
-    Struct.Assign<Groups_, Record.ReadonlyRecord<GroupSpec.Name<Group>, Group>>
-  >;
-
-  addAt<const Name extends string, Group extends GroupSpec.AnyWithProps>(
-    name: Name,
-    group: Group,
-  ): Spec<
-    Struct.Assign<
-      Groups_,
-      Record.ReadonlyRecord<Name, GroupSpec.NamedAt<Group, Name>>
-    >
-  >;
 }
 
 export interface Any {
@@ -56,31 +39,10 @@ export const groups = <Spec_ extends AnyWithProps>(
   self: Spec_,
 ): Spec_[TypeId] => self[TypeId];
 
-const makeRecord = <
-  Groups_ extends Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
->(
-  record: Groups_,
-): Spec<Groups_> => ({
-  [TypeId]: record,
-  add<Group extends GroupSpec.AnyWithProps>(group: Group) {
-    return makeRecord(
-      Struct.assign(
-        record,
-        Record.singleton<GroupSpec.Name<Group>, Group>(group.name, group),
-      ),
-    );
-  },
-  addAt<const Name extends string, Group extends GroupSpec.AnyWithProps>(
-    name: Name,
-    group: Group,
-  ) {
-    return makeRecord(
-      Struct.assign(
-        record,
-        Record.singleton(name, GroupSpec.withName(name, group)),
-      ),
-    );
-  },
+export const fromGroups = (
+  record: Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
+): AnyWithProps => ({
+  [TypeId]: Record.map(record, (group, name) =>
+    GroupSpec.withName(name, group),
+  ),
 });
-
-export const make = (): Spec => makeRecord({});

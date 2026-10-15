@@ -1,45 +1,10 @@
-import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
+import type * as GroupSpec from "@confect/core/GroupSpec";
 import { CodeBlockWriter } from "./CodeBlockWriter";
 import {
-  collectImportBindings,
+  render as renderSpecAssembly,
   type SpecAssemblyNode,
 } from "./SpecAssemblyNode";
-
-export const functions = ({
-  functionNames,
-  registeredFunctionsImportPath,
-  useNode = false,
-}: Parameters<typeof functionsEffect>[0]) =>
-  functionsEffect({ functionNames, registeredFunctionsImportPath, useNode });
-
-const functionsEffect = Effect.fnUntraced(function* ({
-  functionNames,
-  registeredFunctionsImportPath,
-  useNode = false,
-}: {
-  functionNames: string[];
-  registeredFunctionsImportPath: string;
-  useNode?: boolean;
-}) {
-  const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-  if (useNode) {
-    yield* cbw.writeLine(`"use node";`);
-    yield* cbw.blankLine();
-  }
-
-  yield* cbw.writeLine(
-    `import registeredFunctions from "${registeredFunctionsImportPath}";`,
-  );
-  yield* cbw.newLine();
-  yield* Effect.forEach(functionNames, (name) =>
-    cbw.writeLine(`export const ${name} = registeredFunctions.${name};`),
-  );
-
-  return yield* cbw.toString();
-});
 
 /**
  * Emit `convex/schema.ts` as a one-line re-export of the codegen-emitted deploy
@@ -473,50 +438,54 @@ const docsEffect = Effect.fnUntraced(function* ({
 });
 
 export const registeredFunctionsForGroup = ({
+  spec,
   schemaImportPath,
   specImportPath,
   implImportPath,
-  layerExportName,
-  useNode = false,
 }: Parameters<typeof registeredFunctionsForGroupEffect>[0]) =>
   registeredFunctionsForGroupEffect({
+    spec,
     schemaImportPath,
     specImportPath,
     implImportPath,
-    layerExportName,
-    useNode,
   });
 
 const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
+  spec,
   schemaImportPath,
   specImportPath,
   implImportPath,
-  layerExportName,
-  useNode = false,
 }: {
+  spec: GroupSpec.AnyWithProps;
   schemaImportPath: string;
   specImportPath: string;
   implImportPath: string;
-  layerExportName: string;
-  useNode?: boolean;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+  const useNode = spec.runtime === "Node";
+
+  const hasConfectFunctions = (group: GroupSpec.AnyWithProps): boolean =>
+    Object.values(group.functions).some(
+      (functionSpec) => functionSpec.functionProvenance._tag === "Confect",
+    ) || Object.values(group.groups).some(hasConfectFunctions);
+  const forwarding = !useNode && hasConfectFunctions(spec);
 
   if (useNode) {
     yield* cbw.writeLine(
-      `import { RegisteredFunctions } from "@confect/server";`,
-    );
-    yield* cbw.writeLine(
       `import { RegisteredNodeFunction } from "@confect/server/node";`,
+    );
+  } else if (!forwarding) {
+    yield* cbw.writeLine(
+      `import { RegisteredFunctions } from "@confect/server";`,
     );
   } else {
     yield* cbw.writeLine(
-      `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
+      `import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";`,
     );
   }
 
   yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
-  yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
+  yield* cbw.writeLine(`import groupLayer from "${implImportPath}";`);
   yield* cbw.blankLine();
   // The group's own leaf spec is referenced type-only (`typeof import(...)`),
   // so the spec module is erased at transpile time and never enters the
@@ -524,12 +493,39 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   // imports. Typing from the leaf spec (not the project-wide assembled spec)
   // keeps the registry's type dependent solely on its own group.
   const specType = `typeof import("${specImportPath}")["default"]`;
-  const makeFn = useNode
-    ? "RegisteredNodeFunction.make"
-    : "RegisteredConvexFunction.make";
-  yield* cbw.writeLine(
-    `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
-  );
+  if (useNode) {
+    yield* cbw.writeLine(
+      `export default RegisteredNodeFunction.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
+    );
+  } else if (!forwarding) {
+    yield* cbw.writeLine(
+      `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
+    );
+  } else {
+    const bindings = (group: GroupSpec.AnyWithProps, path: string): string =>
+      `{
+${[
+  ...Object.entries(group.functions).map(([name, functionSpec]) => {
+    const key = JSON.stringify(name);
+    const definition = `${path}[${key}]`;
+    return `[${key}]: ${
+      functionSpec.functionProvenance._tag === "Convex"
+        ? `${definition}.handler`
+        : `RegisteredConvexFunction.register({ ...${definition}, handler: forward(${definition}.handler) })`
+    },`;
+  }),
+  ...Object.entries(group.groups).map(([name, child]) => {
+    const key = JSON.stringify(name);
+    return `[${key}]: ${bindings(child, `${path}[${key}]`)},`;
+  }),
+].join("\n")}
+}`;
+    yield* cbw.writeLine(`const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
+
+const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(databaseSchema, groupLayer);
+
+export default ${bindings(spec, "definitions")} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
+  }
 
   return yield* cbw.toString();
 });
@@ -797,134 +793,8 @@ const servicesEffect = Effect.fnUntraced(function* ({
   return yield* cbw.toString();
 });
 
-const writeChildAddGroupAt = Effect.fnUntraced(function* (
-  cbw: CodeBlockWriter,
-  child: SpecAssemblyNode,
-  groupFactory: string,
-): Effect.fn.Return<void> {
-  yield* cbw.write(".addGroupAt(");
-  yield* cbw.quote(child.segment);
-  yield* cbw.write(", ");
-  yield* writeGroupAssembly(cbw, child, groupFactory);
-  yield* cbw.write(")");
-});
-
-const writeGroupFactoryCall = Effect.fnUntraced(function* (
-  cbw: CodeBlockWriter,
-  node: SpecAssemblyNode,
-  groupFactory: string,
-): Effect.fn.Return<void> {
-  yield* cbw.write(groupFactory);
-  yield* cbw.write("(");
-  yield* cbw.quote(node.segment);
-  yield* cbw.write(")");
-
-  yield* Effect.forEach(node.children, (child) =>
-    writeChildAddGroupAt(cbw, child, groupFactory),
-  );
-});
-
-const writeGroupAssembly: (
-  cbw: CodeBlockWriter,
-  node: SpecAssemblyNode,
-  groupFactory: string,
-) => Effect.Effect<void> = (cbw, node, groupFactory) =>
-  Option.match(node.importBinding, {
-    onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
-    onSome: (binding) =>
-      Effect.gen(function* () {
-        yield* cbw.write(binding.localName);
-        yield* Effect.forEach(node.children, (child) =>
-          writeChildAddGroupAt(cbw, child, groupFactory),
-        );
-      }),
-  });
-
-const writeRootAddAt = Effect.fnUntraced(function* (
-  cbw: CodeBlockWriter,
-  node: SpecAssemblyNode,
-  groupFactory: string,
-): Effect.fn.Return<void> {
-  yield* cbw.write(".addAt(");
-  yield* cbw.quote(node.segment);
-  yield* cbw.write(", ");
-
-  yield* writeGroupAssembly(cbw, node, groupFactory);
-
-  yield* cbw.write(")");
-});
-
-const groupTypeExpr = (node: SpecAssemblyNode): string => {
-  const childUnion = Array.map(
-    node.children,
-    (child) => `GroupSpec.NamedAt<${groupTypeExpr(child)}, "${child.segment}">`,
-  ).join(" | ");
-
-  return Option.match(node.importBinding, {
-    onNone: () =>
-      `GroupSpec.GroupSpec<"Convex", "${node.segment}", never, ${childUnion}>`,
-    onSome: (binding) =>
-      node.children.length === 0
-        ? `typeof ${binding.localName}`
-        : `GroupSpec.AddGroups<typeof ${binding.localName}, ${childUnion}>`,
-  });
-};
-
-const rootGroupTypeMember = (node: SpecAssemblyNode): string =>
-  `GroupSpec.NamedAt<${groupTypeExpr(node)}, "${node.segment}">`;
-
 export const assembledSpec = ({
-  nodes,
-}: Parameters<typeof assembledSpecEffect>[0]) => assembledSpecEffect({ nodes });
-
-const assembledSpecEffect = Effect.fnUntraced(function* ({
   nodes,
 }: {
   nodes: ReadonlyArray<SpecAssemblyNode>;
-}) {
-  const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-  yield* cbw.writeLine(
-    nodes.length > 0
-      ? `import { GroupSpec, Spec } from "@confect/core";`
-      : `import { Spec } from "@confect/core";`,
-  );
-
-  yield* Effect.forEach(collectImportBindings(nodes), (binding) =>
-    cbw.writeLine(`import ${binding.localName} from "${binding.importPath}";`),
-  );
-
-  yield* cbw.blankLine();
-
-  yield* cbw.write(`const spec: `);
-  if (nodes.length === 0) {
-    yield* cbw.write(`Spec.Spec`);
-  } else {
-    yield* cbw.write(`Spec.Spec<{`);
-    yield* cbw.newLine();
-    yield* cbw.indent(
-      Effect.gen(function* () {
-        for (const node of nodes) {
-          yield* cbw.writeLine(
-            `readonly ${node.segment}: ${rootGroupTypeMember(node)};`,
-          );
-        }
-      }),
-    );
-    yield* cbw.write(`}>`);
-  }
-  // The assembled spec is runtime-agnostic: a Node group's `makeNode()` is
-  // already baked into its imported leaf spec, so the root is always
-  // `Spec.make()` and binding-less container groups always use
-  // `GroupSpec.makeAt` (containers register no functions and carry no runtime).
-  yield* cbw.write(` = Spec.make()`);
-  yield* Effect.forEach(nodes, (node) =>
-    writeRootAddAt(cbw, node, "GroupSpec.makeAt"),
-  );
-  yield* cbw.write(";");
-  yield* cbw.newLine();
-  yield* cbw.blankLine();
-  yield* cbw.writeLine(`export default spec;`);
-
-  return yield* cbw.toString();
-});
+}) => renderSpecAssembly(nodes);
