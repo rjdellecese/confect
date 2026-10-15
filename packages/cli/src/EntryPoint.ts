@@ -116,4 +116,10 @@ export const discover = Effect.gen(function* () {
     convexConfigEntryOption,
     ...moduleEntryOptions,
   ]);
-});
+}).pipe(
+  Effect.retry({
+    times: 3,
+    while: (error) =>
+      error._tag === "PlatformError" && error.reason._tag === "NotFound",
+  }),
+);
