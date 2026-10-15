@@ -90,13 +90,13 @@ test("both advertised profiles include the whole backend and CLI graph", () => {
 
 test("the coherent baseline selects both moving Node companions; fresh resolution does not", () => {
   expect(consumerDependencies("react", "baseline")).toMatchObject({
-    effect: "4.0.1",
-    "@effect/platform-node": "4.0.1",
-    "@effect/platform-node-shared": "4.0.1",
+    effect: "4.0.4",
+    "@effect/platform-node": "4.0.4",
+    "@effect/platform-node-shared": "4.0.4",
   });
   expect(consumerDependencies("react", "fresh")).toMatchObject({
-    effect: "^4.0.1",
-    "@effect/platform-node": "^4.0.1",
+    effect: "^4.0.4",
+    "@effect/platform-node": "^4.0.4",
   });
   expect(consumerDependencies("react", "fresh")).not.toHaveProperty(
     "@effect/platform-node-shared",

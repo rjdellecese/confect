@@ -7,10 +7,10 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.1",
+    "@effect/vitest": "4.0.4",
     "@types/node": "26.6.5",
     "confect-bench-harness": "workspace:*",
-    "effect": "4.0.1",
+    "effect": "4.0.4",
     "tsdown": "0.23.1",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
