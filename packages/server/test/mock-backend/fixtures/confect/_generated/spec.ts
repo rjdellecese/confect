@@ -19,23 +19,23 @@ const spec: Spec.Spec<{
   readonly groups: GroupSpec.NamedAt<GroupSpec.GroupSpec<"Convex", "groups", never, GroupSpec.NamedAt<typeof groups_aliasImporter, "aliasImporter"> | GroupSpec.NamedAt<typeof groups_cjsImporter, "cjsImporter"> | GroupSpec.NamedAt<typeof groups_middleware, "middleware"> | GroupSpec.NamedAt<typeof groups_middlewareHelpers, "middlewareHelpers"> | GroupSpec.NamedAt<typeof groups_middlewareOptions, "middlewareOptions"> | GroupSpec.NamedAt<typeof groups_middlewareOrder, "middlewareOrder"> | GroupSpec.NamedAt<typeof groups_notes, "notes"> | GroupSpec.NamedAt<GroupSpec.AddGroups<typeof groups_random, GroupSpec.NamedAt<typeof groups_random_stats, "stats">>, "random"> | GroupSpec.NamedAt<typeof groups_runners, "runners"> | GroupSpec.NamedAt<typeof groups_scheduling, "scheduling"> | GroupSpec.NamedAt<typeof groups_typedErrors, "typedErrors">>, "groups">;
   readonly typedErrorsNode: GroupSpec.NamedAt<typeof typedErrorsNode, "typedErrorsNode">;
 }> = Spec.fromGroups({
-  "databaseReader": databaseReader,
-  "groups": GroupSpec.addGroupsAt(GroupSpec.make(), {
-    "aliasImporter": groups_aliasImporter,
-    "cjsImporter": groups_cjsImporter,
-    "middleware": groups_middleware,
-    "middlewareHelpers": groups_middlewareHelpers,
-    "middlewareOptions": groups_middlewareOptions,
-    "middlewareOrder": groups_middlewareOrder,
-    "notes": groups_notes,
-    "random": GroupSpec.addGroupsAt(groups_random, {
-      "stats": groups_random_stats,
+  ["databaseReader"]: databaseReader,
+  ["groups"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
+    ["aliasImporter"]: groups_aliasImporter,
+    ["cjsImporter"]: groups_cjsImporter,
+    ["middleware"]: groups_middleware,
+    ["middlewareHelpers"]: groups_middlewareHelpers,
+    ["middlewareOptions"]: groups_middlewareOptions,
+    ["middlewareOrder"]: groups_middlewareOrder,
+    ["notes"]: groups_notes,
+    ["random"]: GroupSpec.addGroupsAt(groups_random, {
+      ["stats"]: groups_random_stats,
     }),
-    "runners": groups_runners,
-    "scheduling": groups_scheduling,
-    "typedErrors": groups_typedErrors,
+    ["runners"]: groups_runners,
+    ["scheduling"]: groups_scheduling,
+    ["typedErrors"]: groups_typedErrors,
   }),
-  "typedErrorsNode": typedErrorsNode,
+  ["typedErrorsNode"]: typedErrorsNode,
 }) as typeof spec;
 
 export default spec;

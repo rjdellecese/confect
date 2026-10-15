@@ -144,6 +144,8 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
             leafAt(["nested", lastChild, "level3", "level4", name]),
           ),
           leafAt(["jobs"]),
+          leafAt(["__proto__"]),
+          leafAt(["nested", "__proto__"]),
         ];
         yield* fs.makeDirectory(path.join(directory, "_generated"));
         yield* fs.writeFileString(
@@ -195,12 +197,16 @@ const deep = refs.public.nested.${lastChild}.level3.level4.${lastDeep}.get;
 const parent = refs.public.nested.get;
 const middle = refs.public.nested.${lastChild}.level3.get;
 const node = refs.internal.jobs.get;
-expectTypeOf<keyof typeof refs.public>().toEqualTypeOf<${[...rootNames, "nested"].map((name) => `"${name}"`).join(" | ")}>();
-expectTypeOf<keyof typeof refs.public.nested>().toEqualTypeOf<${[...childNames, "get"].map((name) => `"${name}"`).join(" | ")}>();
+const rootProto = refs.public.__proto__.get;
+const nestedProto = refs.public.nested.__proto__.get;
+expectTypeOf<keyof typeof refs.public>().toEqualTypeOf<${[...rootNames, "nested", "__proto__"].map((name) => `"${name}"`).join(" | ")}>();
+expectTypeOf<keyof typeof refs.public.nested>().toEqualTypeOf<${[...childNames, "get", "__proto__"].map((name) => `"${name}"`).join(" | ")}>();
 expectTypeOf(last["~Args"]).toEqualTypeOf<{ readonly id: string }>();
 expectTypeOf(nested).toEqualTypeOf<typeof last>();
 expectTypeOf(parent).toEqualTypeOf<typeof last>();
 expectTypeOf(middle).toEqualTypeOf<typeof last>();
+expectTypeOf(rootProto).toEqualTypeOf<typeof last>();
+expectTypeOf(nestedProto).toEqualTypeOf<typeof last>();
 expectTypeOf(deep["~Returns"]).toEqualTypeOf<string>();
 expectTypeOf(deep["~FunctionVisibility"]).toEqualTypeOf<"public">();
 expectTypeOf(deep["~Error"]).toEqualTypeOf<never>();
@@ -308,6 +314,9 @@ export { schemaReads } from "./schemaReads";
         const bundled = yield* Bundler.bundle(runtimeEntry);
         const assembled: unknown = bundled.module.default;
         assert(Spec.isSpec(assembled));
+        const groups = Spec.groups(assembled);
+        expect(Object.hasOwn(groups, "__proto__")).toBe(true);
+        expect(Object.hasOwn(groups.nested.groups, "__proto__")).toBe(true);
         expect(bundled.module.schemaReads).toEqual({
           args: 0,
           returns: 0,

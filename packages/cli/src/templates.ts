@@ -800,8 +800,9 @@ const writeGroupEntry = Effect.fnUntraced(function* (
   cbw: CodeBlockWriter,
   node: SpecAssemblyNode,
 ): Effect.fn.Return<void> {
+  yield* cbw.write("[");
   yield* cbw.quote(node.segment);
-  yield* cbw.write(": ");
+  yield* cbw.write("]: ");
   yield* writeGroupAssembly(cbw, node);
   yield* cbw.write(",\n");
 });

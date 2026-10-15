@@ -72,7 +72,7 @@ it.effect(
       });
       const first = yield* render;
       expect(yield* render).toBe(first);
-      expect(first).toContain('"child": GroupSpec.make(),');
+      expect(first).toContain('["child"]: GroupSpec.make(),');
     }),
 );
 
