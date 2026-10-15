@@ -42,6 +42,26 @@ import notes from "./notes.spec";
 export default GroupImpl.make(databaseSchema, notes).pipe(GroupImpl.finalize);
 `;
 
+export const writtenFiles = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const writes = yield* Ref.make<ReadonlyArray<string>>([]);
+    const record = (file: string) =>
+      file.endsWith(".ts")
+        ? Ref.update(writes, (paths) => [...paths, file])
+        : Effect.void;
+    yield* effect.pipe(
+      Effect.provideService(FileSystem.FileSystem, {
+        ...fs,
+        writeFile: (...args) =>
+          fs.writeFile(...args).pipe(Effect.tap(() => record(args[0]))),
+        writeFileString: (...args) =>
+          fs.writeFileString(...args).pipe(Effect.tap(() => record(args[0]))),
+      }),
+    );
+    return yield* Ref.get(writes);
+  });
+
 export const make = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;

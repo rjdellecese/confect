@@ -111,8 +111,8 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           yield* fs.utimes(schema, timestamp, timestamp);
           yield* TestClock.setTime(2000);
           expect(
-            (yield* project.provide(codegenHandler)).anyWritesHappened,
-          ).toBe(false);
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
           expect(yield* project.generatedFiles).toEqual(before);
           expect(
             Option.getOrThrow((yield* fs.stat(schema)).mtime).getTime(),
@@ -177,8 +177,8 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           ).toEqual(["list", "list"]);
           const incremental = yield* project.generatedFiles;
           expect(
-            (yield* project.provide(codegenHandler)).anyWritesHappened,
-          ).toBe(false);
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
           expect(yield* project.generatedFiles).toEqual(incremental);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
@@ -277,8 +277,8 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
             '"use node"',
           );
           expect(
-            (yield* project.provide(codegenHandler)).anyWritesHappened,
-          ).toBe(false);
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
           expect(yield* project.generatedFiles).toEqual(nodeOutputs);
           yield* project.write(
             "confect/notes.spec.ts",
@@ -303,8 +303,8 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
             Object.hasOwn(removedOutputs, path.join("convex", "notes.ts")),
           ).toBe(false);
           expect(
-            (yield* project.provide(codegenHandler)).anyWritesHappened,
-          ).toBe(false);
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
           expect(yield* project.generatedFiles).toEqual(removedOutputs);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
@@ -358,8 +358,8 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
           );
           expect(yield* project.generatedFiles).toEqual(before);
           expect(
-            (yield* project.provide(codegenHandler)).anyWritesHappened,
-          ).toBe(false);
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
           expect(yield* project.generatedFiles).toEqual(before);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
@@ -391,7 +391,7 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
             }),
           );
           vi.mocked(esbuild.build).mockClear();
-          expect((yield* run).anyWritesHappened).toBe(true);
+          expect(yield* Project.writtenFiles(run)).not.toEqual([]);
           const batchedOutputs = yield* project.generatedFiles;
           expect(
             vi
@@ -414,7 +414,7 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
             ),
             (spy) => Effect.sync(() => spy.mockRestore()),
           );
-          expect((yield* run).anyWritesHappened).toBe(false);
+          expect(yield* Project.writtenFiles(run)).toEqual([]);
           expect(yield* project.generatedFiles).toEqual(batchedOutputs);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
@@ -538,13 +538,13 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
               get: Effect.succeed(path.join(project.root, "convex")),
             }),
           );
-          expect((yield* run).anyWritesHappened).toBe(true);
-          expect((yield* run).anyWritesHappened).toBe(false);
+          expect(yield* Project.writtenFiles(run)).not.toEqual([]);
+          expect(yield* Project.writtenFiles(run)).toEqual([]);
           yield* fs.remove(path.join(confect, "_generated"), {
             recursive: true,
           });
-          expect((yield* run).anyWritesHappened).toBe(true);
-          expect((yield* run).anyWritesHappened).toBe(false);
+          expect(yield* Project.writtenFiles(run)).not.toEqual([]);
+          expect(yield* Project.writtenFiles(run)).toEqual([]);
         }).pipe(Effect.scoped),
     );
   },

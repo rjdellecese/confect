@@ -1,3 +1,4 @@
+import * as Project from "./integration/Project";
 import * as Bundler from "@confect/cli/Bundler";
 import * as CodegenError from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -123,10 +124,10 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           );
 
           expect(spans).toEqual([]);
-          const first = yield* pass;
-          const second = yield* pass;
-          expect(first.anyWritesHappened).toBe(true);
-          expect(second.anyWritesHappened).toBe(false);
+          const first = yield* Project.writtenFiles(pass);
+          const second = yield* Project.writtenFiles(pass);
+          expect(first).not.toEqual([]);
+          expect(second).toEqual([]);
 
           const passes = spans.filter((span) => span.name === "Cli.codegen");
           expect(passes).toHaveLength(2);

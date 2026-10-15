@@ -10,7 +10,6 @@ import * as HashSet from "effect/HashSet";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
-import * as Ref from "effect/Ref";
 import * as Bundler from "../Bundler";
 import * as CodegenError from "../CodegenError";
 import { LegacySchemaFileError } from "../CodegenError";
@@ -53,7 +52,6 @@ import {
   toModuleImportPath,
   touchConvexSchema,
   writeFileStringAndLog,
-  WriteTracker,
 } from "../utils";
 
 const GENERATED_DIRNAME = "_generated";
@@ -108,25 +106,6 @@ export const codegen = Command.make("codegen", {}, () =>
   Command.withDescription(
     "Generate `confect/_generated` files and the contents of the `convex` directory (except `convex.config.ts` and `tsconfig.json`)",
   ),
-);
-
-export const generateWithSnapshot = Effect.gen(function* () {
-  const tracker = yield* Ref.make(false);
-
-  const result = yield* runCodegen.pipe(
-    Effect.provideService(WriteTracker, tracker),
-  );
-
-  const anyWritesHappened = yield* Ref.get(tracker);
-  return { ...result, anyWritesHappened };
-}).pipe(Effect.withSpan("Cli.codegen"));
-
-export const codegenHandler = generateWithSnapshot.pipe(
-  Effect.tap(() => touchConvexSchema),
-  Effect.map(({ functionPaths, anyWritesHappened }) => ({
-    functionPaths,
-    anyWritesHappened,
-  })),
 );
 
 const runCodegen = Effect.gen(function* () {
@@ -192,6 +171,15 @@ const runCodegen = Effect.gen(function* () {
     snapshot,
   };
 });
+
+export const generateWithSnapshot = runCodegen.pipe(
+  Effect.withSpan("Cli.codegen"),
+);
+
+export const codegenHandler = generateWithSnapshot.pipe(
+  Effect.tap(() => touchConvexSchema),
+  Effect.map(({ functionPaths }) => ({ functionPaths })),
+);
 
 export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
   function* (

@@ -3,13 +3,11 @@ import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as DateTime from "effect/DateTime";
 import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
 import * as Match from "effect/Match";
-import * as Ref from "effect/Ref";
 import * as String from "effect/String";
 import * as GenerationSnapshot from "./GenerationSnapshot";
 import * as GroupPath from "./GroupPath";
@@ -18,23 +16,6 @@ import { logFileAdded, logFileModified, logFileRemoved } from "./log";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import * as templates from "./templates";
-
-/**
- * Tracks whether the current codegen run wrote anything to disk. Set to `true`
- * by every helper that actually overwrites a file (skipping the
- * content-unchanged case). `codegenHandler` provides a fresh `Ref` per run and
- * reads it back to report `anyWritesHappened`; callers outside a codegen pass
- * hit the cached default `Ref` and need not interact with the tracker.
- */
-export const WriteTracker = Context.Reference<Ref.Ref<boolean>>(
-  "@confect/cli/WriteTracker",
-  { defaultValue: () => Ref.makeUnsafe(false) },
-);
-
-const markWritten = Effect.gen(function* () {
-  const tracker = yield* WriteTracker;
-  yield* Ref.set(tracker, true);
-});
 
 export const removePathExtension = Effect.fnUntraced(function* (
   pathStr: string,
@@ -69,14 +50,12 @@ export const writeFileStringAndLog = Effect.fnUntraced(function* (
   const fs = yield* FileSystem.FileSystem;
   if (!(yield* fs.exists(filePath))) {
     yield* fs.writeFileString(filePath, contents);
-    yield* markWritten;
     yield* logFileAdded(filePath);
     return;
   }
   const existing = yield* fs.readFileString(filePath);
   if (existing !== contents) {
     yield* fs.writeFileString(filePath, contents);
-    yield* markWritten;
     yield* logFileModified(filePath);
   }
 });
@@ -111,13 +90,11 @@ export const writeFileString = Effect.fnUntraced(function* (
 
   if (!(yield* fs.exists(filePath))) {
     yield* fs.writeFileString(filePath, contents);
-    yield* markWritten;
     return "Added";
   }
   const existing = yield* fs.readFileString(filePath);
   if (existing !== contents) {
     yield* fs.writeFileString(filePath, contents);
-    yield* markWritten;
     return "Modified";
   }
   return "Unchanged";
@@ -207,13 +184,11 @@ const generateGroupModuleEffect = Effect.fnUntraced(function* ({
 
   if (!(yield* fs.exists(modulePath))) {
     yield* fs.writeFileString(modulePath, functionsContentsString);
-    yield* markWritten;
     return "Added" as const;
   }
   const existing = yield* fs.readFileString(modulePath);
   if (existing !== functionsContentsString) {
     yield* fs.writeFileString(modulePath, functionsContentsString);
-    yield* markWritten;
     return "Modified" as const;
   }
   return "Unchanged" as const;

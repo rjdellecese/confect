@@ -65,7 +65,6 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
     Effect.Effect<
       {
         functionPaths: FunctionPaths.FunctionPaths;
-        anyWritesHappened: boolean;
       },
       | CodegenError.CodegenError
       | GroupPath.GroupModulePathIsNotATypeScriptFileError
