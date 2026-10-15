@@ -1,16 +1,11 @@
+import * as ConvexFunctionDefinitions from "./ConvexFunctionDefinitions";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as Spec from "@confect/core/Spec";
 import type { Layer, Types } from "effect";
-import * as Match from "effect/Match";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as GroupImpl from "./GroupImpl";
-import { mapLeaves } from "./internal/utils";
 import type * as RegisteredFunction from "./RegisteredFunction";
-import * as FunctionRegistryItem from "./FunctionRegistryItem";
-import * as ResolvedMiddleware from "./ResolvedMiddleware";
-import * as GroupRegistry from "./GroupRegistry";
-import * as RegisteredConvexFunction from "./RegisteredConvexFunction";
 
 export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
   Types.Simplify<RegisteredFunctionsHelper<Spec.Groups<Spec_>>>;
@@ -80,33 +75,14 @@ export interface AnyWithProps {
  * to isolate registration to build each function's ctx services); the group's
  * `GroupSpec` is supplied purely as the `Group` type parameter to shape the
  * returned record. Generated isolate modules instead prepare definitions with
- * `ConvexFunctionDefinitions.buildForGroup` and register their handlers
- * locally. Node groups use `RegisteredNodeFunction.buildForGroup` from the Node
- * entry.
+ * `ConvexFunctionDefinitions.buildForGroup` and add local forwarding handlers
+ * before shared registration. Node groups use
+ * `RegisteredNodeFunction.buildForGroup` from the Node entry.
  */
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   databaseSchema: DatabaseSchema.AnyWithProps,
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
-): RegisteredFunctionsForGroupSpec<Group> => {
-  const { functionRegistryItems, middlewareRegistryItems } =
-    GroupRegistry.make(groupLayer);
-
-  return mapLeaves<FunctionRegistryItem.AnyWithProps, RegisteredFunction.Any>(
-    functionRegistryItems as {
-      [key: string]: FunctionRegistryItem.AnyWithProps;
-    },
-    FunctionRegistryItem.isFunctionRegistryItem,
-    (functionRegistryItem) =>
-      Match.value(functionRegistryItem).pipe(
-        Match.tag("Convex", (item) => item.handler),
-        Match.tag("Confect", (item) =>
-          RegisteredConvexFunction.make(
-            databaseSchema,
-            item,
-            ResolvedMiddleware.resolve(item, middlewareRegistryItems),
-          ),
-        ),
-        Match.exhaustive,
-      ),
-  ) as RegisteredFunctionsForGroupSpec<Group>;
-};
+): RegisteredFunctionsForGroupSpec<Group> =>
+  ConvexFunctionDefinitions.register<Group>(
+    ConvexFunctionDefinitions.buildForGroup(databaseSchema, groupLayer),
+  );

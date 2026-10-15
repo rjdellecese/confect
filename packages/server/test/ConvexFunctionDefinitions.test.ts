@@ -39,3 +39,18 @@ it("prepares only its own functions and preserves native registrations", () => {
     Parameters<typeof ConvexFunctionDefinitions.buildForGroup>["length"]
   >().toEqualTypeOf<2>();
 });
+
+it("registers nested definitions without changing native handlers or input records", () => {
+  const native = queryGeneric(() => "native");
+  const leaf = RegisteredConvexFunction.Definition.Registered({
+    handler: native,
+  });
+  const definitions = { _tag: { nested: leaf }, direct: leaf };
+  const registered = ConvexFunctionDefinitions.register(definitions);
+  expect(registered).toEqual({ _tag: { nested: native }, direct: native });
+  expect(definitions).toEqual({ _tag: { nested: leaf }, direct: leaf });
+  expect(definitions._tag.nested).toBe(leaf);
+  expectTypeOf<
+    Parameters<typeof ConvexFunctionDefinitions.register>["length"]
+  >().toEqualTypeOf<1>();
+});

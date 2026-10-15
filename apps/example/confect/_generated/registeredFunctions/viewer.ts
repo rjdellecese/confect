@@ -1,21 +1,21 @@
-import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";
-import { queryGeneric, internalQueryGeneric, mutationGeneric, internalMutationGeneric, actionGeneric, internalActionGeneric } from "convex/server";
+import { ConvexFunctionDefinitions } from "@confect/server";
+import * as Match from "effect/Match";
 import * as Record from "effect/Record";
 import databaseSchema from "../schema";
 import viewer from "../../viewer.impl";
 
-const register = (definitions: ConvexFunctionDefinitions.Definitions): RegisteredFunctions.AnyWithProps => Record.map(definitions, (value) =>
+const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
+
+const forwardHandlers = (definitions: ConvexFunctionDefinitions.Definitions): ConvexFunctionDefinitions.Definitions => Record.map(definitions, (value) =>
   ConvexFunctionDefinitions.isDefinition(value)
-    ? RegisteredConvexFunction.Definition.$match(value, {
-        PublicQuery: ({ definition }) => queryGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        InternalQuery: ({ definition }) => internalQueryGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        PublicMutation: ({ definition }) => mutationGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        InternalMutation: ({ definition }) => internalMutationGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        PublicAction: ({ definition }) => actionGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        InternalAction: ({ definition }) => internalActionGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        Registered: ({ handler }) => handler,
-      })
-    : register(value),
+    ? Match.value(value).pipe(
+        Match.tag("PublicQuery", "InternalQuery", (query) => ({ ...query, definition: { ...query.definition, handler: forward(query.definition.handler) } })),
+        Match.tag("PublicMutation", "InternalMutation", (mutation) => ({ ...mutation, definition: { ...mutation.definition, handler: forward(mutation.definition.handler) } })),
+        Match.tag("PublicAction", "InternalAction", (action) => ({ ...action, definition: { ...action.definition, handler: forward(action.definition.handler) } })),
+        Match.tag("Registered", (registered) => registered),
+        Match.exhaustive,
+      )
+    : forwardHandlers(value),
 );
 
-export default register(ConvexFunctionDefinitions.buildForGroup(databaseSchema, viewer)) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<typeof import("../../viewer.spec")["default"]>;
+export default ConvexFunctionDefinitions.register<typeof import("../../viewer.spec")["default"]>(forwardHandlers(ConvexFunctionDefinitions.buildForGroup(databaseSchema, viewer)));

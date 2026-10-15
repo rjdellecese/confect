@@ -130,16 +130,18 @@ export const make = (
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
 ): RegisteredFunction.Any =>
-  Match.value(prepare(databaseSchema, item, resolvedMiddlewares)).pipe(
-    Match.tagsExhaustive({
-      PublicQuery: ({ definition }) => queryGeneric(definition),
-      InternalQuery: ({ definition }) => internalQueryGeneric(definition),
-      PublicMutation: ({ definition }) => mutationGeneric(definition),
-      InternalMutation: ({ definition }) => internalMutationGeneric(definition),
-      PublicAction: ({ definition }) => actionGeneric(definition),
-      InternalAction: ({ definition }) => internalActionGeneric(definition),
-    }),
-  );
+  register(prepare(databaseSchema, item, resolvedMiddlewares));
+
+export const register = (self: Definition): RegisteredFunction.Any =>
+  Definition.$match(self, {
+    PublicQuery: ({ definition }) => queryGeneric(definition),
+    InternalQuery: ({ definition }) => internalQueryGeneric(definition),
+    PublicMutation: ({ definition }) => mutationGeneric(definition),
+    InternalMutation: ({ definition }) => internalMutationGeneric(definition),
+    PublicAction: ({ definition }) => actionGeneric(definition),
+    InternalAction: ({ definition }) => internalActionGeneric(definition),
+    Registered: ({ handler }) => handler,
+  });
 
 /**
  * Convex evicts a query from its cache once the execution observes the current

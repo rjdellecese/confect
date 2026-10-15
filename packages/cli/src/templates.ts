@@ -506,14 +506,12 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
     );
   } else {
     yield* cbw.writeLine(
-      `import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";`,
+      `import { ConvexFunctionDefinitions } from "@confect/server";`,
     );
   }
 
   if (!useNode) {
-    yield* cbw.writeLine(
-      `import { queryGeneric, internalQueryGeneric, mutationGeneric, internalMutationGeneric, actionGeneric, internalActionGeneric } from "convex/server";`,
-    );
+    yield* cbw.writeLine(`import * as Match from "effect/Match";`);
     yield* cbw.writeLine(`import * as Record from "effect/Record";`);
   }
 
@@ -531,21 +529,21 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
       `export default RegisteredNodeFunction.buildForGroup<${specType}>(databaseSchema, ${layerExportName});`,
     );
   } else {
-    yield* cbw.writeLine(`const register = (definitions: ConvexFunctionDefinitions.Definitions): RegisteredFunctions.AnyWithProps => Record.map(definitions, (value) =>
+    yield* cbw.writeLine(`const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
+
+const forwardHandlers = (definitions: ConvexFunctionDefinitions.Definitions): ConvexFunctionDefinitions.Definitions => Record.map(definitions, (value) =>
   ConvexFunctionDefinitions.isDefinition(value)
-    ? RegisteredConvexFunction.Definition.$match(value, {
-        PublicQuery: ({ definition }) => queryGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        InternalQuery: ({ definition }) => internalQueryGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        PublicMutation: ({ definition }) => mutationGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        InternalMutation: ({ definition }) => internalMutationGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        PublicAction: ({ definition }) => actionGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        InternalAction: ({ definition }) => internalActionGeneric({ ...definition, handler: (ctx, args) => definition.handler(ctx, args) }),
-        Registered: ({ handler }) => handler,
-      })
-    : register(value),
+    ? Match.value(value).pipe(
+        Match.tag("PublicQuery", "InternalQuery", (query) => ({ ...query, definition: { ...query.definition, handler: forward(query.definition.handler) } })),
+        Match.tag("PublicMutation", "InternalMutation", (mutation) => ({ ...mutation, definition: { ...mutation.definition, handler: forward(mutation.definition.handler) } })),
+        Match.tag("PublicAction", "InternalAction", (action) => ({ ...action, definition: { ...action.definition, handler: forward(action.definition.handler) } })),
+        Match.tag("Registered", (registered) => registered),
+        Match.exhaustive,
+      )
+    : forwardHandlers(value),
 );
 
-export default register(ConvexFunctionDefinitions.buildForGroup(databaseSchema, ${layerExportName})) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
+export default ConvexFunctionDefinitions.register<${specType}>(forwardHandlers(ConvexFunctionDefinitions.buildForGroup(databaseSchema, ${layerExportName})));`);
   }
 
   return yield* cbw.toString();

@@ -44,12 +44,16 @@ it.effect.each([false, true])(
       if (useNode) {
         expect(code).toContain("RegisteredNodeFunction.buildForGroup");
         expect(code).not.toContain(
-          "handler: (ctx, args) => definition.handler(ctx, args)",
+          "=> (ctx: Ctx, args: Args) => handler(ctx, args)",
         );
       } else {
         expect(code).toContain(
-          "handler: (ctx, args) => definition.handler(ctx, args)",
+          "=> (ctx: Ctx, args: Args) => handler(ctx, args)",
         );
+        expect(code).toContain("ConvexFunctionDefinitions.register<");
+        expect(code).not.toContain("queryGeneric");
+        expect(code).not.toContain('from "convex/server"');
+        expect(code).not.toContain("const register =");
         expect(code).not.toContain("RegisteredNodeFunction");
       }
     }),
