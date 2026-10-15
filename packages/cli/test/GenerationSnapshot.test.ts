@@ -84,14 +84,17 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
             returns,
             error,
           });
-          const empty = GroupSpec.makeAt("originalEmpty");
-          const node = GroupSpec.makeNodeAt("originalNode").addFunction(
-            nodeAction("run"),
+          const empty = GroupSpec.withName("originalEmpty", GroupSpec.make());
+          const node = GroupSpec.withName(
+            "originalNode",
+            GroupSpec.makeNode(),
+          ).addFunction(nodeAction("run"));
+          const spec = GroupSpec.addGroupsAt(
+            GroupSpec.withName("notTheFilesystemName", GroupSpec.make())
+              .addFunction(fn)
+              .addFunction(query("alpha")),
+            { ["empty"]: GroupSpec.addGroupsAt(empty, { ["node"]: node }) },
           );
-          const spec = GroupSpec.makeAt("notTheFilesystemName")
-            .addFunction(fn)
-            .addFunction(query("alpha"))
-            .addGroupAt("empty", empty.addGroupAt("node", node));
           const functions = spec.functions;
           const authoredGroups = spec.groups;
           const leaf = yield* loadLeaf("nested/notes.spec.ts", spec);
@@ -262,31 +265,32 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
       "ignores equivalent evaluations and empty groups but detects nested runtime and export changes",
       () =>
         Effect.gen(function* () {
-          const original = GroupSpec.make()
-            .addFunction(query("b"))
-            .addFunction(query("a"))
-            .addGroupAt("nested", GroupSpec.make().addFunction(query("run")));
+          const original = GroupSpec.addGroupsAt(
+            GroupSpec.make().addFunction(query("b")).addFunction(query("a")),
+            { ["nested"]: GroupSpec.make().addFunction(query("run")) },
+          );
           const before = GenerationSnapshot.fromLoadedLeaves([
             yield* loadLeaf("notes.spec.ts", original),
           ]);
-          const equivalent = GroupSpec.make()
-            .addFunction(query("a"))
-            .addFunction(query("b"))
-            .addGroupAt("nested", GroupSpec.make().addFunction(query("run")))
-            .addGroupAt("empty", GroupSpec.makeNode());
+          const equivalent = GroupSpec.addGroupsAt(
+            GroupSpec.addGroupsAt(
+              GroupSpec.make().addFunction(query("a")).addFunction(query("b")),
+              { ["nested"]: GroupSpec.make().addFunction(query("run")) },
+            ),
+            { ["empty"]: GroupSpec.makeNode() },
+          );
           const reevaluated = GenerationSnapshot.fromLoadedLeaves([
             yield* loadLeaf("notes.spec.ts", equivalent),
           ]);
           expect(
             GenerationSnapshot.diff(before, roundtrip(reevaluated)),
           ).toEqual({ removed: [], changed: [] });
-          const changed = GroupSpec.make()
-            .addFunction(query("a"))
-            .addFunction(query("renamed"))
-            .addGroupAt(
-              "nested",
-              GroupSpec.makeNode().addFunction(nodeAction("run")),
-            );
+          const changed = GroupSpec.addGroupsAt(
+            GroupSpec.make()
+              .addFunction(query("a"))
+              .addFunction(query("renamed")),
+            { ["nested"]: GroupSpec.makeNode().addFunction(nodeAction("run")) },
+          );
           const after = GenerationSnapshot.update(before, [
             yield* loadLeaf("notes.spec.ts", changed),
           ]);
@@ -323,7 +327,9 @@ for (const { name, pathLayer, sep } of [
             const parentSpec =
               kind === "function"
                 ? GroupSpec.make().addFunction(query("archived"))
-                : GroupSpec.make().addGroupAt("archived", GroupSpec.makeNode());
+                : GroupSpec.addGroupsAt(GroupSpec.make(), {
+                    ["archived"]: GroupSpec.makeNode(),
+                  });
             const parent = yield* loadLeaf(
               ["nested", "notes.spec.ts"].join(sep),
               parentSpec,
@@ -398,12 +404,14 @@ for (const { name, pathLayer, sep } of [
           Effect.gen(function* () {
             const parent = yield* loadLeaf(
               "notes.spec.ts",
-              GroupSpec.make()
-                .addFunction(query("list"))
-                .addGroupAt(
-                  "other",
-                  GroupSpec.make().addGroupAt("archived", GroupSpec.make()),
-                ),
+              GroupSpec.addGroupsAt(
+                GroupSpec.make().addFunction(query("list")),
+                {
+                  ["other"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
+                    ["archived"]: GroupSpec.make(),
+                  }),
+                },
+              ),
             );
             const child = yield* loadLeaf(
               ["notes", "archived.spec.ts"].join(sep),
