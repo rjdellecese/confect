@@ -13,6 +13,7 @@ import { resolveModulePath } from "exsolve";
 import { identity, pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Chunk from "effect/Chunk";
+import * as Cause from "effect/Cause";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -23,7 +24,9 @@ import * as Iterable from "effect/Iterable";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
+import * as Record from "effect/Record";
 import * as Scope from "effect/Scope";
+import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
@@ -55,22 +58,30 @@ const absolutizeMetafile = (
   cwd: string,
 ): esbuild.Metafile => {
   const absolutize = (p: string) => path.resolve(cwd, p);
-  const inputs: esbuild.Metafile["inputs"] = {};
-  for (const [key, value] of Object.entries(metafile.inputs)) {
-    inputs[absolutize(key)] = {
+  const inputs = Record.mapEntries(metafile.inputs, (value, key) => [
+    absolutize(key),
+    {
       ...value,
-      imports: value.imports.map((i) =>
-        Object.assign({}, i, {
-          path: absolutize(i.path),
-          original: i.original ?? i.path,
-        }),
+      imports: Array.map(value.imports, (i) => ({
+        ...i,
+        path: absolutize(i.path),
+        original: i.original ?? i.path,
+      })),
+    },
+  ]);
+  const outputs = Record.mapEntries(metafile.outputs, (value, key) => [
+    absolutize(key),
+    {
+      ...value,
+      ...(value.entryPoint ? { entryPoint: absolutize(value.entryPoint) } : {}),
+      inputs: Record.mapKeys(value.inputs, absolutize),
+      imports: Array.map(value.imports, (imported) =>
+        imported.external
+          ? imported
+          : { ...imported, path: absolutize(imported.path) },
       ),
-    };
-  }
-  const outputs: esbuild.Metafile["outputs"] = {};
-  for (const [key, value] of Object.entries(metafile.outputs)) {
-    outputs[absolutize(key)] = value;
-  }
+    },
+  ]);
   return { inputs, outputs };
 };
 
@@ -179,6 +190,19 @@ interface BatchCompilation {
   readonly cwd: string;
 }
 
+class BatchIncompatible extends Schema.TaggedError<BatchIncompatible>()(
+  "BatchIncompatible",
+  {
+    reason: Schema.Literals([
+      "RuntimeConditions",
+      "UnsupportedEntries",
+      "MixedTsconfigs",
+      "UnattributedWarnings",
+    ]),
+    message: Schema.String,
+  },
+) {}
+
 class Batch extends Context.Service<
   Batch,
   {
@@ -282,7 +306,11 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
     Config.withDefault(""),
   );
   if (/--conditions|-C|--(?:no-)?addons/.test(nodeOptions))
-    return Option.none<BatchCompilation>();
+    return yield* new BatchIncompatible({
+      reason: "RuntimeConditions",
+      message:
+        "NODE_OPTIONS changes Node export conditions; individual builds preserve native resolution.",
+    });
   const runtimeOptions = yield* Effect.try({
     try: () =>
       parseArgs({
@@ -313,7 +341,11 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
       (entry) => !JS_EXT_RE.test(entry) || /[\\/]node_modules[\\/]/.test(entry),
     )
   ) {
-    return Option.none<BatchCompilation>();
+    return yield* new BatchIncompatible({
+      reason: "UnsupportedEntries",
+      message:
+        "Shared builds require JavaScript or TypeScript entries outside node_modules.",
+    });
   }
   const configs = yield* Effect.try({
     try: () => entries.map((entry) => loadTsConfig(path.dirname(entry))),
@@ -321,12 +353,15 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   });
   const config = configs[0];
   if (configs.some((other) => other?.path !== config?.path))
-    return Option.none<BatchCompilation>();
+    return yield* new BatchIncompatible({
+      reason: "MixedTsconfigs",
+      message: `Entries use different tsconfigs: ${Array.dedupe(configs.map((item) => item?.path ?? "(no tsconfig)")).join(", ")}`,
+    });
 
-  const cwd = path.dirname(first);
-  const directory = yield* fs.makeTempDirectoryScoped({
-    prefix: "confect-batch-",
-  });
+  const cwd = yield* fs.realPath(path.dirname(first));
+  const directory = yield* fs
+    .makeTempDirectoryScoped({ prefix: "confect-batch-" })
+    .pipe(Effect.flatMap((temporary) => fs.realPath(temporary)));
   const artifacts = yield* Effect.forEach(entries, (entry, index) =>
     Effect.map(
       fs.realPath(entry),
@@ -380,14 +415,16 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
       path.resolve(cwd, input),
     ),
   );
-  if (
-    result.warnings.some(
-      (warning) =>
-        !warning.location ||
-        !HashSet.has(inputPaths, path.resolve(cwd, warning.location.file)),
-    )
-  )
-    return Option.none<BatchCompilation>();
+  const unattributedWarnings = result.warnings.filter(
+    (warning) =>
+      !warning.location ||
+      !HashSet.has(inputPaths, path.resolve(cwd, warning.location.file)),
+  );
+  if (unattributedWarnings.length > 0)
+    return yield* new BatchIncompatible({
+      reason: "UnattributedWarnings",
+      message: `Cannot attribute build warnings to entries: ${unattributedWarnings.map((warning) => warning.text).join("; ")}`,
+    });
   yield* Effect.forEach(result.outputFiles, (output) =>
     fs.writeFile(output.path, output.contents),
   );
@@ -418,12 +455,12 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
       ];
     }),
   );
-  return Option.some<BatchCompilation>({
+  return {
     entries: HashMap.fromIterable(artifacts),
     metafile: absolutizeMetafile(path, { ...result.metafile, inputs }, cwd),
     warnings: result.warnings,
     cwd,
-  });
+  } satisfies BatchCompilation;
 });
 
 /**
@@ -449,7 +486,27 @@ export const withBatch = <A, E, R>(
       const compilation = yield* Effect.cached(
         compileBatch(entryPoints).pipe(
           Effect.provideService(Scope.Scope, scope),
-          Effect.orElseSucceed(() => Option.none<BatchCompilation>()),
+          Effect.asSome,
+          Effect.catchTag("BatchIncompatible", (error) =>
+            Effect.logDebug(
+              "Shared build skipped; falling back to individual builds.",
+              {
+                entryPoints,
+                reason: error.reason,
+                detail: error.message,
+              },
+            ).pipe(Effect.as(Option.none<BatchCompilation>())),
+          ),
+          Effect.catch((error) =>
+            Effect.logDebug(
+              "Shared build failed; falling back to individual builds.",
+              {
+                entryPoints,
+                reason: "CompileFailure",
+              },
+              Cause.fail(error),
+            ).pipe(Effect.as(Option.none<BatchCompilation>())),
+          ),
         ),
       );
       return yield* Effect.provideService(effect, Batch, {
@@ -660,9 +717,14 @@ const findMetafileInputKey = Effect.fnUntraced(function* (
 ) {
   const path = yield* Path.Path;
   const resolved = path.resolve(absolutePath);
+  if (metafile.inputs[resolved] !== undefined) return Option.some(resolved);
+  const fs = yield* FileSystem.FileSystem;
+  const real = yield* fs
+    .realPath(resolved)
+    .pipe(Effect.orElseSucceed(() => resolved));
   return Array.findFirst(
     Object.keys(metafile.inputs),
-    (key) => path.resolve(key) === resolved,
+    (key) => path.resolve(key) === real,
   );
 });
 

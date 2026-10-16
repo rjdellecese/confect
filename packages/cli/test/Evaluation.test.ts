@@ -10,6 +10,7 @@ import * as Fiber from "effect/Fiber";
 import * as HashSet from "effect/HashSet";
 import * as Path from "effect/Path";
 import * as Result from "effect/Result";
+import * as References from "effect/References";
 import * as Schema from "effect/Schema";
 import * as Evaluation from "@confect/cli/Evaluation";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -58,6 +59,71 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
       ).toBe(true);
     }
   };
+
+  it.effect.each([
+    { level: "Debug", reason: "CompileFailure" },
+    { level: "Info", reason: "CompileFailure" },
+    { level: "Debug", reason: "UnattributedWarnings" },
+    { level: "Info", reason: "UnattributedWarnings" },
+  ] as const)(
+    "honors $level logging for $reason inside the child evaluator",
+    ({ level, reason }) =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        if (reason === "CompileFailure") {
+          yield* project.write("confect/tables/notes.ts", "export default ;");
+        } else {
+          yield* project.write(
+            "tsconfig.json",
+            '{"compilerOptions":{"target":"invalid-target"}}',
+          );
+        }
+        const original = yield* Effect.promise(() =>
+          vi.importActual<typeof ChildProcess>("node:child_process"),
+        );
+        const closed = yield* Deferred.make<void>();
+        const output: string[] = [];
+        vi.mocked(fork).mockImplementationOnce((filename) => {
+          const child = original.fork(filename, {
+            serialization: "advanced",
+            stdio: ["ignore", "pipe", "pipe", "ipc"],
+          });
+          assert(child.stdout);
+          assert(child.stderr);
+          child.stdout.on("data", (chunk: Buffer) => {
+            output.push(chunk.toString());
+          });
+          child.stderr.on("data", (chunk: Buffer) => {
+            output.push(chunk.toString());
+          });
+          child.once("close", () => Deferred.doneUnsafe(closed, Effect.void));
+          return child;
+        });
+        const result = yield* project
+          .provide(Evaluation.generateSnapshot)
+          .pipe(
+            Effect.provideService(References.MinimumLogLevel, level),
+            Effect.result,
+          );
+        yield* Deferred.await(closed).pipe(Effect.timeout("10 seconds"));
+        expect(Result.isFailure(result)).toBe(reason === "CompileFailure");
+        const text = output.join("");
+        if (level === "Debug") {
+          expect(text).toContain("falling back to individual builds");
+          expect(text).toContain(reason);
+          expect(text).toContain("notes.ts");
+          if (reason === "CompileFailure") {
+            expect(text.match(/Shared build failed/g)).toHaveLength(1);
+            expect(text).toContain("Unexpected");
+          }
+        } else {
+          expect(text).not.toContain("falling back to individual builds");
+          expect(text).not.toContain(reason);
+        }
+        expectWorkersExited();
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
 
   it.effect(
     "roundtrips incremental snapshots and disposes failed declaration updates",

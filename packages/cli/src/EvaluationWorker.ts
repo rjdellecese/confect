@@ -5,12 +5,13 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as References from "effect/References";
 import * as RpcServer from "effect/rpc/RpcServer";
 import * as esbuild from "esbuild";
 import * as CodegenError from "./CodegenError";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
-import type { Directories } from "./Evaluation";
+import type { RequestContext } from "./Evaluation";
 import { EvaluationError, requests } from "./Evaluation";
 import { validateImplFiles } from "./LeafModule";
 import { ProjectRoot } from "./ProjectRoot";
@@ -21,18 +22,22 @@ import {
 } from "./confect/codegen";
 
 const evaluate = <A, E, R>(
-  directories: Directories,
+  requestContext: RequestContext,
   effect: Effect.Effect<A, E, R>,
 ) =>
   effect.pipe(
+    Effect.provideService(
+      References.MinimumLogLevel,
+      requestContext.minimumLogLevel,
+    ),
     Effect.provideService(ProjectRoot, {
-      get: Effect.succeed(directories.projectRoot),
+      get: Effect.succeed(requestContext.projectRoot),
     }),
     Effect.provideService(ConfectDirectory, {
-      get: Effect.succeed(directories.confectDirectory),
+      get: Effect.succeed(requestContext.confectDirectory),
     }),
     Effect.provideService(ConvexDirectory, {
-      get: Effect.succeed(directories.convexDirectory),
+      get: Effect.succeed(requestContext.convexDirectory),
     }),
     Effect.catchCause((cause) => {
       const failure = Cause.findErrorOption(cause);
@@ -48,10 +53,11 @@ const evaluate = <A, E, R>(
   );
 
 const handlers = requests.toLayer({
-  Previous: (directories) => evaluate(directories, loadPreviousFunctionPaths),
-  Generate: (directories) =>
+  Previous: (requestContext) =>
+    evaluate(requestContext, loadPreviousFunctionPaths),
+  Generate: (requestContext) =>
     evaluate(
-      directories,
+      requestContext,
       generateWithSnapshot.pipe(Effect.map(({ snapshot }) => snapshot)),
     ),
   Validate: (request) => evaluate(request, validateImplFiles(request.paths)),

@@ -9,6 +9,7 @@ import type { GenerationSnapshot } from "./GenerationSnapshot";
 
 export type Work = Data.TaggedEnum<{
   None: {};
+  Reconcile: {};
   Full: {};
   Impls: { readonly paths: Array.NonEmptyReadonlyArray<ImplModulePath> };
   Declarations: {
@@ -31,6 +32,11 @@ export const full = (pending: Pending): Pending => ({
   work: Work.Full(),
 });
 
+export const reconcile = (pending: Pending): Pending => ({
+  ...pending,
+  work: Work.$is("None")(pending.work) ? Work.Reconcile() : pending.work,
+});
+
 export const add = (
   pending: Pending,
   entries: ReadonlyArray<Kind>,
@@ -42,12 +48,14 @@ export const add = (
       needsFull: forceFull || Work.$is("Full")(pending.work),
       paths: Work.$match(pending.work, {
         None: () => HashSet.empty<ImplModulePath>(),
+        Reconcile: () => HashSet.empty<ImplModulePath>(),
         Full: () => HashSet.empty<ImplModulePath>(),
         Impls: ({ paths }) => HashSet.fromIterable(paths),
         Declarations: ({ paths }) => HashSet.fromIterable(paths),
       }),
       declarations: Work.$match(pending.work, {
         None: () => HashMap.empty<string, Declaration>(),
+        Reconcile: () => HashMap.empty<string, Declaration>(),
         Full: () => HashMap.empty<string, Declaration>(),
         Impls: () => HashMap.empty<string, Declaration>(),
         Declarations: ({ entries: declarations }) =>
@@ -94,7 +102,9 @@ export const add = (
         ? Work.Declarations({ entries: declarations, paths: impls })
         : Array.isReadonlyArrayNonEmpty(impls)
           ? Work.Impls({ paths: impls })
-          : Work.None(),
+          : Work.$is("Reconcile")(pending.work)
+            ? Work.Reconcile()
+            : Work.None(),
     optional: next.optional,
   };
 };
@@ -159,6 +169,7 @@ export const implsToValidate = (
       }),
       Work.$match(pending.work, {
         None: () => HashSet.empty<ImplModulePath>(),
+        Reconcile: () => HashSet.empty<ImplModulePath>(),
         Full: () => HashSet.empty<ImplModulePath>(),
         Impls: ({ paths }) => HashSet.fromIterable(paths),
         Declarations: ({ paths }) => HashSet.fromIterable(paths),
@@ -187,7 +198,7 @@ export const plan = (phase: Phase, pending: Pending): Operation =>
     Incremental: (ready) =>
       Match.value(pending.work).pipe(
         Match.tag("Full", () => Operation.Generate()),
-        Match.tag("None", "Impls", () =>
+        Match.tag("None", "Reconcile", "Impls", () =>
           Operation.Validate({
             snapshot: ready.snapshot,
             paths: implsToValidate(ready, pending),

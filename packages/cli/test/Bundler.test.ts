@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url";
 import * as FileSystem from "effect/FileSystem";
 import * as Console from "effect/Console";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Cause from "effect/Cause";
 import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
@@ -9,6 +10,8 @@ import { expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
+import * as References from "effect/References";
 import * as Result from "effect/Result";
 import * as Bundler from "@confect/cli/Bundler";
 
@@ -324,6 +327,199 @@ const fixture = Effect.fn("Bundler.test.fixture")(function* (
 });
 
 layer(BundlerLayer)("withBatch", (it) => {
+  const incompatibilities: ReadonlyArray<{
+    readonly reason: string;
+    readonly nodeOptions: string;
+    readonly files: Readonly<Record<string, string>>;
+  }> = [
+    {
+      reason: "UnsupportedEntries",
+      nodeOptions: "",
+      files: {
+        "node_modules/second.ts": 'export { shared } from "../shared";',
+      },
+    },
+    {
+      reason: "RuntimeConditions",
+      nodeOptions: "--conditions=custom",
+      files: {},
+    },
+    {
+      reason: "MixedTsconfigs",
+      nodeOptions: "",
+      files: { "nested/tsconfig.json": "{}" },
+    },
+    {
+      reason: "UnattributedWarnings",
+      nodeOptions: "",
+      files: {
+        "tsconfig.json": '{"compilerOptions":{"target":"invalid-target"}}',
+      },
+    },
+  ];
+  it.effect.each(incompatibilities)(
+    "reports $reason once per cached batch with its entries",
+    ({ reason, nodeOptions, files }) =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "tsconfig.json": "{}",
+          "shared.ts": "export const shared = {};",
+          "first.ts": 'export { shared } from "./shared";',
+          "nested/second.ts": 'export { shared } from "../shared";',
+          ...files,
+        });
+        const events: Logger.Options<unknown>[] = [];
+        const entries = [
+          file("first.ts"),
+          file(
+            reason === "UnsupportedEntries"
+              ? "node_modules/second.ts"
+              : "nested/second.ts",
+          ),
+        ];
+        const run = Bundler.withBatch(
+          entries,
+          Effect.forEach(entries, (entry) => Bundler.bundle(entry), {
+            concurrency: "unbounded",
+          }),
+        );
+        yield* Effect.gen(function* () {
+          const results = yield* run;
+          expect(results[0]?.module.shared).not.toBe(results[1]?.module.shared);
+          expect(events).toHaveLength(1);
+          expect(events[0]).toMatchObject({
+            logLevel: "Debug",
+            message: [
+              "Shared build skipped; falling back to individual builds.",
+              {
+                entryPoints: entries,
+                reason,
+                detail: expect.any(String),
+              },
+            ],
+          });
+          yield* run;
+          expect(events).toHaveLength(2);
+        }).pipe(
+          Effect.provide(
+            Logger.layer([
+              Logger.make((event) => {
+                events.push(event);
+              }),
+            ]),
+          ),
+          Effect.provideService(References.MinimumLogLevel, "Debug"),
+          Effect.provide(
+            ConfigProvider.layer(
+              ConfigProvider.fromUnknown({ NODE_OPTIONS: nodeOptions }),
+            ),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect("does not diagnose unused or successful batches", () =>
+    Effect.gen(function* () {
+      const { file } = yield* fixture({ "first.ts": "export default 1;" });
+      const events: Logger.Options<unknown>[] = [];
+      yield* Effect.gen(function* () {
+        yield* Bundler.withBatch(["/missing/entry.ts"], Effect.void);
+        yield* Bundler.withBatch(
+          [file("first.ts")],
+          Bundler.bundle(file("first.ts")),
+        );
+      }).pipe(
+        Effect.provide(
+          Logger.layer([
+            Logger.make((event) => {
+              events.push(event);
+            }),
+          ]),
+        ),
+        Effect.provideService(References.MinimumLogLevel, "Debug"),
+      );
+      expect(events).toEqual([]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "keeps canonical metadata through source and temporary symlinks",
+    () =>
+      Effect.gen(function* () {
+        const { file, fs, path, directory } = yield* fixture({
+          "source/first.ts": 'export { shared } from "./shared";',
+          "source/second.ts":
+            'export { shared } from "./shared"; export { default } from "./warning";',
+          "source/shared.ts":
+            'export { default as value } from "dependency"; export const shared = {};',
+          "source/warning.ts": "export default { duplicate: 1, duplicate: 2 };",
+          "source/node_modules/dependency/package.json":
+            '{ "type": "module", "exports": "./index.js" }',
+          "source/node_modules/dependency/index.js":
+            'export default "external";',
+        });
+        yield* fs.symlink(file("source"), file("linked-source"));
+        yield* fs.symlink(directory, file("linked-temp"));
+        const entries = [
+          file("linked-source/first.ts"),
+          file("linked-source/second.ts"),
+        ] as const;
+        const messages: unknown[] = [];
+        const console = yield* Console.Console;
+        const outputs = yield* Bundler.withBatch(
+          entries,
+          Effect.gen(function* () {
+            const first = yield* Bundler.bundle(entries[0]);
+            expect(messages).toEqual([]);
+            const second = yield* Bundler.bundle(entries[1]);
+            expect(first.module.shared).toBe(second.module.shared);
+            expect(Object.keys(first.metafile.inputs).sort()).toEqual(
+              [
+                yield* fs.realPath(file("source/first.ts")),
+                yield* fs.realPath(file("source/shared.ts")),
+              ].sort(),
+            );
+            expect(
+              yield* Bundler.directlyImports(
+                first,
+                file("linked-source/first.ts"),
+                file("linked-source/shared.ts"),
+              ),
+            ).toBe(true);
+            expect(
+              Bundler.importersOfPackage(first, "dependency", () => true),
+            ).toEqual([yield* fs.realPath(file("source/shared.ts"))]);
+            expect(messages).toHaveLength(1);
+            expect(messages.join("\n")).toContain("warning.ts");
+            const artifacts = Object.keys(second.metafile.outputs);
+            expect(artifacts.length).toBeGreaterThan(1);
+            for (const output of artifacts)
+              expect(output).toBe(yield* fs.realPath(output));
+            return artifacts;
+          }),
+        ).pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            makeTempDirectoryScoped: (options) =>
+              fs.makeTempDirectoryScoped({
+                ...options,
+                directory: file("linked-temp"),
+              }),
+          }),
+          Effect.provideService(
+            Console.Console,
+            Object.assign(Object.create(console), {
+              error: (...args: ReadonlyArray<unknown>) => {
+                messages.push(...args);
+              },
+            }),
+          ),
+        );
+        for (const output of outputs)
+          expect(yield* fs.exists(path.dirname(output))).toBe(false);
+      }).pipe(Effect.scoped),
+  );
+
   it.effect("reuses an enclosing batch for a nested subset", () =>
     Effect.gen(function* () {
       const { file } = yield* fixture({
@@ -752,6 +948,7 @@ layer(BundlerLayer)("withBatch", (it) => {
     "falls back after a failed build and reports only the requested entry's error",
     () =>
       Effect.gen(function* () {
+        const events: Logger.Options<unknown>[] = [];
         const { file, fs } = yield* fixture({
           "first.ts": 'export const value = "valid";',
           "broken.ts": "export const value = ;",
@@ -782,7 +979,46 @@ layer(BundlerLayer)("withBatch", (it) => {
               (yield* Bundler.bundle(file("broken.ts"))).module.value,
             ).toBe("fixed");
           }),
+        ).pipe(
+          Effect.provide(
+            Logger.layer([
+              Logger.make((event) => {
+                events.push(event);
+              }),
+            ]),
+          ),
+          Effect.provideService(References.MinimumLogLevel, "Debug"),
         );
+        expect(events).toHaveLength(1);
+        expect(events[0]).toMatchObject({
+          logLevel: "Debug",
+          message: [
+            "Shared build failed; falling back to individual builds.",
+            {
+              entryPoints: [file("first.ts"), file("broken.ts")],
+              reason: "CompileFailure",
+            },
+          ],
+        });
+        expect(
+          events.map((event) => Cause.pretty(event.cause)).join("\n"),
+        ).toContain("broken.ts");
+        expect(
+          events.map((event) => Cause.findErrorOption(event.cause)),
+        ).toEqual([
+          expect.objectContaining({
+            value: expect.objectContaining({
+              _tag: "BundlerError",
+              cause: expect.objectContaining({
+                errors: [
+                  expect.objectContaining({
+                    location: expect.objectContaining({ file: "broken.ts" }),
+                  }),
+                ],
+              }),
+            }),
+          }),
+        ]);
       }).pipe(Effect.scoped),
   );
 

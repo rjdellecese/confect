@@ -14,6 +14,89 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
     it.effect(
+      "generates once when startup bindings reveal additional library dependencies",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const spec = Project.spec.replace(
+            'import { FunctionSpec, GroupSpec } from "@confect/core";',
+            'import * as FunctionSpec from "@confect/core/FunctionSpec"; import * as GroupSpec from "@confect/core/GroupSpec";',
+          );
+          yield* project.write(
+            "confect/tables/notes.ts",
+            Project.table.replace(
+              'import { Table } from "@confect/core";',
+              'import * as Table from "@confect/core/Table";',
+            ),
+          );
+          yield* project.write("confect/notes.spec.ts", spec);
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace(
+              'import { FunctionImpl, GroupImpl } from "@confect/server";',
+              'import * as FunctionImpl from "@confect/server/FunctionImpl"; import * as GroupImpl from "@confect/server/GroupImpl";',
+            ),
+          );
+          yield* project.write(
+            "convex/convex.config.ts",
+            'import { defineApp } from "convex/server"; console.log("FULL_GENERATION"); export default defineApp();\n',
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const startup = yield* Ref.get(watching.output);
+          expect(startup.match(/^FULL_GENERATION$/gm), startup).toHaveLength(1);
+          const generated = yield* project.generatedFiles;
+          yield* Ref.set(watching.output, "");
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `${spec}\n// declaration-only comment\n`,
+          );
+          yield* watching.waitFor(success);
+          expect(yield* Ref.get(watching.output)).not.toContain(
+            "FULL_GENERATION",
+          );
+          expect(yield* project.generatedFiles).toEqual(generated);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "keeps atomic spec replacements incremental",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.write(
+            "convex/convex.config.ts",
+            'import { defineApp } from "convex/server"; console.log("FULL_GENERATION"); export default defineApp();\n',
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const generated = yield* project.generatedFiles;
+          for (const revision of [1, 2]) {
+            yield* Ref.set(watching.output, "");
+            const marker = `SPEC_REPLACED:${revision}`;
+            yield* project.write(
+              "confect/notes.spec.ts.tmp",
+              `${Project.spec}\nconsole.log("${marker}");\n`,
+            );
+            yield* fs.rename(
+              path.join(project.root, "confect/notes.spec.ts.tmp"),
+              path.join(project.root, "confect/notes.spec.ts"),
+            );
+            yield* watching.waitFor(marker);
+            yield* watching.waitFor(success);
+            expect(yield* Ref.get(watching.output)).not.toContain(
+              "FULL_GENERATION",
+            );
+            expect(yield* project.generatedFiles).toEqual(generated);
+          }
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "does not invalidate Convex schema for ordinary source edits or full generation",
       () =>
         Effect.gen(function* () {

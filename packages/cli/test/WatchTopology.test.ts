@@ -1,10 +1,47 @@
-import { expect, it } from "@effect/vitest";
+import { assert, expect, it } from "@effect/vitest";
+import * as EntryPoint from "@confect/cli/EntryPoint";
+import * as Option from "effect/Option";
 import * as WatchTopology from "@confect/cli/WatchTopology";
 import * as SyncState from "@confect/cli/SyncState";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Ref from "effect/Ref";
+
+it.effect(
+  "gates targeted invalidations without losing concurrent or full work",
+  () =>
+    Effect.gen(function* () {
+      const spec = EntryPoint.parse("notes.spec.ts");
+      const impl = EntryPoint.parse("other.impl.ts");
+      assert(Option.isSome(spec));
+      assert(Option.isSome(impl));
+      const pending = yield* Ref.make(SyncState.empty);
+      const topology = yield* WatchTopology.make(pending);
+      const initial = yield* Deferred.make<void>();
+      yield* Deferred.succeed(initial, undefined);
+      yield* topology.reconcile(0, initial);
+      yield* topology.invalidateEntry(spec.value);
+      yield* topology.invalidateEntry(impl.value);
+      const taken = yield* Deferred.make<void>();
+      const consumer = yield* topology.takePending.pipe(
+        Effect.tap(() => Deferred.succeed(taken, undefined)),
+        Effect.forkScoped,
+      );
+      yield* topology.reconcile(1, initial);
+      yield* Effect.yieldNow;
+      expect(yield* Deferred.isDone(taken)).toBe(false);
+      yield* topology.reconcile(2, initial);
+      expect(yield* Fiber.join(consumer)).toEqual(
+        SyncState.add(SyncState.empty, [spec.value, impl.value]),
+      );
+      yield* topology.invalidate;
+      yield* topology.invalidateEntry(spec.value);
+      yield* topology.reconcile(4, initial);
+      expect((yield* topology.takePending).work._tag).toBe("Full");
+      expect(yield* Ref.get(pending)).toEqual(SyncState.empty);
+    }).pipe(Effect.scoped),
+);
 
 it.effect("waits for initial observation before consuming pending work", () =>
   Effect.gen(function* () {

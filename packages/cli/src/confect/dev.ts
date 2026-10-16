@@ -216,7 +216,21 @@ const syncLoop = Effect.fnUntraced(function* (
         optionalPendingRef,
         HashSet.union(pending.optional),
       );
-      if (!firstSync)
+      const operation = SyncState.plan(phase, pending);
+      yield* Effect.logDebug("Planned development sync").pipe(
+        Effect.annotateLogs({
+          phase: phase._tag,
+          work: pending.work._tag,
+          operation: operation._tag,
+        }),
+      );
+      if (
+        !firstSync &&
+        !(
+          SyncState.Operation.$is("Validate")(operation) &&
+          operation.paths.length === 0
+        )
+      )
         yield* logPending("Dependencies may have changed, reloading…");
 
       const regenerate = (generation: typeof Evaluation.generateSnapshot) =>
@@ -264,17 +278,14 @@ const syncLoop = Effect.fnUntraced(function* (
           }
           return SyncState.Outcome.Succeeded({ snapshot });
         });
-      const outcome = yield* SyncState.Operation.$match(
-        SyncState.plan(phase, pending),
-        {
-          Generate: () => regenerate(Evaluation.generateSnapshot),
-          Validate: ({ paths, snapshot }) => validate(paths, snapshot),
-          Update: ({ snapshot, declarations, paths }) =>
-            regenerate(
-              Evaluation.updateDeclarations(snapshot, declarations, paths),
-            ),
-        },
-      );
+      const outcome = yield* SyncState.Operation.$match(operation, {
+        Generate: () => regenerate(Evaluation.generateSnapshot),
+        Validate: ({ paths, snapshot }) => validate(paths, snapshot),
+        Update: ({ snapshot, declarations, paths }) =>
+          regenerate(
+            Evaluation.updateDeclarations(snapshot, declarations, paths),
+          ),
+      });
       yield* Ref.set(phaseRef, SyncState.transition(outcome));
       if (SyncState.shouldRetry(phase, outcome)) {
         yield* watcher.requestRetry;

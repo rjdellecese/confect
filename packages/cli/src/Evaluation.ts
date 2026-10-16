@@ -5,9 +5,11 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
+import * as LogLevel from "effect/LogLevel";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as References from "effect/References";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcClient from "effect/rpc/RpcClient";
 import type { RpcClientError } from "effect/rpc/RpcClientError";
@@ -21,12 +23,13 @@ import { FunctionPaths } from "./FunctionPaths";
 import { ImplModulePath } from "./ImplModulePath";
 import { ProjectRoot } from "./ProjectRoot";
 
-export const Directories = Schema.Struct({
+export const RequestContext = Schema.Struct({
   projectRoot: Schema.String,
   confectDirectory: Schema.String,
   convexDirectory: Schema.String,
+  minimumLogLevel: Schema.Literals(LogLevel.values),
 });
-export type Directories = typeof Directories.Type;
+export type RequestContext = typeof RequestContext.Type;
 
 export class EvaluationError extends Schema.TaggedError<EvaluationError>()(
   "EvaluationError",
@@ -35,18 +38,18 @@ export class EvaluationError extends Schema.TaggedError<EvaluationError>()(
 
 export const requests = RpcGroup.make(
   Rpc.make("Previous", {
-    payload: Directories,
+    payload: RequestContext,
     success: FunctionPaths,
     error: EvaluationError,
   }),
   Rpc.make("Generate", {
-    payload: Directories,
+    payload: RequestContext,
     success: GenerationSnapshot.GenerationSnapshot,
     error: EvaluationError,
   }),
   Rpc.make("Validate", {
     payload: Schema.Struct({
-      ...Directories.fields,
+      ...RequestContext.fields,
       paths: Schema.Array(ImplModulePath),
     }),
     success: Schema.Void,
@@ -54,7 +57,7 @@ export const requests = RpcGroup.make(
   }),
   Rpc.make("Update", {
     payload: Schema.Struct({
-      ...Directories.fields,
+      ...RequestContext.fields,
       snapshot: GenerationSnapshot.GenerationSnapshot,
       declarations: Schema.NonEmptyArray(EntryPoint.Declaration),
       paths: Schema.Array(ImplModulePath),
@@ -67,13 +70,14 @@ export const requests = RpcGroup.make(
 const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
   run: (
     client: RpcClient.RpcClient<RpcGroup.Rpcs<typeof requests>, RpcClientError>,
-    directories: Directories,
+    requestContext: RequestContext,
   ) => Effect.Effect<A, EvaluationError | RpcClientError>,
 ) {
-  const directories = {
+  const requestContext = {
     projectRoot: yield* ProjectRoot.get,
     confectDirectory: yield* ConfectDirectory.get,
     convexDirectory: yield* ConvexDirectory.get,
+    minimumLogLevel: yield* References.MinimumLogLevel,
   };
   return yield* Effect.scoped(
     Effect.gen(function* () {
@@ -95,7 +99,7 @@ const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
       );
       return yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(requests);
-        return yield* run(client, directories);
+        return yield* run(client, requestContext);
       }).pipe(
         Effect.provide(
           RpcClient.layerProtocolWorker({ size: 1 }).pipe(
@@ -123,13 +127,13 @@ export const loadPreviousFunctionPaths = Effect.gen(function* () {
   ) {
     return FunctionPaths.make(HashSet.empty());
   }
-  return yield* withWorker((client, directories) =>
-    client.Previous(directories),
+  return yield* withWorker((client, requestContext) =>
+    client.Previous(requestContext),
   );
 });
 
-export const generateSnapshot = withWorker((client, directories) =>
-  client.Generate(directories),
+export const generateSnapshot = withWorker((client, requestContext) =>
+  client.Generate(requestContext),
 );
 
 export const generate = generateSnapshot.pipe(
@@ -141,9 +145,9 @@ export const updateDeclarations = (
   declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
   paths: ReadonlyArray<ImplModulePath>,
 ) =>
-  withWorker((client, directories) =>
+  withWorker((client, requestContext) =>
     client.Update({
-      ...directories,
+      ...requestContext,
       snapshot,
       declarations,
       paths,
@@ -151,8 +155,8 @@ export const updateDeclarations = (
   );
 
 export const validate = (paths: ReadonlyArray<ImplModulePath>) =>
-  withWorker((client, directories) =>
-    client.Validate({ ...directories, paths }),
+  withWorker((client, requestContext) =>
+    client.Validate({ ...requestContext, paths }),
   );
 
 export const catchAndLog = <A, R>(
