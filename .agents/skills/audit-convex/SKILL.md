@@ -5,9 +5,14 @@ description: Keep Confect compatible with stable Convex releases and audit new C
 
 # Audit Convex compatibility and features
 
-Keep Confect current with Convex without equating a dependency bump with feature
-support. The Capy automation runs daily at 04:00 America/New_York; its schedule
-and enabled state live in Capy, not in this repository.
+Check both compatibility with new Convex releases and whether their new public
+APIs have Confect equivalents. Equivalent Effect-based APIs count; requiring a
+caller to use a raw Convex client or context is interoperability, not Confect API
+parity. Preserve explicit user-approved exclusions, such as legacy document ID
+conversion, rather than reopening them under the general parity goal.
+
+The Capy automation runs daily at 04:00 America/New_York; its schedule and enabled
+state live in Capy, not in this repository.
 
 ## Scope and shared policy
 
@@ -38,39 +43,54 @@ and quiet no-change behavior replace its dependency-only stopping rule.
    [Convex product updates](https://ship.convex.dev/). Follow relevant official
    documentation links. Backend features can ship without an npm version change,
    so do not stop just because dependency pins are current.
-4. Find the repository issue titled **Convex compatibility and feature tracker**,
-   including closed issues, before creating one. Reuse it as the audit record;
-   preserve human notes. Record the last successfully reviewed versions and
-   dated product updates, evidence links, and unresolved gaps. On the first run,
-   review all releases newer than the workspace pins, the currently pinned
-   releases' features, and product updates from the preceding 30 days. Record
-   that baseline explicitly; it is not a claim of complete historical parity.
-5. On subsequent runs, review new releases and announcements plus unresolved
-   gaps, even if their dependency upgrade already merged. Do not mark unavailable
-   sources as reviewed or advance their checkpoints. Report missing access as a
-   blocker, not as proof that nothing changed.
+4. Read [tracker #800](https://github.com/rjdellecese/confect/issues/800), the
+   canonical inventory for historical gaps and new releases. Maintain the format
+   in [tracker-template.md](tracker-template.md), preserving human notes and
+   decisions. If the issue cannot be read, report the access blocker rather than
+   creating a competing tracker. Its source-review checkpoints record what was
+   examined, not what has been implemented or published.
+5. Preserve the imported CONF-85 inventory, its source evidence, explicit scope
+   decisions, and existing work ownership. Historical IDs and the first release
+   audit's IDs overlap: keep their source namespaces and aliases. Do not discard
+   old gaps because they predate the release lookback or their dependency upgrade
+   already merged. If an item was not reconciled against current code, mark it
+   `unassessed` rather than copying a stale implementation claim.
+6. Review releases and announcements since the successful checkpoints, and
+   unresolved items whose code, upstream contract, linked work, or decision has
+   changed. Do not re-audit every unchanged historical gap each day. Consider
+   bounded, unowned backlog work under the implementation policy below, but do
+   not start large historical features without a design decision. When no source
+   checkpoint exists, review the pinned release, all newer stable releases, and
+   the preceding 30 days of product updates, recording the limited coverage.
+   Never mark unavailable sources as reviewed or advance their checkpoints.
 
 ## Assess features, not just versions
 
 For each relevant addition, deprecation, or behavior change, record one of:
 
-- **Already supported:** show how a Confect user reaches it, citing the wrapper,
-  pass-through API, codegen output, or documentation and relevant tests. Add
-  focused regression coverage when the current suite cannot prove the claim.
+- **Already supported:** identify the Confect-specific API or equivalent Effect
+  representation, its context restrictions, and relevant implementation/tests.
+  Raw context/client access alone does not qualify. Add focused regression
+  coverage when the current suite cannot prove the claim.
 - **Needs Confect work:** identify the affected modules and consumer-visible gap.
   Implement compatible, bounded additions that follow established APIs, with
   tests and documentation. Propose work requiring an API-design decision,
   architectural migration, or a peer-ecosystem major rather than guessing.
-- **Outside Confect's scope:** explain why the upstream capability needs no
-  Confect change, with a source link. Do not label a missing wrapper irrelevant
-  merely because existing tests pass.
+- **Outside Confect's scope:** record an upstream internal API, non-API product
+  change, or explicit user-approved exclusion with its source and rationale.
+  Do not exclude a public API because native access works, existing tests pass,
+  or implementation is inconvenient. Unsettled boundaries, including CLI scope
+  and experimental/deprecated public APIs, need a decision rather than silent
+  exclusion.
 
 Keep deferred work in the tracker with its upstream version or announcement,
 impact, proposed scope, and linked issue or PR. An open implementation PR means
 pending, not supported on `main`. Close a gap only after inspecting the merged
 implementation and its evidence; a closed, unmerged PR does not resolve it and
 must not be recreated without a new user request. Do not repeatedly request a
-decision already recorded in the tracker unless new evidence changes it.
+decision already recorded in the tracker unless new evidence changes it. Record
+the released version separately: a merge is not proof of npm publication. Partial
+improvements do not close an entry with remaining subfeatures.
 
 ## Implement and verify
 
