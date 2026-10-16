@@ -281,6 +281,143 @@ it("requires full work for the first snapshot, untracked output changes, and fai
   );
 });
 
+it("distinguishes generated-only recovery from an unexplained output change", () => {
+  const before = snapshot(
+    HashMap.make(["source.ts", "source"], ["_generated/schema.ts", "before"]),
+    HashMap.empty(),
+    "before",
+  );
+  const inputs = HashMap.make(
+    ["source.ts", "source"],
+    ["_generated/schema.ts", "after"],
+  );
+  const failed = WatchBuild.observe(
+    before,
+    WatchBuild.Outcome.Failed({
+      fingerprints: inputs,
+      failures: [
+        WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" }),
+      ],
+      warnings: [],
+    }),
+  );
+  expect(WatchBuild.diff(before, failed, "_generated/")).toEqual(
+    WatchBuild.Change.Affected({ paths: HashSet.empty() }),
+  );
+  expect(
+    WatchBuild.diff(
+      failed,
+      snapshot(inputs, HashMap.empty(), "after"),
+      "_generated/",
+    ),
+  ).toEqual({
+    _tag: "Recovered",
+    paths: HashSet.empty(),
+  });
+  const unexplained = WatchBuild.observe(
+    before,
+    WatchBuild.Outcome.Failed({
+      fingerprints: WatchBuild.fingerprints(before),
+      failures: [
+        WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" }),
+      ],
+      warnings: [],
+    }),
+  );
+  expect(
+    WatchBuild.diff(
+      unexplained,
+      snapshot(WatchBuild.fingerprints(before), HashMap.empty(), "unexplained"),
+      "_generated/",
+    ),
+  ).toEqual(WatchBuild.Change.Full());
+});
+
+it("signals initial build recovery without inventing a second full generation", () => {
+  const inputs = HashMap.make(["source.ts", "source"]);
+  const failed = WatchBuild.observe(
+    WatchBuild.State.Initial(),
+    WatchBuild.Outcome.Failed({
+      fingerprints: inputs,
+      failures: [
+        WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" }),
+      ],
+      warnings: [],
+    }),
+  );
+  expect(WatchBuild.diff(failed, snapshot(inputs), "_generated/")).toEqual({
+    _tag: "Recovered",
+    paths: HashSet.empty(),
+  });
+});
+
+it("defers newly discovered dependencies until a successful graph can identify their consumers", () => {
+  const initialInputs = HashMap.make(["group.impl.ts", "source"]);
+  const failed = (inputs: WatchBuild.Fingerprints) =>
+    WatchBuild.Outcome.Failed({
+      fingerprints: inputs,
+      failures: [
+        WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" }),
+      ],
+      warnings: [],
+    });
+  const initial = WatchBuild.observe(
+    WatchBuild.State.Initial(),
+    failed(initialInputs),
+  );
+  const discoveredInputs = HashMap.set(initialInputs, "library.ts", "library");
+  const discovered = WatchBuild.observe(initial, failed(discoveredInputs));
+  expect(WatchBuild.diff(initial, discovered, "_generated/")._tag).toBe(
+    "Affected",
+  );
+  const unchanged = WatchBuild.observe(discovered, failed(discoveredInputs));
+  const current = snapshot(
+    HashMap.set(discoveredInputs, "_generated/schema.ts", "generated"),
+    HashMap.make(
+      ["library.ts", HashSet.make("_generated/schema.ts")],
+      ["_generated/schema.ts", HashSet.make("group.impl.ts")],
+    ),
+  );
+  expect(WatchBuild.diff(unchanged, current, "_generated/")).toEqual({
+    _tag: "Recovered",
+    paths: HashSet.make("library.ts", "_generated/schema.ts", "group.impl.ts"),
+  });
+  const edited = WatchBuild.observe(
+    discovered,
+    failed(HashMap.set(discoveredInputs, "library.ts", "edited")),
+  );
+  expect(WatchBuild.diff(discovered, edited, "_generated/")).toEqual(
+    WatchBuild.Change.Full(),
+  );
+  expect(WatchBuild.fingerprints(initial)).toBe(initialInputs);
+});
+
+it("preserves source edits observed alongside a generated-file recovery", () => {
+  const graph = HashMap.make(["source.ts", HashSet.make("group.impl.ts")]);
+  const before = snapshot(HashMap.make(["source.ts", "before"]), graph);
+  const failed = WatchBuild.observe(
+    before,
+    WatchBuild.Outcome.Failed({
+      fingerprints: HashMap.make(
+        ["source.ts", "before"],
+        ["_generated/schema.ts", "generated"],
+      ),
+      failures: [
+        WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" }),
+      ],
+      warnings: [],
+    }),
+  );
+  const current = snapshot(
+    HashMap.make(["source.ts", "after"], ["_generated/schema.ts", "generated"]),
+    graph,
+  );
+  expect(WatchBuild.diff(failed, current, "_generated/")).toEqual({
+    _tag: "Recovered",
+    paths: HashSet.make("source.ts", "group.impl.ts"),
+  });
+});
+
 it("reads diagnostics without exposing historical errors as current errors", () => {
   expect(WatchBuild.diagnostics(WatchBuild.State.Initial())).toEqual({
     errors: [],

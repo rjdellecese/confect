@@ -446,6 +446,76 @@ layer(NodeServices.layer, { excludeTestServices: true })(
 layer(NodeServices.layer, { excludeTestServices: true })(
   "refresh reconciliation",
   (test) => {
+    test.effect.each([false, true])(
+      "recovers a generated-only build failure without discarding a concurrent source edit: %s",
+      (editSource) =>
+        Effect.gen(function* () {
+          let broken = false;
+          const { watcher, project } = yield* controlledWatcher({
+            plugins: [
+              {
+                name: "generated-binding-recovery",
+                setup(build) {
+                  build.onEnd((result) => {
+                    if (broken)
+                      result.errors.push({
+                        id: "generated-binding",
+                        pluginName: "generated-binding-recovery",
+                        text: "generated binding is being replaced",
+                        location: null,
+                        notes: [],
+                        detail: undefined,
+                      });
+                  });
+                },
+              },
+            ],
+          });
+          const fs = yield* FileSystem.FileSystem;
+          yield* fs.makeDirectory(`${project.root}/confect/_generated`, {
+            recursive: true,
+          });
+          yield* project.write(
+            "confect/_generated/binding.ts",
+            "export const value = 1;",
+          );
+          yield* project.write(
+            "confect/notes.spec.ts",
+            'export { value } from "./_generated/binding";',
+          );
+          expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(
+            true,
+          );
+          yield* watcher.next;
+          broken = true;
+          yield* project.write(
+            "confect/_generated/binding.ts",
+            "export const value = 2;",
+          );
+          expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(
+            false,
+          );
+          expect((yield* watcher.pending).work._tag).toBe("None");
+          broken = false;
+          if (editSource)
+            yield* project.write(
+              "confect/notes.spec.ts",
+              'export { value } from "./_generated/binding"; export const changed = true;',
+            );
+          expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(
+            true,
+          );
+          expect((yield* watcher.next).work._tag).toBe(
+            editSource ? "Declarations" : "Reconcile",
+          );
+          expect(yield* watcher.diagnostics).toEqual({
+            errors: [],
+            warnings: [],
+          });
+          expect((yield* watcher.pending).work._tag).toBe("None");
+        }).pipe(Effect.scoped),
+    );
+
     test.effect(
       "requests only one rebuild when quiescent and preserves queued edits",
       () =>

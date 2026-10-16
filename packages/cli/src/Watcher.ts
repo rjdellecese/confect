@@ -286,6 +286,15 @@ const esbuildOptions = (
                           HashSet.has(paths, entry.inputPath),
                         ),
                       ),
+                    Recovered: ({ paths }) =>
+                      SyncState.reconcile(
+                        SyncState.add(
+                          pending,
+                          entries.filter((entry) =>
+                            HashSet.has(paths, entry.inputPath),
+                          ),
+                        ),
+                      ),
                   }),
                 );
                 yield* Queue.offer(signal, undefined);

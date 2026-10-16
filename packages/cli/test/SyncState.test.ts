@@ -125,6 +125,59 @@ it("coalesces implementation work without mutating earlier requests", () => {
   expect(SyncState.empty.work._tag).toBe("None");
 });
 
+it("reconciles recovered observations without losing required generation or failed implementations", () => {
+  const pending = SyncState.reconcile(SyncState.empty);
+  expect(pending.work._tag).toBe("Reconcile");
+  expect(SyncState.isDirty(pending)).toBe(true);
+  expect(SyncState.add(pending, [])).toEqual(pending);
+  expect(SyncState.empty.work._tag).toBe("None");
+  for (const phase of [
+    SyncState.Phase.Bootstrapping(),
+    SyncState.Phase.NeedsFullSync(),
+  ])
+    expect(SyncState.plan(phase, pending)._tag).toBe("Generate");
+  const snapshot = Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves([]));
+  const phase = SyncState.Phase.Incremental({
+    snapshot,
+    failedImpls: HashSet.empty(),
+  });
+  expect(SyncState.plan(phase, pending)).toEqual(
+    SyncState.Operation.Validate({ snapshot, paths: [] }),
+  );
+  const failed = ImplModulePath.make("failed.impl.ts");
+  expect(
+    SyncState.implsToValidate(
+      SyncState.Phase.Incremental({
+        snapshot,
+        failedImpls: HashSet.make(failed),
+      }),
+      pending,
+    ),
+  ).toEqual([failed]);
+  for (const work of [
+    SyncState.full(SyncState.empty),
+    SyncState.add(SyncState.empty, [
+      EntryPoint.Kind.Impl({ relativePath: failed }),
+    ]),
+    SyncState.add(SyncState.empty, [
+      EntryPoint.Kind.Spec({
+        relativePath: SpecModulePath.make("notes.spec.ts"),
+      }),
+    ]),
+  ]) {
+    expect(SyncState.reconcile(work)).toEqual(work);
+  }
+  const optional = EntryPoint.Kind.Http({ relativePath: "http.ts" });
+  expect(SyncState.add(pending, [optional]).work._tag).toBe("Reconcile");
+  expect(HashSet.has(SyncState.add(pending, [optional]).optional, "Http")).toBe(
+    true,
+  );
+  expect(
+    SyncState.add(pending, [EntryPoint.Kind.Impl({ relativePath: failed })])
+      .work._tag,
+  ).toBe("Impls");
+});
+
 it("full work subsumes impl work but preserves independent optional cleanup", () => {
   const pending = SyncState.add(SyncState.empty, [
     EntryPoint.Kind.Http({ relativePath: "http.ts" }),

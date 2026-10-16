@@ -166,6 +166,7 @@ export type State = Data.TaggedEnum<{
   Failed: {
     readonly observation: Extract<Outcome, { readonly _tag: "Failed" }>;
     readonly lastSuccessful: Option.Option<Snapshot>;
+    readonly discovered: HashSet.HashSet<string>;
   };
 }>;
 export const State = Data.taggedEnum<State>();
@@ -185,6 +186,17 @@ export const observe = (previous: State, outcome: Outcome): State =>
       State.Failed({
         observation,
         lastSuccessful: lastSuccessful(previous),
+        discovered: State.$is("Initial")(previous)
+          ? HashSet.empty()
+          : HashSet.union(
+              State.$is("Failed")(previous)
+                ? previous.discovered
+                : HashSet.empty(),
+              HashSet.difference(
+                HashSet.fromIterable(HashMap.keys(observation.fingerprints)),
+                HashSet.fromIterable(HashMap.keys(fingerprints(previous))),
+              ),
+            ),
       }),
   });
 
@@ -205,6 +217,7 @@ export const outputHash = (state: State): Option.Option<string> =>
 export type Change = Data.TaggedEnum<{
   Full: {};
   Affected: { readonly paths: HashSet.HashSet<string> };
+  Recovered: { readonly paths: HashSet.HashSet<string> };
 }>;
 export const Change = Data.taggedEnum<Change>();
 
@@ -229,11 +242,22 @@ export const diff = (
   const sources = changed.filter(
     (file) => !file.startsWith(generatedDirectoryPrefix),
   );
+  const recovered =
+    State.$is("Failed")(previous) && State.$is("Succeeded")(current);
+  const untrackedOutput = recovered
+    ? Option.match(lastSuccessful(previous), {
+        onNone: () => false,
+        onSome: (baseline) =>
+          Equal.equals(baseline.fingerprints, currentFingerprints) &&
+          !Equal.equals(Option.some(baseline.outputHash), outputHash(current)),
+      })
+    : changed.length === 0 &&
+      !Equal.equals(outputHash(previous), outputHash(current));
   if (
     State.$is("Initial")(previous) ||
-    (sources.length > 0 && State.$is("Failed")(current)) ||
-    (changed.length === 0 &&
-      !Equal.equals(outputHash(previous), outputHash(current)))
+    (sources.some((file) => HashMap.has(previousFingerprints, file)) &&
+      State.$is("Failed")(current)) ||
+    untrackedOutput
   )
     return Change.Full();
 
@@ -245,12 +269,23 @@ export const diff = (
     onNone: () => HashMap.empty<string, HashSet.HashSet<string>>(),
     onSome: (snapshot) => snapshot.graph,
   });
-  return Change.Affected({
-    paths: HashSet.union(
-      WatchGraph.affected(graph, sources),
-      WatchGraph.affected(previousGraph, sources),
-    ),
-  });
+  const affectedSources =
+    recovered && State.$is("Failed")(previous)
+      ? Array.fromIterable(
+          HashSet.union(
+            HashSet.fromIterable(sources),
+            HashSet.filter(
+              previous.discovered,
+              (file) => !file.startsWith(generatedDirectoryPrefix),
+            ),
+          ),
+        )
+      : sources;
+  const paths = HashSet.union(
+    WatchGraph.affected(graph, affectedSources),
+    WatchGraph.affected(previousGraph, affectedSources),
+  );
+  return recovered ? Change.Recovered({ paths }) : Change.Affected({ paths });
 };
 
 export const parse = Effect.fn("WatchBuild.parse")(function* (
