@@ -1,5 +1,11 @@
 # @confect/core
 
+## 10.3.1
+
+### Patch Changes
+
+- 7963e35: Fix excessively deep TypeScript instantiation errors when indexing tables with wide literal-union fields using `Table.make(...).index(...)`.
+
 ## 10.3.0
 
 ### Patch Changes
