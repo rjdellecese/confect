@@ -1,5 +1,21 @@
 # @confect/server
 
+## 10.3.1
+
+### Patch Changes
+
+- 3aeb1ad: Correct the AI gateway error guidance to explain how authenticated, project-linked local deployments can use the gateway.
+
+## 10.3.0
+
+### Minor Changes
+
+- 924004d: Require `effect` 4.0.4 or newer in the 4.x series for the CLI and server, alongside updated `@effect/platform-node`, `@effect/ai-openai-compat`, and `@effect/ai-openrouter` dependencies.
+
+### Patch Changes
+
+- 2a2c076: Reduce Convex deployment analysis overhead for generated functions while retaining source maps and existing validation and handler behavior. After upgrading, regenerate with `confect codegen` or `confect dev` before typechecking or deploying existing projects.
+
 ## 10.2.0
 
 No changes in this release.

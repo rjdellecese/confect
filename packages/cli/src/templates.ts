@@ -1,43 +1,10 @@
 import * as Effect from "effect/Effect";
+import type * as GroupSpec from "@confect/core/GroupSpec";
 import { CodeBlockWriter } from "./CodeBlockWriter";
 import {
   render as renderSpecAssembly,
   type SpecAssemblyNode,
 } from "./SpecAssemblyNode";
-
-export const functions = ({
-  functionNames,
-  registeredFunctionsImportPath,
-  useNode = false,
-}: Parameters<typeof functionsEffect>[0]) =>
-  functionsEffect({ functionNames, registeredFunctionsImportPath, useNode });
-
-const functionsEffect = Effect.fnUntraced(function* ({
-  functionNames,
-  registeredFunctionsImportPath,
-  useNode = false,
-}: {
-  functionNames: string[];
-  registeredFunctionsImportPath: string;
-  useNode?: boolean;
-}) {
-  const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-  if (useNode) {
-    yield* cbw.writeLine(`"use node";`);
-    yield* cbw.blankLine();
-  }
-
-  yield* cbw.writeLine(
-    `import registeredFunctions from "${registeredFunctionsImportPath}";`,
-  );
-  yield* cbw.newLine();
-  yield* Effect.forEach(functionNames, (name) =>
-    cbw.writeLine(`export const ${name} = registeredFunctions.${name};`),
-  );
-
-  return yield* cbw.toString();
-});
 
 /**
  * Emit `convex/schema.ts` as a one-line re-export of the codegen-emitted deploy
@@ -471,50 +438,54 @@ const docsEffect = Effect.fnUntraced(function* ({
 });
 
 export const registeredFunctionsForGroup = ({
+  spec,
   schemaImportPath,
   specImportPath,
   implImportPath,
-  layerExportName,
-  useNode = false,
 }: Parameters<typeof registeredFunctionsForGroupEffect>[0]) =>
   registeredFunctionsForGroupEffect({
+    spec,
     schemaImportPath,
     specImportPath,
     implImportPath,
-    layerExportName,
-    useNode,
   });
 
 const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
+  spec,
   schemaImportPath,
   specImportPath,
   implImportPath,
-  layerExportName,
-  useNode = false,
 }: {
+  spec: GroupSpec.AnyWithProps;
   schemaImportPath: string;
   specImportPath: string;
   implImportPath: string;
-  layerExportName: string;
-  useNode?: boolean;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+  const useNode = spec.runtime === "Node";
+
+  const hasConfectFunctions = (group: GroupSpec.AnyWithProps): boolean =>
+    Object.values(group.functions).some(
+      (functionSpec) => functionSpec.functionProvenance._tag === "Confect",
+    ) || Object.values(group.groups).some(hasConfectFunctions);
+  const forwarding = !useNode && hasConfectFunctions(spec);
 
   if (useNode) {
     yield* cbw.writeLine(
-      `import { RegisteredFunctions } from "@confect/server";`,
-    );
-    yield* cbw.writeLine(
       `import { RegisteredNodeFunction } from "@confect/server/node";`,
+    );
+  } else if (!forwarding) {
+    yield* cbw.writeLine(
+      `import { RegisteredFunctions } from "@confect/server";`,
     );
   } else {
     yield* cbw.writeLine(
-      `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
+      `import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";`,
     );
   }
 
   yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
-  yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
+  yield* cbw.writeLine(`import groupLayer from "${implImportPath}";`);
   yield* cbw.blankLine();
   // The group's own leaf spec is referenced type-only (`typeof import(...)`),
   // so the spec module is erased at transpile time and never enters the
@@ -522,12 +493,39 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   // imports. Typing from the leaf spec (not the project-wide assembled spec)
   // keeps the registry's type dependent solely on its own group.
   const specType = `typeof import("${specImportPath}")["default"]`;
-  const makeFn = useNode
-    ? "RegisteredNodeFunction.make"
-    : "RegisteredConvexFunction.make";
-  yield* cbw.writeLine(
-    `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
-  );
+  if (useNode) {
+    yield* cbw.writeLine(
+      `export default RegisteredNodeFunction.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
+    );
+  } else if (!forwarding) {
+    yield* cbw.writeLine(
+      `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
+    );
+  } else {
+    const bindings = (group: GroupSpec.AnyWithProps, path: string): string =>
+      `{
+${[
+  ...Object.entries(group.functions).map(([name, functionSpec]) => {
+    const key = JSON.stringify(name);
+    const definition = `${path}[${key}]`;
+    return `[${key}]: ${
+      functionSpec.functionProvenance._tag === "Convex"
+        ? `${definition}.handler`
+        : `RegisteredConvexFunction.register({ ...${definition}, handler: forward(${definition}.handler) })`
+    },`;
+  }),
+  ...Object.entries(group.groups).map(([name, child]) => {
+    const key = JSON.stringify(name);
+    return `[${key}]: ${bindings(child, `${path}[${key}]`)},`;
+  }),
+].join("\n")}
+}`;
+    yield* cbw.writeLine(`const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
+
+const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(databaseSchema, groupLayer);
+
+export default ${bindings(spec, "definitions")} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
+  }
 
   return yield* cbw.toString();
 });

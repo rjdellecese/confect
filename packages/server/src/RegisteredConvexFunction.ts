@@ -17,6 +17,7 @@ import {
 import type { Value } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Clock from "effect/Clock";
+import * as Data from "effect/Data";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -47,76 +48,93 @@ import * as Storage from "./Storage";
 import type { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 
-export const make = (
+export type Definition = Data.TaggedEnum<{
+  PublicQuery: ReturnType<typeof queryFunction>;
+  InternalQuery: ReturnType<typeof queryFunction>;
+  PublicMutation: ReturnType<typeof mutationFunction>;
+  InternalMutation: ReturnType<typeof mutationFunction>;
+  PublicAction: ReturnType<typeof convexActionFunction>;
+  InternalAction: ReturnType<typeof convexActionFunction>;
+  Registered: { readonly handler: RegisteredFunction.Any };
+}>;
+export const Definition = Data.taggedEnum<Definition>();
+
+export const prepare = (
   databaseSchema: DatabaseSchema.AnyWithProps,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
-): RegisteredFunction.Any => {
-  const { name, functionVisibility, handler } = item;
-
-  return Match.value(item.functionType).pipe(
+) =>
+  Match.value(item.functionType).pipe(
     Match.when("query", () => {
-      const genericFunction = Match.value(functionVisibility).pipe(
-        Match.when("public", () => queryGeneric),
-        Match.when("internal", () => internalQueryGeneric),
+      const definition = queryFunction({
+        databaseSchema,
+        name: item.name,
+        functionVisibility: item.functionVisibility,
+        args: item.args,
+        returns: item.returns,
+        error: item.error,
+        handler: item.handler,
+        resolvedMiddlewares,
+      });
+      return Match.value(item.functionVisibility).pipe(
+        Match.when("public", () => Definition.PublicQuery(definition)),
+        Match.when("internal", () => Definition.InternalQuery(definition)),
         Match.exhaustive,
-      );
-
-      return genericFunction(
-        queryFunction({
-          databaseSchema,
-          name,
-          functionVisibility,
-          args: item.args,
-          returns: item.returns,
-          error: item.error,
-          handler,
-          resolvedMiddlewares,
-        }),
       );
     }),
     Match.when("mutation", () => {
-      const genericFunction = Match.value(functionVisibility).pipe(
-        Match.when("public", () => mutationGeneric),
-        Match.when("internal", () => internalMutationGeneric),
+      const definition = mutationFunction({
+        databaseSchema,
+        name: item.name,
+        functionVisibility: item.functionVisibility,
+        args: item.args,
+        returns: item.returns,
+        error: item.error,
+        handler: item.handler,
+        resolvedMiddlewares,
+      });
+      return Match.value(item.functionVisibility).pipe(
+        Match.when("public", () => Definition.PublicMutation(definition)),
+        Match.when("internal", () => Definition.InternalMutation(definition)),
         Match.exhaustive,
-      );
-
-      return genericFunction(
-        mutationFunction({
-          databaseSchema,
-          name,
-          functionVisibility,
-          args: item.args,
-          returns: item.returns,
-          error: item.error,
-          handler,
-          resolvedMiddlewares,
-        }),
       );
     }),
     Match.when("action", () => {
-      const genericFunction = Match.value(functionVisibility).pipe(
-        Match.when("public", () => actionGeneric),
-        Match.when("internal", () => internalActionGeneric),
+      const definition = convexActionFunction(databaseSchema, {
+        name: item.name,
+        functionVisibility: item.functionVisibility,
+        args: item.args,
+        returns: item.returns,
+        error: item.error,
+        handler: item.handler,
+        resolvedMiddlewares,
+      });
+      return Match.value(item.functionVisibility).pipe(
+        Match.when("public", () => Definition.PublicAction(definition)),
+        Match.when("internal", () => Definition.InternalAction(definition)),
         Match.exhaustive,
-      );
-
-      return genericFunction(
-        convexActionFunction(databaseSchema, {
-          name,
-          functionVisibility,
-          args: item.args,
-          returns: item.returns,
-          error: item.error,
-          handler,
-          resolvedMiddlewares,
-        }),
       );
     }),
     Match.exhaustive,
   );
-};
+
+export const make = (
+  databaseSchema: DatabaseSchema.AnyWithProps,
+  item: FunctionRegistryItem.ConfectFunctionRegistryItem,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
+): RegisteredFunction.Any =>
+  register(prepare(databaseSchema, item, resolvedMiddlewares));
+
+export const register = (self: Definition): RegisteredFunction.Any =>
+  Definition.$match(self, {
+    PublicQuery: (definition) => queryGeneric(definition),
+    InternalQuery: (definition) => internalQueryGeneric(definition),
+    PublicMutation: (definition) => mutationGeneric(definition),
+    InternalMutation: (definition) => internalMutationGeneric(definition),
+    PublicAction: (definition) => actionGeneric(definition),
+    InternalAction: (definition) => internalActionGeneric(definition),
+    Registered: ({ handler }) => handler,
+  });
 
 /**
  * Convex evicts a query from its cache once the execution observes the current

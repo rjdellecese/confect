@@ -1,15 +1,15 @@
 import { fileURLToPath } from "node:url";
 import * as Bundler from "@confect/cli/Bundler";
+import * as Schema from "effect/Schema";
 import type { LeafModule } from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
-import { type FunctionSpec, type GroupSpec, Refs, Spec } from "@confect/core";
+import { FunctionSpec, GroupSpec, Refs, Spec } from "@confect/core";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
@@ -17,6 +17,7 @@ import * as Record from "effect/Record";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
+import { queryGeneric } from "convex/server";
 
 const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
   const relativePath = `${pathSegments.join("/")}.spec.ts`;
@@ -25,10 +26,236 @@ const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
     pathSegments,
     groupPathDot: pathSegments.join("."),
     exportName: pathSegments[pathSegments.length - 1]!,
-    runtime: Option.none(),
     specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
   };
 };
+
+it.effect.each([false, true])(
+  "keeps handler forwarding local only for isolate groups (useNode=%s)",
+  (useNode) =>
+    Effect.gen(function* () {
+      const code = yield* templates.registeredFunctionsForGroup({
+        spec: useNode
+          ? GroupSpec.makeNode()
+          : GroupSpec.make().addFunction(
+              FunctionSpec.publicQuery({
+                name: "get",
+                returns: () => Schema.String,
+              }),
+            ),
+        schemaImportPath: "../schema",
+        specImportPath: "../../notes.spec",
+        implImportPath: "../../notes.impl",
+      });
+      expect(code).toContain('import groupLayer from "../../notes.impl";');
+      expect(code).toContain('typeof import("../../notes.spec")["default"]');
+      if (useNode) {
+        expect(code).toContain("RegisteredNodeFunction.buildForGroup");
+        expect(code).not.toContain(
+          "=> (ctx: Ctx, args: Args) => handler(ctx, args)",
+        );
+      } else {
+        expect(code).toContain(
+          "=> (ctx: Ctx, args: Args) => handler(ctx, args)",
+        );
+        expect(code).toContain(
+          'RegisteredConvexFunction.register({ ...definitions["get"], handler: forward(definitions["get"].handler) })',
+        );
+        expect(code).not.toContain("forwardHandlers");
+        expect(code).not.toContain("Match");
+        expect(code).not.toContain("Record");
+        expect(code).not.toContain("queryGeneric");
+        expect(code).not.toContain('from "convex/server"');
+        expect(code).not.toContain("const register =");
+        expect(code).not.toContain("RegisteredNodeFunction");
+      }
+    }),
+);
+
+it.effect(
+  "emits nested direct bindings without evaluating schemas or wrapping native handlers",
+  () =>
+    Effect.gen(function* () {
+      let evaluations = 0;
+      const native = queryGeneric(() => "native");
+      const spec = GroupSpec.addGroupsAt(GroupSpec.make(), {
+        _tag: GroupSpec.make()
+          .addFunction(
+            FunctionSpec.internalMutation({
+              name: "set",
+              returns: () => {
+                evaluations++;
+                return Schema.String;
+              },
+            }),
+          )
+          .addFunction(
+            FunctionSpec.convexPublicQuery<typeof native>()("native"),
+          ),
+      });
+      const code = yield* templates.registeredFunctionsForGroup({
+        spec,
+        schemaImportPath: "../schema",
+        specImportPath: "../../notes.spec",
+        implImportPath: "../../notes.impl",
+      });
+      expect(evaluations).toBe(0);
+      expect(code).toContain('["_tag"]: {');
+      expect(code).toContain(
+        '["set"]: RegisteredConvexFunction.register({ ...definitions["_tag"]["set"], handler: forward(definitions["_tag"]["set"].handler) })',
+      );
+      expect(code).toContain(
+        '["native"]: definitions["_tag"]["native"].handler',
+      );
+      expect(code).not.toContain('forward(definitions["_tag"]["native"]');
+      expect(code).not.toContain("effect/");
+    }),
+);
+
+it.effect.each([
+  GroupSpec.make(),
+  GroupSpec.make().addFunction(
+    FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()("native"),
+  ),
+])(
+  "uses the fixed builder when there are no Confect handlers to forward",
+  (spec) =>
+    Effect.gen(function* () {
+      const code = yield* templates.registeredFunctionsForGroup({
+        spec,
+        schemaImportPath: "../schema",
+        specImportPath: "../../notes.spec",
+        implImportPath: "../../notes.impl",
+      });
+      expect(code).toContain("RegisteredFunctions.buildForGroup<");
+      expect(code).not.toContain("const forward");
+      expect(code).not.toContain("RegisteredConvexFunction");
+    }),
+);
+
+layer(NodeServices.layer)("registeredFunctionsForGroup", (test) => {
+  test.effect.each([
+    {
+      kind: "Confect",
+      spec: GroupSpec.make().addFunction(
+        FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }),
+      ),
+      source: `import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }));`,
+    },
+    {
+      kind: "native",
+      spec: GroupSpec.make().addFunction(
+        FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()(
+          "get",
+        ),
+      ),
+      source: `import { FunctionSpec, GroupSpec } from "@confect/core";
+import { queryGeneric } from "convex/server";
+export default GroupSpec.make().addFunction(FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()("get"));`,
+    },
+    {
+      kind: "Node",
+      spec: GroupSpec.makeNode(),
+      source: `import { GroupSpec } from "@confect/core";
+export default GroupSpec.makeNode();`,
+    },
+  ])(
+    "compiles $kind registries whose filenames match generated bindings",
+    ({ spec, source }) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const spawner = yield* ChildProcessSpawner;
+        const directory = yield* fs.makeTempDirectoryScoped({
+          directory: import.meta.dirname,
+          prefix: "registry-alias-",
+        });
+        yield* fs.writeFileString(
+          path.join(directory, "schema.ts"),
+          `import { DatabaseSchema } from "@confect/server";
+export default DatabaseSchema.make({});`,
+        );
+        yield* Effect.forEach(
+          [
+            "notes",
+            "forward",
+            "definitions",
+            "ConvexFunctionDefinitions",
+            "RegisteredConvexFunction",
+            "RegisteredFunctions",
+            "RegisteredNodeFunction",
+            "databaseSchema",
+            "groupLayer",
+          ],
+          (name) =>
+            Effect.gen(function* () {
+              yield* fs.writeFileString(
+                path.join(directory, `${name}.spec.ts`),
+                source,
+              );
+              yield* fs.writeFileString(
+                path.join(directory, `${name}.impl.ts`),
+                `import type * as GroupImpl from "@confect/server/GroupImpl";
+import type * as Layer from "effect/Layer";
+declare const implementation: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>;
+export default implementation;`,
+              );
+              const contents = yield* templates.registeredFunctionsForGroup({
+                spec,
+                schemaImportPath: "./schema",
+                specImportPath: `./${name}.spec`,
+                implImportPath: `./${name}.impl`,
+              });
+              expect(contents).toContain(
+                `import groupLayer from "./${name}.impl";`,
+              );
+              yield* fs.writeFileString(
+                path.join(directory, `${name}.registry.ts`),
+                contents,
+              );
+            }),
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "tsconfig.json"),
+          `{
+            "compilerOptions": {
+              "strict": true,
+              "noEmit": true,
+              "noUnusedLocals": true,
+              "noUnusedParameters": true,
+              "exactOptionalPropertyTypes": true,
+              "skipLibCheck": true,
+              "module": "ESNext",
+              "moduleResolution": "Bundler",
+              "target": "ESNext",
+              "verbatimModuleSyntax": true
+            },
+            "include": ["*.ts"]
+          }`,
+        );
+        const compiler = yield* spawner.spawn(
+          ChildProcess.make(process.execPath, [
+            fileURLToPath(
+              new URL(
+                "bin/tsc",
+                import.meta.resolve("typescript/package.json"),
+              ),
+            ),
+            "-p",
+            directory,
+          ]),
+        );
+        const output = yield* compiler.all.pipe(
+          Stream.decodeText(),
+          Stream.mkString,
+        );
+        expect(yield* compiler.exitCode, output).toBe(0);
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
+});
 
 layer(NodeServices.layer)("id", (test) => {
   test.effect.each([{ tableNames: [] }, { tableNames: ["notes", "users"] }])(

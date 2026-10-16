@@ -110,7 +110,7 @@ bench("large object", () => {
     i?: string | undefined;
     j: "admin" | "user";
   }>;
-}).types([2895, "instantiations"]);
+}).types([2898, "instantiations"]);
 
 // --- Optional fields ---
 
@@ -128,19 +128,55 @@ bench("ValueToValidator<{ foo?: { bar?: number | undefined } | undefined }>", ()
 
 bench("ValueToValidator<string | number>", () => {
   return {} as ValueToValidator<string | number>;
-}).types([921, "instantiations"]);
+}).types([924, "instantiations"]);
 
 bench('ValueToValidator<"admin" | "user">', () => {
   return {} as ValueToValidator<"admin" | "user">;
-}).types([928, "instantiations"]);
+}).types([931, "instantiations"]);
 
 bench("ValueToValidator<string | number | boolean[]>", () => {
   return {} as ValueToValidator<string | number | boolean[]>;
-}).types([1353, "instantiations"]);
+}).types([1356, "instantiations"]);
 
 bench("ValueToValidator<{ foo: string } | { bar: number }>", () => {
   return {} as ValueToValidator<{ foo: string } | { bar: number }>;
-}).types([1897, "instantiations"]);
+}).types([1900, "instantiations"]);
+
+bench("ValueToValidator (64-member literal field)", () => {
+  type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7";
+  type Converted = ValueToValidator<{ code: `member_${Digit}${Digit}` }>;
+  return {} as [
+    Converted["fields"]["code"]["members"]["length"],
+    Converted["type"],
+    Converted["fieldPaths"],
+  ];
+}).types([60750, "instantiations"]);
+
+bench("ValueToValidator (256-member optional literal field)", () => {
+  type Hex =
+    | "0"
+    | "1"
+    | "2"
+    | "3"
+    | "4"
+    | "5"
+    | "6"
+    | "7"
+    | "8"
+    | "9"
+    | "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f";
+  type Converted = ValueToValidator<{ code?: `member_${Hex}${Hex}` }>;
+  return {} as [
+    Converted["fields"]["code"]["members"]["length"],
+    Converted["type"],
+    Converted["fieldPaths"],
+  ];
+}).types([780599, "instantiations"]);
 
 // --- Recursive types ---
 
@@ -209,7 +245,7 @@ type LargeTableSchema = typeof LargeTableSchema;
 
 bench("TableSchemaToTableValidator (large struct)", () => {
   return {} as TableSchemaToTableValidator<LargeTableSchema>;
-}).types([13249, "instantiations"]);
+}).types([13269, "instantiations"]);
 
 bench("ValueToValidator<Record<string, any>>", () => {
   return {} as ValueToValidator<Record<string, any>>;

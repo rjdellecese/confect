@@ -1,31 +1,31 @@
 {
   "name": "@confect/server",
   "description": "Backend bindings to the Convex platform",
-  "version": "10.2.0",
+  "version": "10.3.1",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@effect/ai-openai-compat": "4.0.1",
-    "@effect/ai-openrouter": "4.0.1"
+    "@effect/ai-openai-compat": "4.0.4",
+    "@effect/ai-openrouter": "4.0.4"
   },
   "devDependencies": {
-    "@effect/platform-node": "4.0.1",
-    "@effect/vitest": "4.0.1",
+    "@effect/platform-node": "4.0.4",
+    "@effect/vitest": "4.0.4",
     "@swc/jest": "0.2.39",
-    "@types/node": "26.6.4",
+    "@types/node": "26.6.5",
     "@vitest/coverage-v8": "5.0.3",
     "confect-bench-harness": "workspace:*",
     "confect-test-types": "workspace:*",
     "convex-test": "0.0.60",
-    "dotenv": "18.0.5",
-    "effect": "4.0.1",
-    "tsdown": "0.23.0",
+    "dotenv": "18.0.7",
+    "effect": "4.0.4",
+    "tsdown": "0.23.1",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
-    "vite": "8.3.2",
+    "vite": "8.3.4",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "5.0.3"
   },
@@ -69,7 +69,7 @@
     "@confect/core": "workspace:^",
     "@effect/platform-node": "^4.0.0",
     "convex": "^1.45.0",
-    "effect": "^4.0.1"
+    "effect": "^4.0.4"
   },
   "peerDependenciesMeta": {
     "@effect/platform-node": {

@@ -153,9 +153,11 @@ export const validate = Effect.fnUntraced(function* (
     }
   });
 
-  yield* Effect.forEach(
-    tableModules,
-    ({ relativePath }: TableModule) => validateRelativePath(relativePath),
-    { concurrency: "unbounded" },
+  const relativePaths = tableModules.map(({ relativePath }) => relativePath);
+  yield* Bundler.withBatch(
+    relativePaths.map((relativePath) =>
+      path.resolve(confectDirectory, relativePath),
+    ),
+    Effect.forEach(relativePaths, validateRelativePath, { concurrency: 4 }),
   );
 });

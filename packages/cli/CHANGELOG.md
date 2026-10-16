@@ -1,5 +1,37 @@
 # @confect/cli
 
+## 10.3.1
+
+### Patch Changes
+
+- 1b1cb1c: Avoid repeated full generation in `confect dev` when startup creates missing generated bindings, while preserving edits made during generation.
+- 19a0ce3: Keep `confect codegen` and `confect dev` on their shared build when an application imports a package subpath that only CommonJS resolution can find, such as `next/headers` from a package without `exports`. The shared build previously failed on such an import, and every group then fell back to its own build, which made full generation many times slower in large applications.
+- 99e40b5: Fix missing import validation and build warnings in `confect codegen` and `confect dev` when source or temporary directories use symlinked paths.
+- abe78fe: Keep saves of existing spec, table, and implementation files incremental in `confect dev` when the filesystem reports them as creation or removal events.
+- b970ca4: Explain shared-build fallbacks in debug logs for `confect codegen` and `confect dev`, including the original compilation error or the reason individual builds are required.
+
+## 10.3.0
+
+### Minor Changes
+
+- 924004d: Require `effect` 4.0.4 or newer in the 4.x series for the CLI and server, alongside updated `@effect/platform-node`, `@effect/ai-openai-compat`, and `@effect/ai-openrouter` dependencies.
+
+### Patch Changes
+
+- 33eaf6a: Reduce the initialization cost of generated function references in projects with many groups.
+
+  Fix `confect/_generated/spec.ts` failing to typecheck with "Type instantiation is excessively deep and possibly infinite" (TS2589) in projects with many top-level or child groups, while keeping `refs` precisely typed.
+
+  Run `confect codegen` after upgrading to regenerate existing files before typechecking or deploying. User-authored group definitions using `GroupSpec.make()`, `GroupSpec.makeNode()`, `.addFunction()`, and `.middleware()` do not need to change.
+
+- 3d6c37e: Reduce `confect dev` memory use and reload time, and speed up `confect codegen` in applications with many groups and tables. Development reloads no longer retain previously evaluated application modules. Implementation-only edits revalidate affected groups without reloading unrelated implementations; specification, table, and shared dependency edits regenerate only affected declarations and validate their implementations. Adding or removing files, changing configuration, and recovering from generation errors still trigger full generation.
+
+  Avoid redundant regeneration, dependency rebuilds, and Convex deployment retries while preserving edits made during startup or regeneration. Startup, error recovery, and explicit `confect codegen` still notify Convex when generated contents are unchanged.
+
+  Keep generated files up to date when optional sources are deleted while an implementation is invalid. Keep development watching active when directories disappear during discovery or watching, and report dependency watcher failures instead of announcing that generated files are up to date after a failed rebuild.
+
+- 2a2c076: Reduce Convex deployment analysis overhead for generated functions while retaining source maps and existing validation and handler behavior. After upgrading, regenerate with `confect codegen` or `confect dev` before typechecking or deploying existing projects.
+
 ## 10.2.0
 
 ### Minor Changes

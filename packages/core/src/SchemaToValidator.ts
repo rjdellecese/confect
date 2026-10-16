@@ -242,14 +242,16 @@ type UnionValueToValidator<Vl, Optionality extends "required" | "optional"> =
         Optionality
       >;
 
-type ValueTupleToValidatorTuple<VlTuple extends readonly unknown[]> =
-  VlTuple extends
-    | [true, false, ...infer VlRest]
-    | [false, true, ...infer VlRest]
-    ? [VBoolean, ...ValueTupleToValidatorTuple<VlRest>]
-    : VlTuple extends [infer Vl, ...infer VlRest]
-      ? [ConvertValueToValidator<Vl>, ...ValueTupleToValidatorTuple<VlRest>]
-      : [];
+type ValueTupleToValidatorTuple<
+  VlTuple extends readonly unknown[],
+  Acc extends Validator<any, "required", any>[] = [],
+> = VlTuple extends
+  | [true, false, ...infer VlRest]
+  | [false, true, ...infer VlRest]
+  ? ValueTupleToValidatorTuple<VlRest, [...Acc, VBoolean]>
+  : VlTuple extends [infer Vl, ...infer VlRest]
+    ? ValueTupleToValidatorTuple<VlRest, [...Acc, ConvertValueToValidator<Vl>]>
+    : Acc;
 
 type OptionalValueToValidator<Vl> = [Vl] extends [
   (infer Val extends ReadonlyValue) | undefined,

@@ -1,5 +1,25 @@
 # @confect/core
 
+## 10.3.1
+
+### Patch Changes
+
+- 7963e35: Fix excessively deep TypeScript instantiation errors when indexing tables with wide literal-union fields using `Table.make(...).index(...)`.
+
+## 10.3.0
+
+### Patch Changes
+
+- 33eaf6a: Reduce the initialization cost of generated function references in projects with many groups.
+
+  Fix `confect/_generated/spec.ts` failing to typecheck with "Type instantiation is excessively deep and possibly infinite" (TS2589) in projects with many top-level or child groups, while keeping `refs` precisely typed.
+
+  Run `confect codegen` after upgrading to regenerate existing files before typechecking or deploying. User-authored group definitions using `GroupSpec.make()`, `GroupSpec.makeNode()`, `.addFunction()`, and `.middleware()` do not need to change.
+
+- 52e4397: Stop reporting a nested struct as recursive when it is merely assignable to one of its ancestors. `IsRecursive` compared a type against the types above it by assignability, so a struct nested under a parent whose extra fields are all optional (for example `{ badge: string }` inside `{ badge: string; rows?: { badge: string }[] }`) was treated as a cycle: its validator type became `VAny`, and a table built from it had a `never` document type and rejected its own index fields. Types already on the path are now compared by identity.
+- bc41806: Type a record of `Schema.Any` with a required value validator. `Schema.Record(Schema.String, Schema.Any)` compiled to `v.record(v.string(), v.any())` at runtime, but its type carried an optional `VAny` value, which `VRecord` does not accept, so a table with such a field could not be passed to `Table.tableDefinition`.
+- 5ea7c07: Reduce TypeScript type-checking work for table schemas with nested objects, arrays, unions, and optional fields while preserving their inferred types.
+
 ## 10.2.0
 
 No changes in this release.

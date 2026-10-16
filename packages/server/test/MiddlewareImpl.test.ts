@@ -2,7 +2,6 @@ import {
   FunctionImpl,
   GroupImpl,
   MiddlewareImpl,
-  RegisteredConvexFunction,
   RegisteredFunctions,
 } from "@confect/server";
 import type * as DatabaseReaderModule from "@confect/server/DatabaseReader";
@@ -650,7 +649,6 @@ describe("group assembly enforcement", () => {
       RegisteredFunctions.buildForGroup<typeof coveredGroup>(
         databaseSchema,
         GroupImpl.finalize(missingMiddleware),
-        RegisteredConvexFunction.make,
       ),
     ).toThrowError(
       /Middleware "ProvideViewer" is attached to this group's spec, but no implementation was provided/,
@@ -672,7 +670,6 @@ describe("group assembly enforcement", () => {
         Layer.provide(provideViewerLive),
         GroupImpl.finalize,
       ),
-      RegisteredConvexFunction.make,
     );
 
     expect(registered.viewerName).toBeDefined();
@@ -707,7 +704,6 @@ describe("registry key namespacing", () => {
     const registered = RegisteredFunctions.buildForGroup<typeof group>(
       databaseSchema,
       groupLayer,
-      RegisteredConvexFunction.make,
     );
 
     expect(registered.clash).toBeDefined();
