@@ -17,6 +17,68 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 describe("ValueToValidator", () => {
+  it("preserves wide literal unions in required, optional, and nested validators", () => {
+    type Hex =
+      | "0"
+      | "1"
+      | "2"
+      | "3"
+      | "4"
+      | "5"
+      | "6"
+      | "7"
+      | "8"
+      | "9"
+      | "a"
+      | "b"
+      | "c"
+      | "d"
+      | "e"
+      | "f";
+    type Wide = `member_${Hex}${Hex}`;
+    type Converted = ValueToValidator<{
+      code: Wide;
+      optional?: Wide;
+      nested: { codes: readonly Wide[] };
+    }>;
+    type Required = Converted["fields"]["code"];
+    type Optional = Converted["fields"]["optional"];
+    type Element = Converted["fields"]["nested"]["fields"]["codes"]["element"];
+    expectTypeOf<Required["members"]["length"]>().toEqualTypeOf<256>();
+    expectTypeOf<Required["members"][number]["type"]>().toEqualTypeOf<Wide>();
+    expectTypeOf<
+      Required["members"][number]["kind"]
+    >().toEqualTypeOf<"literal">();
+    expectTypeOf<
+      Required["members"][number]["isOptional"]
+    >().toEqualTypeOf<"required">();
+    expectTypeOf<Optional["type"]>().toEqualTypeOf<Wide | undefined>();
+    expectTypeOf<Optional["isOptional"]>().toEqualTypeOf<"optional">();
+    expectTypeOf<Optional["members"]>().toEqualTypeOf<Required["members"]>();
+    expectTypeOf<Element>().toEqualTypeOf<Required>();
+    expectTypeOf<Converted["fieldPaths"]>().toEqualTypeOf<
+      "code" | "optional" | "nested" | "nested.codes"
+    >();
+  });
+
+  it("preserves boolean folding and member types in wide mixed unions", () => {
+    type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7";
+    type Wide = `member_${Digit}${Digit}`;
+    type Converted = ValueToValidator<
+      Wide | boolean | 42 | null | { count: number }
+    >;
+    type Members = Converted["members"][number];
+    expectTypeOf<Converted["members"]["length"]>().toEqualTypeOf<68>();
+    expectTypeOf<Members["type"]>().toEqualTypeOf<
+      Wide | boolean | 42 | null | { count: number }
+    >();
+    expectTypeOf<
+      Extract<Members, { kind: "boolean" }>["type"]
+    >().toEqualTypeOf<boolean>();
+    expectTypeOf<Members["isOptional"]>().toEqualTypeOf<"required">();
+    expectTypeOf<Converted["fieldPaths"]>().toEqualTypeOf<"count">();
+  });
+
   it("preserves never element validators", () => {
     expectTypeOf<ValueToValidator<[]>>().toEqualTypeOf<
       VArray<never[], never>

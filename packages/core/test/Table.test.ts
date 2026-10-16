@@ -3,6 +3,80 @@ import * as Schema from "effect/Schema";
 import * as Table from "@confect/core/Table";
 
 describe("Table", () => {
+  it("indexes a 45-member literal union without forcing schemas or widening field paths", () => {
+    const members = [
+      "member_01",
+      "member_02",
+      "member_03",
+      "member_04",
+      "member_05",
+      "member_06",
+      "member_07",
+      "member_08",
+      "member_09",
+      "member_10",
+      "member_11",
+      "member_12",
+      "member_13",
+      "member_14",
+      "member_15",
+      "member_16",
+      "member_17",
+      "member_18",
+      "member_19",
+      "member_20",
+      "member_21",
+      "member_22",
+      "member_23",
+      "member_24",
+      "member_25",
+      "member_26",
+      "member_27",
+      "member_28",
+      "member_29",
+      "member_30",
+      "member_31",
+      "member_32",
+      "member_33",
+      "member_34",
+      "member_35",
+      "member_36",
+      "member_37",
+      "member_38",
+      "member_39",
+      "member_40",
+      "member_41",
+      "member_42",
+      "member_43",
+      "member_44",
+      "member_45",
+    ] as const;
+    let evaluations = 0;
+    const unnamed = Table.make(() => {
+      evaluations += 1;
+      return Schema.Struct({ code: Schema.Literals(members) });
+    }).index("by_code", ["code"]);
+    const table = unnamed("wide");
+    expect(evaluations).toBe(0);
+    expect(table.indexes.by_code).toEqual(["code"]);
+    expectTypeOf<typeof table.Doc.Type.code>().toEqualTypeOf<
+      (typeof members)[number]
+    >();
+    expectTypeOf(table.indexes.by_code).toEqualTypeOf<
+      ["code", "_creationTime"]
+    >();
+    expectTypeOf<
+      Table.TableValidator<typeof table>["fieldPaths"]
+    >().toEqualTypeOf<"code">();
+    expect(Schema.decodeExit(table.Fields)({ code: "member_45" })._tag).toBe(
+      "Success",
+    );
+    expect(
+      Schema.decodeUnknownExit(table.Fields)({ code: "not-a-member" })._tag,
+    ).toBe("Failure");
+    expect(evaluations).toBe(1);
+  });
+
   it("preserves top-level field checks in Doc", () => {
     const Range = Schema.Struct({
       min: Schema.Finite,
