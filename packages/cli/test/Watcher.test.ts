@@ -400,13 +400,14 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       "preserves targeted work after a delayed %s event for an existing %s",
       ([eventTag, file]) =>
         Effect.gen(function* () {
+          const path = yield* Path.Path;
           const { watcher, project, events, contexts } =
             yield* controlledWatcher();
           yield* watcher.refresh;
           yield* watcher.next;
           yield* project.write(`confect/${file}`, "export const value = 2;");
           yield* watcher.refresh;
-          const entry = EntryPoint.parse(file);
+          const entry = EntryPoint.parse(path.normalize(file));
           assert(Option.isSome(entry));
           const expected = SyncState.add(SyncState.empty, [entry.value]);
           expect(yield* watcher.next).toMatchObject(expected);
