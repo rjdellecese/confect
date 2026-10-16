@@ -1,5 +1,15 @@
 # @confect/cli
 
+## 10.3.1
+
+### Patch Changes
+
+- 1b1cb1c: Avoid repeated full generation in `confect dev` when startup creates missing generated bindings, while preserving edits made during generation.
+- 19a0ce3: Keep `confect codegen` and `confect dev` on their shared build when an application imports a package subpath that only CommonJS resolution can find, such as `next/headers` from a package without `exports`. The shared build previously failed on such an import, and every group then fell back to its own build, which made full generation many times slower in large applications.
+- 99e40b5: Fix missing import validation and build warnings in `confect codegen` and `confect dev` when source or temporary directories use symlinked paths.
+- abe78fe: Keep saves of existing spec, table, and implementation files incremental in `confect dev` when the filesystem reports them as creation or removal events.
+- b970ca4: Explain shared-build fallbacks in debug logs for `confect codegen` and `confect dev`, including the original compilation error or the reason individual builds are required.
+
 ## 10.3.0
 
 ### Minor Changes

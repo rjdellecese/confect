@@ -1,5 +1,11 @@
 # @confect/server
 
+## 10.3.1
+
+### Patch Changes
+
+- 3aeb1ad: Correct the AI gateway error guidance to explain how authenticated, project-linked local deployments can use the gateway.
+
 ## 10.3.0
 
 ### Minor Changes
