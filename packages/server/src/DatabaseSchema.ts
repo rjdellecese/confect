@@ -43,12 +43,11 @@ export type UserTableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
 > &
   string;
 
+export type SystemTableNames = Table.Name<Table.SystemTables>;
+
 export type AllTableNames<DatabaseSchema_ extends AnyWithProps> =
   | UserTableNames<DatabaseSchema_>
-  | Table.Name<Table.SystemTables>;
-
-export type TableNames<DatabaseSchema_ extends AnyWithProps> =
-  UserTableNames<DatabaseSchema_>;
+  | SystemTableNames;
 
 export type TableWithName<
   DatabaseSchema_ extends AnyWithProps,

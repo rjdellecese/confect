@@ -25,8 +25,8 @@ describe("DatabaseSchema", () => {
     expectTypeOf<DatabaseSchema.Tables<typeof schema>>().toEqualTypeOf<
       typeof notes | typeof users
     >();
-    expectTypeOf<DatabaseSchema.TableNames<typeof schema>>().toEqualTypeOf<
-      "notes" | "users"
+    expectTypeOf<DatabaseSchema.SystemTableNames>().toEqualTypeOf<
+      "_storage" | "_scheduled_functions"
     >();
     expectTypeOf<DatabaseSchema.UserTableNames<typeof schema>>().toEqualTypeOf<
       "notes" | "users"
@@ -44,7 +44,6 @@ describe("DatabaseSchema", () => {
     const schema = DatabaseSchema.make({});
     expect(DatabaseSchema.tables(schema)).toEqual({});
     expectTypeOf<DatabaseSchema.Tables<typeof schema>>().toBeNever();
-    expectTypeOf<DatabaseSchema.TableNames<typeof schema>>().toBeNever();
     expectTypeOf<DatabaseSchema.UserTableNames<typeof schema>>().toBeNever();
     expectTypeOf<DatabaseSchema.AllTableNames<typeof schema>>().toEqualTypeOf<
       "_storage" | "_scheduled_functions"

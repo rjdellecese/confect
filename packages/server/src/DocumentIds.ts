@@ -57,7 +57,7 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
   ): GenericId<Name> | null =>
     (Object.hasOwn(Table.systemTables, table)
       ? reader.system.normalizeId(
-          table as Table.Name<Table.SystemTables>,
+          table as DatabaseSchema.SystemTableNames,
           input,
         )
       : reader.normalizeId(

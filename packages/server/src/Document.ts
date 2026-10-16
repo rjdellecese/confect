@@ -11,7 +11,7 @@ import type * as Table from "./Table";
 
 export type Document<
   Schema_ extends DatabaseSchema.AnyWithProps,
-  TableName extends DatabaseSchema.TableNames<Schema_>,
+  TableName extends DatabaseSchema.UserTableNames<Schema_>,
 > = DataModel.DocumentByName<DataModel.FromSchema<Schema_>, TableName>;
 
 export type WithoutSystemFields<Doc> = Doc extends unknown
