@@ -324,6 +324,84 @@ const fixture = Effect.fn("Bundler.test.fixture")(function* (
 });
 
 layer(BundlerLayer)("withBatch", (it) => {
+  it.effect(
+    "keeps canonical metadata through source and temporary symlinks",
+    () =>
+      Effect.gen(function* () {
+        const { file, fs, path, directory } = yield* fixture({
+          "source/first.ts": 'export { shared } from "./shared";',
+          "source/second.ts":
+            'export { shared } from "./shared"; export { default } from "./warning";',
+          "source/shared.ts":
+            'export { default as value } from "dependency"; export const shared = {};',
+          "source/warning.ts": "export default { duplicate: 1, duplicate: 2 };",
+          "source/node_modules/dependency/package.json":
+            '{ "type": "module", "exports": "./index.js" }',
+          "source/node_modules/dependency/index.js":
+            'export default "external";',
+        });
+        yield* fs.symlink(file("source"), file("linked-source"));
+        yield* fs.symlink(directory, file("linked-temp"));
+        const entries = [
+          file("linked-source/first.ts"),
+          file("linked-source/second.ts"),
+        ] as const;
+        const messages: unknown[] = [];
+        const console = yield* Console.Console;
+        const outputs = yield* Bundler.withBatch(
+          entries,
+          Effect.gen(function* () {
+            const first = yield* Bundler.bundle(entries[0]);
+            expect(messages).toEqual([]);
+            const second = yield* Bundler.bundle(entries[1]);
+            expect(first.module.shared).toBe(second.module.shared);
+            expect(Object.keys(first.metafile.inputs).sort()).toEqual(
+              [
+                yield* fs.realPath(file("source/first.ts")),
+                yield* fs.realPath(file("source/shared.ts")),
+              ].sort(),
+            );
+            expect(
+              yield* Bundler.directlyImports(
+                first,
+                file("linked-source/first.ts"),
+                file("linked-source/shared.ts"),
+              ),
+            ).toBe(true);
+            expect(
+              Bundler.importersOfPackage(first, "dependency", () => true),
+            ).toEqual([yield* fs.realPath(file("source/shared.ts"))]);
+            expect(messages).toHaveLength(1);
+            expect(messages.join("\n")).toContain("warning.ts");
+            const artifacts = Object.keys(second.metafile.outputs);
+            expect(artifacts.length).toBeGreaterThan(1);
+            for (const output of artifacts)
+              expect(output).toBe(yield* fs.realPath(output));
+            return artifacts;
+          }),
+        ).pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            makeTempDirectoryScoped: (options) =>
+              fs.makeTempDirectoryScoped({
+                ...options,
+                directory: file("linked-temp"),
+              }),
+          }),
+          Effect.provideService(
+            Console.Console,
+            Object.assign(Object.create(console), {
+              error: (...args: ReadonlyArray<unknown>) => {
+                messages.push(...args);
+              },
+            }),
+          ),
+        );
+        for (const output of outputs)
+          expect(yield* fs.exists(path.dirname(output))).toBe(false);
+      }).pipe(Effect.scoped),
+  );
+
   it.effect("reuses an enclosing batch for a nested subset", () =>
     Effect.gen(function* () {
       const { file } = yield* fixture({

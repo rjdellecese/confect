@@ -69,7 +69,21 @@ const absolutizeMetafile = (
   }
   const outputs: esbuild.Metafile["outputs"] = {};
   for (const [key, value] of Object.entries(metafile.outputs)) {
-    outputs[absolutize(key)] = value;
+    outputs[absolutize(key)] = {
+      ...value,
+      ...(value.entryPoint ? { entryPoint: absolutize(value.entryPoint) } : {}),
+      inputs: Object.fromEntries(
+        Object.entries(value.inputs).map(([input, metadata]) => [
+          absolutize(input),
+          metadata,
+        ]),
+      ),
+      imports: value.imports.map((imported) =>
+        imported.external
+          ? imported
+          : Object.assign({}, imported, { path: absolutize(imported.path) }),
+      ),
+    };
   }
   return { inputs, outputs };
 };
@@ -323,10 +337,10 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   if (configs.some((other) => other?.path !== config?.path))
     return Option.none<BatchCompilation>();
 
-  const cwd = path.dirname(first);
-  const directory = yield* fs.makeTempDirectoryScoped({
-    prefix: "confect-batch-",
-  });
+  const cwd = yield* fs.realPath(path.dirname(first));
+  const directory = yield* fs
+    .makeTempDirectoryScoped({ prefix: "confect-batch-" })
+    .pipe(Effect.flatMap((temporary) => fs.realPath(temporary)));
   const artifacts = yield* Effect.forEach(entries, (entry, index) =>
     Effect.map(
       fs.realPath(entry),
@@ -660,9 +674,14 @@ const findMetafileInputKey = Effect.fnUntraced(function* (
 ) {
   const path = yield* Path.Path;
   const resolved = path.resolve(absolutePath);
+  if (metafile.inputs[resolved] !== undefined) return Option.some(resolved);
+  const fs = yield* FileSystem.FileSystem;
+  const real = yield* fs
+    .realPath(resolved)
+    .pipe(Effect.orElseSucceed(() => resolved));
   return Array.findFirst(
     Object.keys(metafile.inputs),
-    (key) => path.resolve(key) === resolved,
+    (key) => path.resolve(key) === real,
   );
 });
 
