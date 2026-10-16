@@ -258,10 +258,6 @@ const batchResolutionPlugin = (
             createRequire(args.importer).resolve(args.path),
           );
         }
-        // A specifier only CommonJS resolution finds (an extensionless subpath
-        // of a package without `exports`, e.g. `next/headers`) has no ESM
-        // location. Keep it as written, as an individual build does, so it
-        // fails only if evaluated instead of failing the whole batch.
         return external(
           args,
           Option.match(
