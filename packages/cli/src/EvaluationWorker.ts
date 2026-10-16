@@ -22,22 +22,22 @@ import {
 } from "./confect/codegen";
 
 const evaluate = <A, E, R>(
-  directories: RequestContext,
+  requestContext: RequestContext,
   effect: Effect.Effect<A, E, R>,
 ) =>
   effect.pipe(
     Effect.provideService(
       References.MinimumLogLevel,
-      directories.minimumLogLevel,
+      requestContext.minimumLogLevel,
     ),
     Effect.provideService(ProjectRoot, {
-      get: Effect.succeed(directories.projectRoot),
+      get: Effect.succeed(requestContext.projectRoot),
     }),
     Effect.provideService(ConfectDirectory, {
-      get: Effect.succeed(directories.confectDirectory),
+      get: Effect.succeed(requestContext.confectDirectory),
     }),
     Effect.provideService(ConvexDirectory, {
-      get: Effect.succeed(directories.convexDirectory),
+      get: Effect.succeed(requestContext.convexDirectory),
     }),
     Effect.catchCause((cause) => {
       const failure = Cause.findErrorOption(cause);
@@ -53,10 +53,11 @@ const evaluate = <A, E, R>(
   );
 
 const handlers = requests.toLayer({
-  Previous: (directories) => evaluate(directories, loadPreviousFunctionPaths),
-  Generate: (directories) =>
+  Previous: (requestContext) =>
+    evaluate(requestContext, loadPreviousFunctionPaths),
+  Generate: (requestContext) =>
     evaluate(
-      directories,
+      requestContext,
       generateWithSnapshot.pipe(Effect.map(({ snapshot }) => snapshot)),
     ),
   Validate: (request) => evaluate(request, validateImplFiles(request.paths)),

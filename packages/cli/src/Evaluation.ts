@@ -70,10 +70,10 @@ export const requests = RpcGroup.make(
 const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
   run: (
     client: RpcClient.RpcClient<RpcGroup.Rpcs<typeof requests>, RpcClientError>,
-    directories: RequestContext,
+    requestContext: RequestContext,
   ) => Effect.Effect<A, EvaluationError | RpcClientError>,
 ) {
-  const directories = {
+  const requestContext = {
     projectRoot: yield* ProjectRoot.get,
     confectDirectory: yield* ConfectDirectory.get,
     convexDirectory: yield* ConvexDirectory.get,
@@ -99,7 +99,7 @@ const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
       );
       return yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(requests);
-        return yield* run(client, directories);
+        return yield* run(client, requestContext);
       }).pipe(
         Effect.provide(
           RpcClient.layerProtocolWorker({ size: 1 }).pipe(
@@ -127,13 +127,13 @@ export const loadPreviousFunctionPaths = Effect.gen(function* () {
   ) {
     return FunctionPaths.make(HashSet.empty());
   }
-  return yield* withWorker((client, directories) =>
-    client.Previous(directories),
+  return yield* withWorker((client, requestContext) =>
+    client.Previous(requestContext),
   );
 });
 
-export const generateSnapshot = withWorker((client, directories) =>
-  client.Generate(directories),
+export const generateSnapshot = withWorker((client, requestContext) =>
+  client.Generate(requestContext),
 );
 
 export const generate = generateSnapshot.pipe(
@@ -145,9 +145,9 @@ export const updateDeclarations = (
   declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
   paths: ReadonlyArray<ImplModulePath>,
 ) =>
-  withWorker((client, directories) =>
+  withWorker((client, requestContext) =>
     client.Update({
-      ...directories,
+      ...requestContext,
       snapshot,
       declarations,
       paths,
@@ -155,8 +155,8 @@ export const updateDeclarations = (
   );
 
 export const validate = (paths: ReadonlyArray<ImplModulePath>) =>
-  withWorker((client, directories) =>
-    client.Validate({ ...directories, paths }),
+  withWorker((client, requestContext) =>
+    client.Validate({ ...requestContext, paths }),
   );
 
 export const catchAndLog = <A, R>(
