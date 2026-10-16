@@ -23,6 +23,7 @@ import * as Iterable from "effect/Iterable";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
+import * as Record from "effect/Record";
 import * as Scope from "effect/Scope";
 import * as String from "effect/String";
 import * as esbuild from "esbuild";
@@ -55,36 +56,30 @@ const absolutizeMetafile = (
   cwd: string,
 ): esbuild.Metafile => {
   const absolutize = (p: string) => path.resolve(cwd, p);
-  const inputs: esbuild.Metafile["inputs"] = {};
-  for (const [key, value] of Object.entries(metafile.inputs)) {
-    inputs[absolutize(key)] = {
+  const inputs = Record.mapEntries(metafile.inputs, (value, key) => [
+    absolutize(key),
+    {
       ...value,
-      imports: value.imports.map((i) =>
-        Object.assign({}, i, {
-          path: absolutize(i.path),
-          original: i.original ?? i.path,
-        }),
-      ),
-    };
-  }
-  const outputs: esbuild.Metafile["outputs"] = {};
-  for (const [key, value] of Object.entries(metafile.outputs)) {
-    outputs[absolutize(key)] = {
+      imports: Array.map(value.imports, (i) => ({
+        ...i,
+        path: absolutize(i.path),
+        original: i.original ?? i.path,
+      })),
+    },
+  ]);
+  const outputs = Record.mapEntries(metafile.outputs, (value, key) => [
+    absolutize(key),
+    {
       ...value,
       ...(value.entryPoint ? { entryPoint: absolutize(value.entryPoint) } : {}),
-      inputs: Object.fromEntries(
-        Object.entries(value.inputs).map(([input, metadata]) => [
-          absolutize(input),
-          metadata,
-        ]),
-      ),
-      imports: value.imports.map((imported) =>
+      inputs: Record.mapKeys(value.inputs, absolutize),
+      imports: Array.map(value.imports, (imported) =>
         imported.external
           ? imported
-          : Object.assign({}, imported, { path: absolutize(imported.path) }),
+          : { ...imported, path: absolutize(imported.path) },
       ),
-    };
-  }
+    },
+  ]);
   return { inputs, outputs };
 };
 
