@@ -13,6 +13,7 @@ import { resolveModulePath } from "exsolve";
 import { identity, pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Chunk from "effect/Chunk";
+import * as Cause from "effect/Cause";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -25,6 +26,7 @@ import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Record from "effect/Record";
 import * as Scope from "effect/Scope";
+import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
@@ -188,6 +190,19 @@ interface BatchCompilation {
   readonly cwd: string;
 }
 
+class BatchIncompatible extends Schema.TaggedError<BatchIncompatible>()(
+  "BatchIncompatible",
+  {
+    reason: Schema.Literals([
+      "RuntimeConditions",
+      "UnsupportedEntries",
+      "MixedTsconfigs",
+      "UnattributedWarnings",
+    ]),
+    message: Schema.String,
+  },
+) {}
+
 class Batch extends Context.Service<
   Batch,
   {
@@ -291,7 +306,11 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
     Config.withDefault(""),
   );
   if (/--conditions|-C|--(?:no-)?addons/.test(nodeOptions))
-    return Option.none<BatchCompilation>();
+    return yield* new BatchIncompatible({
+      reason: "RuntimeConditions",
+      message:
+        "NODE_OPTIONS changes Node export conditions; individual builds preserve native resolution.",
+    });
   const runtimeOptions = yield* Effect.try({
     try: () =>
       parseArgs({
@@ -322,7 +341,11 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
       (entry) => !JS_EXT_RE.test(entry) || /[\\/]node_modules[\\/]/.test(entry),
     )
   ) {
-    return Option.none<BatchCompilation>();
+    return yield* new BatchIncompatible({
+      reason: "UnsupportedEntries",
+      message:
+        "Shared builds require JavaScript or TypeScript entries outside node_modules.",
+    });
   }
   const configs = yield* Effect.try({
     try: () => entries.map((entry) => loadTsConfig(path.dirname(entry))),
@@ -330,7 +353,10 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   });
   const config = configs[0];
   if (configs.some((other) => other?.path !== config?.path))
-    return Option.none<BatchCompilation>();
+    return yield* new BatchIncompatible({
+      reason: "MixedTsconfigs",
+      message: `Entries use different tsconfigs: ${Array.dedupe(configs.map((item) => item?.path ?? "(no tsconfig)")).join(", ")}`,
+    });
 
   const cwd = yield* fs.realPath(path.dirname(first));
   const directory = yield* fs
@@ -389,14 +415,16 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
       path.resolve(cwd, input),
     ),
   );
-  if (
-    result.warnings.some(
-      (warning) =>
-        !warning.location ||
-        !HashSet.has(inputPaths, path.resolve(cwd, warning.location.file)),
-    )
-  )
-    return Option.none<BatchCompilation>();
+  const unattributedWarnings = result.warnings.filter(
+    (warning) =>
+      !warning.location ||
+      !HashSet.has(inputPaths, path.resolve(cwd, warning.location.file)),
+  );
+  if (unattributedWarnings.length > 0)
+    return yield* new BatchIncompatible({
+      reason: "UnattributedWarnings",
+      message: `Cannot attribute build warnings to entries: ${unattributedWarnings.map((warning) => warning.text).join("; ")}`,
+    });
   yield* Effect.forEach(result.outputFiles, (output) =>
     fs.writeFile(output.path, output.contents),
   );
@@ -427,12 +455,12 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
       ];
     }),
   );
-  return Option.some<BatchCompilation>({
+  return {
     entries: HashMap.fromIterable(artifacts),
     metafile: absolutizeMetafile(path, { ...result.metafile, inputs }, cwd),
     warnings: result.warnings,
     cwd,
-  });
+  } satisfies BatchCompilation;
 });
 
 /**
@@ -458,7 +486,27 @@ export const withBatch = <A, E, R>(
       const compilation = yield* Effect.cached(
         compileBatch(entryPoints).pipe(
           Effect.provideService(Scope.Scope, scope),
-          Effect.orElseSucceed(() => Option.none<BatchCompilation>()),
+          Effect.asSome,
+          Effect.catchTag("BatchIncompatible", (error) =>
+            Effect.logDebug(
+              "Shared build skipped; falling back to individual builds.",
+              {
+                entryPoints,
+                reason: error.reason,
+                detail: error.message,
+              },
+            ).pipe(Effect.as(Option.none<BatchCompilation>())),
+          ),
+          Effect.catch((error) =>
+            Effect.logDebug(
+              "Shared build failed; falling back to individual builds.",
+              {
+                entryPoints,
+                reason: "CompileFailure",
+              },
+              Cause.fail(error),
+            ).pipe(Effect.as(Option.none<BatchCompilation>())),
+          ),
         ),
       );
       return yield* Effect.provideService(effect, Batch, {

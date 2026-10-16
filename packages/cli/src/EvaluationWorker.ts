@@ -5,12 +5,13 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as References from "effect/References";
 import * as RpcServer from "effect/rpc/RpcServer";
 import * as esbuild from "esbuild";
 import * as CodegenError from "./CodegenError";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
-import type { Directories } from "./Evaluation";
+import type { RequestContext } from "./Evaluation";
 import { EvaluationError, requests } from "./Evaluation";
 import { validateImplFiles } from "./LeafModule";
 import { ProjectRoot } from "./ProjectRoot";
@@ -21,10 +22,14 @@ import {
 } from "./confect/codegen";
 
 const evaluate = <A, E, R>(
-  directories: Directories,
+  directories: RequestContext,
   effect: Effect.Effect<A, E, R>,
 ) =>
   effect.pipe(
+    Effect.provideService(
+      References.MinimumLogLevel,
+      directories.minimumLogLevel,
+    ),
     Effect.provideService(ProjectRoot, {
       get: Effect.succeed(directories.projectRoot),
     }),
