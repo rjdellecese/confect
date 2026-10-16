@@ -8,6 +8,10 @@ see, and open a PR for review. Never merge it yourself.
 
 ## Scope
 
+Exclude `convex`, `convex-test`, `convex-helpers`, and `@convex-dev/*` packages
+everywhere in the workspace, even when used only in private apps or fixtures.
+The `audit-convex` skill owns their upgrades and feature assessments.
+
 Every `package.json` dependency that is **not** claimed by
 the `upgrade-published-deps` skill (whose scope covers the published packages'
 `dependencies`/`peerDependencies` plus their lockstep companions, such as

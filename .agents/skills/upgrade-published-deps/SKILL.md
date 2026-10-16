@@ -8,6 +8,12 @@ and open a PR for review. Never merge it yourself.
 
 ## Scope
 
+Exclude `convex`, `convex-test`, `convex-helpers`, and `@convex-dev/*` packages,
+including their workspace pins and overrides. The `audit-convex` skill owns
+their upgrades and feature assessments. When that skill references the shared
+policies below, apply them to its Convex scope rather than running this entire
+upgrade workflow.
+
 A package is published iff its `package.json` does not say `"private": true`—note that some private fixture workspaces also carry `@confect/*` names, so go
 by the field, not the name. A dependency is in scope iff it appears in the
 `dependencies` or `peerDependencies` of any published package, together with
