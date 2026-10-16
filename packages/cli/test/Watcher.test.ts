@@ -9,6 +9,7 @@ import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as SyncState from "@confect/cli/SyncState";
+import * as EntryPoint from "@confect/cli/EntryPoint";
 import * as WatchBuild from "@confect/cli/WatchBuild";
 import * as HashMap from "effect/HashMap";
 import * as HashSet from "effect/HashSet";
@@ -388,6 +389,43 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       { timeout: 15000 },
     );
 
+    test.effect.each([
+      ["Create", "notes.spec.ts"],
+      ["Remove", "notes.spec.ts"],
+      ["Create", "notes.impl.ts"],
+      ["Remove", "notes.impl.ts"],
+      ["Create", "tables/notes.ts"],
+      ["Remove", "tables/notes.ts"],
+    ] as const)(
+      "preserves targeted work after a delayed %s event for an existing %s",
+      ([eventTag, file]) =>
+        Effect.gen(function* () {
+          const { watcher, project, events, contexts } =
+            yield* controlledWatcher();
+          yield* watcher.refresh;
+          yield* watcher.next;
+          yield* project.write(`confect/${file}`, "export const value = 2;");
+          yield* watcher.refresh;
+          const entry = EntryPoint.parse(file);
+          assert(Option.isSome(entry));
+          const expected = SyncState.add(SyncState.empty, [entry.value]);
+          expect(yield* watcher.next).toMatchObject(expected);
+          yield* Queue.offer(events, {
+            _tag: eventTag,
+            path: `${project.root}/confect/${file}`,
+          });
+          expect(yield* watcher.next).toEqual(expected);
+          expect(yield* Queue.poll(contexts)).toEqual(Option.none());
+          yield* watcher.requestRetry;
+          yield* Queue.offer(events, {
+            _tag: eventTag,
+            path: `${project.root}/confect/${file}`,
+          });
+          expect((yield* watcher.next).work._tag).toBe("Full");
+        }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+      { timeout: 15000 },
+    );
+
     test.effect(
       "settles no-op reconfiguration without replacing the context",
       () =>
@@ -400,7 +438,11 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             _tag: "Create",
             path: `${project.root}/confect/notes.spec.ts`,
           });
-          expect((yield* watcher.next).work._tag).toBe("Full");
+          const entry = EntryPoint.parse("notes.spec.ts");
+          assert(Option.isSome(entry));
+          expect(yield* watcher.next).toEqual(
+            SyncState.add(SyncState.empty, [entry.value]),
+          );
           expect(yield* Queue.poll(contexts)).toEqual(Option.none());
           expect((yield* watcher.pending).work._tag).toBe("None");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
@@ -427,7 +469,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             true,
           );
           yield* Queue.offer(events, { _tag: "Remove", path: file });
-          expect((yield* watcher.next).work._tag).toBe("Full");
+          const removedAgain = yield* watcher.next;
+          expect(removedAgain.work._tag).toBe("None");
+          expect(HashSet.has(removedAgain.optional, "Http")).toBe(true);
           yield* project.write("confect/http.ts", "export const value = 2;");
           yield* Queue.offer(events, { _tag: "Create", path: file });
           const replacement = yield* Queue.take(contexts);
@@ -1055,13 +1099,16 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           ).toBe(true);
           const replacement = yield* Queue.take(contexts);
           expect(prematurelyDisposed).toBe(false);
-          expect(queued.work._tag).toBe("Full");
+          expect(queued.work._tag).toBe(
+            file.startsWith("confect/") ? "Impls" : "Full",
+          );
           expect(yield* Deferred.isDone(first.disposed)).toBe(true);
           expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(
             true,
           );
           expect(yield* Ref.get(replacement.rebuilds)).toBe(1);
           expect(yield* Ref.get(first.rebuilds)).toBe(3);
+          expect((yield* watcher.pending).work._tag).toBe("Full");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
       { timeout: 15000 },
     );

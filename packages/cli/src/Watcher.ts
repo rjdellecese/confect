@@ -122,17 +122,21 @@ export const make = Effect.fnUntraced(function* () {
     lock: yield* Semaphore.make(1),
     topology: yield* WatchTopology.make(pendingRef),
   };
-  const restart = state.topology.invalidate.pipe(
-    Effect.andThen(Queue.offer(restartQueue, undefined)),
-    Effect.andThen(Queue.offer(signal, undefined)),
-  );
+  const restartWith = (invalidation: Effect.Effect<void>) =>
+    invalidation.pipe(
+      Effect.andThen(Queue.offer(restartQueue, undefined)),
+      Effect.andThen(Queue.offer(signal, undefined)),
+    );
+  const restart = restartWith(state.topology.invalidate);
+  const restartEntry = (entry: EntryPoint.Kind) =>
+    restartWith(state.topology.invalidateEntry(entry));
   return {
     run: Effect.all(
       [
         Effect.scoped(
           entryPointsWatcher(signal, pendingRef, restartQueue, state),
         ),
-        confectStructureWatcher(signal, pendingRef, restart),
+        confectStructureWatcher(signal, pendingRef, restart, restartEntry),
         convexConfigStructureWatcher(restart),
       ],
       { concurrency: "unbounded" },
@@ -557,6 +561,7 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restart: Effect.Effect<unknown>,
+  restartEntry: (entry: EntryPoint.Kind) => Effect.Effect<unknown>,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -579,6 +584,7 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
         signal,
         pendingRef,
         restart,
+        restartEntry,
       }),
     ),
     Effect.retry({
@@ -658,12 +664,14 @@ const handleConfectChange = ({
   signal,
   pendingRef,
   restart,
+  restartEntry,
 }: {
   relativePath: string;
   eventTag: "Create" | "Update" | "Remove";
   signal: Queue.Queue<void>;
   pendingRef: Ref.Ref<Pending>;
   restart: Effect.Effect<unknown>;
+  restartEntry: (entry: EntryPoint.Kind) => Effect.Effect<unknown>;
 }) => {
   if (relativePath.split(/[/\\]/).includes("_generated")) {
     return Effect.void;
@@ -679,8 +687,9 @@ const handleConfectChange = ({
     Match.exhaustive,
   );
 
-  if (Option.isSome(EntryPoint.parse(relativePath))) {
-    return isLifecycleChange ? restart : Effect.void;
+  const entry = EntryPoint.parse(relativePath);
+  if (Option.isSome(entry)) {
+    return isLifecycleChange ? restartEntry(entry.value) : Effect.void;
   }
 
   // A stray `confect/schema.ts` (now codegen-owned at

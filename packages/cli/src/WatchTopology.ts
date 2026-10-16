@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Semaphore from "effect/Semaphore";
+import type { Kind } from "./EntryPoint";
 import * as SyncState from "./SyncState";
 
 type State = Data.TaggedEnum<{
@@ -35,17 +36,22 @@ export const make = Effect.fn("WatchTopology.make")(function* (
     yield* Deferred.succeed(previous, undefined);
   });
 
+  const invalidate = Effect.fn("WatchTopology.invalidate")(
+    function* (update: (pending: SyncState.Pending) => SyncState.Pending) {
+      yield* Ref.update(state, ({ revision }) =>
+        State.Reconciling({ revision: revision + 1 }),
+      );
+      yield* Ref.update(pending, update);
+      yield* notify;
+    },
+    (effect) => lock.withPermit(effect),
+  );
+
   return {
     revision: Ref.get(state).pipe(Effect.map((current) => current.revision)),
-    invalidate: lock.withPermit(
-      Effect.gen(function* () {
-        yield* Ref.update(state, ({ revision }) =>
-          State.Reconciling({ revision: revision + 1 }),
-        );
-        yield* Ref.update(pending, SyncState.full);
-        yield* notify;
-      }),
-    ),
+    invalidate: invalidate(SyncState.full),
+    invalidateEntry: (entry: Kind) =>
+      invalidate((current) => SyncState.add(current, [entry])),
     reconcile: Effect.fn("WatchTopology.reconcile")(
       function* (revision: number, initial: Deferred.Deferred<void>) {
         const current = yield* Ref.get(state);

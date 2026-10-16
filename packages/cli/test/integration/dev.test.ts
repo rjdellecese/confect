@@ -61,6 +61,42 @@ layer(NodeServices.layer, { excludeTestServices: true })(
     );
 
     it.effect(
+      "keeps atomic spec replacements incremental",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.write(
+            "convex/convex.config.ts",
+            'import { defineApp } from "convex/server"; console.log("FULL_GENERATION"); export default defineApp();\n',
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const generated = yield* project.generatedFiles;
+          for (const revision of [1, 2]) {
+            yield* Ref.set(watching.output, "");
+            const marker = `SPEC_REPLACED:${revision}`;
+            yield* project.write(
+              "confect/notes.spec.ts.tmp",
+              `${Project.spec}\nconsole.log("${marker}");\n`,
+            );
+            yield* fs.rename(
+              path.join(project.root, "confect/notes.spec.ts.tmp"),
+              path.join(project.root, "confect/notes.spec.ts"),
+            );
+            yield* watching.waitFor(marker);
+            yield* watching.waitFor(success);
+            expect(yield* Ref.get(watching.output)).not.toContain(
+              "FULL_GENERATION",
+            );
+            expect(yield* project.generatedFiles).toEqual(generated);
+          }
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "does not invalidate Convex schema for ordinary source edits or full generation",
       () =>
         Effect.gen(function* () {
