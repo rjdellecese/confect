@@ -21,15 +21,16 @@ export class AiGatewayDisabled extends Schema.TaggedError<AiGatewayDisabled>()(
 }
 
 /**
- * The current deployment is local or self-hosted and cannot use the Convex AI
- * gateway. Call the model provider directly with your own API key instead.
+ * The current deployment is anonymous, outdated, or self-hosted and cannot use
+ * the Convex AI gateway. Authenticated, project-linked local deployments are
+ * supported.
  */
 export class AiGatewayUnavailable extends Schema.TaggedError<AiGatewayUnavailable>()(
   "AiGatewayUnavailable",
   {},
 ) {
   override get message(): string {
-    return "The Convex AI gateway is unavailable. This action is running on a local or self-hosted deployment, which cannot use the gateway. Call the model provider directly with your own API key stored in a Convex environment variable.";
+    return "The Convex AI gateway is unavailable on this deployment. For local development, log in, link the deployment to a Convex project, and update the Convex CLI and local backend. Anonymous and self-hosted deployments cannot use the gateway; call the model provider directly with your own API key instead.";
   }
 }
 
