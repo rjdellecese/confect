@@ -327,7 +327,11 @@ const fixture = Effect.fn("Bundler.test.fixture")(function* (
 });
 
 layer(BundlerLayer)("withBatch", (it) => {
-  it.effect.each([
+  const incompatibilities: ReadonlyArray<{
+    readonly reason: string;
+    readonly nodeOptions: string;
+    readonly files: Readonly<Record<string, string>>;
+  }> = [
     {
       reason: "UnsupportedEntries",
       nodeOptions: "",
@@ -352,7 +356,8 @@ layer(BundlerLayer)("withBatch", (it) => {
         "tsconfig.json": '{"compilerOptions":{"target":"invalid-target"}}',
       },
     },
-  ])(
+  ];
+  it.effect.each(incompatibilities)(
     "reports $reason once per cached batch with its entries",
     ({ reason, nodeOptions, files }) =>
       Effect.gen(function* () {
