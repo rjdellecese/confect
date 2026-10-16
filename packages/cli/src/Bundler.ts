@@ -85,6 +85,11 @@ const resolveCjs = Option.liftThrowable((specifier: string, importer: string) =>
   createRequire(importer).resolve(specifier),
 );
 
+const resolveExternalEsm = Option.liftThrowable(
+  (specifier: string, importer: string, conditions: string[]) =>
+    resolveModulePath(specifier, { from: importer, conditions }),
+);
+
 export const resolveModule = (
   specifier: string,
   importer: string,
@@ -255,12 +260,13 @@ const batchResolutionPlugin = (
         }
         return external(
           args,
-          pathToFileURL(
-            resolveModulePath(args.path, {
-              from: args.importer,
-              conditions,
-            }),
-          ).href,
+          Option.match(
+            resolveExternalEsm(args.path, args.importer, conditions),
+            {
+              onNone: () => args.path,
+              onSome: (resolvedPath) => pathToFileURL(resolvedPath).href,
+            },
+          ),
         );
       });
     });

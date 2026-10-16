@@ -631,6 +631,42 @@ layer(BundlerLayer)("withBatch", (it) => {
       }).pipe(Effect.scoped),
   );
 
+  it.effect(
+    "keeps the batch when an external import resolves only through CommonJS",
+    () =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "first.ts": 'export { shared, load } from "./shared";',
+          "second.ts": 'export { shared, load } from "./shared";',
+          "shared.ts":
+            'export const shared = {}; export const load = () => import("legacy/sub");',
+          "node_modules/legacy/package.json":
+            '{ "name": "legacy", "main": "index.js" }',
+          "node_modules/legacy/index.js": 'module.exports = "main";',
+          "node_modules/legacy/sub.js": 'module.exports = "sub";',
+        });
+        const settle = (load: () => Promise<unknown>) =>
+          Effect.promise(() =>
+            load().then(
+              () => "loaded",
+              () => "failed",
+            ),
+          );
+        const original = yield* Bundler.bundle(file("first.ts"));
+        const [first, second] = yield* Bundler.withBatch(
+          [file("first.ts"), file("second.ts")],
+          Effect.all([
+            Bundler.bundle(file("first.ts")),
+            Bundler.bundle(file("second.ts")),
+          ]),
+        );
+        expect(first.module.shared).toBe(second.module.shared);
+        expect(yield* settle(first.module.load)).toBe(
+          yield* settle(original.module.load),
+        );
+      }).pipe(Effect.scoped),
+  );
+
   it.effect.each(["development", "module-sync", "node-addons"] as const)(
     "preserves the native %s condition when resolving external exports",
     (condition) =>
