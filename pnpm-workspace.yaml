@@ -28,7 +28,7 @@ minimumReleaseAgeExclude:
   - effect@4.0.4
 
 overrides:
-  convex: 1.46.0
+  convex: 1.47.0
   effect: 4.0.4
   react: 19.3.0
   react-dom: 19.3.0
