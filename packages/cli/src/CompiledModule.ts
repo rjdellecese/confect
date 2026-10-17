@@ -1,5 +1,6 @@
 import { dynamicImport } from "bundle-require";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import type * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 import { logCoalescedBuildWarnings } from "./log";
@@ -15,12 +16,24 @@ export interface LoadedModule {
   readonly metafile: esbuild.Metafile;
 }
 
+export const namespace = Effect.fn("CompiledModule.namespace")((url: string) =>
+  Effect.tryPromise({
+    try: () => dynamicImport(url, { format: "esm" }),
+    catch: (cause) => new BundlerError({ cause }),
+  }).pipe(
+    Effect.flatMap((module) =>
+      Schema.decodeUnknownEffect(Schema.Record(Schema.String, Schema.Unknown))(
+        module,
+      ).pipe(Effect.mapError((cause) => new BundlerError({ cause }))),
+    ),
+  ),
+);
+
 export const load = Effect.fn("CompiledModule.load")(function* (
   compiled: CompiledModule,
 ): Effect.fn.Return<LoadedModule, BundlerError> {
-  const module = yield* Effect.tryPromise({
-    try: () => dynamicImport(compiled.url, { format: "esm" }),
-    catch: (cause) => new BundlerError({ cause }),
-  }).pipe(Effect.ensuring(logCoalescedBuildWarnings(compiled.warnings)));
+  const module = yield* namespace(compiled.url).pipe(
+    Effect.ensuring(logCoalescedBuildWarnings(compiled.warnings)),
+  );
   return { module, metafile: compiled.metafile };
 });
