@@ -109,6 +109,46 @@ export const resolveModule = (
     resolveCjs(specifier, importer),
   );
 
+export const packageSelfReferencePatterns = Effect.fnUntraced(
+  function* (directory: string) {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const start = path.resolve(directory);
+    const root = path.parse(start).root;
+    const directories = Array.append(
+      Array.unfold(start, (current) =>
+        current === root
+          ? Option.none()
+          : Option.some([current, path.dirname(current)] as const),
+      ),
+      root,
+    );
+    const nearest = yield* Effect.findFirst(directories, (current) =>
+      fs.exists(path.join(current, "package.json")),
+    );
+    if (Option.isNone(nearest)) return [];
+    const contents = yield* fs.readFileString(
+      path.join(nearest.value, "package.json"),
+    );
+    const metadata = yield* Schema.decodeEffect(
+      Schema.fromJsonString(
+        Schema.Struct({
+          name: Schema.optionalKey(Schema.String),
+          exports: Schema.optionalKey(Schema.Unknown),
+        }),
+      ),
+    )(contents);
+    return metadata.name && metadata.exports != null
+      ? [
+          new RegExp(
+            `^${metadata.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:/|$)`,
+          ),
+        ]
+      : [];
+  },
+  Effect.mapError((cause) => new BundlerError({ cause })),
+);
+
 /**
  * Bundles first-party workspace dependencies that `bundle-require` would
  * otherwise externalize and hand to Node's native ESM resolver. Resolves each
@@ -116,8 +156,8 @@ export const resolveModule = (
  * outside `node_modules`—mirroring Vite's "linked dependencies are not
  * externalized" heuristic. Registered ahead of `externalPlugin`, so deferring
  * (returning `undefined`) leaves third-party externalization untouched.
- * `skipPatterns` are the tsconfig `paths` regexes, which keep deferring to
- * esbuild's own `paths` resolution.
+ * `skipPatterns` leave tsconfig `paths` aliases and package self-references to
+ * esbuild's native resolution.
  */
 export const bundleWorkspacePlugin = (
   path: Path.Path,
@@ -375,6 +415,10 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   const externalImports = yield* Ref.make(
     HashMap.empty<string, ReadonlyArray<ExternalImport>>(),
   );
+  const selfReferences = (yield* Effect.forEach(
+    Array.dedupe(entries.map((entry) => path.dirname(entry))),
+    packageSelfReferencePatterns,
+  )).flat();
   const result = yield* Effect.tryPromise({
     try: () =>
       esbuild.build({
@@ -401,7 +445,12 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
           batchResolutionPlugin(
             path,
             fs,
-            tsconfigPathsToRegExp(config?.data.compilerOptions?.paths ?? {}),
+            [
+              ...tsconfigPathsToRegExp(
+                config?.data.compilerOptions?.paths ?? {},
+              ),
+              ...selfReferences,
+            ],
             conditions,
             externalImports,
           ),
@@ -669,11 +718,14 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
   });
 
   const cwd = path.dirname(entryPoint);
+  const selfReferences = yield* packageSelfReferencePatterns(cwd);
   const skipPatterns = yield* Effect.try({
-    try: () =>
-      tsconfigPathsToRegExp(
+    try: () => [
+      ...tsconfigPathsToRegExp(
         loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
       ),
+      ...selfReferences,
+    ],
     catch: (cause) => new BundlerError({ cause }),
   });
   const result = yield* Effect.tryPromise({
@@ -682,6 +734,7 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
         filepath: entryPoint,
         cwd,
         format: "esm",
+        notExternal: selfReferences,
         esbuildOptions: {
           plugins: [
             ...(options?.plugins ?? []),

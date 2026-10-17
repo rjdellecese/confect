@@ -326,7 +326,108 @@ const fixture = Effect.fn("Bundler.test.fixture")(function* (
   };
 });
 
+layer(BundlerLayer)("packageSelfReferencePatterns", (it) => {
+  it.effect(
+    "matches only the nearest exported package name and its subpaths",
+    () =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "package.json":
+            '{"name":"@fixture/backend.v1","exports":{"./*":"./*.ts"}}',
+          "nested/entry.ts": "export {};",
+          "boundary/package.json": '{"name":"@fixture/nested"}',
+          "boundary/entry.ts": "export {};",
+        });
+        const patterns = yield* Bundler.packageSelfReferencePatterns(
+          file("nested"),
+        );
+        expect(patterns).toHaveLength(1);
+        for (const specifier of [
+          "@fixture/backend.v1",
+          "@fixture/backend.v1/leaf",
+        ])
+          expect(patterns.some((pattern) => pattern.test(specifier))).toBe(
+            true,
+          );
+        for (const specifier of [
+          "@fixture/backendXv1",
+          "@fixture/backend.v1-extra",
+        ])
+          expect(patterns.some((pattern) => pattern.test(specifier))).toBe(
+            false,
+          );
+        expect(
+          yield* Bundler.packageSelfReferencePatterns(file("boundary")),
+        ).toEqual([]);
+      }).pipe(Effect.scoped),
+  );
+});
+
 layer(BundlerLayer)("withBatch", (it) => {
+  it.effect(
+    "preserves native self-reference conditions in individual, batch and fallback builds",
+    () =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "package.json":
+            '{"name":"@fixture/backend.v1","type":"module","exports":{".":{"import":"./import.ts","require":"./require.ts"},"./*":"./*.ts"}}',
+          "tsconfig.json": tsconfigContents,
+          "import.ts": 'export const value = "import";',
+          "require.ts": 'export const value = "require";',
+          "leaf.ts": "export const shared = {};",
+          "shared.ts":
+            'import { value } from "@fixture/backend.v1"; import other from "@fixture/backend.v1-extra"; export { shared } from "@fixture/backend.v1/leaf"; export const values = [value, require("@fixture/backend.v1").value, other];',
+          "first.ts": 'export { shared, values } from "~/shared";',
+          "nested/second.ts": 'export { shared, values } from "~/shared";',
+          "node_modules/@fixture/backend.v1-extra/package.json":
+            '{"type":"module","exports":"./index.js"}',
+          "node_modules/@fixture/backend.v1-extra/index.js":
+            'export default "external";',
+        });
+        const individual = yield* Bundler.bundle(file("first.ts"));
+        const [first, second] = yield* Bundler.withBatch(
+          [file("first.ts"), file("nested/second.ts")],
+          Effect.all([
+            Bundler.bundle(file("first.ts")),
+            Bundler.bundle(file("nested/second.ts")),
+          ]),
+        );
+        const fallback = yield* Bundler.withBatch(
+          [file("first.ts"), file("nested/second.ts")],
+          Bundler.bundle(file("nested/second.ts")),
+        ).pipe(
+          Effect.provide(
+            ConfigProvider.layer(
+              ConfigProvider.fromUnknown({
+                NODE_OPTIONS: "--conditions=custom",
+              }),
+            ),
+          ),
+        );
+        for (const bundled of [individual, first, second, fallback]) {
+          expect(bundled.module.values).toEqual([
+            "import",
+            "require",
+            "external",
+          ]);
+          expect(
+            Bundler.importersOfPackage(
+              bundled,
+              "@fixture/backend.v1",
+              () => true,
+            ),
+          ).toEqual([file("shared.ts")]);
+          expect(bundled.metafile.inputs[file("leaf.ts")]).toBeDefined();
+          expect(
+            Object.keys(bundled.metafile.inputs).some((input) =>
+              input.includes("node_modules"),
+            ),
+          ).toBe(false);
+        }
+        expect(first.module.shared).toBe(second.module.shared);
+      }).pipe(Effect.scoped),
+  );
+
   const incompatibilities: ReadonlyArray<{
     readonly reason: string;
     readonly nodeOptions: string;
