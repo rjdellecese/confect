@@ -24,7 +24,21 @@ const makeNative = () => {
       : null;
   const native = {
     normalizeId: normalize,
-    system: { normalizeId: normalize },
+    get: () => {
+      throw new Error("DocumentIds must not fetch documents");
+    },
+    query: () => {
+      throw new Error("DocumentIds must not query documents");
+    },
+    system: {
+      normalizeId: normalize,
+      get: () => {
+        throw new Error("DocumentIds must not fetch system documents");
+      },
+      query: () => {
+        throw new Error("DocumentIds must not query system documents");
+      },
+    },
   };
   vi.spyOn(native, "normalizeId");
   vi.spyOn(native.system, "normalizeId");

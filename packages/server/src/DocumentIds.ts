@@ -35,21 +35,11 @@ export const DocumentIds = <
 >(): DocumentIdsTag<Schema> =>
   Context.Service<DocumentIds<Schema>>("@confect/server/DocumentIds");
 
-type NativeReader<Schema extends DatabaseSchema.AnyWithProps> = Pick<
-  GenericDatabaseReader<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
-  "normalizeId"
-> & {
-  readonly system: Pick<
-    GenericDatabaseReader<
-      DataModel.ToConvex<DataModel.FromSchema<Schema>>
-    >["system"],
-    "normalizeId"
-  >;
-};
-
 export const make = <Schema extends DatabaseSchema.AnyWithProps>(
   schema: Schema,
-  reader: NativeReader<Schema>,
+  reader: GenericDatabaseReader<
+    DataModel.ToConvex<DataModel.FromSchema<Schema>>
+  >,
 ): DocumentIds<Schema> => {
   const normalize = <Name extends DatabaseSchema.AllTableNames<Schema>>(
     table: Name,
@@ -98,5 +88,7 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
 
 export const layer = <Schema extends DatabaseSchema.AnyWithProps>(
   schema: Schema,
-  reader: NativeReader<Schema>,
+  reader: GenericDatabaseReader<
+    DataModel.ToConvex<DataModel.FromSchema<Schema>>
+  >,
 ) => Layer.succeed(DocumentIds<Schema>(), make(schema, reader));
