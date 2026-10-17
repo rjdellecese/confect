@@ -1,6 +1,7 @@
 import * as NodeWorker from "@effect/platform-node/NodeWorker";
 import { fork } from "node:child_process";
 import * as Console from "effect/Console";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as HashSet from "effect/HashSet";
@@ -14,7 +15,13 @@ import * as Rpc from "effect/rpc/Rpc";
 import * as RpcClient from "effect/rpc/RpcClient";
 import type { RpcClientError } from "effect/rpc/RpcClientError";
 import * as RpcGroup from "effect/rpc/RpcGroup";
-import type * as Array from "effect/Array";
+import * as Array from "effect/Array";
+import * as Bundler from "./Bundler";
+import * as LeafModule from "./LeafModule";
+import * as CodegenError from "./CodegenError";
+import { fromBundlerError } from "./BuildError";
+import * as SpecModulePath from "./SpecModulePath";
+import { logCoalescedBuildWarnings } from "./log";
 import * as EntryPoint from "./EntryPoint";
 import * as GenerationSnapshot from "./GenerationSnapshot";
 import { ConfectDirectory } from "./ConfectDirectory";
@@ -47,10 +54,22 @@ export const requests = RpcGroup.make(
     success: GenerationSnapshot.GenerationSnapshot,
     error: EvaluationError,
   }),
-  Rpc.make("Validate", {
+  Rpc.make("LoadSpec", {
     payload: Schema.Struct({
       ...RequestContext.fields,
-      paths: Schema.Array(ImplModulePath),
+      relativePath: SpecModulePath.SpecModulePath,
+      url: Schema.String,
+      serverImporters: Schema.Array(Schema.String),
+    }),
+    success: Schema.Void,
+    error: EvaluationError,
+  }),
+  Rpc.make("ValidateImpl", {
+    payload: Schema.Struct({
+      ...RequestContext.fields,
+      specPath: SpecModulePath.SpecModulePath,
+      url: Schema.String,
+      importsSpec: Schema.Boolean,
     }),
     success: Schema.Void,
     error: EvaluationError,
@@ -67,11 +86,11 @@ export const requests = RpcGroup.make(
   }),
 );
 
-const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
+const withWorker = Effect.fn("Evaluation.withWorker")(function* <A, R>(
   run: (
     client: RpcClient.RpcClient<RpcGroup.Rpcs<typeof requests>, RpcClientError>,
     requestContext: RequestContext,
-  ) => Effect.Effect<A, EvaluationError | RpcClientError>,
+  ) => Effect.Effect<A, EvaluationError | RpcClientError, R>,
 ) {
   const requestContext = {
     projectRoot: yield* ProjectRoot.get,
@@ -156,7 +175,93 @@ export const updateDeclarations = (
 
 export const validate = (paths: ReadonlyArray<ImplModulePath>) =>
   withWorker((client, requestContext) =>
-    client.Validate({ ...requestContext, paths }),
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const pairs = Array.map(paths, (implPath) => ({
+        implPath,
+        specPath: SpecModulePath.fromImpl(implPath),
+      }));
+      return yield* Bundler.withBatch(
+        Array.flatMap(pairs, ({ implPath, specPath }) => [
+          path.resolve(requestContext.confectDirectory, specPath),
+          path.resolve(requestContext.confectDirectory, implPath),
+        ]),
+        Effect.forEach(
+          pairs,
+          ({ implPath, specPath }) =>
+            Effect.gen(function* () {
+              const specAbsolutePath = path.resolve(
+                requestContext.confectDirectory,
+                specPath,
+              );
+              const implAbsolutePath = path.resolve(
+                requestContext.confectDirectory,
+                implPath,
+              );
+              if (!(yield* fs.exists(specAbsolutePath)))
+                return yield* new CodegenError.MissingSpecFileError({
+                  implPath,
+                  expectedSpecPath: specPath,
+                });
+              if (!(yield* fs.exists(implAbsolutePath)))
+                return yield* new CodegenError.MissingImplFileError({
+                  specPath,
+                  expectedImplPath: implPath,
+                });
+              const spec = yield* Bundler.compile(specAbsolutePath).pipe(
+                Effect.mapError((error) => fromBundlerError(specPath, error)),
+              );
+              yield* client
+                .LoadSpec({
+                  ...requestContext,
+                  relativePath: specPath,
+                  url: spec.url,
+                  serverImporters: yield* LeafModule.serverImporters(spec),
+                })
+                .pipe(
+                  Effect.ensuring(logCoalescedBuildWarnings(spec.warnings)),
+                );
+              const impl = yield* Bundler.compile(implAbsolutePath).pipe(
+                Effect.mapError((error) => fromBundlerError(implPath, error)),
+              );
+              yield* client
+                .ValidateImpl({
+                  ...requestContext,
+                  specPath,
+                  url: impl.url,
+                  importsSpec: yield* Bundler.directlyImports(
+                    impl,
+                    implAbsolutePath,
+                    specAbsolutePath,
+                  ),
+                })
+                .pipe(
+                  Effect.ensuring(logCoalescedBuildWarnings(impl.warnings)),
+                );
+            }),
+          { concurrency: 4, discard: true },
+        ),
+      );
+    }).pipe(Effect.scoped, catchDiagnostic),
+  );
+
+export const catchDiagnostic = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  effect.pipe(
+    Effect.catchCause((cause) => {
+      const failure = Cause.findErrorOption(cause);
+      return Effect.fail(
+        Option.isSome(failure) && Schema.is(EvaluationError)(failure.value)
+          ? failure.value
+          : new EvaluationError({
+              diagnostic:
+                Option.isSome(failure) &&
+                CodegenError.isCodegenError(failure.value)
+                  ? CodegenError.renderCodegenError(failure.value)
+                  : Cause.pretty(cause),
+            }),
+      );
+    }),
   );
 
 export const catchAndLog = <A, R>(

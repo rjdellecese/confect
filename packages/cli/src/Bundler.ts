@@ -800,7 +800,7 @@ const findMetafileInputKey = Effect.fnUntraced(function* (
  * metafile). Returns `false` if either path is missing from the metafile.
  */
 export const directlyImports = Effect.fnUntraced(function* (
-  bundled: Bundled,
+  bundled: Pick<Bundled, "metafile">,
   sourceAbsolutePath: string,
   targetAbsolutePath: string,
 ) {
@@ -845,7 +845,7 @@ export const directlyImports = Effect.fnUntraced(function* (
  * imports are not reported.
  */
 export const importersOfPackage = (
-  bundled: Bundled,
+  bundled: Pick<Bundled, "metafile">,
   packageName: string,
   where: (absolutePath: string) => boolean,
 ): ReadonlyArray<string> => {

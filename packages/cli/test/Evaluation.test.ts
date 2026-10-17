@@ -60,6 +60,35 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
     }
   };
 
+  it.effect(
+    "validates coordinator-compiled artifacts without a compiler in the evaluator",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const path = yield* Path.Path;
+        yield* project.provide(Evaluation.generateSnapshot);
+        const original = yield* Effect.promise(() =>
+          vi.importActual<typeof ChildProcess>("node:child_process"),
+        );
+        vi.mocked(fork).mockClear();
+        vi.mocked(fork).mockImplementationOnce((filename) =>
+          original.fork(filename, {
+            serialization: "advanced",
+            env: {
+              ...process.env,
+              ESBUILD_BINARY_PATH: path.join(project.root, "package.json"),
+            },
+          }),
+        );
+        yield* project.provide(
+          Evaluation.validate([ImplModulePath.make("notes.impl.ts")]),
+        );
+        expect(vi.mocked(fork)).toHaveBeenCalledTimes(1);
+        expectWorkersExited();
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
+
   it.effect.each([
     { level: "Debug", reason: "CompileFailure" },
     { level: "Info", reason: "CompileFailure" },

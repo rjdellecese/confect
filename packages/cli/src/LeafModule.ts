@@ -218,9 +218,8 @@ const absoluteModulePath = Effect.fnUntraced(function* (relativePath: string) {
  * otherwise never visits) and any shared helper a spec pulls in—while only ever
  * flagging modules that genuinely reach the client.
  */
-const validateClientSafety = Effect.fnUntraced(function* (
-  leaf: LeafModule,
-  bundled: Bundler.Bundled,
+export const serverImporters = Effect.fnUntraced(function* (
+  bundled: Pick<Bundler.Bundled, "metafile">,
 ) {
   const path = yield* Path.Path;
   const confectDirectory = path.resolve(yield* ConfectDirectory.get);
@@ -236,22 +235,17 @@ const validateClientSafety = Effect.fnUntraced(function* (
     isCheckedUserModule,
   );
 
-  if (importers.length > 0) {
-    return yield* new SpecImportsServerError({
-      specPath: leaf.relativePath,
-      importerPaths: Array.map(importers, (absolutePath) =>
-        toPosixPath(path, path.relative(confectDirectory, absolutePath)),
-      ),
-    });
-  }
+  return Array.map(importers, (absolutePath) =>
+    toPosixPath(path, path.relative(confectDirectory, absolutePath)),
+  );
 });
 
 /**
  * Validate that the leaf's spec file default-exports a `GroupSpec`, and that
  * nothing it reaches drags server code into the client (see
- * {@link validateClientSafety}). Returns the leaf paired with its validated
- * spec, so subsequent operations reuse that association without re-bundling.
- * The runtime is declared by the spec, not its file location.
+ * {@link serverImporters}). Returns the leaf paired with its validated spec, so
+ * subsequent operations reuse that association without re-bundling. The runtime
+ * is declared by the spec, not its file location.
  */
 export const loadSpec = Effect.fn("LeafModule.loadSpec")(function* (
   leaf: LeafModule,
@@ -261,15 +255,29 @@ export const loadSpec = Effect.fn("LeafModule.loadSpec")(function* (
     Effect.mapError((error) => fromBundlerError(leaf.relativePath, error)),
   );
 
-  const groupSpec = bundled.module.default;
+  return yield* parseSpec(
+    leaf,
+    bundled.module.default,
+    yield* serverImporters(bundled),
+  );
+});
 
+export const parseSpec = Effect.fnUntraced(function* (
+  leaf: LeafModule,
+  groupSpec: unknown,
+  importerPaths: ReadonlyArray<string>,
+) {
   if (!GroupSpec.isGroupSpec(groupSpec)) {
     return yield* new SpecMissingDefaultGroupSpecError({
       specPath: leaf.relativePath,
     });
   }
 
-  yield* validateClientSafety(leaf, bundled);
+  if (importerPaths.length > 0)
+    return yield* new SpecImportsServerError({
+      specPath: leaf.relativePath,
+      importerPaths,
+    });
 
   yield* Effect.fromResult(GroupSpec.validateMiddleware(groupSpec)).pipe(
     Effect.mapError(
@@ -343,18 +351,30 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
     });
   }
 
-  if (!Layer.isLayer(bundled.module.default)) {
-    return yield* new ImplMissingDefaultLayerError({
-      implPath: implRelativePath,
-    });
-  }
+  return yield* validateImplModule(leaf, bundled.module.default);
+});
+
+const ImplementationLayer = Schema.declare(
+  (input: unknown): input is Layer.Layer<unknown> => Layer.isLayer(input),
+);
+
+export const validateImplModule = Effect.fnUntraced(function* (
+  leaf: LoadedLeafModule,
+  module: unknown,
+) {
+  const implRelativePath = yield* implPathForSpec(leaf.relativePath);
+  const implLayer = yield* Schema.decodeUnknownEffect(ImplementationLayer)(
+    module,
+  ).pipe(
+    Effect.mapError(
+      () => new ImplMissingDefaultLayerError({ implPath: implRelativePath }),
+    ),
+  );
 
   const groupSpec = leaf.spec;
   const expectedFunctionNames = Object.keys(groupSpec.functions);
 
-  const context = yield* buildImplLayer(
-    bundled.module.default as Layer.Layer<unknown>,
-  );
+  const context = yield* buildImplLayer(implLayer);
   const finalizedGroupImpl = yield* Option.match(
     findFinalizedGroupImpl(context),
     {
