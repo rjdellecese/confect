@@ -72,13 +72,14 @@ import { DatabaseReader, DocumentIds } from "./confect/_generated/services";
 const findNote = (input: string) =>
   Effect.gen(function* () {
     const documentIds = yield* DocumentIds;
-    const parsedId = yield* documentIds.parse("notes", input);
-    if (Option.isNone(parsedId)) return Option.none();
-
     const databaseReader = yield* DatabaseReader;
-    return Option.some(
-      yield* databaseReader.table("notes").get(parsedId.value),
-    );
+    const parsedId = yield* documentIds.parse("notes", input);
+
+    return yield* Option.match(parsedId, {
+      onNone: () => Effect.succeed(Option.none()),
+      onSome: (noteId) =>
+        databaseReader.table("notes").get(noteId).pipe(Effect.map(Option.some)),
+    });
   });
 ```
 
@@ -105,14 +106,20 @@ import { DatabaseReader, DocumentIds } from "./confect/_generated/services";
 const findNoteFromUnknownId = (input: string) =>
   Effect.gen(function* () {
     const documentIds = yield* DocumentIds;
-    const identifiedId = yield* documentIds.identify(input);
-    if (Option.isNone(identifiedId)) return Option.none();
-
-    const matchedId = identifiedId.value;
-    if (matchedId.table !== "notes") return Option.none();
-
     const databaseReader = yield* DatabaseReader;
-    return Option.some(yield* databaseReader.table("notes").get(matchedId.id));
+    const identifiedId = yield* documentIds.identify(input);
+
+    return yield* Option.match(identifiedId, {
+      onNone: () => Effect.succeed(Option.none()),
+      onSome: (matchedId) => {
+        if (matchedId.table !== "notes") return Effect.succeed(Option.none());
+
+        return databaseReader
+          .table("notes")
+          .get(matchedId.id)
+          .pipe(Effect.map(Option.some));
+      },
+    });
   });
 ```
 
