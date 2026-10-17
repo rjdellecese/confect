@@ -3,7 +3,6 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import {
   bundleRequire,
-  dynamicImport,
   injectFileScopePlugin,
   JS_EXT_RE,
   loadTsConfig,
@@ -30,12 +29,10 @@ import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
+import * as CompiledModule from "./CompiledModule";
 import { logCoalescedBuildWarnings } from "./log";
 
-export interface Bundled {
-  readonly module: any;
-  readonly metafile: esbuild.Metafile;
-}
+export type Bundled = CompiledModule.LoadedModule;
 
 /**
  * `bundle-require` sets `absWorkingDir: cwd` on the underlying esbuild build,
@@ -638,20 +635,20 @@ const entryMetafile = (
 });
 
 /**
- * Bundle a TypeScript entry point with esbuild via {@link bundleRequire} and
- * import the result. `bundle-require` writes a temp `.mjs` next to the source,
- * `import()`s it, and deletes it—so third-party `node_modules` externals
- * resolve through the user's normal `node_modules` walk, while first-party
- * workspace deps are bundled by {@link bundleWorkspacePlugin} and tsconfig
- * `paths` aliases stay inside the bundle.
+ * Compile a TypeScript entry point with esbuild via {@link bundleRequire}. The
+ * temporary artifact lives under the source directory until scope closure, so
+ * third-party `node_modules` externals resolve through the user's normal
+ * `node_modules` walk, while first-party workspace deps are bundled by
+ * {@link bundleWorkspacePlugin} and tsconfig `paths` aliases stay inside the
+ * bundle.
  *
  * `cwd` is set to the entry's directory so `bundle-require`'s `tsconfig.json`
  * discovery (which walks upward from `cwd`) lands on the project's tsconfig
  * regardless of where `confect codegen` was invoked from, and so esbuild
  * resolves relative imports against the entry's location.
  *
- * The returned pair carries both the imported module and the esbuild metafile
- * so callers can inspect the import graph (see {@link directlyImports}); the
+ * The returned artifact carries its import URL and the esbuild metafile so
+ * callers can inspect the import graph before evaluating the module; the
  * metafile is captured via a small `onEnd` plugin because `bundle-require`
  * itself only exposes a flat `dependencies: string[]`.
  *
@@ -660,10 +657,14 @@ const entryMetafile = (
  * resolutions (e.g. `convex.config` imports) before the workspace and
  * externalization heuristics see them.
  */
-export const bundle = Effect.fn("Bundler.bundle")(function* (
+export const compile = Effect.fn("Bundler.compile")(function* (
   entryPoint: string,
   options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
-): Effect.fn.Return<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> {
+): Effect.fn.Return<
+  CompiledModule.CompiledModule,
+  BundlerError,
+  Path.Path | FileSystem.FileSystem | Scope.Scope
+> {
   const path = yield* Path.Path;
   const fs = yield* FileSystem.FileSystem;
 
@@ -688,26 +689,17 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
           entry.value.source,
           entry.value.output,
         );
-        const module = yield* Effect.tryPromise({
-          try: () =>
-            dynamicImport(pathToFileURL(entry.value.output).href, {
-              format: "esm",
-            }),
-          catch: (cause) => new BundlerError({ cause }),
-        }).pipe(
-          Effect.ensuring(
-            logCoalescedBuildWarnings(
-              compilation.value.warnings.filter(
-                (warning) =>
-                  warning.location &&
-                  metafile.inputs[
-                    path.resolve(compilation.value.cwd, warning.location.file)
-                  ],
-              ),
-            ),
+        return {
+          url: pathToFileURL(entry.value.output).href,
+          metafile,
+          warnings: compilation.value.warnings.filter(
+            (warning) =>
+              warning.location &&
+              metafile.inputs[
+                path.resolve(compilation.value.cwd, warning.location.file)
+              ],
           ),
-        );
-        return { module, metafile };
+        };
       }
     }
   }
@@ -719,6 +711,12 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
 
   const cwd = path.dirname(entryPoint);
   const selfReferences = yield* packageSelfReferencePatterns(cwd);
+  const directory = yield* fs
+    .makeTempDirectoryScoped({
+      directory: cwd,
+      prefix: ".confect-bundle-",
+    })
+    .pipe(Effect.mapError((cause) => new BundlerError({ cause })));
   const skipPatterns = yield* Effect.try({
     try: () => [
       ...tsconfigPathsToRegExp(
@@ -730,11 +728,14 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
   });
   const result = yield* Effect.tryPromise({
     try: () =>
-      bundleRequire({
+      bundleRequire<string>({
         filepath: entryPoint,
         cwd,
         format: "esm",
         notExternal: selfReferences,
+        require: (url) => url,
+        getOutputFile: () => path.join(directory, "entry.mjs"),
+        preserveTemporaryFile: true,
         esbuildOptions: {
           plugins: [
             ...(options?.plugins ?? []),
@@ -746,7 +747,7 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
       }),
     catch: (cause) => new BundlerError({ cause }),
   }).pipe(
-    Effect.ensuring(
+    Effect.tapError(() =>
       Effect.andThen(Ref.get(buildResultRef), (captured) =>
         logCoalescedBuildWarnings(captured.warnings),
       ),
@@ -759,10 +760,22 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
   }
 
   return {
-    module: result.mod,
+    url: result.mod,
     metafile: absolutizeMetafile(path, metafile, cwd),
+    warnings: (yield* Ref.get(buildResultRef)).warnings,
   };
 });
+
+export const bundle = Effect.fn("Bundler.bundle")(
+  (
+    entryPoint: string,
+    options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
+  ) =>
+    compile(entryPoint, options).pipe(
+      Effect.flatMap(CompiledModule.load),
+      Effect.scoped,
+    ),
+);
 
 const findMetafileInputKey = Effect.fnUntraced(function* (
   metafile: esbuild.Metafile,

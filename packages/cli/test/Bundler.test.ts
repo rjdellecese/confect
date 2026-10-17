@@ -1,4 +1,4 @@
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as FileSystem from "effect/FileSystem";
 import * as Console from "effect/Console";
 import * as ConfigProvider from "effect/ConfigProvider";
@@ -13,7 +13,9 @@ import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as References from "effect/References";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import * as Bundler from "@confect/cli/Bundler";
+import * as CompiledModule from "@confect/cli/CompiledModule";
 
 const BundlerLayer = Layer.mergeAll(NodePath.layer, NodeFileSystem.layer);
 
@@ -359,6 +361,38 @@ layer(BundlerLayer)("packageSelfReferencePatterns", (it) => {
         expect(
           yield* Bundler.packageSelfReferencePatterns(file("boundary")),
         ).toEqual([]);
+      }).pipe(Effect.scoped),
+  );
+});
+
+layer(BundlerLayer)("compile", (it) => {
+  it.effect.each(["individual", "batch"] as const)(
+    "keeps %s compilation separate from evaluation and releases its artifacts",
+    (mode) =>
+      Effect.gen(function* () {
+        const { file, fs } = yield* fixture({ "entry.ts": "" });
+        const marker = file("evaluated");
+        const markerLiteral = yield* Schema.encodeEffect(
+          Schema.fromJsonString(Schema.String),
+        )(marker);
+        yield* fs.writeFileString(
+          file("entry.ts"),
+          `import { writeFileSync } from "node:fs"; writeFileSync(${markerLiteral}, "evaluated"); export default 42;`,
+        );
+        const evaluate = Effect.gen(function* () {
+          const artifact = yield* Bundler.compile(file("entry.ts"));
+          expect(yield* fs.exists(marker)).toBe(false);
+          expect(yield* fs.exists(fileURLToPath(artifact.url))).toBe(true);
+          expect((yield* CompiledModule.load(artifact)).module.default).toBe(
+            42,
+          );
+          expect(yield* fs.readFileString(marker)).toBe("evaluated");
+          return artifact;
+        });
+        const artifact = yield* mode === "batch"
+          ? Bundler.withBatch([file("entry.ts")], evaluate)
+          : Effect.scoped(evaluate);
+        expect(yield* fs.exists(fileURLToPath(artifact.url))).toBe(false);
       }).pipe(Effect.scoped),
   );
 });
