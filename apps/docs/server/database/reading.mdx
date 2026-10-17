@@ -39,6 +39,97 @@ reader.table("notes").get("by_author", "John Doe");
 reader.table("users").get("by_name_and_age", "John Doe", 21);
 ```
 
+## Validate document IDs
+
+Use `DocumentIds` when you receive a string, such as a URL parameter, and need
+a table-typed ID before reading a document. Import the schema-typed service
+from `confect/_generated/services`. Confect provides it in queries, mutations,
+and middleware that covers only those function types, not in actions or HTTP
+handlers. An action or HTTP handler can call a query to perform the check.
+
+Both methods return an `Effect` containing an `Option`. Table arguments
+are limited to your schema's table names plus `_storage` and
+`_scheduled_functions`.
+
+| Method                | Use when                                                                                     | Result inside the `Effect`                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `parse(table, input)` | You expect a string to be an ID for a particular table and need to validate that assumption. | `Option<GenericId<typeof table>>`                                                        |
+| `identify(input)`     | You need to determine which known table a current-format ID belongs to.                      | `Option` of correlated `{ readonly table: Name; readonly id: GenericId<Name> }` variants |
+
+### Parse before reading
+
+Use `parse` to prove that an untrusted string is a valid ID for the expected table.
+On success, you receive the table-typed ID without a cast.
+
+`parse` returns `Some(id)` when the string is a valid ID for the specified table.
+Invalid strings and IDs for a different table return `None`.
+
+```ts
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import { DatabaseReader, DocumentIds } from "./confect/_generated/services";
+
+const findNote = (input: string) =>
+  Effect.gen(function* () {
+    const documentIds = yield* DocumentIds;
+    const databaseReader = yield* DatabaseReader;
+    const parsedId = yield* documentIds.parse("notes", input);
+
+    return yield* Option.match(parsedId, {
+      onNone: () => Effect.succeed(Option.none()),
+      onSome: (noteId) =>
+        databaseReader.table("notes").get(noteId).pipe(Effect.map(Option.some)),
+    });
+  });
+```
+
+Parsing does not prove that a document exists. The separate `get` can still
+fail with `GetByIdFailure`, for example after deletion. None of the `DocumentIds` methods
+establishes authorization or proves that an ID originated in your deployment.
+Check access before returning a document to the caller.
+
+### Identify an unknown table
+
+`identify` tries the tables in your schema and both system tables using native
+runtime ID lookups, not document scans. It validates the input in the same way
+as `parse`. An invalid string or an ID that matches none of the known tables
+returns `None`.
+
+The result keeps each table name paired with its ID type. Narrow `table` to
+use `id` with a specific table:
+
+```ts
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import { DatabaseReader, DocumentIds } from "./confect/_generated/services";
+
+const findNoteFromUnknownId = (input: string) =>
+  Effect.gen(function* () {
+    const documentIds = yield* DocumentIds;
+    const databaseReader = yield* DatabaseReader;
+    const identifiedId = yield* documentIds.identify(input);
+
+    return yield* Option.match(identifiedId, {
+      onNone: () => Effect.succeed(Option.none()),
+      onSome: (matchedId) => {
+        if (matchedId.table !== "notes") return Effect.succeed(Option.none());
+
+        return databaseReader
+          .table("notes")
+          .get(matchedId.id)
+          .pipe(Effect.map(Option.some));
+      },
+    });
+  });
+```
+
+Identification is scoped to the current runtime and schema. It is not a
+frontend-only decoder or a way to discover tables across Convex components.
+
+Invalid or mismatching IDs return `None`. Unexpected native runtime failures
+remain Effect defects; the service does not disguise them as invalid input.
+This failure behavior applies to both methods.
+
 ## Retrieve multiple documents
 
 ### Indexes
