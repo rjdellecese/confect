@@ -11,8 +11,7 @@ caller to use a raw Convex client or context is interoperability, not Confect AP
 parity. Preserve explicit user-approved exclusions, such as legacy document ID
 conversion, rather than reopening them under the general parity goal.
 
-The Capy automation runs daily at 04:00 America/New_York; its schedule and enabled
-state live in Capy, not in this repository.
+This workflow runs as a Capy automation.
 
 ## Scope and shared policy
 
