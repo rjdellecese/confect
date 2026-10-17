@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import { pipe } from "effect/Function";
 import * as HashSet from "effect/HashSet";
+import * as HashMap from "effect/HashMap";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
@@ -29,7 +30,6 @@ import {
   validateAllImpls,
   withImplFiles,
   type LeafModule,
-  type LoadedLeafModule,
 } from "../LeafModule";
 import {
   logFileAdded,
@@ -41,6 +41,7 @@ import {
 } from "../log";
 import { ProjectRoot } from "../ProjectRoot";
 import { assemblyNodesFromLeaves } from "../SpecAssemblyNode";
+import type { SpecModulePath } from "../SpecModulePath";
 import * as TableModule from "../TableModule";
 import * as templates from "../templates";
 import {
@@ -153,7 +154,7 @@ const runCodegen = Effect.gen(function* () {
     { concurrency: "unbounded" },
   );
   yield* validateAllImpls(leaves);
-  yield* generateGroupRegisteredFunctions(leaves);
+  yield* generateGroupRegisteredFunctions(snapshot.leaves);
   yield* removeObsoleteRegisteredFunctions(leaves);
   const [functionPaths] = yield* Effect.all(
     [
@@ -199,7 +200,14 @@ export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
           GenerationSnapshot.update(snapshot, leaves),
         );
         yield* validateAllImpls(leaves);
-        yield* generateGroupRegisteredFunctions(leaves);
+        const updatedPaths = HashSet.fromIterable(
+          Array.map(leaves, (leaf) => leaf.relativePath.replaceAll("\\", "/")),
+        );
+        yield* generateGroupRegisteredFunctions(
+          HashMap.filter(next.leaves, (_, relativePath) =>
+            HashSet.has(updatedPaths, relativePath),
+          ),
+        );
         yield* FunctionModule.applyFunctionPlan(
           GenerationSnapshot.diff(snapshot, next),
         );
@@ -260,15 +268,18 @@ const generateAssembledSpecs = Effect.fnUntraced(function* (
 });
 
 const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
-  leaves: ReadonlyArray<LoadedLeafModule>,
+  leaves: Iterable<readonly [SpecModulePath, GenerationSnapshot.GroupTree]>,
 ) {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
   yield* Effect.forEach(
     leaves,
-    Effect.fnUntraced(function* (leaf: LoadedLeafModule) {
-      const registryRelativePath = yield* registeredFunctionsRelativePath(leaf);
+    Effect.fnUntraced(function* ([relativePath, group]) {
+      const registryRelativePath = path.join(
+        "registeredFunctions",
+        relativePath.slice(0, -".spec.ts".length) + ".ts",
+      );
       const registryPath = path.join(
         confectDirectory,
         "_generated",
@@ -280,7 +291,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
         yield* fs.makeDirectory(registryDir, { recursive: true });
       }
 
-      const implRelativePath = yield* implPathForSpec(leaf.relativePath);
+      const implRelativePath = yield* implPathForSpec(relativePath);
       const schemaImportPath = yield* toModuleImportPath(
         path.relative(
           path.dirname(registryPath),
@@ -292,7 +303,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
       const specImportPath = yield* toModuleImportPath(
         path.relative(
           path.dirname(registryPath),
-          path.join(confectDirectory, leaf.relativePath),
+          path.join(confectDirectory, relativePath),
         ),
       );
       const implImportPath = yield* toModuleImportPath(
@@ -303,7 +314,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
       );
 
       const contents = yield* templates.registeredFunctionsForGroup({
-        spec: leaf.spec,
+        group,
         schemaImportPath,
         specImportPath,
         implImportPath,

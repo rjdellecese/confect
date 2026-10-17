@@ -185,6 +185,80 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
     );
 
     it.effect(
+      "rewrites only the registry when function provenance changes",
+      () =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          let { snapshot } = yield* project.provide(generateWithSnapshot);
+          const registry = path.join(
+            "confect",
+            "_generated",
+            "registeredFunctions",
+            "notes.ts",
+          );
+          const nativeSpec = `import { FunctionSpec, GroupSpec } from "@confect/core";
+import type { RegisteredQuery } from "convex/server";
+export default GroupSpec.make().addFunction(FunctionSpec.convexPublicQuery<RegisteredQuery<"public", {}, null>>()("list"));`;
+          const nativeImpl = `import { FunctionImpl, GroupImpl } from "@confect/server";
+import * as Layer from "effect/Layer";
+import { queryGeneric } from "convex/server";
+import databaseSchema from "./_generated/schema";
+import notes from "./notes.spec";
+const list = FunctionImpl.make(databaseSchema, notes, "list", queryGeneric(() => null));
+export default GroupImpl.make(databaseSchema, notes).pipe(Layer.provide(list), GroupImpl.finalize);`;
+          for (const { spec, impl, registration } of [
+            {
+              spec: nativeSpec,
+              impl: nativeImpl,
+              registration: "RegisteredFunctions.buildForGroup<",
+            },
+            {
+              spec: Project.spec,
+              impl: Project.impl,
+              registration: 'handler: forward(definitions["list"].handler)',
+            },
+          ]) {
+            yield* project.write("confect/notes.spec.ts", spec);
+            yield* project.write("confect/notes.impl.ts", impl);
+            const before = snapshot;
+            const writes = yield* Project.writtenFiles(
+              project.provide(
+                updateDeclarations(
+                  snapshot,
+                  [
+                    {
+                      _tag: "Spec",
+                      relativePath: SpecModulePath.make("notes.spec.ts"),
+                    },
+                  ],
+                  [],
+                ).pipe(
+                  Effect.tap((next) =>
+                    Effect.sync(() => {
+                      snapshot = next;
+                    }),
+                  ),
+                ),
+              ),
+            );
+            expect(writes).toEqual([path.join(project.root, registry)]);
+            expect(GenerationSnapshot.diff(before, snapshot)).toEqual({
+              removed: [],
+              changed: [],
+            });
+            const incremental = yield* project.generatedFiles;
+            expect(incremental[registry]).toContain(registration);
+            expect(
+              yield* Project.writtenFiles(project.provide(codegenHandler)),
+            ).toEqual([]);
+            expect(yield* project.generatedFiles).toEqual(incremental);
+          }
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "checks global parent collisions before validating an updated implementation",
       () =>
         Effect.gen(function* () {
