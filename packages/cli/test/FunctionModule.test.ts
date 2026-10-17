@@ -127,7 +127,7 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
             "typedErrorsNode.spec.ts",
             {
               runtime: "Node",
-              functionNames: ["failingNodeAction"],
+              functions: [{ name: "failingNodeAction", provenance: "Confect" }],
               groups: {},
             },
           ],
@@ -159,11 +159,13 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
             "notes.spec.ts",
             {
               runtime: "Convex",
-              functionNames: [],
+              functions: [],
               groups: {
                 archived: {
                   runtime: "Node",
-                  functionNames: ["failingNodeAction"],
+                  functions: [
+                    { name: "failingNodeAction", provenance: "Confect" },
+                  ],
                   groups: {},
                 },
               },

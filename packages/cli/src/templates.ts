@@ -1,5 +1,7 @@
 import * as Effect from "effect/Effect";
-import type * as GroupSpec from "@confect/core/GroupSpec";
+import * as Array from "effect/Array";
+import * as Record from "effect/Record";
+import type { GroupTree } from "./GenerationSnapshot";
 import { CodeBlockWriter } from "./CodeBlockWriter";
 import {
   render as renderSpecAssembly,
@@ -438,37 +440,36 @@ const docsEffect = Effect.fnUntraced(function* ({
 });
 
 export const registeredFunctionsForGroup = ({
-  spec,
+  group,
   schemaImportPath,
   specImportPath,
   implImportPath,
 }: Parameters<typeof registeredFunctionsForGroupEffect>[0]) =>
   registeredFunctionsForGroupEffect({
-    spec,
+    group,
     schemaImportPath,
     specImportPath,
     implImportPath,
   });
 
 const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
-  spec,
+  group,
   schemaImportPath,
   specImportPath,
   implImportPath,
 }: {
-  spec: GroupSpec.AnyWithProps;
+  group: GroupTree;
   schemaImportPath: string;
   specImportPath: string;
   implImportPath: string;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-  const useNode = spec.runtime === "Node";
+  const useNode = group.runtime === "Node";
 
-  const hasConfectFunctions = (group: GroupSpec.AnyWithProps): boolean =>
-    Object.values(group.functions).some(
-      (functionSpec) => functionSpec.functionProvenance._tag === "Confect",
-    ) || Object.values(group.groups).some(hasConfectFunctions);
-  const forwarding = !useNode && hasConfectFunctions(spec);
+  const hasConfectFunctions = (tree: GroupTree): boolean =>
+    Array.some(tree.functions, ({ provenance }) => provenance === "Confect") ||
+    Record.some(tree.groups, hasConfectFunctions);
+  const forwarding = !useNode && hasConfectFunctions(group);
 
   if (useNode) {
     yield* cbw.writeLine(
@@ -502,19 +503,19 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
       `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
     );
   } else {
-    const bindings = (group: GroupSpec.AnyWithProps, path: string): string =>
+    const bindings = (tree: GroupTree, path: string): string =>
       `{
 ${[
-  ...Object.entries(group.functions).map(([name, functionSpec]) => {
+  ...Array.map(tree.functions, ({ name, provenance }) => {
     const key = JSON.stringify(name);
     const definition = `${path}[${key}]`;
     return `[${key}]: ${
-      functionSpec.functionProvenance._tag === "Convex"
+      provenance === "Convex"
         ? `${definition}.handler`
         : `RegisteredConvexFunction.register({ ...${definition}, handler: forward(${definition}.handler) })`
     },`;
   }),
-  ...Object.entries(group.groups).map(([name, child]) => {
+  ...Array.map(Record.toEntries(tree.groups), ([name, child]) => {
     const key = JSON.stringify(name);
     return `[${key}]: ${bindings(child, `${path}[${key}]`)},`;
   }),
@@ -524,7 +525,7 @@ ${[
 
 const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(databaseSchema, groupLayer);
 
-export default ${bindings(spec, "definitions")} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
+export default ${bindings(group, "definitions")} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
   }
 
   return yield* cbw.toString();

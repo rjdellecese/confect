@@ -1,7 +1,9 @@
 import { fileURLToPath } from "node:url";
 import * as Bundler from "@confect/cli/Bundler";
+import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
+import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import * as Schema from "effect/Schema";
-import type { LeafModule } from "@confect/cli/LeafModule";
+import { loadSpec, type LeafModule } from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
 import { FunctionSpec, GroupSpec, Refs, Spec } from "@confect/core";
@@ -9,8 +11,10 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as HashMap from "effect/HashMap";
 import * as FileSystem from "effect/FileSystem";
 import * as Order from "effect/Order";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
@@ -18,6 +22,7 @@ import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import { queryGeneric } from "convex/server";
+import { vi } from "vitest";
 
 const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
   const relativePath = `${pathSegments.join("/")}.spec.ts`;
@@ -30,19 +35,50 @@ const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
   };
 };
 
+const snapshotGroup = Effect.fnUntraced(
+  function* (spec: GroupSpec.AnyWithProps) {
+    yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        vi.spyOn(Bundler, "bundle").mockReturnValue(
+          Effect.succeed({
+            module: { default: spec },
+            metafile: { inputs: {}, outputs: {} },
+          }),
+        ),
+      ),
+      (spy) => Effect.sync(() => spy.mockRestore()),
+    );
+    const leaf = yield* loadSpec(leafAt(["notes"]));
+    const snapshot = yield* Effect.fromResult(
+      GenerationSnapshot.fromLoadedLeaves([leaf]),
+    );
+    const codec = Schema.fromJsonString(GenerationSnapshot.GenerationSnapshot);
+    const encoded = yield* Schema.encodeEffect(codec)(snapshot);
+    const decoded = yield* Schema.decodeEffect(codec)(encoded);
+    return Option.getOrThrow(
+      Array.head(Array.fromIterable(HashMap.values(decoded.leaves))),
+    );
+  },
+  Effect.scoped,
+  Effect.provide(NodeServices.layer),
+  Effect.provideService(ConfectDirectory, { get: Effect.succeed("/confect") }),
+);
+
 it.effect.each([false, true])(
   "keeps handler forwarding local only for isolate groups (useNode=%s)",
   (useNode) =>
     Effect.gen(function* () {
       const code = yield* templates.registeredFunctionsForGroup({
-        spec: useNode
-          ? GroupSpec.makeNode()
-          : GroupSpec.make().addFunction(
-              FunctionSpec.publicQuery({
-                name: "get",
-                returns: () => Schema.String,
-              }),
-            ),
+        group: yield* snapshotGroup(
+          useNode
+            ? GroupSpec.makeNode()
+            : GroupSpec.make().addFunction(
+                FunctionSpec.publicQuery({
+                  name: "get",
+                  returns: () => Schema.String,
+                }),
+              ),
+        ),
         schemaImportPath: "../schema",
         specImportPath: "../../notes.spec",
         implImportPath: "../../notes.impl",
@@ -94,7 +130,7 @@ it.effect(
           ),
       });
       const code = yield* templates.registeredFunctionsForGroup({
-        spec,
+        group: yield* snapshotGroup(spec),
         schemaImportPath: "../schema",
         specImportPath: "../../notes.spec",
         implImportPath: "../../notes.impl",
@@ -122,7 +158,7 @@ it.effect.each([
   (spec) =>
     Effect.gen(function* () {
       const code = yield* templates.registeredFunctionsForGroup({
-        spec,
+        group: yield* snapshotGroup(spec),
         schemaImportPath: "../schema",
         specImportPath: "../../notes.spec",
         implImportPath: "../../notes.impl",
@@ -203,7 +239,7 @@ declare const implementation: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>;
 export default implementation;`,
               );
               const contents = yield* templates.registeredFunctionsForGroup({
-                spec,
+                group: yield* snapshotGroup(spec),
                 schemaImportPath: "./schema",
                 specImportPath: `./${name}.spec`,
                 implImportPath: `./${name}.impl`,
