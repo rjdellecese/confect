@@ -428,11 +428,14 @@ const syncLoop = Effect.fnUntraced(function* (
       const nextSnapshot = yield* SyncState.Operation.$match(operation, {
         Generate: () => Evaluation.generateSnapshot,
         Update: ({ snapshot, declarations, paths }) =>
-          Evaluation.updateDeclarations(snapshot, declarations, paths),
-        Validate: ({ snapshot, paths }) =>
-          (paths.length === 0 ? Effect.void : Evaluation.validate(paths)).pipe(
-            Effect.as(snapshot),
+          Compilation.withPreparedRevisions(
+            Evaluation.updateDeclarations(snapshot, declarations, paths),
           ),
+        Validate: ({ snapshot, paths }) =>
+          (paths.length === 0
+            ? Effect.void
+            : Compilation.withPreparedRevisions(Evaluation.validate(paths))
+          ).pipe(Effect.as(snapshot)),
       }).pipe(
         Effect.mapError(
           (error) =>
