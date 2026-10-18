@@ -420,7 +420,7 @@ const compileLive = Effect.fn("Bundler.compileLive")(
       entries: HashMap.fromIterable(artifacts),
       metafile: result.metafile,
       warnings: result.warnings,
-      cwd,
+      cwd: result.cwd,
     } satisfies BatchCompilation;
   },
   Effect.mapError((cause) =>

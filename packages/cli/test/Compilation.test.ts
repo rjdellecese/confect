@@ -54,6 +54,40 @@ const compileAndLoad = Effect.fn("Compilation.test.compileAndLoad")(function* (
 layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
+  it.effect("keeps warning ownership when reusing a wider context", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped();
+      const nested = path.join(root, "nested");
+      yield* fs.makeDirectory(nested);
+      const warning = path.join(root, "entry.ts");
+      const clean = path.join(nested, "entry.ts");
+      yield* fs.writeFileString(
+        warning,
+        "export default { duplicate: 1, duplicate: 2 };",
+      );
+      yield* fs.writeFileString(clean, "export default 1;");
+      yield* Effect.gen(function* () {
+        const initial = yield* Bundler.withBatch(
+          [warning, clean],
+          Bundler.compile(clean),
+        );
+        expect(initial.warnings).toEqual([]);
+        const reused = yield* Bundler.compile(clean);
+        expect(reused.origin?.context).toBe(initial.origin?.context);
+        expect(reused.warnings).toEqual([]);
+        const warned = yield* Bundler.compile(warning);
+        expect(warned.origin?.context).toBe(initial.origin?.context);
+        expect(warned.warnings).toHaveLength(1);
+        expect(warned.warnings[0]?.text).toContain("Duplicate key");
+      }).pipe(
+        Effect.provide(
+          Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+        ),
+      );
+    }).pipe(Effect.scoped),
+  );
   it.effect(
     "stabilizes unsolicited watch discovery outside confect and publishes readiness",
     () =>

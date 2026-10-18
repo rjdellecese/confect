@@ -25,6 +25,7 @@ import * as CompilationPlugin from "./CompilationPlugin";
 
 export interface Snapshot {
   readonly receipt: CompilationState.Receipt;
+  readonly cwd: string;
   readonly metafile: esbuild.Metafile;
   readonly warnings: ReadonlyArray<esbuild.Message>;
 }
@@ -136,6 +137,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   const fs = yield* FileSystem.FileSystem;
   const crypto = yield* Crypto.Crypto;
   const path = yield* Path.Path;
+  const cwd = path.resolve(options.absWorkingDir ?? ".");
   const directory = yield* fs.makeTempDirectoryScoped({
     prefix: "confect-context-",
   });
@@ -585,6 +587,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
         if (Option.isSome(existing))
           return {
             receipt,
+            cwd,
             metafile: relocateMetafile(
               metafile,
               output,
@@ -635,6 +638,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
         yield* ensureActive;
         return {
           receipt,
+          cwd,
           metafile: relocateMetafile(metafile, output, target, path),
           warnings: captured.warnings,
         } satisfies Snapshot;
