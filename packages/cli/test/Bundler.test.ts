@@ -657,7 +657,7 @@ layer(BundlerLayer)("withBatch", (it) => {
 
   it.effect("reuses an enclosing batch for a nested subset", () =>
     Effect.gen(function* () {
-      const { file } = yield* fixture({
+      const { file, path } = yield* fixture({
         "shared.ts": "export const shared = {};",
         "first.ts": 'export { shared } from "./shared";',
         "second.ts": 'export { shared } from "./shared";',
@@ -667,13 +667,58 @@ layer(BundlerLayer)("withBatch", (it) => {
         Effect.gen(function* () {
           const first = yield* Bundler.bundle(file("first.ts"));
           const second = yield* Bundler.withBatch(
-            [file("second.ts")],
+            [path.relative(".", file("second.ts"))],
             Bundler.bundle(file("second.ts")),
           );
           expect(first.module.shared).toBe(second.module.shared);
         }),
       );
     }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "uses constant-time canonical membership and defers output metadata",
+    () =>
+      Effect.gen(function* () {
+        const files = Object.fromEntries(
+          Array.from({ length: 64 }, (_, index) => [
+            `entry${index}.ts`,
+            "export default {};",
+          ]),
+        );
+        const { file, path } = yield* fixture(files);
+        const entries = Object.keys(files).map(file);
+        let resolutions = 0;
+        yield* Bundler.withBatch(
+          entries,
+          Effect.gen(function* () {
+            yield* Bundler.compile(file("entry63.ts"));
+            resolutions = 0;
+            const artifact = yield* Bundler.compile(file("entry63.ts"));
+            expect(resolutions).toBe(2);
+            expect(
+              Object.getOwnPropertyDescriptor(artifact.metafile, "outputs"),
+            ).toHaveProperty("get", expect.any(Function));
+            expect(Object.keys(artifact.metafile.inputs)).toEqual([
+              file("entry63.ts"),
+            ]);
+            const outputs = artifact.metafile.outputs;
+            expect(Object.keys(outputs)).toHaveLength(1);
+            expect(artifact.metafile.outputs).toBe(outputs);
+            expect(
+              Object.getOwnPropertyDescriptor(artifact.metafile, "outputs"),
+            ).not.toHaveProperty("get");
+          }),
+        ).pipe(
+          Effect.provideService(Path.Path, {
+            ...path,
+            resolve: (...parts) => {
+              resolutions++;
+              return path.resolve(...parts);
+            },
+          }),
+        );
+      }).pipe(Effect.scoped),
   );
 
   it.effect("does not touch unused entries and preserves the inner error", () =>
