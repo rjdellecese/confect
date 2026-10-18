@@ -11,18 +11,31 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 import * as Scope from "effect/Scope";
+import * as Ref from "effect/Ref";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
 import * as Bundler from "@confect/cli/Bundler";
 import * as Compilation from "@confect/cli/Compilation";
 import * as CompilationState from "@confect/cli/CompilationState";
 import * as CompiledModule from "@confect/cli/CompiledModule";
+import type * as CompilationInputs from "@confect/cli/CompilationInputs";
 
 const observe = Effect.gen(function* () {
   const compiler = yield* Compilation.Service;
   const queue = yield* Queue.unbounded<CompilationState.Revision>();
   yield* compiler.events.pipe(
     Stream.runForEach((revision) => Queue.offer(queue, revision)),
+    Effect.forkScoped,
+  );
+  return queue;
+});
+
+const observeRestarts = Effect.gen(function* () {
+  const compiler = yield* Compilation.Service;
+  const queue = yield* Queue.unbounded<CompilationInputs.RestartNotification>();
+  yield* compiler.restarts.pipe(
+    Stream.runForEach((event) => Queue.offer(queue, event)),
     Effect.forkScoped,
   );
   return queue;
@@ -153,7 +166,7 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   );
 
   it.effect(
-    "observes self-reference exports changes without source edits",
+    "requests a fresh session for self-reference exports changes without source edits",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -184,13 +197,18 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
         yield* manifest("./one.ts");
         yield* Effect.gen(function* () {
           const queue = yield* observe;
+          const restarts = yield* observeRestarts;
           const first = yield* Compilation.runJob(Bundler.bundle(entry));
           expect((yield* first.exit).module.default).toBe(1);
           yield* Queue.take(queue);
           yield* manifest("./two.ts");
-          expect((yield* Queue.take(queue)).errors).toEqual([]);
+          expect((yield* Queue.take(restarts)).paths).toContain(
+            path.join(root, "package.json"),
+          );
           const next = yield* Compilation.runJob(Bundler.bundle(entry));
-          expect((yield* next.exit).module.default).toBe(2);
+          expect(Exit.isFailure(next.exit)).toBe(true);
+          expect(next.receipts).toEqual([]);
+          expect(yield* Queue.poll(queue)).toEqual(Option.none());
         }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
       }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
   );
@@ -380,7 +398,7 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
       }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
   );
   it.effect(
-    "routes external export changes even when emitted import bytes stay equal",
+    "separates external manifest restarts from source compilation revisions",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -409,19 +427,28 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
         );
         yield* Effect.gen(function* () {
           const queue = yield* observe;
+          const restarts = yield* observeRestarts;
           const first = yield* Compilation.runJob(Bundler.compile(entry));
           const original = yield* first.exit;
-          const bytes = yield* fs.readFileString(fileURLToPath(original.url));
+          expect(original.origin?.roots).toEqual([entry]);
           yield* Queue.take(queue);
           yield* manifest("two");
-          const changed = yield* Queue.take(queue);
-          expect(changed.affectedRoots).toEqual([entry]);
-          const second = yield* Compilation.runJob(Bundler.compile(entry));
-          const next = yield* second.exit;
-          expect(yield* fs.readFileString(fileURLToPath(next.url))).toBe(bytes);
-          expect(next.metafile.inputs[entry]?.imports[0]?.path).toBe(
-            path.join(dependency, "two.js"),
+          const changed = yield* Queue.take(restarts);
+          expect(changed.paths).toContain(
+            path.join(dependency, "package.json"),
           );
+          const second = yield* Compilation.runJob(Bundler.compile(entry));
+          expect(Exit.isFailure(second.exit)).toBe(true);
+          expect(second.receipts).toEqual([]);
+          expect(second.failedReceipts).toEqual([]);
+          expect(yield* Queue.poll(queue)).toEqual(Option.none());
+          const compiler = yield* Compilation.Service;
+          const verification = yield* Compilation.runJob(compiler.verify);
+          expect(Exit.isFailure(verification.exit)).toBe(true);
+          expect(verification.failedReceipts).toEqual([]);
+          yield* compiler.reset;
+          const afterReset = yield* Compilation.runJob(Bundler.compile(entry));
+          expect(Exit.isFailure(afterReset.exit)).toBe(true);
         }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
       }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
   );
@@ -560,7 +587,7 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
       }).pipe(Effect.scoped),
   );
   it.effect(
-    "reports incompatible nested external scopes instead of resolving the wrong package",
+    "relocates nested external packages without changing their source scopes",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -576,7 +603,9 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
           );
           yield* fs.writeFileString(
             path.join(dependency, "index.js"),
-            "export default 1;",
+            directory === root
+              ? 'export default "root";'
+              : 'export default "nested";',
           );
           yield* fs.writeFileString(
             path.join(directory, "entry.ts"),
@@ -586,29 +615,21 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
         yield* Effect.gen(function* () {
           const first = path.join(root, "entry.ts");
           const second = path.join(nested, "entry.ts");
-          const queue = yield* observe;
           const job = yield* Compilation.runJob(
-            Bundler.withBatch([first, second], Bundler.compile(first)),
-          );
-          const result = yield* Effect.result(job.exit);
-          expect(Result.isFailure(result)).toBe(true);
-          if (Result.isFailure(result))
-            expect(result.failure.cause).toMatchObject({
-              errors: expect.arrayContaining([
-                expect.objectContaining({
-                  text: expect.stringContaining("different package scope"),
-                }),
-              ]),
-            });
-          expect(job.receipts).toEqual([]);
-          expect(job.failedReceipts).toHaveLength(1);
-          expect(job.failedReceipts[0]?.roots).toEqual([first]);
-          expect(
-            CompilationState.unacknowledgedRoots(
-              yield* Queue.take(queue),
-              job.failedReceipts,
+            Bundler.withBatch(
+              [first, second],
+              Effect.all([Bundler.bundle(first), Bundler.bundle(second)]),
             ),
+          );
+          const result = yield* job.exit;
+          expect(result.map((bundled) => bundled.module.default)).toEqual([
+            "root",
+            "nested",
+          ]);
+          expect(
+            Bundler.importersOfPackage(result[1], "dependency", () => true),
           ).toEqual([second]);
+          expect(job.failedReceipts).toEqual([]);
         }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
       }).pipe(Effect.scoped),
   );
@@ -655,5 +676,213 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
           ).toEqual([entry]);
         }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
       }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+  );
+  it.effect("relocates import and require conditions independently", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped();
+      const dependency = path.join(root, "node_modules", "conditional");
+      yield* fs.makeDirectory(dependency, { recursive: true });
+      yield* fs.writeFileString(
+        path.join(dependency, "package.json"),
+        '{ "type": "module", "exports": { "import": "./import.js", "require": "./require.cjs" } }',
+      );
+      yield* fs.writeFileString(
+        path.join(dependency, "import.js"),
+        'export default "import";',
+      );
+      yield* fs.writeFileString(
+        path.join(dependency, "require.cjs"),
+        'module.exports = "require";',
+      );
+      const entry = path.join(root, "entry.ts");
+      yield* fs.writeFileString(
+        entry,
+        'import value from "conditional"; export const imported = value; export const required = () => require("conditional");',
+      );
+      yield* Effect.gen(function* () {
+        const job = yield* Compilation.runJob(Bundler.bundle(entry));
+        const loaded = yield* job.exit;
+        expect(loaded.module.imported).toBe("import");
+        expect(loaded.metafile.inputs[entry]?.imports).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              kind: "import-statement",
+              path: path.join(dependency, "import.js"),
+              original: "conditional",
+            }),
+            expect.objectContaining({
+              kind: "require-call",
+              path: path.join(dependency, "require.cjs"),
+              original: "conditional",
+            }),
+          ]),
+        );
+      }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
+    }).pipe(Effect.scoped),
+  );
+  it.effect(
+    "verifies existing contexts without creating snapshots or consuming changed roots",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        yield* fs.writeFileString(entry, "export default 1;");
+        const snapshots = yield* Ref.make(0);
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const queue = yield* observe;
+          yield* compiler.verify;
+          expect(yield* compiler.topology).toEqual([]);
+          const first = yield* Compilation.runJob(Bundler.bundle(entry));
+          yield* first.exit;
+          yield* Queue.take(queue);
+          const topology = yield* compiler.topology;
+          const unchanged = yield* Compilation.runJob(compiler.verify);
+          yield* unchanged.exit;
+          expect((yield* Queue.take(queue)).affectedRoots).toEqual([]);
+          expect(unchanged.receipts).toEqual([]);
+          yield* fs.writeFileString(entry, "export default 2;");
+          const changed = yield* Compilation.runJob(compiler.verify);
+          yield* changed.exit;
+          const revision = yield* Queue.take(queue).pipe(
+            Effect.repeat({ until: (event) => event.affectedRoots.length > 0 }),
+          );
+          expect(
+            CompilationState.unacknowledgedRoots(revision, [
+              ...first.receipts,
+              ...changed.receipts,
+            ]),
+          ).toEqual([entry]);
+          yield* fs.writeFileString(entry, "export default ;");
+          const failed = yield* Compilation.runJob(compiler.verify);
+          yield* failed.exit;
+          expect(failed.failedReceipts).toEqual([]);
+          expect(failed.receipts).toEqual([]);
+          expect(
+            (yield* Queue.take(queue).pipe(
+              Effect.repeat({ until: (event) => event.errors.length > 0 }),
+            )).errors.length,
+          ).toBeGreaterThan(0);
+          expect(yield* compiler.topology).toEqual(topology);
+          expect(yield* Ref.get(snapshots)).toBe(1);
+        }).pipe(
+          Effect.provide(Compilation.layer({ ownedDirectories: [] })),
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            makeTempDirectoryScoped: (options) =>
+              fs
+                .makeTempDirectoryScoped(options)
+                .pipe(
+                  Effect.tap(() =>
+                    options?.prefix === ".confect-artifacts-"
+                      ? Ref.update(snapshots, (count) => count + 1)
+                      : Effect.void,
+                  ),
+                ),
+          }),
+        );
+      }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+  );
+  it.effect(
+    "restarts before resolving a newly installed shadowing dependency",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const nested = path.join(root, "nested");
+        yield* fs.makeDirectory(nested);
+        const install = (directory: string, value: string) =>
+          Effect.gen(function* () {
+            const dependency = path.join(
+              directory,
+              "node_modules",
+              "dependency",
+            );
+            yield* fs.makeDirectory(dependency, { recursive: true });
+            yield* fs.writeFileString(
+              path.join(dependency, "package.json"),
+              '{ "type": "module", "exports": "./index.js" }',
+            );
+            yield* fs.writeFileString(
+              path.join(dependency, "index.js"),
+              `export default "${value}";`,
+            );
+          });
+        yield* install(root, "root");
+        const entry = path.join(nested, "entry.ts");
+        yield* fs.writeFileString(
+          entry,
+          'export { default } from "dependency";',
+        );
+        yield* Effect.gen(function* () {
+          const restarts = yield* observeRestarts;
+          const first = yield* Compilation.runJob(Bundler.bundle(entry));
+          expect((yield* first.exit).module.default).toBe("root");
+          yield* install(nested, "nested");
+          const next = yield* Compilation.runJob(Bundler.bundle(entry));
+          expect(Exit.isFailure(next.exit)).toBe(true);
+          expect(next.receipts).toEqual([]);
+          expect((yield* Queue.take(restarts)).paths).toContain(
+            path.join(nested, "node_modules", "dependency", "package.json"),
+          );
+        }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
+      }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+  );
+  it.effect.each(["--conditions=custom", "--no-addons"])(
+    "rejects unsupported NODE_OPTIONS %s without starting a context",
+    (nodeOptions) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        yield* fs.writeFileString(entry, "export default 1;");
+        yield* Effect.gen(function* () {
+          const job = yield* Compilation.runJob(Bundler.compile(entry)).pipe(
+            Effect.provide(
+              ConfigProvider.layer(
+                ConfigProvider.fromUnknown({ NODE_OPTIONS: nodeOptions }),
+              ),
+            ),
+          );
+          const result = yield* Effect.result(job.exit);
+          expect(Result.isFailure(result)).toBe(true);
+          if (Result.isFailure(result))
+            expect(result.failure.cause).toMatchObject({
+              _tag: "UnsupportedCompilationRuntimeOptions",
+            });
+          expect(yield* (yield* Compilation.Service).topology).toEqual([]);
+        }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
+      }).pipe(Effect.scoped),
+  );
+  it.effect(
+    "rejects untagged custom plugins instead of guessing cache compatibility",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        yield* fs.writeFileString(entry, "export default 1;");
+        yield* Effect.gen(function* () {
+          const job = yield* Compilation.runJob(
+            Bundler.compile(entry, {
+              plugins: [{ name: "custom", setup() {} }],
+            }),
+          );
+          const result = yield* Effect.result(job.exit);
+          expect(Result.isFailure(result)).toBe(true);
+          if (Result.isFailure(result))
+            expect(result.failure.cause).toMatchObject({
+              _tag: "UnsupportedCompilationProfile",
+            });
+          expect(yield* (yield* Compilation.Service).topology).toEqual([]);
+        }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
+      }).pipe(Effect.scoped),
   );
 });

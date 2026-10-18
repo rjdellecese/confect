@@ -17,6 +17,11 @@ import * as Result from "effect/Result";
 import * as References from "effect/References";
 import * as Logger from "effect/Logger";
 import * as Schema from "effect/Schema";
+import * as Queue from "effect/Queue";
+import * as Stream from "effect/Stream";
+import * as ChildProcessCommand from "effect/process/ChildProcess";
+import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
+import * as esbuild from "esbuild";
 import * as Evaluation from "@confect/cli/Evaluation";
 import * as EvaluationSession from "@confect/cli/EvaluationSession";
 import * as Bundler from "@confect/cli/Bundler";
@@ -68,6 +73,153 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
       ).toBe(true);
     }
   };
+
+  it.effect.each(["external", "component"] as const)(
+    "resolves %s manifest changes in a fresh compiler process",
+    (mode) =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const spawner = yield* ChildProcessSpawner;
+        const dependency = path.join(
+          project.root,
+          "node_modules",
+          "session-dependency",
+        );
+        yield* fs.makeDirectory(dependency, { recursive: true });
+        for (const value of ["one", "two"])
+          yield* fs.writeFileString(
+            path.join(dependency, `${value}.js`),
+            mode === "component"
+              ? `import { defineComponent } from "convex/server"; export default defineComponent("${value}");`
+              : `export default "${value}";`,
+          );
+        const manifest = (value: string) =>
+          fs.writeFileString(
+            path.join(dependency, "package.json"),
+            `{ "type": "module", "exports": { "${mode === "component" ? "./convex.config" : "."}": "./${value}.js" } }`,
+          );
+        yield* manifest("one");
+        const entry = path.join(
+          project.root,
+          mode === "component" ? "convex.config.ts" : "entry.ts",
+        );
+        yield* fs.writeFileString(
+          entry,
+          mode === "component"
+            ? 'import { defineApp } from "convex/server"; import component from "session-dependency/convex.config"; const app = defineApp(); app.use(component); export default app;'
+            : 'export { default } from "session-dependency";',
+        );
+        const script = path.join(project.root, "CompilerSession.mjs");
+        const source = path.join(project.root, "CompilerSession.source.mjs");
+        yield* fs.writeFileString(
+          source,
+          `
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
+import * as Effect from "effect/Effect";
+import * as Console from "effect/Console";
+import * as Stream from "effect/Stream";
+import * as Bundler from ${yield* Schema.encodeEffect(Schema.fromJsonString(Schema.String))(path.resolve(import.meta.dirname, "../src/Bundler.ts"))};
+import * as Compilation from ${yield* Schema.encodeEffect(Schema.fromJsonString(Schema.String))(path.resolve(import.meta.dirname, "../src/Compilation.ts"))};
+import * as ConvexConfig from ${yield* Schema.encodeEffect(Schema.fromJsonString(Schema.String))(path.resolve(import.meta.dirname, "../src/ConvexConfig.ts"))};
+Effect.gen(function* () {
+  const result = yield* Compilation.runJob(process.argv[4] === "component"
+    ? ConvexConfig.discoverInstalledComponents(process.argv[2], "convex.config.ts")
+    : Bundler.bundle(process.argv[2]).pipe(Effect.map((loaded) => loaded.module.default)));
+  yield* Console.log("ready:" + JSON.stringify(yield* result.exit));
+  if (process.argv[3] === "watch") {
+    yield* Stream.runHead((yield* Compilation.Service).restarts);
+    yield* Console.log("restart");
+  }
+}).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })), Effect.scoped, Effect.provide(NodeServices.layer), NodeRuntime.runMain);
+`,
+        );
+        yield* Effect.promise(() =>
+          esbuild.build({
+            entryPoints: [source],
+            outfile: script,
+            bundle: true,
+            packages: "external",
+            platform: "node",
+            format: "esm",
+            logLevel: "silent",
+          }),
+        );
+        const first = yield* spawner.spawn(
+          ChildProcessCommand.make(process.execPath, [
+            script,
+            entry,
+            "watch",
+            mode,
+          ]),
+        );
+        const lines = yield* Queue.unbounded<string>();
+        yield* first.stdout.pipe(
+          Stream.decodeText(),
+          Stream.splitLines,
+          Stream.runForEach((line) => Queue.offer(lines, line)),
+          Effect.forkScoped,
+        );
+        const ready = yield* Queue.take(lines).pipe(
+          Effect.repeat({ until: (line) => line.startsWith("ready:") }),
+        );
+        expect(ready).toContain('"one"');
+        yield* manifest("two");
+        yield* Queue.take(lines).pipe(
+          Effect.repeat({ until: (line) => line === "restart" }),
+        );
+        expect(yield* first.exitCode).toBe(0);
+        const second = yield* spawner.spawn(
+          ChildProcessCommand.make(process.execPath, [
+            script,
+            entry,
+            "once",
+            mode,
+          ]),
+        );
+        const output = yield* second.stdout.pipe(
+          Stream.decodeText(),
+          Stream.mkString,
+        );
+        expect(yield* second.exitCode).toBe(0);
+        expect(output).toContain('"two"');
+        expect(second.pid).not.toBe(first.pid);
+      }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
+    { timeout: 25000 },
+  );
+
+  it.effect(
+    "generates a live snapshot with nested workspace dependency scopes",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const path = yield* Path.Path;
+        const job = yield* Compilation.runJob(
+          project.provide(Evaluation.generateSnapshot),
+        ).pipe(
+          Effect.provide(
+            Compilation.layer({
+              ownedDirectories: [
+                path.join(project.root, "confect", "_generated"),
+                path.join(project.root, "convex"),
+              ],
+            }),
+          ),
+        );
+        yield* job.exit;
+        expect(job.failedReceipts).toEqual([]);
+        expect(job.receipts.flatMap((receipt) => receipt.roots)).toEqual(
+          expect.arrayContaining([
+            path.join(project.root, "confect", "notes.impl.ts"),
+            path.join(project.root, "confect", "notes.spec.ts"),
+          ]),
+        );
+        expectWorkersExited();
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
 
   it.effect(
     "records successful and failed worker evaluation consumption",

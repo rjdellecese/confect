@@ -1,5 +1,7 @@
 import { createRequire, findPackageJSON, isBuiltin } from "node:module";
-import { externalPlugin, injectFileScopePlugin } from "bundle-require";
+import { injectFileScopePlugin } from "bundle-require";
+import { pathToFileURL } from "node:url";
+import { resolveModulePath } from "exsolve";
 import * as Effect from "effect/Effect";
 import * as Context from "effect/Context";
 import type * as FileSystem from "effect/FileSystem";
@@ -9,6 +11,7 @@ import * as Option from "effect/Option";
 import * as Array from "effect/Array";
 import * as Record from "effect/Record";
 import type * as esbuild from "esbuild";
+import * as CompilationInputs from "./CompilationInputs";
 
 export const namespace = "confect-generated";
 export const nativeProbe = Symbol("confect-native-resolution");
@@ -17,6 +20,15 @@ export const componentPattern = /convex\.config/;
 const resolveRequire = Option.liftThrowable(
   (specifier: string, importer: string) =>
     createRequire(importer).resolve(specifier),
+);
+
+const resolveImport = Option.liftThrowable(
+  (specifier: string, importer: string, conditions: ReadonlyArray<string>) =>
+    resolveModulePath(specifier, {
+      from: importer,
+      conditions: Array.prepend(conditions, "import"),
+      cache: false,
+    }),
 );
 
 export const packageManifest = Option.liftThrowable(
@@ -31,198 +43,217 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
   fs: FileSystem.FileSystem,
   ownedDirectories: ReadonlyArray<string>,
   authoredFiles: ReadonlyArray<string>,
+  conditions: ReadonlyArray<string>,
+  inputs: CompilationInputs.Inputs,
 ) {
   const imports = yield* Ref.make<
     Readonly<
       Record<
         string,
-        ReadonlyArray<{ readonly original: string; readonly path: string }>
+        ReadonlyArray<{
+          readonly original: string;
+          readonly path: string;
+          readonly emitted: string;
+        }>
       >
     >
   >({});
   const watches = Effect.fn("CompilationPlugin.watches")(function* (
     args: esbuild.OnResolveArgs,
   ) {
+    const segments = args.path.split("/");
+    const packageName = args.path.startsWith("@")
+      ? `${segments[0]}/${segments[1]}`
+      : segments[0];
+    const candidates =
+      packageName &&
+      !args.path.startsWith(".") &&
+      !args.path.startsWith("#") &&
+      !path.isAbsolute(args.path)
+        ? Array.map(
+            CompilationInputs.ancestors(path, path.dirname(args.importer)),
+            (directory) =>
+              path.join(directory, "node_modules", packageName, "package.json"),
+          )
+        : [];
+    yield* inputs.track(candidates);
+    yield* inputs.checkFiles(candidates);
     const manifest = Option.flatMap(
       packageManifest(args.path, args.importer),
       Option.fromNullishOr,
     );
-    if (Option.isNone(manifest)) return { watchFiles: [], watchDirs: [] };
-    const real = yield* fs
-      .realPath(manifest.value)
-      .pipe(Effect.orElseSucceed(() => manifest.value));
+    const known = yield* Option.match(manifest, {
+      onNone: () => Effect.succeed([] as string[]),
+      onSome: (file) =>
+        fs.realPath(file).pipe(
+          Effect.orElseSucceed(() => file),
+          Effect.map((real) => [file, real]),
+        ),
+    });
+    const watchFiles = Array.dedupe([...candidates, ...known]);
+    yield* inputs.track(watchFiles);
     return {
-      watchFiles: Array.dedupe([manifest.value, real]),
-      watchDirs: Array.dedupe([
-        path.dirname(manifest.value),
-        path.dirname(real),
-      ]),
+      watchFiles,
+      watchDirs: Array.dedupe(Array.map(watchFiles, path.dirname)),
     };
   });
-  const record = (args: esbuild.OnResolveArgs, resolved: string) =>
+  const record = (
+    args: esbuild.OnResolveArgs,
+    resolved: string,
+    emitted: string,
+  ) =>
     Effect.runSyncWith(Context.empty())(
       Ref.update(imports, (current) => ({
         ...current,
         [args.importer]: Array.append(current[args.importer] ?? [], {
           original: args.path,
           path: resolved,
+          emitted,
         }),
       })),
     );
   const plugin: esbuild.Plugin = {
     name: "confect:native-resolution",
     setup(build) {
-      return Effect.runPromiseWith(Context.empty())(
-        Effect.gen(function* () {
-          build.onStart(() => {
-            Effect.runSyncWith(Context.empty())(Ref.set(imports, {}));
-          });
-          let externalize: Parameters<
-            esbuild.PluginBuild["onResolve"]
-          >[1] = () => undefined;
-          yield* Effect.promise(() =>
-            Promise.resolve(
-              externalPlugin().setup({
-                ...build,
-                onResolve(_options, callback) {
-                  externalize = callback;
-                },
-              }),
-            ),
-          );
-          const injected = injectFileScopePlugin();
-          void injected.setup({
-            ...build,
-            onLoad(options, callback) {
-              build.onLoad(options, (args) =>
-                Promise.resolve(callback(args)).then((loaded) =>
-                  args.namespace === namespace && loaded
-                    ? { ...loaded, resolveDir: path.dirname(args.path) }
-                    : loaded,
-                ),
-              );
-            },
-          });
-          build.onResolve({ filter: /.*/ }, (args) =>
+      build.onStart(() =>
+        Effect.runPromiseWith(Context.empty())(
+          inputs.check.pipe(
+            Effect.andThen(Ref.set(imports, {})),
+            Effect.asVoid,
+          ),
+        ),
+      );
+      const injected = injectFileScopePlugin();
+      void injected.setup({
+        ...build,
+        onLoad(options, callback) {
+          build.onLoad(options, (args) =>
             Effect.runPromiseWith(Context.empty())(
               Effect.gen(function* () {
-                if (
-                  args.pluginData === nativeProbe ||
-                  (args.namespace !== "file" &&
-                    args.namespace !== "" &&
-                    args.namespace !== namespace)
-                )
-                  return undefined;
-                if (isBuiltin(args.path))
-                  return { path: args.path, external: true };
-                const resolved = yield* Effect.promise(() =>
-                  build.resolve(args.path, {
-                    importer: args.importer,
-                    resolveDir: args.resolveDir,
-                    kind: args.kind,
-                    namespace: "file",
-                    pluginData: nativeProbe,
-                  }),
+                yield* inputs.ensure;
+                if (args.namespace === "file")
+                  yield* inputs.trackSource(args.path);
+                const loaded = yield* Effect.promise(() =>
+                  Promise.resolve(callback(args)),
                 );
-                if (resolved.errors.length > 0) {
-                  if (
-                    !args.path.startsWith(".") &&
-                    !path.isAbsolute(args.path)
-                  ) {
-                    const required = resolveRequire(args.path, args.importer);
-                    const origin =
-                      build.initialOptions.absWorkingDir ?? args.resolveDir;
-                    const fromOutput = resolveRequire(
-                      args.path,
-                      path.join(origin, "_"),
-                    );
-                    if (Option.isNone(required) || Option.isNone(fromOutput))
-                      return undefined;
-                    if (fromOutput.value !== required.value)
-                      return {
-                        errors: [
-                          {
-                            text: `Persistent compilation cannot externalize "${args.path}" across package scopes.`,
-                          },
-                        ],
-                      };
-                    record(args, required.value);
-                    return {
-                      path: args.path,
-                      external: true,
-                      ...(yield* watches(args)),
-                    };
-                  }
-                  return undefined;
-                }
-                if (resolved.external) return resolved;
-                if (
-                  !Array.contains(authoredFiles, resolved.path) &&
-                  Array.some(ownedDirectories, (directory) => {
-                    const relative = path.relative(directory, resolved.path);
-                    return (
-                      relative !== ".." &&
-                      !relative.startsWith(`..${path.sep}`) &&
-                      !path.isAbsolute(relative)
-                    );
-                  })
-                )
-                  return { ...resolved, namespace };
-                if (
-                  args.kind !== "entry-point" &&
-                  /[\\/]node_modules[\\/]/.test(resolved.path)
-                ) {
-                  if (
-                    !args.path.startsWith(".") &&
-                    !path.isAbsolute(args.path)
-                  ) {
-                    const origin =
-                      build.initialOptions.absWorkingDir ?? args.resolveDir;
-                    const fromOutput = yield* Effect.promise(() =>
-                      build.resolve(args.path, {
-                        importer: path.join(origin, "_"),
-                        resolveDir: origin,
-                        kind: args.kind,
-                        namespace: "file",
-                        pluginData: nativeProbe,
-                      }),
-                    );
-                    if (
-                      fromOutput.path !== resolved.path ||
-                      fromOutput.errors.length > 0
-                    )
-                      return {
-                        errors: [
-                          {
-                            text: `Persistent compilation cannot externalize "${args.path}" from ${args.importer}: the artifact directory has a different package scope.`,
-                          },
-                        ],
-                      };
-                  }
-                  record(args, resolved.path);
-                  return {
-                    ...(yield* Effect.promise(() =>
-                      Promise.resolve(externalize(args)),
-                    )),
-                    ...(yield* watches(args)),
-                  };
-                }
-                return undefined;
+                return args.namespace === namespace && loaded
+                  ? { ...loaded, resolveDir: path.dirname(args.path) }
+                  : loaded;
               }),
             ),
           );
-          build.onLoad({ filter: /.*/, namespace }, (args) =>
-            Effect.runPromiseWith(Context.empty())(
-              fs.readFile(args.path).pipe(
-                Effect.map((contents) => ({
-                  contents,
-                  loader: path.extname(args.path) === ".json" ? "json" : "text",
-                  resolveDir: path.dirname(args.path),
-                })),
-              ),
-            ),
-          );
-        }),
+        },
+      });
+      build.onResolve({ filter: /.*/ }, (args) =>
+        Effect.runPromiseWith(Context.empty())(
+          Effect.gen(function* () {
+            yield* inputs.ensure;
+            if (
+              args.pluginData === nativeProbe ||
+              (args.namespace !== "file" &&
+                args.namespace !== "" &&
+                args.namespace !== namespace)
+            )
+              return undefined;
+            if (isBuiltin(args.path))
+              return { path: args.path, external: true };
+            const resolved = yield* Effect.promise(() =>
+              build.resolve(args.path, {
+                importer: args.importer,
+                resolveDir: args.resolveDir,
+                kind: args.kind,
+                namespace: "file",
+                pluginData: nativeProbe,
+              }),
+            );
+            if (resolved.errors.length > 0) {
+              if (!args.path.startsWith(".") && !path.isAbsolute(args.path)) {
+                const watched = yield* watches(args);
+                yield* inputs.checkFiles(watched.watchFiles);
+                const required = resolveRequire(args.path, args.importer);
+                if (Option.isNone(required)) return undefined;
+                yield* inputs.trackSource(required.value);
+                yield* inputs.track([required.value]);
+                const emitted =
+                  args.kind === "require-call" ||
+                  args.kind === "require-resolve"
+                    ? required.value
+                    : args.path;
+                record(args, required.value, emitted);
+                return {
+                  path: emitted,
+                  external: true,
+                  ...watched,
+                };
+              }
+              return undefined;
+            }
+            if (resolved.external) return resolved;
+            if (
+              !Array.contains(authoredFiles, resolved.path) &&
+              Array.some(ownedDirectories, (directory) => {
+                const relative = path.relative(directory, resolved.path);
+                return (
+                  relative !== ".." &&
+                  !relative.startsWith(`..${path.sep}`) &&
+                  !path.isAbsolute(relative)
+                );
+              })
+            )
+              return { ...resolved, namespace };
+            if (
+              args.kind !== "entry-point" &&
+              /[\\/]node_modules[\\/]/.test(resolved.path)
+            ) {
+              if (
+                (args.path.startsWith(".") || path.isAbsolute(args.path)) &&
+                !/[\\/]node_modules[\\/]/.test(args.path)
+              )
+                return undefined;
+              yield* inputs.trackSource(resolved.path);
+              const watched = yield* watches(args);
+              yield* inputs.checkFiles(watched.watchFiles);
+              const required = resolveRequire(args.path, args.importer);
+              const imported = resolveImport(
+                args.path,
+                args.importer,
+                conditions,
+              );
+              if (Option.isNone(required) && Option.isNone(imported))
+                return undefined;
+              const emitted =
+                args.kind === "require-call" || args.kind === "require-resolve"
+                  ? Option.getOrElse(required, () => resolved.path)
+                  : Option.match(imported, {
+                      onNone: () => args.path,
+                      onSome: (file) => pathToFileURL(file).href,
+                    });
+              const physical =
+                args.kind === "require-call" || args.kind === "require-resolve"
+                  ? Option.getOrElse(required, () => resolved.path)
+                  : Option.getOrElse(imported, () => resolved.path);
+              yield* inputs.track([physical]);
+              record(args, physical, emitted);
+              return {
+                path: emitted,
+                external: true,
+                ...watched,
+              };
+            }
+            return undefined;
+          }),
+        ),
+      );
+      build.onLoad({ filter: /.*/, namespace }, (args) =>
+        Effect.runPromiseWith(Context.empty())(
+          fs.readFile(args.path).pipe(
+            Effect.map((contents) => ({
+              contents,
+              loader: path.extname(args.path) === ".json" ? "json" : "text",
+              resolveDir: path.dirname(args.path),
+            })),
+          ),
+        ),
       );
     },
   };
@@ -234,20 +265,20 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
         ...metafile,
         inputs: Record.map(metafile.inputs, (metadata, file) => ({
           ...metadata,
-          imports: Array.map(metadata.imports, (imported) => {
-            const match = imported.external
-              ? Array.findFirst(
+          imports: Array.flatMap(metadata.imports, (imported) => {
+            const matching = imported.external
+              ? Array.filter(
                   captured[path.resolve(cwd, physicalPath(file))] ?? [],
-                  (item) => item.original === imported.path,
+                  (item) => item.emitted === imported.path,
                 )
-              : Option.none();
-            return Option.isSome(match)
-              ? {
+              : [];
+            return Array.isReadonlyArrayNonEmpty(matching)
+              ? Array.map(matching, (match) => ({
                   ...imported,
-                  path: match.value.path,
-                  original: match.value.original,
-                }
-              : imported;
+                  path: match.path,
+                  original: match.original,
+                }))
+              : [imported];
           }),
         })),
       };

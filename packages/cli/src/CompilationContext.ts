@@ -17,6 +17,7 @@ import * as Option from "effect/Option";
 import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 import * as CompilationState from "./CompilationState";
+import type * as CompilationInputs from "./CompilationInputs";
 
 export interface Snapshot {
   readonly receipt: CompilationState.Receipt;
@@ -54,6 +55,10 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   options: esbuild.BuildOptions,
   normalize: (metafile: esbuild.Metafile) => esbuild.Metafile,
   publish: (revision: CompilationState.Revision) => Effect.Effect<void>,
+  guard: Effect.Effect<
+    void,
+    BundlerError | CompilationInputs.RestartRequired
+  > = Effect.void,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const crypto = yield* Crypto.Crypto;
@@ -86,6 +91,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   const failures = new WeakMap<object, CompilationState.Receipt>();
   const capture = Effect.fn("CompilationContext.capture")(
     function* (result: esbuild.BuildResult) {
+      yield* guard;
       const number = yield* Ref.updateAndGet(revision, (value) => value + 1);
       const receipt = {
         context: topology.id,
@@ -179,6 +185,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       });
       identities.set(result, { receipt, metafile, values: next });
       yield* Ref.set(values, next);
+      yield* guard;
       yield* publish({
         ...receipt,
         roots: topology.roots,
@@ -222,37 +229,46 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     try: () => native.watch(),
     catch: (cause) => new BundlerError({ cause }),
   });
+  const rebuild = Effect.fn("CompilationContext.rebuild")(function* () {
+    yield* guard;
+    const outcome = yield* Effect.tryPromise({
+      try: () => native.rebuild(),
+      catch: (cause) => new BundlerError({ cause }),
+    }).pipe(Effect.result);
+    yield* guard;
+    if (Result.isFailure(outcome)) {
+      const cause = outcome.failure.cause;
+      if (
+        typeof cause !== "object" ||
+        cause === null ||
+        !("errors" in cause) ||
+        !globalThis.Array.isArray(cause.errors)
+      )
+        return yield* outcome.failure;
+      const receipt = Array.head(
+        Array.getSomes(
+          Array.map(cause.errors, (item: unknown) =>
+            typeof item === "object" && item !== null
+              ? Option.fromUndefinedOr(failures.get(item))
+              : Option.none(),
+          ),
+        ),
+      );
+      return yield* Option.isSome(receipt)
+        ? new CompilationState.Failed({ cause, receipt: receipt.value })
+        : outcome.failure;
+    }
+    return outcome.success;
+  });
   return {
     ...topology,
+    verify: rebuild().pipe(
+      Effect.catchTag("CompilationFailed", () => Effect.void),
+      Effect.asVoid,
+    ),
     consume: Effect.fn("CompilationContext.consume")(
       function* () {
-        const outcome = yield* Effect.tryPromise({
-          try: () => native.rebuild(),
-          catch: (cause) => new BundlerError({ cause }),
-        }).pipe(Effect.result);
-        if (Result.isFailure(outcome)) {
-          const cause = outcome.failure.cause;
-          if (
-            typeof cause !== "object" ||
-            cause === null ||
-            !("errors" in cause) ||
-            !globalThis.Array.isArray(cause.errors)
-          )
-            return yield* outcome.failure;
-          const receipt = Array.head(
-            Array.getSomes(
-              Array.map(cause.errors, (item: unknown) =>
-                typeof item === "object" && item !== null
-                  ? Option.fromUndefinedOr(failures.get(item))
-                  : Option.none(),
-              ),
-            ),
-          );
-          return yield* Option.isSome(receipt)
-            ? new CompilationState.Failed({ cause, receipt: receipt.value })
-            : outcome.failure;
-        }
-        const result = outcome.success;
+        const result = yield* rebuild();
         const captured = identities.get(result);
         if (!captured?.metafile || !result.outputFiles) {
           return yield* new BundlerError({

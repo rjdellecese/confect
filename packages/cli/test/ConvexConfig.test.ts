@@ -52,7 +52,7 @@ const directoriesLayer = ({
 
 layer(TestLayer)("discoverInstalledComponents", (it) => {
   it.effect.each(["standalone", "persistent"] as const)(
-    "refreshes component exports on a subsequent %s generation",
+    "handles component export changes according to the %s session policy",
     (mode) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -90,11 +90,19 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
           const second = yield* Compilation.runJob(
             discoverInstalledComponents(config, "convex.config.ts"),
           );
-          expect((yield* second.exit)[0]?.name).toBe("two");
-          if (mode === "persistent")
-            expect(second.receipts[0]?.context).toBe(
-              first.receipts[0]?.context,
+          if (mode === "persistent") {
+            expect(Result.isFailure(yield* Effect.result(second.exit))).toBe(
+              true,
             );
+            expect(second.receipts).toEqual([]);
+            const compiler = yield* Effect.serviceOption(Compilation.Service);
+            expect(compiler._tag).toBe("Some");
+            if (compiler._tag === "Some")
+              expect(yield* compiler.value.restartRequired).toMatchObject({
+                _tag: "Some",
+                value: { reason: "ResolutionInputsChanged" },
+              });
+          } else expect((yield* second.exit)[0]?.name).toBe("two");
         });
         yield* mode === "persistent"
           ? program.pipe(

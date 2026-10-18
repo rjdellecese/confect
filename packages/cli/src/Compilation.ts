@@ -17,6 +17,7 @@ import { BundlerError } from "./BuildError";
 import * as CompilationContext from "./CompilationContext";
 import * as CompilationState from "./CompilationState";
 import * as CompiledModule from "./CompiledModule";
+import * as CompilationInputs from "./CompilationInputs";
 
 class FailedAttempts extends Context.Service<
   FailedAttempts,
@@ -36,6 +37,14 @@ export class Service extends Context.Service<
     readonly ownedDirectories: ReadonlyArray<string>;
     readonly authoredFiles: ReadonlyArray<string>;
     readonly events: Stream.Stream<CompilationState.Revision>;
+    readonly restarts: Stream.Stream<
+      CompilationInputs.RestartNotification,
+      BundlerError
+    >;
+    readonly restartRequired: Effect.Effect<
+      Option.Option<CompilationInputs.RestartNotification>
+    >;
+    readonly resolutionInputs: CompilationInputs.Inputs;
     readonly compile: (
       request: Request,
     ) => Effect.Effect<
@@ -44,6 +53,7 @@ export class Service extends Context.Service<
       Scope.Scope
     >;
     readonly reset: Effect.Effect<void>;
+    readonly verify: Effect.Effect<void, BundlerError>;
     readonly topology: Effect.Effect<ReadonlyArray<CompilationState.Topology>>;
   }
 >()("@confect/cli/Compilation/Service") {}
@@ -71,11 +81,14 @@ export const canonicalPath = Effect.fn("Compilation.canonicalPath")(function* (
 export const layer = (options: {
   readonly ownedDirectories: ReadonlyArray<string>;
   readonly authoredFiles?: ReadonlyArray<string>;
+  readonly restartInputs?: ReadonlyArray<string>;
 }) =>
   Layer.effect(
     Service,
     Effect.gen(function* () {
       const owner = yield* Scope.Scope;
+      const resolutionInputs = yield* CompilationInputs.make();
+      yield* resolutionInputs.track(options.restartInputs ?? []);
       const services = Context.make(
         FileSystem.FileSystem,
         yield* FileSystem.FileSystem,
@@ -110,7 +123,28 @@ export const layer = (options: {
         ownedDirectories,
         authoredFiles,
         events: Stream.fromQueue(events),
+        restarts: resolutionInputs.events,
+        restartRequired: resolutionInputs.pending,
+        resolutionInputs,
         reset,
+        verify: lock
+          .withPermit(
+            Effect.gen(function* () {
+              yield* resolutionInputs.check;
+              yield* Effect.forEach(
+                yield* Ref.get(contexts),
+                (context) => context.verify,
+              );
+              yield* resolutionInputs.check;
+            }),
+          )
+          .pipe(
+            Effect.mapError((cause) =>
+              Schema.is(BundlerError)(cause)
+                ? cause
+                : new BundlerError({ cause }),
+            ),
+          ),
         topology: Ref.get(contexts).pipe(
           Effect.map((current) =>
             Array.map(current, ({ id, profile, roots }) => ({
@@ -122,6 +156,8 @@ export const layer = (options: {
         ),
         compile: Effect.fn("Compilation.compile")(
           function* (request) {
+            yield* Effect.forEach(request.roots, resolutionInputs.trackSource);
+            yield* resolutionInputs.check;
             const selected = yield* Effect.gen(function* () {
               const current = yield* Ref.get(contexts);
               const existing = Array.findFirst(current, (context) =>
@@ -144,6 +180,7 @@ export const layer = (options: {
                 request.options,
                 request.normalize,
                 (event) => Queue.offer(events, event).pipe(Effect.asVoid),
+                resolutionInputs.check,
               ).pipe(
                 Effect.provide(services),
                 Effect.provideService(Scope.Scope, scope),
@@ -160,7 +197,11 @@ export const layer = (options: {
               yield* Ref.set(contexts, Array.append(retained, entry));
               return entry;
             }).pipe(Effect.uninterruptible);
-            return yield* selected.consume().pipe(Effect.provide(services));
+            const outcome = yield* selected
+              .consume()
+              .pipe(Effect.provide(services), Effect.result);
+            yield* resolutionInputs.check;
+            return yield* Effect.fromResult(outcome);
           },
           Effect.mapError((cause) =>
             Schema.is(BundlerError)(cause) ||

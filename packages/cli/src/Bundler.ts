@@ -91,6 +91,7 @@ const resolveEsm = Option.liftThrowable((specifier: string, importer: string) =>
   resolveModulePath(specifier, {
     from: importer,
     conditions: ["node", "import"],
+    cache: false,
   }),
 );
 
@@ -100,7 +101,7 @@ const resolveCjs = Option.liftThrowable((specifier: string, importer: string) =>
 
 const resolveExternalEsm = Option.liftThrowable(
   (specifier: string, importer: string, conditions: string[]) =>
-    resolveModulePath(specifier, { from: importer, conditions }),
+    resolveModulePath(specifier, { from: importer, conditions, cache: false }),
 );
 
 export const resolveModule = (
@@ -390,11 +391,22 @@ const compileLive = Effect.fn("Bundler.compileLive")(
       return yield* new BundlerError({ cause: { _tag: "EmptyCompilation" } });
     const cwd = yield* Compilation.canonicalPath(path.dirname(first));
     const roots = yield* Effect.forEach(entries, Compilation.canonicalPath);
+    const conditions = [
+      "node",
+      ...(process.features.require_module ? ["module-sync"] : []),
+      ...(runtimeOptions["no-addons"] ? [] : ["node-addons"]),
+      ...Array.filter(
+        runtimeOptions.conditions ?? [],
+        (condition) => typeof condition === "string",
+      ),
+    ];
     const resolver = yield* CompilationPlugin.make(
       path,
       fs,
       service.ownedDirectories,
       service.authoredFiles,
+      conditions,
+      service.resolutionInputs,
     );
     const result = yield* service.compile({
       roots,
@@ -414,15 +426,7 @@ const compileLive = Effect.fn("Bundler.compileLive")(
         bundle: true,
         splitting: batch,
         logLevel: "silent",
-        conditions: [
-          "node",
-          ...(process.features.require_module ? ["module-sync"] : []),
-          ...(runtimeOptions["no-addons"] ? [] : ["node-addons"]),
-          ...Array.filter(
-            runtimeOptions.conditions ?? [],
-            (condition) => typeof condition === "string",
-          ),
-        ],
+        conditions,
         plugins: [...(options?.plugins ?? []), resolver.plugin],
       },
       normalize: (metafile) =>
