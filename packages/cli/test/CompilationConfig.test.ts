@@ -6,6 +6,10 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Result from "effect/Result";
 import * as esbuild from "esbuild";
+import * as ChildProcess from "effect/process/ChildProcess";
+import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
+import * as Stream from "effect/Stream";
+import { fileURLToPath } from "node:url";
 
 const fixture = Effect.fn("CompilationConfig.test.fixture")(function* (
   files: Readonly<Record<string, string>>,
@@ -22,20 +26,52 @@ const fixture = Effect.fn("CompilationConfig.test.fixture")(function* (
 });
 
 const build = (source: string, conditions?: string[]) =>
-  Effect.tryPromise({
-    try: () =>
-      esbuild.build({
-        entryPoints: [source],
-        bundle: true,
-        platform: "node",
-        format: "esm",
-        write: false,
-        logLevel: "silent",
-        ...(conditions === undefined ? {} : { conditions }),
-      }),
-    catch: (cause) =>
-      new CompilationConfig.DiscoveryFailed({ path: source, cause }),
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    let directory = path.dirname(path.resolve(source));
+    let configuration: string | undefined;
+    while (directory !== path.parse(directory).root) {
+      const candidate = path.join(directory, "tsconfig.json");
+      if (yield* fs.exists(candidate)) {
+        configuration = candidate;
+        break;
+      }
+      directory = path.dirname(directory);
+    }
+    return yield* Effect.tryPromise({
+      try: () =>
+        esbuild.build({
+          entryPoints: [source],
+          bundle: true,
+          platform: "node",
+          format: "esm",
+          write: false,
+          logLevel: "silent",
+          ...(configuration
+            ? { tsconfig: configuration }
+            : { tsconfigRaw: {} }),
+          ...(conditions === undefined ? {} : { conditions }),
+        }),
+      catch: (cause) =>
+        new CompilationConfig.DiscoveryFailed({ path: source, cause }),
+    });
   });
+
+const discoverFiles = <E = never, R = never>(
+  source: string,
+  observe?: (
+    file: string,
+    kind: CompilationConfig.CandidateKind,
+  ) => Effect.Effect<void, E, R>,
+  conditions?: ReadonlyArray<string>,
+  observeRuntime?: (
+    observation: CompilationConfig.RuntimeObservation,
+  ) => Effect.Effect<void, E, R>,
+) =>
+  CompilationConfig.discover(source, observe, conditions, observeRuntime).pipe(
+    Effect.map((discovery) => discovery.files),
+  );
 
 const entry = "export const node = <div />";
 const chosen = '{"compilerOptions":{"jsxFactory":"chosen.h"}}';
@@ -43,10 +79,165 @@ const chosen = '{"compilerOptions":{"jsxFactory":"chosen.h"}}';
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationConfig",
   (it) => {
+    it.effect(
+      "returns the lexical nearest tsconfig and all absent nearer candidates",
+      () =>
+        Effect.gen(function* () {
+          const { source, root, path } = yield* fixture({
+            "src/entry.tsx": entry,
+            "tsconfig.json": "{}",
+          });
+          const result = yield* CompilationConfig.discover(source);
+          expect(result).toEqual({
+            configuration: path.join(root, "tsconfig.json"),
+            files: [
+              path.join(root, "src/tsconfig.json"),
+              path.join(root, "tsconfig.json"),
+            ],
+          });
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect(
+      "excludes the filesystem root from the released find-up search",
+      () =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const fs = yield* FileSystem.FileSystem;
+          const inspected: string[] = [];
+          const source = path.join(
+            path.parse(path.resolve(".")).root,
+            "entry.tsx",
+          );
+          const result = yield* CompilationConfig.discover(source).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              realPath: (file) => {
+                inspected.push(file);
+                return fs.realPath(file);
+              },
+            }),
+          );
+          expect(result).toEqual({ configuration: undefined, files: [] });
+          expect(inspected).toEqual([]);
+        }),
+    );
+
+    it.effect(
+      "selects from the original entry symlink rather than its real directory",
+      () =>
+        Effect.gen(function* () {
+          const { root, path, fs } = yield* fixture({
+            "physical/entry.tsx": entry,
+            "physical/tsconfig.json": chosen.replace("chosen", "wrong"),
+            "lexical/tsconfig.json": chosen,
+          });
+          const source = path.join(root, "lexical/entry.tsx");
+          yield* fs.symlink(path.join(root, "physical/entry.tsx"), source);
+          const result = yield* CompilationConfig.discover(source);
+          expect(result.configuration).toBe(
+            path.join(root, "lexical/tsconfig.json"),
+          );
+          expect(result.files).not.toContain(
+            path.join(root, "physical/tsconfig.json"),
+          );
+          expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
+            "chosen.h(",
+          );
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect("selects lexical package configs even inside node_modules", () =>
+      Effect.gen(function* () {
+        const { root, path } = yield* fixture({
+          "node_modules/fixture/entry.tsx": entry,
+          "node_modules/fixture/tsconfig.json": chosen,
+        });
+        const source = path.join(root, "node_modules/fixture/entry.tsx");
+        const result = yield* CompilationConfig.discover(source);
+        expect(result.configuration).toBe(
+          path.join(root, "node_modules/fixture/tsconfig.json"),
+        );
+        expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
+          "chosen.h(",
+        );
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect(
+      "returns raw-empty selection without observing jsconfig or imported nested configs",
+      () =>
+        Effect.gen(function* () {
+          const { source, root, path, fs } = yield* fixture({
+            "src/entry.tsx": 'export { node } from "./nested/value";',
+            "src/jsconfig.json": '{"extends":',
+            "src/nested/tsconfig.json": '{"extends":',
+            "src/nested/value.tsx":
+              "const React = { createElement: () => 1 }; export const node = <div />;",
+          });
+          const reads: string[] = [];
+          const result = yield* CompilationConfig.discover(source).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              readFileString: (file, encoding) => {
+                reads.push(file);
+                return fs.readFileString(file, encoding);
+              },
+            }),
+          );
+          expect(result.configuration).toBeUndefined();
+          expect(result.files).toContain(path.join(root, "src/tsconfig.json"));
+          expect(result.files).not.toContain(
+            path.join(root, "src/jsconfig.json"),
+          );
+          expect(result.files).not.toContain(
+            path.join(root, "src/nested/tsconfig.json"),
+          );
+          expect(reads).toEqual([]);
+          const native = yield* build(source);
+          expect(native.outputFiles?.[0]?.text).toContain(
+            "React.createElement(",
+          );
+          expect(native.warnings).toHaveLength(0);
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect(
+      "rejects a nearest tsconfig directory without reading an ancestor config",
+      () =>
+        Effect.gen(function* () {
+          const { source, root, path, fs } = yield* fixture({
+            "src/entry.tsx": entry,
+            "src/tsconfig.json/contents": "{}",
+            "tsconfig.json": chosen,
+          });
+          const reads: string[] = [];
+          const result = yield* Effect.result(
+            CompilationConfig.discover(source).pipe(
+              Effect.provideService(FileSystem.FileSystem, {
+                ...fs,
+                readFileString: (file, encoding) => {
+                  reads.push(file);
+                  return fs.readFileString(file, encoding);
+                },
+              }),
+            ),
+          );
+          expect(Result.isFailure(result)).toBe(true);
+          if (Result.isFailure(result))
+            expect(result.failure).toMatchObject({
+              path: path.join(root, "src/tsconfig.json"),
+              reason: "NotRegularFile",
+            });
+          expect(reads).toEqual([]);
+        }).pipe(Effect.scoped),
+    );
+
     const nativeCases: ReadonlyArray<{
       readonly name: string;
       readonly files: Readonly<Record<string, string>>;
       readonly dependencies: ReadonlyArray<string>;
+      readonly factory?: string;
     }> = [
       {
         name: "nested array extends and nonstandard filenames",
@@ -147,37 +338,38 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         dependencies: ["node_modules/fixture/actual.custom"],
       },
       {
-        name: "jsconfig discovery",
+        name: "jsconfig is ignored when no tsconfig is selected",
         files: {
           "jsconfig.json": '{"extends":"./base.custom"}',
           "base.custom": chosen,
         },
-        dependencies: ["tsconfig.json", "jsconfig.json", "base.custom"],
+        dependencies: ["src/tsconfig.json", "tsconfig.json"],
+        factory: "React.createElement",
       },
       {
-        name: "nearest tsconfig overrides parent jsconfig",
+        name: "nearest tsconfig ignores parent jsconfig",
         files: {
           "jsconfig.json": '{"extends":"./parent.custom"}',
           "parent.custom": '{"compilerOptions":{"jsxFactory":"parent.h"}}',
           "src/tsconfig.json": chosen,
           "src/jsconfig.json": '{"extends":"./not-read"}',
         },
-        dependencies: ["src/tsconfig.json", "jsconfig.json", "parent.custom"],
+        dependencies: ["src/tsconfig.json"],
       },
     ];
     it.effect.each(nativeCases)(
       "matches native esbuild: $name",
-      ({ files, dependencies }) =>
+      ({ files, dependencies, factory = "chosen.h" }) =>
         Effect.gen(function* () {
           const { source, root, path } = yield* fixture({
             "src/entry.tsx": entry,
             ...files,
           });
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           for (const file of dependencies)
             expect(discovered).toContain(path.join(root, file));
           const result = yield* build(source);
-          expect(result.outputFiles?.[0]?.text).toContain("chosen.h(");
+          expect(result.outputFiles?.[0]?.text).toContain(`${factory}(`);
           expect(result.warnings).toHaveLength(0);
         }).pipe(Effect.scoped),
     );
@@ -187,7 +379,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         ["config", "extends"].map((malformed) => ({ configName, malformed })),
       ),
     )(
-      "rejects a shadowed malformed parent $configName $malformed like native",
+      "ignores a shadowed malformed parent $configName $malformed with explicit selection",
       ({ configName, malformed }) =>
         Effect.gen(function* () {
           const { source, root, path } = yield* fixture({
@@ -199,35 +391,22 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                 : '{"extends":"./parent.custom"}',
             "parent.custom": '{"extends":',
           });
-          const failedName =
-            malformed === "config" ? configName : "parent.custom";
-          const discovered = yield* Effect.result(
-            CompilationConfig.discover(source),
+          const discovered = yield* CompilationConfig.discover(source);
+          expect(discovered.configuration).toBe(
+            path.join(root, "src/tsconfig.json"),
           );
-          expect(Result.isFailure(discovered)).toBe(true);
-          if (Result.isFailure(discovered))
-            expect(discovered.failure).toMatchObject({
-              _tag: "CompilationConfigDiscoveryFailed",
-              path: path.join(root, failedName),
-            });
-          const native = yield* Effect.result(build(source));
-          expect(Result.isFailure(native)).toBe(true);
-          if (Result.isFailure(native))
-            expect(native.failure.cause).toMatchObject({
-              errors: expect.arrayContaining([
-                expect.objectContaining({
-                  text: "Unexpected end of file in JSON",
-                  location: expect.objectContaining({
-                    file: expect.stringContaining(`/${failedName}`),
-                  }),
-                }),
-              ]),
-            });
+          expect(discovered.files).not.toContain(path.join(root, configName));
+          expect(discovered.files).not.toContain(
+            path.join(root, "parent.custom"),
+          );
+          const native = yield* build(source);
+          expect(native.outputFiles?.[0]?.text).toContain("chosen.h(");
+          expect(native.warnings).toHaveLength(0);
         }).pipe(Effect.scoped),
     );
 
     it.effect.each(["tsconfig.json", "jsconfig.json"])(
-      "observes missing extends from shadowed parent %s because native warns",
+      "ignores missing extends from shadowed parent %s under the released profile",
       (configName) =>
         Effect.gen(function* () {
           const { source, root, path } = yield* fixture({
@@ -236,19 +415,14 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             [configName]:
               '{"extends":"./parent.custom","compilerOptions":{"jsxFactory":"unused.h"}}',
           });
-          const discovered = yield* CompilationConfig.discover(source);
-          expect(discovered).toContain(path.join(root, "parent.custom"));
-          expect(discovered).toContain(path.join(root, "parent.custom.json"));
+          const discovered = yield* discoverFiles(source);
+          expect(discovered).not.toContain(path.join(root, "parent.custom"));
+          expect(discovered).not.toContain(
+            path.join(root, "parent.custom.json"),
+          );
           const native = yield* build(source);
           expect(native.outputFiles?.[0]?.text).toContain("chosen.h(");
-          expect(native.warnings).toEqual([
-            expect.objectContaining({
-              text: 'Cannot find base config file "./parent.custom"',
-              location: expect.objectContaining({
-                file: expect.stringContaining(`/${configName}`),
-              }),
-            }),
-          ]);
+          expect(native.warnings).toHaveLength(0);
         }).pipe(Effect.scoped),
     );
 
@@ -264,7 +438,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             "unrelated/tsconfig.json": '{"extends":',
           });
           const reads: string[] = [];
-          const discovered = yield* CompilationConfig.discover(source).pipe(
+          const discovered = yield* discoverFiles(source).pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
               readFileString: (file, encoding) => {
@@ -344,7 +518,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             [first]: chosen,
             [second]: chosen.replace("chosen", "wrong"),
           });
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           expect(discovered).toContain(path.join(root, first));
           expect(discovered).not.toContain(path.join(root, second));
           expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
@@ -367,7 +541,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               "wrong",
             ),
           });
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           expect(discovered).toContain(
             path.join(root, "node_modules/fixture/tsconfig.json"),
           );
@@ -395,7 +569,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               "required",
             ),
           });
-          const discovered = yield* CompilationConfig.discover(
+          const discovered = yield* discoverFiles(
             source,
             undefined,
             conditions,
@@ -422,11 +596,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               '{"exports":{"custom":"./custom.json","require":"./fallback.json"}}',
             "node_modules/fixture/custom.json": chosen,
           });
-          const discovered = yield* CompilationConfig.discover(
-            source,
-            undefined,
-            ["custom"],
-          );
+          const discovered = yield* discoverFiles(source, undefined, [
+            "custom",
+          ]);
           expect(discovered).toContain(
             path.join(root, "node_modules/fixture/custom.json"),
           );
@@ -445,7 +617,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             "tsconfig.json": '{"extends":"./future.custom"}',
           });
           const base = path.join(root, "future.custom");
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           expect(discovered).toContain(base);
           expect(discovered).toContain(`${base}.json`);
           expect((yield* build(source)).warnings).toHaveLength(1);
@@ -473,7 +645,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             "node_modules/fixture/tsconfig.json": chosen,
           });
           const future = path.join(root, "node_modules/fixture/future.custom");
-          expect(yield* CompilationConfig.discover(source)).toContain(future);
+          expect(yield* discoverFiles(source)).toContain(future);
           expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
             "chosen.h(",
           );
@@ -500,20 +672,18 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const config = path.join(root, "tsconfig.json");
           const baselines = new Map<string, string>();
           let changed = false;
-          const result = yield* CompilationConfig.discover(
-            source,
-            (file, kind) =>
-              Effect.gen(function* () {
-                if (kind === "File" && !baselines.has(file))
-                  baselines.set(file, yield* fs.readFileString(file));
-                if (file === config && !changed) {
-                  changed = true;
-                  yield* fs.writeFileString(
-                    config,
-                    '{"extends":"./after.custom"}',
-                  );
-                }
-              }),
+          const result = yield* discoverFiles(source, (file, kind) =>
+            Effect.gen(function* () {
+              if (kind === "File" && !baselines.has(file))
+                baselines.set(file, yield* fs.readFileString(file));
+              if (file === config && !changed) {
+                changed = true;
+                yield* fs.writeFileString(
+                  config,
+                  '{"extends":"./after.custom"}',
+                );
+              }
+            }),
           ).pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
@@ -564,7 +734,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         }
         const reads: string[] = [];
         const outcome = yield* Effect.result(
-          CompilationConfig.discover(source, (file) =>
+          discoverFiles(source, (file) =>
             Effect.gen(function* () {
               if (mode === "changed-alias" && file === alias) {
                 yield* fs.remove(alias);
@@ -606,7 +776,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const alias = path.join(root, "tsconfig.json");
           const actual = path.join(root, "shared/config.custom");
           yield* fs.symlink(actual, alias);
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           expect(discovered).toEqual(
             expect.arrayContaining([
               alias,
@@ -635,7 +805,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const alias = path.join(root, "alias.custom");
           const actual = path.join(root, "shared/config.custom");
           yield* fs.symlink(actual, alias);
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           expect(discovered).toEqual(
             expect.arrayContaining([
               alias,
@@ -686,7 +856,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               "wrong",
             ),
           });
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           expect(discovered).toContain(
             path.join(root, "node_modules/fixture", target),
           );
@@ -717,7 +887,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             "node_modules/fixture/package.json": `{"exports":"./${encoded}"}`,
             [`node_modules/fixture/${decoded}`]: chosen,
           });
-          expect(yield* CompilationConfig.discover(source)).toContain(
+          expect(yield* discoverFiles(source)).toContain(
             path.join(root, "node_modules/fixture", decoded),
           );
           expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
@@ -783,7 +953,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               "wrong",
             ),
           });
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           expect(discovered).toContain(path.join(root, target));
           expect(discovered).not.toContain(
             path.join(root, "node_modules", packageName, "wrong.custom"),
@@ -815,7 +985,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               "wrong",
             ),
           });
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           expect(discovered).toContain(
             path.join(root, "node_modules/fixture", target),
           );
@@ -846,7 +1016,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               "wrong",
             ),
           });
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           expect(discovered).toContain(
             path.join(root, "node_modules/fixture/tsconfig.json"),
           );
@@ -874,7 +1044,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             root,
             "node_modules/fixture/future config.custom",
           );
-          expect(yield* CompilationConfig.discover(source)).toContain(future);
+          expect(yield* discoverFiles(source)).toContain(future);
           expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
             "chosen.h(",
           );
@@ -902,7 +1072,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const observed: string[] = [];
           const read: string[] = [];
           const outcome = yield* Effect.result(
-            CompilationConfig.discover(source, (file) =>
+            discoverFiles(source, (file) =>
               Effect.sync(() => {
                 observed.push(file);
               }),
@@ -936,9 +1106,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             "tsconfig.json": '{"extends":"fixture"}',
             "node_modules/fixture/package.json": `{"exports":"./${encoded}"}`,
           });
-          const outcome = yield* Effect.result(
-            CompilationConfig.discover(source),
-          );
+          const outcome = yield* Effect.result(discoverFiles(source));
           expect(Result.isFailure(outcome)).toBe(true);
           if (Result.isFailure(outcome))
             expect(outcome.failure).toMatchObject({ reason });
@@ -979,7 +1147,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               "wrong",
             ),
           });
-          const discovered = yield* CompilationConfig.discover(source);
+          const discovered = yield* discoverFiles(source);
           expect(discovered).toContain(
             path.join(root, "node_modules/fixture", candidate),
           );
@@ -1004,7 +1172,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           "base.json": chosen,
         });
         const observations = new Map<string, CompilationConfig.CandidateKind>();
-        yield* CompilationConfig.discover(source, (file, kind) =>
+        yield* discoverFiles(source, (file, kind) =>
           Effect.sync(() => {
             observations.set(file, kind);
           }),
@@ -1024,7 +1192,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           "base.custom":
             '{"extends":"./tsconfig.json","compilerOptions":{"jsxFactory":"chosen.h"}}',
         });
-        expect(yield* CompilationConfig.discover(source)).toContain(
+        expect(yield* discoverFiles(source)).toContain(
           path.join(root, "base.custom"),
         );
         expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
@@ -1042,14 +1210,12 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             "tsconfig.json": '{"extends":"fixture"}',
             ".pnp.cjs": "throw new Error('must not execute')",
           });
-          const result = yield* Effect.result(
-            CompilationConfig.discover(source),
-          );
+          const result = yield* Effect.result(discoverFiles(source));
           expect(Result.isFailure(result)).toBe(true);
           if (Result.isFailure(result))
             expect(result.failure).toMatchObject({
               path: path.join(root, ".pnp.cjs"),
-              reason: "YarnPlugAndPlay",
+              reason: "PnpRuntimeUnavailable",
             });
         }).pipe(Effect.scoped),
     );
@@ -1073,7 +1239,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             ? "{}"
             : "throw new Error('must not execute')",
         });
-        const discovered = yield* CompilationConfig.discover(source);
+        const discovered = yield* discoverFiles(source);
         expect(discovered).toContain(path.join(root, "tsconfig.json"));
         if (mode !== "none")
           expect(discovered).toContain(path.join(root, "base.custom"));
@@ -1081,6 +1247,244 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           "chosen.h(",
         );
       }).pipe(Effect.scoped),
+    );
+
+    it.effect(
+      "preserves old and new Node execution through real Yarn zip configs",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const spawner = yield* ChildProcessSpawner;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const project = path.join(root, "project");
+          const config = path.join(root, "config");
+          yield* fs.makeDirectory(project);
+          yield* fs.makeDirectory(config);
+          yield* fs.symlink(
+            fileURLToPath(new URL("../node_modules", import.meta.url)),
+            path.join(root, "node_modules"),
+          );
+          yield* fs.writeFileString(
+            path.join(project, "package.json"),
+            '{"name":"pnp-config-fixture","private":true,"type":"module","packageManager":"yarn@4.18.1","dependencies":{"config":"file:../config"}}',
+          );
+          yield* fs.writeFileString(
+            path.join(project, ".yarnrc.yml"),
+            "nodeLinker: pnp\nenableGlobalCache: false\nenableTelemetry: false\npnpEnableEsmLoader: true\n",
+          );
+          yield* fs.writeFileString(
+            path.join(config, "package.json"),
+            '{"name":"config","version":"1.0.0","type":"module","exports":{".":{"import":"./import.json","require":"./require.json"},"./missing":"./absent.json","./runtime":"./runtime.js"}}',
+          );
+          yield* fs.writeFileString(
+            path.join(config, "import.json"),
+            '{"extends":"./shared.json"}',
+          );
+          yield* fs.writeFileString(path.join(config, "shared.json"), chosen);
+          yield* fs.writeFileString(
+            path.join(config, "require.json"),
+            `{"extends":"${path.join(project, "require-base.json").split(path.sep).join("/")}"}`,
+          );
+          yield* fs.writeFileString(
+            path.join(project, "require-base.json"),
+            '{"compilerOptions":{"jsxFactory":"wrong.h"}}',
+          );
+          yield* fs.writeFileString(
+            path.join(config, "runtime.js"),
+            'export const value = "chosen";',
+          );
+          yield* fs.writeFileString(
+            path.join(project, "tsconfig.json"),
+            '{"extends":"config"}',
+          );
+          yield* fs.writeFileString(
+            path.join(project, "entry.tsx"),
+            'import { value } from "config/runtime"; const chosen = { h: () => value }; const wrong = { h: () => "wrong" }; export const valueFromConfig = <div />; export { value };',
+          );
+          yield* fs.makeDirectory(path.join(project, "nested"));
+          yield* fs.writeFileString(
+            path.join(project, "nested/tsconfig.json"),
+            '{"extends":"config"}',
+          );
+          yield* fs.writeFileString(
+            path.join(project, "nested/value.tsx"),
+            'const chosen = { h: () => "import" }; const wrong = { h: () => "require" }; export const value = <div />;',
+          );
+          yield* fs.writeFileString(
+            path.join(project, "require-entry.ts"),
+            'export const value = require("./nested/value.tsx").value;',
+          );
+          const yarn = fileURLToPath(
+            new URL(
+              "bin/yarn.js",
+              import.meta.resolve("@yarnpkg/cli-dist/package.json"),
+            ),
+          );
+          const run = (args: ReadonlyArray<string>) =>
+            Effect.gen(function* () {
+              const child = yield* spawner.spawn(
+                ChildProcess.make(process.execPath, [yarn, ...args], {
+                  cwd: project,
+                  env: { YARN_ENABLE_IMMUTABLE_INSTALLS: "false" },
+                  extendEnv: true,
+                }),
+              );
+              const output = yield* child.all.pipe(
+                Stream.decodeText(),
+                Stream.mkString,
+              );
+              expect(yield* child.exitCode, output).toBe(0);
+              return output;
+            });
+          yield* run(["install"]);
+          const runner = path.join(root, "runner.mjs");
+          yield* Effect.tryPromise({
+            try: () =>
+              esbuild.build({
+                stdin: {
+                  contents: `
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
+import Module from "node:module";
+import { bundleRequire } from "bundle-require";
+import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as Bundler from "./Bundler";
+import * as Compilation from "./Compilation";
+import * as CompilationConfig from "./CompilationConfig";
+
+const entry = path.resolve("entry.tsx");
+const config = path.resolve("tsconfig.json");
+const run = (effect) => Effect.runPromise(effect.pipe(Effect.scoped, Effect.provide(NodeServices.layer)));
+const observations = [];
+let observedFiles = 0;
+const discovery = await run(CompilationConfig.discover(entry, () => Effect.sync(() => { observedFiles++; }), [], (observation) => Effect.sync(() => { observations.push(observation); })));
+const files = discovery.files;
+const portable = file => file.split(path.sep).join("/");
+const archive = files.find(file => file.endsWith(".zip"));
+assert(archive);
+assert(files.some(file => portable(file).includes(".zip/") && portable(file).endsWith("/import.json")));
+assert(files.some(file => portable(file).includes(".zip/") && portable(file).endsWith("/shared.json")));
+assert(!files.some(file => portable(file).endsWith("/require.json")));
+assert.equal(observations.length, 1);
+const runtime = observations[0];
+const before = observedFiles;
+assert.equal(await Effect.runPromise(runtime.current), runtime.value);
+assert.equal(observedFiles, before);
+assert.equal(runtime.value, Module.findPnpApi(entry));
+
+const old = await bundleRequire({ filepath: entry, cwd: path.dirname(entry), format: "esm", esbuildOptions: { logLevel: "silent" } });
+assert.equal(old.mod.value, "chosen");
+assert.equal(old.mod.valueFromConfig, "chosen");
+for (const mode of ["Once", "Watch"]) {
+  const loaded = await run(Bundler.bundle(entry).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [], mode }))));
+  assert.equal(loaded.module.value, old.mod.value);
+  assert.equal(loaded.module.valueFromConfig, old.mod.valueFromConfig);
+}
+
+const requiredBase = path.resolve("require-base.json");
+const nestedDiscovery = await run(CompilationConfig.discover(path.resolve("nested/value.tsx"), undefined, []));
+assert.equal(nestedDiscovery.configuration, path.resolve("nested/tsconfig.json"));
+assert(!nestedDiscovery.files.includes(requiredBase));
+assert(nestedDiscovery.files.some(file => portable(file).includes(".zip/") && portable(file).endsWith("/import.json")));
+const nativeRequire = await import("esbuild").then(esbuild => esbuild.build({ entryPoints: [path.resolve("require-entry.ts")], absWorkingDir: process.cwd(), bundle: true, platform: "node", format: "esm", write: false, logLevel: "silent", tsconfig: config }));
+assert(nativeRequire.outputFiles[0].text.includes("chosen.h("));
+await fs.writeFile(path.resolve("nested/tsconfig.json"), '{"extends":');
+try {
+  await run(Effect.gen(function* () {
+    const compiler = yield* Compilation.Service;
+    const loaded = yield* Bundler.bundle(path.resolve("require-entry.ts"));
+    assert.equal(loaded.module.value, "import");
+    yield* Effect.promise(() => fs.writeFile(requiredBase, "{}"));
+    const changed = yield* Effect.result(compiler.verify);
+    assert(Result.isSuccess(changed));
+  }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [], mode: "Once" }))));
+} finally {
+  await fs.writeFile(requiredBase, '{"compilerOptions":{"jsxFactory":"wrong.h"}}');
+  await fs.writeFile(path.resolve("nested/tsconfig.json"), '{"extends":"config"}');
+}
+
+await fs.writeFile(config, '{"extends":"config/missing"}');
+const missing = (await run(CompilationConfig.discover(entry))).files;
+assert(missing.some(file => portable(file).includes(".zip/") && portable(file).endsWith("/absent.json")));
+await fs.writeFile(config, '{"extends":"config"}');
+
+const secret = path.resolve(".env.local");
+await fs.writeFile(secret, "throw new Error('forbidden file was evaluated')");
+for (const guarded of [runtime.path, archive]) {
+  const backup = guarded + ".backup";
+  await fs.rename(guarded, backup);
+  try {
+    await fs.symlink(secret, guarded);
+    const rejected = await Effect.runPromise(Effect.result(runtime.current));
+    assert(Result.isFailure(rejected));
+    assert.equal(rejected.failure.reason, "ForbiddenFile");
+  } finally {
+    await fs.rm(guarded, { force: true });
+    await fs.rename(backup, guarded);
+  }
+}
+
+await run(Effect.gen(function* () {
+  const compiler = yield* Compilation.Service;
+  yield* Bundler.bundle(entry);
+  yield* Effect.sleep("550 millis");
+  const future = new Date(Date.now() + 10000);
+  yield* Effect.promise(() => fs.utimes(runtime.path, future, future));
+  const changed = yield* Effect.result(compiler.verify);
+  assert(Result.isFailure(changed));
+  assert.equal(changed.failure.cause._tag, "CompilationRestartRequired");
+  assert(changed.failure.cause.paths.includes(runtime.path));
+  assert(Result.isFailure(yield* Effect.result(compiler.verify)));
+}).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [], mode: "Once" }))));
+
+const archiveSize = (await fs.stat(archive)).size;
+try {
+  await run(Effect.gen(function* () {
+    const compiler = yield* Compilation.Service;
+    yield* Bundler.bundle(entry);
+    yield* Effect.promise(() => fs.appendFile(archive, new Uint8Array([0])));
+    const changed = yield* Effect.result(compiler.verify);
+    assert(Result.isFailure(changed));
+    assert.equal(changed.failure.cause._tag, "CompilationRestartRequired");
+    assert(changed.failure.cause.paths.includes(archive));
+  }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [], mode: "Once" }))));
+} finally {
+  await fs.truncate(archive, archiveSize);
+}
+
+await run(Effect.gen(function* () {
+  const compiler = yield* Compilation.Service;
+  yield* Bundler.bundle(entry);
+  yield* Effect.promise(() => fs.appendFile(runtime.path, "\\n"));
+  const changed = yield* Effect.result(compiler.verify);
+  assert(Result.isFailure(changed));
+  assert.equal(changed.failure.cause._tag, "CompilationRestartRequired");
+  assert(changed.failure.cause.paths.includes(runtime.path));
+}).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [], mode: "Once" }))));
+console.log("PNP_CONFIG_PARITY_AND_RESTARTS_OK");
+`,
+                  resolveDir: fileURLToPath(new URL("../src", import.meta.url)),
+                  loader: "ts",
+                },
+                bundle: true,
+                platform: "node",
+                format: "esm",
+                packages: "external",
+                outfile: runner,
+                logLevel: "silent",
+              }),
+            catch: (cause) =>
+              new CompilationConfig.DiscoveryFailed({ path: runner, cause }),
+          });
+          expect(yield* run(["node", runner])).toContain(
+            "PNP_CONFIG_PARITY_AND_RESTARTS_OK",
+          );
+        }).pipe(Effect.scoped, Effect.timeout("60 seconds")),
+      { timeout: 65000 },
     );
 
     it.effect("rejects malformed JSONC instead of evaluating it", () =>

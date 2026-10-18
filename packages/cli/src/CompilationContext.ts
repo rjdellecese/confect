@@ -115,7 +115,7 @@ export const relocateMetafile = (
 
 export const make = Effect.fn("CompilationContext.make")(function* (
   topology: CompilationState.Topology,
-  options: esbuild.BuildOptions,
+  options: Omit<esbuild.BuildOptions, "tsconfig" | "tsconfigRaw">,
   normalize: (metafile: esbuild.Metafile) => esbuild.Metafile,
   publish: (revision: CompilationState.Revision) => Effect.Effect<void>,
   guards: Readonly<
@@ -389,6 +389,9 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       try: () =>
         esbuild.context({
           ...options,
+          ...(topology.configuration === undefined
+            ? { tsconfigRaw: {} }
+            : { tsconfig: topology.configuration }),
           outdir: output,
           sourceRoot: pathToFileURL(`${output}${path.sep}`).href,
           write: false,

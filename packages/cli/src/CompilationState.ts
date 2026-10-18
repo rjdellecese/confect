@@ -25,6 +25,7 @@ export interface Revision extends Receipt {
 export interface Topology {
   readonly id: number;
   readonly profile: Profile;
+  readonly configuration: string | undefined;
   readonly roots: ReadonlyArray<string>;
 }
 
@@ -51,8 +52,10 @@ export const compatible = (
   current: Topology,
   profile: Profile,
   roots: ReadonlyArray<string>,
+  configuration: string | undefined,
 ): boolean =>
   current.profile === profile &&
+  current.configuration === configuration &&
   Array.every(roots, (root) => Array.contains(current.roots, root));
 
 export const acknowledged = (
@@ -91,7 +94,13 @@ export const retain = <A extends Topology>(
 ): ReadonlyArray<A> =>
   Array.filter(
     contexts,
-    (context) => !compatible(incoming, context.profile, context.roots),
+    (context) =>
+      !compatible(
+        incoming,
+        context.profile,
+        context.roots,
+        context.configuration,
+      ),
   );
 
 export class Failed extends Schema.TaggedError<Failed>()("CompilationFailed", {

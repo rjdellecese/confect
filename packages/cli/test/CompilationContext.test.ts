@@ -39,9 +39,10 @@ const preparedFixture = Effect.gen(function* () {
     mode: CompilationState.Mode = "Watch",
     guards?: Parameters<typeof CompilationContext.make>[4],
     publishFailure?: Parameters<typeof CompilationContext.make>[6],
+    configuration?: string,
   ) =>
     CompilationContext.make(
-      { id: 1, profile: "modules", roots: [entry] },
+      { id: 1, profile: "modules", configuration, roots: [entry] },
       {
         entryPoints: [entry],
         absWorkingDir: root,
@@ -325,7 +326,17 @@ describe("CompilationContext", () => {
           ],
           filesystem,
           "Once",
-          guards,
+          {
+            ...guards,
+            trackSource: (file) =>
+              Effect.gen(function* () {
+                yield* guards.trackSource(file);
+                if (file === helper) yield* guards.configuration(file);
+                return undefined;
+              }),
+          },
+          undefined,
+          config,
         );
         const snapshot = yield* context.consume();
         expect(outputs).toHaveLength(2);
@@ -730,7 +741,12 @@ describe("CompilationContext", () => {
         >([]);
         let incomplete = true;
         const context = yield* CompilationContext.make(
-          { id: 1, profile: "modules", roots: [entry] },
+          {
+            id: 1,
+            profile: "modules",
+            configuration: undefined,
+            roots: [entry],
+          },
           {
             entryPoints: [entry],
             absWorkingDir: root,
@@ -867,7 +883,12 @@ describe("CompilationContext", () => {
             ),
         };
         const context = yield* CompilationContext.make(
-          { id: 1, profile: "modules", roots: [entry] },
+          {
+            id: 1,
+            profile: "modules",
+            configuration: undefined,
+            roots: [entry],
+          },
           {
             entryPoints: [entry],
             absWorkingDir: root,

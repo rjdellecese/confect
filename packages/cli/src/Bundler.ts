@@ -252,7 +252,9 @@ class Batch extends Context.Service<
   Batch,
   {
     readonly entryPoints: HashSet.HashSet<string>;
-    readonly compilation: Effect.Effect<
+    readonly compilation: (
+      entry: string,
+    ) => Effect.Effect<
       Option.Option<BatchCompilation>,
       BundlerError | CompilationState.Failed,
       Path.Path | FileSystem.FileSystem
@@ -365,6 +367,7 @@ const compileLive = Effect.fn("Bundler.compileLive")(
     const first = entries[0];
     if (!first)
       return yield* new BundlerError({ cause: { _tag: "EmptyCompilation" } });
+    const configuration = yield* service.resolutionInputs.configuration(first);
     const cwd = yield* Compilation.canonicalPath(path.dirname(first));
     const roots = yield* Effect.forEach(entries, Compilation.canonicalPath);
     const conditions = service.conditions;
@@ -379,6 +382,7 @@ const compileLive = Effect.fn("Bundler.compileLive")(
     const result = yield* service.compile({
       roots,
       profile: options?.profile ?? "modules",
+      configuration,
       options: {
         entryPoints: Array.map(roots, (entry, index) => ({
           in: entry,
@@ -606,12 +610,13 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
 });
 
 /**
- * Lazily shares one compilation across ordinary bundle calls in this effect.
- * Different tsconfigs and failed compilations fall back to individual builds.
- * Runtime conditions supplied through NODE_OPTIONS also use individual builds.
- * Imports still run at each caller. Temporary chunks live until the supplied
- * artifact scope closes, or until this effect finishes for standalone callers.
- * The disposable evaluator, not this scope, owns Node's import cache.
+ * Lazily shares compilations across ordinary bundle calls in this effect. The
+ * compiler service groups entries by their nearest tsconfig and retries failed
+ * groups as requested leaves through the same compiler. Standalone builds fall
+ * back to individual builds for incompatible configurations. Imports still run
+ * at each caller. Temporary chunks live until the supplied artifact scope
+ * closes, or until this effect finishes for standalone callers. The disposable
+ * evaluator, not this scope, owns Node's import cache.
  */
 export const withBatch = <A, E, R>(
   entryPoints: ReadonlyArray<string>,
@@ -633,20 +638,77 @@ export const withBatch = <A, E, R>(
         CompiledModule.ArtifactScope,
       );
       const live = yield* Effect.serviceOption(Compilation.Service);
-      const compilation = yield* Effect.cached(
-        (Option.isSome(live)
-          ? compileLive(live.value, entryPoints, true).pipe(
-              Effect.asSome,
-              Effect.catchTag("CompilationFailed", () =>
-                Effect.succeed(Option.none<BatchCompilation>()),
+      const compilation = Option.isSome(live)
+        ? yield* Effect.gen(function* () {
+            const groups = yield* Effect.cached(
+              Effect.gen(function* () {
+                const selected = yield* Effect.forEach(
+                  Array.fromIterable(entryKeys),
+                  (entry) =>
+                    live.value.resolutionInputs.configuration(entry).pipe(
+                      Effect.map((configuration) => ({
+                        entry,
+                        configuration,
+                      })),
+                    ),
+                );
+                const compiled = yield* Effect.forEach(
+                  Object.values(
+                    Array.groupBy(
+                      selected,
+                      ({ configuration }) => configuration ?? "",
+                    ),
+                  ),
+                  (group) =>
+                    Effect.gen(function* () {
+                      const entries = Array.map(group, ({ entry }) => entry);
+                      const result = yield* Effect.cached(
+                        compileLive(live.value, entries, true).pipe(
+                          Effect.asSome,
+                          Effect.catchTag("CompilationFailed", () =>
+                            Effect.succeed(Option.none<BatchCompilation>()),
+                          ),
+                          Effect.provideService(
+                            Scope.Scope,
+                            Option.getOrElse(artifactScope, () => scope),
+                          ),
+                        ),
+                      );
+                      return Array.map(
+                        entries,
+                        (entry) => [entry, result] as const,
+                      );
+                    }),
+                );
+                return HashMap.fromIterable(Array.flatten(compiled));
+              }).pipe(
+                Effect.mapError((cause) =>
+                  Schema.is(BundlerError)(cause)
+                    ? cause
+                    : new BundlerError({ cause }),
+                ),
               ),
-            )
-          : compileBatch(entryPoints).pipe(
+            );
+            return (entry: string) =>
+              groups.pipe(
+                Effect.flatMap((compiled) =>
+                  Option.getOrElse(HashMap.get(compiled, entry), () =>
+                    Effect.succeed(Option.none<BatchCompilation>()),
+                  ),
+                ),
+              );
+          })
+        : yield* Effect.cached(
+            compileBatch(entryPoints).pipe(
               Effect.asSome,
               Effect.catchTag("BatchIncompatible", (error) =>
                 Effect.logDebug(
                   "Shared build skipped; falling back to individual builds.",
-                  { entryPoints, reason: error.reason, detail: error.message },
+                  {
+                    entryPoints,
+                    reason: error.reason,
+                    detail: error.message,
+                  },
                 ).pipe(Effect.as(Option.none<BatchCompilation>())),
               ),
               Effect.catch((error) =>
@@ -656,14 +718,12 @@ export const withBatch = <A, E, R>(
                   Cause.fail(error),
                 ).pipe(Effect.as(Option.none<BatchCompilation>())),
               ),
-            )
-        ).pipe(
-          Effect.provideService(
-            Scope.Scope,
-            Option.getOrElse(artifactScope, () => scope),
-          ),
-        ),
-      );
+              Effect.provideService(
+                Scope.Scope,
+                Option.getOrElse(artifactScope, () => scope),
+              ),
+            ),
+          ).pipe(Effect.map((compiled) => (_entry: string) => compiled));
       return yield* Effect.provideService(effect, Batch, {
         entryPoints: entryKeys,
         compilation,
@@ -817,11 +877,13 @@ export const compile = Effect.fn("Bundler.compile")(function* (
     !options?.plugins?.length &&
     HashSet.has(batch.value.entryPoints, path.resolve(entryPoint))
   ) {
-    const compilation = yield* batch.value.compilation.pipe(
-      Effect.catchTag("CompilationFailed", (error) =>
-        Compilation.fail(path.resolve(entryPoint))(error),
-      ),
-    );
+    const compilation = yield* batch.value
+      .compilation(path.resolve(entryPoint))
+      .pipe(
+        Effect.catchTag("CompilationFailed", (error) =>
+          Compilation.fail(path.resolve(entryPoint))(error),
+        ),
+      );
     if (Option.isSome(compilation)) {
       const entry = HashMap.get(
         compilation.value.entries,

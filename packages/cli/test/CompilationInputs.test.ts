@@ -1,20 +1,166 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { expect, layer } from "@effect/vitest";
+import { assert, expect, layer } from "@effect/vitest";
+import { vi } from "vitest";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as PlatformError from "effect/PlatformError";
 import * as Stream from "effect/Stream";
 import * as CompilationInputs from "@confect/cli/CompilationInputs";
+import * as CompilationConfig from "@confect/cli/CompilationConfig";
+
+vi.mock("@confect/cli/CompilationConfig", (importOriginal) =>
+  importOriginal<typeof CompilationConfig>().then((original) => ({
+    ...original,
+    discover: vi.fn(original.discover),
+  })),
+);
 
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationInputs",
   (it) => {
+    it.effect.each(["Once", "Watch"] as const)(
+      "guards nearer config creation without observing ignored source configs in %s mode",
+      (mode) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const nested = path.join(root, "nested");
+          const helper = path.join(root, "helper");
+          yield* fs.makeDirectory(nested);
+          yield* fs.makeDirectory(helper);
+          const selected = path.join(root, "tsconfig.json");
+          const ignored = path.join(helper, "tsconfig.json");
+          const nearer = path.join(nested, "tsconfig.json");
+          yield* fs.writeFileString(selected, "{}");
+          yield* fs.writeFileString(ignored, "not JSON");
+          const inputs = yield* CompilationInputs.make(mode);
+          expect(
+            yield* inputs.configuration(path.join(nested, "entry.ts")),
+          ).toBe(selected);
+          yield* inputs.trackSource(path.join(helper, "value.ts"));
+          yield* fs.writeFileString(ignored, "still not JSON");
+          yield* inputs.check;
+          expect(yield* inputs.pending).toEqual(Option.none());
+          yield* fs.writeFileString(nearer, "{}");
+          const failure = yield* Effect.flip(inputs.check);
+          expect(failure).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [nearer],
+          });
+          yield* fs.remove(nearer);
+          expect(
+            yield* Effect.flip(
+              inputs.configuration(path.join(nested, "entry.ts")),
+            ),
+          ).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [nearer],
+          });
+        }).pipe(Effect.scoped),
+    );
+    it.effect.each([
+      "replace",
+      "remove",
+      "changed-before-registration",
+      "files-during-acquisition",
+      "observation-failure",
+    ] as const)("keeps runtime configuration %s changes sticky", (mode) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        const marker = path.join(root, ".pnp.cjs");
+        yield* fs.writeFileString(marker, "initial");
+        const initial = {};
+        const active = yield* Ref.make<object | undefined>(
+          mode === "changed-before-registration" ? {} : initial,
+        );
+        let changed = false;
+        const current = Effect.gen(function* () {
+          if (changed && mode === "files-during-acquisition")
+            yield* fs.writeFileString(marker, "updated").pipe(
+              Effect.mapError(
+                (cause) =>
+                  new CompilationConfig.DiscoveryFailed({
+                    path: marker,
+                    cause,
+                  }),
+              ),
+            );
+          if (changed && mode === "observation-failure")
+            return yield* new CompilationConfig.DiscoveryFailed({
+              path: marker,
+              cause: "API observation failed",
+            });
+          return yield* Ref.get(active);
+        });
+        const discover = vi.mocked(CompilationConfig.discover);
+        const original = discover.getMockImplementation();
+        assert(original);
+        const actual = yield* Effect.promise(() =>
+          vi.importActual<typeof CompilationConfig>(
+            "@confect/cli/CompilationConfig",
+          ),
+        );
+        const implementation: typeof CompilationConfig.discover = (
+          sourceFile,
+          observe,
+          conditions,
+          observeRuntime,
+        ) =>
+          actual.discover(sourceFile, observe, conditions, observeRuntime).pipe(
+            Effect.tap(() => observe?.(marker, "File") ?? Effect.void),
+            Effect.tap(
+              () =>
+                observeRuntime?.({ path: marker, value: initial, current }) ??
+                Effect.void,
+            ),
+          );
+        yield* Effect.acquireRelease(
+          Effect.sync(() => discover.mockImplementation(implementation)),
+          () => Effect.sync(() => discover.mockImplementation(original)),
+        );
+        const inputs = yield* CompilationInputs.make("Once");
+        if (mode === "changed-before-registration") {
+          expect(yield* Effect.flip(inputs.configuration(entry))).toMatchObject(
+            {
+              _tag: "CompilationRestartRequired",
+              paths: [marker],
+            },
+          );
+          return;
+        }
+        yield* inputs.configuration(entry);
+        yield* inputs.check;
+        changed = true;
+        if (mode === "replace") yield* Ref.set(active, {});
+        if (mode === "remove") yield* Ref.set(active, undefined);
+        const failure = yield* Effect.flip(inputs.check);
+        if (mode === "observation-failure")
+          expect(failure).toMatchObject({
+            _tag: "BundlerError",
+            cause: { _tag: "CompilationConfigDiscoveryFailed" },
+          });
+        else
+          expect(failure).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [marker],
+          });
+        changed = false;
+        yield* Ref.set(active, initial);
+        yield* fs.writeFileString(marker, "initial");
+        expect(yield* Effect.flip(inputs.ensure)).toEqual(failure);
+      }).pipe(Effect.scoped),
+    );
     it.effect("bounds concurrent scans while checking every known input", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;

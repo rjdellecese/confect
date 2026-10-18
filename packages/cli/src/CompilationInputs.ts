@@ -87,10 +87,16 @@ export const make = Effect.fn("CompilationInputs.make")(
     const crypto = yield* Crypto.Crypto;
     const scope = yield* Scope.Scope;
     const baseline = yield* Ref.make(HashMap.empty<string, string>());
+    const runtimes = yield* Ref.make(
+      HashMap.empty<string, CompilationConfig.RuntimeObservation>(),
+    );
     const configDirectories = yield* Ref.make(HashSet.empty<string>());
     const generation = yield* Ref.make(0);
     const watched = yield* Ref.make(HashSet.empty<string>());
     const sources = yield* Ref.make(HashSet.empty<string>());
+    const configurations = yield* Ref.make(
+      HashMap.empty<string, string | undefined>(),
+    );
     const pending = yield* Ref.make(Option.none<RestartNotification>());
     const events = yield* Queue.unbounded<RestartNotification, BundlerError>();
     const observationFailure = yield* Ref.make(Option.none<BundlerError>());
@@ -171,16 +177,18 @@ export const make = Effect.fn("CompilationInputs.make")(
       Effect.gen(function* () {
         yield* ensure;
         const current = yield* Ref.get(baseline);
-        const entries = files
-          ? Array.getSomes(
-              Array.map(files, (file) =>
-                Option.map(
-                  HashMap.get(current, file),
-                  (expected) => [file, expected] as const,
+        const observedRuntimes = HashMap.toEntries(yield* Ref.get(runtimes));
+        const entries =
+          files && observedRuntimes.length === 0
+            ? Array.getSomes(
+                Array.map(files, (file) =>
+                  Option.map(
+                    HashMap.get(current, file),
+                    (expected) => [file, expected] as const,
+                  ),
                 ),
-              ),
-            )
-          : HashMap.toEntries(current);
+              )
+            : HashMap.toEntries(current);
         const changed = yield* Effect.filter(
           entries,
           ([file, expected]) =>
@@ -191,6 +199,38 @@ export const make = Effect.fn("CompilationInputs.make")(
           const notification = yield* notify(
             Array.map(changed, ([file]) => file),
           );
+          return yield* new RestartRequired({ paths: notification.paths });
+        }
+        if (observedRuntimes.length === 0) return;
+        const changedRuntimes = yield* Effect.filter(
+          observedRuntimes,
+          ([, observation]) =>
+            observation.current.pipe(
+              Effect.map((actual) => actual !== observation.value),
+              Effect.catch((cause) =>
+                Effect.gen(function* () {
+                  const failure = new BundlerError({ cause });
+                  yield* Ref.set(observationFailure, Option.some(failure));
+                  yield* Queue.fail(events, failure);
+                  return yield* failure;
+                }),
+              ),
+            ),
+        );
+        const changedDuringAcquisition = yield* Effect.filter(
+          entries,
+          ([file, expected]) =>
+            fingerprint(file).pipe(Effect.map((actual) => actual !== expected)),
+          { concurrency: 16 },
+        );
+        const paths = Array.dedupe(
+          Array.map(
+            [...changedRuntimes, ...changedDuringAcquisition],
+            ([file]) => file,
+          ),
+        );
+        if (Array.isReadonlyArrayNonEmpty(paths)) {
+          const notification = yield* notify(paths);
           return yield* new RestartRequired({ paths: notification.paths });
         }
       }).pipe((effect) => lock.withPermit(effect));
@@ -291,8 +331,25 @@ export const make = Effect.fn("CompilationInputs.make")(
                 Array.map(names, (name) => path.join(ancestor, name)),
               ),
             );
+            yield* Ref.update(sources, HashSet.add(directory));
+            yield* Ref.update(generation, (current) => current + 1);
+          }),
+        );
+      }),
+      configuration: Effect.fn("CompilationInputs.configuration")(function* (
+        file: string,
+      ) {
+        const directory = path.dirname(path.resolve(file));
+        return yield* sourceLock.withPermit(
+          Effect.gen(function* () {
+            yield* ensure;
+            const cached = HashMap.get(
+              yield* Ref.get(configurations),
+              directory,
+            );
+            if (Option.isSome(cached)) return cached.value;
             const configs = yield* CompilationConfig.discover(
-              file,
+              path.resolve(file),
               (candidate, kind) =>
                 Effect.gen(function* () {
                   if (kind === "Directory")
@@ -309,6 +366,30 @@ export const make = Effect.fn("CompilationInputs.make")(
                     yield* Ref.update(generation, (current) => current + 1);
                 }),
               conditions,
+              (observation) =>
+                lock.withPermit(
+                  Effect.gen(function* () {
+                    yield* ensure;
+                    const previous = HashMap.get(
+                      yield* Ref.get(runtimes),
+                      observation.path,
+                    );
+                    if (Option.isSome(previous)) {
+                      if (previous.value.value !== observation.value) {
+                        const notification = yield* notify([observation.path]);
+                        return yield* new RestartRequired({
+                          paths: notification.paths,
+                        });
+                      }
+                      return;
+                    }
+                    yield* Ref.update(
+                      runtimes,
+                      HashMap.set(observation.path, observation),
+                    );
+                    yield* Ref.update(generation, (current) => current + 1);
+                  }),
+                ),
             ).pipe(
               Effect.provideService(FileSystem.FileSystem, fs),
               Effect.provideService(Path.Path, path),
@@ -324,8 +405,12 @@ export const make = Effect.fn("CompilationInputs.make")(
                 }),
               ),
             );
-            yield* verify(configs);
-            yield* Ref.update(sources, HashSet.add(directory));
+            yield* verify(configs.files);
+            yield* Ref.update(
+              configurations,
+              HashMap.set(directory, configs.configuration),
+            );
+            return configs.configuration;
           }),
         );
       }),

@@ -4,6 +4,7 @@ import * as Path from "effect/Path";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { parseTree, type Node, type ParseError } from "jsonc-parser";
+import Module from "node:module";
 
 export class DiscoveryFailed extends Schema.TaggedError<DiscoveryFailed>()(
   "CompilationConfigDiscoveryFailed",
@@ -17,6 +18,17 @@ export class DiscoveryRejected extends Schema.TaggedError<DiscoveryRejected>()(
 
 type Failure = DiscoveryFailed | DiscoveryRejected;
 export type CandidateKind = "File" | "Directory" | "Missing";
+
+export interface RuntimeObservation {
+  readonly path: string;
+  readonly value: object;
+  readonly current: Effect.Effect<object | undefined, Failure>;
+}
+
+export interface Discovery {
+  readonly configuration: string | undefined;
+  readonly files: ReadonlyArray<string>;
+}
 
 const property = (node: Node | undefined, key: string): Node | undefined =>
   node?.type === "object"
@@ -56,6 +68,7 @@ const exportTarget = (
   exports: Node,
   subpath: string,
   conditions: ReadonlyArray<string>,
+  pnp = false,
 ): Result.Result<string | undefined, DiscoveryRejected> => {
   const reject = (reason: string) =>
     Result.fail(new DiscoveryRejected({ path: file, reason }));
@@ -86,7 +99,10 @@ const exportTarget = (
         for (const key of patterns) {
           const star = key.indexOf("*");
           if (star < 0) {
-            if (subpath.startsWith(key)) return Result.succeed(undefined);
+            if (subpath.startsWith(key))
+              return pnp
+                ? reject("PnpDirectoryExport")
+                : Result.succeed(undefined);
             continue;
           }
           const prefix = key.slice(0, star);
@@ -194,8 +210,11 @@ export const discover = <E = never, R = never>(
     kind: CandidateKind,
   ) => Effect.Effect<void, E, R> = () => Effect.void,
   conditions: ReadonlyArray<string> = ["node", "module"],
+  observeRuntime: (
+    observation: RuntimeObservation,
+  ) => Effect.Effect<void, E, R> = () => Effect.void,
 ): Effect.Effect<
-  ReadonlyArray<string>,
+  Discovery,
   Failure | E,
   FileSystem.FileSystem | Path.Path | R
 > =>
@@ -204,6 +223,7 @@ export const discover = <E = never, R = never>(
     const path = yield* Path.Path;
     const discovered = new Set<string>();
     const visited = new Set<string>();
+    const pnpFiles = new Set<string>();
     const reject = (file: string, reason: string) =>
       new DiscoveryRejected({ path: file, reason });
     const validate = Effect.fn("CompilationConfig.validate")(function* (
@@ -273,6 +293,61 @@ export const discover = <E = never, R = never>(
         tree: yield* Effect.fromResult(parse(file, contents, manifest)),
       };
     });
+    const acquirePnp = (
+      issuer: string,
+    ): Effect.Effect<object | undefined, Failure> =>
+      Effect.gen(function* () {
+        for (const file of pnpFiles) yield* validate(file);
+        const api: unknown = yield* Effect.try({
+          try: (): unknown =>
+            "findPnpApi" in Module && typeof Module.findPnpApi === "function"
+              ? Module.findPnpApi(issuer)
+              : undefined,
+          catch: (cause) => new DiscoveryFailed({ path: issuer, cause }),
+        });
+        for (const file of pnpFiles) yield* validate(file);
+        if (api === null || api === undefined) return undefined;
+        if (typeof api !== "object")
+          return yield* reject(issuer, "InvalidPnpApi");
+        return api;
+      });
+    const resolvePnp = Effect.fn("CompilationConfig.resolvePnp")(function* (
+      api: object,
+      request: string,
+      issuer: string | null,
+    ) {
+      if (
+        !("resolveToUnqualified" in api) ||
+        typeof api.resolveToUnqualified !== "function"
+      )
+        return yield* reject(issuer ?? request, "InvalidPnpApi");
+      const resolve = api.resolveToUnqualified;
+      const resolved: unknown = yield* Effect.try({
+        try: (): unknown =>
+          resolve.call(api, request, issuer, { considerBuiltins: false }),
+        catch: (cause) =>
+          new DiscoveryFailed({ path: issuer ?? request, cause }),
+      }).pipe(
+        Effect.catchIf(
+          (error) =>
+            typeof error.cause === "object" &&
+            error.cause !== null &&
+            "code" in error.cause &&
+            error.cause.code === "MODULE_NOT_FOUND",
+          () => Effect.void,
+        ),
+      );
+      if (resolved === undefined || resolved === null) return undefined;
+      if (typeof resolved !== "string" || !path.isAbsolute(resolved))
+        return yield* reject(issuer ?? request, "InvalidPnpResolution");
+      for (const ancestor of parents(path, resolved)) {
+        if (path.basename(ancestor).endsWith(".zip")) {
+          pnpFiles.add(ancestor);
+          yield* inspect(ancestor);
+        }
+      }
+      return resolved;
+    });
     const visit = (file: string): Effect.Effect<boolean, Failure | E, R> =>
       Effect.gen(function* () {
         const config = yield* read(file);
@@ -321,13 +396,69 @@ export const discover = <E = never, R = never>(
             : parts.length > count
               ? `./${parts.slice(count).join("/")}`
               : ".";
-        for (const current of parents(path, directory)) {
-          for (const name of [".pnp.data.json", ".pnp.cjs", ".pnp.js"]) {
+        let pnpPath: string | undefined;
+        for (const current of new Set([
+          ...parents(path, directory),
+          ...parents(path, path.dirname(path.resolve(sourceFile))),
+        ])) {
+          for (const name of [
+            ".pnp.data.json",
+            ".pnp.cjs",
+            ".pnp.js",
+            ".pnp.loader.mjs",
+          ]) {
             const file = path.join(current, name);
-            if ((yield* inspect(file)).kind !== "Missing")
-              return yield* reject(file, "YarnPlugAndPlay");
+            pnpFiles.add(file);
+            if (
+              (yield* inspect(file)).kind === "File" &&
+              name !== ".pnp.loader.mjs"
+            )
+              pnpPath ??= file;
           }
         }
+        const issuer = path.join(directory, "tsconfig.json");
+        const currentApi = acquirePnp(issuer);
+        const api = yield* currentApi;
+        if (api !== undefined) {
+          const apiPath = yield* resolvePnp(api, "pnpapi", null);
+          if (!apiPath) return yield* reject(issuer, "InvalidPnpApi");
+          pnpFiles.add(apiPath);
+          yield* inspect(apiPath);
+          yield* observeRuntime({
+            path: apiPath,
+            value: api,
+            current: currentApi,
+          });
+          if (!packageName)
+            return yield* reject(issuer, "UnsupportedPackageSpecifier");
+          const packageDirectory = yield* resolvePnp(api, packageName, issuer);
+          const unqualified = yield* resolvePnp(api, value, issuer);
+          if (!packageDirectory || !unqualified) return;
+          const manifestFile = path.join(packageDirectory, "package.json");
+          const manifest = yield* read(manifestFile, true);
+          const exports = property(manifest?.tree, "exports");
+          if (exports && exports.type !== "null") {
+            const target = yield* Effect.fromResult(
+              exportTarget(
+                manifestFile,
+                exports,
+                subpath,
+                ["node", "import", ...conditions],
+                true,
+              ),
+            );
+            if (target) yield* visit(path.join(packageDirectory, target));
+            return;
+          }
+          if (!(yield* visit(unqualified)) && !unqualified.endsWith(".json"))
+            yield* visit(`${unqualified}.json`);
+          return;
+        }
+        if (
+          pnpPath &&
+          !("findPnpApi" in Module && typeof Module.findPnpApi === "function")
+        )
+          return yield* reject(pnpPath, "PnpRuntimeUnavailable");
         for (const current of parents(path, directory)) {
           if (path.basename(current) === "node_modules") continue;
           const packageDirectory = path.join(
@@ -367,9 +498,14 @@ export const discover = <E = never, R = never>(
       path,
       path.dirname(path.resolve(sourceFile)),
     )) {
-      if (directory.split(path.sep).includes("node_modules")) continue;
-      if (!(yield* visit(path.join(directory, "tsconfig.json"))))
-        yield* visit(path.join(directory, "jsconfig.json"));
+      if (directory === path.parse(directory).root) break;
+      const configuration = path.join(directory, "tsconfig.json");
+      const candidate = yield* inspect(configuration);
+      if (candidate.kind === "Missing") continue;
+      if (candidate.kind !== "File")
+        return yield* reject(configuration, "NotRegularFile");
+      yield* visit(configuration);
+      return { configuration, files: [...discovered] };
     }
-    return [...discovered];
+    return { configuration: undefined, files: [...discovered] };
   }).pipe(Effect.withSpan("CompilationConfig.discover"));

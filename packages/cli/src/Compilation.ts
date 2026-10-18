@@ -34,7 +34,8 @@ class PreparedRevisions extends Context.Service<
 export interface Request {
   readonly roots: ReadonlyArray<string>;
   readonly profile: CompilationState.Profile;
-  readonly options: esbuild.BuildOptions;
+  readonly configuration: string | undefined;
+  readonly options: Omit<esbuild.BuildOptions, "tsconfig" | "tsconfigRaw">;
   readonly normalize: (metafile: esbuild.Metafile) => esbuild.Metafile;
 }
 
@@ -181,9 +182,10 @@ export const layer = (options: {
           ),
         topology: Ref.get(contexts).pipe(
           Effect.map((current) =>
-            Array.map(current, ({ id, profile, roots }) => ({
+            Array.map(current, ({ id, profile, configuration, roots }) => ({
               id,
               profile,
+              configuration,
               roots,
             })),
           ),
@@ -202,6 +204,7 @@ export const layer = (options: {
                         context,
                         request.profile,
                         request.roots,
+                        request.configuration,
                       ) &&
                       (!failed ||
                         context.roots.length === request.roots.length),
@@ -212,6 +215,7 @@ export const layer = (options: {
               const topology = {
                 id: yield* Ref.updateAndGet(nextId, (id) => id + 1),
                 profile: request.profile,
+                configuration: request.configuration,
                 roots: request.roots,
               };
               const retained = CompilationState.retain(current, topology);

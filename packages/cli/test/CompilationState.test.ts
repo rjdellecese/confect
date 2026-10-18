@@ -151,28 +151,62 @@ describe("CompilationState", () => {
     const topology = {
       id: 1,
       profile: "modules",
+      configuration: undefined,
       roots: ["a", "b"],
     } as const;
-    expect(CompilationState.compatible(topology, "modules", ["b"])).toBe(true);
-    expect(CompilationState.compatible(topology, "modules", ["c"])).toBe(false);
     expect(
-      CompilationState.compatible(topology, "component-config", ["b"]),
+      CompilationState.compatible(topology, "modules", ["b"], undefined),
+    ).toBe(true);
+    expect(
+      CompilationState.compatible(topology, "modules", ["c"], undefined),
     ).toBe(false);
+    expect(
+      CompilationState.compatible(
+        topology,
+        "component-config",
+        ["b"],
+        undefined,
+      ),
+    ).toBe(false);
+    expect(
+      CompilationState.compatible(
+        topology,
+        "modules",
+        ["b"],
+        "/project/tsconfig.json",
+      ),
+    ).toBe(false);
+    expect(
+      CompilationState.compatible(
+        { ...topology, configuration: "/project/tsconfig.json" },
+        "modules",
+        ["b"],
+        "/project/tsconfig.json",
+      ),
+    ).toBe(true);
   });
   it("retires only contexts whose roots have replacement coverage", () => {
     const contexts = Array.from({ length: 8 }, (_, id) => ({
       id,
       profile: "modules" as const,
+      configuration: undefined,
       roots: [`${id}`],
     }));
     const incoming = {
       id: 9,
       profile: "modules" as const,
+      configuration: undefined,
       roots: ["0", "1", "new"],
     };
     expect(
       CompilationState.retain(contexts, incoming).map(({ id }) => id),
     ).toEqual([2, 3, 4, 5, 6, 7]);
     expect(contexts).toHaveLength(8);
+    expect(
+      CompilationState.retain(contexts, {
+        ...incoming,
+        configuration: "/other/tsconfig.json",
+      }),
+    ).toEqual(contexts);
   });
 });

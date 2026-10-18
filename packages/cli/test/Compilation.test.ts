@@ -54,6 +54,161 @@ const compileAndLoad = Effect.fn("Compilation.test.compileAndLoad")(function* (
 layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
+  it.effect.each(["Once", "Watch"] as const)(
+    "partitions shared-helper batches by released configuration profiles in %s mode",
+    (mode) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const helper = path.join(root, "helper.tsx");
+        const entries: string[] = [];
+        for (const name of ["left", "right"]) {
+          const directory = path.join(root, name);
+          yield* fs.makeDirectory(directory);
+          yield* fs.writeFileString(
+            path.join(directory, "tsconfig.json"),
+            `{"compilerOptions":{"jsxFactory":"${name}.h"}}`,
+          );
+          for (const index of [1, 2]) {
+            const entry = path.join(directory, `entry${index}.ts`);
+            entries.push(entry);
+            yield* fs.writeFileString(
+              entry,
+              'export { default } from "../helper";',
+            );
+          }
+        }
+        yield* fs.writeFileString(
+          helper,
+          "const left={h:()=>1}; const right={h:()=>2}; export default <div/>;",
+        );
+        const original = yield* Effect.forEach(entries, (entry) =>
+          Bundler.bundle(entry),
+        );
+        expect(original.map(({ module }) => module.default)).toEqual([
+          1, 1, 2, 2,
+        ]);
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const run = () =>
+            Compilation.runJob(
+              Bundler.withBatch(
+                entries,
+                Effect.forEach(entries, (entry) =>
+                  Bundler.bundle(entry).pipe(Effect.result),
+                ),
+              ),
+            );
+          const first = yield* run();
+          const loaded = yield* first.exit;
+          expect(
+            loaded.map((result) =>
+              Result.isSuccess(result)
+                ? result.success.module.default
+                : "failed",
+            ),
+          ).toEqual([1, 1, 2, 2]);
+          expect(first.receipts).toHaveLength(2);
+          expect(first.failedReceipts).toEqual([]);
+          expect(first.receipts.map(({ roots }) => roots)).toEqual([
+            entries.slice(0, 2),
+            entries.slice(2),
+          ]);
+          expect(
+            (yield* compiler.topology).map(
+              ({ configuration }) => configuration,
+            ),
+          ).toEqual([
+            path.join(root, "left/tsconfig.json"),
+            path.join(root, "right/tsconfig.json"),
+          ]);
+          const broken = entries[1]!;
+          yield* fs.writeFileString(broken, "export default = ;");
+          const failed = yield* run();
+          const partial = yield* failed.exit;
+          expect(
+            partial.map((result) =>
+              Result.isSuccess(result)
+                ? result.success.module.default
+                : "failed",
+            ),
+          ).toEqual([1, "failed", 2, 2]);
+          expect(failed.failedReceipts.map(({ roots }) => roots)).toEqual([
+            [broken],
+          ]);
+          expect(failed.receipts.flatMap(({ roots }) => roots).sort()).toEqual(
+            entries.filter((entry) => entry !== broken).sort(),
+          );
+          yield* fs.writeFileString(
+            broken,
+            'export { default } from "../helper";',
+          );
+          const recovered = yield* run();
+          expect((yield* recovered.exit).every(Result.isSuccess)).toBe(true);
+          expect(recovered.failedReceipts).toEqual([]);
+          expect(yield* compiler.topology).toHaveLength(2);
+        }).pipe(
+          Effect.provide(Compilation.layer({ mode, ownedDirectories: [] })),
+        );
+      }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
+  );
+  it.effect(
+    "selects lexical entry configurations before sharing canonical source roots",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.tsx");
+        yield* fs.writeFileString(
+          entry,
+          "const left={h:()=>1}; const right={h:()=>2}; export default <div/>;",
+        );
+        const aliases: string[] = [];
+        for (const name of ["left", "right"]) {
+          const directory = path.join(root, name);
+          yield* fs.makeDirectory(directory);
+          yield* fs.writeFileString(
+            path.join(directory, "tsconfig.json"),
+            `{"compilerOptions":{"jsxFactory":"${name}.h"}}`,
+          );
+          const alias = path.join(directory, "entry.tsx");
+          yield* fs.symlink(entry, alias);
+          aliases.push(alias);
+        }
+        expect(
+          (yield* Effect.forEach(aliases, (alias) =>
+            Bundler.bundle(alias),
+          )).map(({ module }) => module.default),
+        ).toEqual([1, 2]);
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const loaded = yield* Bundler.withBatch(
+            aliases,
+            Effect.forEach(aliases, (alias) => Bundler.bundle(alias)),
+          );
+          expect(loaded.map(({ module }) => module.default)).toEqual([1, 2]);
+          const contexts = yield* compiler.topology;
+          expect(contexts).toHaveLength(2);
+          expect(contexts.map(({ roots }) => roots)).toEqual([
+            [entry],
+            [entry],
+          ]);
+          expect(contexts.map(({ configuration }) => configuration)).toEqual([
+            path.join(root, "left/tsconfig.json"),
+            path.join(root, "right/tsconfig.json"),
+          ]);
+          expect((yield* Bundler.bundle(aliases[0]!)).module.default).toBe(1);
+          expect((yield* Bundler.bundle(aliases[1]!)).module.default).toBe(2);
+          expect(yield* compiler.topology).toHaveLength(2);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
   it.effect("keeps warning ownership when reusing a wider context", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -183,8 +338,8 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
           "module.exports = 1;",
         );
         yield* fs.writeFileString(
-          path.join(nested, "tsconfig.json"),
-          '{"extends":"../compiler.settings"}',
+          path.join(root, "tsconfig.json"),
+          '{"extends":"./compiler.settings"}',
         );
         yield* fs.writeFileString(
           settings,
@@ -953,7 +1108,7 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
           path.join(nested, "leaf.ts"),
           "module.exports = { value: 1 };",
         );
-        const config = path.join(nested, "tsconfig.json");
+        const config = path.join(root, "tsconfig.json");
         yield* fs.writeFileString(
           config,
           '{ "compilerOptions": { "strict": true } }',
