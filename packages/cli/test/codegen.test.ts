@@ -46,6 +46,66 @@ vi.mock("esbuild", (importOriginal) =>
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect.each([
+      { files: ["bad-name.ts"], error: "InvalidTableFilenameError" },
+      {
+        files: ["user_profiles.ts", "userProfiles.ts"],
+        error: "ConflictingDocNameError",
+      },
+    ])("rejects $error before writing generated bindings", ({ files, error }) =>
+      Effect.gen(function* () {
+        const project = yield* Project.make;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        for (const file of files)
+          yield* project.write(`confect/tables/${file}`, Project.table);
+        const result = yield* project
+          .provide(codegenHandler)
+          .pipe(Effect.result);
+        assert(Result.isFailure(result));
+        expect(result.failure._tag).toBe(error);
+        expect(
+          yield* fs.exists(path.join(project.root, "confect", "_generated")),
+        ).toBe(false);
+        expect(
+          yield* fs.readDirectory(path.join(project.root, "convex")),
+        ).toEqual([]);
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect.each([
+      {
+        table: "export default {};",
+        spec: Project.spec,
+        error: "InvalidTableDefaultExportError",
+      },
+      {
+        table: Project.table,
+        spec: "export default {};",
+        error: "SpecMissingDefaultGroupSpecError",
+      },
+      { table: Project.table, spec: Project.spec, error: "BundleFailedError" },
+    ])(
+      "preserves $error when the shared build cannot compile an implementation",
+      ({ table, spec, error }) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write("confect/tables/notes.ts", table);
+          yield* project.write("confect/notes.spec.ts", spec);
+          yield* project.write("confect/notes.impl.ts", "export default ;");
+          const result = yield* project
+            .provide(codegenHandler)
+            .pipe(Effect.result);
+          assert(Result.isFailure(result));
+          expect(result.failure._tag).toBe(error);
+          yield* project.write("confect/tables/notes.ts", Project.table);
+          yield* project.write("confect/notes.spec.ts", Project.spec);
+          yield* project.write("confect/notes.impl.ts", Project.impl);
+          yield* project.provide(codegenHandler);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect.each(["http.ts", "crons.ts", "auth.ts"])(
       "checks optional module %s without evaluating it and recovers after errors",
       (file) =>
@@ -115,6 +175,9 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
               path.join(project.root, "convex/schema.ts"),
             ),
           ).toBe(previousSchema);
+          expect(
+            yield* fs.exists(path.join(project.root, "confect", "_generated")),
+          ).toBe(false);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -462,7 +525,7 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
     );
 
     it.effect(
-      "shares one build per evaluation phase without changing generated output",
+      "shares one build across evaluation phases without changing generated output",
       () =>
         Effect.gen(function* () {
           const path = yield* Path.Path;
@@ -489,6 +552,7 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
           vi.mocked(esbuild.build).mockClear();
           expect(yield* Project.writtenFiles(run)).not.toEqual([]);
           const batchedOutputs = yield* project.generatedFiles;
+          expect(vi.mocked(esbuild.build)).toHaveBeenCalledTimes(1);
           expect(
             vi
               .mocked(esbuild.build)
@@ -496,7 +560,7 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
                 ([options]) => Object.keys(options?.entryPoints ?? {}).length,
               )
               .filter((count) => count > 1),
-          ).toEqual([2, 3, 3]);
+          ).toEqual([8]);
           yield* Effect.acquireRelease(
             Effect.sync(() =>
               vi
@@ -512,6 +576,26 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
           );
           expect(yield* Project.writtenFiles(run)).toEqual([]);
           expect(yield* project.generatedFiles).toEqual(batchedOutputs);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "evaluates each spec once across table, spec and implementation phases",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write(
+            "confect/notes.spec.ts",
+            Project.spec +
+              '\nglobalThis.__confectSpecRuns = (globalThis.__confectSpecRuns ?? 0) + 1;\nif (globalThis.__confectSpecRuns !== 1) throw new Error("Spec evaluated twice in one generation");\n',
+          );
+          yield* project.provide(codegenHandler);
+          const before = yield* project.generatedFiles;
+          expect(
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
+          expect(yield* project.generatedFiles).toEqual(before);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
