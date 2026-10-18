@@ -29,7 +29,7 @@ export class SessionTerminationError extends Schema.TaggedError<SessionTerminati
   "DevSessionTerminationError",
   {
     pid: Schema.NullOr(Schema.Finite),
-    reason: Schema.Literals(["SignalFailed", "SignalRejected", "CloseTimeout"]),
+    reason: Schema.Literals(["SignalFailed", "SignalRejected", "ExitTimeout"]),
     cause: Schema.optionalKey(Schema.Defect()),
   },
 ) {}
@@ -50,36 +50,54 @@ export class SessionExited extends Schema.TaggedError<SessionExited>()(
   },
 ) {}
 
-const sendRestart = Effect.callback<void, SupervisorError | MissingSessionIpc>(
-  (resume) => {
-    if (typeof process.send !== "function") {
-      resume(Effect.fail(new MissingSessionIpc()));
-      return;
-    }
-    if (!process.connected) {
-      resume(Effect.interrupt);
-      return;
-    }
-    try {
-      process.send(RestartSignal.make({}), (cause) => {
-        resume(
-          !process.connected
-            ? Effect.interrupt
-            : cause
-              ? Effect.fail(
+const sendRestart = Effect.scoped(
+  Effect.gen(function* () {
+    if (!process.connected) return yield* Effect.interrupt;
+    const acknowledged = yield* Deferred.make<void>();
+    const runSync = Effect.runSyncWith(yield* Effect.context());
+    const onDisconnect = () => {
+      runSync(Deferred.succeed(acknowledged, undefined));
+    };
+    yield* Effect.acquireRelease(
+      Effect.sync(() => {
+        process.once("disconnect", onDisconnect);
+      }),
+      () =>
+        Effect.sync(() => {
+          process.off("disconnect", onDisconnect);
+        }),
+    );
+    yield* Effect.callback<void, SupervisorError | MissingSessionIpc>(
+      (resume) => {
+        if (typeof process.send !== "function") {
+          resume(Effect.fail(new MissingSessionIpc()));
+          return;
+        }
+        try {
+          process.send(RestartSignal.make({}), (cause) => {
+            resume(
+              cause
+                ? !process.connected
+                  ? Effect.interrupt
+                  : Effect.fail(
+                      new SupervisorError({ operation: "Restart", cause }),
+                    )
+                : Effect.void,
+            );
+          });
+        } catch (cause) {
+          resume(
+            !process.connected
+              ? Effect.interrupt
+              : Effect.fail(
                   new SupervisorError({ operation: "Restart", cause }),
-                )
-              : Effect.void,
-        );
-      });
-    } catch (cause) {
-      resume(
-        !process.connected
-          ? Effect.interrupt
-          : Effect.fail(new SupervisorError({ operation: "Restart", cause })),
-      );
-    }
-  },
+                ),
+          );
+        }
+      },
+    );
+    yield* Deferred.await(acknowledged);
+  }),
 );
 
 const parentDisconnected = Effect.callback<never>((resume) => {
@@ -125,16 +143,13 @@ const runParentSession = Effect.scoped(
         cause: "The CLI entrypoint is missing",
       });
     }
-    const closed = yield* Deferred.make<void>();
+    const terminated = yield* Deferred.make<void>();
     const outcome = yield* Deferred.make<
       boolean,
       SupervisorError | SessionExited
     >();
     const restartRequested = yield* Ref.make(false);
     const runSync = Effect.runSyncWith(yield* Effect.context());
-    const onMessage = (message: unknown) => {
-      if (isRestartSignal(message)) runSync(Ref.set(restartRequested, true));
-    };
     const child = yield* Effect.acquireRelease(
       Effect.try({
         try: () => {
@@ -143,6 +158,23 @@ const runParentSession = Effect.scoped(
             env: { ...process.env, [sessionMarker]: "1" },
             stdio: ["inherit", "inherit", "inherit", "ipc"],
           });
+          const onMessage = (message: unknown) => {
+            if (!isRestartSignal(message)) return;
+            runSync(
+              Ref.set(restartRequested, true).pipe(
+                Effect.andThen(
+                  Effect.try({
+                    try: () => {
+                      if (session.connected) session.disconnect();
+                    },
+                    catch: (cause) =>
+                      new SupervisorError({ operation: "Restart", cause }),
+                  }),
+                ),
+                Effect.catch((error) => Deferred.fail(outcome, error)),
+              ),
+            );
+          };
           session.on("message", onMessage);
           session.on("error", (cause) => {
             runSync(
@@ -152,23 +184,28 @@ const runParentSession = Effect.scoped(
               ),
             );
           });
-          session.once("close", (code, signal) => {
+          const onExit = (
+            code: number | null,
+            signal: NodeJS.Signals | null,
+          ) => {
             runSync(
               Effect.gen(function* () {
-                yield* Deferred.succeed(closed, undefined);
+                yield* Deferred.succeed(terminated, undefined);
                 yield* code === 0 && signal === null
                   ? Deferred.succeed(outcome, yield* Ref.get(restartRequested))
                   : Deferred.fail(outcome, new SessionExited({ code, signal }));
               }),
             );
-          });
-          return session;
+          };
+          session.once("exit", onExit);
+          session.once("close", onExit);
+          return { session, onMessage };
         },
         catch: (cause) => new SupervisorError({ operation: "Spawn", cause }),
       }),
-      (session) =>
+      ({ session }) =>
         Effect.gen(function* () {
-          if (yield* Deferred.isDone(closed)) return;
+          if (yield* Deferred.isDone(terminated)) return;
           const stopped = yield* Effect.try({
             try: () => {
               if (session.connected) session.disconnect();
@@ -177,7 +214,7 @@ const runParentSession = Effect.scoped(
               new SupervisorError({ operation: "Terminate", cause }),
           }).pipe(Effect.result);
           const exited = Result.isSuccess(stopped)
-            ? yield* Deferred.await(closed).pipe(
+            ? yield* Deferred.await(terminated).pipe(
                 Effect.timeoutOption("5 seconds"),
               )
             : Option.none();
@@ -187,7 +224,7 @@ const runParentSession = Effect.scoped(
               catch: (cause) =>
                 new SupervisorError({ operation: "Terminate", cause }),
             }).pipe(Effect.result);
-            const reaped = yield* Deferred.await(closed).pipe(
+            const reaped = yield* Deferred.await(terminated).pipe(
               Effect.timeoutOption("5 seconds"),
             );
             if (Option.isNone(reaped)) {
@@ -197,7 +234,7 @@ const runParentSession = Effect.scoped(
                   reason: Result.isFailure(killed)
                     ? "SignalFailed"
                     : killed.success
-                      ? "CloseTimeout"
+                      ? "ExitTimeout"
                       : "SignalRejected",
                   ...(Result.isFailure(killed)
                     ? { cause: killed.failure }
@@ -212,7 +249,7 @@ const runParentSession = Effect.scoped(
     );
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
-        child.off("message", onMessage);
+        child.session.off("message", child.onMessage);
       }),
     );
     return yield* Deferred.await(outcome);

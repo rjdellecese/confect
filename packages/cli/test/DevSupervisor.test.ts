@@ -56,7 +56,7 @@ const parentHarness = Effect.gen(function* () {
         });
         vi.spyOn(child, "kill").mockImplementation((signal = "SIGTERM") => {
           runSync(Queue.offer(signals, signal));
-          if (signal === "SIGKILL") child.emit("close", null, "SIGKILL");
+          if (signal === "SIGKILL") child.emit("exit", null, "SIGKILL");
           return true;
         });
         runSync(Queue.offer(started, child));
@@ -115,7 +115,7 @@ const childHarness = Effect.gen(function* () {
 });
 
 it.effect(
-  "waits for child close before restarting without overlapping sessions",
+  "waits for child exit before restarting without overlapping sessions",
   () =>
     Effect.gen(function* () {
       const harness = yield* parentHarness;
@@ -147,14 +147,11 @@ it.effect(
       yield* Effect.yieldNow;
       expect(harness.spawn).toHaveBeenCalledTimes(1);
       first.emit("exit", 0, null);
-      yield* Effect.yieldNow;
-      expect(harness.spawn).toHaveBeenCalledTimes(1);
-      first.emit("close", 0, null);
       const second = yield* Queue.take(harness.started);
       expect(first.listeners("message")).toEqual([unrelated]);
       expect(harness.spawn).toHaveBeenCalledTimes(2);
       expect(yield* Queue.size(harness.signals)).toBe(0);
-      second.emit("close", 0, null);
+      second.emit("exit", 0, null);
       yield* Fiber.join(fiber);
       expect(yield* Queue.size(harness.signals)).toBe(0);
       expect(harness.spawn).toHaveBeenCalledTimes(2);
@@ -172,9 +169,30 @@ it.effect.each([undefined, "ConfectDevSessionRestart", { _tag: "Other" }])(
       );
       const child = yield* Queue.take(harness.started);
       child.emit("message", message);
-      child.emit("close", 0, null);
+      child.emit("exit", 0, null);
       yield* Fiber.join(fiber);
       expect(harness.spawn).toHaveBeenCalledTimes(1);
+    }).pipe(Effect.scoped),
+);
+
+it.effect(
+  "records restart before acknowledging a child that exits immediately",
+  () =>
+    Effect.gen(function* () {
+      const harness = yield* parentHarness;
+      const fiber = yield* DevSupervisor.run(Effect.void).pipe(
+        Effect.provide(parentConfig),
+        Effect.forkScoped,
+      );
+      const first = yield* Queue.take(harness.started);
+      vi.spyOn(first, "disconnect").mockImplementation(() => {
+        first.emit("exit", 0, null);
+      });
+      first.emit("message", restartSignal);
+      const second = yield* Queue.take(harness.started);
+      expect(harness.spawn).toHaveBeenCalledTimes(2);
+      second.emit("exit", 0, null);
+      yield* Fiber.join(fiber);
     }).pipe(Effect.scoped),
 );
 
@@ -194,7 +212,7 @@ it.effect.each([
       );
       const child = yield* Queue.take(harness.started);
       if (restart) child.emit("message", restartSignal);
-      child.emit("close", code, signal);
+      child.emit("exit", code, signal);
       expect(yield* Fiber.join(fiber)).toEqual(
         Result.fail(new DevSupervisor.SessionExited({ code, signal })),
       );
@@ -238,13 +256,14 @@ it.effect(
       );
       const child = yield* Queue.take(harness.started);
       child.emit("message", restartSignal);
+      expect(yield* Queue.take(harness.stopping)).toBe(child);
       const interrupt = yield* Fiber.interrupt(fiber).pipe(
         Effect.tap(() => Deferred.succeed(finished, undefined)),
         Effect.forkScoped,
       );
-      expect(yield* Queue.take(harness.stopping)).toBe(child);
+      yield* Effect.yieldNow;
       expect(yield* Deferred.isDone(finished)).toBe(false);
-      child.emit("close", null, "SIGTERM");
+      child.emit("exit", null, "SIGTERM");
       yield* Fiber.join(interrupt);
       const exit = yield* Effect.exit(Fiber.join(fiber));
       assert(Exit.isFailure(exit));
@@ -322,9 +341,9 @@ it.effect("force-terminates a child that ignores graceful shutdown", () =>
 it.effect.each([
   { mode: "throw", reason: "SignalFailed" },
   { mode: "reject", reason: "SignalRejected" },
-  { mode: "accept", reason: "CloseTimeout" },
+  { mode: "accept", reason: "ExitTimeout" },
 ] as const)(
-  "reports $reason if forced termination cannot confirm child close",
+  "reports $reason if forced termination cannot confirm child exit",
   ({ mode, reason }) =>
     Effect.gen(function* () {
       const harness = yield* parentHarness;
@@ -401,9 +420,9 @@ it.effect(
     }).pipe(Effect.scoped),
 );
 
-it.effect(
-  "sends the typed restart only after scoped cleanup and awaits IPC acknowledgement",
-  () =>
+it.effect.each(["send-first", "disconnect-first"] as const)(
+  "sends restart after cleanup and awaits the parent's acknowledgement with %s",
+  (order) =>
     Effect.gen(function* () {
       const harness = yield* childHarness;
       const cleaning = yield* Deferred.make<void>();
@@ -428,11 +447,22 @@ it.effect(
       expect(harness.send).not.toHaveBeenCalled();
       expect(harness.disconnect).not.toHaveBeenCalled();
       yield* Deferred.succeed(allowCleanup, undefined);
-      const acknowledge = yield* Deferred.await(harness.sent);
+      const sent = yield* Deferred.await(harness.sent);
       expect(yield* Ref.get(cleaned)).toBe(true);
       expect(yield* Deferred.isDone(finished)).toBe(false);
       expect(harness.disconnect).not.toHaveBeenCalled();
-      acknowledge(null);
+      if (order === "send-first") {
+        sent(null);
+        yield* Effect.yieldNow;
+        expect(yield* Deferred.isDone(finished)).toBe(false);
+        expect(harness.disconnect).not.toHaveBeenCalled();
+        harness.disconnect();
+      } else {
+        harness.disconnect();
+        yield* Effect.yieldNow;
+        expect(yield* Deferred.isDone(finished)).toBe(false);
+        sent(null);
+      }
       yield* Fiber.join(fiber);
       expect(harness.send).toHaveBeenCalledTimes(1);
       expect(harness.disconnect).toHaveBeenCalledTimes(1);
@@ -455,6 +485,26 @@ it.effect("does not request restart when scope cleanup defects", () =>
     expect(Cause.hasFails(exit.cause)).toBe(true);
     expect(harness.send).not.toHaveBeenCalled();
     expect(harness.disconnect).toHaveBeenCalledTimes(1);
+  }).pipe(Effect.scoped),
+);
+
+it.effect("preserves interruption while awaiting restart acknowledgement", () =>
+  Effect.gen(function* () {
+    const harness = yield* childHarness;
+    const listeners = process.listenerCount("disconnect");
+    const fiber = yield* DevSupervisor.run(DevSupervisor.requestRestart).pipe(
+      Effect.provide(childConfig),
+      Effect.forkScoped,
+    );
+    const sent = yield* Deferred.await(harness.sent);
+    sent(null);
+    yield* Effect.yieldNow;
+    yield* Fiber.interrupt(fiber);
+    const exit = yield* Effect.exit(Fiber.join(fiber));
+    assert(Exit.isFailure(exit));
+    expect(Cause.hasInterruptsOnly(exit.cause)).toBe(true);
+    expect(harness.disconnect).toHaveBeenCalledTimes(1);
+    expect(process.listenerCount("disconnect")).toBe(listeners);
   }).pipe(Effect.scoped),
 );
 

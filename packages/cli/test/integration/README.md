@@ -1,8 +1,12 @@
 # CLI process integration tests
 
-These tests launch `bin/confect.mjs` in disposable consumer directories with no generated files. They use the built CLI and workspace package distributions, not Vitest's source aliases. Run `pnpm build` before `pnpm exec vitest run --project @confect/cli test/integration` (CI's shared setup also builds first).
+The dev tests launch `bin/confect.mjs` in disposable consumer directories with no generated files. They use the built CLI and workspace package distributions, not Vitest's source aliases. Run `pnpm build` before `pnpm exec vitest run --project @confect/cli test/integration` (CI's shared setup also builds first).
 
 Each consumer has its own package and TypeScript configuration; dependencies resolve through the CLI package's installed dependencies. Tests clean up consumers and child processes through Effect scopes. Output gates coordinate edits and assertions. The bounded quiet-window check intentionally uses real time to detect watcher self-trigger loops.
+
+`DevSupervisor.test.ts` exercises real supervisor and session processes through temporary `.mjs` launchers. These launchers import `DevSupervisor.ts` directly using Node's native TypeScript support, so this suite does not require a CLI build. Typed stdout events gate lifecycle assertions; a temporary journal records session start and cleanup PIDs. The tests verify a single restart, inherited stdout/stderr, successful exit, and cleanup without orphan processes when the supervisor's control IPC disconnects. They use event deadlines rather than sleeps and remove their launchers and journals through scoped cleanup.
+
+The supervisor acknowledges a restart by disconnecting IPC after recording the request; the child waits for that acknowledgement before exiting. Process `exit` is the no-overlap barrier. On Node 24.21.0, parent-initiated IPC disconnection can emit `disconnect` and `exit` without a subsequent `close`, so the harness waits separately for process exit and output-stream completion.
 
 ## Performance regressions for issue #771
 
