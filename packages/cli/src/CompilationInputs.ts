@@ -54,6 +54,7 @@ const names = [
   "bun.lock",
   "bun.lockb",
   ".pnp.cjs",
+  ".pnp.js",
   ".pnp.loader.mjs",
   ".pnp.data.json",
   ".npmrc",

@@ -207,6 +207,32 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
             Compilation.layer({ mode: "Once", ownedDirectories: [] }),
           ),
         );
+        for (const name of ["left", "right"])
+          yield* fs.remove(path.join(root, name, "tsconfig.json"));
+        yield* fs.writeFileString(
+          path.join(root, "tsconfig.json"),
+          '{"compilerOptions":{"jsxFactory":"left.h"}}',
+        );
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const job = yield* Compilation.runJob(
+            Bundler.withBatch(
+              aliases,
+              Effect.forEach(aliases, (alias) => Bundler.bundle(alias)),
+            ),
+          );
+          expect((yield* job.exit).map(({ module }) => module.default)).toEqual(
+            [1, 1],
+          );
+          expect(job.receipts.map(({ roots }) => roots)).toEqual([[entry]]);
+          expect((yield* compiler.topology).map(({ roots }) => roots)).toEqual([
+            [entry],
+          ]);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
       }).pipe(Effect.scoped),
   );
   it.effect("keeps warning ownership when reusing a wider context", () =>

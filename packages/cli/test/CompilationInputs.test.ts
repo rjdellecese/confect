@@ -25,6 +25,25 @@ vi.mock("@confect/cli/CompilationConfig", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationInputs",
   (it) => {
+    it.effect(
+      "guards native legacy PnP markers even without a selected config",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const inputs = yield* CompilationInputs.make("Once");
+          const entry = path.join(root, "entry.ts");
+          expect(yield* inputs.configuration(entry)).toBeUndefined();
+          yield* inputs.trackSource(entry);
+          const marker = path.join(root, ".pnp.js");
+          yield* fs.writeFileString(marker, "module.exports = {};");
+          expect(yield* Effect.flip(inputs.check)).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [marker],
+          });
+        }).pipe(Effect.scoped),
+    );
     it.effect.each(["Once", "Watch"] as const)(
       "guards nearer config creation without observing ignored source configs in %s mode",
       (mode) =>

@@ -369,7 +369,8 @@ const compileLive = Effect.fn("Bundler.compileLive")(
       return yield* new BundlerError({ cause: { _tag: "EmptyCompilation" } });
     const configuration = yield* service.resolutionInputs.configuration(first);
     const cwd = yield* Compilation.canonicalPath(path.dirname(first));
-    const roots = yield* Effect.forEach(entries, Compilation.canonicalPath);
+    const sources = yield* Effect.forEach(entries, Compilation.canonicalPath);
+    const roots = Array.dedupe(sources);
     const conditions = service.conditions;
     const resolver = yield* CompilationPlugin.make(
       path,
@@ -405,7 +406,7 @@ const compileLive = Effect.fn("Bundler.compileLive")(
         absolutizeMetafile(path, resolver.normalize(metafile, cwd), cwd),
     });
     const artifacts = yield* Effect.forEach(
-      Array.zip(entries, roots),
+      Array.zip(entries, sources),
       ([entry, source]) =>
         Effect.gen(function* () {
           const output = Array.findFirst(
@@ -877,18 +878,16 @@ export const compile = Effect.fn("Bundler.compile")(function* (
     !options?.plugins?.length &&
     HashSet.has(batch.value.entryPoints, path.resolve(entryPoint))
   ) {
+    const entryKey = path.resolve(entryPoint);
     const compilation = yield* batch.value
-      .compilation(path.resolve(entryPoint))
+      .compilation(entryKey)
       .pipe(
         Effect.catchTag("CompilationFailed", (error) =>
           Compilation.fail(path.resolve(entryPoint))(error),
         ),
       );
     if (Option.isSome(compilation)) {
-      const entry = HashMap.get(
-        compilation.value.entries,
-        path.resolve(entryPoint),
-      );
+      const entry = HashMap.get(compilation.value.entries, entryKey);
       if (Option.isSome(entry)) {
         return entryArtifact(
           path,
