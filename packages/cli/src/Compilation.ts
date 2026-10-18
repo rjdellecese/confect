@@ -30,6 +30,8 @@ class PreparedRevisions extends Context.Service<
   ReadonlyArray<CompilationState.Receipt>
 >()("@confect/cli/Compilation/PreparedRevisions") {}
 
+export type Mode = "Once" | "Watch";
+
 export interface Request {
   readonly roots: ReadonlyArray<string>;
   readonly profile: CompilationState.Profile;
@@ -89,6 +91,7 @@ export const canonicalPath = Effect.fn("Compilation.canonicalPath")(function* (
 });
 
 export const layer = (options: {
+  readonly mode?: Mode;
   readonly ownedDirectories: ReadonlyArray<string>;
   readonly authoredFiles?: ReadonlyArray<string>;
   readonly restartInputs?: ReadonlyArray<string>;
@@ -100,7 +103,7 @@ export const layer = (options: {
       const conditions = yield* NodeConditions.current.pipe(
         Effect.mapError((cause) => new BundlerError({ cause })),
       );
-      const resolutionInputs = yield* CompilationInputs.make();
+      const resolutionInputs = yield* CompilationInputs.make(options.mode);
       yield* resolutionInputs.track(options.restartInputs ?? []);
       const services = Context.make(
         FileSystem.FileSystem,
@@ -205,6 +208,7 @@ export const layer = (options: {
                 request.normalize,
                 (event) => Queue.offer(events, event).pipe(Effect.asVoid),
                 resolutionInputs,
+                options.mode,
               ).pipe(
                 Effect.provide(services),
                 Effect.provideService(Scope.Scope, scope),

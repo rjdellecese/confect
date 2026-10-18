@@ -15,6 +15,7 @@ import * as Array from "effect/Array";
 import * as Record from "effect/Record";
 import * as Option from "effect/Option";
 import * as esbuild from "esbuild";
+import type { Mode } from "./Compilation";
 import { BundlerError } from "./BuildError";
 import * as CompilationState from "./CompilationState";
 import type * as CompilationInputs from "./CompilationInputs";
@@ -95,6 +96,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     check: Effect.void,
     ensure: Effect.void,
   },
+  mode: Mode = "Watch",
 ) {
   const fs = yield* FileSystem.FileSystem;
   const crypto = yield* Crypto.Crypto;
@@ -272,10 +274,11 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     }),
     (context) => Effect.promise(() => context.dispose()),
   );
-  yield* Effect.tryPromise({
-    try: () => native.watch(),
-    catch: (cause) => new BundlerError({ cause }),
-  });
+  if (mode === "Watch")
+    yield* Effect.tryPromise({
+      try: () => native.watch(),
+      catch: (cause) => new BundlerError({ cause }),
+    });
   const rebuild = Effect.fn("CompilationContext.rebuild")(function* () {
     yield* guards.ensure;
     const outcome = yield* Effect.tryPromise({
