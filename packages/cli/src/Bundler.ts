@@ -513,9 +513,9 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
  * Lazily shares one compilation across ordinary bundle calls in this effect.
  * Different tsconfigs and failed compilations fall back to individual builds.
  * Runtime conditions supplied through NODE_OPTIONS also use individual builds.
- * Imports still run at each caller, and temporary chunks live until the effect
- * finishes. The disposable evaluator, not this scope, owns Node's import
- * cache.
+ * Imports still run at each caller. Temporary chunks live until the supplied
+ * artifact scope closes, or until this effect finishes for standalone callers.
+ * The disposable evaluator, not this scope, owns Node's import cache.
  */
 export const withBatch = <A, E, R>(
   entryPoints: ReadonlyArray<string>,
@@ -529,9 +529,15 @@ export const withBatch = <A, E, R>(
         entryPoints.every((entry) => current.value.entryPoints.includes(entry))
       )
         return yield* effect;
+      const artifactScope = yield* Effect.serviceOption(
+        CompiledModule.ArtifactScope,
+      );
       const compilation = yield* Effect.cached(
         compileBatch(entryPoints).pipe(
-          Effect.provideService(Scope.Scope, scope),
+          Effect.provideService(
+            Scope.Scope,
+            Option.getOrElse(artifactScope, () => scope),
+          ),
           Effect.asSome,
           Effect.catchTag("BatchIncompatible", (error) =>
             Effect.logDebug(
@@ -711,12 +717,21 @@ export const compile = Effect.fn("Bundler.compile")(function* (
 
   const cwd = path.dirname(entryPoint);
   const selfReferences = yield* packageSelfReferencePatterns(cwd);
+  const artifactScope = yield* Effect.serviceOption(
+    CompiledModule.ArtifactScope,
+  );
+  const scope = Option.isSome(artifactScope)
+    ? artifactScope.value
+    : yield* Scope.Scope;
   const directory = yield* fs
     .makeTempDirectoryScoped({
       directory: cwd,
       prefix: ".confect-bundle-",
     })
-    .pipe(Effect.mapError((cause) => new BundlerError({ cause })));
+    .pipe(
+      Effect.provideService(Scope.Scope, scope),
+      Effect.mapError((cause) => new BundlerError({ cause })),
+    );
   const skipPatterns = yield* Effect.try({
     try: () => [
       ...tsconfigPathsToRegExp(

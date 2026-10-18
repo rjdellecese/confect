@@ -1,5 +1,7 @@
 import { dynamicImport } from "bundle-require";
 import * as Effect from "effect/Effect";
+import * as Context from "effect/Context";
+import type * as Scope from "effect/Scope";
 import * as Schema from "effect/Schema";
 import type * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
@@ -10,6 +12,11 @@ export interface CompiledModule {
   readonly metafile: esbuild.Metafile;
   readonly warnings: ReadonlyArray<esbuild.Message>;
 }
+
+export class ArtifactScope extends Context.Service<
+  ArtifactScope,
+  Scope.Scope
+>()("@confect/cli/CompiledModule/ArtifactScope") {}
 
 export interface LoadedModule {
   readonly module: any;

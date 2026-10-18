@@ -198,7 +198,13 @@ export const discoverInstalledComponents = Effect.fn(
     plugins: [componentConfigPlugin(path)],
   }).pipe(Effect.mapError((error) => fromBundlerError(displayPath, error)));
 
-  const app = module.default as
+  return yield* parseInstalledComponents(module.default, displayPath);
+});
+
+export const parseInstalledComponents = Effect.fn(
+  "ConvexConfig.parseInstalledComponents",
+)(function* (value: unknown, displayPath: string) {
+  const app = value as
     | { _isRoot?: unknown; export?: unknown }
     | null
     | undefined;

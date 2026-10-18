@@ -133,9 +133,9 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           expect(passes).toHaveLength(2);
           expect(passes[0]).not.toBe(passes[1]);
           for (const name of [
-            "LeafModule.loadSpec",
-            "LeafModule.validateImpl",
-            "ConvexConfig.discoverInstalledComponents",
+            "EvaluationSession.loadSpecs",
+            "EvaluationSession.validateImpls",
+            "EvaluationSession.components",
           ]) {
             const operations = spans.filter((span) => span.name === name);
             expect(operations).toHaveLength(2);
@@ -144,17 +144,17 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             }
           }
           const bundles = spans.filter(
-            (span) => span.name === "Bundler.bundle",
+            (span) => span.name === "Bundler.compile",
           );
           expect(bundles.length).toBeGreaterThan(0);
           for (const bundle of bundles) {
             const parent = Option.getOrUndefined(bundle.parent);
             assert(parent?._tag === "Span");
             expect([
-              "Cli.codegen",
-              "LeafModule.loadSpec",
-              "LeafModule.validateImpl",
-              "ConvexConfig.discoverInstalledComponents",
+              "EvaluationSession.compile",
+              "EvaluationSession.loadSpecs",
+              "EvaluationSession.validateImpls",
+              "EvaluationSession.components",
             ]).toContain(parent.name);
           }
           for (const span of spans) {
@@ -165,9 +165,9 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
     );
 
     it.effect.each([
-      { kind: "spec", name: "LeafModule.loadSpec" },
-      { kind: "impl", name: "LeafModule.validateImpl" },
-      { kind: "config", name: "ConvexConfig.discoverInstalledComponents" },
+      { kind: "spec", name: "EvaluationSession.loadSpecs" },
+      { kind: "impl", name: "EvaluationSession.validateImpls" },
+      { kind: "config", name: "EvaluationSession.components" },
     ] as const)(
       "retains a failed $kind operation when the caller recovers",
       ({ kind, name }) =>

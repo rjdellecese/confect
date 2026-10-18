@@ -83,7 +83,7 @@
   "overrides": [
     {
       "files": [
-        "packages/cli/src/Evaluation.ts",
+        "packages/cli/src/EvaluationSession.ts",
         "packages/cli/test/Evaluation.test.ts"
       ],
       "rules": {
