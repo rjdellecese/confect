@@ -15,7 +15,7 @@ import { RpcClientError } from "effect/rpc/RpcClientError";
 import { WorkerError } from "effect/workers/WorkerError";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
 import * as Bundler from "./Bundler";
-import { ArtifactScope } from "./CompiledModule";
+import * as CompiledModule from "./CompiledModule";
 import * as CodegenError from "./CodegenError";
 import * as ConvexConfig from "./ConvexConfig";
 import type * as GenerationSnapshot from "./GenerationSnapshot";
@@ -88,7 +88,10 @@ export const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
                 client,
                 requestContext,
               }),
-              Effect.provideService(ArtifactScope, artifactScope),
+              Effect.provideService(
+                CompiledModule.ArtifactScope,
+                artifactScope,
+              ),
             );
           }).pipe(
             Effect.provide(
@@ -152,6 +155,7 @@ export const loadSpecs = Effect.fn("EvaluationSession.loadSpecs")(function* (
             })
             .pipe(
               Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)),
+              Effect.ensuring(CompiledModule.consume(artifact)),
             );
           return yield* LeafModule.toLeafModule(relativePath);
         }),
@@ -204,6 +208,7 @@ export const validateImpls = Effect.fn("EvaluationSession.validateImpls")(
               })
               .pipe(
                 Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)),
+                Effect.ensuring(CompiledModule.consume(artifact)),
               );
           }),
         { concurrency: 4, discard: true },
@@ -290,6 +295,7 @@ export const validateTables = Effect.fn("EvaluationSession.validateTables")(
               })
               .pipe(
                 Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)),
+                Effect.ensuring(CompiledModule.consume(artifact)),
               );
           }),
         { concurrency: 4, discard: true },
@@ -305,11 +311,15 @@ export const components = Effect.fn("EvaluationSession.components")(function* (
   const path = yield* Path.Path;
   const { client, requestContext } = yield* ModuleEvaluation;
   const artifact = yield* Bundler.compile(absolutePath, {
+    profile: "component-config",
     plugins: [ConvexConfig.componentConfigPlugin(path)],
   }).pipe(Effect.mapError((error) => fromBundlerError(displayPath, error)));
   return yield* client
     .Components({ ...requestContext, displayPath, url: artifact.url })
-    .pipe(Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)));
+    .pipe(
+      Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)),
+      Effect.ensuring(CompiledModule.consume(artifact)),
+    );
 });
 
 export const previous = Effect.fn("EvaluationSession.previous")(function* (
@@ -321,5 +331,8 @@ export const previous = Effect.fn("EvaluationSession.previous")(function* (
   );
   return yield* client
     .Previous({ ...requestContext, url: artifact.url })
-    .pipe(Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)));
+    .pipe(
+      Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)),
+      Effect.ensuring(CompiledModule.consume(artifact)),
+    );
 });

@@ -20,6 +20,7 @@ import * as Schema from "effect/Schema";
 import * as Evaluation from "@confect/cli/Evaluation";
 import * as EvaluationSession from "@confect/cli/EvaluationSession";
 import * as Bundler from "@confect/cli/Bundler";
+import * as Compilation from "@confect/cli/Compilation";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { FunctionPaths } from "@confect/cli/FunctionPaths";
@@ -67,6 +68,56 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
       ).toBe(true);
     }
   };
+
+  it.effect(
+    "records successful and failed worker evaluation consumption",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const path = yield* Path.Path;
+        yield* project.write("confect/tables/notes.ts", "export default {};");
+        yield* Effect.gen(function* () {
+          const validate = project.provide(
+            EvaluationSession.validateTables([
+              { relativePath: "tables/notes.ts", tableName: "notes" },
+            ]).pipe(EvaluationSession.provide),
+          );
+          const failed = yield* Compilation.runJob(validate);
+          expect(Result.isFailure(yield* Effect.result(failed.exit))).toBe(
+            true,
+          );
+          expect(failed.failedReceipts).toEqual([]);
+          expect(failed.receipts.flatMap((receipt) => receipt.roots)).toContain(
+            path.join(project.root, "confect", "tables", "notes.ts"),
+          );
+          yield* project.write(
+            "confect/tables/notes.ts",
+            'import * as Table from "@confect/core/Table"; import * as Schema from "effect/Schema"; export default Table.make(() => Schema.Struct({ text: Schema.String }));',
+          );
+          const successful = yield* Compilation.runJob(validate);
+          yield* successful.exit;
+          expect(successful.failedReceipts).toEqual([]);
+          expect(
+            successful.receipts.flatMap((receipt) => receipt.roots),
+          ).toEqual([path.join(project.root, "confect", "tables", "notes.ts")]);
+          expectWorkersExited();
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({
+              ownedDirectories: [
+                path.join(project.root, "confect", "_generated"),
+                path.join(project.root, "convex"),
+              ],
+              authoredFiles: [
+                path.join(project.root, "convex", "convex.config.ts"),
+                path.join(project.root, "convex", "tsconfig.json"),
+              ],
+            }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
 
   it.effect(
     "generates and updates declarations from prepared artifacts with no child compiler",
