@@ -8,6 +8,7 @@ import * as Record from "effect/Record";
 import * as Order from "effect/Order";
 
 export type Profile = "modules" | "component-config";
+export type Mode = "Once" | "Watch";
 
 export interface Receipt {
   readonly context: number;
@@ -175,25 +176,38 @@ const byPath = Order.mapInput(
 
 export const fingerprintInput = (
   metafile: esbuild.Metafile,
-  hashes: { readonly inputs: Values; readonly outputs: Values },
+  hashes: Values,
   root: string,
-  output: string,
+  generated: ReadonlyArray<string> = [],
 ): string =>
   JSON.stringify({
-    outputs: Array.sort(
-      Array.map(
-        reachable(metafile.outputs, [output]),
-        ([file]) => [file, hashes.outputs[file]] as const,
-      ),
-      byPath,
-    ),
     inputs: Array.sort(
-      Array.map(
-        reachable(metafile.inputs, [root]),
-        ([file]) => [file, hashes.inputs[file]] as const,
+      Array.getSomes(
+        Array.map(reachable(metafile.inputs, [root]), ([file, metadata]) =>
+          Array.contains(generated, file)
+            ? Option.none()
+            : Option.some([
+                file,
+                JSON.stringify([hashes[file], metadata.imports]),
+              ] as const),
+        ),
       ),
       byPath,
     ),
+  });
+
+export const fingerprintArtifacts = (hashes: Values): string =>
+  JSON.stringify(Array.sort(Record.toEntries(hashes), byPath));
+
+export const fingerprintFailure = (
+  errors: ReadonlyArray<
+    Pick<esbuild.Message, "id" | "pluginName" | "text" | "location" | "notes">
+  >,
+  inputs: Values,
+): string =>
+  JSON.stringify({
+    errors,
+    inputs: Array.sort(Record.toEntries(inputs), byPath),
   });
 
 export const changedRoots = (

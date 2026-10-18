@@ -14,8 +14,9 @@ import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
-import type { Mode } from "./Compilation";
 import { BundlerError } from "./BuildError";
+import type { Mode } from "./CompilationState";
+import * as CompilationConfig from "./CompilationConfig";
 
 export interface RestartNotification {
   readonly reason: "ResolutionInputsChanged";
@@ -80,12 +81,14 @@ export const ancestors = (
   );
 
 export const make = Effect.fn("CompilationInputs.make")(
-  function* (mode: Mode = "Watch") {
+  function* (mode: Mode = "Watch", conditions?: ReadonlyArray<string>) {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const crypto = yield* Crypto.Crypto;
     const scope = yield* Scope.Scope;
     const baseline = yield* Ref.make(HashMap.empty<string, string>());
+    const configDirectories = yield* Ref.make(HashSet.empty<string>());
+    const generation = yield* Ref.make(0);
     const watched = yield* Ref.make(HashSet.empty<string>());
     const sources = yield* Ref.make(HashSet.empty<string>());
     const pending = yield* Ref.make(Option.none<RestartNotification>());
@@ -107,6 +110,11 @@ export const make = Effect.fn("CompilationInputs.make")(
             reason: "ForbiddenFile",
           });
         const stat = yield* fs.stat(real);
+        if (
+          stat.type === "Directory" &&
+          HashSet.has(yield* Ref.get(configDirectories), file)
+        )
+          return `${real}\0directory`;
         if (stat.type !== "File")
           return yield* new ObservationRejected({
             path: file,
@@ -118,7 +126,15 @@ export const make = Effect.fn("CompilationInputs.make")(
         return `${real}\0${Hex.encode(digest)}`;
       },
       Effect.catch((error) => {
-        if (error._tag === "PlatformError" && error.reason._tag === "NotFound")
+        if (
+          error._tag === "PlatformError" &&
+          (error.reason._tag === "NotFound" ||
+            (error.reason._tag === "BadResource" &&
+              typeof error.reason.cause === "object" &&
+              error.reason.cause !== null &&
+              "code" in error.reason.cause &&
+              error.reason.cause.code === "ENOTDIR"))
+        )
           return Effect.succeed("missing");
         return Effect.gen(function* () {
           const failure = new BundlerError({ cause: error });
@@ -202,7 +218,8 @@ export const make = Effect.fn("CompilationInputs.make")(
               for (const directory of ancestors(path, path.dirname(file))) {
                 if (
                   HashSet.has(yield* Ref.get(watched), directory) ||
-                  !(yield* fs.exists(directory))
+                  !(yield* fs.exists(directory)) ||
+                  (yield* fs.stat(directory)).type !== "Directory"
                 )
                   continue;
                 yield* Ref.update(watched, HashSet.add(directory));
@@ -252,6 +269,7 @@ export const make = Effect.fn("CompilationInputs.make")(
     );
 
     return {
+      generation: Ref.get(generation),
       events: Stream.fromQueue(events),
       pending: Ref.get(pending),
       check,
@@ -273,13 +291,48 @@ export const make = Effect.fn("CompilationInputs.make")(
                 Array.map(names, (name) => path.join(ancestor, name)),
               ),
             );
+            const configs = yield* CompilationConfig.discover(
+              file,
+              (candidate, kind) =>
+                Effect.gen(function* () {
+                  if (kind === "Directory")
+                    yield* Ref.update(
+                      configDirectories,
+                      HashSet.add(candidate),
+                    );
+                  const unseen = !HashMap.has(
+                    yield* Ref.get(baseline),
+                    candidate,
+                  );
+                  yield* track([candidate]);
+                  if (unseen)
+                    yield* Ref.update(generation, (current) => current + 1);
+                }),
+              conditions,
+            ).pipe(
+              Effect.provideService(FileSystem.FileSystem, fs),
+              Effect.provideService(Path.Path, path),
+              Effect.catch((cause) =>
+                Effect.gen(function* () {
+                  if (Schema.is(RestartRequired)(cause)) return yield* cause;
+                  const failure = Schema.is(BundlerError)(cause)
+                    ? cause
+                    : new BundlerError({ cause });
+                  yield* Ref.set(observationFailure, Option.some(failure));
+                  yield* Queue.fail(events, failure);
+                  return yield* failure;
+                }),
+              ),
+            );
+            yield* verify(configs);
             yield* Ref.update(sources, HashSet.add(directory));
           }),
         );
       }),
     };
   },
-  (effect, _mode?: Mode) => Effect.provide(effect, NodeCrypto.layer),
+  (effect, _mode?: Mode, _conditions?: ReadonlyArray<string>) =>
+    Effect.provide(effect, NodeCrypto.layer),
 );
 
 export type Inputs = Effect.Success<ReturnType<typeof make>>;

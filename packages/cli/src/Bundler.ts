@@ -635,7 +635,12 @@ export const withBatch = <A, E, R>(
       const live = yield* Effect.serviceOption(Compilation.Service);
       const compilation = yield* Effect.cached(
         (Option.isSome(live)
-          ? compileLive(live.value, entryPoints, true).pipe(Effect.asSome)
+          ? compileLive(live.value, entryPoints, true).pipe(
+              Effect.asSome,
+              Effect.catchTag("CompilationFailed", () =>
+                Effect.succeed(Option.none<BatchCompilation>()),
+              ),
+            )
           : compileBatch(entryPoints).pipe(
               Effect.asSome,
               Effect.catchTag("BatchIncompatible", (error) =>

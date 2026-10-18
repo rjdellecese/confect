@@ -12,6 +12,7 @@ import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 import * as Scope from "effect/Scope";
 import * as Ref from "effect/Ref";
+import * as Fiber from "effect/Fiber";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
@@ -19,6 +20,7 @@ import * as Bundler from "@confect/cli/Bundler";
 import * as Compilation from "@confect/cli/Compilation";
 import * as CompilationState from "@confect/cli/CompilationState";
 import * as CompiledModule from "@confect/cli/CompiledModule";
+import * as ConvexConfig from "@confect/cli/ConvexConfig";
 import type * as CompilationInputs from "@confect/cli/CompilationInputs";
 
 const observe = Effect.gen(function* () {
@@ -52,6 +54,325 @@ const compileAndLoad = Effect.fn("Compilation.test.compileAndLoad")(function* (
 layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
+  it.effect(
+    "stabilizes unsolicited watch discovery outside confect and publishes readiness",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const confect = path.join(root, "confect");
+        const shared = path.join(root, "shared");
+        yield* fs.makeDirectory(confect);
+        yield* fs.makeDirectory(shared);
+        const entry = path.join(confect, "entry.ts");
+        yield* fs.writeFileString(entry, "export default 1;");
+        yield* Effect.gen(function* () {
+          const events = yield* observe;
+          yield* Bundler.compile(entry);
+          const initial = yield* Queue.take(events);
+          yield* fs.writeFileString(
+            path.join(shared, "helper.ts"),
+            "export default 2;",
+          );
+          yield* fs.writeFileString(
+            entry,
+            'export { default } from "../shared/helper";',
+          );
+          const updated = yield* Queue.take(events);
+          expect(updated.revision).toBeGreaterThan(initial.revision);
+          expect(updated.affectedRoots).toEqual([entry]);
+          expect(updated.errors).toEqual([]);
+          const loaded = yield* Compilation.withPreparedRevisions(
+            Bundler.bundle(entry),
+          );
+          expect(loaded.module.default).toBe(2);
+          expect(yield* Queue.poll(events)).toEqual(Option.none());
+        }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
+      }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+  );
+
+  it.effect(
+    "surfaces fatal unsolicited source observation through compiler events",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        yield* fs.writeFileString(entry, "export default 1;");
+        yield* fs.writeFileString(
+          path.join(root, ".env.local"),
+          "export default 2;",
+        );
+        yield* fs.symlink(
+          path.join(root, ".env.local"),
+          path.join(root, "alias.ts"),
+        );
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          yield* Bundler.compile(entry);
+          const outcome = yield* Stream.runDrain(compiler.events).pipe(
+            Effect.result,
+            Effect.forkScoped,
+          );
+          yield* fs.writeFileString(
+            entry,
+            'export { default } from "./alias";',
+          );
+          const failure = yield* Fiber.join(outcome);
+          expect(Result.isFailure(failure)).toBe(true);
+          if (Result.isFailure(failure))
+            expect(failure.failure.cause).toMatchObject({
+              _tag: "CompilationSourceRejected",
+            });
+        }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
+      }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+  );
+  it.effect.each(["Once", "Watch"] as const)(
+    "guards transitive nonstandard config inputs in %s mode",
+    (mode) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const nested = path.join(root, "workspace");
+        yield* fs.makeDirectory(nested);
+        const entry = path.join(root, "entry.ts");
+        const settings = path.join(root, "compiler.settings");
+        yield* fs.writeFileString(
+          entry,
+          'export default require("./workspace/leaf");',
+        );
+        yield* fs.writeFileString(
+          path.join(nested, "leaf.ts"),
+          "module.exports = 1;",
+        );
+        yield* fs.writeFileString(
+          path.join(nested, "tsconfig.json"),
+          '{"extends":"../compiler.settings"}',
+        );
+        yield* fs.writeFileString(
+          settings,
+          '{"compilerOptions":{"strict":true}}',
+        );
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const restarts = yield* observeRestarts;
+          const first = yield* Bundler.compile(entry);
+          expect(yield* fs.readFileString(fileURLToPath(first.url))).toContain(
+            '"use strict";',
+          );
+          yield* fs.writeFileString(
+            settings,
+            '{"compilerOptions":{"strict":false}}',
+          );
+          if (mode === "Watch")
+            expect((yield* Queue.take(restarts)).paths).toContain(settings);
+          expect(
+            (yield* Effect.flip(Bundler.compile(entry))).cause,
+          ).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [settings],
+          });
+          yield* compiler.reset;
+          expect(
+            (yield* Effect.flip(Bundler.compile(entry))).cause,
+          ).toMatchObject({ _tag: "CompilationRestartRequired" });
+        }).pipe(
+          Effect.provide(Compilation.layer({ mode, ownedDirectories: [] })),
+        );
+        const rebuilt = yield* Bundler.compile(entry).pipe(
+          Effect.provide(Compilation.layer({ mode, ownedDirectories: [] })),
+        );
+        expect(
+          yield* fs.readFileString(fileURLToPath(rebuilt.url)),
+        ).not.toContain('"use strict";');
+      }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+  );
+  it.effect(
+    "captures component wrappers and their native JSON dependencies",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const child = path.join(root, "child");
+        yield* fs.makeDirectory(child);
+        const entry = path.join(root, "convex.config.ts");
+        yield* fs.writeFileString(
+          entry,
+          'import child from "./child/convex.config"; export default child;',
+        );
+        yield* fs.writeFileString(
+          path.join(child, "convex.config.ts"),
+          'export { default } from "./name.json";',
+        );
+        const data = path.join(child, "name.json");
+        yield* fs.writeFileString(data, '{"_name":"one"}');
+        yield* Effect.gen(function* () {
+          const events = yield* observe;
+          const options = {
+            profile: "component-config" as const,
+            plugins: [ConvexConfig.componentConfigPlugin(path)],
+          };
+          const initial = yield* Bundler.bundle(entry, options);
+          expect(initial.module.default).toMatchObject({
+            defaultName: "one",
+            componentDefinitionPath: child,
+          });
+          yield* Queue.take(events);
+          yield* fs.writeFileString(data, '{"_name":"two"}');
+          const changed = yield* Bundler.bundle(entry, options);
+          expect(changed.module.default).toMatchObject({
+            defaultName: "two",
+            componentDefinitionPath: child,
+          });
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([entry]);
+          yield* Bundler.compile(entry, options);
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([]);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
+  it.effect(
+    "recovers requested leaves from a failed batch through the same compiler",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const spec = path.join(root, "spec.ts");
+        const impl = path.join(root, "impl.ts");
+        yield* fs.writeFileString(spec, "export default 1;");
+        yield* fs.writeFileString(impl, "export default = ;");
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const first = yield* Bundler.withBatch(
+            [spec, impl],
+            Bundler.bundle(spec),
+          );
+          expect(first.module.default).toBe(1);
+          expect(yield* compiler.topology).toHaveLength(2);
+          const second = yield* Bundler.withBatch(
+            [spec, impl],
+            Bundler.bundle(spec),
+          );
+          expect(second.module.default).toBe(1);
+          expect(yield* compiler.topology).toHaveLength(2);
+          yield* fs.writeFileString(impl, "export default 2;");
+          yield* Bundler.withBatch([spec, impl], Bundler.compile(spec));
+          expect(yield* compiler.topology).toHaveLength(1);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "captures JSON input edits and traverses generated inputs without a self-loop",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const owned = path.join(root, "generated");
+        yield* fs.makeDirectory(owned);
+        const entry = path.join(root, "entry.ts");
+        const generated = path.join(owned, "value.ts");
+        const json = path.join(root, "value.json");
+        yield* fs.writeFileString(
+          entry,
+          'export { default } from "./generated/value";',
+        );
+        yield* fs.writeFileString(
+          generated,
+          'export { default } from "../value.json"; /*aaaa*/',
+        );
+        yield* fs.writeFileString(json, '{"value":1}');
+        yield* Effect.gen(function* () {
+          const events = yield* observe;
+          yield* Bundler.compile(entry);
+          yield* Queue.take(events);
+          yield* fs.writeFileString(
+            generated,
+            'export { default } from "../value.json"; /*bbbb*/',
+          );
+          yield* Bundler.compile(entry);
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([]);
+          yield* fs.writeFileString(json, '{"value":2}');
+          const changed = yield* Bundler.bundle(entry);
+          expect(changed.module.default).toEqual({ value: 2 });
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([entry]);
+          yield* Bundler.compile(entry);
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([]);
+          yield* fs.writeFileString(
+            generated,
+            'export { default } from "data:text/javascript,export default 3";',
+          );
+          yield* Bundler.compile(entry);
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([entry]);
+          yield* fs.writeFileString(
+            generated,
+            'export { default } from "data:text/javascript,export default 4";',
+          );
+          const generatedOnly = yield* Bundler.bundle(entry);
+          expect(generatedOnly.module.default).toBe(4);
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([]);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [owned] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "keeps partial authored input edits pending while diagnostics are unchanged",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        const helper = path.join(root, "helper.ts");
+        yield* fs.writeFileString(
+          entry,
+          'export { default } from "./helper"; import "./missing";',
+        );
+        yield* fs.writeFileString(helper, "/*aaaa*/ export default 1;");
+        yield* Effect.gen(function* () {
+          const events = yield* observe;
+          yield* Effect.result(Bundler.compile(entry));
+          const first = yield* Queue.take(events);
+          expect(first.errors.length).toBeGreaterThan(0);
+          yield* Effect.result(Bundler.compile(entry));
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([]);
+          yield* fs.writeFileString(helper, "/*bbbb*/ export default 1;");
+          yield* Effect.result(Bundler.compile(entry));
+          const changed = yield* Queue.take(events);
+          expect(changed.errors.map(({ text }) => text)).toEqual(
+            first.errors.map(({ text }) => text),
+          );
+          expect(changed.affectedRoots).toEqual([entry]);
+          yield* fs.writeFileString(
+            path.join(root, "missing.ts"),
+            "export {};",
+          );
+          yield* Bundler.compile(entry);
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([entry]);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
   it.effect(
     "pins prepared revisions once per wrapper and leaves default compilation unchanged",
     () =>
@@ -241,6 +562,7 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
         );
         yield* Effect.gen(function* () {
           const queue = yield* observe;
+          const restarts = yield* observeRestarts;
           const failed = yield* Compilation.runJob(Bundler.compile(entry));
           expect(Exit.isFailure(failed.exit)).toBe(true);
           yield* Queue.take(queue);
@@ -248,12 +570,38 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
             path.join(root, "tsconfig.json"),
             '{ "compilerOptions": { "paths": { "~/*": ["./*"] } } }',
           );
+          expect((yield* Queue.take(restarts)).paths).toContain(
+            path.join(root, "tsconfig.json"),
+          );
+          expect(
+            (yield* Effect.flip(Bundler.compile(entry))).cause,
+          ).toMatchObject({ _tag: "CompilationRestartRequired" });
+        }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
+        yield* Effect.gen(function* () {
+          const queue = yield* observe;
+          const restarts = yield* observeRestarts;
+          const compiled = yield* Bundler.bundle(entry);
+          expect(compiled.module.default).toBe(7);
           const created = yield* Queue.take(queue);
           expect(created.errors).toEqual([]);
           yield* fs.writeFileString(
             path.join(root, "tsconfig.json"),
             '{ "compilerOptions": { "paths": {} } }',
           );
+          expect((yield* Queue.take(restarts)).paths).toContain(
+            path.join(root, "tsconfig.json"),
+          );
+          expect(
+            (yield* Effect.flip(Bundler.compile(entry))).cause,
+          ).toMatchObject({ _tag: "CompilationRestartRequired" });
+        }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
+        yield* Effect.gen(function* () {
+          const queue = yield* observe;
+          expect(
+            Exit.isFailure(
+              (yield* Compilation.runJob(Bundler.compile(entry))).exit,
+            ),
+          ).toBe(true);
           const removed = yield* Queue.take(queue);
           expect(removed.errors.length).toBeGreaterThan(0);
         }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
@@ -577,18 +925,24 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
           '{ "compilerOptions": { "strict": true } }',
         );
         yield* Effect.gen(function* () {
-          const queue = yield* observe;
+          const restarts = yield* observeRestarts;
           const first = yield* Compilation.runJob(Bundler.compile(entry));
           const strict = yield* first.exit;
           expect(yield* fs.readFileString(fileURLToPath(strict.url))).toContain(
             '"use strict";',
           );
-          yield* Queue.take(queue);
           yield* fs.writeFileString(
             config,
             '{ "compilerOptions": { "strict": false } }',
           );
-          expect((yield* Queue.take(queue)).affectedRoots).toEqual([entry]);
+          expect((yield* Queue.take(restarts)).paths).toContain(config);
+          expect(
+            (yield* Effect.flip(Bundler.compile(entry))).cause,
+          ).toMatchObject({ _tag: "CompilationRestartRequired" });
+        }).pipe(
+          Effect.provide(Compilation.layer({ ownedDirectories: [owned] })),
+        );
+        yield* Effect.gen(function* () {
           const second = yield* Compilation.runJob(Bundler.compile(entry));
           const loose = yield* second.exit;
           expect(

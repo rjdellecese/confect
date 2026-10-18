@@ -6,6 +6,7 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Result from "effect/Result";
 import * as Scope from "effect/Scope";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
@@ -30,8 +31,6 @@ class PreparedRevisions extends Context.Service<
   ReadonlyArray<CompilationState.Receipt>
 >()("@confect/cli/Compilation/PreparedRevisions") {}
 
-export type Mode = "Once" | "Watch";
-
 export interface Request {
   readonly roots: ReadonlyArray<string>;
   readonly profile: CompilationState.Profile;
@@ -39,13 +38,15 @@ export interface Request {
   readonly normalize: (metafile: esbuild.Metafile) => esbuild.Metafile;
 }
 
+export type { Mode } from "./CompilationState";
+
 export class Service extends Context.Service<
   Service,
   {
     readonly ownedDirectories: ReadonlyArray<string>;
     readonly authoredFiles: ReadonlyArray<string>;
     readonly conditions: ReadonlyArray<string>;
-    readonly events: Stream.Stream<CompilationState.Revision>;
+    readonly events: Stream.Stream<CompilationState.Revision, BundlerError>;
     readonly restarts: Stream.Stream<
       CompilationInputs.RestartNotification,
       BundlerError
@@ -91,7 +92,7 @@ export const canonicalPath = Effect.fn("Compilation.canonicalPath")(function* (
 });
 
 export const layer = (options: {
-  readonly mode?: Mode;
+  readonly mode?: CompilationState.Mode;
   readonly ownedDirectories: ReadonlyArray<string>;
   readonly authoredFiles?: ReadonlyArray<string>;
   readonly restartInputs?: ReadonlyArray<string>;
@@ -103,13 +104,19 @@ export const layer = (options: {
       const conditions = yield* NodeConditions.current.pipe(
         Effect.mapError((cause) => new BundlerError({ cause })),
       );
-      const resolutionInputs = yield* CompilationInputs.make(options.mode);
+      const resolutionInputs = yield* CompilationInputs.make(
+        options.mode,
+        conditions,
+      );
       yield* resolutionInputs.track(options.restartInputs ?? []);
       const services = Context.make(
         FileSystem.FileSystem,
         yield* FileSystem.FileSystem,
       ).pipe(Context.add(Path.Path, yield* Path.Path));
-      const events = yield* Queue.unbounded<CompilationState.Revision>();
+      const events = yield* Queue.unbounded<
+        CompilationState.Revision,
+        BundlerError
+      >();
       const ownedDirectories = yield* Effect.forEach(
         options.ownedDirectories,
         canonicalPath,
@@ -187,11 +194,18 @@ export const layer = (options: {
             yield* resolutionInputs.ensure;
             const selected = yield* Effect.gen(function* () {
               const current = yield* Ref.get(contexts);
-              const existing = Array.findFirst(current, (context) =>
-                CompilationState.compatible(
-                  context,
-                  request.profile,
-                  request.roots,
+              const existing = yield* Effect.findFirst(current, (context) =>
+                context.failed.pipe(
+                  Effect.map(
+                    (failed) =>
+                      CompilationState.compatible(
+                        context,
+                        request.profile,
+                        request.roots,
+                      ) &&
+                      (!failed ||
+                        context.roots.length === request.roots.length),
+                  ),
                 ),
               );
               if (Option.isSome(existing)) return existing.value;
@@ -209,6 +223,10 @@ export const layer = (options: {
                 (event) => Queue.offer(events, event).pipe(Effect.asVoid),
                 resolutionInputs,
                 options.mode,
+                (error) =>
+                  Schema.is(CompilationInputs.RestartRequired)(error.cause)
+                    ? Effect.void
+                    : Queue.fail(events, error).pipe(Effect.asVoid),
               ).pipe(
                 Effect.provide(services),
                 Effect.provideService(Scope.Scope, scope),
@@ -236,6 +254,19 @@ export const layer = (options: {
               .consume(Option.getOrUndefined(expected))
               .pipe(Effect.provide(services), Effect.result);
             yield* resolutionInputs.check;
+            if (Result.isSuccess(outcome)) {
+              const current = yield* Ref.get(contexts);
+              const retained = CompilationState.retain(current, selected);
+              yield* Effect.forEach(
+                Array.filter(
+                  current,
+                  (context) =>
+                    context !== selected && !Array.contains(retained, context),
+                ),
+                (context) => Scope.close(context.scope, Exit.void),
+              );
+              yield* Ref.set(contexts, Array.append(retained, selected));
+            }
             return yield* Effect.fromResult(outcome);
           },
           Effect.mapError((cause) =>
