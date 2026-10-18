@@ -11,6 +11,7 @@ import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import * as EvaluationSession from "../EvaluationSession";
 import * as Bundler from "../Bundler";
+import * as CompiledModule from "../CompiledModule";
 import { fromBundlerError } from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import { LegacySchemaFileError } from "../CodegenError";
@@ -119,7 +120,16 @@ const runCodegen = Effect.gen(function* () {
   const specPaths = leaves.map((leaf) =>
     SpecModulePath.make(leaf.relativePath),
   );
-  const implPaths = yield* Effect.forEach(specPaths, implPathForSpec);
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const implPaths = yield* Effect.forEach(specPaths, implPathForSpec).pipe(
+    Effect.flatMap((paths) =>
+      Effect.filter(paths, (file) =>
+        fs.exists(path.resolve(confectDirectory, file)),
+      ),
+    ),
+  );
   yield* generateConfectGeneratedDirectory;
   yield* warnIfNoTables(tableModules);
   yield* generateIdConstructor(tableModules);
@@ -206,6 +216,7 @@ export const compileOptionalModules = Effect.gen(function* () {
             Effect.mapError((error) => fromBundlerError(relativePath, error)),
           );
           yield* logCoalescedBuildWarnings(artifact.warnings);
+          yield* CompiledModule.consume(artifact);
         }),
       { concurrency: 4, discard: true },
     ),

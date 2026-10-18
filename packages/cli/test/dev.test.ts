@@ -8,11 +8,19 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as esbuild from "esbuild";
+import type * as DevSupervisor from "@confect/cli/DevSupervisor";
 import { dev } from "@confect/cli/confect/dev";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as Project from "./integration/Project";
+
+vi.mock("@confect/cli/DevSupervisor", (importOriginal) =>
+  importOriginal<typeof DevSupervisor>().then((original) => ({
+    ...original,
+    run: Effect.scoped,
+  })),
+);
 
 vi.mock("esbuild", (importOriginal) =>
   importOriginal<typeof esbuild>().then((original) => ({

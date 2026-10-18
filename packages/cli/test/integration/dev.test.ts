@@ -97,6 +97,57 @@ layer(NodeServices.layer, { excludeTestServices: true })(
     );
 
     it.effect(
+      "keeps source edits in one session and restarts cleanly for compiler configuration",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const source = `${Project.spec}\nconsole.log("SESSION_PARENT:" + process.ppid);\n`;
+          yield* project.write("confect/notes.spec.ts", source);
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const initial = yield* Ref.get(watching.output);
+          const first = initial.match(/SESSION_PARENT:(\d+)/)?.[1];
+          expect(first, initial).toBeDefined();
+          const generated = yield* project.generatedFiles;
+          yield* Ref.set(watching.output, "");
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `${source}\n// ordinary source edit\n`,
+          );
+          yield* watching.waitFor(success);
+          const edited = yield* Ref.get(watching.output);
+          expect(edited).not.toContain("Performing initial sync");
+          expect(
+            [...edited.matchAll(/SESSION_PARENT:(\d+)/g)].map(
+              (match) => match[1],
+            ),
+          ).toEqual([first]);
+          yield* Ref.set(watching.output, "");
+          yield* project.write(
+            "tsconfig.json",
+            '{"compilerOptions":{"moduleResolution":"Bundler","strict":true}}',
+          );
+          yield* watching.waitFor("Performing initial sync");
+          yield* watching.waitFor(success);
+          const restarted = yield* Ref.get(watching.output);
+          const parents = [...restarted.matchAll(/SESSION_PARENT:(\d+)/g)].map(
+            (match) => match[1],
+          );
+          expect(parents.length, restarted).toBeGreaterThan(0);
+          expect(
+            parents.every((pid) => pid !== first),
+            restarted,
+          ).toBe(true);
+          expect(
+            restarted.match(/Performing initial sync/g),
+            restarted,
+          ).toHaveLength(1);
+          expect(yield* project.generatedFiles).toEqual(generated);
+        }).pipe(Effect.scoped),
+      { timeout: 90000 },
+    );
+
+    it.effect(
       "does not invalidate Convex schema for ordinary source edits or full generation",
       () =>
         Effect.gen(function* () {
