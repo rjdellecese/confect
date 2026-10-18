@@ -14,6 +14,41 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
     it.effect(
+      "stabilizes a newly discovered external helper without another edit",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          yield* Ref.set(watching.output, "");
+          yield* fs.makeDirectory(path.join(project.root, "helpers/nested"), {
+            recursive: true,
+          });
+          yield* project.write(
+            "helpers/nested/value.ts",
+            'export const value = "discovered";',
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            `${Project.impl}\nimport { value } from "../helpers/nested/value";\nconsole.log("DISCOVERY:" + value);\n`,
+          );
+          yield* watching.waitFor("DISCOVERY:discovered");
+          yield* watching.waitFor(success);
+          expect(yield* Ref.get(watching.output)).not.toContain(
+            "Performing initial sync",
+          );
+          const incremental = yield* project.generatedFiles;
+          const once = yield* project.start("codegen");
+          yield* once.waitFor(success);
+          expect(Number(yield* once.handle.exitCode)).toBe(0);
+          expect(yield* project.generatedFiles).toEqual(incremental);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "generates once when startup bindings reveal additional library dependencies",
       () =>
         Effect.gen(function* () {
