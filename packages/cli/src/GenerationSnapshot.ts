@@ -129,6 +129,39 @@ const parseTree = (
     return tree;
   });
 
+export const parseRootPath = (
+  key: string,
+): Result.Result<SpecModulePath.SpecModulePath, SnapshotError> =>
+  Result.gen(function* () {
+    const relativePath = yield* Schema.decodeResult(CanonicalSpecPath)(
+      key,
+    ).pipe(
+      Result.mapError(
+        (cause) =>
+          new SnapshotError({
+            reason: "NoncanonicalPath",
+            relativePath: key,
+            pathSegments: [],
+            cause,
+          }),
+      ),
+    );
+    const path = rootPath(relativePath);
+    yield* Result.try({
+      try: () => {
+        for (const segment of path.pathSegments)
+          Identifier.validateConfectFunctionIdentifier(segment);
+      },
+      catch: () =>
+        new SnapshotError({
+          reason: "NoncanonicalPath",
+          relativePath,
+          pathSegments: path.pathSegments,
+        }),
+    });
+    return relativePath;
+  });
+
 const fromEntries = (
   entries: ReadonlyArray<readonly [string, GroupTree]>,
 ): Result.Result<
@@ -138,32 +171,8 @@ const fromEntries = (
   Result.gen(function* () {
     let leaves = HashMap.empty<SpecModulePath.SpecModulePath, GroupTree>();
     for (const [key, tree] of entries) {
-      const relativePath = yield* Schema.decodeResult(CanonicalSpecPath)(
-        key,
-      ).pipe(
-        Result.mapError(
-          (cause) =>
-            new SnapshotError({
-              reason: "NoncanonicalPath",
-              relativePath: key,
-              pathSegments: [],
-              cause,
-            }),
-        ),
-      );
+      const relativePath = yield* parseRootPath(key);
       const path = rootPath(relativePath);
-      yield* Result.try({
-        try: () => {
-          for (const segment of path.pathSegments)
-            Identifier.validateConfectFunctionIdentifier(segment);
-        },
-        catch: () =>
-          new SnapshotError({
-            reason: "NoncanonicalPath",
-            relativePath,
-            pathSegments: path.pathSegments,
-          }),
-      });
       if (HashMap.has(leaves, relativePath)) {
         return yield* Result.fail(
           new SnapshotError({

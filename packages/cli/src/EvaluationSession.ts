@@ -250,27 +250,30 @@ export const withImplFiles = Effect.fn("EvaluationSession.withImplFiles")(
   },
 );
 
-export const loadAll = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const files = yield* LeafModule.discoverLeafSpecFiles;
-  const leaves = yield* loadSpecs(
-    files.map((file) => SpecModulePath.SpecModulePath.make(file)),
-  );
-  yield* Effect.forEach(leaves, (leaf) =>
-    Effect.gen(function* () {
-      const implPath = yield* LeafModule.implPathForSpec(leaf.relativePath);
-      if (!(yield* fs.exists(path.resolve(confectDirectory, implPath))))
-        return yield* new CodegenError.MissingImplFileError({
-          specPath: leaf.relativePath,
-          expectedImplPath: implPath,
-        });
-    }),
-  );
-  yield* LeafModule.validateOrphanImpls(files);
-  return leaves;
-});
+export const discoverLeaves = LeafModule.discoverLeafSpecFiles.pipe(
+  Effect.flatMap((files) => Effect.forEach(files, LeafModule.toLeafModule)),
+);
+
+export const validateSiblings = Effect.fn("EvaluationSession.validateSiblings")(
+  function* (leaves: ReadonlyArray<LeafModule.LeafModule>) {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+    yield* Effect.forEach(leaves, (leaf) =>
+      Effect.gen(function* () {
+        const implPath = yield* LeafModule.implPathForSpec(leaf.relativePath);
+        if (!(yield* fs.exists(path.resolve(confectDirectory, implPath))))
+          return yield* new CodegenError.MissingImplFileError({
+            specPath: leaf.relativePath,
+            expectedImplPath: implPath,
+          });
+      }),
+    );
+    yield* LeafModule.validateOrphanImpls(
+      leaves.map(({ relativePath }) => relativePath),
+    );
+  },
+);
 
 export const validateTables = Effect.fn("EvaluationSession.validateTables")(
   function* (tables: ReadonlyArray<TableModule>) {

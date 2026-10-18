@@ -99,6 +99,30 @@ const metadataGroup = (
 });
 
 describe("GenerationSnapshot parsing", () => {
+  test.each(["notes.spec.ts", "admin/reports.spec.ts"])(
+    "parses declaration root %s without runtime metadata",
+    (path) =>
+      expect(Result.getOrThrow(GenerationSnapshot.parseRootPath(path))).toBe(
+        path,
+      ),
+  );
+
+  test.each([
+    "schema.spec.ts",
+    "bad-dir/notes.spec.ts",
+    "notes/..spec.ts",
+    "notes\\list.spec.ts",
+    ".spec.ts",
+  ])("rejects invalid declaration root %s without runtime metadata", (path) => {
+    const result = GenerationSnapshot.parseRootPath(path);
+    assert(Result.isFailure(result));
+    expect(result.failure).toMatchObject({
+      _tag: "SnapshotError",
+      reason: "NoncanonicalPath",
+      relativePath: path,
+    });
+  });
+
   test.each([
     { reason: "InvalidShape", entries: {} },
     {

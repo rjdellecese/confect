@@ -107,31 +107,26 @@ export const codegen = Command.make("codegen", {}, () =>
 );
 
 const runCodegen = Effect.gen(function* () {
-  yield* generateConfectGeneratedDirectory;
-  // Reject a legacy `confect/schema.ts` up front so the user-facing
-  // migration message surfaces before any bundler error from impl
-  // validation (each impl imports `_generated/schema.ts`).
   yield* rejectLegacySchemaFile;
-  // List `confect/tables/*.ts` (filename-only—no bundling yet) so the
-  // `_generated/id.ts` constructor can be emitted *before* we bundle any
-  // user-authored table module. Tables import from `_generated/id.ts` for
-  // cross-table id refs, so it must exist on disk first.
   const tableModules = yield* TableModule.discover;
+  yield* validateNoDocNameCollisions(tableModules);
+  const leaves = yield* EvaluationSession.discoverLeaves;
+  yield* Effect.forEach(leaves, ({ relativePath }) =>
+    Effect.fromResult(
+      GenerationSnapshot.parseRootPath(relativePath.replaceAll("\\", "/")),
+    ),
+  );
+  const specPaths = leaves.map((leaf) =>
+    SpecModulePath.make(leaf.relativePath),
+  );
+  const implPaths = yield* Effect.forEach(specPaths, implPathForSpec);
+  yield* generateConfectGeneratedDirectory;
   yield* warnIfNoTables(tableModules);
   yield* generateIdConstructor(tableModules);
-  // Now that `_generated/id.ts` is on disk, bundle each table module and
-  // check its default export is an `UnnamedTable`. Surface diagnostics
-  // here (rather than later) so they appear before impl-validation noise.
-  yield* EvaluationSession.validateTables(tableModules);
-  yield* validateNoDocNameCollisions(tableModules);
   yield* generateTableWrappers(tableModules);
   yield* removeObsoleteTableWrappers(tableModules);
   yield* generateRuntimeSchema(tableModules);
-  const leaves = yield* EvaluationSession.loadAll;
   yield* removeLegacyFiles;
-  const snapshot = yield* EvaluationSession.snapshot(
-    leaves.map((leaf) => SpecModulePath.make(leaf.relativePath)),
-  );
   yield* generateAssembledSpecs(leaves);
   // `_generated/api.ts`/`nodeApi.ts` are no longer imported by generated or
   // impl code (impls take the database schema from `_generated/schema`
@@ -151,7 +146,21 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
-  yield* EvaluationSession.validateImpls(leaves);
+  const snapshot = yield* EvaluationSession.withBatch(
+    [
+      ...tableModules.map(({ relativePath }) => relativePath),
+      ...specPaths,
+      ...implPaths,
+    ],
+    Effect.gen(function* () {
+      yield* EvaluationSession.validateTables(tableModules);
+      yield* EvaluationSession.loadSpecs(specPaths);
+      yield* EvaluationSession.validateSiblings(leaves);
+      const inspected = yield* EvaluationSession.snapshot(specPaths);
+      yield* EvaluationSession.validateImpls(leaves);
+      return inspected;
+    }),
+  );
   yield* generateGroupRegisteredFunctions(snapshot.leaves);
   yield* removeObsoleteRegisteredFunctions(leaves);
   const [functionPaths] = yield* Effect.all(
