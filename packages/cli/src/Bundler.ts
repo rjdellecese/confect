@@ -813,9 +813,8 @@ export const compile = Effect.fn("Bundler.compile")(function* (
     HashSet.has(batch.value.entryPoints, path.resolve(entryPoint))
   ) {
     const compilation = yield* batch.value.compilation.pipe(
-      Effect.catchTag(
-        "CompilationFailed",
-        Compilation.fail(path.resolve(entryPoint)),
+      Effect.catchTag("CompilationFailed", (error) =>
+        Compilation.fail(path.resolve(entryPoint))(error),
       ),
     );
     if (Option.isSome(compilation)) {
@@ -849,9 +848,8 @@ export const compile = Effect.fn("Bundler.compile")(function* (
       options,
     ).pipe(
       Effect.provideService(Scope.Scope, scope),
-      Effect.catchTag(
-        "CompilationFailed",
-        Compilation.fail(path.resolve(entryPoint)),
+      Effect.catchTag("CompilationFailed", (error) =>
+        Compilation.fail(path.resolve(entryPoint))(error),
       ),
     );
     const entry = HashMap.get(compilation.entries, path.resolve(entryPoint));

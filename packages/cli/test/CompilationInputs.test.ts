@@ -1,6 +1,8 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
+import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
@@ -13,6 +15,90 @@ import * as CompilationInputs from "@confect/cli/CompilationInputs";
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationInputs",
   (it) => {
+    it.effect("bounds concurrent scans while checking every known input", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const files = Array.from({ length: 40 }, (_, index) =>
+          path.join(root, `missing-${index}.json`),
+        );
+        const blocked = yield* Ref.make(false);
+        const active = yield* Ref.make(0);
+        const checked = yield* Ref.make(0);
+        const saturated = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        const inputs = yield* CompilationInputs.make().pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            watch: () => Stream.never,
+            stat: (file) =>
+              Effect.gen(function* () {
+                if (!(yield* Ref.get(blocked))) return yield* fs.stat(file);
+                return yield* Effect.acquireUseRelease(
+                  Ref.updateAndGet(active, (count) => count + 1),
+                  (count) =>
+                    Effect.gen(function* () {
+                      if (count === 16)
+                        yield* Deferred.succeed(saturated, undefined);
+                      yield* Deferred.await(release);
+                      yield* Ref.update(checked, (value) => value + 1);
+                      return yield* fs.stat(file);
+                    }),
+                  () => Ref.update(active, (count) => count - 1),
+                );
+              }),
+          }),
+        );
+        yield* inputs.track(files);
+        yield* Ref.set(blocked, true);
+        const scanning = yield* inputs.check.pipe(Effect.forkScoped);
+        yield* Deferred.await(saturated);
+        expect(yield* Ref.get(active)).toBe(16);
+        yield* Deferred.succeed(release, undefined);
+        yield* Fiber.join(scanning);
+        expect(yield* Ref.get(checked)).toBe(files.length);
+        expect(yield* Ref.get(active)).toBe(0);
+      }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+    );
+
+    it.effect("checks absent candidates without resolving every ancestor", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const files = Array.from({ length: 390 }, (_, index) =>
+          path.join(root, `absent-${index}`, "package.json"),
+        );
+        const resolutions = yield* Ref.make(0);
+        const observations = yield* Ref.make(0);
+        const inputs = yield* CompilationInputs.make().pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            watch: () => Stream.never,
+            stat: (file) =>
+              Ref.update(observations, (count) => count + 1).pipe(
+                Effect.andThen(fs.stat(file)),
+              ),
+            realPath: (file) =>
+              Ref.update(resolutions, (count) => count + 1).pipe(
+                Effect.andThen(fs.realPath(file)),
+              ),
+          }),
+        );
+        yield* inputs.track(files);
+        yield* Ref.set(observations, 0);
+        yield* inputs.check;
+        expect(yield* Ref.get(resolutions)).toBe(0);
+        expect(yield* Ref.get(observations)).toBe(files.length);
+        yield* fs.makeDirectory(path.dirname(files[0] ?? ""));
+        yield* fs.writeFileString(files[0] ?? "", "{}");
+        const changed = yield* Effect.result(inputs.check);
+        expect(Result.isFailure(changed)).toBe(true);
+        expect(yield* Ref.get(resolutions)).toBe(1);
+      }).pipe(Effect.scoped),
+    );
+
     it.effect.each(["direct", "alias", "named-alias"] as const)(
       "rejects forbidden observation inputs before any read: %s",
       (mode) =>

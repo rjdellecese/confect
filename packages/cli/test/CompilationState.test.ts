@@ -3,6 +3,48 @@ import * as CompilationState from "@confect/cli/CompilationState";
 import type * as esbuild from "esbuild";
 
 describe("CompilationState", () => {
+  it("visits shared and cyclic graph entries once per fingerprint", () => {
+    const leaves = Array.from({ length: 390 }, (_, index) => `leaf-${index}`);
+    const edges = (paths: ReadonlyArray<string>) =>
+      paths.map((path) => ({ path, kind: "import-statement" as const }));
+    const entries = {
+      root: { bytes: 1, imports: edges(leaves) },
+      shared: { bytes: 1, imports: edges(["root", "missing"]) },
+      ...Object.fromEntries(
+        leaves.map((leaf) => [
+          leaf,
+          { bytes: 1, imports: edges(["shared", "missing"]) },
+        ]),
+      ),
+    };
+    let reads = 0;
+    const inputs = new Proxy(entries, {
+      get(target, key, receiver) {
+        reads++;
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    const hashes = Object.fromEntries(
+      Object.keys(entries).map((file) => [file, file]),
+    );
+    const fingerprint = CompilationState.fingerprintInput(
+      { inputs, outputs: {} },
+      { inputs: hashes, outputs: {} },
+      "root",
+      "missing-output",
+    );
+    expect(reads).toBe(leaves.length + 3);
+    expect(fingerprint).toBe(
+      JSON.stringify({
+        outputs: [],
+        inputs: Object.entries(hashes).sort(([a], [b]) =>
+          a < b ? -1 : a > b ? 1 : 0,
+        ),
+      }),
+    );
+    expect(entries.shared.imports).toEqual(edges(["root", "missing"]));
+  });
+
   it("coalesces consumed roots without mutating earlier receipts", () => {
     const receipt = { context: 1, revision: 2, roots: ["a"] };
     const next = CompilationState.consume([receipt], receipt, ["b", "a"]);

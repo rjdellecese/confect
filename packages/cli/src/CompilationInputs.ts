@@ -93,6 +93,7 @@ export const make = Effect.fn("CompilationInputs.make")(function* () {
   const sourceLock = yield* Semaphore.make(1);
   const fingerprint = Effect.fn("CompilationInputs.fingerprint")(
     function* (file: string) {
+      yield* fs.stat(file);
       const real = yield* fs.realPath(file);
       if (
         path.basename(file) === ".env.local" ||
@@ -162,8 +163,11 @@ export const make = Effect.fn("CompilationInputs.make")(function* () {
             ),
           )
         : HashMap.toEntries(current);
-      const changed = yield* Effect.filter(entries, ([file, expected]) =>
-        fingerprint(file).pipe(Effect.map((actual) => actual !== expected)),
+      const changed = yield* Effect.filter(
+        entries,
+        ([file, expected]) =>
+          fingerprint(file).pipe(Effect.map((actual) => actual !== expected)),
+        { concurrency: 16 },
       );
       if (Array.isReadonlyArrayNonEmpty(changed)) {
         const notification = yield* notify(

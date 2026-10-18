@@ -49,18 +49,36 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
   conditions: ReadonlyArray<string>,
   inputs: CompilationInputs.Inputs,
 ) {
-  const imports = yield* Ref.make<
-    Readonly<
-      Record<
-        string,
-        ReadonlyArray<{
-          readonly original: string;
-          readonly path: string;
-          readonly emitted: string;
-        }>
-      >
-    >
-  >({});
+  const imports = yield* Ref.make(
+    HashMap.empty<
+      string,
+      ReadonlyArray<{
+        readonly original: string;
+        readonly path: string;
+        readonly emitted: string;
+      }>
+    >(),
+  );
+  const resolutions = yield* Ref.make(
+    HashMap.empty<
+      string,
+      {
+        readonly required: Option.Option<string>;
+        readonly imported: Option.Option<string>;
+      }
+    >(),
+  );
+  const resolveNative = (args: esbuild.OnResolveArgs) =>
+    Ref.modify(resolutions, (current) => {
+      const key = `${path.dirname(args.importer)}\0${args.path}`;
+      const previous = HashMap.get(current, key);
+      if (Option.isSome(previous)) return [previous.value, current];
+      const resolved = {
+        required: resolveRequire(args.path, args.importer),
+        imported: resolveImport(args.path, args.importer, conditions),
+      };
+      return [resolved, HashMap.set(current, key, resolved)];
+    });
   const discover = Effect.fn("CompilationPlugin.discover")(function* (
     importer: string,
     specifier: string,
@@ -103,6 +121,50 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
     HashMap.empty<string, { readonly run: ReturnType<typeof discover> }>(),
   );
   const discoveryLock = yield* Semaphore.make(1);
+  const probes = yield* Ref.make(
+    HashMap.empty<
+      string,
+      {
+        readonly importer: string;
+        readonly run: Effect.Effect<esbuild.ResolveResult>;
+      }
+    >(),
+  );
+  const probe = Effect.fn("CompilationPlugin.probe")(function* (
+    build: esbuild.PluginBuild,
+    args: esbuild.OnResolveArgs,
+  ) {
+    const resolve = Effect.promise(() =>
+      build.resolve(args.path, {
+        importer: args.importer,
+        resolveDir: args.resolveDir,
+        kind: args.kind,
+        namespace: "file",
+        pluginData: nativeProbe,
+        with: args.with,
+      }),
+    );
+    if (args.kind === "entry-point" || Record.size(args.with) > 0)
+      return yield* resolve;
+    const key = `${path.dirname(args.importer)}\0${args.path}\0${args.resolveDir}\0${args.kind}\0${args.namespace}`;
+    const cached = yield* discoveryLock.withPermit(
+      Effect.gen(function* () {
+        const previous = HashMap.get(yield* Ref.get(probes), key);
+        if (Option.isSome(previous)) return previous.value;
+        const discovered = {
+          importer: args.importer,
+          run: yield* Effect.cached(resolve),
+        };
+        yield* Ref.update(probes, HashMap.set(key, discovered));
+        return discovered;
+      }),
+    );
+    const resolved = yield* cached.run;
+    return cached.importer !== args.importer &&
+      (resolved.errors.length > 0 || resolved.warnings.length > 0)
+      ? yield* resolve
+      : resolved;
+  });
   const watches = Effect.fn("CompilationPlugin.watches")(function* (
     args: esbuild.OnResolveArgs,
   ) {
@@ -137,14 +199,20 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
     emitted: string,
   ) =>
     Effect.runSyncWith(Context.empty())(
-      Ref.update(imports, (current) => ({
-        ...current,
-        [args.importer]: Array.append(current[args.importer] ?? [], {
-          original: args.path,
-          path: resolved,
-          emitted,
-        }),
-      })),
+      Ref.update(imports, (current) =>
+        HashMap.set(
+          current,
+          args.importer,
+          Array.append(
+            Option.getOrElse(HashMap.get(current, args.importer), () => []),
+            {
+              original: args.path,
+              path: resolved,
+              emitted,
+            },
+          ),
+        ),
+      ),
     );
   const plugin: esbuild.Plugin = {
     name: "confect:native-resolution",
@@ -152,7 +220,9 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
       build.onStart(() =>
         Effect.runPromiseWith(Context.empty())(
           inputs.check.pipe(
-            Effect.andThen(Ref.set(imports, {})),
+            Effect.andThen(Ref.set(imports, HashMap.empty())),
+            Effect.andThen(Ref.set(resolutions, HashMap.empty())),
+            Effect.andThen(Ref.set(probes, HashMap.empty())),
             Effect.andThen(Ref.set(discoveries, HashMap.empty())),
             Effect.asVoid,
           ),
@@ -192,19 +262,11 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
               return undefined;
             if (isBuiltin(args.path))
               return { path: args.path, external: true };
-            const resolved = yield* Effect.promise(() =>
-              build.resolve(args.path, {
-                importer: args.importer,
-                resolveDir: args.resolveDir,
-                kind: args.kind,
-                namespace: "file",
-                pluginData: nativeProbe,
-              }),
-            );
+            const resolved = yield* probe(build, args);
             if (resolved.errors.length > 0) {
               if (!args.path.startsWith(".") && !path.isAbsolute(args.path)) {
                 const watched = yield* watches(args);
-                const required = resolveRequire(args.path, args.importer);
+                const { required } = yield* resolveNative(args);
                 if (Option.isNone(required)) return undefined;
                 yield* inputs.trackSource(required.value);
                 yield* inputs.track([required.value]);
@@ -246,12 +308,7 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
                 return undefined;
               yield* inputs.trackSource(resolved.path);
               const watched = yield* watches(args);
-              const required = resolveRequire(args.path, args.importer);
-              const imported = resolveImport(
-                args.path,
-                args.importer,
-                conditions,
-              );
+              const { required, imported } = yield* resolveNative(args);
               if (Option.isNone(required) && Option.isNone(imported))
                 return undefined;
               const emitted =
@@ -301,7 +358,13 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
           imports: Array.flatMap(metadata.imports, (imported) => {
             const matching = imported.external
               ? Array.filter(
-                  captured[path.resolve(cwd, physicalPath(file))] ?? [],
+                  Option.getOrElse(
+                    HashMap.get(
+                      captured,
+                      path.resolve(cwd, physicalPath(file)),
+                    ),
+                    () => [],
+                  ),
                   (item) => item.emitted === imported.path,
                 )
               : [];

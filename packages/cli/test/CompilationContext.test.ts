@@ -14,6 +14,59 @@ import * as CompilationContext from "@confect/cli/CompilationContext";
 import type * as esbuild from "esbuild";
 
 describe("CompilationContext", () => {
+  it.live(
+    "rejects incomplete native results before publishing readiness and recovers",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        yield* fs.writeFileString(entry, "export default 1;");
+        const events = yield* Ref.make<
+          ReadonlyArray<CompilationState.Revision>
+        >([]);
+        let incomplete = true;
+        const context = yield* CompilationContext.make(
+          { id: 1, profile: "modules", roots: [entry] },
+          {
+            entryPoints: [entry],
+            absWorkingDir: root,
+            bundle: true,
+            format: "esm",
+            platform: "node",
+            logLevel: "silent",
+            plugins: [
+              {
+                name: "incomplete-result",
+                setup(build) {
+                  build.onEnd((result) => {
+                    if (incomplete) Reflect.deleteProperty(result, "metafile");
+                  });
+                },
+              },
+            ],
+          },
+          (metafile) => metafile,
+          (revision) => Ref.update(events, (current) => [...current, revision]),
+        );
+        const failure = yield* Effect.flip(context.consume());
+        expect(String(failure.cause)).toContain(
+          "esbuild completed without metafile",
+        );
+        expect(yield* Ref.get(events)).toEqual([]);
+        incomplete = false;
+        yield* fs.writeFileString(entry, "export default 2;");
+        const snapshot = yield* context.consume();
+        expect(snapshot.metafile.outputs).not.toEqual({});
+        expect(yield* Ref.get(events)).not.toEqual([]);
+      }).pipe(
+        Effect.scoped,
+        Effect.timeout("10 seconds"),
+        Effect.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+      ),
+  );
+
   it.effect(
     "relocates the output graph without changing input identities or the original metafile",
     () =>

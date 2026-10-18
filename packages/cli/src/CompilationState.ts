@@ -1,7 +1,6 @@
 import type * as esbuild from "esbuild";
 import * as Schema from "effect/Schema";
 import * as Array from "effect/Array";
-import * as Chunk from "effect/Chunk";
 import * as HashSet from "effect/HashSet";
 import * as Iterable from "effect/Iterable";
 import * as Option from "effect/Option";
@@ -124,24 +123,37 @@ const reachable = <
     Iterable.getSomes(
       Iterable.unfold<
         {
-          readonly pending: Chunk.Chunk<string>;
+          readonly pending: Pending | undefined;
           readonly visited: HashSet.HashSet<string>;
         },
         Option.Option<readonly [string, A]>
       >(
-        { pending: Chunk.fromIterable(roots), visited: HashSet.empty() },
+        {
+          pending: Array.reduce<string, Pending | undefined>(
+            roots,
+            undefined,
+            (next, file) => ({ file, next }),
+          ),
+          visited: HashSet.empty(),
+        },
         ({ pending, visited }) => {
-          if (!Chunk.isNonEmpty(pending)) return Option.none();
-          const first = Chunk.headNonEmpty(pending);
-          const rest = Chunk.tailNonEmpty(pending);
-          const value = entries[first];
-          if (!value || HashSet.has(visited, first))
+          if (!pending) return Option.none();
+          const { file: first, next: rest } = pending;
+          if (HashSet.has(visited, first))
             return Option.some([Option.none(), { pending: rest, visited }]);
+          const value = entries[first];
+          if (!value)
+            return Option.some([
+              Option.none(),
+              { pending: rest, visited: HashSet.add(visited, first) },
+            ]);
           return Option.some([
             Option.some([first, value] as const),
             {
               pending: Array.reduce(value.imports, rest, (queue, imported) =>
-                imported.external ? queue : Chunk.append(queue, imported.path),
+                imported.external
+                  ? queue
+                  : { file: imported.path, next: queue },
               ),
               visited: HashSet.add(visited, first),
             },
@@ -150,6 +162,11 @@ const reachable = <
       ),
     ),
   );
+
+interface Pending {
+  readonly file: string;
+  readonly next: Pending | undefined;
+}
 
 const byPath = Order.mapInput(
   Order.String,

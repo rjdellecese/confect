@@ -25,6 +25,29 @@ export interface Snapshot {
   readonly warnings: ReadonlyArray<esbuild.Message>;
 }
 
+export class IncompleteCompilation extends Schema.TaggedError<IncompleteCompilation>()(
+  "IncompleteCompilation",
+  {
+    context: Schema.Finite,
+    reason: Schema.Literals([
+      "MissingMetafile",
+      "MissingOutputFiles",
+      "MissingRevision",
+    ]),
+  },
+) {
+  override get message() {
+    switch (this.reason) {
+      case "MissingMetafile":
+        return "esbuild completed without metafile";
+      case "MissingOutputFiles":
+        return "esbuild completed without output files";
+      case "MissingRevision":
+        return "esbuild completed without a captured compilation revision";
+    }
+  }
+}
+
 export const relocateMetafile = (
   metafile: esbuild.Metafile,
   from: string,
@@ -104,6 +127,13 @@ export const make = Effect.fn("CompilationContext.make")(function* (
         roots: topology.roots,
       };
       const metafile = result.metafile ? normalize(result.metafile) : undefined;
+      if (result.errors.length === 0 && (!metafile || !result.outputFiles)) {
+        yield* guards.check;
+        return yield* new IncompleteCompilation({
+          context: topology.id,
+          reason: metafile ? "MissingOutputFiles" : "MissingMetafile",
+        });
+      }
       for (const error of result.errors) failures.set(error, receipt);
       const hashes = Record.fromEntries(
         yield* Effect.forEach(result.outputFiles ?? [], (file) =>
@@ -277,10 +307,10 @@ export const make = Effect.fn("CompilationContext.make")(function* (
         const captured = identities.get(result);
         if (!captured?.metafile || !result.outputFiles) {
           return yield* new BundlerError({
-            cause: {
-              _tag: "MissingCompilationRevision",
+            cause: new IncompleteCompilation({
+              reason: "MissingRevision",
               context: topology.id,
-            },
+            }),
           });
         }
         const { receipt, metafile } = captured;
