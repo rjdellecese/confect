@@ -136,7 +136,7 @@ export const layer = (options: {
         verify: lock
           .withPermit(
             Effect.gen(function* () {
-              yield* resolutionInputs.check;
+              yield* resolutionInputs.ensure;
               yield* Effect.forEach(
                 yield* Ref.get(contexts),
                 (context) => context.verify,
@@ -163,7 +163,7 @@ export const layer = (options: {
         compile: Effect.fn("Compilation.compile")(
           function* (request) {
             yield* Effect.forEach(request.roots, resolutionInputs.trackSource);
-            yield* resolutionInputs.check;
+            yield* resolutionInputs.ensure;
             const selected = yield* Effect.gen(function* () {
               const current = yield* Ref.get(contexts);
               const existing = Array.findFirst(current, (context) =>
@@ -186,7 +186,7 @@ export const layer = (options: {
                 request.options,
                 request.normalize,
                 (event) => Queue.offer(events, event).pipe(Effect.asVoid),
-                resolutionInputs.check,
+                resolutionInputs,
               ).pipe(
                 Effect.provide(services),
                 Effect.provideService(Scope.Scope, scope),

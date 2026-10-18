@@ -10,8 +10,11 @@ import * as Ref from "effect/Ref";
 import * as Option from "effect/Option";
 import * as Array from "effect/Array";
 import * as Record from "effect/Record";
+import * as HashMap from "effect/HashMap";
+import * as Semaphore from "effect/Semaphore";
 import type * as esbuild from "esbuild";
 import * as CompilationInputs from "./CompilationInputs";
+import { BundlerError } from "./BuildError";
 
 export const namespace = "confect-generated";
 export const nativeProbe = Symbol("confect-native-resolution");
@@ -58,44 +61,75 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
       >
     >
   >({});
-  const watches = Effect.fn("CompilationPlugin.watches")(function* (
-    args: esbuild.OnResolveArgs,
+  const discover = Effect.fn("CompilationPlugin.discover")(function* (
+    importer: string,
+    specifier: string,
+    bare: boolean,
   ) {
-    const segments = args.path.split("/");
-    const packageName = args.path.startsWith("@")
-      ? `${segments[0]}/${segments[1]}`
-      : segments[0];
-    const candidates =
-      packageName &&
-      !args.path.startsWith(".") &&
-      !args.path.startsWith("#") &&
-      !path.isAbsolute(args.path)
-        ? Array.map(
-            CompilationInputs.ancestors(path, path.dirname(args.importer)),
-            (directory) =>
-              path.join(directory, "node_modules", packageName, "package.json"),
-          )
-        : [];
+    const candidates = bare
+      ? Array.map(
+          CompilationInputs.ancestors(path, path.dirname(importer)),
+          (directory) =>
+            path.join(directory, "node_modules", specifier, "package.json"),
+        )
+      : [];
     yield* inputs.track(candidates);
     yield* inputs.checkFiles(candidates);
     const manifest = Option.flatMap(
-      packageManifest(args.path, args.importer),
+      packageManifest(specifier, importer),
       Option.fromNullishOr,
     );
     const known = yield* Option.match(manifest, {
       onNone: () => Effect.succeed([] as string[]),
       onSome: (file) =>
         fs.realPath(file).pipe(
-          Effect.orElseSucceed(() => file),
+          Effect.catch((cause) =>
+            cause.reason._tag === "NotFound"
+              ? Effect.succeed(file)
+              : Effect.fail(new BundlerError({ cause })),
+          ),
           Effect.map((real) => [file, real]),
         ),
     });
     const watchFiles = Array.dedupe([...candidates, ...known]);
     yield* inputs.track(watchFiles);
+    yield* inputs.checkFiles(watchFiles);
     return {
       watchFiles,
       watchDirs: Array.dedupe(Array.map(watchFiles, path.dirname)),
     };
+  });
+  const discoveries = yield* Ref.make(
+    HashMap.empty<string, { readonly run: ReturnType<typeof discover> }>(),
+  );
+  const discoveryLock = yield* Semaphore.make(1);
+  const watches = Effect.fn("CompilationPlugin.watches")(function* (
+    args: esbuild.OnResolveArgs,
+  ) {
+    yield* inputs.ensure;
+    const bare =
+      !args.path.startsWith(".") &&
+      !args.path.startsWith("#") &&
+      !path.isAbsolute(args.path);
+    const specifier = bare
+      ? args.path
+          .split("/")
+          .slice(0, args.path.startsWith("@") ? 2 : 1)
+          .join("/")
+      : args.path;
+    const key = `${path.dirname(args.importer)}\0${specifier}`;
+    const cached = yield* discoveryLock.withPermit(
+      Effect.gen(function* () {
+        const previous = HashMap.get(yield* Ref.get(discoveries), key);
+        if (Option.isSome(previous)) return previous.value;
+        const discovered = {
+          run: yield* Effect.cached(discover(args.importer, specifier, bare)),
+        };
+        yield* Ref.update(discoveries, HashMap.set(key, discovered));
+        return discovered;
+      }),
+    );
+    return yield* cached.run;
   });
   const record = (
     args: esbuild.OnResolveArgs,
@@ -119,6 +153,7 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
         Effect.runPromiseWith(Context.empty())(
           inputs.check.pipe(
             Effect.andThen(Ref.set(imports, {})),
+            Effect.andThen(Ref.set(discoveries, HashMap.empty())),
             Effect.asVoid,
           ),
         ),
@@ -169,7 +204,6 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
             if (resolved.errors.length > 0) {
               if (!args.path.startsWith(".") && !path.isAbsolute(args.path)) {
                 const watched = yield* watches(args);
-                yield* inputs.checkFiles(watched.watchFiles);
                 const required = resolveRequire(args.path, args.importer);
                 if (Option.isNone(required)) return undefined;
                 yield* inputs.trackSource(required.value);
@@ -212,7 +246,6 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
                 return undefined;
               yield* inputs.trackSource(resolved.path);
               const watched = yield* watches(args);
-              yield* inputs.checkFiles(watched.watchFiles);
               const required = resolveRequire(args.path, args.importer);
               const imported = resolveImport(
                 args.path,

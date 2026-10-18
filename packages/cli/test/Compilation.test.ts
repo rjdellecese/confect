@@ -722,6 +722,82 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
       }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
     }).pipe(Effect.scoped),
   );
+  it.effect("scans the baseline at build and handoff boundaries only", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped();
+      const entry = path.join(root, "entry.ts");
+      const marker = path.join(root, "compiler.json");
+      yield* fs.writeFileString(entry, "export default 1;");
+      yield* fs.writeFileString(marker, "{}");
+      const reads = yield* Ref.make(0);
+      yield* Effect.gen(function* () {
+        const compiler = yield* Compilation.Service;
+        yield* Bundler.compile(entry);
+        yield* Ref.set(reads, 0);
+        yield* Bundler.compile(entry);
+        expect(yield* Ref.get(reads)).toBe(3);
+        yield* Ref.set(reads, 0);
+        yield* compiler.verify;
+        expect(yield* Ref.get(reads)).toBe(3);
+      }).pipe(
+        Effect.provide(
+          Compilation.layer({ ownedDirectories: [], restartInputs: [marker] }),
+        ),
+        Effect.provideService(FileSystem.FileSystem, {
+          ...fs,
+          watch: () => Stream.never,
+          readFile: (file) =>
+            (file === marker
+              ? Ref.update(reads, (count) => count + 1)
+              : Effect.void
+            ).pipe(Effect.andThen(fs.readFile(file))),
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "rejects metadata changes during artifact copying before handoff",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        const marker = path.join(root, "compiler.json");
+        yield* fs.writeFileString(entry, "export default 1;");
+        yield* fs.writeFileString(marker, "{}");
+        yield* Effect.gen(function* () {
+          const job = yield* Compilation.runJob(Bundler.compile(entry));
+          expect(Exit.isFailure(job.exit)).toBe(true);
+          expect(job.receipts).toEqual([]);
+          expect(
+            yield* (yield* Compilation.Service).restartRequired,
+          ).toMatchObject({ _tag: "Some", value: { paths: [marker] } });
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({
+              ownedDirectories: [],
+              restartInputs: [marker],
+            }),
+          ),
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            watch: () => Stream.never,
+            copy: (...args) =>
+              fs
+                .copy(...args)
+                .pipe(
+                  Effect.andThen(
+                    fs.writeFileString(marker, '{"changed":true}'),
+                  ),
+                ),
+          }),
+        );
+      }).pipe(Effect.scoped),
+  );
   it.effect(
     "verifies existing contexts without creating snapshots or consuming changed roots",
     () =>

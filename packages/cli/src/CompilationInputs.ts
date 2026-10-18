@@ -33,6 +33,15 @@ class ObservationFailed extends Schema.TaggedError<ObservationFailed>()(
   { directory: Schema.String, cause: Schema.Unknown },
 ) {}
 
+class ObservationRejected extends Schema.TaggedError<ObservationRejected>()(
+  "ResolutionInputObservationRejected",
+  {
+    path: Schema.String,
+    resolvedPath: Schema.String,
+    reason: Schema.Literals(["ForbiddenFile", "NotRegularFile"]),
+  },
+) {}
+
 const names = [
   "package.json",
   "package-lock.json",
@@ -84,16 +93,37 @@ export const make = Effect.fn("CompilationInputs.make")(function* () {
   const sourceLock = yield* Semaphore.make(1);
   const fingerprint = Effect.fn("CompilationInputs.fingerprint")(
     function* (file: string) {
-      const contents = yield* fs.readFile(file);
       const real = yield* fs.realPath(file);
+      if (
+        path.basename(file) === ".env.local" ||
+        path.basename(real) === ".env.local"
+      )
+        return yield* new ObservationRejected({
+          path: file,
+          resolvedPath: real,
+          reason: "ForbiddenFile",
+        });
+      const stat = yield* fs.stat(real);
+      if (stat.type !== "File")
+        return yield* new ObservationRejected({
+          path: file,
+          resolvedPath: real,
+          reason: "NotRegularFile",
+        });
+      const contents = yield* fs.readFile(real);
       const digest = yield* crypto.digest("SHA-256", contents);
       return `${real}\0${Hex.encode(digest)}`;
     },
-    Effect.catch((error) =>
-      error.reason._tag === "NotFound" || error.reason._tag === "BadResource"
-        ? Effect.succeed("missing")
-        : Effect.fail(new BundlerError({ cause: error })),
-    ),
+    Effect.catch((error) => {
+      if (error._tag === "PlatformError" && error.reason._tag === "NotFound")
+        return Effect.succeed("missing");
+      return Effect.gen(function* () {
+        const failure = new BundlerError({ cause: error });
+        yield* Ref.set(observationFailure, Option.some(failure));
+        yield* Queue.fail(events, failure);
+        return yield* failure;
+      });
+    }),
   );
 
   const notify = Effect.fn("CompilationInputs.notify")(function* (

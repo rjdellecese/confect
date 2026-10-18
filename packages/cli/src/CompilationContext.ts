@@ -55,10 +55,15 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   options: esbuild.BuildOptions,
   normalize: (metafile: esbuild.Metafile) => esbuild.Metafile,
   publish: (revision: CompilationState.Revision) => Effect.Effect<void>,
-  guard: Effect.Effect<
-    void,
-    BundlerError | CompilationInputs.RestartRequired
-  > = Effect.void,
+  guards: Readonly<
+    Record<
+      "check" | "ensure",
+      Effect.Effect<void, BundlerError | CompilationInputs.RestartRequired>
+    >
+  > = {
+    check: Effect.void,
+    ensure: Effect.void,
+  },
 ) {
   const fs = yield* FileSystem.FileSystem;
   const crypto = yield* Crypto.Crypto;
@@ -91,7 +96,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   const failures = new WeakMap<object, CompilationState.Receipt>();
   const capture = Effect.fn("CompilationContext.capture")(
     function* (result: esbuild.BuildResult) {
-      yield* guard;
+      yield* guards.ensure;
       const number = yield* Ref.updateAndGet(revision, (value) => value + 1);
       const receipt = {
         context: topology.id,
@@ -185,7 +190,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       });
       identities.set(result, { receipt, metafile, values: next });
       yield* Ref.set(values, next);
-      yield* guard;
+      yield* guards.check;
       yield* publish({
         ...receipt,
         roots: topology.roots,
@@ -230,12 +235,12 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     catch: (cause) => new BundlerError({ cause }),
   });
   const rebuild = Effect.fn("CompilationContext.rebuild")(function* () {
-    yield* guard;
+    yield* guards.ensure;
     const outcome = yield* Effect.tryPromise({
       try: () => native.rebuild(),
       catch: (cause) => new BundlerError({ cause }),
     }).pipe(Effect.result);
-    yield* guard;
+    yield* guards.ensure;
     if (Result.isFailure(outcome)) {
       const cause = outcome.failure.cause;
       if (
