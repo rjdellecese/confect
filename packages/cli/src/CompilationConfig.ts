@@ -66,7 +66,7 @@ const exportTarget = (
     const keys = entries.map((entry) => string(entry.children?.[0]) ?? "");
     if (keys.some((key) => key.startsWith("."))) {
       if (keys.some((key) => !key.startsWith(".")))
-        return reject("MixedPackageExportKeys");
+        return Result.succeed(undefined);
       target =
         subpath.endsWith("/") || subpath.includes("*")
           ? undefined
@@ -155,7 +155,7 @@ const exportTarget = (
         keys.some((key) => key.startsWith(".")) &&
         keys.some((key) => !key.startsWith("."))
       )
-        return reject("MixedPackageExportKeys");
+        return Result.succeed(null);
       for (const entry of node.children ?? []) {
         const key = string(entry.children?.[0]);
         if (

@@ -654,34 +654,48 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       {
         exports:
           '{"require":{"require":"./wrong.custom","./mixed":"./other.custom"}}',
-        extension: "fixture",
-        reason: "MixedPackageExportKeys",
+        target: "tsconfig.json",
       },
+      {
+        exports: '{".":"./wrong.custom","require":"./wrong.custom"}',
+        target: "tsconfig.json",
+      },
+      {
+        exports:
+          '[{".":"./wrong.custom","require":"./wrong.custom"},"./actual.custom"]',
+        target: "actual.custom",
+      },
+      {
+        exports:
+          '{"require":{".":"./wrong.custom","require":"./wrong.custom"},"default":"./wrong.custom"}',
+        target: "tsconfig.json",
+      },
+      { exports: "true", target: "tsconfig.json" },
+      { exports: '[true,"./actual.custom"]', target: "actual.custom" },
     ])(
-      "fails closed for unsupported exports: $reason",
-      ({ exports, extension, reason }) =>
+      "preserves native fallback for malformed export maps: $exports",
+      ({ exports, target }) =>
         Effect.gen(function* () {
-          const { source } = yield* fixture({
+          const { source, root, path } = yield* fixture({
             "src/entry.tsx": entry,
-            "tsconfig.json": `{"extends":"${extension}"}`,
+            "tsconfig.json": '{"extends":"fixture"}',
             "node_modules/fixture/package.json": `{"exports":${exports}}`,
+            [`node_modules/fixture/${target}`]: chosen,
             "node_modules/fixture/wrong.custom": chosen.replace(
               "chosen",
               "wrong",
             ),
           });
-          const result = yield* Effect.result(
-            CompilationConfig.discover(source),
+          const discovered = yield* CompilationConfig.discover(source);
+          expect(discovered).toContain(
+            path.join(root, "node_modules/fixture", target),
           );
-          expect(Result.isFailure(result)).toBe(true);
-          if (Result.isFailure(result))
-            expect(result.failure).toMatchObject({
-              _tag: "CompilationConfigDiscoveryRejected",
-              reason,
-            });
-          expect((yield* build(source)).outputFiles?.[0]?.text).not.toContain(
-            "wrong.h(",
+          expect(discovered).not.toContain(
+            path.join(root, "node_modules/fixture/wrong.custom"),
           );
+          const native = yield* build(source);
+          expect(native.outputFiles?.[0]?.text).toContain("chosen.h(");
+          expect(native.warnings.length).toBeGreaterThan(0);
         }).pipe(Effect.scoped),
     );
 
