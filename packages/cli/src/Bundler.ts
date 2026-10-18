@@ -1,4 +1,5 @@
 import { createRequire, isBuiltin } from "node:module";
+import * as Lazy from "@confect/core/Lazy";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import {
@@ -243,7 +244,7 @@ class BatchIncompatible extends Schema.TaggedError<BatchIncompatible>()(
 class Batch extends Context.Service<
   Batch,
   {
-    readonly entryPoints: ReadonlyArray<string>;
+    readonly entryPoints: HashSet.HashSet<string>;
     readonly compilation: Effect.Effect<
       Option.Option<BatchCompilation>,
       never,
@@ -520,13 +521,17 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
 export const withBatch = <A, E, R>(
   entryPoints: ReadonlyArray<string>,
   effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, R> =>
+): Effect.Effect<A, E, R | Path.Path> =>
   Effect.scopedWith((scope) =>
     Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const entryKeys = HashSet.fromIterable(
+        entryPoints.map((entry) => path.resolve(entry)),
+      );
       const current = yield* Effect.serviceOption(Batch);
       if (
         Option.isSome(current) &&
-        entryPoints.every((entry) => current.value.entryPoints.includes(entry))
+        HashSet.isSubset(entryKeys, current.value.entryPoints)
       )
         return yield* effect;
       const artifactScope = yield* Effect.serviceOption(
@@ -562,7 +567,7 @@ export const withBatch = <A, E, R>(
         ),
       );
       return yield* Effect.provideService(effect, Batch, {
-        entryPoints,
+        entryPoints: entryKeys,
         compilation,
       });
     }),
@@ -627,18 +632,22 @@ const entryMetafile = (
   compilation: BatchCompilation,
   source: string,
   output: string,
-): esbuild.Metafile => ({
-  inputs: reachableMetafileEntries(
-    compilation.metafile.inputs,
-    source,
-    identity,
-  ),
-  outputs: reachableMetafileEntries(
-    compilation.metafile.outputs,
-    output,
-    (key) => path.resolve(compilation.cwd, key),
-  ),
-});
+): esbuild.Metafile => {
+  const metafile = {
+    inputs: reachableMetafileEntries(
+      compilation.metafile.inputs,
+      source,
+      identity,
+    ),
+    outputs: compilation.metafile.outputs,
+  };
+  Lazy.defineProperty(metafile, "outputs", () =>
+    reachableMetafileEntries(compilation.metafile.outputs, output, (key) =>
+      path.resolve(compilation.cwd, key),
+    ),
+  );
+  return metafile;
+};
 
 /**
  * Compile a TypeScript entry point with esbuild via {@link bundleRequire}. The
@@ -678,9 +687,7 @@ export const compile = Effect.fn("Bundler.compile")(function* (
   if (
     Option.isSome(batch) &&
     !options?.plugins?.length &&
-    batch.value.entryPoints.some(
-      (entry) => path.resolve(entry) === path.resolve(entryPoint),
-    )
+    HashSet.has(batch.value.entryPoints, path.resolve(entryPoint))
   ) {
     const compilation = yield* batch.value.compilation;
     if (Option.isSome(compilation)) {
