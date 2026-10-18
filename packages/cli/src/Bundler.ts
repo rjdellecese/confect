@@ -359,30 +359,6 @@ const compileLive = Effect.fn("Bundler.compileLive")(
         cause: { _tag: "UnsupportedCompilationProfile" },
       });
     }
-    const nodeOptions = yield* Config.String("NODE_OPTIONS").pipe(
-      Config.withDefault(""),
-    );
-    if (/--conditions|-C|--(?:no-)?addons/.test(nodeOptions)) {
-      return yield* new BundlerError({
-        cause: {
-          _tag: "UnsupportedCompilationRuntimeOptions",
-          option: "NODE_OPTIONS",
-        },
-      });
-    }
-    const runtimeOptions = yield* Effect.try({
-      try: () =>
-        parseArgs({
-          args: process.execArgv,
-          options: {
-            conditions: { type: "string", short: "C", multiple: true },
-            "no-addons": { type: "boolean" },
-          },
-          strict: false,
-          allowPositionals: true,
-        }).values,
-      catch: (cause) => new BundlerError({ cause }),
-    });
     const entries = Array.dedupe(
       Array.map(entryPoints, (entry) => path.resolve(entry)),
     );
@@ -391,15 +367,7 @@ const compileLive = Effect.fn("Bundler.compileLive")(
       return yield* new BundlerError({ cause: { _tag: "EmptyCompilation" } });
     const cwd = yield* Compilation.canonicalPath(path.dirname(first));
     const roots = yield* Effect.forEach(entries, Compilation.canonicalPath);
-    const conditions = [
-      "node",
-      ...(process.features.require_module ? ["module-sync"] : []),
-      ...(runtimeOptions["no-addons"] ? [] : ["node-addons"]),
-      ...Array.filter(
-        runtimeOptions.conditions ?? [],
-        (condition) => typeof condition === "string",
-      ),
-    ];
+    const conditions = service.conditions;
     const resolver = yield* CompilationPlugin.make(
       path,
       fs,
@@ -426,7 +394,7 @@ const compileLive = Effect.fn("Bundler.compileLive")(
         bundle: true,
         splitting: batch,
         logLevel: "silent",
-        conditions,
+        conditions: Array.fromIterable(conditions),
         plugins: [...(options?.plugins ?? []), resolver.plugin],
       },
       normalize: (metafile) =>

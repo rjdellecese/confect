@@ -834,7 +834,7 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
       }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
   );
   it.effect.each(["--conditions=custom", "--no-addons"])(
-    "rejects unsupported NODE_OPTIONS %s without starting a context",
+    "captures startup NODE_OPTIONS %s once per compiler session",
     (nodeOptions) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -843,21 +843,35 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
         const entry = path.join(root, "entry.ts");
         yield* fs.writeFileString(entry, "export default 1;");
         yield* Effect.gen(function* () {
-          const job = yield* Compilation.runJob(Bundler.compile(entry)).pipe(
+          const compiler = yield* Compilation.Service;
+          const initial = compiler.conditions;
+          const job = yield* Compilation.runJob(Bundler.bundle(entry)).pipe(
             Effect.provide(
               ConfigProvider.layer(
-                ConfigProvider.fromUnknown({ NODE_OPTIONS: nodeOptions }),
+                ConfigProvider.fromUnknown({
+                  NODE_OPTIONS: "--conditions=later",
+                }),
               ),
             ),
           );
-          const result = yield* Effect.result(job.exit);
-          expect(Result.isFailure(result)).toBe(true);
-          if (Result.isFailure(result))
-            expect(result.failure.cause).toMatchObject({
-              _tag: "UnsupportedCompilationRuntimeOptions",
-            });
-          expect(yield* (yield* Compilation.Service).topology).toEqual([]);
-        }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
+          expect((yield* job.exit).module.default).toBe(1);
+          expect(yield* compiler.topology).toHaveLength(1);
+          expect(initial).not.toContain("later");
+          if (nodeOptions === "--no-addons")
+            expect(initial).not.toContain("node-addons");
+          else expect(initial).toContain("custom");
+          expect(compiler.conditions).toBe(initial);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ ownedDirectories: [] }).pipe(
+              Layer.provide(
+                ConfigProvider.layer(
+                  ConfigProvider.fromUnknown({ NODE_OPTIONS: nodeOptions }),
+                ),
+              ),
+            ),
+          ),
+        );
       }).pipe(Effect.scoped),
   );
   it.effect(

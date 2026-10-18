@@ -18,6 +18,7 @@ import * as CompilationContext from "./CompilationContext";
 import * as CompilationState from "./CompilationState";
 import * as CompiledModule from "./CompiledModule";
 import * as CompilationInputs from "./CompilationInputs";
+import * as NodeConditions from "./NodeConditions";
 
 class FailedAttempts extends Context.Service<
   FailedAttempts,
@@ -36,6 +37,7 @@ export class Service extends Context.Service<
   {
     readonly ownedDirectories: ReadonlyArray<string>;
     readonly authoredFiles: ReadonlyArray<string>;
+    readonly conditions: ReadonlyArray<string>;
     readonly events: Stream.Stream<CompilationState.Revision>;
     readonly restarts: Stream.Stream<
       CompilationInputs.RestartNotification,
@@ -87,6 +89,9 @@ export const layer = (options: {
     Service,
     Effect.gen(function* () {
       const owner = yield* Scope.Scope;
+      const conditions = yield* NodeConditions.current.pipe(
+        Effect.mapError((cause) => new BundlerError({ cause })),
+      );
       const resolutionInputs = yield* CompilationInputs.make();
       yield* resolutionInputs.track(options.restartInputs ?? []);
       const services = Context.make(
@@ -122,6 +127,7 @@ export const layer = (options: {
       return Service.of({
         ownedDirectories,
         authoredFiles,
+        conditions,
         events: Stream.fromQueue(events),
         restarts: resolutionInputs.events,
         restartRequired: resolutionInputs.pending,

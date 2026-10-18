@@ -221,6 +221,265 @@ Effect.gen(function* () {
     { timeout: 30000 },
   );
 
+  it.effect.each([
+    { name: "defaults", env: "", argv: [], expected: "node-addons" },
+    {
+      name: "long argv equals",
+      env: "",
+      argv: ["--conditions=env"],
+      expected: "env",
+    },
+    {
+      name: "long argv separate",
+      env: "",
+      argv: ["--conditions", "env"],
+      expected: "env",
+    },
+    { name: "short argv", env: "", argv: ["-C", "env"], expected: "env" },
+    {
+      name: "environment long",
+      env: "--conditions=env",
+      argv: [],
+      expected: "env",
+    },
+    { name: "environment short", env: "-C env", argv: [], expected: "env" },
+    {
+      name: "quoted value",
+      env: '--conditions="two words"',
+      argv: [],
+      expected: "two words",
+    },
+    {
+      name: "quoted argument",
+      env: '"--conditions=two words"',
+      argv: [],
+      expected: "two words",
+    },
+    {
+      name: "quoted short value",
+      env: '-C "two words"',
+      argv: [],
+      expected: "two words",
+    },
+    {
+      name: "escaped quote and backslash",
+      env: String.raw`--conditions="a\"b\\c"`,
+      argv: [],
+      expected: 'a"b\\c',
+    },
+    {
+      name: "literal single quotes",
+      env: "--conditions='literal'",
+      argv: [],
+      expected: "'literal'",
+    },
+    {
+      name: "repeated environment",
+      env: "--conditions=cli -C env",
+      argv: [],
+      expected: "env",
+    },
+    {
+      name: "combined conditions",
+      env: "--conditions=env",
+      argv: ["-C", "cli"],
+      expected: "env",
+    },
+    {
+      name: "argv contributes conditions",
+      env: "--conditions=cli",
+      argv: ["-C", "env"],
+      expected: "env",
+    },
+    {
+      name: "environment no addons",
+      env: "--no-addons",
+      argv: [],
+      expected: "module-sync",
+    },
+    {
+      name: "argv no addons",
+      env: "",
+      argv: ["--no-addons"],
+      expected: "module-sync",
+    },
+    {
+      name: "argv reenables addons",
+      env: "--no-addons",
+      argv: ["--addons"],
+      expected: "node-addons",
+    },
+    {
+      name: "argv disables addons",
+      env: "--addons",
+      argv: ["--no-addons"],
+      expected: "module-sync",
+    },
+    {
+      name: "repeated environment addons",
+      env: "--no-addons --addons",
+      argv: [],
+      expected: "node-addons",
+    },
+    {
+      name: "underscore alias",
+      env: "--no_addons",
+      argv: [],
+      expected: "module-sync",
+    },
+    {
+      name: "explicit addon condition",
+      env: "--no-addons -C node-addons",
+      argv: [],
+      expected: "node-addons",
+    },
+    {
+      name: "disabled synchronous require",
+      env: "--no-addons --no-experimental-require-module",
+      argv: [],
+      expected: "default",
+    },
+  ])(
+    "matches fresh Node import and require startup conditions: $name",
+    ({ env, argv, expected }) =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const spawner = yield* ChildProcessSpawner;
+        const dependency = path.join(
+          project.root,
+          "node_modules",
+          "startup-dependency",
+        );
+        yield* fs.makeDirectory(dependency, { recursive: true });
+        const labels = [
+          "env",
+          "cli",
+          "two words",
+          'a"b\\c',
+          "'literal'",
+          "node-addons",
+          "module-sync",
+          "default",
+        ];
+        const encode = Schema.encodeEffect(
+          Schema.fromJsonString(Schema.Unknown),
+        );
+        for (const directory of [project.root, dependency]) {
+          const branches = { import: {}, require: {} } as Record<
+            "import" | "require",
+            Record<string, string>
+          >;
+          for (const kind of ["import", "require"] as const) {
+            for (const [index, label] of labels.entries()) {
+              const file = `${kind}-${index}.cjs`;
+              branches[kind][label] = `./${file}`;
+              yield* fs.writeFileString(
+                path.join(directory, file),
+                `module.exports = ${yield* encode(`${kind}:${label}`)};`,
+              );
+            }
+          }
+          yield* fs.writeFileString(
+            path.join(directory, "package.json"),
+            yield* encode({
+              name:
+                directory === project.root
+                  ? "startup-self"
+                  : "startup-dependency",
+              type: "module",
+              exports: branches,
+            }),
+          );
+        }
+        const entry = path.join(project.root, "entry.js");
+        yield* fs.writeFileString(
+          entry,
+          `
+import external from "startup-dependency";
+import self from "startup-self";
+export const values = [external, self];
+export const required = () => [require("startup-dependency"), require("startup-self")];
+`,
+        );
+        const native = path.join(project.root, "NativeConditions.mjs");
+        yield* fs.writeFileString(
+          native,
+          `
+import { createRequire } from "node:module";
+import { values } from "./entry.js";
+const require = createRequire(import.meta.url);
+console.log(JSON.stringify({ values, required: [require.resolve("startup-dependency"), require.resolve("startup-self")] }));
+`,
+        );
+        const source = path.join(project.root, "CompilerConditions.source.mjs");
+        const compiled = path.join(project.root, "CompilerConditions.mjs");
+        yield* fs.writeFileString(
+          source,
+          `
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
+import * as Effect from "effect/Effect";
+import * as Console from "effect/Console";
+import * as Bundler from ${yield* encode(path.resolve(import.meta.dirname, "../src/Bundler.ts"))};
+import * as Compilation from ${yield* encode(path.resolve(import.meta.dirname, "../src/Compilation.ts"))};
+Effect.gen(function* () {
+  const job = yield* Compilation.runJob(Bundler.bundle(process.argv[2]));
+  const loaded = yield* job.exit;
+  yield* Console.log(JSON.stringify({ values: loaded.module.values, required: loaded.metafile.inputs[process.argv[2]].imports.filter((item) => item.kind === "require-call").map((item) => item.path) }));
+}).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })), Effect.scoped, Effect.provide(NodeServices.layer), NodeRuntime.runMain);
+`,
+        );
+        yield* Effect.promise(() =>
+          esbuild.build({
+            entryPoints: [source],
+            outfile: compiled,
+            bundle: true,
+            packages: "external",
+            platform: "node",
+            format: "esm",
+            logLevel: "silent",
+          }),
+        );
+        const results = yield* Effect.forEach([native, compiled], (script) =>
+          Effect.gen(function* () {
+            const child = yield* spawner.spawn(
+              ChildProcessCommand.make(
+                process.execPath,
+                [...argv, script, entry],
+                { extendEnv: true, env: { NODE_OPTIONS: env } },
+              ),
+            );
+            const stderr = yield* child.stderr.pipe(
+              Stream.decodeText(),
+              Stream.mkString,
+              Effect.forkScoped,
+            );
+            const output = yield* child.stdout.pipe(
+              Stream.decodeText(),
+              Stream.mkString,
+            );
+            expect(yield* child.exitCode, yield* Fiber.join(stderr)).toBe(0);
+            return yield* Schema.decodeEffect(
+              Schema.fromJsonString(
+                Schema.Struct({
+                  values: Schema.Array(Schema.String),
+                  required: Schema.Array(Schema.String),
+                }),
+              ),
+            )(output.trim());
+          }),
+        );
+        expect(results[0]?.values).toEqual([
+          `import:${expected}`,
+          `import:${expected}`,
+        ]);
+        expect(results[1]).toEqual(results[0]);
+      }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
+    { timeout: 25000 },
+  );
+
   it.effect(
     "records successful and failed worker evaluation consumption",
     () =>
