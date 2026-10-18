@@ -39,7 +39,14 @@ it("does not regress watermarks when older receipts arrive", () => {
 
 it("acknowledges failed shared attempts only for covered work", () => {
   const failed = [{ context: 1, revision: 2, roots: ["a"] }];
-  const topology = [{ id: 1, profile: "modules" as const, roots: ["a", "b"] }];
+  const topology = [
+    {
+      id: 1,
+      profile: "modules" as const,
+      configuration: undefined,
+      roots: ["a", "b"],
+    },
+  ];
   const partial = DevelopmentState.acknowledgeFailures(
     DevelopmentState.empty,
     failed,
@@ -63,7 +70,7 @@ it("drops receipts for retired contexts without dropping active coverage", () =>
     { context: 2, revision: 4, roots: ["b"] },
   ]);
   const retained = DevelopmentState.retain(consumed, [
-    { id: 2, profile: "modules", roots: ["b"] },
+    { id: 2, profile: "modules", configuration: undefined, roots: ["b"] },
   ]);
   expect(HashMap.has(retained, 1)).toBe(false);
   expect(HashMap.has(retained, 2)).toBe(true);
