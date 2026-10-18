@@ -216,11 +216,21 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
         expect((yield* bundle).module.default).toBe(42);
         yield* fs.remove(entry);
         expect(Exit.isFailure(yield* Effect.exit(bundle))).toBe(true);
-        expect(spans).toHaveLength(2);
-        assert(spans[0]?.status._tag === "Ended");
-        assert(spans[1]?.status._tag === "Ended");
-        expect(Exit.isSuccess(spans[0].status.exit)).toBe(true);
-        expect(Exit.isFailure(spans[1].status.exit)).toBe(true);
+        const bundles = spans.filter((span) => span.name === "Bundler.bundle");
+        const compilations = spans.filter(
+          (span) => span.name === "Bundler.compile",
+        );
+        expect(bundles).toHaveLength(2);
+        expect(compilations).toHaveLength(2);
+        for (const operations of [bundles, compilations]) {
+          assert(operations[0]?.status._tag === "Ended");
+          assert(operations[1]?.status._tag === "Ended");
+          expect(Exit.isSuccess(operations[0].status.exit)).toBe(true);
+          expect(Exit.isFailure(operations[1].status.exit)).toBe(true);
+        }
+        for (const compilation of compilations) {
+          expect(bundles).toContain(Option.getOrUndefined(compilation.parent));
+        }
       }),
     );
   },
