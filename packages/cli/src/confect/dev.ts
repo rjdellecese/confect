@@ -148,18 +148,7 @@ const runSession = Effect.gen(function* () {
   const inventory = yield* EntryPoint.discover;
   const enqueue = (event: DevelopmentEvents.Event) =>
     Queue.offer(events, { _tag: "Filesystem", event }).pipe(Effect.asVoid);
-  const structure = watched.confectEvents.pipe(
-    Stream.runForEach(enqueue),
-    Effect.retry({
-      schedule: watched.schedule,
-      while: (error) =>
-        Effect.gen(function* () {
-          const recover = yield* watched.recover(error);
-          if (recover) yield* enqueue(DevelopmentEvents.Event.Rescan());
-          return recover;
-        }),
-    }),
-  );
+  const structure = watched.confectEvents.pipe(Stream.runForEach(enqueue));
   const restart = compiler.restarts.pipe(
     Stream.runForEach(() => DevSupervisor.requestRestart),
   );
@@ -343,11 +332,6 @@ const syncLoop = Effect.fnUntraced(function* (
       }
       const change = event.event;
       if (change._tag === "Restart") return yield* DevSupervisor.requestRestart;
-      if (change._tag === "Rescan") {
-        yield* rescan;
-        yield* Ref.update(pendingRef, SyncState.full);
-        return;
-      }
       if (change.kind !== "Update") yield* rescan;
       const phase = yield* Ref.get(phaseRef);
       if (change.file === path.join(confect, "schema.ts")) {

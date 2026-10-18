@@ -2,12 +2,13 @@ import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as FiberMap from "effect/FiberMap";
 import * as Filter from "effect/Filter";
+import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
-import * as Schedule from "effect/Schedule";
-import * as Schema from "effect/Schema";
+import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
@@ -18,7 +19,6 @@ export type Event = Data.TaggedEnum<{
     readonly file: string;
     readonly kind: "Create" | "Update" | "Remove";
   };
-  Rescan: {};
   Restart: { readonly file: string };
 }>;
 export const Event = Data.taggedEnum<Event>();
@@ -53,28 +53,95 @@ export const watch = Effect.gen(function* () {
   const convex = yield* ConvexDirectory.get;
   yield* fs.makeDirectory(confect, { recursive: true });
   yield* fs.makeDirectory(convex, { recursive: true });
-  const removedDirectory = Schema.Struct({
-    code: Schema.Literal("ENOENT"),
-    syscall: Schema.Literal("scandir"),
-    path: Schema.String,
-  });
-  const confectEvents = fs.watch(confect, { recursive: true }).pipe(
-    Stream.filterMap(
-      Filter.fromPredicateOption(
-        (event: FileSystem.WatchEvent): Option.Option<Event> => {
-          const file = path.resolve(confect, event.path);
-          const relative = path.relative(confect, file);
-          if (
-            isArtifact(file) ||
-            relative.split(path.sep).includes("_generated")
-          )
-            return Option.none();
-          if (Array.contains(configurationFiles, path.basename(file)))
-            return Option.some(Event.Restart({ file }));
-          return Option.some(Event.Authored({ file, kind: event._tag }));
-        },
-      ),
-    ),
+  const confectEvents = Stream.callback<Event, PlatformError>((output) =>
+    Effect.gen(function* () {
+      const watchers = yield* FiberMap.make<string, void, PlatformError>();
+      const incoming = yield* Queue.unbounded<{
+        readonly directory: string;
+        readonly ancestors: HashSet.HashSet<string>;
+        readonly event: FileSystem.WatchEvent;
+      }>();
+      const ignored = (file: string) =>
+        isArtifact(file) ||
+        Array.contains(
+          path.relative(confect, file).split(path.sep),
+          "_generated",
+        );
+      const add = Effect.fn("DevelopmentEvents.addDirectory")(function* (
+        directory: string,
+        ancestors: HashSet.HashSet<string>,
+      ): Effect.fn.Return<void, PlatformError> {
+        if (yield* FiberMap.has(watchers, directory)) return;
+        const real = yield* fs.realPath(directory);
+        if (HashSet.has(ancestors, real)) return;
+        const nextAncestors = HashSet.add(ancestors, real);
+        yield* FiberMap.run(
+          watchers,
+          directory,
+          fs.watch(directory).pipe(
+            Stream.catchIf(
+              (error) =>
+                directory !== confect && error.reason._tag === "NotFound",
+              () => Stream.empty,
+            ),
+            Stream.runForEach((event) =>
+              Queue.offer(incoming, {
+                directory,
+                ancestors: nextAncestors,
+                event,
+              }),
+            ),
+          ),
+        );
+        yield* Effect.forEach(yield* fs.readDirectory(directory), (name) =>
+          addIfDirectory(path.join(directory, name), nextAncestors),
+        );
+      });
+      const addIfDirectory = (
+        file: string,
+        ancestors: HashSet.HashSet<string>,
+      ) =>
+        Effect.gen(function* () {
+          if (ignored(file)) return;
+          if ((yield* fs.stat(file)).type === "Directory")
+            yield* add(file, ancestors);
+        }).pipe(
+          Effect.catchIf(
+            (error) => error.reason._tag === "NotFound",
+            () => Effect.void,
+          ),
+        );
+      yield* add(confect, HashSet.empty());
+      yield* Effect.all(
+        [
+          FiberMap.join(watchers),
+          Effect.gen(function* () {
+            const { directory, ancestors, event } = yield* Queue.take(incoming);
+            const file = path.resolve(directory, event.path);
+            if (ignored(file)) return;
+            if (event._tag !== "Update") {
+              const removed = Array.filter(
+                Array.fromIterable(watchers),
+                ([watched]) =>
+                  watched === file || watched.startsWith(`${file}${path.sep}`),
+              );
+              yield* Effect.forEach(removed, ([watched]) =>
+                FiberMap.remove(watchers, watched),
+              );
+              if (event._tag === "Create")
+                yield* addIfDirectory(file, ancestors);
+            }
+            yield* Queue.offer(
+              output,
+              Array.contains(configurationFiles, path.basename(file))
+                ? Event.Restart({ file })
+                : Event.Authored({ file, kind: event._tag }),
+            );
+          }).pipe(Effect.forever),
+        ],
+        { concurrency: "unbounded" },
+      );
+    }),
   );
   const convexEvents = fs.watch(convex).pipe(
     Stream.filterMap(
@@ -106,26 +173,9 @@ export const watch = Effect.gen(function* () {
       ),
     ),
   );
-  const recover = (error: PlatformError) =>
-    Effect.gen(function* () {
-      const removed = Schema.decodeUnknownOption(removedDirectory)(
-        error.reason.cause,
-      );
-      if (Option.isNone(removed)) return false;
-      const relative = path.relative(confect, removed.value.path);
-      return (
-        relative !== "" &&
-        relative !== ".." &&
-        !relative.startsWith(`..${path.sep}`) &&
-        !path.isAbsolute(relative) &&
-        (yield* fs.exists(confect).pipe(Effect.orElseSucceed(() => false)))
-      );
-    });
   return {
     confectEvents,
     convexEvents,
     projectEvents,
-    recover,
-    schedule: Schedule.spaced("10 millis"),
   };
 });
