@@ -14,6 +14,42 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
     it.effect(
+      "keeps shared-helper edits incremental across config profiles",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.makeConfigProfiles;
+          const path = yield* Path.Path;
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const initial = yield* project.generatedFiles;
+          expect(initial[path.join("convex", "notes.ts")]).toContain(
+            "export const list =",
+          );
+          expect(initial[path.join("convex", "nested", "other.ts")]).toContain(
+            "export const other =",
+          );
+          yield* Ref.set(watching.output, "");
+          yield* project.writeNames("updatedList", "updatedOther");
+          yield* watching.waitFor(success);
+          const incremental = yield* project.generatedFiles;
+          expect(incremental[path.join("convex", "notes.ts")]).toContain(
+            "export const updatedList =",
+          );
+          expect(
+            incremental[path.join("convex", "nested", "other.ts")],
+          ).toContain("export const updatedOther =");
+          expect(yield* Ref.get(watching.output)).not.toContain(
+            "Performing initial sync",
+          );
+          const once = yield* project.start("codegen");
+          yield* once.waitFor(success);
+          expect(Number(yield* once.handle.exitCode)).toBe(0);
+          expect(yield* project.generatedFiles).toEqual(incremental);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "stabilizes a newly discovered external helper without another edit",
       () =>
         Effect.gen(function* () {

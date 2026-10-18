@@ -154,3 +154,42 @@ export const make = Effect.gen(function* () {
     );
   return { root, write, start, generatedFiles, provide };
 });
+
+export const makeConfigProfiles = Effect.gen(function* () {
+  const project = yield* make;
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  yield* fs.makeDirectory(path.join(project.root, "confect/helpers"));
+  yield* fs.makeDirectory(path.join(project.root, "confect/nested"));
+  yield* project.write(
+    "tsconfig.json",
+    '{"compilerOptions":{"moduleResolution":"Bundler","jsxFactory":"rootFactory.h"}}',
+  );
+  yield* project.write(
+    "confect/nested/tsconfig.json",
+    '{"extends":"../../tsconfig.json","compilerOptions":{"jsxFactory":"nestedFactory.h"}}',
+  );
+  const writeNames = (rootName: string, nestedName: string) =>
+    project.write(
+      "confect/helpers/name.tsx",
+      `const rootFactory = { h: () => ${JSON.stringify(rootName)} };\nconst nestedFactory = { h: () => ${JSON.stringify(nestedName)} };\nexport const name = <div />;\n`,
+    );
+  yield* writeNames("list", "other");
+  yield* project.write(
+    "confect/notes.spec.ts",
+    `import { name } from "./helpers/name";\n${spec.replace('name: "list"', "name")}`,
+  );
+  yield* project.write(
+    "confect/notes.impl.ts",
+    `import { name } from "./helpers/name";\n${impl.replace('"list"', "name")}`,
+  );
+  yield* project.write(
+    "confect/nested/other.spec.ts",
+    `import { name } from "../helpers/name";\n${spec.replace('name: "list"', "name").replace('"./_generated/', '"../_generated/')}`,
+  );
+  yield* project.write(
+    "confect/nested/other.impl.ts",
+    `import { name } from "../helpers/name";\n${impl.replaceAll('"./_generated/', '"../_generated/').replace('"./notes.spec"', '"./other.spec"').replace('"list"', "name")}`,
+  );
+  return { ...project, writeNames };
+});

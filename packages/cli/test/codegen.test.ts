@@ -47,6 +47,86 @@ vi.mock("esbuild", (importOriginal) =>
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect(
+      "partitions shared helpers by each entry's selected config",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.makeConfigProfiles;
+          const path = yield* Path.Path;
+          yield* project.provide(generateWithSnapshot);
+          const baseline = yield* project.generatedFiles;
+          expect(baseline[path.join("convex", "notes.ts")]).toContain(
+            "export const list =",
+          );
+          expect(baseline[path.join("convex", "nested", "other.ts")]).toContain(
+            "export const other =",
+          );
+          vi.mocked(esbuild.build).mockClear();
+          vi.mocked(esbuild.context).mockClear();
+          yield* project.provide(codegenHandler);
+          expect(yield* project.generatedFiles).toEqual(baseline);
+          expect(vi.mocked(esbuild.build)).not.toHaveBeenCalled();
+          expect(vi.mocked(esbuild.context)).toHaveBeenCalledTimes(3);
+          expect(
+            vi
+              .mocked(esbuild.context)
+              .mock.calls.map(([options]) => options.tsconfig ?? "")
+              .sort(),
+          ).toEqual(
+            [
+              path.join(project.root, "tsconfig.json"),
+              path.join(project.root, "tsconfig.json"),
+              path.join(project.root, "confect/nested/tsconfig.json"),
+            ].sort(),
+          );
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect.each(["nested", "ancestor"] as const)(
+      "preserves generation with an ignored malformed %s config",
+      (ignored) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* fs.makeDirectory(path.join(project.root, "confect/helpers"));
+          yield* project.write(
+            "confect/helpers/name.ts",
+            'export const name = "list";',
+          );
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { name } from "./helpers/name";\n${Project.spec.replace('name: "list"', "name")}`,
+          );
+          if (ignored === "ancestor")
+            yield* project.write("confect/tsconfig.json", "{}");
+          yield* project.write(
+            ignored === "nested"
+              ? "confect/helpers/tsconfig.json"
+              : "tsconfig.json",
+            '{"extends":',
+          );
+          yield* project.provide(generateWithSnapshot);
+          const baseline = yield* project.generatedFiles;
+          vi.mocked(esbuild.build).mockClear();
+          vi.mocked(esbuild.context).mockClear();
+          yield* project.provide(codegenHandler);
+          expect(yield* project.generatedFiles).toEqual(baseline);
+          expect(vi.mocked(esbuild.build)).not.toHaveBeenCalled();
+          const selected = path.join(
+            project.root,
+            ignored === "ancestor" ? "confect/tsconfig.json" : "tsconfig.json",
+          );
+          expect(vi.mocked(esbuild.context).mock.calls.length).toBeGreaterThan(
+            0,
+          );
+          for (const [options] of vi.mocked(esbuild.context).mock.calls)
+            expect(options.tsconfig).toBe(selected);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect.each([
       { files: ["bad-name.ts"], error: "InvalidTableFilenameError" },
       {
