@@ -525,7 +525,7 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
     );
 
     it.effect(
-      "shares one build across evaluation phases without changing generated output",
+      "separates table roots while sharing specs and implementations without changing generated output",
       () =>
         Effect.gen(function* () {
           const path = yield* Path.Path;
@@ -552,7 +552,7 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
           vi.mocked(esbuild.build).mockClear();
           expect(yield* Project.writtenFiles(run)).not.toEqual([]);
           const batchedOutputs = yield* project.generatedFiles;
-          expect(vi.mocked(esbuild.build)).toHaveBeenCalledTimes(1);
+          expect(vi.mocked(esbuild.build)).toHaveBeenCalledTimes(2);
           expect(
             vi
               .mocked(esbuild.build)
@@ -560,7 +560,38 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
                 ([options]) => Object.keys(options?.entryPoints ?? {}).length,
               )
               .filter((count) => count > 1),
-          ).toEqual([8]);
+          ).toEqual([2, 6]);
+          expect(
+            vi
+              .mocked(esbuild.build)
+              .mock.calls.map(([options]) => options?.entryPoints),
+          ).toEqual([
+            expect.arrayContaining(
+              ["labels", "notes"].map((name) =>
+                expect.objectContaining({
+                  in: path.join(
+                    project.root,
+                    "confect",
+                    "tables",
+                    `${name}.ts`,
+                  ),
+                }),
+              ),
+            ),
+            expect.arrayContaining(
+              ["notes", "other", "another"].flatMap((name) =>
+                ["spec", "impl"].map((kind) =>
+                  expect.objectContaining({
+                    in: path.join(
+                      project.root,
+                      "confect",
+                      `${name}.${kind}.ts`,
+                    ),
+                  }),
+                ),
+              ),
+            ),
+          ]);
           yield* Effect.acquireRelease(
             Effect.sync(() =>
               vi
