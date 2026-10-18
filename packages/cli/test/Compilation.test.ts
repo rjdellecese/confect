@@ -53,6 +53,101 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
   it.effect(
+    "pins prepared revisions once per wrapper and leaves default compilation unchanged",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        yield* fs.writeFileString(entry, "export default 1;");
+        yield* Effect.gen(function* () {
+          const events = yield* observe;
+          const compiler = yield* Compilation.Service;
+          yield* Compilation.withPreparedRevisions(
+            Effect.gen(function* () {
+              yield* Bundler.compile(entry);
+              const first = yield* Queue.take(events);
+              yield* Bundler.compile(entry);
+              expect((yield* Queue.take(events)).revision).toBeGreaterThan(
+                first.revision,
+              );
+            }),
+          );
+          const prepared = yield* compiler.preparedRevisions;
+          yield* Compilation.withPreparedRevisions(
+            Effect.gen(function* () {
+              const reused = yield* Compilation.runJob(compileAndLoad(entry));
+              expect(Exit.isSuccess(reused.exit)).toBe(true);
+              expect(reused.receipts).toEqual(prepared);
+              expect(yield* Queue.poll(events)).toEqual(Option.none());
+              yield* fs.writeFileString(entry, "export default 2;");
+              const edited = yield* Queue.take(events);
+              expect(
+                CompilationState.acknowledged(edited, reused.receipts),
+              ).toBe(false);
+              const refreshed = yield* Compilation.runJob(
+                compileAndLoad(entry),
+              );
+              expect(Exit.isSuccess(refreshed.exit)).toBe(true);
+              const rebuilt = yield* Queue.take(events);
+              expect(rebuilt.revision).toBeGreaterThan(edited.revision);
+              yield* Bundler.compile(entry);
+              expect((yield* Queue.take(events)).revision).toBeGreaterThan(
+                rebuilt.revision,
+              );
+            }),
+          );
+          const before = yield* compiler.preparedRevisions;
+          yield* Bundler.compile(entry);
+          expect((yield* Queue.take(events)).revision).toBeGreaterThan(
+            before[0]?.revision ?? 0,
+          );
+        }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
+      }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+  );
+
+  it.effect(
+    "checks restart inputs before handing off a matching prepared result",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        const settings = path.join(root, "settings.json");
+        yield* fs.writeFileString(entry, "export default 1;");
+        yield* fs.writeFileString(settings, "{}");
+        yield* Effect.gen(function* () {
+          yield* Bundler.compile(entry);
+          const outcome = yield* Compilation.withPreparedRevisions(
+            Effect.gen(function* () {
+              yield* fs.writeFileString(settings, '{"changed":true}');
+              return yield* Effect.result(Bundler.compile(entry));
+            }),
+          );
+          expect(Result.isFailure(outcome)).toBe(true);
+          if (Result.isFailure(outcome))
+            expect(outcome.failure.cause).toMatchObject({
+              _tag: "CompilationRestartRequired",
+              paths: [settings],
+            });
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({
+              ownedDirectories: [],
+              restartInputs: [settings],
+            }),
+          ),
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            watch: () => Stream.never,
+          }),
+        );
+      }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
+  );
+
+  it.effect(
     "acknowledges no-edit rebuilds without clearing a later native edit",
     () =>
       Effect.gen(function* () {

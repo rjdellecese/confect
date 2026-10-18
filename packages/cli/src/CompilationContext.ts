@@ -25,6 +25,14 @@ export interface Snapshot {
   readonly warnings: ReadonlyArray<esbuild.Message>;
 }
 
+interface Captured {
+  readonly receipt: CompilationState.Receipt;
+  readonly metafile: esbuild.Metafile | undefined;
+  readonly values: CompilationState.Values;
+  readonly outputFiles: ReadonlyArray<esbuild.OutputFile> | undefined;
+  readonly warnings: ReadonlyArray<esbuild.Message>;
+}
+
 export class IncompleteCompilation extends Schema.TaggedError<IncompleteCompilation>()(
   "IncompleteCompilation",
   {
@@ -108,19 +116,14 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       readonly values: CompilationState.Values;
     }>
   >();
-  const identities = new WeakMap<
-    object,
-    {
-      readonly receipt: CompilationState.Receipt;
-      readonly metafile: esbuild.Metafile | undefined;
-      readonly values: CompilationState.Values;
-    }
-  >();
+  const identities = new WeakMap<object, Captured>();
+  const prepared = yield* Ref.make(Option.none<Captured>());
   const failures = new WeakMap<object, CompilationState.Receipt>();
   const capture = Effect.fn("CompilationContext.capture")(
     function* (result: esbuild.BuildResult) {
       yield* guards.ensure;
       const number = yield* Ref.updateAndGet(revision, (value) => value + 1);
+      yield* Ref.set(prepared, Option.none());
       const receipt = {
         context: topology.id,
         revision: number,
@@ -218,9 +221,18 @@ export const make = Effect.fn("CompilationContext.make")(function* (
           }),
         );
       });
-      identities.set(result, { receipt, metafile, values: next });
+      const captured = {
+        receipt,
+        metafile,
+        values: next,
+        outputFiles: result.outputFiles,
+        warnings: result.warnings,
+      };
+      identities.set(result, captured);
       yield* Ref.set(values, next);
       yield* guards.check;
+      if (result.errors.length === 0)
+        yield* Ref.set(prepared, Option.some(captured));
       yield* publish({
         ...receipt,
         roots: topology.roots,
@@ -297,15 +309,26 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   });
   return {
     ...topology,
+    preparedRevision: Ref.get(prepared).pipe(
+      Effect.map(Option.map((captured) => captured.receipt)),
+    ),
     verify: rebuild().pipe(
       Effect.catchTag("CompilationFailed", () => Effect.void),
       Effect.asVoid,
     ),
     consume: Effect.fn("CompilationContext.consume")(
-      function* () {
-        const result = yield* rebuild();
-        const captured = identities.get(result);
-        if (!captured?.metafile || !result.outputFiles) {
+      function* (expected?: CompilationState.Receipt) {
+        const available = expected
+          ? yield* guards.check.pipe(Effect.andThen(Ref.get(prepared)))
+          : Option.none<Captured>();
+        const captured =
+          expected &&
+          Option.isSome(available) &&
+          available.value.receipt.context === expected.context &&
+          available.value.receipt.revision === expected.revision
+            ? available.value
+            : identities.get(yield* rebuild());
+        if (!captured?.metafile || !captured.outputFiles) {
           return yield* new BundlerError({
             cause: new IncompleteCompilation({
               reason: "MissingRevision",
@@ -328,13 +351,13 @@ export const make = Effect.fn("CompilationContext.make")(function* (
               existing.value.directory,
               path,
             ),
-            warnings: result.warnings,
+            warnings: captured.warnings,
           } satisfies Snapshot;
         const target = yield* fs.makeTempDirectoryScoped({
           directory: options.absWorkingDir,
           prefix: ".confect-artifacts-",
         });
-        const files = result.outputFiles;
+        const files = captured.outputFiles;
         yield* lock.withPermit(
           Effect.gen(function* () {
             if ((yield* Ref.get(latestRevision)) === receipt.revision) {
@@ -371,15 +394,16 @@ export const make = Effect.fn("CompilationContext.make")(function* (
         return {
           receipt,
           metafile: relocateMetafile(metafile, output, target, path),
-          warnings: result.warnings,
+          warnings: captured.warnings,
         } satisfies Snapshot;
       },
-      Effect.mapError((cause) =>
-        Schema.is(BundlerError)(cause) ||
-        Schema.is(CompilationState.Failed)(cause)
-          ? cause
-          : new BundlerError({ cause }),
-      ),
+      (effect, _expected?: CompilationState.Receipt) =>
+        Effect.mapError(effect, (cause) =>
+          Schema.is(BundlerError)(cause) ||
+          Schema.is(CompilationState.Failed)(cause)
+            ? cause
+            : new BundlerError({ cause }),
+        ),
     ),
   };
 }, Effect.provide(NodeCrypto.layer));

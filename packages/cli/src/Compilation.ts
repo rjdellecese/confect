@@ -25,6 +25,11 @@ class FailedAttempts extends Context.Service<
   Ref.Ref<ReadonlyArray<CompilationState.Receipt>>
 >()("@confect/cli/Compilation/FailedAttempts") {}
 
+class PreparedRevisions extends Context.Service<
+  PreparedRevisions,
+  ReadonlyArray<CompilationState.Receipt>
+>()("@confect/cli/Compilation/PreparedRevisions") {}
+
 export interface Request {
   readonly roots: ReadonlyArray<string>;
   readonly profile: CompilationState.Profile;
@@ -57,6 +62,9 @@ export class Service extends Context.Service<
     readonly reset: Effect.Effect<void>;
     readonly verify: Effect.Effect<void, BundlerError>;
     readonly topology: Effect.Effect<ReadonlyArray<CompilationState.Topology>>;
+    readonly preparedRevisions: Effect.Effect<
+      ReadonlyArray<CompilationState.Receipt>
+    >;
   }
 >()("@confect/cli/Compilation/Service") {}
 
@@ -133,6 +141,16 @@ export const layer = (options: {
         restartRequired: resolutionInputs.pending,
         resolutionInputs,
         reset,
+        preparedRevisions: lock.withPermit(
+          Effect.gen(function* () {
+            return Array.getSomes(
+              yield* Effect.forEach(
+                yield* Ref.get(contexts),
+                (context) => context.preparedRevision,
+              ),
+            );
+          }),
+        ),
         verify: lock
           .withPermit(
             Effect.gen(function* () {
@@ -203,8 +221,15 @@ export const layer = (options: {
               yield* Ref.set(contexts, Array.append(retained, entry));
               return entry;
             }).pipe(Effect.uninterruptible);
+            const prepared = yield* Effect.serviceOption(PreparedRevisions);
+            const expected = Option.flatMap(prepared, (receipts) =>
+              Array.findFirst(
+                receipts,
+                (receipt) => receipt.context === selected.id,
+              ),
+            );
             const outcome = yield* selected
-              .consume()
+              .consume(Option.getOrUndefined(expected))
               .pipe(Effect.provide(services), Effect.result);
             yield* resolutionInputs.check;
             return yield* Effect.fromResult(outcome);
@@ -220,6 +245,17 @@ export const layer = (options: {
       });
     }),
   );
+
+export const withPreparedRevisions = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+) =>
+  Effect.gen(function* () {
+    const compiler = yield* Service;
+    const receipts = yield* compiler.preparedRevisions;
+    return yield* effect.pipe(
+      Effect.provideService(PreparedRevisions, receipts),
+    );
+  });
 
 export const fail = (root: string) => (error: CompilationState.Failed) =>
   Effect.gen(function* () {
