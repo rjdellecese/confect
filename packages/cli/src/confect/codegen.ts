@@ -12,6 +12,7 @@ import * as Record from "effect/Record";
 import * as EvaluationSession from "../EvaluationSession";
 import * as Bundler from "../Bundler";
 import * as CompiledModule from "../CompiledModule";
+import * as CompilationSession from "../CompilationSession";
 import { fromBundlerError } from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import { LegacySchemaFileError } from "../CodegenError";
@@ -194,6 +195,7 @@ export const generateWithSnapshot = runCodegen.pipe(
 export const codegenHandler = generateWithSnapshot.pipe(
   Effect.tap(() => touchConvexSchema),
   Effect.map(({ functionPaths }) => ({ functionPaths })),
+  Effect.provide(CompilationSession.layer("Once")),
 );
 
 export const compileOptionalModules = Effect.gen(function* () {

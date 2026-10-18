@@ -1,5 +1,6 @@
 import type { BuildError, BundlerError } from "@confect/cli/BuildError";
 import type * as DevSupervisor from "@confect/cli/DevSupervisor";
+import type * as CompilationInputs from "@confect/cli/CompilationInputs";
 import type { ConfigError } from "effect/Config";
 import type * as CodegenError from "@confect/cli/CodegenError";
 import type { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -68,6 +69,8 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
         functionPaths: FunctionPaths.FunctionPaths;
       },
       | CodegenError.CodegenError
+      | BundlerError
+      | CompilationInputs.RestartRequired
       | EvaluationError
       | GroupPath.GroupModulePathIsNotATypeScriptFileError
       | PlatformError,

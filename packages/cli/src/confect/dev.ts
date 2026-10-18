@@ -23,6 +23,7 @@ import * as Ansi from "../Ansi";
 import * as SyncState from "../SyncState";
 import type { OptionalFile } from "../EntryPoint";
 import * as Compilation from "../Compilation";
+import * as CompilationSession from "../CompilationSession";
 import * as CompilationInputs from "../CompilationInputs";
 import type * as CompilationState from "../CompilationState";
 import * as DevelopmentState from "../DevelopmentState";
@@ -170,30 +171,16 @@ const runSession = Effect.gen(function* () {
 
 export const dev = Command.make("dev", {}, () =>
   DevSupervisor.run(
-    Effect.gen(function* () {
-      const path = yield* Path.Path;
-      const confect = yield* ConfectDirectory.get;
-      const convex = yield* ConvexDirectory.get;
-      return yield* runSession.pipe(
-        Effect.provide(
-          Compilation.layer({
-            ownedDirectories: [path.join(confect, "_generated"), convex],
-            authoredFiles: [
-              path.join(convex, "convex.config.ts"),
-              path.join(convex, "tsconfig.json"),
-              path.join(convex, "package.json"),
-            ],
-          }),
-        ),
-        Effect.catchTags({
-          CompilationRestartRequired: () => DevSupervisor.requestRestart,
-          BundlerError: (error) =>
-            Schema.is(CompilationInputs.RestartRequired)(error.cause)
-              ? DevSupervisor.requestRestart
-              : Effect.fail(error),
-        }),
-      );
-    }),
+    runSession.pipe(
+      Effect.provide(CompilationSession.layer("Watch")),
+      Effect.catchTags({
+        CompilationRestartRequired: () => DevSupervisor.requestRestart,
+        BundlerError: (error) =>
+          Schema.is(CompilationInputs.RestartRequired)(error.cause)
+            ? DevSupervisor.requestRestart
+            : Effect.fail(error),
+      }),
+    ),
   ),
 ).pipe(Command.withDescription("Start the Confect development server"));
 

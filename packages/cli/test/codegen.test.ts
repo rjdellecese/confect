@@ -40,6 +40,7 @@ vi.mock("esbuild", (importOriginal) =>
   importOriginal<typeof esbuild>().then((original) => ({
     ...original,
     build: vi.fn(original.build),
+    context: vi.fn(original.context),
   })),
 );
 
@@ -550,12 +551,14 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
             }),
           );
           vi.mocked(esbuild.build).mockClear();
+          vi.mocked(esbuild.context).mockClear();
           expect(yield* Project.writtenFiles(run)).not.toEqual([]);
           const batchedOutputs = yield* project.generatedFiles;
-          expect(vi.mocked(esbuild.build)).toHaveBeenCalledTimes(2);
+          expect(vi.mocked(esbuild.build)).not.toHaveBeenCalled();
+          expect(vi.mocked(esbuild.context)).toHaveBeenCalledTimes(2);
           expect(
             vi
-              .mocked(esbuild.build)
+              .mocked(esbuild.context)
               .mock.calls.map(
                 ([options]) => Object.keys(options?.entryPoints ?? {}).length,
               )
@@ -563,7 +566,7 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
           ).toEqual([2, 6]);
           expect(
             vi
-              .mocked(esbuild.build)
+              .mocked(esbuild.context)
               .mock.calls.map(([options]) => options?.entryPoints),
           ).toEqual([
             expect.arrayContaining(
