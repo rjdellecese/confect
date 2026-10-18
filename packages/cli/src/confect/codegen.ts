@@ -146,14 +146,10 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
+  yield* EvaluationSession.validateTables(tableModules);
   const snapshot = yield* EvaluationSession.withBatch(
-    [
-      ...tableModules.map(({ relativePath }) => relativePath),
-      ...specPaths,
-      ...implPaths,
-    ],
+    [...specPaths, ...implPaths],
     Effect.gen(function* () {
-      yield* EvaluationSession.validateTables(tableModules);
       yield* EvaluationSession.loadSpecs(specPaths);
       yield* EvaluationSession.validateSiblings(leaves);
       const inspected = yield* EvaluationSession.snapshot(specPaths);
