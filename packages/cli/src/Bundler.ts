@@ -31,6 +31,9 @@ import * as String from "effect/String";
 import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 import * as CompiledModule from "./CompiledModule";
+import * as Compilation from "./Compilation";
+import * as CompilationPlugin from "./CompilationPlugin";
+import * as CompilationState from "./CompilationState";
 import { logCoalescedBuildWarnings } from "./log";
 
 export type Bundled = CompiledModule.LoadedModule;
@@ -55,7 +58,8 @@ const absolutizeMetafile = (
   metafile: esbuild.Metafile,
   cwd: string,
 ): esbuild.Metafile => {
-  const absolutize = (p: string) => path.resolve(cwd, p);
+  const absolutize = (p: string) =>
+    path.resolve(cwd, CompilationPlugin.physicalPath(p));
   const inputs = Record.mapEntries(metafile.inputs, (value, key) => [
     absolutize(key),
     {
@@ -165,6 +169,7 @@ export const bundleWorkspacePlugin = (
   name: "confect:bundle-workspace",
   setup(build) {
     build.onResolve({ filter: /^[^./]/ }, (args) => {
+      if (args.pluginData === CompilationPlugin.nativeProbe) return undefined;
       if (args.namespace !== "file" && args.namespace !== "") return undefined;
       if (isBuiltin(args.path) || path.isAbsolute(args.path)) return undefined;
       if (Array.some(skipPatterns, (pattern) => pattern.test(args.path))) {
@@ -219,6 +224,7 @@ const captureBuildResultPlugin = (
 });
 
 interface BatchCompilation {
+  readonly receipt?: CompilationState.Receipt;
   readonly entries: HashMap.HashMap<
     string,
     { readonly source: string; readonly output: string }
@@ -247,7 +253,7 @@ class Batch extends Context.Service<
     readonly entryPoints: HashSet.HashSet<string>;
     readonly compilation: Effect.Effect<
       Option.Option<BatchCompilation>,
-      never,
+      BundlerError | CompilationState.Failed,
       Path.Path | FileSystem.FileSystem
     >;
   }
@@ -334,6 +340,123 @@ const batchResolutionPlugin = (
     });
   },
 });
+
+const compileLive = Effect.fn("Bundler.compileLive")(
+  function* (
+    service: Compilation.Service["Service"],
+    entryPoints: ReadonlyArray<string>,
+    batch: boolean,
+    options?: {
+      readonly plugins?: ReadonlyArray<esbuild.Plugin>;
+      readonly profile?: "component-config";
+    },
+  ) {
+    const path = yield* Path.Path;
+    const fs = yield* FileSystem.FileSystem;
+    if (options?.plugins?.length && options.profile !== "component-config") {
+      return yield* new BundlerError({
+        cause: { _tag: "UnsupportedCompilationProfile" },
+      });
+    }
+    const nodeOptions = yield* Config.String("NODE_OPTIONS").pipe(
+      Config.withDefault(""),
+    );
+    if (/--conditions|-C|--(?:no-)?addons/.test(nodeOptions)) {
+      return yield* new BundlerError({
+        cause: {
+          _tag: "UnsupportedCompilationRuntimeOptions",
+          option: "NODE_OPTIONS",
+        },
+      });
+    }
+    const runtimeOptions = yield* Effect.try({
+      try: () =>
+        parseArgs({
+          args: process.execArgv,
+          options: {
+            conditions: { type: "string", short: "C", multiple: true },
+            "no-addons": { type: "boolean" },
+          },
+          strict: false,
+          allowPositionals: true,
+        }).values,
+      catch: (cause) => new BundlerError({ cause }),
+    });
+    const entries = Array.dedupe(
+      Array.map(entryPoints, (entry) => path.resolve(entry)),
+    );
+    const first = entries[0];
+    if (!first)
+      return yield* new BundlerError({ cause: { _tag: "EmptyCompilation" } });
+    const cwd = yield* Compilation.canonicalPath(path.dirname(first));
+    const roots = yield* Effect.forEach(entries, Compilation.canonicalPath);
+    const resolver = yield* CompilationPlugin.make(
+      path,
+      fs,
+      service.ownedDirectories,
+      service.authoredFiles,
+    );
+    const result = yield* service.compile({
+      roots,
+      profile: options?.profile ?? "modules",
+      options: {
+        entryPoints: Array.map(roots, (entry, index) => ({
+          in: entry,
+          out: `${index}`,
+        })),
+        absWorkingDir: cwd,
+        outExtension: { ".js": ".mjs" },
+        chunkNames: "chunk-[hash]",
+        format: "esm",
+        platform: "node",
+        mainFields: ["main"],
+        sourcemap: "inline",
+        bundle: true,
+        splitting: batch,
+        logLevel: "silent",
+        conditions: [
+          "node",
+          ...(process.features.require_module ? ["module-sync"] : []),
+          ...(runtimeOptions["no-addons"] ? [] : ["node-addons"]),
+          ...Array.filter(
+            runtimeOptions.conditions ?? [],
+            (condition) => typeof condition === "string",
+          ),
+        ],
+        plugins: [...(options?.plugins ?? []), resolver.plugin],
+      },
+      normalize: (metafile) =>
+        absolutizeMetafile(path, resolver.normalize(metafile, cwd), cwd),
+    });
+    const artifacts = yield* Effect.forEach(
+      Array.zip(entries, roots),
+      ([entry, source]) =>
+        Effect.gen(function* () {
+          const output = Array.findFirst(
+            Record.toEntries(result.metafile.outputs),
+            ([, metadata]) => metadata.entryPoint === source,
+          );
+          if (Option.isNone(output))
+            return yield* new BundlerError({
+              cause: { _tag: "MissingCompilationOutput", entry },
+            });
+          return [entry, { source, output: output.value[0] }] as const;
+        }),
+    );
+    return {
+      receipt: result.receipt,
+      entries: HashMap.fromIterable(artifacts),
+      metafile: result.metafile,
+      warnings: result.warnings,
+      cwd,
+    } satisfies BatchCompilation;
+  },
+  Effect.mapError((cause) =>
+    Schema.is(BundlerError)(cause) || Schema.is(CompilationState.Failed)(cause)
+      ? cause
+      : new BundlerError({ cause }),
+  ),
+);
 
 const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   entryPoints: ReadonlyArray<string>,
@@ -537,32 +660,30 @@ export const withBatch = <A, E, R>(
       const artifactScope = yield* Effect.serviceOption(
         CompiledModule.ArtifactScope,
       );
+      const live = yield* Effect.serviceOption(Compilation.Service);
       const compilation = yield* Effect.cached(
-        compileBatch(entryPoints).pipe(
+        (Option.isSome(live)
+          ? compileLive(live.value, entryPoints, true).pipe(Effect.asSome)
+          : compileBatch(entryPoints).pipe(
+              Effect.asSome,
+              Effect.catchTag("BatchIncompatible", (error) =>
+                Effect.logDebug(
+                  "Shared build skipped; falling back to individual builds.",
+                  { entryPoints, reason: error.reason, detail: error.message },
+                ).pipe(Effect.as(Option.none<BatchCompilation>())),
+              ),
+              Effect.catch((error) =>
+                Effect.logDebug(
+                  "Shared build failed; falling back to individual builds.",
+                  { entryPoints, reason: "CompileFailure" },
+                  Cause.fail(error),
+                ).pipe(Effect.as(Option.none<BatchCompilation>())),
+              ),
+            )
+        ).pipe(
           Effect.provideService(
             Scope.Scope,
             Option.getOrElse(artifactScope, () => scope),
-          ),
-          Effect.asSome,
-          Effect.catchTag("BatchIncompatible", (error) =>
-            Effect.logDebug(
-              "Shared build skipped; falling back to individual builds.",
-              {
-                entryPoints,
-                reason: error.reason,
-                detail: error.message,
-              },
-            ).pipe(Effect.as(Option.none<BatchCompilation>())),
-          ),
-          Effect.catch((error) =>
-            Effect.logDebug(
-              "Shared build failed; falling back to individual builds.",
-              {
-                entryPoints,
-                reason: "CompileFailure",
-              },
-              Cause.fail(error),
-            ).pipe(Effect.as(Option.none<BatchCompilation>())),
           ),
         ),
       );
@@ -649,6 +770,33 @@ const entryMetafile = (
   return metafile;
 };
 
+const entryArtifact = (
+  path: Path.Path,
+  compilation: BatchCompilation,
+  source: string,
+  output: string,
+): CompiledModule.CompiledModule => {
+  const metafile = entryMetafile(path, compilation, source, output);
+  return {
+    url: pathToFileURL(output).href,
+    ...(compilation.receipt
+      ? { origin: { ...compilation.receipt, roots: [source] } }
+      : {}),
+    metafile,
+    warnings: Array.filter(compilation.warnings, (warning) => {
+      if (!warning.location) return true;
+      const file = path.resolve(
+        compilation.cwd,
+        CompilationPlugin.physicalPath(warning.location.file),
+      );
+      return (
+        compilation.metafile.inputs[file] === undefined ||
+        metafile.inputs[file] !== undefined
+      );
+    }),
+  };
+};
+
 /**
  * Compile a TypeScript entry point with esbuild via {@link bundleRequire}. The
  * temporary artifact lives under the source directory until scope closure, so
@@ -674,7 +822,10 @@ const entryMetafile = (
  */
 export const compile = Effect.fn("Bundler.compile")(function* (
   entryPoint: string,
-  options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
+  options?: {
+    readonly plugins?: ReadonlyArray<esbuild.Plugin>;
+    readonly profile?: "component-config";
+  },
 ): Effect.fn.Return<
   CompiledModule.CompiledModule,
   BundlerError,
@@ -689,32 +840,59 @@ export const compile = Effect.fn("Bundler.compile")(function* (
     !options?.plugins?.length &&
     HashSet.has(batch.value.entryPoints, path.resolve(entryPoint))
   ) {
-    const compilation = yield* batch.value.compilation;
+    const compilation = yield* batch.value.compilation.pipe(
+      Effect.catchTag(
+        "CompilationFailed",
+        Compilation.fail(path.resolve(entryPoint)),
+      ),
+    );
     if (Option.isSome(compilation)) {
       const entry = HashMap.get(
         compilation.value.entries,
         path.resolve(entryPoint),
       );
       if (Option.isSome(entry)) {
-        const metafile = entryMetafile(
+        return entryArtifact(
           path,
           compilation.value,
           entry.value.source,
           entry.value.output,
         );
-        return {
-          url: pathToFileURL(entry.value.output).href,
-          metafile,
-          warnings: compilation.value.warnings.filter(
-            (warning) =>
-              warning.location &&
-              metafile.inputs[
-                path.resolve(compilation.value.cwd, warning.location.file)
-              ],
-          ),
-        };
       }
     }
+  }
+
+  const live = yield* Effect.serviceOption(Compilation.Service);
+  if (Option.isSome(live)) {
+    const artifactScope = yield* Effect.serviceOption(
+      CompiledModule.ArtifactScope,
+    );
+    const scope = Option.isSome(artifactScope)
+      ? artifactScope.value
+      : yield* Scope.Scope;
+    const compilation = yield* compileLive(
+      live.value,
+      [entryPoint],
+      false,
+      options,
+    ).pipe(
+      Effect.provideService(Scope.Scope, scope),
+      Effect.catchTag(
+        "CompilationFailed",
+        Compilation.fail(path.resolve(entryPoint)),
+      ),
+    );
+    const entry = HashMap.get(compilation.entries, path.resolve(entryPoint));
+    if (Option.isNone(entry))
+      return yield* new BundlerError({
+        cause: { _tag: "MissingCompilationOutput", entryPoint },
+      });
+    return entryArtifact(
+      path,
+      compilation,
+      entry.value.source,
+      entry.value.output,
+    );
   }
 
   const buildResultRef = yield* Ref.make<CapturedBuildResult>({
@@ -724,6 +902,10 @@ export const compile = Effect.fn("Bundler.compile")(function* (
 
   const cwd = path.dirname(entryPoint);
   const selfReferences = yield* packageSelfReferencePatterns(cwd);
+  const nativePatterns =
+    options?.profile === "component-config"
+      ? [...selfReferences, CompilationPlugin.componentPattern]
+      : selfReferences;
   const artifactScope = yield* Effect.serviceOption(
     CompiledModule.ArtifactScope,
   );
@@ -744,7 +926,7 @@ export const compile = Effect.fn("Bundler.compile")(function* (
       ...tsconfigPathsToRegExp(
         loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
       ),
-      ...selfReferences,
+      ...nativePatterns,
     ],
     catch: (cause) => new BundlerError({ cause }),
   });
@@ -754,7 +936,7 @@ export const compile = Effect.fn("Bundler.compile")(function* (
         filepath: entryPoint,
         cwd,
         format: "esm",
-        notExternal: selfReferences,
+        notExternal: nativePatterns,
         require: (url) => url,
         getOutputFile: () => path.join(directory, "entry.mjs"),
         preserveTemporaryFile: true,
@@ -791,7 +973,10 @@ export const compile = Effect.fn("Bundler.compile")(function* (
 export const bundle = Effect.fn("Bundler.bundle")(
   (
     entryPoint: string,
-    options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
+    options?: {
+      readonly plugins?: ReadonlyArray<esbuild.Plugin>;
+      readonly profile?: "component-config";
+    },
   ) =>
     compile(entryPoint, options).pipe(
       Effect.flatMap(CompiledModule.load),
