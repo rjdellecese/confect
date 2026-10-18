@@ -69,6 +69,24 @@ export class UnstableInputs extends Schema.TaggedError<UnstableInputs>()(
   }
 }
 
+export class NativeOperationFailed extends Schema.TaggedError<NativeOperationFailed>()(
+  "CompilationNativeOperationFailed",
+  { context: Schema.Finite, cause: Schema.Unknown },
+) {
+  override get message() {
+    return `esbuild rebuild failed: ${String(this.cause)}`;
+  }
+}
+
+const diagnostic = (cause: unknown): esbuild.Message => ({
+  id: "confect:compilation-operation",
+  pluginName: "confect:revision",
+  text: String(cause),
+  location: null,
+  notes: [],
+  detail: cause,
+});
+
 export const relocateMetafile = (
   metafile: esbuild.Metafile,
   from: string,
@@ -150,6 +168,62 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   const identities = new WeakMap<object, Captured>();
   const prepared = yield* Ref.make(Option.none<Captured>());
   const failures = new WeakMap<object, CompilationState.Receipt>();
+  const failedCaptures = new WeakMap<object, CompilationState.Failed>();
+  const failureValues = (errors: ReadonlyArray<esbuild.Message>) =>
+    Effect.gen(function* () {
+      const hash = Hex.encode(
+        yield* crypto.digest(
+          "SHA-256",
+          new TextEncoder().encode(
+            CompilationState.fingerprintFailure(
+              Array.map(
+                errors,
+                ({ id, pluginName, text, location, notes }) => ({
+                  id,
+                  pluginName,
+                  text,
+                  location,
+                  notes,
+                }),
+              ),
+              yield* sources.captured,
+            ),
+          ),
+        ),
+      );
+      return Record.fromEntries(
+        Array.map(topology.roots, (root) => [root, hash]),
+      );
+    });
+  const observeFailure = (cause: unknown) =>
+    lock.withPermit(
+      Effect.gen(function* () {
+        yield* guards.check;
+        yield* sources.ensure;
+        yield* Ref.set(prepared, Option.none());
+        yield* Ref.set(failed, true);
+        yield* Ref.set(needsStabilization, false);
+        const receipt = {
+          context: topology.id,
+          revision: yield* Ref.updateAndGet(revision, (current) => current + 1),
+          roots: topology.roots,
+        };
+        const errors = [diagnostic(cause)];
+        const next = yield* failureValues(errors);
+        const previous = yield* Ref.getAndSet(values, next);
+        yield* publish({
+          ...receipt,
+          errors,
+          warnings: [],
+          affectedRoots: CompilationState.changedRoots(
+            previous,
+            next,
+            topology.roots,
+          ),
+        });
+        return new CompilationState.Failed({ cause, receipt });
+      }),
+    );
   const capture = Effect.fn("CompilationContext.capture")(
     function* (result: esbuild.BuildResult) {
       yield* Ref.set(prepared, Option.none());
@@ -175,14 +249,20 @@ export const make = Effect.fn("CompilationContext.make")(function* (
         roots: topology.roots,
       };
       const metafile = result.metafile ? normalize(result.metafile) : undefined;
-      if (result.errors.length === 0 && (!metafile || !result.outputFiles)) {
-        yield* guards.check;
-        return yield* new IncompleteCompilation({
-          context: topology.id,
-          reason: metafile ? "MissingOutputFiles" : "MissingMetafile",
-        });
-      }
-      for (const error of result.errors) failures.set(error, receipt);
+      const incomplete =
+        result.errors.length === 0 && (!metafile || !result.outputFiles)
+          ? new IncompleteCompilation({
+              context: topology.id,
+              reason: metafile ? "MissingOutputFiles" : "MissingMetafile",
+            })
+          : undefined;
+      const errors = incomplete ? [diagnostic(incomplete)] : result.errors;
+      if (incomplete)
+        failedCaptures.set(
+          result,
+          new CompilationState.Failed({ cause: incomplete, receipt }),
+        );
+      for (const error of errors) failures.set(error, receipt);
       const hashes = Record.fromEntries(
         yield* Effect.forEach(result.outputFiles ?? [], (file) =>
           crypto
@@ -190,7 +270,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
             .pipe(Effect.map((hash) => [file.path, Hex.encode(hash)] as const)),
         ),
       );
-      if (result.outputFiles && result.errors.length === 0) {
+      if (result.outputFiles && errors.length === 0) {
         if (
           !CompilationState.sameValues(yield* Ref.get(latestHashes), hashes)
         ) {
@@ -208,32 +288,8 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       }
       const previous = yield* Ref.get(values);
       const next = yield* Effect.gen(function* () {
-        if (!metafile || !result.outputFiles || result.errors.length > 0) {
-          const errors = Array.map(
-            result.errors,
-            ({ id, pluginName, text, location, notes }) => ({
-              id,
-              pluginName,
-              text,
-              location,
-              notes,
-            }),
-          );
-          const failureHash = Hex.encode(
-            yield* crypto.digest(
-              "SHA-256",
-              new TextEncoder().encode(
-                CompilationState.fingerprintFailure(
-                  errors,
-                  yield* sources.captured,
-                ),
-              ),
-            ),
-          );
-          return Record.fromEntries(
-            Array.map(topology.roots, (root) => [root, failureHash]),
-          );
-        }
+        if (!metafile || !result.outputFiles || errors.length > 0)
+          return yield* failureValues(errors);
         const raw = result.metafile;
         if (!raw)
           return yield* new IncompleteCompilation({
@@ -309,9 +365,8 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       yield* guards.check;
       identities.set(result, captured);
       yield* Ref.set(values, next);
-      if (result.errors.length === 0)
-        yield* Ref.set(prepared, Option.some(captured));
-      yield* Ref.set(failed, result.errors.length > 0);
+      if (errors.length === 0) yield* Ref.set(prepared, Option.some(captured));
+      yield* Ref.set(failed, errors.length > 0);
       yield* Ref.set(needsStabilization, false);
       yield* publish({
         ...receipt,
@@ -321,7 +376,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
           next,
           topology.roots,
         ),
-        errors: result.errors,
+        errors,
         warnings: result.warnings,
       });
     },
@@ -355,11 +410,13 @@ export const make = Effect.fn("CompilationContext.make")(function* (
                   Effect.runPromiseWith(Context.empty())(
                     capture(result).pipe(
                       Effect.tapError((cause) =>
-                        publishFailure(
-                          Schema.is(BundlerError)(cause)
+                        Effect.gen(function* () {
+                          const failure = Schema.is(BundlerError)(cause)
                             ? cause
-                            : new BundlerError({ cause }),
-                        ),
+                            : new BundlerError({ cause });
+                          yield* Ref.set(terminalFailure, Option.some(failure));
+                          yield* publishFailure(failure);
+                        }),
                       ),
                     ),
                   ),
@@ -383,6 +440,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
         try: () => native.rebuild(),
         catch: (cause) => new BundlerError({ cause }),
       }).pipe(Effect.result);
+      yield* ensureActive;
       yield* guards.ensure;
       yield* sources.ensure.pipe(
         Effect.mapError((cause) => new BundlerError({ cause })),
@@ -394,8 +452,12 @@ export const make = Effect.fn("CompilationContext.make")(function* (
           cause === null ||
           !("errors" in cause) ||
           !globalThis.Array.isArray(cause.errors)
-        )
-          return yield* outcome.failure;
+        ) {
+          const failure = yield* observeFailure(
+            new NativeOperationFailed({ context: topology.id, cause }),
+          );
+          return yield* failure;
+        }
         if (
           Array.some(
             cause.errors,
@@ -415,11 +477,36 @@ export const make = Effect.fn("CompilationContext.make")(function* (
             ),
           ),
         );
-        return yield* Option.isSome(receipt)
-          ? new CompilationState.Failed({ cause, receipt: receipt.value })
-          : outcome.failure;
+        if (Option.isSome(receipt))
+          return yield* new CompilationState.Failed({
+            cause,
+            receipt: receipt.value,
+          });
+        const failure = yield* observeFailure(
+          new NativeOperationFailed({ context: topology.id, cause }),
+        );
+        return yield* failure;
       }
       if (provisional.has(outcome.success)) continue;
+      const capturedFailure = failedCaptures.get(outcome.success);
+      if (capturedFailure) return yield* capturedFailure;
+      if (
+        !outcome.success.metafile ||
+        !outcome.success.outputFiles ||
+        !identities.has(outcome.success)
+      ) {
+        const failure = yield* observeFailure(
+          new IncompleteCompilation({
+            context: topology.id,
+            reason: !outcome.success.metafile
+              ? "MissingMetafile"
+              : !outcome.success.outputFiles
+                ? "MissingOutputFiles"
+                : "MissingRevision",
+          }),
+        );
+        return yield* failure;
+      }
       return outcome.success;
     }
     return yield* new BundlerError({

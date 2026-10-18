@@ -1,4 +1,5 @@
-import { describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, it } from "@effect/vitest";
+import { vi } from "vitest";
 import * as Path from "effect/Path";
 import * as Effect from "effect/Effect";
 import * as Context from "effect/Context";
@@ -15,7 +16,14 @@ import * as Result from "effect/Result";
 import * as CompilationState from "@confect/cli/CompilationState";
 import * as CompilationContext from "@confect/cli/CompilationContext";
 import * as CompilationInputs from "@confect/cli/CompilationInputs";
-import type * as esbuild from "esbuild";
+import * as esbuild from "esbuild";
+
+vi.mock("esbuild", (importOriginal) =>
+  importOriginal<typeof esbuild>().then((actual) => ({
+    ...actual,
+    context: vi.fn(actual.context),
+  })),
+);
 
 const preparedFixture = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -90,6 +98,95 @@ const preparedFixture = Effect.gen(function* () {
 });
 
 describe("CompilationContext", () => {
+  it.live.each(["operation", "metadata"] as const)(
+    "recovers from unsolicited native %s failures on a later edit",
+    (kind) =>
+      Effect.gen(function* () {
+        const fixture = yield* preparedFixture;
+        const helperDirectory = fixture.path.join(fixture.root, "shared");
+        yield* fixture.fs.makeDirectory(helperDirectory);
+        const helper = fixture.path.join(helperDirectory, "helper.ts");
+        yield* fixture.fs.writeFileString(helper, "export default 2;");
+        let broken = false;
+        const factory = vi.mocked(esbuild.context);
+        const original = factory.getMockImplementation();
+        assert(original);
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
+        yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            factory.mockImplementation((options) =>
+              runPromise(
+                Effect.promise(() => original(options)).pipe(
+                  Effect.map((actual) => ({
+                    ...actual,
+                    rebuild: () =>
+                      broken && kind === "operation"
+                        ? Promise.reject(
+                            new Error("watcher service unavailable"),
+                          )
+                        : actual.rebuild(),
+                  })),
+                ),
+              ),
+            ),
+          ),
+          () => Effect.sync(() => factory.mockImplementation(original)),
+        );
+        const fatal = yield* Queue.unbounded<unknown>();
+        const guards = yield* CompilationInputs.make();
+        yield* guards.trackSource(fixture.entry);
+        const context = yield* fixture.make(
+          [
+            {
+              name: "incomplete-watch-result",
+              setup(build) {
+                build.onEnd((result) => {
+                  if (broken && kind === "metadata")
+                    Reflect.deleteProperty(result, "metafile");
+                });
+              },
+            },
+          ],
+          fixture.fs,
+          "Watch",
+          guards,
+          (error) => Queue.offer(fatal, error).pipe(Effect.asVoid),
+        );
+        yield* context.consume();
+        yield* Queue.take(fixture.events);
+        broken = true;
+        yield* fixture.fs.writeFileString(
+          fixture.entry,
+          'export { default } from "./shared/helper";',
+        );
+        const failed = yield* Queue.take(fixture.events);
+        expect(failed.errors[0]?.text).toContain(
+          kind === "operation"
+            ? "watcher service unavailable"
+            : "esbuild completed without metafile",
+        );
+        expect(yield* context.preparedRevision).toEqual(Option.none());
+        expect(yield* Queue.poll(fatal)).toEqual(Option.none());
+        broken = false;
+        yield* fixture.fs.writeFileString(helper, "export default 3;");
+        const recovered = yield* Queue.take(fixture.events);
+        expect(recovered.errors).toEqual([]);
+        expect(recovered.affectedRoots).toEqual([fixture.entry]);
+        const before = yield* Ref.get(fixture.builds);
+        const snapshot = yield* context.consume(recovered);
+        expect(yield* Ref.get(fixture.builds)).toBe(before);
+        expect(
+          yield* fixture.fs.readFileString(
+            Object.keys(snapshot.metafile.outputs)[0] ?? "",
+          ),
+        ).toContain("= 3;");
+        expect(yield* Queue.poll(fatal)).toEqual(Option.none());
+      }).pipe(
+        Effect.scoped,
+        Effect.timeout("10 seconds"),
+        Effect.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+      ),
+  );
   it.live(
     "surfaces bounded unsolicited stabilization failure and rejects prior captures",
     () =>
@@ -659,12 +756,26 @@ describe("CompilationContext", () => {
         expect(String(failure.cause)).toContain(
           "esbuild completed without metafile",
         );
-        expect(yield* Ref.get(events)).toEqual([]);
+        expect(yield* Ref.get(events)).toEqual([
+          expect.objectContaining({
+            errors: [
+              expect.objectContaining({
+                text: expect.stringContaining(
+                  "esbuild completed without metafile",
+                ),
+              }),
+            ],
+          }),
+        ]);
+        expect(yield* context.preparedRevision).toEqual(Option.none());
         incomplete = false;
         yield* fs.writeFileString(entry, "export default 2;");
         const snapshot = yield* context.consume();
         expect(snapshot.metafile.outputs).not.toEqual({});
-        expect(yield* Ref.get(events)).not.toEqual([]);
+        expect((yield* Ref.get(events)).at(-1)?.errors).toEqual([]);
+        expect(yield* context.preparedRevision).toEqual(
+          Option.some(snapshot.receipt),
+        );
       }).pipe(
         Effect.scoped,
         Effect.timeout("10 seconds"),
