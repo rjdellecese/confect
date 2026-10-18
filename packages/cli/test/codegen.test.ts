@@ -46,6 +46,28 @@ vi.mock("esbuild", (importOriginal) =>
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect.each(["http.ts", "crons.ts", "auth.ts"])(
+      "checks optional module %s without evaluating it and recovers after errors",
+      (file) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write(`confect/${file}`, "export default ;");
+          const failed = yield* project
+            .provide(codegenHandler)
+            .pipe(Effect.result);
+          assert(Result.isFailure(failed));
+          expect(failed.failure).toMatchObject({
+            _tag: "BundleFailedError",
+            file,
+          });
+          yield* project.write(
+            `confect/${file}`,
+            'import "./_generated/registeredFunctions/notes";\nimport "../convex/notes";\nthrow new Error("Optional runtime must not execute");\nexport default {};\n',
+          );
+          yield* project.provide(codegenHandler);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
     it.effect.each([
       "schema.spec.ts",
       "http.spec.ts",
@@ -142,7 +164,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             Project.impl.replace('"list"', '"latest"'),
           );
           const bundle = yield* Effect.acquireRelease(
-            Effect.sync(() => vi.spyOn(Bundler, "bundle")),
+            Effect.sync(() => vi.spyOn(Bundler, "compile")),
             (spy) => Effect.sync(() => spy.mockRestore()),
           );
           const next = yield* project.provide(
@@ -516,10 +538,10 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
           const active = { spec: 0, impl: 0 };
           const maximum = { spec: 0, impl: 0 };
           let completedSpecs = 0;
-          const original = Bundler.bundle;
+          const original = Bundler.compile;
           yield* Effect.acquireRelease(
             Effect.sync(() =>
-              vi.spyOn(Bundler, "bundle").mockImplementation((entry) =>
+              vi.spyOn(Bundler, "compile").mockImplementation((entry) =>
                 Effect.gen(function* () {
                   const phase = entry.endsWith(".spec.ts")
                     ? "spec"
@@ -568,7 +590,7 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
           const path = yield* Path.Path;
           const project = yield* Project.make;
           const bundle = yield* Effect.acquireRelease(
-            Effect.sync(() => vi.spyOn(Bundler, "bundle")),
+            Effect.sync(() => vi.spyOn(Bundler, "compile")),
             (spy) => Effect.sync(() => spy.mockRestore()),
           );
           yield* codegenHandler.pipe(

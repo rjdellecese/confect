@@ -1,18 +1,25 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import { fork } from "node:child_process";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type * as ChildProcess from "node:child_process";
 import { vi } from "vitest";
 import * as Effect from "effect/Effect";
+import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Equal from "effect/Equal";
 import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
 import * as HashSet from "effect/HashSet";
 import * as Path from "effect/Path";
 import * as Result from "effect/Result";
 import * as References from "effect/References";
+import * as Logger from "effect/Logger";
 import * as Schema from "effect/Schema";
 import * as Evaluation from "@confect/cli/Evaluation";
+import * as EvaluationSession from "@confect/cli/EvaluationSession";
+import * as Bundler from "@confect/cli/Bundler";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { FunctionPaths } from "@confect/cli/FunctionPaths";
@@ -20,6 +27,7 @@ import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import { SpecModulePath } from "@confect/cli/SpecModulePath";
+import { TableModulePath } from "@confect/cli/TableModulePath";
 import * as Project from "./integration/Project";
 
 vi.mock("node:child_process", (importOriginal) =>
@@ -61,6 +69,174 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
   };
 
   it.effect(
+    "generates and updates declarations from prepared artifacts with no child compiler",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const path = yield* Path.Path;
+        const fs = yield* FileSystem.FileSystem;
+        const original = yield* Effect.promise(() =>
+          vi.importActual<typeof ChildProcess>("node:child_process"),
+        );
+        yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            vi.mocked(fork).mockImplementation((filename) =>
+              original.fork(filename, {
+                serialization: "advanced",
+                env: {
+                  ...process.env,
+                  ESBUILD_BINARY_PATH: path.join(project.root, "package.json"),
+                },
+              }),
+            ),
+          ),
+          () =>
+            Effect.sync(() =>
+              vi.mocked(fork).mockImplementation(original.fork),
+            ),
+        );
+        const isolated = `\nif (process.pid === ${process.pid}) throw new Error("User module ran in coordinator");\n`;
+        yield* project.write(
+          "confect/tables/notes.ts",
+          Project.table + isolated,
+        );
+        yield* project.write("confect/notes.spec.ts", Project.spec + isolated);
+        yield* project.write("confect/notes.impl.ts", Project.impl + isolated);
+        yield* fs.makeDirectory(path.join(project.root, "convex", "waitlist"));
+        yield* project.write(
+          "convex/waitlist/convex.config.ts",
+          'import { defineComponent } from "convex/server";\nexport default defineComponent("waitlist");\n' +
+            isolated,
+        );
+        yield* project.write(
+          "convex/convex.config.ts",
+          'import { defineApp } from "convex/server";\nimport waitlist from "./waitlist/convex.config";\nconst app = defineApp();\napp.use(waitlist);\nexport default app;\n' +
+            isolated,
+        );
+        for (const file of ["http.ts", "crons.ts", "auth.ts"]) {
+          yield* project.write(
+            `confect/${file}`,
+            'throw new Error("Optional modules must only compile");\nexport default {};\n',
+          );
+        }
+        const snapshot = yield* project.provide(Evaluation.generateSnapshot);
+        const first = yield* project.generatedFiles;
+        expect(
+          first[path.join("confect", "_generated", "components.ts")],
+        ).toContain('"waitlist"');
+        expectWorkersExited();
+        expect(
+          Equal.equals(
+            yield* project.provide(Evaluation.loadPreviousFunctionPaths),
+            GenerationSnapshot.functionPaths(snapshot),
+          ),
+        ).toBe(true);
+        yield* project.write(
+          "confect/notes.spec.ts",
+          Project.spec.replace('name: "list"', 'name: "latest"') + isolated,
+        );
+        yield* project.write(
+          "confect/notes.impl.ts",
+          Project.impl.replace('"list"', '"latest"') + isolated,
+        );
+        yield* project.write(
+          "confect/tables/notes.ts",
+          Project.table.replace(
+            "text: Schema.String",
+            "text: Schema.String, archived: Schema.Boolean",
+          ) + isolated,
+        );
+        const next = yield* project.provide(
+          Evaluation.updateDeclarations(
+            snapshot,
+            [
+              {
+                _tag: "Spec",
+                relativePath: SpecModulePath.make("notes.spec.ts"),
+              },
+              {
+                _tag: "Table",
+                relativePath: TableModulePath.make("tables/notes.ts"),
+              },
+            ],
+            [ImplModulePath.make("notes.impl.ts")],
+          ),
+        );
+        expect(
+          [...GenerationSnapshot.functionPaths(next)].map((fn) => fn.name),
+        ).toEqual(["latest"]);
+        const updated = yield* project.generatedFiles;
+        expect(
+          yield* Project.writtenFiles(
+            project.provide(Evaluation.generateSnapshot),
+          ),
+        ).toEqual([]);
+        expect(yield* project.generatedFiles).toEqual(updated);
+        expectWorkersExited();
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
+
+  it.effect(
+    "keeps batch and individual artifacts through later RPC phases and worker termination",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const path = yield* Path.Path;
+        const fs = yield* FileSystem.FileSystem;
+        yield* project.provide(Evaluation.generateSnapshot);
+        const original = yield* Effect.promise(() =>
+          vi.importActual<typeof ChildProcess>("node:child_process"),
+        );
+        const artifacts: string[] = [];
+        const presentAtExit: boolean[] = [];
+        vi.mocked(fork).mockImplementationOnce((...args) => {
+          const child = original.fork(...args);
+          child.once("exit", () =>
+            presentAtExit.push(...artifacts.map(existsSync)),
+          );
+          return child;
+        });
+        yield* project.provide(
+          Effect.gen(function* () {
+            const entry = path.join(
+              project.root,
+              "confect",
+              "_generated",
+              "spec.ts",
+            );
+            const { client, requestContext } =
+              yield* EvaluationSession.ModuleEvaluation;
+            const batch = yield* Bundler.withBatch(
+              [entry],
+              Bundler.compile(entry),
+            ).pipe(Effect.scoped);
+            const individual = yield* Bundler.compile(entry).pipe(
+              Effect.scoped,
+            );
+            artifacts.push(
+              fileURLToPath(batch.url),
+              fileURLToPath(individual.url),
+            );
+            for (const artifact of [batch, individual]) {
+              expect(yield* fs.exists(fileURLToPath(artifact.url))).toBe(true);
+              const previous = yield* client.Previous({
+                ...requestContext,
+                url: artifact.url,
+              });
+              expect([...previous].map((fn) => fn.name)).toEqual(["list"]);
+            }
+          }).pipe(EvaluationSession.provide),
+        );
+        expect(presentAtExit).toEqual([true, true]);
+        for (const artifact of artifacts)
+          expect(yield* fs.exists(artifact)).toBe(false);
+        expectWorkersExited();
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
+
+  it.effect(
     "validates coordinator-compiled artifacts without a compiler in the evaluator",
     () =>
       Effect.gen(function* () {
@@ -95,7 +271,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
     { level: "Debug", reason: "UnattributedWarnings" },
     { level: "Info", reason: "UnattributedWarnings" },
   ] as const)(
-    "honors $level logging for $reason inside the child evaluator",
+    "honors $level logging for $reason in the compilation coordinator",
     ({ level, reason }) =>
       Effect.gen(function* () {
         const project = yield* setup;
@@ -112,6 +288,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
         );
         const closed = yield* Deferred.make<void>();
         const output: string[] = [];
+        const events: Logger.Options<unknown>[] = [];
         vi.mocked(fork).mockImplementationOnce((filename) => {
           const child = original.fork(filename, {
             serialization: "advanced",
@@ -128,22 +305,34 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           child.once("close", () => Deferred.doneUnsafe(closed, Effect.void));
           return child;
         });
-        const result = yield* project
-          .provide(Evaluation.generateSnapshot)
-          .pipe(
-            Effect.provideService(References.MinimumLogLevel, level),
-            Effect.result,
-          );
+        const result = yield* project.provide(Evaluation.generateSnapshot).pipe(
+          Effect.provideService(References.MinimumLogLevel, level),
+          Effect.provide(
+            Logger.layer([
+              Logger.make((event) => {
+                events.push(event);
+              }),
+            ]),
+          ),
+          Effect.result,
+        );
         yield* Deferred.await(closed).pipe(Effect.timeout("10 seconds"));
         expect(Result.isFailure(result)).toBe(reason === "CompileFailure");
-        const text = output.join("");
+        expect(output.join("")).not.toContain(
+          "falling back to individual builds",
+        );
+        const text = yield* Schema.encodeEffect(
+          Schema.fromJsonString(Schema.Unknown),
+        )(events.map((event) => event.message));
         if (level === "Debug") {
           expect(text).toContain("falling back to individual builds");
           expect(text).toContain(reason);
           expect(text).toContain("notes.ts");
           if (reason === "CompileFailure") {
             expect(text.match(/Shared build failed/g)).toHaveLength(1);
-            expect(text).toContain("Unexpected");
+            expect(
+              events.map((event) => Cause.pretty(event.cause)).join("\n"),
+            ).toContain("Unexpected");
           }
         } else {
           expect(text).not.toContain("falling back to individual builds");
@@ -262,6 +451,36 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
   );
 
   it.effect(
+    "ignores unbuildable previous specs but reports invalid exports and worker exits",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        yield* project.provide(Evaluation.generateSnapshot);
+        yield* project.write(
+          "confect/_generated/spec.ts",
+          'import "./missing";\nexport default {};\n',
+        );
+        expect(
+          HashSet.size(
+            yield* project.provide(Evaluation.loadPreviousFunctionPaths),
+          ),
+        ).toBe(0);
+        for (const source of ["export default {};", "process.exit(23);"]) {
+          yield* project.write("confect/_generated/spec.ts", source);
+          const failed = yield* project
+            .provide(Evaluation.loadPreviousFunctionPaths)
+            .pipe(Effect.result);
+          assert(Result.isFailure(failed));
+          expect(failed.failure.diagnostic).toContain(
+            source.startsWith("process") ? "23" : "valid Spec",
+          );
+          expectWorkersExited();
+        }
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
+
+  it.effect(
     "isolates successive imports and disposes failed evaluations",
     () =>
       Effect.gen(function* () {
@@ -295,25 +514,38 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
     { timeout: 30000 },
   );
 
-  it.effect(
-    "recovers after a user module exits its evaluator",
-    () =>
+  it.effect.each(["validate", "generate", "update"] as const)(
+    "recovers after a user module exits its evaluator during %s",
+    (operation) =>
       Effect.gen(function* () {
         const project = yield* setup;
-        yield* project.provide(Evaluation.generate);
+        const snapshot = yield* project.provide(Evaluation.generateSnapshot);
         yield* project.write(
           "confect/notes.impl.ts",
           `${Project.impl}\nprocess.exit(23);\n`,
         );
         const paths = [ImplModulePath.make("notes.impl.ts")];
-        const failed = yield* project
-          .provide(Evaluation.validate(paths))
-          .pipe(Effect.result);
+        const run =
+          operation === "validate"
+            ? Evaluation.validate(paths).pipe(Effect.asVoid)
+            : operation === "generate"
+              ? Evaluation.generateSnapshot.pipe(Effect.asVoid)
+              : Evaluation.updateDeclarations(
+                  snapshot,
+                  [
+                    {
+                      _tag: "Spec",
+                      relativePath: SpecModulePath.make("notes.spec.ts"),
+                    },
+                  ],
+                  paths,
+                ).pipe(Effect.asVoid);
+        const failed = yield* project.provide(run).pipe(Effect.result);
         assert(Result.isFailure(failed));
         expect(failed.failure.diagnostic).toContain("23");
         expectWorkersExited();
         yield* project.write("confect/notes.impl.ts", Project.impl);
-        yield* project.provide(Evaluation.validate(paths));
+        yield* project.provide(run);
         expectWorkersExited();
       }).pipe(Effect.scoped),
     { timeout: 30000 },
@@ -343,12 +575,12 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
     { timeout: 15000 },
   );
 
-  it.effect(
-    "terminates an evaluator stuck in synchronous user code",
-    () =>
+  it.effect.each(["validate", "generate", "update"] as const)(
+    "terminates an evaluator stuck in synchronous user code during %s",
+    (operation) =>
       Effect.gen(function* () {
         const project = yield* setup;
-        yield* project.provide(Evaluation.generate);
+        const snapshot = yield* project.provide(Evaluation.generateSnapshot);
         yield* project.write(
           "confect/notes.impl.ts",
           `${Project.impl}\nprocess.stdout.write("EVALUATION_BLOCKED");\nwhile (true) {}\n`,
@@ -370,9 +602,23 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
           });
           return child;
         });
-        const fiber = yield* project
-          .provide(Evaluation.validate([ImplModulePath.make("notes.impl.ts")]))
-          .pipe(Effect.forkScoped);
+        const paths = [ImplModulePath.make("notes.impl.ts")];
+        const run =
+          operation === "validate"
+            ? Evaluation.validate(paths).pipe(Effect.asVoid)
+            : operation === "generate"
+              ? Evaluation.generateSnapshot.pipe(Effect.asVoid)
+              : Evaluation.updateDeclarations(
+                  snapshot,
+                  [
+                    {
+                      _tag: "Spec",
+                      relativePath: SpecModulePath.make("notes.spec.ts"),
+                    },
+                  ],
+                  paths,
+                ).pipe(Effect.asVoid);
+        const fiber = yield* project.provide(run).pipe(Effect.forkScoped);
         yield* Deferred.await(blocked).pipe(Effect.timeout("10 seconds"));
         yield* Fiber.interrupt(fiber).pipe(Effect.timeout("10 seconds"));
         expectWorkersExited();

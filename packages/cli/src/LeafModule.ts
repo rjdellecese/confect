@@ -546,7 +546,7 @@ export const loadAll = Effect.gen(function* () {
  * runtime, surfacing as a confusing `Refs.make` error rather than a
  * codegen-time diagnostic.
  */
-const validateOrphanImpls = Effect.fnUntraced(function* (
+export const validateOrphanImpls = Effect.fnUntraced(function* (
   specFiles: ReadonlyArray<string>,
 ) {
   const fs = yield* FileSystem.FileSystem;

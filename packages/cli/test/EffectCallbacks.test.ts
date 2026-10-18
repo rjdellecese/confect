@@ -67,6 +67,7 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
         functionPaths: FunctionPaths.FunctionPaths;
       },
       | CodegenError.CodegenError
+      | EvaluationError
       | GroupPath.GroupModulePathIsNotATypeScriptFileError
       | PlatformError,
       GenerationServices | ProjectRoot
