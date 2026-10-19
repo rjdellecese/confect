@@ -172,72 +172,80 @@ const outcome = (result: Result.Result<unknown, unknown>) =>
       }
     : { _tag: "Failure" as const, diagnostic: String(result.failure) };
 
-export const run = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const rows = yield* Effect.forEach(fixtures, (fixture) =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const root = yield* fs.makeTempDirectoryScoped({
-          directory: path.resolve(
-            import.meta.dirname,
-            "../../../../packages/cli/test",
-          ),
-          prefix: ".module-prototype-",
-        });
-        for (const [relative, source] of Object.entries(fixture.files)) {
-          const file = path.join(root, relative);
-          yield* fs.makeDirectory(path.dirname(file), { recursive: true });
-          yield* fs.writeFileString(file, source);
-        }
-        const entry = path.join(root, "entry.ts");
-        const baseline = outcome(
-          yield* Effect.scoped(
-            Effect.gen(function* () {
-              const artifact = yield* Bundler.compile(entry);
-              return yield* Runner.evaluateNative({
-                _tag: "Native",
-                url: artifact.url,
-                exportName: "probe",
-                invoke: fixture.invoke ?? false,
-              });
-            }).pipe(
-              Effect.provide(
-                Compilation.layer({ mode: "Once", ownedDirectories: [] }),
-              ),
+export const runWith = <E, R>(
+  evaluate: (entry: string, invoke: boolean) => Effect.Effect<unknown, E, R>,
+) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const rows = yield* Effect.forEach(fixtures, (fixture) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const root = yield* fs.makeTempDirectoryScoped({
+            directory: path.resolve(
+              import.meta.dirname,
+              "../../../../packages/cli/test",
             ),
-          ).pipe(Effect.timeout("10 seconds"), Effect.result),
-        );
-        const candidate = outcome(
-          yield* Effect.scoped(
-            Effect.gen(function* () {
-              const compiler = yield* Compiler.make(entry);
-              const prepared = yield* compiler.compile;
-              yield* prepared.validate;
-              const value = yield* Runner.evaluate({
-                snapshot: prepared.snapshot,
-                exportName: "probe",
-                invoke: fixture.invoke ?? false,
-              });
-              yield* prepared.validate;
-              return value;
-            }),
-          ).pipe(Effect.timeout("10 seconds"), Effect.result),
-        );
-        const expected = (value: ReturnType<typeof outcome>) =>
-          fixture.reject
-            ? value._tag === "Failure"
-            : value._tag === "Success" &&
-              isDeepStrictEqual(value.value, fixture.value);
-        return {
-          name: fixture.name,
-          oracleMatchesFixture: expected(baseline),
-          compatible: expected(baseline) && expected(candidate),
-          baseline,
-          candidate,
-        };
-      }),
-    ),
-  );
-  return { qualified: rows.every((row) => row.compatible), rows };
-});
+            prefix: ".module-prototype-",
+          });
+          for (const [relative, source] of Object.entries(fixture.files)) {
+            const file = path.join(root, relative);
+            yield* fs.makeDirectory(path.dirname(file), { recursive: true });
+            yield* fs.writeFileString(file, source);
+          }
+          const entry = path.join(root, "entry.ts");
+          const baseline = outcome(
+            yield* Effect.scoped(
+              Effect.gen(function* () {
+                const artifact = yield* Bundler.compile(entry);
+                return yield* Runner.evaluateNative({
+                  _tag: "Native",
+                  url: artifact.url,
+                  exportName: "probe",
+                  invoke: fixture.invoke ?? false,
+                });
+              }).pipe(
+                Effect.provide(
+                  Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+                ),
+              ),
+            ).pipe(Effect.timeout("10 seconds"), Effect.result),
+          );
+          const candidate = outcome(
+            yield* Effect.scoped(evaluate(entry, fixture.invoke ?? false)).pipe(
+              Effect.timeout("10 seconds"),
+              Effect.result,
+            ),
+          );
+          const expected = (value: ReturnType<typeof outcome>) =>
+            fixture.reject
+              ? value._tag === "Failure"
+              : value._tag === "Success" &&
+                isDeepStrictEqual(value.value, fixture.value);
+          return {
+            name: fixture.name,
+            oracleMatchesFixture: expected(baseline),
+            compatible: expected(baseline) && expected(candidate),
+            baseline,
+            candidate,
+          };
+        }),
+      ),
+    );
+    return { qualified: rows.every((row) => row.compatible), rows };
+  });
+
+export const run = runWith((entry, invoke) =>
+  Effect.gen(function* () {
+    const compiler = yield* Compiler.make(entry);
+    const prepared = yield* compiler.compile;
+    yield* prepared.validate;
+    const value = yield* Runner.evaluate({
+      snapshot: prepared.snapshot,
+      exportName: "probe",
+      invoke,
+    });
+    yield* prepared.validate;
+    return value;
+  }),
+);

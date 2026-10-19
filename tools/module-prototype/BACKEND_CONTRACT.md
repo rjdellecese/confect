@@ -225,6 +225,13 @@ would not satisfy that condition.
 
 ## Qualification decision
 
+The subsequent [cold Rspack experiment](./README.md#rspack-cold-compilation-experiment)
+matches all fifteen existing semantic oracle cases using public APIs. It also
+exercises exact cold-capture validation and demonstrates why incremental
+callbacks alone are not a complete receipt. This is positive feasibility
+evidence, not completion of the qualification gates below; the adapter remains
+Linux-only and outside production transaction handling.
+
 Prefer assessing the supported filesystem boundary over extending a compiler or
 building another JavaScript loader. Rspack is a candidate for a native integration;
 webpack provides a stable public-API comparison. Neither is selected for production.

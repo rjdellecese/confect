@@ -85,6 +85,8 @@
       "files": [
         "packages/cli/src/EvaluationSession.ts",
         "tools/module-prototype/src/Runner.ts",
+        "tools/module-prototype/src/RspackInputs.ts",
+        "tools/module-prototype/test/RspackInputs.test.ts",
         "packages/cli/test/Evaluation.test.ts",
         "packages/cli/src/DevSupervisor.ts",
         "packages/cli/test/DevSupervisor.test.ts",
@@ -92,6 +94,15 @@
       ],
       "rules": {
         "effecttsgo/node-builtin-import": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/module-prototype/src/RspackInputs.ts",
+        "tools/module-prototype/test/RspackInputs.test.ts"
+      ],
+      "rules": {
+        "effecttsgo/async-function": "off"
       }
     },
     {
