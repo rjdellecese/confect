@@ -48,6 +48,47 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
     it.effect(
+      "passes inherited aliases and per-entry options through one resolved config",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.makeInheritedConfigProfiles;
+          const path = yield* Path.Path;
+          vi.mocked(esbuild.build).mockClear();
+          vi.mocked(esbuild.context).mockClear();
+          yield* project.provide(codegenHandler);
+          const generated = yield* project.generatedFiles;
+          expect(generated[path.join("convex", "notes.ts")]).toContain(
+            "export const list =",
+          );
+          expect(
+            generated[path.join("convex", "nested", "other.ts")],
+          ).toContain("export const other =");
+          expect(vi.mocked(esbuild.build)).not.toHaveBeenCalled();
+          expect(vi.mocked(esbuild.context)).toHaveBeenCalledTimes(3);
+          const factories = vi
+            .mocked(esbuild.context)
+            .mock.calls.map(([options]) => {
+              expect(options).not.toHaveProperty("tsconfig");
+              assert(typeof options.tsconfigRaw === "object");
+              expect(options.tsconfigRaw).not.toHaveProperty("extends");
+              expect(options.tsconfigRaw.compilerOptions?.baseUrl).toBe(
+                project.root,
+              );
+              expect(
+                options.tsconfigRaw.compilerOptions?.target?.toLowerCase(),
+              ).toBe("es2022");
+              return options.tsconfigRaw.compilerOptions?.jsxFactory ?? "";
+            });
+          expect(factories.sort()).toEqual(
+            ["rootFactory.h", "rootFactory.h", "nestedFactory.h"].sort(),
+          );
+          yield* project.provide(codegenHandler);
+          expect(yield* project.generatedFiles).toEqual(generated);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "partitions shared helpers by each entry's selected config",
       () =>
         Effect.gen(function* () {
@@ -70,14 +111,14 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           expect(
             vi
               .mocked(esbuild.context)
-              .mock.calls.map(([options]) => options.tsconfig ?? "")
+              .mock.calls.map(([options]) => {
+                expect(options).not.toHaveProperty("tsconfig");
+                assert(typeof options.tsconfigRaw === "object");
+                return options.tsconfigRaw.compilerOptions?.jsxFactory ?? "";
+              })
               .sort(),
           ).toEqual(
-            [
-              path.join(project.root, "tsconfig.json"),
-              path.join(project.root, "tsconfig.json"),
-              path.join(project.root, "confect/nested/tsconfig.json"),
-            ].sort(),
+            ["rootFactory.h", "rootFactory.h", "nestedFactory.h"].sort(),
           );
         }).pipe(Effect.scoped),
       { timeout: 30000 },
@@ -114,15 +155,14 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           yield* project.provide(codegenHandler);
           expect(yield* project.generatedFiles).toEqual(baseline);
           expect(vi.mocked(esbuild.build)).not.toHaveBeenCalled();
-          const selected = path.join(
-            project.root,
-            ignored === "ancestor" ? "confect/tsconfig.json" : "tsconfig.json",
-          );
           expect(vi.mocked(esbuild.context).mock.calls.length).toBeGreaterThan(
             0,
           );
-          for (const [options] of vi.mocked(esbuild.context).mock.calls)
-            expect(options.tsconfig).toBe(selected);
+          for (const [options] of vi.mocked(esbuild.context).mock.calls) {
+            expect(options).not.toHaveProperty("tsconfig");
+            expect(options.tsconfigRaw).toBeDefined();
+            expect(options.tsconfigRaw).not.toHaveProperty("extends");
+          }
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
