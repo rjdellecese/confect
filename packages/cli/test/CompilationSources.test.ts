@@ -1,8 +1,12 @@
-import { describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, it } from "@effect/vitest";
+import { vi } from "vitest";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import * as Effect from "effect/Effect";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as Deferred from "effect/Deferred";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
@@ -16,7 +20,169 @@ const services = Layer.mergeAll(
   NodePath.layer,
 );
 
+const setupCallbacks = Effect.fn("setupCallbacks")(function* (
+  plugins: ReadonlyArray<esbuild.Plugin>,
+) {
+  const onStart = vi.fn<esbuild.PluginBuild["onStart"]>();
+  const onLoad = vi.fn<esbuild.PluginBuild["onLoad"]>();
+  for (const plugin of plugins)
+    yield* Effect.promise(() =>
+      Promise.resolve(
+        plugin.setup({
+          initialOptions: {},
+          esbuild,
+          onStart,
+          onLoad,
+          onEnd: vi.fn(),
+          onResolve: vi.fn(),
+          onDispose: vi.fn(),
+          resolve: vi.fn(),
+        }),
+      ),
+    );
+  return {
+    start: () =>
+      Promise.all(
+        onStart.mock.calls.map(([callback]) => Promise.resolve(callback())),
+      ),
+    load: (args: esbuild.OnLoadArgs) => {
+      const registration = onLoad.mock.calls.find(
+        ([options]) => options.namespace === args.namespace,
+      );
+      assert(registration !== undefined);
+      return Promise.resolve(registration[1](args));
+    },
+  };
+});
+
 describe("CompilationSources", () => {
+  it.live(
+    "keeps published observations unchanged as builds accumulate inputs",
+    () =>
+      Effect.gen(function* () {
+        let text = "first";
+        const sources = yield* CompilationSources.make({
+          plugins: [
+            {
+              name: "virtual",
+              setup(build) {
+                build.onLoad({ filter: /.*/, namespace: "virtual" }, () => ({
+                  contents: text,
+                }));
+              },
+            },
+          ],
+        });
+        const callbacks = yield* setupCallbacks(sources.plugins);
+        const args: esbuild.OnLoadArgs = {
+          path: "entry",
+          namespace: "virtual",
+          suffix: "",
+          with: {},
+          pluginData: undefined,
+        };
+        const metafile: esbuild.Metafile = {
+          inputs: { "virtual:entry": { bytes: 5, imports: [] } },
+          outputs: {},
+        };
+        yield* Effect.promise(() => callbacks.start());
+        yield* Effect.promise(() => callbacks.load(args));
+        const captured = yield* sources.captured;
+        const inputs = yield* sources.inputs(metafile);
+        const capturedValue = { ...captured };
+        const inputValue = { ...inputs };
+        text = "second";
+        yield* Effect.promise(() => callbacks.load(args));
+        yield* Effect.promise(() =>
+          callbacks.load({ ...args, path: "additional" }),
+        );
+        expect(Object.keys(yield* sources.captured)).toHaveLength(2);
+        expect(yield* sources.inputs(metafile)).not.toEqual(inputs);
+        expect(captured).toEqual(capturedValue);
+        expect(inputs).toEqual(inputValue);
+        yield* Effect.promise(() => callbacks.start());
+        expect(yield* sources.captured).toEqual({});
+        text = "third";
+        yield* Effect.promise(() => callbacks.load(args));
+        expect(Object.keys(yield* sources.captured)).toHaveLength(1);
+        expect(yield* sources.inputs(metafile)).not.toEqual(inputs);
+        expect(captured).toEqual(capturedValue);
+        expect(inputs).toEqual(inputValue);
+      }).pipe(Effect.provide(services)),
+  );
+
+  it.live.each(["plugin", "file", "json"] as const)(
+    "isolates a late %s observation from a newer build",
+    (mode) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const crypto = yield* Crypto.Crypto;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const file = path.join(root, "input.json");
+        yield* fs.writeFileString(file, '{"value":1}');
+        const entered = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        let firstDigest = true;
+        let loads = 0;
+        const sources = yield* CompilationSources.make({
+          plugins: [
+            {
+              name: "virtual",
+              setup(build) {
+                build.onLoad({ filter: /.*/, namespace: "virtual" }, () => {
+                  const loaded = { contents: String(++loads) };
+                  return loads === 1
+                    ? Effect.runPromiseWith(Context.empty())(
+                        Deferred.succeed(entered, undefined).pipe(
+                          Effect.andThen(Deferred.await(release)),
+                          Effect.as(loaded),
+                        ),
+                      )
+                    : loaded;
+                });
+              },
+            },
+          ],
+        }).pipe(
+          Effect.provideService(Crypto.Crypto, {
+            ...crypto,
+            digest: (algorithm, data) =>
+              Effect.gen(function* () {
+                if (mode !== "plugin" && firstDigest) {
+                  firstDigest = false;
+                  yield* Deferred.succeed(entered, undefined);
+                  yield* Deferred.await(release);
+                }
+                return yield* crypto.digest(algorithm, data);
+              }),
+          }),
+        );
+        const callbacks = yield* setupCallbacks(sources.plugins);
+        const args: esbuild.OnLoadArgs = {
+          path: mode === "plugin" ? "entry" : file,
+          namespace: mode === "plugin" ? "virtual" : "file",
+          suffix: "",
+          with: mode === "json" ? { type: "json" } : {},
+          pluginData: undefined,
+        };
+        yield* Effect.promise(() => callbacks.start());
+        const pending = callbacks.load(args);
+        yield* Deferred.await(entered);
+        yield* Effect.promise(() => callbacks.start());
+        expect(yield* sources.captured).toEqual({});
+        yield* fs.writeFileString(file, '{"value":2}');
+        yield* Effect.promise(() => callbacks.load(args));
+        const captured = yield* sources.captured;
+        const capturedValue = { ...captured };
+        expect(Object.keys(captured)).toHaveLength(1);
+        yield* Deferred.succeed(release, undefined);
+        yield* Effect.promise(() => pending);
+        expect(yield* sources.captured).toEqual(captured);
+        expect(captured).toEqual(capturedValue);
+      }).pipe(Effect.scoped, Effect.provide(services)),
+  );
+
   it.live(
     "observes same-length attributed JSON edits even when native output is identical",
     () =>

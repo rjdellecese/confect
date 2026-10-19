@@ -10,9 +10,8 @@ import {
   tsconfigPathsToRegExp,
 } from "bundle-require";
 import { resolveModulePath } from "exsolve";
-import { identity, pipe } from "effect/Function";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as Chunk from "effect/Chunk";
 import * as Cause from "effect/Cause";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
@@ -20,7 +19,6 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as HashMap from "effect/HashMap";
 import * as HashSet from "effect/HashSet";
-import * as Iterable from "effect/Iterable";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
@@ -741,60 +739,6 @@ export const withBatch = <A, E, R>(
     }),
   );
 
-interface MetafileTraversal {
-  readonly pending: Chunk.Chunk<string>;
-  readonly visited: HashSet.HashSet<string>;
-}
-
-const reachableMetafileEntries = <
-  Metadata extends {
-    readonly imports: ReadonlyArray<{
-      readonly path: string;
-      readonly external?: boolean;
-    }>;
-  },
->(
-  entries: Readonly<Record<string, Metadata>>,
-  root: string,
-  resolveImport: (path: string) => string,
-): Record<string, Metadata> =>
-  Object.fromEntries(
-    pipe(
-      Iterable.unfold<
-        MetafileTraversal,
-        Option.Option<readonly [string, Metadata]>
-      >(
-        { pending: Chunk.of(root), visited: HashSet.empty() },
-        ({ pending, visited }) => {
-          if (!Chunk.isNonEmpty(pending)) return Option.none();
-          const key = Chunk.headNonEmpty(pending);
-          const remaining = Chunk.tailNonEmpty(pending);
-          const metadata = entries[key];
-          if (HashSet.has(visited, key) || metadata === undefined)
-            return Option.some([
-              Option.none(),
-              { pending: remaining, visited },
-            ]);
-          return Option.some([
-            Option.some([key, metadata] as const),
-            {
-              pending: Array.reduce(
-                metadata.imports,
-                remaining,
-                (queue, imported) =>
-                  imported.external
-                    ? queue
-                    : Chunk.append(queue, resolveImport(imported.path)),
-              ),
-              visited: HashSet.add(visited, key),
-            },
-          ]);
-        },
-      ),
-      Iterable.getSomes,
-    ),
-  );
-
 const entryMetafile = (
   path: Path.Path,
   compilation: BatchCompilation,
@@ -802,16 +746,18 @@ const entryMetafile = (
   output: string,
 ): esbuild.Metafile => {
   const metafile = {
-    inputs: reachableMetafileEntries(
-      compilation.metafile.inputs,
-      source,
-      identity,
+    inputs: Object.fromEntries(
+      CompilationState.reachable(compilation.metafile.inputs, [source]),
     ),
     outputs: compilation.metafile.outputs,
   };
   Lazy.defineProperty(metafile, "outputs", () =>
-    reachableMetafileEntries(compilation.metafile.outputs, output, (key) =>
-      path.resolve(compilation.cwd, key),
+    Object.fromEntries(
+      CompilationState.reachable(
+        compilation.metafile.outputs,
+        [output],
+        (key) => path.resolve(compilation.cwd, key),
+      ),
     ),
   );
   return metafile;

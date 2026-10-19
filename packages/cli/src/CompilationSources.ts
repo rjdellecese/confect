@@ -9,7 +9,6 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as esbuild from "esbuild";
 import * as CompilationPlugin from "./CompilationPlugin";
-import type * as CompilationState from "./CompilationState";
 import type * as CompilationInputs from "./CompilationInputs";
 
 export class Rejected extends Schema.TaggedError<Rejected>()(
@@ -35,6 +34,9 @@ class TransformFailed extends Schema.TaggedError<TransformFailed>()(
   { path: Schema.String, cause: Schema.Unknown },
 ) {}
 
+const serializeIdentity = (parts: ReadonlyArray<string | undefined>): string =>
+  JSON.stringify(parts);
+
 export const make = Effect.fn("CompilationSources.make")(function* (
   options: esbuild.BuildOptions,
   trackSource?: CompilationInputs.Inputs["trackSource"],
@@ -42,7 +44,7 @@ export const make = Effect.fn("CompilationSources.make")(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const crypto = yield* Crypto.Crypto;
-  const contents = yield* Ref.make<CompilationState.Values>({});
+  let contents = new Map<string, string>();
   const rejected = yield* Ref.make(Option.none<Rejected>());
   const ensure = Effect.gen(function* () {
     const failure = yield* Ref.get(rejected);
@@ -73,6 +75,7 @@ export const make = Effect.fn("CompilationSources.make")(function* (
     ),
   );
   const observe = Effect.fn("CompilationSources.observe")(function* (
+    observed: Map<string, string>,
     args: esbuild.OnLoadArgs,
     loaded: esbuild.OnLoadResult | null | undefined,
     original?: Uint8Array,
@@ -86,17 +89,16 @@ export const make = Effect.fn("CompilationSources.make")(function* (
     const originalDigest = original
       ? Hex.encode(yield* crypto.digest("SHA-256", original))
       : undefined;
-    yield* Ref.update(contents, (current) => ({
-      ...current,
-      [`${key(args.path, args.namespace, args.suffix)}\0${attributes(args.with)}`]:
-        JSON.stringify([
-          digest,
-          originalDigest,
-          loaded.loader ?? "js",
-          loaded.resolveDir ?? "",
-          attributes(args.with),
-        ]),
-    }));
+    observed.set(
+      `${key(args.path, args.namespace, args.suffix)}\0${attributes(args.with)}`,
+      serializeIdentity([
+        digest,
+        originalDigest,
+        loaded.loader ?? "js",
+        loaded.resolveDir ?? "",
+        attributes(args.with),
+      ]),
+    );
     return loaded;
   });
   const wrap = (plugin: esbuild.Plugin): esbuild.Plugin => ({
@@ -105,8 +107,9 @@ export const make = Effect.fn("CompilationSources.make")(function* (
       return plugin.setup({
         ...build,
         onLoad(filter, callback) {
-          build.onLoad(filter, (args) =>
-            Effect.runPromiseWith(Context.empty())(
+          build.onLoad(filter, (args) => {
+            const observed = contents;
+            return Effect.runPromiseWith(Context.empty())(
               Effect.gen(function* () {
                 if (
                   args.namespace === "file" ||
@@ -124,10 +127,10 @@ export const make = Effect.fn("CompilationSources.make")(function* (
                 const loaded = yield* Effect.promise(() =>
                   Promise.resolve(callback(args)),
                 );
-                return yield* observe(args, loaded);
+                return yield* observe(observed, args, loaded);
               }),
-            ),
-          );
+            );
+          });
         },
       });
     },
@@ -135,24 +138,20 @@ export const make = Effect.fn("CompilationSources.make")(function* (
   const native: esbuild.Plugin = {
     name: "confect:source-files",
     setup(build) {
-      build.onLoad({ filter: /.*/, namespace: "dataurl" }, (args) =>
-        Effect.runPromiseWith(Context.empty())(
-          Effect.gen(function* () {
-            yield* Ref.update(contents, (current) => ({
-              ...current,
-              [`${key(args.path, args.namespace, args.suffix)}\0${attributes(args.with)}`]:
-                JSON.stringify([
-                  "native-data-url",
-                  args.path,
-                  attributes(args.with),
-                ]),
-            }));
-            return undefined;
-          }),
-        ),
-      );
-      build.onLoad({ filter: /.*/, namespace: "file" }, (args) =>
-        Effect.runPromiseWith(Context.empty())(
+      build.onLoad({ filter: /.*/, namespace: "dataurl" }, (args) => {
+        contents.set(
+          `${key(args.path, args.namespace, args.suffix)}\0${attributes(args.with)}`,
+          serializeIdentity([
+            "native-data-url",
+            args.path,
+            attributes(args.with),
+          ]),
+        );
+        return undefined;
+      });
+      build.onLoad({ filter: /.*/, namespace: "file" }, (args) => {
+        const observed = contents;
+        return Effect.runPromiseWith(Context.empty())(
           Effect.gen(function* () {
             const file = yield* readable(args.path);
             if (trackSource) yield* trackSource(args.path);
@@ -175,7 +174,10 @@ export const make = Effect.fn("CompilationSources.make")(function* (
                 ],
               };
             if (args.with.type === "json") {
-              yield* observe(args, { contents: bytes, loader: "json" });
+              yield* observe(observed, args, {
+                contents: bytes,
+                loader: "json",
+              });
               const transformed = yield* Effect.tryPromise({
                 try: () =>
                   esbuild.transform(bytes, {
@@ -199,16 +201,16 @@ export const make = Effect.fn("CompilationSources.make")(function* (
                   Effect.succeed({ errors: [{ text: String(error.cause) }] }),
                 ),
               );
-              return yield* observe(args, transformed, bytes);
+              return yield* observe(observed, args, transformed, bytes);
             }
-            return yield* observe(args, {
+            return yield* observe(observed, args, {
               contents: bytes,
               loader: args.with.type ? loaders[args.with.type] : "default",
               resolveDir: path.dirname(args.path),
             });
           }),
-        ),
-      );
+        );
+      });
     },
   };
   return {
@@ -217,31 +219,27 @@ export const make = Effect.fn("CompilationSources.make")(function* (
       {
         name: "confect:source-observation",
         setup(build) {
-          build.onStart(() =>
-            Effect.runPromiseWith(Context.empty())(
-              Ref.set(contents, {}).pipe(Effect.asVoid),
-            ),
-          );
+          build.onStart(() => {
+            contents = new Map();
+          });
         },
       } satisfies esbuild.Plugin,
       ...(options.plugins ?? []).map(wrap),
       native,
     ],
-    captured: Ref.get(contents).pipe(
-      Effect.map((observed) =>
-        Object.fromEntries(
-          Object.entries(observed).filter(
-            ([file]) =>
-              !file.startsWith(`${CompilationPlugin.namespace}:`) &&
-              !file.startsWith("dataurl:"),
-          ),
+    captured: Effect.sync(() =>
+      Object.fromEntries(
+        Array.from(contents).filter(
+          ([file]) =>
+            !file.startsWith(`${CompilationPlugin.namespace}:`) &&
+            !file.startsWith("dataurl:"),
         ),
       ),
     ),
     inputs: Effect.fn("CompilationSources.inputs")(function* (
       metafile: esbuild.Metafile,
     ) {
-      const observed = yield* Ref.get(contents);
+      const observed = contents;
       const immutable = Object.fromEntries(
         Object.values(metafile.inputs).flatMap((metadata) =>
           metadata.imports.flatMap((imported) =>
@@ -249,9 +247,9 @@ export const make = Effect.fn("CompilationSources.make")(function* (
               ? [
                   [
                     imported.path,
-                    observed[
-                      `${key(imported.original, "dataurl")}\0${attributes(imported.with ?? {})}`
-                    ],
+                    observed.get(
+                      `${key(imported.original, "dataurl")}\0${attributes(imported.with ?? {})}`,
+                    ),
                   ],
                 ]
               : [],
@@ -265,10 +263,10 @@ export const make = Effect.fn("CompilationSources.make")(function* (
         const suffix = attributes(metadata.with ?? {});
         const base = metadata.with ? file.replace(/ with \{.*\}$/, "") : file;
         return (
-          observed[`${file}\0${suffix}`] ??
-          observed[`${path.resolve(cwd, file)}\0${suffix}`] ??
-          observed[`${base}\0${suffix}`] ??
-          observed[`${path.resolve(cwd, base)}\0${suffix}`] ??
+          observed.get(`${file}\0${suffix}`) ??
+          observed.get(`${path.resolve(cwd, file)}\0${suffix}`) ??
+          observed.get(`${base}\0${suffix}`) ??
+          observed.get(`${path.resolve(cwd, base)}\0${suffix}`) ??
           immutable[file]
         );
       };

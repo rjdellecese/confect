@@ -1,8 +1,7 @@
 import type * as esbuild from "esbuild";
 import * as Schema from "effect/Schema";
 import * as Array from "effect/Array";
-import * as HashSet from "effect/HashSet";
-import * as Iterable from "effect/Iterable";
+import { identity } from "effect/Function";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import * as Order from "effect/Order";
@@ -118,7 +117,7 @@ export const sameValues = (before: Values, after: Values): boolean =>
   Record.size(before) === Record.size(after) &&
   Record.every(before, (value, key) => after[key] === value);
 
-const reachable = <
+export function* reachable<
   A extends {
     readonly imports: ReadonlyArray<{
       readonly path: string;
@@ -128,54 +127,24 @@ const reachable = <
 >(
   entries: Readonly<Record<string, A>>,
   roots: ReadonlyArray<string>,
-): ReadonlyArray<readonly [string, A]> =>
-  Array.fromIterable(
-    Iterable.getSomes(
-      Iterable.unfold<
-        {
-          readonly pending: Pending | undefined;
-          readonly visited: HashSet.HashSet<string>;
-        },
-        Option.Option<readonly [string, A]>
-      >(
-        {
-          pending: Array.reduce<string, Pending | undefined>(
-            roots,
-            undefined,
-            (next, file) => ({ file, next }),
-          ),
-          visited: HashSet.empty(),
-        },
-        ({ pending, visited }) => {
-          if (!pending) return Option.none();
-          const { file: first, next: rest } = pending;
-          if (HashSet.has(visited, first))
-            return Option.some([Option.none(), { pending: rest, visited }]);
-          const value = entries[first];
-          if (!value)
-            return Option.some([
-              Option.none(),
-              { pending: rest, visited: HashSet.add(visited, first) },
-            ]);
-          return Option.some([
-            Option.some([first, value] as const),
-            {
-              pending: Array.reduce(value.imports, rest, (queue, imported) =>
-                imported.external
-                  ? queue
-                  : { file: imported.path, next: queue },
-              ),
-              visited: HashSet.add(visited, first),
-            },
-          ]);
-        },
-      ),
-    ),
-  );
-
-interface Pending {
-  readonly file: string;
-  readonly next: Pending | undefined;
+  resolveImport: (file: string) => string = identity,
+): Generator<readonly [string, A]> {
+  const visited = new Set(roots);
+  const pending = [...visited];
+  for (let index = 0; index < pending.length; index++) {
+    const file = pending[index];
+    if (file === undefined) continue;
+    const metadata = entries[file];
+    if (!metadata) continue;
+    yield [file, metadata];
+    for (const imported of metadata.imports) {
+      if (imported.external) continue;
+      const next = resolveImport(imported.path);
+      if (visited.has(next)) continue;
+      visited.add(next);
+      pending.push(next);
+    }
+  }
 }
 
 const byPath = Order.mapInput(
@@ -183,27 +152,40 @@ const byPath = Order.mapInput(
   (pair: readonly [string, string]) => pair[0],
 );
 
+export const makeInputFingerprinter = (
+  metafile: esbuild.Metafile,
+  hashes: Values,
+  generated: ReadonlyArray<string> = [],
+) => {
+  const excluded = new Set(generated);
+  const serialized = new Map<string, string>();
+  return (root: string): string => {
+    const files: string[] = [];
+    for (const [file, metadata] of reachable(metafile.inputs, [root])) {
+      if (excluded.has(file)) continue;
+      if (!serialized.has(file))
+        serialized.set(
+          file,
+          JSON.stringify([
+            file,
+            JSON.stringify([hashes[file], metadata.imports]),
+          ]),
+        );
+      files.push(file);
+    }
+    return `{"inputs":[${files
+      .sort()
+      .map((file) => serialized.get(file))
+      .join(",")}]}`;
+  };
+};
+
 export const fingerprintInput = (
   metafile: esbuild.Metafile,
   hashes: Values,
   root: string,
   generated: ReadonlyArray<string> = [],
-): string =>
-  JSON.stringify({
-    inputs: Array.sort(
-      Array.getSomes(
-        Array.map(reachable(metafile.inputs, [root]), ([file, metadata]) =>
-          Array.contains(generated, file)
-            ? Option.none()
-            : Option.some([
-                file,
-                JSON.stringify([hashes[file], metadata.imports]),
-              ] as const),
-        ),
-      ),
-      byPath,
-    ),
-  });
+): string => makeInputFingerprinter(metafile, hashes, generated)(root);
 
 export const fingerprintArtifacts = (hashes: Values): string =>
   JSON.stringify(Array.sort(Record.toEntries(hashes), byPath));

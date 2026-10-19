@@ -330,6 +330,11 @@ export const make = Effect.fn("CompilationContext.make")(function* (
             outputs: {},
           }).inputs,
         );
+        const fingerprint = CompilationState.makeInputFingerprinter(
+          metafile,
+          inputHashes,
+          generated,
+        );
         return Record.fromEntries(
           yield* Effect.forEach(topology.roots, (root) =>
             Effect.gen(function* () {
@@ -347,12 +352,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
                 return yield* new CompilationSources.Unobserved({
                   paths: [root],
                 });
-              const contents = CompilationState.fingerprintInput(
-                metafile,
-                inputHashes,
-                input.value,
-                generated,
-              );
+              const contents = fingerprint(input.value);
               return yield* crypto
                 .digest("SHA-256", new TextEncoder().encode(contents))
                 .pipe(Effect.map((hash) => [root, Hex.encode(hash)] as const));

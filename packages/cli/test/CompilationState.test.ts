@@ -2,6 +2,102 @@ import { describe, expect, it } from "@effect/vitest";
 import * as CompilationState from "@confect/cli/CompilationState";
 
 describe("CompilationState", () => {
+  it("serializes shared input identities once within a build", () => {
+    let serializations = 0;
+    const external = {
+      path: "external",
+      kind: "import-statement" as const,
+      external: true,
+      toJSON() {
+        serializations++;
+        return { path: this.path, kind: this.kind, external: this.external };
+      },
+    };
+    const metafile = {
+      inputs: {
+        left: {
+          bytes: 1,
+          imports: [{ path: "shared", kind: "import-statement" as const }],
+        },
+        right: {
+          bytes: 1,
+          imports: [{ path: "shared", kind: "import-statement" as const }],
+        },
+        shared: { bytes: 1, imports: [external] },
+      },
+      outputs: {},
+    };
+    const hashes = { left: "left", right: "right", shared: "shared" };
+    const fingerprint = CompilationState.makeInputFingerprinter(
+      metafile,
+      hashes,
+    );
+    const left = fingerprint("left");
+    const right = fingerprint("right");
+    expect(fingerprint("left")).toBe(left);
+    expect(right).not.toBe(left);
+    expect(serializations).toBe(1);
+    const updated = CompilationState.makeInputFingerprinter(metafile, {
+      ...hashes,
+      shared: "changed",
+    });
+    expect(updated("left")).not.toBe(left);
+    expect(updated("right")).not.toBe(right);
+    expect(serializations).toBe(2);
+    expect(hashes.shared).toBe("shared");
+    expect(metafile.inputs.shared.imports).toEqual([external]);
+  });
+
+  it("preserves canonical framing for escaped input names and identities", () => {
+    const name = 'quoted"\\\n☃';
+    const metadata = { bytes: 1, imports: [] };
+    const hashes = { [name]: 'value"\\\n☃' };
+    const fingerprint = CompilationState.makeInputFingerprinter(
+      { inputs: { [name]: metadata }, outputs: {} },
+      hashes,
+    );
+    expect(fingerprint(name)).toBe(
+      JSON.stringify({
+        inputs: [[name, JSON.stringify([hashes[name], metadata.imports])]],
+      }),
+    );
+    expect(fingerprint("missing")).toBe('{"inputs":[]}');
+  });
+
+  it("walks breadth first without revisiting aliases or external edges", () => {
+    const imported = (path: string, external = false) => ({ path, external });
+    const inputs = {
+      root: {
+        imports: [
+          imported("left"),
+          imported("right"),
+          imported("outside", true),
+        ],
+      },
+      left: { imports: [imported("leaf"), imported("root")] },
+      right: { imports: [imported("leaf")] },
+      leaf: { imports: [] },
+      outside: { imports: [] },
+    };
+    expect(
+      [...CompilationState.reachable(inputs, ["root", "root"])].map(
+        ([file]) => file,
+      ),
+    ).toEqual(["root", "left", "right", "leaf"]);
+    expect(
+      [
+        ...CompilationState.reachable(
+          {
+            "/root": { imports: [imported("leaf")] },
+            "/leaf": { imports: [] },
+          },
+          ["/root"],
+          (file) => `/${file}`,
+        ),
+      ].map(([file]) => file),
+    ).toEqual(["/root", "/leaf"]);
+  });
+
   it("ignores output and byte-count metadata while retaining authored input graph identity", () => {
     const root = {
       bytes: 1,
