@@ -156,7 +156,6 @@ const runSession = Effect.gen(function* () {
     [
       structure,
       watched.convexEvents.pipe(Stream.runForEach(enqueue)),
-      watched.projectEvents.pipe(Stream.runForEach(enqueue)),
       compiler.events.pipe(
         Stream.runForEach((revision) =>
           Queue.offer(events, { _tag: "Compilation", revision }),
@@ -331,7 +330,6 @@ const syncLoop = Effect.fnUntraced(function* (
         return;
       }
       const change = event.event;
-      if (change._tag === "Restart") return yield* DevSupervisor.requestRestart;
       if (change.kind !== "Update") yield* rescan;
       const phase = yield* Ref.get(phaseRef);
       if (change.file === path.join(confect, "schema.ts")) {

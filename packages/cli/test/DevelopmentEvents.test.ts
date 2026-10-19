@@ -3,7 +3,6 @@ import { expect, layer } from "@effect/vitest";
 import * as DevelopmentEvents from "@confect/cli/DevelopmentEvents";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
-import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import type * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -14,6 +13,50 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 
 layer(NodeServices.layer)("DevelopmentEvents", (it) => {
+  it.effect("leaves Convex resolution metadata to the compiler", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped();
+      const confect = path.join(root, "confect");
+      const convex = path.join(root, "convex");
+      const events = yield* Queue.unbounded<FileSystem.WatchEvent>();
+      const watched = yield* DevelopmentEvents.watch.pipe(
+        Effect.provideService(ConfectDirectory, {
+          get: Effect.succeed(confect),
+        }),
+        Effect.provideService(ConvexDirectory, {
+          get: Effect.succeed(convex),
+        }),
+        Effect.provideService(FileSystem.FileSystem, {
+          ...fs,
+          watch: (directory) => {
+            expect(directory).toBe(convex);
+            return Stream.fromQueue(events);
+          },
+        }),
+      );
+      yield* Queue.offerAll(events, [
+        { _tag: "Update", path: "tsconfig.json" },
+        { _tag: "Update", path: "package.json" },
+        { _tag: "Create", path: "convex.config.ts" },
+        { _tag: "Update", path: "convex.config.ts" },
+      ]);
+      expect(
+        yield* watched.convexEvents.pipe(Stream.take(2), Stream.runCollect),
+      ).toEqual([
+        DevelopmentEvents.Event.Authored({
+          file: path.join(convex, "convex.config.ts"),
+          kind: "Create",
+        }),
+        DevelopmentEvents.Event.Authored({
+          file: path.join(convex, "convex.config.ts"),
+          kind: "Update",
+        }),
+      ]);
+    }).pipe(Effect.scoped),
+  );
+
   it.effect(
     "subscribes only to authored directories and follows directory replacement",
     () =>
@@ -37,7 +80,6 @@ layer(NodeServices.layer)("DevelopmentEvents", (it) => {
         const scanned = yield* Ref.make<ReadonlyArray<string>>([]);
         const events = yield* Queue.unbounded<DevelopmentEvents.Event>();
         const watched = yield* DevelopmentEvents.watch.pipe(
-          Effect.provideService(ProjectRoot, { get: Effect.succeed(root) }),
           Effect.provideService(ConfectDirectory, {
             get: Effect.succeed(confect),
           }),
@@ -95,8 +137,9 @@ layer(NodeServices.layer)("DevelopmentEvents", (it) => {
           path: "tsconfig.json",
         });
         expect(yield* Queue.take(events)).toEqual(
-          DevelopmentEvents.Event.Restart({
+          DevelopmentEvents.Event.Authored({
             file: path.join(nested, "tsconfig.json"),
+            kind: "Update",
           }),
         );
         expect(yield* Queue.size(subscribed)).toBe(0);

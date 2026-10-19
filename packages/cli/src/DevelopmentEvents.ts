@@ -12,29 +12,14 @@ import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
-import { ProjectRoot } from "./ProjectRoot";
 
 export type Event = Data.TaggedEnum<{
   Authored: {
     readonly file: string;
     readonly kind: "Create" | "Update" | "Remove";
   };
-  Restart: { readonly file: string };
 }>;
 export const Event = Data.taggedEnum<Event>();
-
-const configurationFiles = [
-  "package.json",
-  "tsconfig.json",
-  "jsconfig.json",
-  "pnpm-lock.yaml",
-  "package-lock.json",
-  "yarn.lock",
-  "bun.lock",
-  "bun.lockb",
-  ".pnp.cjs",
-  ".pnp.data.json",
-];
 
 export const isArtifact = (file: string): boolean =>
   Array.some(
@@ -48,7 +33,6 @@ export const isArtifact = (file: string): boolean =>
 export const watch = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const projectRoot = yield* ProjectRoot.get;
   const confect = yield* ConfectDirectory.get;
   const convex = yield* ConvexDirectory.get;
   yield* fs.makeDirectory(confect, { recursive: true });
@@ -133,9 +117,7 @@ export const watch = Effect.gen(function* () {
             }
             yield* Queue.offer(
               output,
-              Array.contains(configurationFiles, path.basename(file))
-                ? Event.Restart({ file })
-                : Event.Authored({ file, kind: event._tag }),
+              Event.Authored({ file, kind: event._tag }),
             );
           }).pipe(Effect.forever),
         ],
@@ -149,25 +131,8 @@ export const watch = Effect.gen(function* () {
         (event: FileSystem.WatchEvent): Option.Option<Event> => {
           const file = path.resolve(convex, event.path);
           const relative = path.relative(convex, file);
-          if (relative === "tsconfig.json" || relative === "package.json")
-            return Option.some(Event.Restart({ file }));
           return relative === "convex.config.ts"
             ? Option.some(Event.Authored({ file, kind: event._tag }))
-            : Option.none();
-        },
-      ),
-    ),
-  );
-  const projectEvents = fs.watch(projectRoot).pipe(
-    Stream.filterMap(
-      Filter.fromPredicateOption(
-        (event: FileSystem.WatchEvent): Option.Option<Event> => {
-          const file = path.resolve(projectRoot, event.path);
-          return Array.contains(
-            configurationFiles,
-            path.relative(projectRoot, file),
-          )
-            ? Option.some(Event.Restart({ file }))
             : Option.none();
         },
       ),
@@ -176,6 +141,5 @@ export const watch = Effect.gen(function* () {
   return {
     confectEvents,
     convexEvents,
-    projectEvents,
   };
 });
