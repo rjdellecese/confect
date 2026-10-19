@@ -25,6 +25,36 @@ const fixture = Effect.fn("CompilationConfig.test.fixture")(function* (
   return { root, source: path.join(root, "src/entry.tsx"), fs, path };
 });
 
+const buildRaw = (
+  source: string,
+  tsconfigRaw: esbuild.TsconfigRaw,
+  conditions?: string[],
+  warnings: ReadonlyArray<esbuild.PartialMessage> = [],
+) =>
+  Effect.tryPromise({
+    try: () =>
+      esbuild.build({
+        entryPoints: [source],
+        bundle: true,
+        platform: "node",
+        format: "esm",
+        write: false,
+        logLevel: "silent",
+        tsconfigRaw,
+        plugins: [
+          {
+            name: "owned-configuration-warnings",
+            setup(build) {
+              build.onStart(() => ({ warnings: [...warnings] }));
+            },
+          },
+        ],
+        ...(conditions === undefined ? {} : { conditions }),
+      }),
+    catch: (cause) =>
+      new CompilationConfig.DiscoveryFailed({ path: source, cause }),
+  });
+
 const build = (source: string, conditions?: string[]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -39,7 +69,7 @@ const build = (source: string, conditions?: string[]) =>
       }
       directory = path.dirname(directory);
     }
-    return yield* Effect.tryPromise({
+    const native = yield* Effect.tryPromise({
       try: () =>
         esbuild.build({
           entryPoints: [source],
@@ -56,6 +86,21 @@ const build = (source: string, conditions?: string[]) =>
       catch: (cause) =>
         new CompilationConfig.DiscoveryFailed({ path: source, cause }),
     });
+    const owned = yield* CompilationConfig.discover(
+      source,
+      undefined,
+      conditions,
+    );
+    const compiled = yield* buildRaw(
+      source,
+      owned.tsconfigRaw,
+      conditions,
+      owned.warnings,
+    );
+    expect(compiled.outputFiles?.map(({ text }) => text)).toEqual(
+      native.outputFiles?.map(({ text }) => text),
+    );
+    return compiled;
   });
 
 const discoverFiles = <E = never, R = never>(
@@ -79,6 +124,326 @@ const chosen = '{"compilerOptions":{"jsxFactory":"chosen.h"}}';
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationConfig",
   (it) => {
+    it.effect("preserves the __proto__ paths alias as an own mapping", () =>
+      Effect.gen(function* () {
+        const { source } = yield* fixture({
+          "src/entry.tsx": 'export { value } from "__proto__";',
+          "tsconfig.json":
+            '{"compilerOptions":{"paths":{"__proto__":["./value.ts"]}}}',
+          "value.ts": 'export const value = "chosen-prototype-key";',
+        });
+        const selected = yield* CompilationConfig.discover(source);
+        expect(
+          Object.hasOwn(
+            selected.tsconfigRaw.compilerOptions?.paths ?? {},
+            "__proto__",
+          ),
+        ).toBe(true);
+        expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
+          "chosen-prototype-key",
+        );
+      }).pipe(Effect.scoped),
+    );
+    it.effect(
+      "owns filesystem configuration selection despite recognized inert PnP data",
+      () =>
+        Effect.gen(function* () {
+          const { source, root, path } = yield* fixture({
+            "src/entry.tsx": entry,
+            "tsconfig.json": '{"extends":"fixture/base.json"}',
+            "node_modules/fixture/base.json": chosen,
+            "native-map/base.json":
+              '{"compilerOptions":{"jsxFactory":"wrong.h"}}',
+            ".pnp.data.json":
+              '{"packageRegistryData":[["project",[["root",{"packageLocation":"./","packageDependencies":[["fixture","mapped"]]}]]],["fixture",[["mapped",{"packageLocation":"./native-map/","packageDependencies":[]}]]]]}',
+          });
+          const selected = yield* CompilationConfig.discover(source);
+          expect(selected.files).toContain(
+            path.join(root, "node_modules/fixture/base.json"),
+          );
+          expect(selected.files).not.toContain(
+            path.join(root, "native-map/base.json"),
+          );
+          expect(selected.tsconfigRaw.compilerOptions?.jsxFactory).toBe(
+            "chosen.h",
+          );
+          expect(
+            (yield* buildRaw(source, selected.tsconfigRaw)).outputFiles?.[0]
+              ?.text,
+          ).toContain("chosen.h(");
+          const native = yield* Effect.tryPromise({
+            try: () =>
+              esbuild.build({
+                entryPoints: [source],
+                bundle: true,
+                write: false,
+                platform: "node",
+                format: "esm",
+                logLevel: "silent",
+                tsconfig: path.join(root, "tsconfig.json"),
+              }),
+            catch: (cause) =>
+              new CompilationConfig.DiscoveryFailed({ path: source, cause }),
+          });
+          expect(native.outputFiles?.[0]?.text).toContain("wrong.h(");
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each([
+      {
+        reason: "MissingExtends",
+        config:
+          '{"extends":"./missing.json","compilerOptions":{"jsxFactory":"chosen.h"}}',
+      },
+      {
+        reason: "CyclicExtends",
+        config: '{"extends":"./base.json"}',
+        base: '{"extends":"./tsconfig.json","compilerOptions":{"jsxFactory":"chosen.h"}}',
+      },
+      {
+        reason: "InvalidCompilerOption",
+        config:
+          '{"extends":"./base.json","compilerOptions":{"jsxFactory":null}}',
+        base: chosen,
+      },
+      {
+        reason: "InvalidPaths",
+        config:
+          '{"compilerOptions":{"jsxFactory":"chosen.h","paths":{"unused":["bare/value"]}}}',
+      },
+    ])(
+      "retains structured $reason diagnostics with owned options",
+      ({ reason, config, base }) =>
+        Effect.gen(function* () {
+          const { source } = yield* fixture({
+            "src/entry.tsx": entry,
+            "tsconfig.json": config,
+            ...(base === undefined ? {} : { "base.json": base }),
+          });
+          const selected = yield* CompilationConfig.discover(source);
+          expect(selected.warnings).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                detail: expect.objectContaining({
+                  _tag: "CompilationConfigDiagnostic",
+                  reason,
+                }),
+              }),
+            ]),
+          );
+          expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
+            "chosen.h(",
+          );
+        }).pipe(Effect.scoped),
+    );
+    it.effect(
+      "preserves configDir wildcard parent segments until import substitution",
+      () =>
+        Effect.gen(function* () {
+          const { source, root, path } = yield* fixture({
+            "src/entry.tsx": 'export { value } from "@/a/b";',
+            "tsconfig.json":
+              '{"compilerOptions":{"paths":{"@/*":["${configDir}/fixtures/*/../value.ts"]}}}',
+            "fixtures/a/value.ts": 'export const value = "chosen-placeholder";',
+            "fixtures/value.ts": 'export const value = "wrong";',
+          });
+          const resolved = yield* CompilationConfig.discover(source);
+          expect(resolved.tsconfigRaw.compilerOptions?.paths?.["@/*"]).toEqual([
+            `${root}${path.sep}fixtures/*/../value.ts`,
+          ]);
+          expect(
+            (yield* buildRaw(source, resolved.tsconfigRaw)).outputFiles?.[0]
+              ?.text,
+          ).toContain("chosen-placeholder");
+        }).pipe(Effect.scoped),
+    );
+    it.effect("merges every diamond branch in extends order", () =>
+      Effect.gen(function* () {
+        const { source } = yield* fixture({
+          "src/entry.tsx": entry,
+          "tsconfig.json": '{"extends":["./left.json","./right.json"]}',
+          "left.json":
+            '{"extends":"./shared.json","compilerOptions":{"jsxFactory":"wrong.h"}}',
+          "right.json":
+            '{"extends":"./shared.json","compilerOptions":{"strict":false}}',
+          "shared.json":
+            '{"compilerOptions":{"jsxFactory":"chosen.h","strict":true}}',
+        });
+        expect((yield* CompilationConfig.discover(source)).tsconfigRaw).toEqual(
+          {
+            compilerOptions: { jsxFactory: "chosen.h", strict: false },
+          },
+        );
+        expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
+          "chosen.h(",
+        );
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect.each([false, true])(
+      "retains inherited path origins with a child baseUrl override: %s",
+      (override) =>
+        Effect.gen(function* () {
+          const { source, root, path } = yield* fixture({
+            "src/entry.tsx": 'export { value } from "alias";',
+            "tsconfig.json": override
+              ? '{"extends":"./config/base.json","compilerOptions":{"baseUrl":"./other"}}'
+              : '{"extends":"./config/base.json"}',
+            "config/base.json":
+              '{"compilerOptions":{"paths":{"alias":["./value.ts"]}}}',
+            "config/value.ts": 'export const value = "chosen-origin";',
+            "other/value.ts": 'export const value = "chosen-override";',
+            "value.ts": 'export const value = "wrong";',
+          });
+          const resolved = yield* CompilationConfig.discover(source);
+          expect(resolved.tsconfigRaw.compilerOptions?.paths).toEqual({
+            alias: [
+              `${path.join(root, override ? "other" : "config")}${path.sep}./value.ts`,
+            ],
+          });
+          const output = (yield* build(source)).outputFiles?.[0]?.text;
+          expect(output).toContain(
+            override ? "chosen-override" : "chosen-origin",
+          );
+          expect(output).not.toContain('"wrong"');
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect("keeps wildcard segments until import substitution", () =>
+      Effect.gen(function* () {
+        const { source } = yield* fixture({
+          "src/entry.tsx": 'export { value } from "@/a/b";',
+          "tsconfig.json":
+            '{"compilerOptions":{"paths":{"@/*":["./*/../shared.ts"]}}}',
+          "a/shared.ts": 'export const value = "chosen-wildcard";',
+          "shared.ts": 'export const value = "wrong";',
+        });
+        expect(
+          (yield* CompilationConfig.discover(source)).tsconfigRaw
+            .compilerOptions?.paths,
+        ).toMatchObject({ "@/*": [expect.stringContaining("*/../shared.ts")] });
+        expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
+          "chosen-wildcard",
+        );
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect.each([false, true])(
+      "validates bare path targets after the final inherited baseUrl: %s",
+      (withBase) =>
+        Effect.gen(function* () {
+          const { source } = yield* fixture({
+            "src/entry.tsx": 'export { value } from "alias";',
+            "tsconfig.json": withBase
+              ? '{"extends":["./paths.json","./base.json"]}'
+              : '{"extends":"./paths.json"}',
+            "paths.json":
+              '{"compilerOptions":{"paths":{"alias":["lib/value.ts"]}}}',
+            "base.json": '{"compilerOptions":{"baseUrl":"."}}',
+            "lib/value.ts": 'export const value = "chosen-path";',
+            "node_modules/alias/package.json": '{"main":"index.js"}',
+            "node_modules/alias/index.js":
+              'export const value = "chosen-fallback";',
+          });
+          const resolved = yield* CompilationConfig.discover(source);
+          expect(
+            resolved.tsconfigRaw.compilerOptions?.paths?.alias,
+          ).toHaveLength(withBase ? 1 : 0);
+          expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
+            withBase ? "chosen-path" : "chosen-fallback",
+          );
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect("does not erase inherited options with invalid child types", () =>
+      Effect.gen(function* () {
+        const { source, root, path } = yield* fixture({
+          "src/entry.tsx":
+            'import { value } from "alias"; export class Value { field = value; }',
+          "tsconfig.json":
+            '{"extends":"./base.json","compilerOptions":{"baseUrl":null,"paths":null,"useDefineForClassFields":null}}',
+          "base.json":
+            '{"compilerOptions":{"baseUrl":"./lib","paths":{"alias":["./value.ts"]},"useDefineForClassFields":false}}',
+          "lib/value.ts": 'export const value = "chosen";',
+        });
+        expect(
+          (yield* CompilationConfig.discover(source)).tsconfigRaw
+            .compilerOptions,
+        ).toMatchObject({
+          baseUrl: path.join(root, "lib"),
+          useDefineForClassFields: false,
+        });
+        const output = (yield* build(source)).outputFiles?.[0]?.text;
+        expect(output).toContain("this.field = value");
+        expect(output).toContain('"chosen"');
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect("expands configDir from each selected lexical profile", () =>
+      Effect.gen(function* () {
+        const { root, path } = yield* fixture({
+          "base.json":
+            '{"compilerOptions":{"paths":{"alias":["${configDir}/value.ts"]}}}',
+          "one/tsconfig.json": '{"extends":"../base.json"}',
+          "two/tsconfig.json": '{"extends":"../base.json"}',
+          "one/entry.tsx": 'export { value } from "alias";',
+          "two/entry.tsx": 'export { value } from "alias";',
+          "one/value.ts": 'export const value = "chosen-one";',
+          "two/value.ts": 'export const value = "chosen-two";',
+        });
+        for (const name of ["one", "two"]) {
+          const source = path.join(root, name, "entry.tsx");
+          expect(
+            (yield* CompilationConfig.discover(source)).tsconfigRaw
+              .compilerOptions?.paths,
+          ).toEqual({ alias: [path.join(root, name, "value.ts")] });
+          expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
+            `chosen-${name}`,
+          );
+        }
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect.each(["es2021", "es2022"])(
+      "preserves inherited target field semantics: %s",
+      (target) =>
+        Effect.gen(function* () {
+          const { source } = yield* fixture({
+            "src/entry.tsx": "export class Value { field = 1; }",
+            "tsconfig.json": '{"extends":"./base.json"}',
+            "base.json": `{"compilerOptions":{"target":"${target}"}}`,
+          });
+          expect(
+            (yield* CompilationConfig.discover(source)).tsconfigRaw
+              .compilerOptions?.target,
+          ).toBe(target);
+          const output = (yield* build(source)).outputFiles?.[0]?.text;
+          if (target === "es2021") expect(output).toContain("this.field = 1");
+          else expect(output).toContain("field = 1");
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect("preserves inherited automatic JSX options", () =>
+      Effect.gen(function* () {
+        const { source } = yield* fixture({
+          "src/entry.tsx": entry,
+          "tsconfig.json": '{"extends":"./base.json"}',
+          "base.json":
+            '{"compilerOptions":{"jsx":"react-jsx","jsxImportSource":"fixture-runtime"}}',
+          "node_modules/fixture-runtime/package.json":
+            '{"exports":{"./jsx-runtime":"./runtime.js"}}',
+          "node_modules/fixture-runtime/runtime.js":
+            'export function jsx(){return "chosen-runtime"}; export { jsx as jsxs };',
+        });
+        expect(
+          (yield* CompilationConfig.discover(source)).tsconfigRaw
+            .compilerOptions,
+        ).toEqual({ jsx: "react-jsx", jsxImportSource: "fixture-runtime" });
+        expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
+          "chosen-runtime",
+        );
+      }).pipe(Effect.scoped),
+    );
     it.effect(
       "returns the lexical nearest tsconfig and all absent nearer candidates",
       () =>
@@ -90,6 +455,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const result = yield* CompilationConfig.discover(source);
           expect(result).toEqual({
             configuration: path.join(root, "tsconfig.json"),
+            tsconfigRaw: { compilerOptions: {} },
+            warnings: [],
             files: [
               path.join(root, "src/tsconfig.json"),
               path.join(root, "tsconfig.json"),
@@ -118,7 +485,12 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               },
             }),
           );
-          expect(result).toEqual({ configuration: undefined, files: [] });
+          expect(result).toEqual({
+            configuration: undefined,
+            tsconfigRaw: {},
+            warnings: [],
+            files: [],
+          });
           expect(inspected).toEqual([]);
         }),
     );
@@ -179,9 +551,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const result = yield* CompilationConfig.discover(source).pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
-              readFileString: (file, encoding) => {
+              readFile: (file) => {
                 reads.push(file);
-                return fs.readFileString(file, encoding);
+                return fs.readFile(file);
               },
             }),
           );
@@ -216,9 +588,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             CompilationConfig.discover(source).pipe(
               Effect.provideService(FileSystem.FileSystem, {
                 ...fs,
-                readFileString: (file, encoding) => {
+                readFile: (file) => {
                   reads.push(file);
-                  return fs.readFileString(file, encoding);
+                  return fs.readFile(file);
                 },
               }),
             ),
@@ -441,9 +813,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const discovered = yield* discoverFiles(source).pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
-              readFileString: (file, encoding) => {
+              readFile: (file) => {
                 reads.push(file);
-                return fs.readFileString(file, encoding);
+                return fs.readFile(file);
               },
             }),
           );
@@ -687,10 +1059,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           ).pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
-              readFileString: (file, encoding) =>
+              readFile: (file) =>
                 Effect.gen(function* () {
                   expect(baselines.has(file)).toBe(true);
-                  return yield* fs.readFileString(file, encoding);
+                  return yield* fs.readFile(file);
                 }),
             }),
           );
@@ -744,9 +1116,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           ).pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
-              readFileString: (file, encoding) => {
+              readFile: (file) => {
                 reads.push(file);
-                return fs.readFileString(file, encoding);
+                return fs.readFile(file);
               },
             }),
           ),
@@ -1079,9 +1451,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             ).pipe(
               Effect.provideService(FileSystem.FileSystem, {
                 ...fs,
-                readFileString: (file, encoding) => {
+                readFile: (file) => {
                   read.push(file);
-                  return fs.readFileString(file, encoding);
+                  return fs.readFile(file);
                 },
               }),
             ),
@@ -1202,21 +1574,25 @@ layer(NodeServices.layer, { excludeTestServices: true })(
     );
 
     it.effect(
-      "rejects Yarn PnP explicitly without evaluating its manifest",
+      "uses filesystem inheritance without an active Yarn runtime or evaluating inert metadata",
       () =>
         Effect.gen(function* () {
           const { source, root, path } = yield* fixture({
             "src/entry.tsx": entry,
             "tsconfig.json": '{"extends":"fixture"}',
             ".pnp.cjs": "throw new Error('must not execute')",
+            "node_modules/fixture/tsconfig.json": chosen,
           });
-          const result = yield* Effect.result(discoverFiles(source));
-          expect(Result.isFailure(result)).toBe(true);
-          if (Result.isFailure(result))
-            expect(result.failure).toMatchObject({
-              path: path.join(root, ".pnp.cjs"),
-              reason: "PnpRuntimeUnavailable",
-            });
+          const result = yield* CompilationConfig.discover(source);
+          expect(result.files).toContain(
+            path.join(root, "node_modules/fixture/tsconfig.json"),
+          );
+          expect(result.tsconfigRaw).toEqual({
+            compilerOptions: { jsxFactory: "chosen.h" },
+          });
+          expect((yield* build(source)).outputFiles?.[0]?.text).toContain(
+            "chosen.h(",
+          );
         }).pipe(Effect.scoped),
     );
 

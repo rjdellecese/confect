@@ -20,6 +20,7 @@ import * as CompilationState from "./CompilationState";
 import * as CompiledModule from "./CompiledModule";
 import * as CompilationInputs from "./CompilationInputs";
 import * as NodeConditions from "./NodeConditions";
+import type * as CompilationConfig from "./CompilationConfig";
 
 class FailedAttempts extends Context.Service<
   FailedAttempts,
@@ -34,7 +35,7 @@ class PreparedRevisions extends Context.Service<
 export interface Request {
   readonly roots: ReadonlyArray<string>;
   readonly profile: CompilationState.Profile;
-  readonly configuration: string | undefined;
+  readonly configuration: CompilationConfig.Discovery;
   readonly options: Omit<esbuild.BuildOptions, "tsconfig" | "tsconfigRaw">;
   readonly normalize: (metafile: esbuild.Metafile) => esbuild.Metafile;
 }
@@ -204,7 +205,7 @@ export const layer = (options: {
                         context,
                         request.profile,
                         request.roots,
-                        request.configuration,
+                        request.configuration.configuration,
                       ) &&
                       (!failed ||
                         context.roots.length === request.roots.length),
@@ -215,14 +216,17 @@ export const layer = (options: {
               const topology = {
                 id: yield* Ref.updateAndGet(nextId, (id) => id + 1),
                 profile: request.profile,
-                configuration: request.configuration,
+                configuration: request.configuration.configuration,
                 roots: request.roots,
               };
               const retained = CompilationState.retain(current, topology);
               const scope = yield* Scope.fork(owner, "sequential");
               const created = yield* CompilationContext.make(
                 topology,
-                request.options,
+                {
+                  ...request.options,
+                  tsconfigRaw: request.configuration.tsconfigRaw,
+                },
                 request.normalize,
                 (event) => Queue.offer(events, event).pipe(Effect.asVoid),
                 resolutionInputs,
@@ -231,6 +235,7 @@ export const layer = (options: {
                   Schema.is(CompilationInputs.RestartRequired)(error.cause)
                     ? Effect.void
                     : Queue.fail(events, error).pipe(Effect.asVoid),
+                request.configuration.warnings,
               ).pipe(
                 Effect.provide(services),
                 Effect.provideService(Scope.Scope, scope),

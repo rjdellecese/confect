@@ -25,6 +25,276 @@ vi.mock("@confect/cli/CompilationConfig", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationInputs",
   (it) => {
+    it.effect.each(["base", "selection"] as const)(
+      "guards same-size %s edits without mutating the resolved configuration",
+      (kind) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const entry = path.join(root, "entry.tsx");
+          const config = path.join(root, "tsconfig.json");
+          const first = path.join(root, "first.json");
+          const other = path.join(root, "other.json");
+          yield* fs.writeFileString(config, '{"extends":"./first.json"}');
+          yield* fs.writeFileString(
+            first,
+            '{"compilerOptions":{"jsxFactory":"first.h"}}',
+          );
+          yield* fs.writeFileString(
+            other,
+            '{"compilerOptions":{"jsxFactory":"other.h"}}',
+          );
+          const inputs = yield* CompilationInputs.make("Once");
+          const initial = yield* inputs.configuration(entry);
+          expect(initial.tsconfigRaw.compilerOptions?.jsxFactory).toBe(
+            "first.h",
+          );
+          expect(yield* inputs.configuration(entry)).toBe(initial);
+          const changed = kind === "base" ? first : config;
+          const before = yield* fs.readFile(changed);
+          yield* fs.writeFileString(
+            changed,
+            kind === "base"
+              ? '{"compilerOptions":{"jsxFactory":"other.h"}}'
+              : '{"extends":"./other.json"}',
+          );
+          expect((yield* fs.readFile(changed)).length).toBe(before.length);
+          expect(yield* Effect.flip(inputs.check)).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [changed],
+          });
+          expect(initial.tsconfigRaw.compilerOptions?.jsxFactory).toBe(
+            "first.h",
+          );
+          const fresh = yield* CompilationInputs.make("Once");
+          const selected = yield* fresh.configuration(entry);
+          expect(selected.tsconfigRaw.compilerOptions?.jsxFactory).toBe(
+            "other.h",
+          );
+          if (kind === "selection") {
+            expect(selected.files).toContain(other);
+            expect(selected.files).not.toContain(first);
+          }
+          expect(yield* Effect.flip(inputs.configuration(entry))).toMatchObject(
+            {
+              _tag: "CompilationRestartRequired",
+              paths: [changed],
+            },
+          );
+        }).pipe(Effect.scoped),
+    );
+    it.effect.each(
+      ["configuration", "base"].flatMap((target) =>
+        ["Missing", "Directory"].map((kind) => ({ target, kind })),
+      ),
+    )(
+      "rejects a transient $kind classification for the $target before caching",
+      ({ target, kind }) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const configuration = path.join(root, "tsconfig.json");
+          const base = path.join(root, "base.json");
+          yield* fs.writeFileString(configuration, '{"extends":"./base.json"}');
+          yield* fs.writeFileString(base, "{}");
+          const file = target === "configuration" ? configuration : base;
+          let inspections = 0;
+          let directory = false;
+          const inputs = yield* CompilationInputs.make("Once").pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              realPath: (candidate) => {
+                if (candidate === file && ++inspections === 4) {
+                  if (kind === "Missing")
+                    return Effect.fail(
+                      PlatformError.systemError({
+                        _tag: "NotFound",
+                        module: "FileSystem",
+                        method: "realPath",
+                      }),
+                    );
+                  directory = true;
+                }
+                return fs.realPath(candidate);
+              },
+              stat: (candidate) =>
+                fs.stat(candidate).pipe(
+                  Effect.map((info) => {
+                    if (candidate !== file || !directory) return info;
+                    directory = false;
+                    return { ...info, type: "Directory" as const };
+                  }),
+                ),
+            }),
+          );
+          expect(
+            yield* Effect.flip(
+              inputs.configuration(path.join(root, "entry.ts")),
+            ),
+          ).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [file],
+          });
+          expect(inspections).toBe(4);
+          expect((yield* fs.stat(file)).type).toBe("File");
+          expect(yield* Effect.flip(inputs.check)).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [file],
+          });
+        }).pipe(Effect.scoped),
+    );
+    it.effect(
+      "verifies a consumed file classification against its acquired missing baseline",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const file = path.join(root, "tsconfig.json");
+          yield* fs.writeFileString(file, "{}");
+          let inspections = 0;
+          const inputs = yield* CompilationInputs.make("Once").pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              realPath: (candidate) => {
+                if (candidate === file && [2, 3].includes(++inspections))
+                  return Effect.fail(
+                    PlatformError.systemError({
+                      _tag: "NotFound",
+                      module: "FileSystem",
+                      method: "realPath",
+                    }),
+                  );
+                return fs.realPath(candidate);
+              },
+            }),
+          );
+          expect(
+            yield* Effect.flip(
+              inputs.configuration(path.join(root, "entry.ts")),
+            ),
+          ).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [file],
+          });
+          expect(inspections).toBe(3);
+          expect((yield* fs.stat(file)).type).toBe("File");
+        }).pipe(Effect.scoped),
+    );
+    it.effect(
+      "classifies a discovery-time alias retarget as a sticky restart",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const first = path.join(root, "first.json");
+          const second = path.join(root, "second.json");
+          const alias = path.join(root, "tsconfig.json");
+          yield* fs.writeFileString(first, "{}");
+          yield* fs.writeFileString(second, "{}");
+          yield* fs.symlink(first, alias);
+          let inspections = 0;
+          const inputs = yield* CompilationInputs.make("Once").pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              realPath: (file) =>
+                Effect.gen(function* () {
+                  if (file === alias && ++inspections === 7) {
+                    yield* fs.remove(alias);
+                    yield* fs.symlink(second, alias);
+                  }
+                  return yield* fs.realPath(file);
+                }),
+            }),
+          );
+          expect(
+            yield* Effect.flip(
+              inputs.configuration(path.join(root, "entry.ts")),
+            ),
+          ).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [alias],
+          });
+          expect(inspections).toBe(7);
+          expect(yield* inputs.pending).toMatchObject({
+            _tag: "Some",
+            value: { paths: [alias] },
+          });
+          yield* fs.remove(alias);
+          yield* fs.symlink(first, alias);
+          expect(yield* Effect.flip(inputs.check)).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [alias],
+          });
+        }).pipe(Effect.scoped),
+    );
+    it.effect.each(["configuration", "manifest", "base", "alias"] as const)(
+      "rejects ABA bytes delivered by the %s reader before parsing or caching",
+      (kind) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const config = path.join(root, "tsconfig.json");
+          const base = path.join(root, "base.json");
+          const manifest = path.join(root, "node_modules/fixture/package.json");
+          yield* fs.makeDirectory(path.dirname(manifest), { recursive: true });
+          yield* fs.writeFileString(
+            base,
+            '{"compilerOptions":{"jsxFactory":"first.h"}}',
+          );
+          yield* fs.writeFileString(manifest, '{"exports":"./base.json"}');
+          yield* fs.writeFileString(
+            path.join(path.dirname(manifest), "base.json"),
+            "{}",
+          );
+          if (kind === "alias") yield* fs.symlink(base, config);
+          else
+            yield* fs.writeFileString(
+              config,
+              kind === "manifest"
+                ? '{"extends":"fixture"}'
+                : '{"extends":"./base.json"}',
+            );
+          const target =
+            kind === "manifest"
+              ? manifest
+              : kind === "base" || kind === "alias"
+                ? base
+                : config;
+          const original = yield* fs.readFile(target);
+          const delivered = new TextEncoder().encode(
+            "!".repeat(original.length),
+          );
+          let reads = 0;
+          const trigger = kind === "alias" ? 5 : 3;
+          const inputs = yield* CompilationInputs.make("Once").pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              readFile: (file) => {
+                if (file === target && ++reads === trigger)
+                  return Effect.succeed(delivered);
+                return fs.readFile(file);
+              },
+            }),
+          );
+          const outcome = yield* Effect.flip(
+            inputs.configuration(path.join(root, "entry.ts")),
+          );
+          expect(outcome).toMatchObject({ _tag: "CompilationRestartRequired" });
+          expect(reads).toBe(trigger);
+          expect(yield* fs.readFile(target)).toEqual(original);
+          expect(
+            yield* Effect.flip(
+              inputs.configuration(path.join(root, "entry.ts")),
+            ),
+          ).toMatchObject({ _tag: "CompilationRestartRequired" });
+          expect(reads).toBe(trigger);
+        }).pipe(Effect.scoped),
+    );
     it.effect(
       "guards native legacy PnP markers even without a selected config",
       () =>
@@ -34,7 +304,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const root = yield* fs.makeTempDirectoryScoped();
           const inputs = yield* CompilationInputs.make("Once");
           const entry = path.join(root, "entry.ts");
-          expect(yield* inputs.configuration(entry)).toBeUndefined();
+          expect(
+            (yield* inputs.configuration(entry)).configuration,
+          ).toBeUndefined();
           yield* inputs.trackSource(entry);
           const marker = path.join(root, ".pnp.js");
           yield* fs.writeFileString(marker, "module.exports = {};");
@@ -62,7 +334,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* fs.writeFileString(ignored, "not JSON");
           const inputs = yield* CompilationInputs.make(mode);
           expect(
-            yield* inputs.configuration(path.join(nested, "entry.ts")),
+            (yield* inputs.configuration(path.join(nested, "entry.ts")))
+              .configuration,
           ).toBe(selected);
           yield* inputs.trackSource(path.join(helper, "value.ts"));
           yield* fs.writeFileString(ignored, "still not JSON");
@@ -135,15 +408,26 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           observe,
           conditions,
           observeRuntime,
+          observeRead,
         ) =>
-          actual.discover(sourceFile, observe, conditions, observeRuntime).pipe(
-            Effect.tap(() => observe?.(marker, "File") ?? Effect.void),
-            Effect.tap(
-              () =>
-                observeRuntime?.({ path: marker, value: initial, current }) ??
-                Effect.void,
-            ),
-          );
+          actual
+            .discover(
+              sourceFile,
+              observe,
+              conditions,
+              observeRuntime,
+              observeRead,
+            )
+            .pipe(
+              Effect.tap(
+                () => observe?.(marker, "File", marker) ?? Effect.void,
+              ),
+              Effect.tap(
+                () =>
+                  observeRuntime?.({ path: marker, value: initial, current }) ??
+                  Effect.void,
+              ),
+            );
         yield* Effect.acquireRelease(
           Effect.sync(() => discover.mockImplementation(implementation)),
           () => Effect.sync(() => discover.mockImplementation(original)),

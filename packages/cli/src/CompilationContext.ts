@@ -115,7 +115,9 @@ export const relocateMetafile = (
 
 export const make = Effect.fn("CompilationContext.make")(function* (
   topology: CompilationState.Topology,
-  options: Omit<esbuild.BuildOptions, "tsconfig" | "tsconfigRaw">,
+  options: Omit<esbuild.BuildOptions, "tsconfig" | "tsconfigRaw"> & {
+    readonly tsconfigRaw: esbuild.TsconfigRaw;
+  },
   normalize: (metafile: esbuild.Metafile) => esbuild.Metafile,
   publish: (revision: CompilationState.Revision) => Effect.Effect<void>,
   guards: Readonly<
@@ -133,6 +135,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   mode: CompilationState.Mode = "Watch",
   publishFailure: (error: BundlerError) => Effect.Effect<void> = () =>
     Effect.void,
+  configurationWarnings: ReadonlyArray<esbuild.PartialMessage> = [],
 ) {
   const fs = yield* FileSystem.FileSystem;
   const crypto = yield* Crypto.Crypto;
@@ -389,9 +392,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       try: () =>
         esbuild.context({
           ...options,
-          ...(topology.configuration === undefined
-            ? { tsconfigRaw: {} }
-            : { tsconfig: topology.configuration }),
+          tsconfigRaw: options.tsconfigRaw,
           outdir: output,
           sourceRoot: pathToFileURL(`${output}${path.sep}`).href,
           write: false,
@@ -408,6 +409,9 @@ export const make = Effect.fn("CompilationContext.make")(function* (
                         startedGeneration,
                         yield* guards.generation ?? Effect.succeed(0),
                       );
+                      return {
+                        warnings: Array.fromIterable(configurationWarnings),
+                      };
                     }),
                   ),
                 );

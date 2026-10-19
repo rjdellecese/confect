@@ -40,10 +40,12 @@ const preparedFixture = Effect.gen(function* () {
     guards?: Parameters<typeof CompilationContext.make>[4],
     publishFailure?: Parameters<typeof CompilationContext.make>[6],
     configuration?: string,
+    tsconfigRaw: esbuild.TsconfigRaw = {},
   ) =>
     CompilationContext.make(
       { id: 1, profile: "modules", configuration, roots: [entry] },
       {
+        tsconfigRaw,
         entryPoints: [entry],
         absWorkingDir: root,
         bundle: true,
@@ -271,26 +273,23 @@ describe("CompilationContext", () => {
       ),
   );
   it.live(
-    "rebuilds provisional transitive config captures before publishing or preparing them",
+    "rebuilds provisional package metadata captures before publishing or preparing them",
     () =>
       Effect.gen(function* () {
         const fixture = yield* preparedFixture;
         const nested = fixture.path.join(fixture.root, "nested");
         yield* fixture.fs.makeDirectory(nested);
         const helper = fixture.path.join(nested, "leaf.ts");
-        const config = fixture.path.join(nested, "tsconfig.json");
+        const config = fixture.path.join(nested, "package.json");
         yield* fixture.fs.writeFileString(
           fixture.entry,
-          'export default require("./nested/leaf");',
+          'import "./nested/leaf"; export default 1;',
         );
         yield* fixture.fs.writeFileString(
           helper,
-          "module.exports = { value: 1 };",
+          "globalThis.provisionalSideEffect = 1;",
         );
-        yield* fixture.fs.writeFileString(
-          config,
-          '{"compilerOptions":{"strict":true}}',
-        );
+        yield* fixture.fs.writeFileString(config, '{"sideEffects":true}');
         let edited = false;
         const filesystem = {
           ...fixture.fs,
@@ -302,7 +301,7 @@ describe("CompilationContext", () => {
                   edited = true;
                   yield* fixture.fs.writeFileString(
                     config,
-                    '{"compilerOptions":{"strict":false}}',
+                    '{"sideEffects":false}',
                   );
                 }),
               ),
@@ -316,7 +315,7 @@ describe("CompilationContext", () => {
         const context = yield* fixture.make(
           [
             {
-              name: "capture-native-config-output",
+              name: "capture-package-metadata-output",
               setup(build) {
                 build.onEnd((result) => {
                   outputs.push(result.outputFiles?.[0]?.text ?? "");
@@ -326,27 +325,17 @@ describe("CompilationContext", () => {
           ],
           filesystem,
           "Once",
-          {
-            ...guards,
-            trackSource: (file) =>
-              Effect.gen(function* () {
-                yield* guards.trackSource(file);
-                if (file === helper) yield* guards.configuration(file);
-                return undefined;
-              }),
-          },
-          undefined,
-          config,
+          guards,
         );
         const snapshot = yield* context.consume();
         expect(outputs).toHaveLength(2);
-        expect(outputs[0]).toContain('"use strict";');
-        expect(outputs[1]).not.toContain('"use strict";');
+        expect(outputs[0]).toContain("provisionalSideEffect");
+        expect(outputs[1]).not.toContain("provisionalSideEffect");
         expect(
           yield* fixture.fs.readFileString(
             Object.keys(snapshot.metafile.outputs)[0] ?? "",
           ),
-        ).not.toContain('"use strict";');
+        ).not.toContain("provisionalSideEffect");
         expect(yield* context.preparedRevision).toEqual(
           Option.some(snapshot.receipt),
         );
@@ -748,6 +737,7 @@ describe("CompilationContext", () => {
             roots: [entry],
           },
           {
+            tsconfigRaw: {},
             entryPoints: [entry],
             absWorkingDir: root,
             bundle: true,
@@ -890,6 +880,7 @@ describe("CompilationContext", () => {
             roots: [entry],
           },
           {
+            tsconfigRaw: {},
             entryPoints: [entry],
             absWorkingDir: root,
             bundle: true,

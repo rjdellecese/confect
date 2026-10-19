@@ -54,6 +54,121 @@ const compileAndLoad = Effect.fn("Compilation.test.compileAndLoad")(function* (
 layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
+  it.effect(
+    "publishes owned configuration diagnostics and guards missing inheritance",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        const config = path.join(root, "tsconfig.json");
+        const missing = path.join(root, "missing.json");
+        yield* fs.writeFileString(entry, "export default 1;");
+        yield* fs.writeFileString(
+          config,
+          '{"extends":"./missing.json","compilerOptions":{"strict":null,"paths":{"unused":["bare"]}}}',
+        );
+        yield* Effect.gen(function* () {
+          const artifact = yield* Bundler.compile(entry);
+          const warnings = artifact.warnings;
+          expect(warnings).toHaveLength(3);
+          expect(warnings).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                detail: expect.objectContaining({ reason: "MissingExtends" }),
+              }),
+              expect.objectContaining({
+                detail: expect.objectContaining({
+                  reason: "InvalidCompilerOption",
+                }),
+              }),
+              expect.objectContaining({
+                detail: expect.objectContaining({ reason: "InvalidPaths" }),
+              }),
+            ]),
+          );
+          expect(
+            warnings.map((item) =>
+              path.resolve(root, item.location?.file ?? ""),
+            ),
+          ).toEqual([config, config, config]);
+          yield* fs.writeFileString(missing, "{}");
+          expect(
+            (yield* Effect.flip(Bundler.compile(entry))).cause,
+          ).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [missing],
+          });
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
+  it.effect.each(["Once", "Watch"] as const)(
+    "compiles only the owned raw configuration without native config reads in %s mode",
+    (mode) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.tsx");
+        const configuration = path.join(root, "tsconfig.json");
+        yield* fs.writeFileString(
+          configuration,
+          "native config parsing must fail",
+        );
+        yield* fs.writeFileString(
+          entry,
+          "const owned={h:()=>7}; export default <div/>;",
+        );
+        const contents = new TextEncoder().encode(
+          '{"compilerOptions":{"jsxFactory":"owned.h"}}',
+        );
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const resolved =
+            yield* compiler.resolutionInputs.configuration(entry);
+          expect(resolved.configuration).toBe(configuration);
+          expect(resolved.tsconfigRaw).toEqual({
+            compilerOptions: { jsxFactory: "owned.h" },
+          });
+          expect(yield* compiler.resolutionInputs.configuration(entry)).toBe(
+            resolved,
+          );
+          const result = yield* Bundler.bundle(entry, {
+            profile: "component-config",
+            plugins: [
+              {
+                name: "assert-owned-config",
+                setup(build) {
+                  expect(build.initialOptions.tsconfig).toBeUndefined();
+                  expect(build.initialOptions.tsconfigRaw).toBe(
+                    resolved.tsconfigRaw,
+                  );
+                },
+              },
+            ],
+          });
+          expect(result.module.default).toBe(7);
+          yield* compiler.verify;
+        }).pipe(
+          Effect.provide(Compilation.layer({ mode, ownedDirectories: [] })),
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            readFile: (file) =>
+              file === configuration
+                ? Effect.succeed(contents)
+                : fs.readFile(file),
+          }),
+        );
+        expect(yield* fs.readFileString(configuration)).toBe(
+          "native config parsing must fail",
+        );
+      }).pipe(Effect.scoped),
+  );
   it.effect.each(["Once", "Watch"] as const)(
     "partitions shared-helper batches by released configuration profiles in %s mode",
     (mode) =>

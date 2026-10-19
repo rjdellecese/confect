@@ -96,7 +96,7 @@ export const make = Effect.fn("CompilationInputs.make")(
     const watched = yield* Ref.make(HashSet.empty<string>());
     const sources = yield* Ref.make(HashSet.empty<string>());
     const configurations = yield* Ref.make(
-      HashMap.empty<string, string | undefined>(),
+      HashMap.empty<string, CompilationConfig.Discovery>(),
     );
     const pending = yield* Ref.make(Option.none<RestartNotification>());
     const events = yield* Queue.unbounded<RestartNotification, BundlerError>();
@@ -351,7 +351,7 @@ export const make = Effect.fn("CompilationInputs.make")(
             if (Option.isSome(cached)) return cached.value;
             const configs = yield* CompilationConfig.discover(
               path.resolve(file),
-              (candidate, kind) =>
+              (candidate, kind, realPath) =>
                 Effect.gen(function* () {
                   if (kind === "Directory")
                     yield* Ref.update(
@@ -363,6 +363,22 @@ export const make = Effect.fn("CompilationInputs.make")(
                     candidate,
                   );
                   yield* track([candidate]);
+                  const captured = Option.getOrUndefined(
+                    HashMap.get(yield* Ref.get(baseline), candidate),
+                  );
+                  const consistent =
+                    kind === "Missing"
+                      ? captured === "missing"
+                      : kind === "Directory"
+                        ? captured === `${realPath}\0directory`
+                        : captured?.startsWith(`${realPath}\0`) === true &&
+                          captured !== `${realPath}\0directory`;
+                  if (!consistent) {
+                    const notification = yield* notify([candidate]);
+                    return yield* new RestartRequired({
+                      paths: notification.paths,
+                    });
+                  }
                   if (unseen)
                     yield* Ref.update(generation, (current) => current + 1);
                 }),
@@ -391,12 +407,46 @@ export const make = Effect.fn("CompilationInputs.make")(
                     yield* Ref.update(generation, (current) => current + 1);
                   }),
                 ),
+              (observation) =>
+                lock.withPermit(
+                  Effect.gen(function* () {
+                    yield* ensure;
+                    const expected = yield* Ref.get(baseline);
+                    const digest = yield* crypto.digest(
+                      "SHA-256",
+                      observation.contents,
+                    );
+                    const captured = `${observation.realPath}\0${Hex.encode(digest)}`;
+                    const changed = Array.filter(
+                      Array.dedupe([observation.path, observation.realPath]),
+                      (candidate) =>
+                        Option.getOrUndefined(
+                          HashMap.get(expected, candidate),
+                        ) !== captured,
+                    );
+                    if (Array.isReadonlyArrayNonEmpty(changed)) {
+                      const notification = yield* notify(changed);
+                      return yield* new RestartRequired({
+                        paths: notification.paths,
+                      });
+                    }
+                  }),
+                ),
             ).pipe(
               Effect.provideService(FileSystem.FileSystem, fs),
               Effect.provideService(Path.Path, path),
               Effect.catch((cause) =>
                 Effect.gen(function* () {
                   if (Schema.is(RestartRequired)(cause)) return yield* cause;
+                  if (
+                    Schema.is(CompilationConfig.DiscoveryRejected)(cause) &&
+                    cause.reason === "ChangedDuringDiscovery"
+                  ) {
+                    const notification = yield* notify([cause.path]);
+                    return yield* new RestartRequired({
+                      paths: notification.paths,
+                    });
+                  }
                   const failure = Schema.is(BundlerError)(cause)
                     ? cause
                     : new BundlerError({ cause });
@@ -407,11 +457,8 @@ export const make = Effect.fn("CompilationInputs.make")(
               ),
             );
             yield* verify(configs.files);
-            yield* Ref.update(
-              configurations,
-              HashMap.set(directory, configs.configuration),
-            );
-            return configs.configuration;
+            yield* Ref.update(configurations, HashMap.set(directory, configs));
+            return configs;
           }),
         );
       }),

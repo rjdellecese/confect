@@ -3,8 +3,14 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
-import { parseTree, type Node, type ParseError } from "jsonc-parser";
+import {
+  getNodeValue,
+  parseTree,
+  type Node,
+  type ParseError,
+} from "jsonc-parser";
 import Module from "node:module";
+import type * as esbuild from "esbuild";
 
 export class DiscoveryFailed extends Schema.TaggedError<DiscoveryFailed>()(
   "CompilationConfigDiscoveryFailed",
@@ -27,8 +33,163 @@ export interface RuntimeObservation {
 
 export interface Discovery {
   readonly configuration: string | undefined;
+  readonly tsconfigRaw: esbuild.TsconfigRaw;
+  readonly warnings: ReadonlyArray<esbuild.PartialMessage>;
   readonly files: ReadonlyArray<string>;
 }
+
+export interface ReadObservation {
+  readonly path: string;
+  readonly realPath: string;
+  readonly contents: Uint8Array;
+}
+
+interface Resolved {
+  readonly options: Readonly<Record<string, unknown>>;
+  readonly pathsOrigin:
+    | { readonly directory: string; readonly file: string }
+    | undefined;
+}
+
+const warning = (
+  file: string,
+  reason: string,
+  subject: string,
+  text: string,
+): esbuild.PartialMessage => ({
+  pluginName: "confect:configuration",
+  text,
+  location: { file, line: 1, column: 0 },
+  detail: { _tag: "CompilationConfigDiagnostic", path: file, reason, subject },
+});
+
+const compilerOptions = (tree: Node, file: string) => {
+  const options = property(tree, "compilerOptions");
+  const result: Record<string, unknown> = {};
+  const warnings: esbuild.PartialMessage[] = [];
+  const invalid = (key: string) =>
+    warnings.push(
+      warning(
+        file,
+        "InvalidCompilerOption",
+        key,
+        `Ignoring invalid compilerOptions.${key}; the inherited value or default is used.`,
+      ),
+    );
+  for (const key of [
+    "alwaysStrict",
+    "experimentalDecorators",
+    "preserveValueImports",
+    "strict",
+    "useDefineForClassFields",
+    "verbatimModuleSyntax",
+  ]) {
+    const value = property(options, key);
+    if (value?.type === "boolean") result[key] = value.value;
+    else if (value) invalid(key);
+  }
+  for (const key of [
+    "baseUrl",
+    "jsx",
+    "jsxFactory",
+    "jsxFragmentFactory",
+    "jsxImportSource",
+    "target",
+    "importsNotUsedAsValues",
+  ]) {
+    const value = string(property(options, key));
+    if (value === undefined) {
+      if (property(options, key)) invalid(key);
+      continue;
+    }
+    if (
+      (key === "target" &&
+        !/^(?:es3|es5|es6|es20(?:1[5-9]|2[0-5])|esnext)$/i.test(value)) ||
+      (key === "jsx" &&
+        ![
+          "preserve",
+          "react-native",
+          "react",
+          "react-jsx",
+          "react-jsxdev",
+        ].includes(value.toLowerCase())) ||
+      (key === "importsNotUsedAsValues" &&
+        !["remove", "preserve", "error"].includes(value)) ||
+      ((key === "jsxFactory" || key === "jsxFragmentFactory") &&
+        !/^[$_\p{ID_Start}][$_\u200c\u200d\p{ID_Continue}]*(?:\.[$_\p{ID_Start}][$_\u200c\u200d\p{ID_Continue}]*)*$/u.test(
+          value,
+        ))
+    ) {
+      invalid(key);
+      continue;
+    }
+    result[key] = value;
+  }
+  const paths = property(options, "paths");
+  if (paths?.type === "object") result.paths = getNodeValue(paths);
+  else if (paths) invalid("paths");
+  return { options: result, warnings };
+};
+
+const substitute = (path: Path.Path, value: string, directory: string) =>
+  value.startsWith("${configDir}")
+    ? `${directory}${path.sep}${value.slice(12).replace(/^[\\/]+/, "")}`
+    : value;
+
+const flatten = (path: Path.Path, resolved: Resolved, directory: string) => {
+  const warnings: esbuild.PartialMessage[] = [];
+  const paths = resolved.options.paths;
+  if (typeof paths !== "object" || paths === null || Array.isArray(paths))
+    return { tsconfigRaw: { compilerOptions: resolved.options }, warnings };
+  const base =
+    typeof resolved.options.baseUrl === "string"
+      ? resolved.options.baseUrl
+      : (resolved.pathsOrigin?.directory ?? directory);
+  const normalized = new Map<string, string[]>();
+  const invalid = (subject: string) =>
+    warnings.push(
+      warning(
+        resolved.pathsOrigin?.file ?? path.join(directory, "tsconfig.json"),
+        "InvalidPaths",
+        subject,
+        `Ignoring invalid compilerOptions.paths entry "${subject}". Relative targets require "./" or "../" when baseUrl is absent.`,
+      ),
+    );
+  for (const [key, values] of Object.entries(paths)) {
+    if (key.split("*").length > 2 || !Array.isArray(values)) {
+      invalid(key);
+      continue;
+    }
+    const targets: string[] = [];
+    for (const item of values) {
+      if (typeof item !== "string" || item.split("*").length > 2) {
+        invalid(key);
+        continue;
+      }
+      const value = substitute(path, item, directory);
+      if (
+        typeof resolved.options.baseUrl !== "string" &&
+        !/^(?:\.{1,2}(?:[\\/]|$)|[\\/]|[a-z]:[\\/])/i.test(value)
+      ) {
+        invalid(key);
+        continue;
+      }
+      targets.push(
+        path.isAbsolute(value) ? value : `${base}${path.sep}${value}`,
+      );
+    }
+    normalized.set(key, targets);
+  }
+  return {
+    tsconfigRaw: {
+      compilerOptions: {
+        ...resolved.options,
+        paths: Object.fromEntries(normalized),
+      },
+    },
+    warnings,
+  };
+};
 
 const property = (node: Node | undefined, key: string): Node | undefined =>
   node?.type === "object"
@@ -69,7 +230,23 @@ const exportTarget = (
   subpath: string,
   conditions: ReadonlyArray<string>,
   pnp = false,
-): Result.Result<string | undefined, DiscoveryRejected> => {
+): Result.Result<
+  {
+    readonly target: string | undefined;
+    readonly warnings: ReadonlyArray<esbuild.PartialMessage>;
+  },
+  DiscoveryRejected
+> => {
+  const warnings: esbuild.PartialMessage[] = [];
+  const invalid = () =>
+    warnings.push(
+      warning(
+        file,
+        "InvalidPackageExports",
+        subpath,
+        "Ignoring an invalid package exports entry while resolving configuration inheritance.",
+      ),
+    );
   const reject = (reason: string) =>
     Result.fail(new DiscoveryRejected({ path: file, reason }));
   let target: Node | undefined = exports;
@@ -78,8 +255,10 @@ const exportTarget = (
     const entries = exports.children ?? [];
     const keys = entries.map((entry) => string(entry.children?.[0]) ?? "");
     if (keys.some((key) => key.startsWith("."))) {
-      if (keys.some((key) => !key.startsWith(".")))
-        return Result.succeed(undefined);
+      if (keys.some((key) => !key.startsWith("."))) {
+        invalid();
+        return Result.succeed({ target: undefined, warnings });
+      }
       target =
         subpath.endsWith("/") || subpath.includes("*")
           ? undefined
@@ -102,7 +281,7 @@ const exportTarget = (
             if (subpath.startsWith(key))
               return pnp
                 ? reject("PnpDirectoryExport")
-                : Result.succeed(undefined);
+                : Result.succeed({ target: undefined, warnings });
             continue;
           }
           const prefix = key.slice(0, star);
@@ -170,8 +349,10 @@ const exportTarget = (
       if (
         keys.some((key) => key.startsWith(".")) &&
         keys.some((key) => !key.startsWith("."))
-      )
+      ) {
+        invalid();
         return Result.succeed(null);
+      }
       for (const entry of node.children ?? []) {
         const key = string(entry.children?.[0]);
         if (
@@ -185,22 +366,26 @@ const exportTarget = (
       }
       return Result.succeed(undefined);
     }
+    invalid();
     return Result.succeed(null);
   };
-  return Result.flatMap(select(target), (value) => {
-    if (value == null || /%(?:2f|5c)|%(?![\da-f]{2})/i.test(value))
-      return Result.succeed(undefined);
-    let decoded: string;
-    try {
-      decoded = decodeURIComponent(value);
-    } catch {
-      return reject("NonUtf8PackageExportTarget");
-    }
-    if (decoded.endsWith("/") || decoded.endsWith("\\"))
-      return Result.succeed(undefined);
-    if (decoded.includes("\0")) return reject("NullBytePackageExportTarget");
-    return Result.succeed(decoded);
-  });
+  return Result.map(
+    Result.flatMap(select(target), (value) => {
+      if (value == null || /%(?:2f|5c)|%(?![\da-f]{2})/i.test(value))
+        return Result.succeed(undefined);
+      let decoded: string;
+      try {
+        decoded = decodeURIComponent(value);
+      } catch {
+        return reject("NonUtf8PackageExportTarget");
+      }
+      if (decoded.endsWith("/") || decoded.endsWith("\\"))
+        return Result.succeed(undefined);
+      if (decoded.includes("\0")) return reject("NullBytePackageExportTarget");
+      return Result.succeed(decoded);
+    }),
+    (selected) => ({ target: selected, warnings }),
+  );
 };
 
 export const discover = <E = never, R = never>(
@@ -208,10 +393,14 @@ export const discover = <E = never, R = never>(
   observe: (
     file: string,
     kind: CandidateKind,
+    realPath: string,
   ) => Effect.Effect<void, E, R> = () => Effect.void,
   conditions: ReadonlyArray<string> = ["node", "module"],
   observeRuntime: (
     observation: RuntimeObservation,
+  ) => Effect.Effect<void, E, R> = () => Effect.void,
+  observeRead: (
+    observation: ReadObservation,
   ) => Effect.Effect<void, E, R> = () => Effect.void,
 ): Effect.Effect<
   Discovery,
@@ -222,8 +411,12 @@ export const discover = <E = never, R = never>(
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const discovered = new Set<string>();
-    const visited = new Set<string>();
+    const resolving = new Set<string>();
+    const completed = new Map<string, Resolved>();
+    let cyclic = false;
+    let configurationDirectory = path.dirname(path.resolve(sourceFile));
     const pnpFiles = new Set<string>();
+    const warnings: esbuild.PartialMessage[] = [];
     const reject = (file: string, reason: string) =>
       new DiscoveryRejected({ path: file, reason });
     const validate = Effect.fn("CompilationConfig.validate")(function* (
@@ -265,8 +458,11 @@ export const discover = <E = never, R = never>(
     ) {
       const found = yield* validate(file);
       discovered.add(file);
-      yield* observe(file, found.kind);
-      return yield* validate(file);
+      yield* observe(file, found.kind, found.real);
+      const confirmed = yield* validate(file);
+      if (confirmed.kind !== found.kind || confirmed.real !== found.real)
+        return yield* reject(file, "ChangedDuringDiscovery");
+      return confirmed;
     });
     const read = Effect.fn("CompilationConfig.read")(function* (
       file: string,
@@ -278,19 +474,21 @@ export const discover = <E = never, R = never>(
         yield* inspect(found.real);
       }
       const guarded = yield* validate(file);
-      if (guarded.kind !== "File") return undefined;
-      if (guarded.real !== found.real)
+      if (guarded.kind !== "File" || guarded.real !== found.real)
         return yield* reject(file, "ChangedDuringDiscovery");
       const contents = yield* fs
-        .readFileString(guarded.real)
+        .readFile(guarded.real)
         .pipe(
           Effect.mapError(
             (cause) => new DiscoveryFailed({ path: file, cause }),
           ),
         );
+      yield* observeRead({ path: file, realPath: guarded.real, contents });
       return {
         real: guarded.real,
-        tree: yield* Effect.fromResult(parse(file, contents, manifest)),
+        tree: yield* Effect.fromResult(
+          parse(file, new TextDecoder().decode(contents), manifest),
+        ),
       };
     });
     const acquirePnp = (
@@ -348,12 +546,28 @@ export const discover = <E = never, R = never>(
       }
       return resolved;
     });
-    const visit = (file: string): Effect.Effect<boolean, Failure | E, R> =>
+    const visit = (
+      file: string,
+    ): Effect.Effect<Resolved | undefined, Failure | E, R> =>
       Effect.gen(function* () {
         const config = yield* read(file);
-        if (!config) return false;
-        if (visited.has(config.real)) return true;
-        visited.add(config.real);
+        if (!config) return undefined;
+        if (resolving.has(config.real)) {
+          cyclic = true;
+          warnings.push(
+            warning(
+              file,
+              "CyclicExtends",
+              config.real,
+              `Ignoring cyclic configuration inheritance at "${file}".`,
+            ),
+          );
+          return { options: {}, pathsOrigin: undefined };
+        }
+        const cached = completed.get(config.real);
+        if (cached) return cached;
+        resolving.add(config.real);
+        let inherited: Resolved = { options: {}, pathsOrigin: undefined };
         const extension = property(config.tree, "extends");
         const values =
           extension?.type === "array"
@@ -361,24 +575,63 @@ export const discover = <E = never, R = never>(
             : [extension];
         for (const item of values) {
           const value = string(item);
-          if (value !== undefined)
-            yield* extend(path.dirname(config.real), value);
+          if (value !== undefined) {
+            const base = yield* extend(path.dirname(config.real), value);
+            if (base)
+              inherited = {
+                options: { ...inherited.options, ...base.options },
+                pathsOrigin: base.pathsOrigin ?? inherited.pathsOrigin,
+              };
+            else
+              warnings.push(
+                warning(
+                  file,
+                  "MissingExtends",
+                  value,
+                  `Cannot find base configuration "${value}".`,
+                ),
+              );
+          }
         }
-        return true;
+        const parsed = compilerOptions(config.tree, config.real);
+        warnings.push(...parsed.warnings);
+        const own = parsed.options;
+        const baseUrl =
+          typeof own.baseUrl === "string"
+            ? path.resolve(
+                path.dirname(config.real),
+                substitute(path, own.baseUrl, configurationDirectory),
+              )
+            : undefined;
+        const result = {
+          options: {
+            ...inherited.options,
+            ...own,
+            ...(baseUrl === undefined ? {} : { baseUrl }),
+          },
+          pathsOrigin:
+            own.paths !== undefined
+              ? { directory: path.dirname(config.real), file: config.real }
+              : inherited.pathsOrigin,
+        };
+        resolving.delete(config.real);
+        if (!cyclic) completed.set(config.real, result);
+        return result;
       });
     const extend = (
       directory: string,
       value: string,
-    ): Effect.Effect<void, Failure | E, R> =>
+    ): Effect.Effect<Resolved | undefined, Failure | E, R> =>
       Effect.gen(function* () {
         if (!packagePath(value) || path.isAbsolute(value)) {
           const file = path.resolve(
             directory,
             value === "." || value === ".." ? `${value}/tsconfig.json` : value,
           );
-          if (!(yield* visit(file)) && !file.endsWith(".json"))
-            yield* visit(`${file}.json`);
-          return;
+          return (
+            (yield* visit(file)) ??
+            (file.endsWith(".json") ? undefined : yield* visit(`${file}.json`))
+          );
         }
         if (!value)
           return yield* reject(directory, "UnsupportedPackageSpecifier");
@@ -396,7 +649,6 @@ export const discover = <E = never, R = never>(
             : parts.length > count
               ? `./${parts.slice(count).join("/")}`
               : ".";
-        let pnpPath: string | undefined;
         for (const current of new Set([
           ...parents(path, directory),
           ...parents(path, path.dirname(path.resolve(sourceFile))),
@@ -409,11 +661,7 @@ export const discover = <E = never, R = never>(
           ]) {
             const file = path.join(current, name);
             pnpFiles.add(file);
-            if (
-              (yield* inspect(file)).kind === "File" &&
-              name !== ".pnp.loader.mjs"
-            )
-              pnpPath ??= file;
+            yield* inspect(file);
           }
         }
         const issuer = path.join(directory, "tsconfig.json");
@@ -438,7 +686,7 @@ export const discover = <E = never, R = never>(
           const manifest = yield* read(manifestFile, true);
           const exports = property(manifest?.tree, "exports");
           if (exports && exports.type !== "null") {
-            const target = yield* Effect.fromResult(
+            const selection = yield* Effect.fromResult(
               exportTarget(
                 manifestFile,
                 exports,
@@ -447,18 +695,19 @@ export const discover = <E = never, R = never>(
                 true,
               ),
             );
-            if (target) yield* visit(path.join(packageDirectory, target));
-            return;
+            warnings.push(...selection.warnings);
+            const target = selection.target;
+            return target
+              ? yield* visit(path.join(packageDirectory, target))
+              : undefined;
           }
-          if (!(yield* visit(unqualified)) && !unqualified.endsWith(".json"))
-            yield* visit(`${unqualified}.json`);
-          return;
+          return (
+            (yield* visit(unqualified)) ??
+            (unqualified.endsWith(".json")
+              ? undefined
+              : yield* visit(`${unqualified}.json`))
+          );
         }
-        if (
-          pnpPath &&
-          !("findPnpApi" in Module && typeof Module.findPnpApi === "function")
-        )
-          return yield* reject(pnpPath, "PnpRuntimeUnavailable");
         for (const current of parents(path, directory)) {
           if (path.basename(current) === "node_modules") continue;
           const packageDirectory = path.join(
@@ -474,15 +723,21 @@ export const discover = <E = never, R = never>(
             if (config) base = path.resolve(packageDirectory, config);
             const exports = property(manifest.tree, "exports");
             if (exports) {
-              const target = yield* Effect.fromResult(
+              const selection = yield* Effect.fromResult(
                 exportTarget(manifestFile, exports, subpath, [
                   "node",
                   "require",
                   ...conditions,
                 ]),
               );
-              if (target && (yield* visit(path.join(packageDirectory, target))))
-                return;
+              warnings.push(...selection.warnings);
+              const target = selection.target;
+              if (target) {
+                const selected = yield* visit(
+                  path.join(packageDirectory, target),
+                );
+                if (selected) return selected;
+              }
             }
           }
           for (const file of [
@@ -490,7 +745,8 @@ export const discover = <E = never, R = never>(
             base,
             `${base}.json`,
           ]) {
-            if (yield* visit(file)) return;
+            const selected = yield* visit(file);
+            if (selected) return selected;
           }
         }
       });
@@ -504,8 +760,24 @@ export const discover = <E = never, R = never>(
       if (candidate.kind === "Missing") continue;
       if (candidate.kind !== "File")
         return yield* reject(configuration, "NotRegularFile");
-      yield* visit(configuration);
-      return { configuration, files: [...discovered] };
+      configurationDirectory = directory;
+      const selected = yield* visit(configuration);
+      const flattened = flatten(
+        path,
+        selected ?? { options: {}, pathsOrigin: undefined },
+        directory,
+      );
+      return {
+        configuration,
+        tsconfigRaw: flattened.tsconfigRaw,
+        warnings: [...warnings, ...flattened.warnings],
+        files: [...discovered],
+      };
     }
-    return { configuration: undefined, files: [...discovered] };
+    return {
+      configuration: undefined,
+      tsconfigRaw: {},
+      warnings,
+      files: [...discovered],
+    };
   }).pipe(Effect.withSpan("CompilationConfig.discover"));

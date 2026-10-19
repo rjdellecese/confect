@@ -34,6 +34,7 @@ import * as CompiledModule from "./CompiledModule";
 import * as Compilation from "./Compilation";
 import * as CompilationPlugin from "./CompilationPlugin";
 import * as CompilationState from "./CompilationState";
+import type * as CompilationConfig from "./CompilationConfig";
 import { logCoalescedBuildWarnings } from "./log";
 
 export type Bundled = CompiledModule.LoadedModule;
@@ -353,6 +354,7 @@ const compileLive = Effect.fn("Bundler.compileLive")(
       readonly plugins?: ReadonlyArray<esbuild.Plugin>;
       readonly profile?: "component-config";
     },
+    selected?: CompilationConfig.Discovery,
   ) {
     const path = yield* Path.Path;
     const fs = yield* FileSystem.FileSystem;
@@ -367,7 +369,8 @@ const compileLive = Effect.fn("Bundler.compileLive")(
     const first = entries[0];
     if (!first)
       return yield* new BundlerError({ cause: { _tag: "EmptyCompilation" } });
-    const configuration = yield* service.resolutionInputs.configuration(first);
+    const configuration =
+      selected ?? (yield* service.resolutionInputs.configuration(first));
     const cwd = yield* Compilation.canonicalPath(path.dirname(first));
     const sources = yield* Effect.forEach(entries, Compilation.canonicalPath);
     const roots = Array.dedupe(sources);
@@ -657,14 +660,20 @@ export const withBatch = <A, E, R>(
                   Object.values(
                     Array.groupBy(
                       selected,
-                      ({ configuration }) => configuration ?? "",
+                      ({ configuration }) => configuration.configuration ?? "",
                     ),
                   ),
                   (group) =>
                     Effect.gen(function* () {
                       const entries = Array.map(group, ({ entry }) => entry);
                       const result = yield* Effect.cached(
-                        compileLive(live.value, entries, true).pipe(
+                        compileLive(
+                          live.value,
+                          entries,
+                          true,
+                          undefined,
+                          group[0].configuration,
+                        ).pipe(
                           Effect.asSome,
                           Effect.catchTag("CompilationFailed", () =>
                             Effect.succeed(Option.none<BatchCompilation>()),
