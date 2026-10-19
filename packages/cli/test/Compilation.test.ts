@@ -6,6 +6,7 @@ import { expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
+import * as PlatformError from "effect/PlatformError";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
@@ -54,6 +55,119 @@ const compileAndLoad = Effect.fn("Compilation.test.compileAndLoad")(function* (
 layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
+  it.effect.each([false, true])(
+    "materializes only requested roots while preserving shared identity and write recovery (%s)",
+    (failExtension) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const one = path.join(root, "one.ts");
+        const two = path.join(root, "two.ts");
+        yield* fs.writeFileString(
+          one,
+          'export { shared } from "./shared"; export const lazy = () => import("./lazy"); export default 1;',
+        );
+        yield* fs.writeFileString(
+          two,
+          'export { shared } from "./shared"; export default 2;',
+        );
+        yield* fs.writeFileString(
+          path.join(root, "shared.ts"),
+          "export const shared = {};",
+        );
+        yield* fs.writeFileString(
+          path.join(root, "lazy.ts"),
+          "export default 42;",
+        );
+        const writes: string[] = [];
+        let failNextWrite = false;
+        yield* Effect.gen(function* () {
+          yield* Bundler.withBatch([one, two], Bundler.compile(one));
+          writes.length = 0;
+          const scope = yield* Scope.make();
+          yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
+          yield* Effect.gen(function* () {
+            const first = yield* Bundler.compile(one);
+            expect(writes.toSorted()).toEqual(
+              Object.keys(first.metafile.outputs).sort(),
+            );
+            const originalWrites = [...writes];
+            const loadedFirst = yield* CompiledModule.load(first);
+            expect(
+              (yield* Effect.promise<{ default: number }>(() =>
+                loadedFirst.module.lazy(),
+              )).default,
+            ).toBe(42);
+            const originalBytes = yield* fs.readFile(fileURLToPath(first.url));
+            const repeated = yield* Bundler.compile(one);
+            expect(repeated.url).toBe(first.url);
+            expect(writes).toEqual(originalWrites);
+            failNextWrite = failExtension;
+            if (failExtension) {
+              expect(
+                Result.isFailure(
+                  yield* Bundler.compile(two).pipe(Effect.result),
+                ),
+              ).toBe(true);
+              expect(failNextWrite).toBe(false);
+              expect(yield* fs.readFile(fileURLToPath(first.url))).toEqual(
+                originalBytes,
+              );
+            }
+            const { second, concurrent } = yield* Effect.all(
+              {
+                second: Bundler.compile(two),
+                concurrent: Bundler.compile(two),
+              },
+              { concurrency: 2 },
+            );
+            expect(concurrent.url).toBe(second.url);
+            expect(path.dirname(fileURLToPath(second.url))).toBe(
+              path.dirname(fileURLToPath(first.url)),
+            );
+            const loadedSecond = yield* CompiledModule.load(second);
+            expect(loadedSecond.module.shared).toBe(loadedFirst.module.shared);
+            expect(loadedSecond.module.default).toBe(2);
+            for (const file of originalWrites)
+              expect(writes.filter((written) => written === file)).toHaveLength(
+                1,
+              );
+            const complete = [
+              ...new Set([
+                ...Object.keys(first.metafile.outputs),
+                ...Object.keys(second.metafile.outputs),
+              ]),
+            ].sort();
+            expect([...new Set(writes)].sort()).toEqual(complete);
+            yield* Scope.close(scope, Exit.void);
+            for (const file of complete)
+              expect(yield* fs.exists(file)).toBe(false);
+          }).pipe(Effect.provideService(CompiledModule.ArtifactScope, scope));
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ ownedDirectories: [], mode: "Once" }),
+          ),
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            writeFile: (file, bytes, options) =>
+              Effect.gen(function* () {
+                writes.push(file);
+                yield* fs.writeFile(file, bytes, options);
+                if (!failNextWrite) return;
+                failNextWrite = false;
+                return yield* PlatformError.systemError({
+                  _tag: "PermissionDenied",
+                  module: "FileSystem",
+                  method: "writeFile",
+                  pathOrDescriptor: file,
+                });
+              }),
+          }),
+        );
+      }).pipe(Effect.scoped),
+  );
+
   it.effect(
     "publishes owned configuration diagnostics and guards missing inheritance",
     () =>

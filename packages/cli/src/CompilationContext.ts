@@ -88,6 +88,81 @@ const diagnostic = (cause: unknown): esbuild.Message => ({
   detail: cause,
 });
 
+export class MissingArtifact extends Schema.TaggedError<MissingArtifact>()(
+  "CompilationArtifactMissing",
+  { kind: Schema.Literals(["EntryPoint", "Output"]), path: Schema.String },
+) {
+  override get message() {
+    return `esbuild did not capture ${this.kind === "EntryPoint" ? "an output for entry" : "output"}: ${this.path}`;
+  }
+}
+
+export const selectArtifacts = (
+  metafile: esbuild.Metafile,
+  outputFiles: ReadonlyArray<esbuild.OutputFile>,
+  roots: ReadonlyArray<string>,
+  path: Path.Path,
+  cwd: string,
+) => {
+  const remaining = new Set(roots);
+  const pending: string[] = [];
+  const metadataByPath = new Map(
+    Object.entries(metafile.outputs).map(([file, metadata]) => [
+      path.resolve(cwd, file),
+      metadata,
+    ]),
+  );
+  for (const [file, metadata] of metadataByPath) {
+    const entryPoint =
+      metadata.entryPoint &&
+      path.resolve(cwd, CompilationPlugin.physicalPath(metadata.entryPoint));
+    if (entryPoint && remaining.has(entryPoint)) {
+      pending.push(file);
+      remaining.delete(entryPoint);
+    }
+  }
+  for (const root of remaining)
+    return Result.fail(new MissingArtifact({ kind: "EntryPoint", path: root }));
+  const available = new Map(outputFiles.map((file) => [file.path, file]));
+  const visited = new Set(pending);
+  const outputs: esbuild.Metafile["outputs"] = {};
+  const files: esbuild.OutputFile[] = [];
+  for (let index = 0; index < pending.length; index++) {
+    const file = pending[index];
+    if (file === undefined) continue;
+    const metadata = metadataByPath.get(file);
+    const bytes = available.get(file);
+    if (!metadata || !bytes)
+      return Result.fail(new MissingArtifact({ kind: "Output", path: file }));
+    const cssBundle =
+      metadata.cssBundle && path.resolve(cwd, metadata.cssBundle);
+    outputs[file] = {
+      ...metadata,
+      imports: metadata.imports.map((imported) =>
+        imported.external
+          ? imported
+          : { ...imported, path: path.resolve(cwd, imported.path) },
+      ),
+      ...(cssBundle ? { cssBundle } : {}),
+    };
+    files.push(bytes);
+    const dependencies = metadata.imports
+      .filter((imported) => !imported.external)
+      .map((imported) => path.resolve(cwd, imported.path));
+    if (cssBundle) dependencies.push(cssBundle);
+    if (available.has(`${file}.map`)) dependencies.push(`${file}.map`);
+    for (const dependency of dependencies) {
+      if (visited.has(dependency)) continue;
+      visited.add(dependency);
+      pending.push(dependency);
+    }
+  }
+  return Result.succeed({
+    metafile: { inputs: metafile.inputs, outputs },
+    files,
+  });
+};
+
 export const relocateMetafile = (
   metafile: esbuild.Metafile,
   from: string,
@@ -100,6 +175,11 @@ export const relocateMetafile = (
       path.join(to, path.relative(from, file)),
       {
         ...metadata,
+        ...(metadata.cssBundle
+          ? {
+              cssBundle: path.join(to, path.relative(from, metadata.cssBundle)),
+            }
+          : {}),
         imports: Array.map(metadata.imports, (imported) =>
           imported.external
             ? imported
@@ -165,6 +245,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     ReadonlyArray<{
       readonly directory: string;
       readonly artifacts: string;
+      readonly files: ReadonlySet<string>;
     }>
   >();
   const identities = new WeakMap<object, Captured>();
@@ -544,7 +625,10 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       Effect.asVoid,
     ),
     consume: Effect.fn("CompilationContext.consume")(
-      function* (expected?: CompilationState.Receipt) {
+      function* (
+        expected?: CompilationState.Receipt,
+        roots: ReadonlyArray<string> = topology.roots,
+      ) {
         yield* ensureActive;
         yield* sources.ensure;
         const available = expected
@@ -565,36 +649,39 @@ export const make = Effect.fn("CompilationContext.make")(function* (
             }),
           });
         }
-        const { receipt, metafile } = captured;
-        const scope = yield* Scope.Scope;
-        const previous = snapshots.get(scope) ?? [];
-        const existing = Array.findFirst(
-          previous,
-          (snapshot) => snapshot.artifacts === captured.artifacts,
-        );
-        if (Option.isSome(existing))
-          return {
-            receipt,
+        const { receipt } = captured;
+        const { metafile, files } = yield* Effect.fromResult(
+          selectArtifacts(
+            captured.metafile,
+            captured.outputFiles,
+            roots,
+            path,
             cwd,
-            metafile: relocateMetafile(
-              metafile,
-              output,
-              existing.value.directory,
-              path,
-            ),
-            warnings: captured.warnings,
-          } satisfies Snapshot;
-        const target = yield* fs.makeTempDirectoryScoped({
-          directory: options.absWorkingDir,
-          prefix: ".confect-artifacts-",
-        });
-        const files = captured.outputFiles;
-        const directories = new Set([target]);
-        yield* lock.withPermit(
-          Effect.forEach(files, (file) =>
-            Effect.gen(function* () {
+          ),
+        );
+        const scope = yield* Scope.Scope;
+        const directoryCandidate =
+          snapshots
+            .get(scope)
+            ?.find((snapshot) => snapshot.artifacts === captured.artifacts)
+            ?.directory ??
+          (yield* fs.makeTempDirectoryScoped({
+            directory: options.absWorkingDir,
+            prefix: ".confect-artifacts-",
+          }));
+        const target = yield* lock.withPermit(
+          Effect.gen(function* () {
+            const previous = snapshots.get(scope) ?? [];
+            const existing = previous.find(
+              (snapshot) => snapshot.artifacts === captured.artifacts,
+            );
+            const snapshotDirectory = existing?.directory ?? directoryCandidate;
+            const written = new Set(existing?.files);
+            const directories = new Set([snapshotDirectory]);
+            for (const file of files) {
+              if (written.has(file.path)) continue;
               const destination = path.join(
-                target,
+                snapshotDirectory,
                 path.relative(output, file.path),
               );
               const parent = path.dirname(destination);
@@ -603,21 +690,29 @@ export const make = Effect.fn("CompilationContext.make")(function* (
                 directories.add(parent);
               }
               yield* fs.writeFile(destination, file.contents);
-            }),
-          ),
-        );
-        if (!snapshots.has(scope))
-          yield* Scope.addFinalizer(
-            scope,
-            Effect.sync(() => {
-              snapshots.delete(scope);
-            }),
-          );
-        snapshots.set(
-          scope,
-          Array.append(previous, {
-            directory: target,
-            artifacts: captured.artifacts,
+              written.add(file.path);
+            }
+            if (!snapshots.has(scope))
+              yield* Scope.addFinalizer(
+                scope,
+                Effect.sync(() => {
+                  snapshots.delete(scope);
+                }),
+              );
+            const snapshot = {
+              directory: snapshotDirectory,
+              artifacts: captured.artifacts,
+              files: written,
+            };
+            snapshots.set(
+              scope,
+              existing
+                ? previous.map((value) =>
+                    value === existing ? snapshot : value,
+                  )
+                : [...previous, snapshot],
+            );
+            return snapshotDirectory;
           }),
         );
         yield* sources.ensure;
@@ -629,7 +724,11 @@ export const make = Effect.fn("CompilationContext.make")(function* (
           warnings: captured.warnings,
         } satisfies Snapshot;
       },
-      (effect, _expected?: CompilationState.Receipt) =>
+      (
+        effect,
+        _expected?: CompilationState.Receipt,
+        _roots?: ReadonlyArray<string>,
+      ) =>
         Effect.mapError(effect, (cause) =>
           Schema.is(BundlerError)(cause) ||
           Schema.is(CompilationState.Failed)(cause)

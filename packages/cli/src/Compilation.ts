@@ -260,7 +260,7 @@ export const layer = (options: {
               ),
             );
             const outcome = yield* selected
-              .consume(Option.getOrUndefined(expected))
+              .consume(Option.getOrUndefined(expected), request.roots)
               .pipe(Effect.provide(services), Effect.result);
             yield* resolutionInputs.check;
             if (Result.isSuccess(outcome)) {
