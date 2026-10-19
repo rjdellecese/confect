@@ -724,6 +724,9 @@ importers:
       esbuild:
         specifier: 0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0
         version: 0.28.2
+      rolldown:
+        specifier: 1.2.13
+        version: 1.2.13
       typescript:
         specifier: 7.0.2
         version: 7.0.2

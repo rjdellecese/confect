@@ -4,6 +4,11 @@ This private workspace package evaluates a compiler architecture. It is not
 published, used by `confect dev` or `confect codegen`, or a production fallback.
 The existing compiler remains the compatibility oracle.
 
+See [the backend contract and capability assessment](./BACKEND_CONTRACT.md) for
+the subsequent native validation-boundary investigation. It distinguishes
+freshness validation from semantic preparation and records real esbuild and
+Rolldown probes; it does not promote the adapter below.
+
 ## Run the checks
 
 From the repository root, with the workspace dependencies and packages built:
@@ -26,6 +31,10 @@ seconds, removes the fixtures, prints a JSON report, and exits nonzero if the
 oracle differs from the fixture or the prototype differs from the expected
 result. Run it separately from CLI typechecks while those temporary fixtures
 exist. The root production test project does not discover this private package.
+
+The two `*Boundary.test.ts` integration suites run with the private test command.
+They check native engine capabilities and limitations; passing them is not a
+claim that either engine satisfies the complete backend contract.
 
 **The gate currently fails. Do not benchmark this candidate as equivalent to
 the existing compiler.** Passing the unit suite does not qualify the backend.
