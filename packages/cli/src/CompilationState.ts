@@ -113,10 +113,6 @@ export class Failed extends Schema.TaggedError<Failed>()("CompilationFailed", {
 
 export type Values = Readonly<Record<string, string>>;
 
-export const sameValues = (before: Values, after: Values): boolean =>
-  Record.size(before) === Record.size(after) &&
-  Record.every(before, (value, key) => after[key] === value);
-
 export function* reachable<
   A extends {
     readonly imports: ReadonlyArray<{

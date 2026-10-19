@@ -13,6 +13,7 @@ import * as Ref from "effect/Ref";
 import * as Queue from "effect/Queue";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
+import * as PlatformError from "effect/PlatformError";
 import * as CompilationState from "@confect/cli/CompilationState";
 import * as CompilationContext from "@confect/cli/CompilationContext";
 import * as CompilationInputs from "@confect/cli/CompilationInputs";
@@ -101,6 +102,86 @@ const preparedFixture = Effect.gen(function* () {
 });
 
 describe("CompilationContext", () => {
+  it.live("writes artifacts only when a captured revision is consumed", () =>
+    Effect.gen(function* () {
+      const fixture = yield* preparedFixture;
+      const writes: string[] = [];
+      const context = yield* fixture.make(
+        [],
+        {
+          ...fixture.fs,
+          writeFile: (...args) => {
+            writes.push(args[0]);
+            return fixture.fs.writeFile(...args);
+          },
+        },
+        "Once",
+      );
+      yield* context.verify;
+      expect(writes).toEqual([]);
+      const prepared = yield* context.preparedRevision;
+      assert(Option.isSome(prepared));
+      const snapshot = yield* context.consume(prepared.value);
+      expect(writes).toEqual(Object.keys(snapshot.metafile.outputs));
+      yield* context.verify;
+      const next = yield* context.preparedRevision;
+      assert(Option.isSome(next));
+      const unchanged = yield* context.consume(next.value);
+      expect(Object.keys(unchanged.metafile.outputs)).toEqual(
+        Object.keys(snapshot.metafile.outputs),
+      );
+      expect(writes).toEqual(Object.keys(snapshot.metafile.outputs));
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+    ),
+  );
+
+  it.live("recovers the captured bytes after an artifact write fails", () =>
+    Effect.gen(function* () {
+      const fixture = yield* preparedFixture;
+      let failNextWrite = false;
+      const context = yield* fixture.make(
+        [],
+        {
+          ...fixture.fs,
+          writeFile: (...args) =>
+            Effect.gen(function* () {
+              yield* fixture.fs.writeFile(...args);
+              if (!failNextWrite) return;
+              failNextWrite = false;
+              return yield* PlatformError.systemError({
+                _tag: "PermissionDenied",
+                module: "FileSystem",
+                method: "writeFile",
+                pathOrDescriptor: args[0],
+              });
+            }),
+        },
+        "Once",
+      );
+      yield* context.consume().pipe(Effect.scoped);
+      yield* fixture.fs.writeFileString(fixture.entry, "export default 2;");
+      failNextWrite = true;
+      expect(
+        Result.isFailure(
+          yield* context.consume().pipe(Effect.scoped, Effect.result),
+        ),
+      ).toBe(true);
+      expect(failNextWrite).toBe(false);
+      yield* fixture.fs.writeFileString(fixture.entry, "export default 1;");
+      yield* Effect.gen(function* () {
+        const snapshot = yield* context.consume();
+        const output = Object.keys(snapshot.metafile.outputs)[0];
+        assert(output);
+        expect(yield* fixture.fs.readFileString(output)).toContain("= 1;");
+      }).pipe(Effect.scoped);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+    ),
+  );
+
   it.live.each(["operation", "metadata"] as const)(
     "recovers from unsolicited native %s failures on a later edit",
     (kind) =>

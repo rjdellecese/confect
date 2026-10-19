@@ -145,7 +145,6 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     prefix: "confect-context-",
   });
   const output = path.join(directory, "output");
-  const latest = path.join(directory, "latest");
   const lock = yield* Semaphore.make(1);
   const rebuildLock = yield* Semaphore.make(1);
   const stabilization = yield* Queue.sliding<void>(1);
@@ -156,13 +155,11 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     if (Option.isSome(failure)) return yield* failure.value;
   });
   const revision = yield* Ref.make(0);
-  const latestRevision = yield* Ref.make(0);
   const values = yield* Ref.make<CompilationState.Values>({});
   const failed = yield* Ref.make(false);
   const startedGeneration = yield* Ref.make(0);
   const provisional = new WeakSet<object>();
   const sources = yield* CompilationSources.make(options, guards.trackSource);
-  const latestHashes = yield* Ref.make<CompilationState.Values>({});
   const snapshots = new WeakMap<
     Scope.Scope,
     ReadonlyArray<{
@@ -275,22 +272,6 @@ export const make = Effect.fn("CompilationContext.make")(function* (
             .pipe(Effect.map((hash) => [file.path, Hex.encode(hash)] as const)),
         ),
       );
-      if (result.outputFiles && errors.length === 0) {
-        if (
-          !CompilationState.sameValues(yield* Ref.get(latestHashes), hashes)
-        ) {
-          yield* fs.remove(latest, { recursive: true, force: true });
-          yield* fs.makeDirectory(latest, { recursive: true });
-          yield* Effect.forEach(result.outputFiles, (file) => {
-            const target = path.join(latest, path.relative(output, file.path));
-            return fs
-              .makeDirectory(path.dirname(target), { recursive: true })
-              .pipe(Effect.andThen(fs.writeFile(target, file.contents)));
-          });
-          yield* Ref.set(latestHashes, hashes);
-        }
-        yield* Ref.set(latestRevision, number);
-      }
       const previous = yield* Ref.get(values);
       const next = yield* Effect.gen(function* () {
         if (!metafile || !result.outputFiles || errors.length > 0)
@@ -608,24 +589,22 @@ export const make = Effect.fn("CompilationContext.make")(function* (
           prefix: ".confect-artifacts-",
         });
         const files = captured.outputFiles;
+        const directories = new Set([target]);
         yield* lock.withPermit(
-          Effect.gen(function* () {
-            if ((yield* Ref.get(latestRevision)) === receipt.revision) {
-              yield* fs.copy(latest, target, { overwrite: true });
-            } else {
-              yield* Effect.forEach(files, (file) => {
-                const destination = path.join(
-                  target,
-                  path.relative(output, file.path),
-                );
-                return fs
-                  .makeDirectory(path.dirname(destination), { recursive: true })
-                  .pipe(
-                    Effect.andThen(fs.writeFile(destination, file.contents)),
-                  );
-              });
-            }
-          }),
+          Effect.forEach(files, (file) =>
+            Effect.gen(function* () {
+              const destination = path.join(
+                target,
+                path.relative(output, file.path),
+              );
+              const parent = path.dirname(destination);
+              if (!directories.has(parent)) {
+                yield* fs.makeDirectory(parent, { recursive: true });
+                directories.add(parent);
+              }
+              yield* fs.writeFile(destination, file.contents);
+            }),
+          ),
         );
         if (!snapshots.has(scope))
           yield* Scope.addFinalizer(

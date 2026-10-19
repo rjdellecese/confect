@@ -1565,9 +1565,9 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
           Effect.provideService(FileSystem.FileSystem, {
             ...fs,
             watch: () => Stream.never,
-            copy: (...args) =>
+            writeFile: (...args) =>
               fs
-                .copy(...args)
+                .writeFile(...args)
                 .pipe(
                   Effect.andThen(
                     fs.writeFileString(marker, '{"changed":true}'),
