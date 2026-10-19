@@ -172,7 +172,7 @@ export const makeConfigProfiles = Effect.gen(function* () {
   const writeNames = (rootName: string, nestedName: string) =>
     project.write(
       "confect/helpers/name.tsx",
-      `const rootFactory = { h: () => ${JSON.stringify(rootName)} };\nconst nestedFactory = { h: () => ${JSON.stringify(nestedName)} };\nexport const name = <div />;\n`,
+      `const rootFactory = { h: () => ${JSON.stringify(rootName)}, z: () => ${JSON.stringify(`configured${rootName}`)} };\nconst nestedFactory = { h: () => ${JSON.stringify(nestedName)} };\nexport const name = <div />;\n`,
     );
   yield* writeNames("list", "other");
   yield* project.write(
@@ -192,4 +192,46 @@ export const makeConfigProfiles = Effect.gen(function* () {
     `import { name } from "../helpers/name";\n${impl.replaceAll('"./_generated/', '"../_generated/').replace('"./notes.spec"', '"./other.spec"').replace('"list"', "name")}`,
   );
   return { ...project, writeNames };
+});
+
+export const makeInheritedConfigProfiles = Effect.gen(function* () {
+  const project = yield* makeConfigProfiles;
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  yield* fs.makeDirectory(path.join(project.root, "configs"));
+  const writeBaseConfig = (jsxFactory: string) =>
+    project.write(
+      "configs/base.json",
+      JSON.stringify({
+        compilerOptions: {
+          baseUrl: "..",
+          paths: { "@profile/name": ["./confect/helpers/name.tsx"] },
+          jsxFactory,
+        },
+      }),
+    );
+  yield* writeBaseConfig("rootFactory.h");
+  yield* project.write(
+    "configs/overrides.json",
+    '{"compilerOptions":{"target":"ES2022"}}',
+  );
+  yield* project.write(
+    "tsconfig.json",
+    '{"extends":["./configs/base.json","./configs/overrides.json"],"compilerOptions":{"moduleResolution":"Bundler"}}',
+  );
+  for (const file of [
+    "confect/notes.spec.ts",
+    "confect/notes.impl.ts",
+    "confect/nested/other.spec.ts",
+    "confect/nested/other.impl.ts",
+  ]) {
+    const contents = yield* fs.readFileString(path.join(project.root, file));
+    yield* project.write(
+      file,
+      contents
+        .replace('"./helpers/name"', '"@profile/name"')
+        .replace('"../helpers/name"', '"@profile/name"'),
+    );
+  }
+  return { ...project, writeBaseConfig };
 });

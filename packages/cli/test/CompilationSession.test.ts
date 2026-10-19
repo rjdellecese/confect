@@ -5,6 +5,7 @@ import * as esbuild from "esbuild";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
@@ -24,6 +25,63 @@ vi.mock("esbuild", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationSession",
   (it) => {
+    it.effect.each(["Once", "Watch"] as const)(
+      "guards project resolution metadata before the first compile in %s mode",
+      (mode) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.provide(
+            Effect.gen(function* () {
+              const compiler = yield* Compilation.Service;
+              expect(yield* compiler.topology).toEqual([]);
+              yield* project.write(
+                "package.json",
+                '{"type":"module","name":"changed"}',
+              );
+              const result = yield* compiler.verify.pipe(Effect.result);
+              assert(Result.isFailure(result));
+              expect(result.failure.cause).toMatchObject({
+                _tag: "CompilationRestartRequired",
+              });
+            }).pipe(Effect.provide(CompilationSession.layer(mode))),
+          );
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each(["Once", "Watch"] as const)(
+      "ignores shadowed and unused configuration changes in %s mode",
+      (mode) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const path = yield* Path.Path;
+          yield* project.write("confect/tsconfig.json", "{}");
+          yield* project.write("confect/entry.ts", "export default 42;");
+          yield* project.provide(
+            Effect.gen(function* () {
+              const compiler = yield* Compilation.Service;
+              const entry = path.join(project.root, "confect/entry.ts");
+              const initial = yield* Bundler.compile(entry);
+              assert(initial.origin);
+              for (const file of ["tsconfig.json", "jsconfig.json"]) {
+                yield* project.write(file, '{"extends":');
+                yield* compiler.verify;
+                const compiled = yield* Bundler.compile(entry);
+                expect(compiled.origin).toMatchObject({
+                  context: initial.origin.context,
+                  roots: initial.origin.roots,
+                });
+                expect(
+                  (yield* CompiledModule.namespace(compiled.url)).default,
+                ).toBe(42);
+                expect(Option.isNone(yield* compiler.restartRequired)).toBe(
+                  true,
+                );
+              }
+            }).pipe(Effect.provide(CompilationSession.layer(mode))),
+          );
+        }).pipe(Effect.scoped),
+    );
+
     it.effect.each([
       {
         mode: "Once",

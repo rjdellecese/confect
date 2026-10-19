@@ -14,6 +14,103 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
     it.effect(
+      "ignores shadowed configs while continuing to compile imported helpers",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* fs.makeDirectory(path.join(project.root, "confect/helpers"));
+          yield* project.write("confect/tsconfig.json", "{}");
+          yield* project.write(
+            "confect/helpers/value.ts",
+            'export const value = "initial";',
+          );
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { value } from "./helpers/value";\nconsole.log("IGNORED_CONFIG_EDIT:" + value);\n${Project.spec}`,
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const generated = yield* project.generatedFiles;
+          yield* Ref.set(watching.output, "");
+          for (const file of [
+            "tsconfig.json",
+            "jsconfig.json",
+            "confect/helpers/tsconfig.json",
+          ])
+            yield* project.write(file, '{"extends":');
+          yield* project.write(
+            "confect/helpers/value.ts",
+            'export const value = "edited";',
+          );
+          yield* watching.waitFor("IGNORED_CONFIG_EDIT:edited");
+          yield* watching.waitFor(success);
+          expect(yield* Ref.get(watching.output)).not.toContain(
+            "Performing initial sync",
+          );
+          expect(yield* project.generatedFiles).toEqual(generated);
+          const once = yield* project.start("codegen");
+          yield* once.waitFor(success);
+          expect(Number(yield* once.handle.exitCode)).toBe(0);
+          expect(yield* project.generatedFiles).toEqual(generated);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "restarts for inherited config edits and keeps alias source edits incremental",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.makeInheritedConfigProfiles;
+          const path = yield* Path.Path;
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const initial = yield* project.generatedFiles;
+          expect(initial[path.join("convex", "notes.ts")]).toContain(
+            "export const list =",
+          );
+          expect(initial[path.join("convex", "nested", "other.ts")]).toContain(
+            "export const other =",
+          );
+          yield* Ref.set(watching.output, "");
+          yield* project.writeNames("updatedList", "updatedOther");
+          yield* watching.waitFor(success);
+          const incremental = yield* project.generatedFiles;
+          expect(incremental[path.join("convex", "notes.ts")]).toContain(
+            "export const updatedList =",
+          );
+          expect(
+            incremental[path.join("convex", "nested", "other.ts")],
+          ).toContain("export const updatedOther =");
+          expect(yield* Ref.get(watching.output)).not.toContain(
+            "Performing initial sync",
+          );
+          yield* Ref.set(watching.output, "");
+          yield* project.writeBaseConfig("rootFactory.z");
+          yield* watching.waitFor("Performing initial sync");
+          yield* watching.waitFor(success);
+          const restarted = yield* Ref.get(watching.output);
+          expect(
+            restarted.match(/Performing initial sync/g),
+            restarted,
+          ).toHaveLength(1);
+          const resolved = yield* project.generatedFiles;
+          expect(resolved[path.join("convex", "notes.ts")]).toContain(
+            "export const configuredupdatedList =",
+          );
+          expect(resolved[path.join("convex", "nested", "other.ts")]).toContain(
+            "export const updatedOther =",
+          );
+          const once = yield* project.start("codegen");
+          yield* once.waitFor(success);
+          expect(Number(yield* once.handle.exitCode)).toBe(0);
+          expect(yield* project.generatedFiles).toEqual(resolved);
+        }).pipe(Effect.scoped),
+      { timeout: 90000 },
+    );
+
+    it.effect(
       "keeps shared-helper edits incremental across config profiles",
       () =>
         Effect.gen(function* () {
