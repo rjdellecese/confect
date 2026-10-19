@@ -707,6 +707,33 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  tools/module-prototype:
+    devDependencies:
+      '@effect/platform-node':
+        specifier: 4.0.4
+        version: 4.0.4(effect@4.0.4)(redis@6.2.1)
+      '@effect/vitest':
+        specifier: 4.0.4
+        version: 4.0.4(effect@4.0.4)(vitest@5.0.3)
+      '@types/node':
+        specifier: 26.6.5
+        version: 26.6.5
+      effect:
+        specifier: 4.0.4
+        version: 4.0.4
+      esbuild:
+        specifier: 0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0
+        version: 0.28.2
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.3.4
+        version: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.15)(yaml@2.9.0)
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@types/node@26.6.5)(@vitest/browser-preview@4.1.11)(@vitest/coverage-v8@5.0.3)(happy-dom@20.14.6)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.15)(yaml@2.9.0))
+
   tools/oxlint-rules:
     devDependencies:
       '@effect/platform-node':

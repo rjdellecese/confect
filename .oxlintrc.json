@@ -84,6 +84,7 @@
     {
       "files": [
         "packages/cli/src/EvaluationSession.ts",
+        "tools/module-prototype/src/Runner.ts",
         "packages/cli/test/Evaluation.test.ts",
         "packages/cli/src/DevSupervisor.ts",
         "packages/cli/test/DevSupervisor.test.ts",

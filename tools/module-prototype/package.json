@@ -1,0 +1,21 @@
+{
+  "name": "module-prototype",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gate": "pnpm --dir ../.. exec tsx tools/module-prototype/src/gate.ts",
+    "test": "pnpm --dir ../.. exec vitest run --config tools/module-prototype/vitest.config.ts",
+    "typecheck": "tsc --noEmit --project tsconfig.json"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "4.0.4",
+    "@effect/vitest": "4.0.4",
+    "@types/node": "26.6.5",
+    "effect": "4.0.4",
+    "esbuild": "0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.3"
+  }
+}
