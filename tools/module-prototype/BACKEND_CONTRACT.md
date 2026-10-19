@@ -7,16 +7,25 @@ Keep a mature compiler responsible for module semantics. Do not promote the
 thin Vite adapter, replace native resolution with a Confect resolver, or equate
 watcher silence with freshness.
 
-The next implementation target is an **engine-owned refresh/prepare boundary**:
-refresh the native graph and validate a previously prepared revision without
-necessarily linking and generating artifacts again. A changed graph still needs
-normal semantic preparation before evaluation. Bundled output remains valid;
-incremental work does not require an unbundled runtime.
+Upstream compiler changes and private compiler forks are out of scope. The prior
+recommendation to pursue a native refresh/capture extension is withdrawn.
+Emission-free validation is an optimization hypothesis, not a requirement that
+justifies maintaining compiler internals. Ordinary full preparation remains a
+valid implementation when exact freshness cannot be established more cheaply.
 
-The current public APIs do not yet establish this complete boundary. esbuild has
-a useful resolver-only primitive but no complete validation receipt. Rolldown
-has a real experimental scan API, but not the entire persistent, observable,
-owned-configuration boundary. Neither finding justifies a production switch.
+The alternative worth qualifying is a **supported input-filesystem boundary**.
+Confect records the filesystem facts supplied to a whole compiler, while that
+compiler retains resolution, loading and linking. Unchanged complete observations
+could validate an existing preparation without invoking the compiler; changed
+inputs still require normal preparation. This needs neither a scan-only API nor
+an unbundled runtime. It is not yet a qualified Confect backend.
+
+webpack exposes such a public boundary; current Rspack also exposes filesystem
+injection and explicit rebuild inputs, with experimental filesystem configuration.
+These are more concrete candidates for this approach than adding APIs to esbuild.
+Keep esbuild as the production backend and compatibility oracle while assessing
+the alternatives. Its remaining performance regression is not accepted as the
+long-term endpoint.
 
 ## Ownership
 
@@ -66,7 +75,7 @@ that policy.
 
 ## Refresh is not readiness
 
-The proposed operations are a semantic contract, not an implemented public API:
+These operations describe responsibilities, not a required new compiler API:
 
 1. **Refresh:** inspect current inputs and native discovery state against a
    receipt. Return current, changed, restart-required, unproven, or a structured
@@ -180,32 +189,63 @@ Relevant source locations are `src/api/experimental.ts`,
 `src/types/module-info.ts`, and `src/options/input-options.ts` in Rolldown's
 package source. The native link stage reports missing-export diagnostics.
 
-## Next implementation decision
+## Alternatives using existing APIs
 
-Prefer a focused native-boundary feasibility change over a new Confect loader:
+| Alternative                                                  | Assessment                                                                                                                                                                                                             |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keep whole esbuild preparations                              | Preserves the qualified module semantics and existing guards. It is the safe production baseline, but does not by itself resolve the measured latency and memory regression.                                           |
+| Skip esbuild rebuilds using known files and replayed imports | Rejected: the probes demonstrate missing discovery evidence. Watcher events and output equality do not repair that gap.                                                                                                |
+| Expand the thin Vite adapter                                 | Not preferred: fixing the failed gate piecemeal moves loader and linking responsibilities into Confect. Adopting the full pipeline would be a separate migration, not a small adapter fix.                             |
+| Use webpack with its input filesystem API                    | A concrete stable integration surface below resolution. It needs semantic/configuration parity and performance qualification; replacing a fast native compiler with a JavaScript compiler is not inherently a speedup. |
+| Use Rspack with its input filesystem API                     | A native whole-compiler candidate with public explicit invalidation. Its filesystem option is experimental, and native/JavaScript crossing costs, cache provenance and compatibility still require qualification.      |
 
-1. Explore an esbuild refresh/capture extension that retains the native scan,
-   exposes complete observation provenance, and permits preparation from that
-   capture. Preserve the existing configuration handoff and module semantics.
-   This requires an upstream-capability discussion or an explicitly isolated
-   feasibility branch; it is not implementable by pretending the current public
-   plugin callbacks already provide all the required facts.
-   A feasibility patch is not a commitment to maintaining a permanent private
-   compiler fork; an upstream-supported, sustainable surface is part of the
-   backend selection criterion.
-2. Require the glob, same-metadata, candidate-kind, realpath and acquisition-race
-   cases to pass before accepting a current receipt. Preserve the existing
-   receipt, recovery, protected-file and evaluation-isolation suites. No current
-   production test or operation budget is changed by this assessment.
-3. Only then measure unchanged refresh, a one-group edit, shared-helper edits,
-   configuration restart, cold start and memory. Distinguish read/scan, linking,
-   generation and evaluation costs. Do not promise that the boundary removes
-   the entire observed regression.
-4. If obtaining or maintaining this capability in esbuild is not sustainable,
-   evaluate Rolldown against the same contract, including owned configuration
-   and API stability. Its scan API makes it worth investigating, not a qualified
-   replacement today.
+webpack's [compiler API](https://webpack.js.org/api/compiler-object/) exposes
+`inputFileSystem`; its resolver receives that filesystem too. In Rspack 2.2.9,
+`experiments.useInputFileSystem` selects the injected filesystem, and the native
+binding supplies it to the compiler and resolver factories. A catch-all selection
+is necessary for this design: intercepting source files but leaving native
+package/discovery reads outside the boundary would repeat the original problem.
+Rspack's public `run(callback, { modifiedFiles, removedFiles })` accepts explicit
+changes. An empty change set must not be mistaken for an independent freshness
+check; Confect would derive these sets from exact observations, not trust events.
 
-The decision is to keep the semantic engine replaceable while keeping one
-authority for each fact. This work adds evidence and a contract only; production
-validation is not skipped, and no backend switch or performance claim is made.
+A filesystem boundary is generic observation, not a second resolver. It must
+record returned bytes, missing results, directory entries, kinds and symlink/
+realpath results. It must enforce protected-path policy before reads. Loader and
+plugin access outside that boundary, external runtime inputs and cache reuse all
+need explicit treatment. A cached module does not become observation-free merely
+because it caused no filesystem calls in a later compilation.
+
+Owned configuration remains mandatory. A backend accepting a filename rather
+than an object is not automatically unsuitable: an explicit, Confect-produced
+flattened configuration artifact can preserve one selection authority, provided
+relative-path semantics, secondary discovery and exact provenance are qualified.
+Passing the user's original tsconfig back to an independently discovering backend
+would not satisfy that condition.
+
+## Qualification decision
+
+Prefer assessing the supported filesystem boundary over extending a compiler or
+building another JavaScript loader. Rspack is a candidate for a native integration;
+webpack provides a stable public-API comparison. Neither is selected for production.
+The integration must meet these gates before adoption:
+
+1. Complete acquisition and validation, including negative candidates, directory
+   changes, same-metadata edits, realpaths, protected aliases and races. Warm
+   cache hits must retain the facts originally consumed; incomplete provenance
+   requires full recapture, not a current receipt.
+2. The existing semantic gate plus owned configuration, runtime conditions,
+   generated namespaces, diagnostics and platform behavior. A transform-only
+   esbuild loader could preserve some syntax behavior, but would not by itself
+   preserve another backend's resolution or linking semantics.
+3. Existing transaction, scoped evaluation, per-root consumption, pending-sibling
+   and newer-edit accounting, stabilization, recovery and resource bounds. A
+   whole-compilation read set alone does not establish selective-root scheduling.
+4. Repeatably better startup, reload and memory results on equivalent behavior.
+   Measure the complete integration, including filesystem callbacks and exact
+   validation; isolated compiler timings are not sufficient.
+
+Do not replace the current implementation with a larger adapter merely to obtain
+an attractive API. If the candidate needs compiler patches, reconstructed module
+semantics, weaker guarantees or unjustified integration complexity, reject it.
+This assessment changes no production behavior and makes no speedup claim.
