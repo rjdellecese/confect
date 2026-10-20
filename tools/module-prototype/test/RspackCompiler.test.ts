@@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
 import { pathToFileURL } from "node:url";
 import * as RspackCompiler from "../src/RspackCompiler.ts";
 import * as Runner from "../src/Runner.ts";
+import * as CompilationInputs from "../../../packages/cli/src/CompilationInputs.ts";
 
 const fixture = (files: Readonly<Record<string, string>>) =>
   Effect.gen(function* () {
@@ -31,6 +32,35 @@ const evaluate = (url: string) =>
   });
 
 describe("Rspack cold compiler prototype", () => {
+  it.effect(
+    "externalizes packages and requires restart after their resolution metadata changes",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "entry.ts":
+            'import value from "dependency"; export const probe = () => value;',
+          "node_modules/dependency/package.json": '{"main":"./one.cjs"}',
+          "node_modules/dependency/one.cjs": "module.exports = 1;",
+          "node_modules/dependency/two.cjs": "module.exports = 2;",
+        });
+        const prepared = yield* RspackCompiler.compile(entry);
+        expect(yield* evaluate(prepared.url)).toBe(1);
+        expect(prepared.reusable).toBe(false);
+        expect(prepared.external).toEqual([
+          expect.objectContaining({
+            importer: entry,
+            physical: path.join(root, "node_modules/dependency/one.cjs"),
+          }),
+        ]);
+        yield* fs.writeFileString(
+          path.join(root, "node_modules/dependency/package.json"),
+          '{"main":"./two.cjs"}',
+        );
+        const result = yield* prepared.validate.pipe(Effect.result);
+        assert(Result.isFailure(result));
+        assert(Schema.is(CompilationInputs.RestartRequired)(result.failure));
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
   it.effect("preserves physical file scope for a suffixed module", () =>
     Effect.gen(function* () {
       const { entry, path, root } = yield* fixture({

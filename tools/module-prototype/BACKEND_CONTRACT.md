@@ -226,11 +226,16 @@ would not satisfy that condition.
 ## Qualification decision
 
 The subsequent [cold Rspack experiment](./README.md#rspack-cold-compilation-experiment)
-matches all fifteen existing semantic oracle cases using public APIs. It also
-exercises exact cold-capture validation and demonstrates why incremental
-callbacks alone are not a complete receipt. This is positive feasibility
-evidence, not completion of the qualification gates below; the adapter remains
-Linux-only and outside production transaction handling.
+matches all seventeen semantic oracle cases using public APIs. It also exercises
+external runtime policy, native per-root graph fingerprints, exact cold-capture
+validation and the existing receipt bookkeeping. Public parser settings preserve
+Node runtime resolution rather than converting it to module IDs. Both pipelines
+leave those runtime calls outside the compiled graph; preparation validation is
+not evaluation freshness. Raw external-resolution probes are conservatively
+ineligible for certified preparation reuse. These results are positive feasibility
+evidence, not completion of the qualification gates below: PnP is rejected, the
+read guard remains Linux-only, and the live development coordinator is not wired
+to the candidate.
 
 Prefer assessing the supported filesystem boundary over extending a compiler or
 building another JavaScript loader. Rspack is a candidate for a native integration;

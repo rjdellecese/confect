@@ -18,6 +18,26 @@ interface Fixture {
 
 const fixtures: ReadonlyArray<Fixture> = [
   {
+    name: "external require.resolve with an explicit Node runtime binding",
+    files: {
+      "entry.ts":
+        'import { createRequire } from "node:module"; globalThis.require = createRequire(import.meta.url); export const probe = require.resolve("dependency").replaceAll("\\\\", "/").endsWith("/dependency/index.cjs");',
+      "node_modules/dependency/package.json": '{"main":"./index.cjs"}',
+      "node_modules/dependency/index.cjs": 'module.exports = "dependency";',
+    },
+    value: true,
+  },
+  {
+    name: "authored Node createRequire resolution",
+    files: {
+      "entry.ts":
+        'import { createRequire } from "node:module"; const require = createRequire(import.meta.url); export const probe = require.resolve("dependency").replaceAll("\\\\", "/").endsWith("/dependency/index.cjs");',
+      "node_modules/dependency/package.json": '{"main":"./index.cjs"}',
+      "node_modules/dependency/index.cjs": 'module.exports = "dependency";',
+    },
+    value: true,
+  },
+  {
     name: "owned inherited alias and live bindings",
     files: {
       "tsconfig.json": '{"extends":"./base.json"}',

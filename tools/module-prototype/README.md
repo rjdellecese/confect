@@ -36,7 +36,7 @@ oracle differs from the fixture or the prototype differs from the expected
 result. Run it separately from CLI typechecks while those temporary fixtures
 exist. The root production test project does not discover this private package.
 
-The two `*Boundary.test.ts` integration suites run with the private test command.
+The three `*Boundary.test.ts` integration suites run with the private test command.
 They check native engine capabilities and limitations; passing them is not a
 claim that either engine satisfies the complete backend contract.
 
@@ -45,9 +45,9 @@ the existing compiler.** Passing the unit suite does not qualify the backend.
 
 ## Rspack cold-compilation experiment
 
-`gate:rspack` runs the same fifteen fixtures, expected values, rejection control
+`gate:rspack` runs the same seventeen fixtures, expected values, rejection control
 and ten-second budgets as `gate`. It uses the existing compiler as the oracle
-and fresh child processes for both evaluations. **All fifteen oracle controls
+and fresh child processes for both evaluations. **All seventeen oracle controls
 and Rspack results match.** The report marks its scope as `cold-semantic-gate`
 and explicitly reports `productionQualified: false`.
 
@@ -60,6 +60,13 @@ the graph, import-attribute identities, CommonJS/ESM linking and artifact output
 Built-in attribute loaders, a public attribute-policy hook and source-file scope
 definitions reproduce the exercised contracts without a custom module runtime.
 Missing exports are configured as errors rather than warnings.
+
+`compileEntries` also prepares multiple roots under one owned configuration.
+A shared native runtime/chunk preserves dependency identity across entry artifacts.
+`RspackGraph` detaches native module identities, source and dependency edges before
+closing the compiler. It combines those facts with original input observations
+and external runtime observations to fingerprint each root; it does not infer
+imports from generated JavaScript. Separate configurations require separate batches.
 
 `RspackInputs` supplies the native compiler's input filesystem. A one-shot
 capture records returned byte hashes, realpaths, errors, stat identities/kinds,
@@ -101,14 +108,47 @@ scope, owned configuration without nested rediscovery, missing-export failures,
 fresh evaluation and comment-only invalidation. Thirty filesystem tests exercise
 capture, replay, sealing and read-safety cases.
 
-**No performance comparison or production switch has been made.** The adapter
-does not yet reproduce production third-party externalization, generated-module
-ownership, active Yarn semantics, full diagnostics or runtime-condition coverage.
-The existing Watch/receipt/pending-edit/recovery state machines are not integrated,
-and a whole-build read set is not proof of selective-root scheduling. Windows
-and a portable equivalent of the read guard remain unqualified. The result keeps
-Rspack viable for further qualification; it does not establish that the complete
-integration is simpler or faster than the current compiler.
+### External policy and revision qualification
+
+`RspackExternals` keeps the production distinction between workspace modules and
+third-party runtime dependencies. Native resolution classifies the request;
+the existing `createRequire`/`exsolve` policy selects the actual runtime target,
+with the owned input guards around it. Tests cover import/require/custom export
+conditions, singleton identity, nested installations, workspace symlinks, aliases,
+deferred import failure and restart detection. Observations seal before publication.
+Raw runtime resolution is outside Rspack's recorded filesystem, so these captures
+report `reusable: false` rather than certify emission-free preparation reuse.
+
+The expanded gate adds explicit Node `createRequire` and free `require.resolve`
+cases. Rspack's default parsing can turn the latter into a module ID instead of a
+Node filename. Setting only `requireResolve: false` is insufficient: it still
+rewrites the free `require` into a context module. The adapter sets both
+`requireResolve: false` and `requireAsExpression: false` through public parser
+options, preserving the Node call and matching the oracle in fresh processes.
+Nested-importer tests distinguish a global entry-rooted require from a named local
+`createRequire`; they must not be conflated. A public graph hook rejects any
+remaining parsed resolve dependency instead of silently returning a module ID.
+
+Those preserved runtime lookups are outside the compiled graph in both the oracle
+and the candidate. A target edit can change a fresh evaluation while preparation
+validation still succeeds. `reusable` concerns compiler preparations only, never
+evaluated exports or acknowledgment of runtime work. No evaluated values are cached.
+
+The revision integration tests use real multi-root Rspack artifacts with the
+existing `CompilationState`, `Compilation.runJob`, `CompiledModule.Consumption`
+and `DevelopmentState` bookkeeping. They check comment-only, shared and lazy-edge
+changes, stable unchanged fingerprints, shared module identity, partial-root
+receipts, pending siblings/newer revisions, and no acknowledgment after failed
+post-evaluation validation. This exercises the accounting boundary, not the full
+development coordinator or a new revision/session state machine.
+
+**No performance comparison or production switch has been made.** PnP projects
+are explicitly rejected before configuration discovery without evaluating their
+loaders. Generated-module ownership, full diagnostics/runtime-condition coverage,
+live Watch scheduling, stabilization/recovery, bounded retained revision lifetimes
+and portable read protection remain unqualified. Validation is still whole-capture
+and conservative when a sibling changes. The result does not establish that the
+complete integration is simpler or faster than the current compiler.
 
 ## Vite module-oriented adapter
 
@@ -136,12 +176,14 @@ oracle artifact; it is not a fallback when the prototype fails.
 
 ### Compatibility result
 
-With Node 24.21.0, esbuild 0.28.2, and Vite 8.3.4, all fifteen oracle fixtures
-match their expected outcomes. Nine prototype cases match: inherited aliases,
+With Node 24.21.0, esbuild 0.28.2, and Vite 8.3.4, all seventeen oracle fixtures
+match their expected outcomes. Eleven prototype cases match, including the nine
+matches from the original fifteen-case gate: inherited aliases,
 live bindings, a cyclic graph, literal dynamic imports, importer-relative
 identities, ordinary JSON attributes, the oracle's TypeScript-attribute
 behavior, CommonJS default imports, Node builtins, and lazy Confect schemas
-(some cases exercise more than one behavior).
+(some cases exercise more than one behavior). Both added explicit Node runtime
+resolution cases also match.
 
 Six cases block qualification:
 
