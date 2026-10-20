@@ -268,9 +268,15 @@ Changed observations drive public rebuild inputs; only actual native callbacks
 replace facts. Unreacquired changes and warm failures force a cold recapture,
 while a bounded native-build epoch retires obsolete evidence. Artifacts remain
 job-scoped and evaluation remains fresh. Raw external runtime probes still
-prohibit reuse, including in the representative Confect workload. This establishes
-a narrower warm path, not complete provenance for arbitrary loaders or a measured
-whole-loop performance improvement.
+prohibit reuse, including in the representative Confect workload. The
+[matched warm-candidate comparison](./README.md#bounded-warm-scale-result) passes
+correctness but remains 3.64–3.92 times slower at startup and 4.83–5.12 times
+slower on reload than consolidated esbuild. The separate diagnostic gate recorded
+six native runs on six distinct compiler instances, with no same-instance reuse.
+This establishes a narrower warm path, not complete provenance for arbitrary
+loaders or a practical performance improvement. External-resolution provenance
+must be completed before the representative workload can exercise warm reuse;
+removing the conservative guard would invalidate the experiment.
 
 Prefer assessing the supported filesystem boundary over extending a compiler or
 building another JavaScript loader. Rspack is a candidate for a native integration;

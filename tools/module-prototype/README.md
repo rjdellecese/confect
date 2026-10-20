@@ -162,8 +162,62 @@ and session tests also passed five additional sequential runs. Adversarial tests
 cover restored-mtime edits, missing recovery, extension shadows, glob membership,
 symlink retargeting, compile/evaluation races and retained immutable receipts.
 Graph snapshots canonically order modules and edges; native iteration order is
-not a semantic difference. The representative warm-candidate scale comparison
-has not yet run, so these checks do not establish its performance.
+not a semantic difference. The following scale result applies to frozen warm
+candidate `b4912a94`, not to the older cold candidates.
+
+### Bounded warm scale result
+
+The separate diagnostic gate passed every correctness and cleanup assertion, but
+observed six `Compiler.run` calls on six distinct instances: four at startup,
+two on reload, and no same-instance reuse. Each instance received one close
+call; no native runs occurred after readiness or during shutdown. The observer
+wrapped public methods without changing arguments, callbacks or return values.
+These are API-call and instance-reuse counts, not logical cache-hit, constructor
+or completed-Rust-compilation counts. The diagnostic gate's 64.536s startup and
+45.658s reload are excluded from acceptance results.
+
+Twelve fresh trials then ran sequentially, without the observer or a profiler,
+against the same frozen esbuild baselines. Each row is the mean of two runs;
+times are seconds and memory is process-tree MiB.
+
+| Edit | Version              | Startup | Reload | Startup RSS | Reload RSS | Sampled whole-run peak |
+| ---- | -------------------- | ------: | -----: | ----------: | ---------: | ---------------------: |
+| Impl | 10.3.1               |  10.458 |  4.076 |       376.0 |      401.7 |                  812.0 |
+| Impl | Consolidated esbuild |  18.448 |  9.885 |       726.9 |      821.5 |                  959.9 |
+| Impl | Bounded warm Rspack  |  67.151 | 50.562 |       844.7 |      897.5 |                 1233.9 |
+| Spec | 10.3.1               |  10.664 |  3.892 |       413.1 |      408.3 |                  828.3 |
+| Spec | Consolidated esbuild |  16.593 |  9.877 |       743.7 |      843.1 |                  939.1 |
+| Spec | Bounded warm Rspack  |  65.104 | 47.711 |       839.6 |      954.5 |                 1237.0 |
+
+The candidate remains **3.64–3.92 times slower at startup and 4.83–5.12 times
+slower on reload than consolidated esbuild**. The supported warm path works for
+the fully observed test fixtures, but the external-runtime policy prevents it
+from being used in this representative workload. This result does not qualify
+adoption. Completing external-resolution provenance is the prerequisite to a
+meaningful warm-performance experiment; dropping that guard is not an option.
+The older `6a0f3b57` was not included in these matched trials, so its earlier
+timings do not establish the warm change's incremental overhead.
+
+Every gate/trial matched all 1,064 file hashes, with aggregate
+`84552d0933d648c6f603aa13c7115a30eb65bd27cec5ee33d166b168e7e39b9b`.
+Each had exactly 390 initial evaluations, only `g0` on reload, two readiness
+messages, one reload, zero late evaluations, at most four processes and clean
+shutdown without forced killing. Source/build/runtime fingerprints matched
+before and after; both prior 7,095-file preservation checks and all checked
+earlier evidence manifests passed. Acceptance retained the 180-second budgets,
+250ms RSS sampling, and no forced GC or added settling. Two repetitions per
+version/edit type are a small sample; brief memory peaks can be missed.
+
+Complete evidence is preserved on the measurement and parent machines under
+`~/.capy/work/rspack-warm-comparison` and `rspack-warm-gate`, and both copied
+manifests verified. Trial manifest:
+`bce66f131959ed3b655d089abdb771ca3380437f4fbf3f96db7e13545e000b4c`;
+summary: `9df6681d7a956dfe52e482d9c94e40bcc07cfc78d1b54bbca4e0d30d2906d4cd`;
+gate manifest: `6f50998936be75d884b83acd9eb5fee1571fa24a42732716ea2dff4c0bcf29ac`.
+The preserved scratch harness retains 44 sequential-await errors and 55
+Effect-style warnings across eight scripts; repository source has zero lint
+diagnostics. Production remains esbuild. No further implementation or timing
+work is running.
 
 ### Corrected cold startup and reload profile
 
