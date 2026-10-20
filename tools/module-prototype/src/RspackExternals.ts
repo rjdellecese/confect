@@ -8,6 +8,7 @@ import type {
   Module,
 } from "@rspack/core";
 import * as Context from "effect/Context";
+import * as Cache from "effect/Cache";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -88,29 +89,55 @@ export const make = Effect.fn("RspackExternals.make")(
     let pending = 0;
     let captureFailure: Unsupported | undefined;
 
-    const rejectPnp = Effect.fn("RspackExternals.rejectPnp")(function* (
-      importer: string,
-    ) {
-      if ("pnp" in process.versions)
-        return yield* new Unsupported({ path: importer, reason: "ActivePnp" });
-      for (const directory of CompilationInputs.ancestors(
-        path,
-        path.dirname(importer),
-      )) {
-        for (const name of [
-          ".pnp.cjs",
-          ".pnp.js",
-          ".pnp.loader.mjs",
-          ".pnp.data.json",
-        ]) {
-          const candidate = path.join(directory, name);
+    const pnpDirectories = yield* Cache.make({
+      capacity: 4096,
+      lookup: Effect.fn("RspackExternals.checkPnpDirectory")(function* (
+        directory: string,
+      ) {
+        const candidates = CompilationInputs.ancestors(path, directory).flatMap(
+          (ancestor) =>
+            [".pnp.cjs", ".pnp.js", ".pnp.loader.mjs", ".pnp.data.json"].map(
+              (name) => path.join(ancestor, name),
+            ),
+        );
+        for (const candidate of candidates) {
           if (yield* fs.exists(candidate))
             return yield* new Unsupported({
               path: candidate,
               reason: "PnpProject",
             });
         }
-      }
+        yield* inputs.track(candidates);
+        for (const candidate of candidates) {
+          if (yield* fs.exists(candidate))
+            return yield* new Unsupported({
+              path: candidate,
+              reason: "PnpProject",
+            });
+        }
+        yield* inputs.checkFiles(candidates);
+      }),
+    });
+    const rejectPnp = Effect.fn("RspackExternals.rejectPnp")(function* (
+      importer: string,
+    ) {
+      if ("pnp" in process.versions)
+        return yield* new Unsupported({ path: importer, reason: "ActivePnp" });
+      yield* Cache.get(pnpDirectories, path.dirname(importer));
+    });
+    const packageCandidates = yield* Cache.make({
+      capacity: 4096,
+      lookup: Effect.fn("RspackExternals.discoverPackage")(function* (
+        key: string,
+      ) {
+        const [directory, name] = key.split("\0");
+        const candidates = CompilationInputs.ancestors(path, directory).map(
+          (ancestor) =>
+            path.join(ancestor, "node_modules", name, "package.json"),
+        );
+        yield* inputs.track(candidates);
+        return candidates;
+      }),
     });
 
     const resolve = Effect.fn("RspackExternals.resolve")(function* (
@@ -141,12 +168,11 @@ export const make = Effect.fn("RspackExternals.make")(
         .slice(0, request.startsWith("@") ? 2 : 1)
         .join("/");
       const candidates = bare
-        ? CompilationInputs.ancestors(path, path.dirname(importer)).map(
-            (directory) =>
-              path.join(directory, "node_modules", name, "package.json"),
+        ? yield* Cache.get(
+            packageCandidates,
+            `${path.dirname(importer)}\0${name}`,
           )
         : [];
-      yield* inputs.track(candidates);
       const nativeResolve = data.getResolve();
       const context = data.context;
       const native = yield* Effect.tryPromise({
