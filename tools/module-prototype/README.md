@@ -151,9 +151,9 @@ receipts, pending siblings/newer revisions, and no acknowledgment after failed
 post-evaluation validation. These tests exercise the accounting boundary; the
 separate live integration below exercises the development coordinator.
 
-**The original live candidate failed the representative scale gate. A corrected
-batch-boundary candidate is undergoing the same gate; production remains
-unchanged.** PnP projects
+**The corrected batch candidate passes the scale correctness gate but is much
+slower than both esbuild baselines. Do not adopt this integration; production
+remains unchanged.** PnP projects
 are explicitly rejected before configuration discovery without evaluating their
 loaders. Full diagnostics/runtime-condition coverage, warm-cache provenance and
 portable read protection remain unqualified. Validation is still whole-capture
@@ -313,8 +313,9 @@ Effect-style warnings for deliberate Node filesystem/timer instrumentation.
 ### Batch-boundary correction
 
 Frozen candidate `6a0f3b5735d0ebe0a38b869a2d09c11f8b79d909` implements the
-profile-derived correction. Its scale results are pending; the older timeout
-above remains evidence about `e341d9ad`, not a measurement of this revision.
+profile-derived correction. It passes the scale correctness gate and all twelve
+matched trials below; the older timeout remains evidence about `e341d9ad`, not a
+measurement of this revision.
 
 An optional native batch hook leaves the existing esbuild batch path unchanged.
 The native hook records lexical `lstat`/`realpath` provenance and configuration
@@ -346,8 +347,67 @@ revisions. All existing assertions and budgets remain unchanged.
 
 The frozen correction passes 165 private tests, 1,424 default CLI runtime/type
 checks and all seventeen semantic oracle controls, plus exact/inexact typechecks,
-the workspace build, formatting and lint. These checks authorize the repeated
-scale experiment, not adoption or a performance-parity claim.
+the workspace build, formatting and lint. These checks are supplemented by the
+matched measurements below, not treated as a performance-parity claim.
+
+### Corrected scale result
+
+The separate native correctness gate completed in **58.925 seconds at startup
+and 42.533 seconds on reload**. It passed every original assertion and is excluded
+from the twelve subsequent matched trials. Those trials used the same 390-group,
+275-table fixture, shared runtime dependencies and Node 24.21.0, with alternating
+version order and no profiling or concurrent workload.
+
+Each row is the arithmetic mean of two runs; times are seconds.
+
+| Edit | Version              | Startup | Reload |
+| ---- | -------------------- | ------: | -----: |
+| Impl | 10.3.1               |  10.195 |  2.587 |
+| Impl | Consolidated esbuild |  15.998 |  9.306 |
+| Impl | Corrected Rspack     |  59.426 | 42.112 |
+| Spec | 10.3.1               |  10.507 |  3.661 |
+| Spec | Consolidated esbuild |  16.036 |  8.938 |
+| Spec | Corrected Rspack     |  57.637 | 40.499 |
+
+Mean process-tree RSS is in MiB. Peaks cover the whole run, not only reload.
+
+| Edit | Version              | Startup readiness | Reload readiness | Sampled peak |
+| ---- | -------------------- | ----------------: | ---------------: | -----------: |
+| Impl | 10.3.1               |             401.1 |            395.4 |        816.9 |
+| Impl | Consolidated esbuild |             735.5 |            863.4 |        947.4 |
+| Impl | Corrected Rspack     |             787.5 |            937.0 |      1,193.6 |
+| Spec | 10.3.1               |             393.2 |            418.6 |        843.9 |
+| Spec | Consolidated esbuild |             718.1 |            811.3 |        957.7 |
+| Spec | Corrected Rspack     |             781.1 |            975.9 |      1,191.6 |
+
+All thirteen runs, including the separate gate, matched every one of the 1,064
+generated-file hashes, with aggregate SHA-256
+`84552d0933d648c6f603aa13c7115a30eb65bd27cec5ee33d166b168e7e39b9b`.
+Each evaluated 390 groups initially and only `g0` on reload, emitted two readiness
+messages and one reload message, had no late evaluations, reached at most four
+processes and passed cleanup without forced killing. Before/after fingerprints
+of the measured source, builds and runtime dependencies matched; all 7,095
+preserved original source/runtime/build files and prior evidence also verified.
+
+The correction eliminates the timeout without weakening the tested behavior,
+but Rspack is still **3.6–3.7 times slower at startup and about 4.53 times slower
+on reload than consolidated esbuild**, with roughly 25% higher sampled peaks.
+This cold integration does not earn adoption. The timings do not identify the
+remaining cost's internal phases or establish the performance of an unqualified
+warm-cache design. Production remains esbuild; no further implementation or
+timing work is running.
+
+These are only two repetitions per version/edit mode. RSS was sampled every
+250ms without forced GC or added idle settling, so short peaks can be missed.
+Complete individual results, logs, process samples and hashes are retained in
+`rspack-batch-comparison`, with manifest digest
+`46c46410a45d75ec879b56c35572f3b15d97e164326c74b87abefff7d1841584`
+and summary digest
+`9081530add50e665357f91ab0ceef902dc64f55ae469211f89c7e7d51384c2e3`.
+The separate gate manifest is
+`0d90a0082ef8bcc0023c0e92d356225e42ff43bc8ce566a83a6c72cfde066bbd`.
+The preserved scratch harness/controllers retain 44 sequential-await lint errors
+and 50 Effect-style warnings across six scripts; these are not repository changes.
 
 ## Vite module-oriented adapter
 

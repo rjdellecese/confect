@@ -254,10 +254,13 @@ that fixing the duplication would achieve parity; see the
 
 The resulting [batch-boundary correction](./README.md#batch-boundary-correction)
 is implemented in frozen candidate `6a0f3b57`, with explicit validation boundaries,
-buffered receipts and retained lexical root provenance. Its full regression suite
-passes; the representative scale gate and matched measurements are pending. The
-older candidate's timeout must not be presented as this revision's measurement,
-and a bounded-work unit test is not a substitute for the scale gate.
+buffered receipts and retained lexical root provenance. It passes the full
+regression suite, separate representative correctness gate and all twelve matched
+trials. It remains 3.6–3.7 times slower at startup and about 4.53 times slower on
+reload than consolidated esbuild, with roughly 25% higher sampled memory peaks.
+The [measured correction](./README.md#corrected-scale-result) fixes the timeout
+but fails the practical adoption criterion. The older timeout is not this
+revision's result, and unqualified warm caching is not an assumed remedy.
 
 Prefer assessing the supported filesystem boundary over extending a compiler or
 building another JavaScript loader. Rspack is a candidate for a native integration;
