@@ -570,6 +570,212 @@ describe("Rspack bounded warm provenance", () => {
   );
 });
 
+describe("Rspack observed external preparations", () => {
+  it.effect.each(["import", "require"] as const)(
+    "retains only the active $0 edge when a shared request changes kind",
+    (kind) =>
+      Effect.gen(function* () {
+        const { entry, fs } = yield* fixture({
+          "package.json": '{"name":"consumer","type":"module"}',
+          "entry.ts":
+            'import { value } from "fixture-package"; const required = require("fixture-package"); export const probe = () => value + required.value;',
+          "node_modules/fixture-package/package.json":
+            '{"name":"fixture-package","type":"module","exports":{"import":"./index.js","require":"./index.cjs"}}',
+          "node_modules/fixture-package/index.js": "export const value = 1;",
+          "node_modules/fixture-package/index.cjs": "exports.value = 2;",
+        });
+        const run = vi.spyOn(Compiler.prototype, "run");
+        const engine = yield* RspackCompiler.make([entry], {
+          observedExternals: true,
+        });
+        const first = yield* engine.compile();
+        expect(first.external).toHaveLength(2);
+        expect(yield* evaluate(first.urls[entry])).toBe(3);
+        yield* fs.writeFileString(
+          entry,
+          kind === "import"
+            ? 'import { value } from "fixture-package"; export const probe = () => value;'
+            : 'const { value } = require("fixture-package"); export const probe = () => value;',
+        );
+        const changed = yield* engine.compile();
+        expect(run.mock.instances[1]).toBe(run.mock.instances[0]);
+        const cold = yield* RspackCompiler.compile(entry, {
+          observedExternals: true,
+        });
+        expect(changed.external).toHaveLength(1);
+        expect(changed.external).toEqual(cold.external);
+        expect(changed.fingerprints).toEqual(cold.fingerprints);
+        expect(yield* evaluate(changed.urls[entry])).toBe(
+          kind === "import" ? 1 : 2,
+        );
+        yield* changed.validate;
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "matches cold provenance after an importer removes an external edge",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs } = yield* fixture({
+          "package.json": '{"name":"consumer","type":"module"}',
+          "entry.ts":
+            'import { value } from "fixture-package"; export const probe = () => value;',
+          "node_modules/fixture-package/package.json":
+            '{"name":"fixture-package","type":"module","exports":"./index.js"}',
+          "node_modules/fixture-package/index.js": "export const value = 1;",
+        });
+        const engine = yield* RspackCompiler.make([entry], {
+          observedExternals: true,
+        });
+        const first = yield* engine.compile();
+        yield* fs.writeFileString(entry, "export const probe = () => 2;");
+        const changed = yield* engine.compile();
+        const cold = yield* RspackCompiler.compile(entry, {
+          observedExternals: true,
+        });
+        expect(changed.external).toEqual(cold.external);
+        expect(changed.fingerprints).toEqual(cold.fingerprints);
+        expect(yield* evaluate(changed.urls[entry])).toBe(2);
+        expect(yield* evaluate(first.urls[entry])).toBe(1);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "reuses an observed external preparation with fresh evaluation",
+    () =>
+      Effect.gen(function* () {
+        const { entry } = yield* fixture({
+          "package.json": '{"name":"consumer","type":"module"}',
+          "entry.ts":
+            'import { next } from "fixture-package"; export const probe = () => next();',
+          "node_modules/fixture-package/package.json":
+            '{"name":"fixture-package","type":"module","exports":"./index.js"}',
+          "node_modules/fixture-package/index.js":
+            "let value = 0; export const next = () => ++value;",
+        });
+        const run = vi.spyOn(Compiler.prototype, "run");
+        const engine = yield* RspackCompiler.make([entry], {
+          observedExternals: true,
+        });
+        const first = yield* engine.compile();
+        const second = yield* engine.compile();
+        expect(first.reusable).toBe(true);
+        expect(second.reusable).toBe(true);
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(second.external).toEqual(first.external);
+        expect(second.external).toHaveLength(1);
+        expect(second.urls[entry]).not.toBe(first.urls[entry]);
+        expect(yield* evaluate(first.urls[entry])).toBe(1);
+        expect(yield* evaluate(second.urls[entry])).toBe(1);
+        yield* second.validate;
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "retains external provenance across cached importers and their reintroduction",
+    () =>
+      Effect.gen(function* () {
+        const originalSource =
+          'import { value } from "./cached"; export const probe = () => value;';
+        const { entry, fs } = yield* fixture({
+          "package.json": '{"name":"consumer","type":"module"}',
+          "entry.ts": originalSource,
+          "cached.ts": 'export { value } from "fixture-package";',
+          "node_modules/fixture-package/package.json":
+            '{"name":"fixture-package","type":"module","exports":"./index.js"}',
+          "node_modules/fixture-package/index.js": "export const value = 1;",
+        });
+        const run = vi.spyOn(Compiler.prototype, "run");
+        const engine = yield* RspackCompiler.make([entry], {
+          observedExternals: true,
+        });
+        const first = yield* engine.compile();
+        const evidence = snapshot(first.external);
+        yield* fs.writeFileString(entry, `${originalSource} // edit`);
+        const warm = yield* engine.compile();
+        expect(warm.external).toEqual(first.external);
+        expect(warm.external).toHaveLength(1);
+        expect(run).toHaveBeenCalledTimes(2);
+        expect(run.mock.instances[1]).toBe(run.mock.instances[0]);
+        yield* fs.writeFileString(entry, "export const probe = () => 0;");
+        const removed = yield* engine.compile();
+        expect(removed.external).toEqual([]);
+        yield* fs.writeFileString(entry, originalSource);
+        const restored = yield* engine.compile();
+        expect(restored.external).toEqual(first.external);
+        expect(restored.fingerprints).toEqual(first.fingerprints);
+        expect(snapshot(first.external)).toBe(evidence);
+        expect(yield* evaluate(restored.urls[entry])).toBe(1);
+        const cold = yield* RspackCompiler.compile(entry, {
+          observedExternals: true,
+        });
+        expect(restored.fingerprints).toEqual(cold.fingerprints);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "cold-recaptures runtime-only discovery and preserves manifest-free shadow behavior",
+    () =>
+      Effect.gen(function* () {
+        const { fs, path, root } = yield* fixture({
+          "package.json": '{"name":"consumer","type":"module"}',
+          "nested/entry.ts":
+            'import { value } from "fixture-package"; export const probe = () => value;',
+          "node_modules/fixture-package/package.json":
+            '{"name":"fixture-package","type":"module","exports":"./index.js"}',
+          "node_modules/fixture-package/index.js": "export const value = 1;",
+        });
+        const entry = path.join(root, "nested/entry.ts");
+        const run = vi.spyOn(Compiler.prototype, "run");
+        const engine = yield* RspackCompiler.make([entry], {
+          observedExternals: true,
+        });
+        const first = yield* engine.compile();
+        expect(first.reusable).toBe(true);
+        const directory = path.join(
+          root,
+          "nested/node_modules/fixture-package",
+        );
+        yield* fs.makeDirectory(directory, { recursive: true });
+        yield* fs.writeFileString(
+          path.join(directory, "index.js"),
+          "exports.value = 2;",
+        );
+        const shadowed = yield* engine.compile();
+        expect(run).toHaveBeenCalledTimes(2);
+        expect(run.mock.instances[1]).not.toBe(run.mock.instances[0]);
+        expect(shadowed.reusable).toBe(false);
+        expect(yield* evaluate(shadowed.urls[entry])).toBe(2);
+        expect(yield* evaluate(first.urls[entry])).toBe(1);
+        yield* shadowed.validate;
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "keeps encoded target semantics through the original cold fallback",
+    () =>
+      Effect.gen(function* () {
+        const { entry } = yield* fixture({
+          "package.json": '{"name":"consumer","type":"module"}',
+          "entry.ts":
+            'import { value } from "fixture-package"; export const probe = () => value;',
+          "node_modules/fixture-package/package.json":
+            '{"name":"fixture-package","type":"module","exports":"./space%20name.js"}',
+          "node_modules/fixture-package/space%20name.js":
+            "export const value = 1;",
+          "node_modules/fixture-package/space name.js":
+            "export const value = 2;",
+        });
+        const prepared = yield* RspackCompiler.compile(entry, {
+          observedExternals: true,
+        });
+        expect(prepared.reusable).toBe(false);
+        expect(yield* evaluate(prepared.url)).toBe(2);
+        yield* prepared.validate;
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+});
+
 describe("Rspack cold compiler prototype", () => {
   it.effect(
     "externalizes packages and requires restart after their resolution metadata changes",

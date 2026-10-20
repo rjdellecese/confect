@@ -290,6 +290,33 @@ export const make = (
     realpath,
     readdir: wrap("readdir", fs.readdir),
   };
+  const ensure: Effect.Effect<void, Failed | Changed> = Effect.suspend(() =>
+    failure
+      ? Effect.fail(failure)
+      : sealed
+        ? Effect.fail(fail("ensure", "", "Sealed"))
+        : Effect.void,
+  );
+  const readFile = Effect.fn("RspackInputs.readFile")(function* (name: string) {
+    yield* ensure;
+    return yield* Effect.callback<Uint8Array, Failed | Changed>((resume) => {
+      fileSystem.readFile(name, (cause, value) => {
+        if (cause)
+          return resume(
+            Effect.fail(
+              Schema.is(Failed)(cause) || Schema.is(Changed)(cause)
+                ? cause
+                : fail("readFile", name, "RequestFailed", cause),
+            ),
+          );
+        resume(
+          value instanceof Uint8Array
+            ? Effect.succeed(value)
+            : Effect.fail(fail("readFile", name, "UnsupportedResult")),
+        );
+      });
+    });
+  });
   const check = Effect.fn("RspackInputs.check")(function* (
     observation: Observation,
   ) {
@@ -360,5 +387,5 @@ export const make = (
       });
     }),
   );
-  return { fileSystem, capture, changes, validate, resolve };
+  return { fileSystem, capture, changes, validate, resolve, ensure, readFile };
 };
