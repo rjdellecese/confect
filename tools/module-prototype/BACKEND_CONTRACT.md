@@ -245,9 +245,12 @@ The representative scale run subsequently failed: frozen live candidate
 `e341d9ad` did not reach initial readiness within the unchanged 180-second budget
 for 390 groups and 275 tables. Both esbuild baselines completed the same workload;
 the remaining repetitions stopped on the candidate failure. This integration
-does not pass the practical adoption gate. The result does not identify the
-responsible internal phase or establish that Rspack itself is inherently slow;
-see the [recorded scale result](./README.md#representative-scale-result).
+does not pass the practical adoption gate. A subsequent profile attributes the
+dominant stall to repeated batch-wide preparation and validation in the adapter:
+the table batch built in 12.2 seconds, while its full validation phase took
+102.0 seconds. This does not establish that Rspack itself is inherently slow or
+that fixing the duplication would achieve parity; see the
+[profile and proposed corrective experiment](./README.md#startup-profile-repeated-batch-work-in-the-adapter).
 
 Prefer assessing the supported filesystem boundary over extending a compiler or
 building another JavaScript loader. Rspack is a candidate for a native integration;

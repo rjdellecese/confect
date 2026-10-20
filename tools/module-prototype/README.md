@@ -227,15 +227,15 @@ The compiled plain-Node launcher, shared dependency bindings, native loader and
 evaluation-worker shim were checked before measurement. Before/after fingerprints
 matched for all three source trees, 298 build files and 4,558 runtime-package
 files. Neither runtime TypeScript compilation nor a changed baseline explains
-the result. The logs end after generated-file writes and do not establish which
-compiler, validation or scheduling phase consumed the budget. Native shutdown
+the result. The uninstrumented logs end after generated-file writes and did not
+attribute the consumed budget; the subsequent profile below does. Native shutdown
 also emitted `ObjectRef is not unref` warnings; process cleanup still passed.
 
 **Do not adopt this integration on the present evidence.** Small-project semantic
 and lifecycle qualification passed, but practical scale qualification did not.
-This rejects the current cold integration, not Rspack in general. A separate
-diagnostic profile would be needed to attribute the timeout; completing PnP,
-portability or warm-cache work would not substitute for that evidence.
+This rejects the current cold integration, not Rspack in general. Completing
+PnP, portability or warm-cache work would not substitute for practical scale
+evidence.
 
 Full logs, per-file hashes, process samples and binding/fingerprint proofs are
 retained in the run evidence directory `rspack-live-comparison`. Its
@@ -246,6 +246,66 @@ retained in the run evidence directory `rspack-live-comparison`. Its
 The preserved benchmark-only Node harness retains 22 sequential-await lint errors
 and 25 Effect-style warnings; the separately checked repository source has no
 remaining lint diagnostics. No further timing or implementation work is running.
+
+### Startup profile: repeated batch work in the adapter
+
+A subsequent diagnostic run used the same frozen candidate, 390 groups, 275
+tables and 180-second limit. A scratch copy of the compiled launcher added
+Effect span aggregation and timed the native `compiler.run` callback. Node CPU
+profiles covered the supervisor, compiler process and evaluator. The frozen
+sources, 298 build files and 4,558 dependency files remained byte-identical.
+
+The dominant stall is repeated work in the adapter, not an uncompleted native
+build or slow authored evaluation. Table validation took **102.0 seconds**;
+the batch build finished after **12.2 seconds**, leaving about **89.8 seconds**
+for per-entry preparation and validation. All 275 table RPCs completed, consuming
+only 0.84 seconds of cumulative RPC span time. The spec/impl batch then finished
+building in 40.9 seconds, but only 35 spec RPCs completed before cancellation.
+Implementation evaluation had not started. The evaluator was idle in 99.4% of
+its CPU-profile samples.
+
+Across the run, the adapter entered 314 per-entry preparations and performed:
+
+| Operation                       |                                                 Observed work |
+| ------------------------------- | ------------------------------------------------------------: |
+| Native `compiler.run`           | 5 calls, 40.1 s total including JS hooks/filesystem callbacks |
+| Whole-capture replay            |                        406 calls, 66.9 s cumulative span time |
+| Root canonicalization           |                    104,025 calls, 23.8 s cumulative span time |
+| Resolution-input fingerprinting |                                                 646,622 calls |
+| Configuration lookup            |                     104,016 calls, 1.0 s cumulative span time |
+
+Nested and concurrent spans overlap: these times must not be summed into an
+elapsed-time breakdown. Four per-entry requests were pending at cancellation;
+ended spans include interrupted work. These instrumented durations are diagnostic
+evidence, not a replacement for the unprofiled benchmark.
+
+The mechanism is visible in `RspackSession.prepare`: it partitions and
+canonicalizes every batch root before consulting the artifact-scope cache, then
+replays the entire captured input set even on a cache hit. The returned compiler
+validator also performs resolution-input checks before and after that replay;
+the caller performs additional checks. The four-way table/spec concurrency waits
+on the adapter's single preparation lock, and polling adds further replay work.
+Batch artifacts are reused, but batch preparation and validation costs are paid
+again for each entry. Configuration discovery itself is cached and was not the
+dominant cost; repeated canonical filesystem lookups and replay were.
+
+The next corrective experiment should separate immutable batch preparation from
+per-entry lookup, retain lexical/canonical provenance in that batch capture, and
+coalesce validation at explicit preparation/publication boundaries. It must keep
+the existing stale-publication, symlink, failed-attempt and pending-root tests;
+memoizing a successful freshness check or weakening guards is not a fix. The
+native-run intervals include adapter hooks and profiling overhead; they are not
+a lower bound on an optimized backend's startup. Removing the duplication alone
+does not prove performance parity or isolate Rust compiler cost. No implementation
+change was made during this profiling task.
+
+The diagnostic evidence is retained as `rspack-startup-profile-evidence`.
+Its manifest digest is
+`f24a368ed926d3033a6bc09b22612854754679880cc08f76a2f9304f203a96b5`;
+`summary.json` is
+`8bf130f53c1b7ca1d13b643e21bc66facc8bdc8b7af22b4e13bf637f42a8101c`.
+The scratch profiler/controller have zero lint errors and three remaining
+Effect-style warnings for deliberate Node filesystem/timer instrumentation.
 
 ## Vite module-oriented adapter
 
