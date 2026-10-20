@@ -241,6 +241,14 @@ tests cover generated-code ownership, mixed configurations, real component
 definitions, edit/recovery/restart behavior and scoped receipt accounting. They
 do not establish performance parity or general production readiness.
 
+The representative scale run subsequently failed: frozen live candidate
+`e341d9ad` did not reach initial readiness within the unchanged 180-second budget
+for 390 groups and 275 tables. Both esbuild baselines completed the same workload;
+the remaining repetitions stopped on the candidate failure. This integration
+does not pass the practical adoption gate. The result does not identify the
+responsible internal phase or establish that Rspack itself is inherently slow;
+see the [recorded scale result](./README.md#representative-scale-result).
+
 Prefer assessing the supported filesystem boundary over extending a compiler or
 building another JavaScript loader. Rspack is a candidate for a native integration;
 webpack provides a stable public-API comparison. Neither is selected for production.

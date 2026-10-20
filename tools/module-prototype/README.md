@@ -151,7 +151,8 @@ receipts, pending siblings/newer revisions, and no acknowledgment after failed
 post-evaluation validation. These tests exercise the accounting boundary; the
 separate live integration below exercises the development coordinator.
 
-**No performance comparison or production switch has been made.** PnP projects
+**The live candidate failed the representative scale gate; production remains
+unchanged.** PnP projects
 are explicitly rejected before configuration discovery without evaluating their
 loaders. Full diagnostics/runtime-condition coverage, warm-cache provenance and
 portable read protection remain unqualified. Validation is still whole-capture
@@ -199,6 +200,52 @@ and component-definition edits. Session tests separately cover artifact cleanup,
 fresh evaluation, pending siblings, newer revisions, failed-batch recovery and
 the stabilization bound. This is a bounded Linux qualification, not proof of all
 production lifecycle cases or evidence that the integration is faster or simpler.
+
+### Representative scale result
+
+Frozen candidate `e341d9ad9a7dec502b453bc877f41013128103fc` did not reach initial
+readiness within the existing 180-second budget on the 390-group, 275-table
+fixture. The comparison stopped at that first candidate failure: no edit was
+attempted, and the remaining nine of twelve planned runs did not start.
+
+| Version                           |            Startup |   Impl reload | Sampled peak process-tree RSS |
+| --------------------------------- | -----------------: | ------------: | ----------------------------: |
+| 10.3.1 (`eaa5da76`)               |           10.912 s |       3.033 s |                     913.3 MiB |
+| Consolidated esbuild (`d3e63cfa`) |           18.197 s |       8.786 s |                     956.6 MiB |
+| Rspack (`e341d9ad`)               | Timed out at 180 s | Not attempted |                   1,069.3 MiB |
+
+These are individual sequential, unprofiled runs, not averages. Both completed
+baselines matched all 1,064 generated files, 390 startup implementation
+evaluations, only `g0` on reload, two readiness messages and one reload message.
+The candidate recorded zero implementation evaluations and zero readiness
+messages; its output parity at this scale therefore remains unverified. All three
+runs reached at most four processes and passed cleanup without forced killing.
+RSS was sampled every 250ms, so short peaks can be missed; the candidate's final
+774.4 MiB sample is not readiness or steady-state memory.
+
+The compiled plain-Node launcher, shared dependency bindings, native loader and
+evaluation-worker shim were checked before measurement. Before/after fingerprints
+matched for all three source trees, 298 build files and 4,558 runtime-package
+files. Neither runtime TypeScript compilation nor a changed baseline explains
+the result. The logs end after generated-file writes and do not establish which
+compiler, validation or scheduling phase consumed the budget. Native shutdown
+also emitted `ObjectRef is not unref` warnings; process cleanup still passed.
+
+**Do not adopt this integration on the present evidence.** Small-project semantic
+and lifecycle qualification passed, but practical scale qualification did not.
+This rejects the current cold integration, not Rspack in general. A separate
+diagnostic profile would be needed to attribute the timeout; completing PnP,
+portability or warm-cache work would not substitute for that evidence.
+
+Full logs, per-file hashes, process samples and binding/fingerprint proofs are
+retained in the run evidence directory `rspack-live-comparison`. Its
+`SHA256SUMS` digest is
+`e215b5c17780c8ef8aac68c3fe37bada9774b6f5148e1e5d07e4efa2926fe2dd`;
+`summary.json` is
+`e045d8d7a639bb8e8b1656ec7ab48cf991e22b31302f20f7a9e540614d4f4a4d`.
+The preserved benchmark-only Node harness retains 22 sequential-await lint errors
+and 25 Effect-style warnings; the separately checked repository source has no
+remaining lint diagnostics. No further timing or implementation work is running.
 
 ## Vite module-oriented adapter
 
