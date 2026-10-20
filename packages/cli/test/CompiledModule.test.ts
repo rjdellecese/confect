@@ -5,6 +5,21 @@ import * as Ref from "effect/Ref";
 import * as CompiledModule from "@confect/cli/CompiledModule";
 import type { Receipt } from "@confect/cli/CompilationState";
 
+it.effect("consumes a backend-neutral origin-only projection", () =>
+  Effect.gen(function* () {
+    const origin = { context: 1, revision: 2, roots: ["native"] };
+    const recorded = yield* Ref.make<ReadonlyArray<Receipt>>([]);
+    yield* CompiledModule.consume({ origin }).pipe(
+      Effect.provideService(CompiledModule.Consumption, {
+        record: (receipt) =>
+          Ref.update(recorded, (current) => [...current, receipt]),
+      }),
+    );
+    yield* CompiledModule.consume({});
+    expect(yield* Ref.get(recorded)).toEqual([origin]);
+  }),
+);
+
 it.effect.each(["export default 42", 'throw new Error("failed evaluation")'])(
   "records attempted consumption after loading %s",
   (source) =>

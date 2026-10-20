@@ -87,6 +87,15 @@ ownership, size and modification/change/birth times. They exclude access time,
 block count and block size. The native callback bridge and its deterministic
 race mocks have narrowly scoped Node-import/async lint exceptions.
 
+Live compilation uses an artifact-filtered filesystem view: compiler-owned
+directories are absent from directory listings, and their entry-count, size and
+modification/change-time effects do not invalidate parent-directory observations.
+Directory stat observations instead include sorted non-artifact membership while
+retaining kind, device/inode, mode, ownership and birth time. Authored membership
+changes and directory replacement still invalidate the view. The scoped flattened
+configuration is visible only at its exact internal paths; its observations are
+checked during compilation but not retained after that scope closes.
+
 The seven real-engine tests in `rspackBoundary.test.ts` also qualify public API
 behavior separately from this cold adapter:
 
@@ -105,7 +114,7 @@ behavior separately from this cold adapter:
 The cold adapter avoids warm-cache provenance assumptions rather than claiming
 to have solved them. Its unit coverage additionally checks exact physical file
 scope, owned configuration without nested rediscovery, missing-export failures,
-fresh evaluation and comment-only invalidation. Thirty filesystem tests exercise
+fresh evaluation and comment-only invalidation. The filesystem tests exercise
 capture, replay, sealing and read-safety cases.
 
 ### External policy and revision qualification
@@ -139,16 +148,57 @@ existing `CompilationState`, `Compilation.runJob`, `CompiledModule.Consumption`
 and `DevelopmentState` bookkeeping. They check comment-only, shared and lazy-edge
 changes, stable unchanged fingerprints, shared module identity, partial-root
 receipts, pending siblings/newer revisions, and no acknowledgment after failed
-post-evaluation validation. This exercises the accounting boundary, not the full
-development coordinator or a new revision/session state machine.
+post-evaluation validation. These tests exercise the accounting boundary; the
+separate live integration below exercises the development coordinator.
 
 **No performance comparison or production switch has been made.** PnP projects
 are explicitly rejected before configuration discovery without evaluating their
-loaders. Generated-module ownership, full diagnostics/runtime-condition coverage,
-live Watch scheduling, stabilization/recovery, bounded retained revision lifetimes
-and portable read protection remain unqualified. Validation is still whole-capture
-and conservative when a sibling changes. The result does not establish that the
-complete integration is simpler or faster than the current compiler.
+loaders. Full diagnostics/runtime-condition coverage, warm-cache provenance and
+portable read protection remain unqualified. Validation is still whole-capture
+and conservative when a sibling changes.
+
+### Isolated live development loop
+
+The private launcher uses the existing `dev.runSession`, development-state
+coordinator, supervisor and evaluation worker. Production commands still select
+esbuild. A backend-neutral preparation seam returns native artifacts and import
+graphs without pretending they are esbuild metafiles; default delegation and
+existing compilation budgets remain covered by the CLI suite.
+
+Build the workspace first, then build the private launcher:
+
+```sh
+pnpm build
+pnpm --filter module-prototype build:dev
+```
+
+From a disposable consumer project, run Node with the absolute path to
+`tools/module-prototype/dist/rspackDev.mjs`, followed by `dev`. The compiled
+launcher needs this checkout's dependencies and built evaluation worker; it is
+not a distributable CLI. The private test command rebuilds it before testing.
+
+`RspackSession` partitions lexical entry configurations, cold-compiles each
+preparation and retains only validation evidence between jobs. Artifacts are
+immutable and shared only inside an evaluation's `ArtifactScope`. Native graphs
+are projected to the requested entry before package-import checks, so an impl
+compiled in the same batch cannot contaminate its spec's graph. The adapter uses
+the existing receipt, failed-attempt and pending-root protocols, with at most
+eight stabilization attempts. A 250ms polling interval replays observations;
+unchanged evidence does not rebuild, but idle validation still incurs I/O.
+
+Generated ownership follows canonical resolved paths and explicit authored
+exceptions. Generated JavaScript and TypeScript execute through the ordinary
+code loader; only non-code files use the JSON/text fallback. Generated contents
+are excluded from authored fingerprints while native identities and edges remain
+available. Component imports wrap real definitions using supported native hooks;
+CommonJS component imports fail closed rather than use ESM resolution silently.
+
+Live tests compare generated files with the production command across source
+edits, syntax-error recovery, configuration restart, mixed configuration profiles
+and component-definition edits. Session tests separately cover artifact cleanup,
+fresh evaluation, pending siblings, newer revisions, failed-batch recovery and
+the stabilization bound. This is a bounded Linux qualification, not proof of all
+production lifecycle cases or evidence that the integration is faster or simpler.
 
 ## Vite module-oriented adapter
 

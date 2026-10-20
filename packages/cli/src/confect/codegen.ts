@@ -212,7 +212,7 @@ export const compileOptionalModules = Effect.gen(function* () {
       paths,
       (relativePath) =>
         Effect.gen(function* () {
-          const artifact = yield* Bundler.compile(
+          const artifact = yield* Bundler.prepare(
             path.resolve(confectDirectory, relativePath),
           ).pipe(
             Effect.mapError((error) => fromBundlerError(relativePath, error)),

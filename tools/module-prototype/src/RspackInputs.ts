@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { callbackify } from "node:util";
+import { isArtifact } from "../../../packages/cli/src/DevelopmentEvents.ts";
 
 export class Failed extends Schema.TaggedError<Failed>()("RspackInputsFailed", {
   method: Schema.String,
@@ -33,11 +34,19 @@ type Method =
   | "readlink"
   | "realpath"
   | "readdir";
-export interface Observation {
-  readonly method: Method;
-  readonly path: string;
-  readonly fingerprint: string;
-}
+export const Observation = Schema.Struct({
+  method: Schema.Literals([
+    "readFile",
+    "stat",
+    "lstat",
+    "readlink",
+    "realpath",
+    "readdir",
+  ]),
+  path: Schema.String,
+  fingerprint: Schema.String,
+});
+export interface Observation extends Schema.Schema.Type<typeof Observation> {}
 export interface Capture {
   readonly observations: ReadonlyArray<Observation>;
   readonly validate: Effect.Effect<void, Failed | Changed>;
@@ -72,7 +81,11 @@ const statFingerprint = (value: fs.Stats) => ({
 });
 
 export const make = (
-  options: { readonly deniedBasenames?: ReadonlyArray<string> } = {},
+  options: {
+    readonly deniedBasenames?: ReadonlyArray<string>;
+    readonly hideArtifacts?: boolean;
+    readonly visibleArtifacts?: ReadonlyArray<string>;
+  } = {},
 ) => {
   const basenames = options.deniedBasenames ?? [];
   const observations: Observation[] = [];
@@ -90,6 +103,15 @@ export const make = (
 
   const request = async (method: Method, name: string) => {
     if (denied(name, basenames)) throw fail(method, name, "ProtectedPath");
+    if (
+      options.hideArtifacts &&
+      isArtifact(name) &&
+      !options.visibleArtifacts?.includes(name)
+    )
+      return {
+        error: fail(method, name, "OwnedArtifact", undefined, "ENOENT"),
+        fingerprint: "owned-artifact",
+      };
     let real: string | undefined;
     let realError: string | undefined;
     try {
@@ -141,13 +163,34 @@ export const make = (
       else if (method === "readlink") value = await fs.promises.readlink(name);
       else if (method === "realpath") value = await fs.promises.realpath(name);
       else value = await fs.promises.readdir(name);
+      const directoryEntries =
+        options.hideArtifacts &&
+        value instanceof fs.Stats &&
+        value.isDirectory()
+          ? (await fs.promises.readdir(name))
+              .filter((entry) => !isArtifact(path.join(name, entry)))
+              .sort()
+          : undefined;
+      if (options.hideArtifacts && Array.isArray(value))
+        value = value.filter((entry) => !isArtifact(path.join(name, entry)));
       const result = Buffer.isBuffer(value)
         ? {
             bytes: value.length,
             sha256: createHash("sha256").update(value).digest("hex"),
           }
         : value instanceof fs.Stats
-          ? statFingerprint(value)
+          ? {
+              ...statFingerprint(value),
+              ...(directoryEntries
+                ? {
+                    size: 0,
+                    nlink: 1,
+                    mtimeMs: 0,
+                    ctimeMs: 0,
+                    directoryEntries,
+                  }
+                : {}),
+            }
           : value;
       return {
         value,
@@ -245,6 +288,31 @@ export const make = (
     realpath: wrap("realpath", fs.realpath),
     readdir: wrap("readdir", fs.readdir),
   };
+  const validate = Effect.fn("RspackInputs.validate")(function* (
+    recorded: ReadonlyArray<Observation>,
+  ) {
+    for (const observation of recorded) {
+      const result = yield* Effect.tryPromise({
+        try: () => request(observation.method, observation.path),
+        catch: (cause) =>
+          Schema.is(Failed)(cause)
+            ? cause
+            : fail(
+                observation.method,
+                observation.path,
+                "ValidationFailed",
+                cause,
+              ),
+      });
+      if (result.fingerprint !== observation.fingerprint)
+        return yield* new Changed({
+          method: observation.method,
+          path: observation.path,
+          expected: observation.fingerprint,
+          actual: result.fingerprint,
+        });
+    }
+  });
   let receipt: Capture | undefined;
   const capture: Effect.Effect<Capture, Failed | Changed> = Effect.suspend(
     () => {
@@ -255,32 +323,10 @@ export const make = (
       if (failure !== undefined) return Effect.fail(failure);
       receipt = {
         observations,
-        validate: Effect.gen(function* () {
-          for (const observation of observations) {
-            const result = yield* Effect.tryPromise({
-              try: () => request(observation.method, observation.path),
-              catch: (cause) =>
-                Schema.is(Failed)(cause)
-                  ? cause
-                  : fail(
-                      observation.method,
-                      observation.path,
-                      "ValidationFailed",
-                      cause,
-                    ),
-            });
-            if (result.fingerprint !== observation.fingerprint)
-              return yield* new Changed({
-                method: observation.method,
-                path: observation.path,
-                expected: observation.fingerprint,
-                actual: result.fingerprint,
-              });
-          }
-        }).pipe(Effect.withSpan("RspackInputs.validate")),
+        validate: validate(observations),
       };
       return Effect.succeed(receipt);
     },
   );
-  return { fileSystem, capture };
+  return { fileSystem, capture, validate };
 };

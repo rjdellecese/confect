@@ -219,7 +219,7 @@ const absoluteModulePath = Effect.fnUntraced(function* (relativePath: string) {
  * flagging modules that genuinely reach the client.
  */
 export const serverImporters = Effect.fnUntraced(function* (
-  bundled: Pick<Bundler.Bundled, "metafile">,
+  bundled: Parameters<typeof Bundler.importersOfPackage>[0],
 ) {
   const path = yield* Path.Path;
   const confectDirectory = path.resolve(yield* ConfectDirectory.get);

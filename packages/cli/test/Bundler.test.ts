@@ -16,8 +16,258 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Bundler from "@confect/cli/Bundler";
 import * as CompiledModule from "@confect/cli/CompiledModule";
+import * as CompilationBackend from "@confect/cli/CompilationBackend";
+import * as Ref from "effect/Ref";
+import * as Scope from "effect/Scope";
 
 const BundlerLayer = Layer.mergeAll(NodePath.layer, NodeFileSystem.layer);
+
+layer(BundlerLayer)("prepare", (it) => {
+  const artifact: CompiledModule.NativeArtifact = {
+    url: "data:text/javascript,export default 42",
+    graph: { nodes: [] },
+    warnings: [],
+    origin: { context: 1, revision: 2, roots: ["native"] },
+  };
+
+  it.effect(
+    "queries all native module variants and deduplicates physical importers",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const source = path.resolve("source.ts");
+        const target = path.resolve("target.ts");
+        const graph: CompiledModule.ModuleGraph = {
+          graph: {
+            nodes: [
+              {
+                id: "source:first",
+                path: source,
+                imports: [{ id: "server", original: "@confect/server" }],
+              },
+              { id: "target:first", path: target, imports: [] },
+              {
+                id: "source:second",
+                path: source,
+                imports: [
+                  { id: "target:second" },
+                  { id: "server", original: "@confect/server/subpath" },
+                ],
+              },
+              { id: "target:second", path: target, imports: [] },
+            ],
+          },
+        };
+        expect(yield* Bundler.directlyImports(graph, source, target)).toBe(
+          true,
+        );
+        expect(yield* Bundler.directlyImports(graph, target, source)).toBe(
+          false,
+        );
+        expect(
+          Bundler.importersOfPackage(graph, "@confect/server", () => true),
+        ).toEqual([source]);
+      }),
+  );
+
+  it.effect("defaults to an ordinary esbuild artifact", () =>
+    Effect.gen(function* () {
+      const { file } = yield* fixture({ "entry.ts": "export default 42;" });
+      const prepared = yield* Bundler.prepare(file("entry.ts"));
+      expect("metafile" in prepared).toBe(true);
+      expect("graph" in prepared).toBe(false);
+      expect((yield* CompiledModule.namespace(prepared.url)).default).toBe(42);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "delegates native preparation with ambient roots and profiles",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const one = path.resolve("native-one.ts");
+        const two = path.resolve("native-two.ts");
+        const requests = yield* Ref.make<
+          ReadonlyArray<CompilationBackend.Preparation>
+        >([]);
+        yield* Effect.gen(function* () {
+          yield* Bundler.withBatch(
+            [one, two, one],
+            Effect.gen(function* () {
+              expect(yield* Bundler.prepare(one)).toBe(artifact);
+              yield* Bundler.withBatch([two], Bundler.prepare(two));
+              yield* Bundler.prepare("outside.ts");
+            }),
+          );
+          yield* Bundler.prepare(one, {
+            profile: "component-config",
+            plugins: [
+              {
+                name: "must-not-run",
+                setup() {
+                  throw new Error("esbuild plugin ran");
+                },
+              },
+            ],
+          });
+        }).pipe(
+          Effect.provideService(CompilationBackend.Service, {
+            prepare: (request) =>
+              Ref.update(requests, (current) => [...current, request]).pipe(
+                Effect.as(artifact),
+              ),
+          }),
+        );
+        expect(yield* Ref.get(requests)).toEqual([
+          { entry: one, roots: [one, two], profile: "modules" },
+          { entry: two, roots: [one, two], profile: "modules" },
+          {
+            entry: path.resolve("outside.ts"),
+            roots: [path.resolve("outside.ts")],
+            profile: "modules",
+          },
+          { entry: one, roots: [one], profile: "component-config" },
+        ]);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "rejects unsupported native plugins before invoking the backend",
+    () =>
+      Effect.gen(function* () {
+        const error = yield* Bundler.prepare("entry.ts", {
+          plugins: [{ name: "unsupported", setup() {} }],
+        }).pipe(
+          Effect.provideService(CompilationBackend.Service, {
+            prepare: () => Effect.die("backend must not run"),
+          }),
+          Effect.flip,
+        );
+        expect(error.cause).toEqual({ _tag: "UnsupportedCompilationProfile" });
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect("uses the evaluator artifact scope for native preparation", () =>
+    Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      const finalized = yield* Ref.make(false);
+      yield* Bundler.prepare("entry.ts").pipe(
+        Effect.provideService(CompilationBackend.Service, {
+          prepare: () =>
+            Effect.addFinalizer(() => Ref.set(finalized, true)).pipe(
+              Effect.as(artifact),
+            ),
+        }),
+        Effect.provideService(CompiledModule.ArtifactScope, scope),
+        Effect.scoped,
+      );
+      expect(yield* Ref.get(finalized)).toBe(false);
+      yield* Scope.close(scope, Exit.void);
+      expect(yield* Ref.get(finalized)).toBe(true);
+    }),
+  );
+
+  it.effect(
+    "keeps legacy compile and bundle on esbuild under a native backend",
+    () =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({ "entry.ts": "export default 17;" });
+        yield* Bundler.withBatch(
+          [file("entry.ts")],
+          Effect.gen(function* () {
+            const compiled = yield* Bundler.compile(file("entry.ts"));
+            expect(compiled.metafile.inputs[file("entry.ts")]).toBeDefined();
+            expect(
+              (yield* Bundler.bundle(file("entry.ts"))).module.default,
+            ).toBe(17);
+          }),
+        ).pipe(
+          Effect.provideService(CompilationBackend.Service, {
+            prepare: () =>
+              Effect.die("legacy compile must not use native backend"),
+          }),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "queries native graph identities without inventing metafile facts",
+    () =>
+      Effect.gen(function* () {
+        const { file, fs } = yield* fixture({
+          "source.ts": "",
+          "target.ts": "",
+          "other.ts": "",
+        });
+        yield* fs.symlink(file("source.ts"), file("linked.ts"));
+        const graph: CompiledModule.ModuleGraph = {
+          graph: {
+            nodes: [
+              {
+                id: "opaque:source",
+                path: file("source.ts"),
+                imports: [
+                  { id: "opaque:target" },
+                  {
+                    id: "external:server",
+                    original: "@confect/server/subpath",
+                  },
+                ],
+              },
+              { id: "opaque:target", path: file("target.ts"), imports: [] },
+              {
+                id: "opaque:other",
+                path: file("other.ts"),
+                imports: [
+                  { id: "external:other", original: "@confect/server-extra" },
+                ],
+              },
+              {
+                id: "virtual",
+                imports: [
+                  { id: "external:server", original: "@confect/server" },
+                ],
+              },
+            ],
+          },
+        };
+        expect(
+          yield* Bundler.directlyImports(
+            graph,
+            file("source.ts"),
+            file("target.ts"),
+          ),
+        ).toBe(true);
+        expect(
+          yield* Bundler.directlyImports(
+            graph,
+            file("linked.ts"),
+            file("target.ts"),
+          ),
+        ).toBe(true);
+        expect(
+          yield* Bundler.directlyImports(
+            graph,
+            file("target.ts"),
+            file("source.ts"),
+          ),
+        ).toBe(false);
+        expect(
+          yield* Bundler.directlyImports(
+            graph,
+            file("missing.ts"),
+            file("target.ts"),
+          ),
+        ).toBe(false);
+        expect(
+          Bundler.importersOfPackage(graph, "@confect/server", () => true),
+        ).toEqual([file("source.ts")]);
+        expect(
+          Bundler.importersOfPackage(graph, "@confect/server", () => false),
+        ).toEqual([]);
+      }).pipe(Effect.scoped),
+  );
+});
 
 const tsconfigContents = JSON.stringify(
   {

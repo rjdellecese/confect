@@ -26,6 +26,10 @@ import * as Evaluation from "@confect/cli/Evaluation";
 import * as EvaluationSession from "@confect/cli/EvaluationSession";
 import * as Bundler from "@confect/cli/Bundler";
 import * as Compilation from "@confect/cli/Compilation";
+import * as CompilationBackend from "@confect/cli/CompilationBackend";
+import * as CompiledModule from "@confect/cli/CompiledModule";
+import * as Ref from "effect/Ref";
+import type { Receipt } from "@confect/cli/CompilationState";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { FunctionPaths } from "@confect/cli/FunctionPaths";
@@ -73,6 +77,59 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
       ).toBe(true);
     }
   };
+
+  it.effect.each(["table", "component", "previous"] as const)(
+    "prepares native %s artifacts and consumes failed worker evaluations",
+    (kind) =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const path = yield* Path.Path;
+        const prepared = yield* Ref.make<
+          ReadonlyArray<CompilationBackend.Preparation>
+        >([]);
+        const consumed = yield* Ref.make<ReadonlyArray<Receipt>>([]);
+        const origin = { context: 1, revision: 2, roots: ["native"] };
+        const absolute = path.join(project.root, "confect", "native.ts");
+        const operation =
+          kind === "table"
+            ? EvaluationSession.validateTables([
+                { relativePath: "native.ts", tableName: "native" },
+              ])
+            : kind === "component"
+              ? EvaluationSession.components(absolute, "native.ts")
+              : EvaluationSession.previous(absolute);
+        const error = yield* operation.pipe(
+          EvaluationSession.provide,
+          project.provide,
+          Effect.provideService(CompilationBackend.Service, {
+            prepare: (request) =>
+              Ref.update(prepared, (requests) => [...requests, request]).pipe(
+                Effect.as({
+                  url: 'data:text/javascript,throw "native evaluation attempted"',
+                  graph: { nodes: [] },
+                  warnings: [],
+                  origin,
+                }),
+              ),
+          }),
+          Effect.provideService(CompiledModule.Consumption, {
+            record: (receipt) =>
+              Ref.update(consumed, (receipts) => [...receipts, receipt]),
+          }),
+          Effect.flip,
+        );
+        expect(error._tag).toBe("ImportFailedError");
+        expect(yield* Ref.get(prepared)).toEqual([
+          {
+            entry: absolute,
+            roots: [absolute],
+            profile: kind === "component" ? "component-config" : "modules",
+          },
+        ]);
+        expect(yield* Ref.get(consumed)).toEqual([origin]);
+        expectWorkersExited();
+      }),
+  );
 
   it.effect.each(["external", "component"] as const)(
     "resolves %s manifest changes in a fresh compiler process",

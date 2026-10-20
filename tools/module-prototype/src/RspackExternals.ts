@@ -136,18 +136,17 @@ export const make = Effect.fn("RspackExternals.make")(
         !request.startsWith(".") &&
         !request.startsWith("#") &&
         !path.isAbsolute(request);
-      if (bare) {
-        const name = request
-          .split("/")
-          .slice(0, request.startsWith("@") ? 2 : 1)
-          .join("/");
-        yield* inputs.track(
-          CompilationInputs.ancestors(path, path.dirname(importer)).map(
+      const name = request
+        .split("/")
+        .slice(0, request.startsWith("@") ? 2 : 1)
+        .join("/");
+      const candidates = bare
+        ? CompilationInputs.ancestors(path, path.dirname(importer)).map(
             (directory) =>
               path.join(directory, "node_modules", name, "package.json"),
-          ),
-        );
-      }
+          )
+        : [];
+      yield* inputs.track(candidates);
       const nativeResolve = data.getResolve();
       const context = data.context;
       const native = yield* Effect.tryPromise({
@@ -163,7 +162,7 @@ export const make = Effect.fn("RspackExternals.make")(
       )
         return;
       if (!resolved && !bare) return;
-      yield* inputs.check;
+      yield* inputs.checkFiles(candidates);
       runtimeResolution = true;
       const requiredPath = requireTarget(request, importer);
       const importedPath = importTarget(request, importer, conditions);
@@ -193,7 +192,7 @@ export const make = Effect.fn("RspackExternals.make")(
         });
       const bytes = yield* fs.readFile(canonical);
       const sha256 = Hex.encode(yield* crypto.digest("SHA-256", bytes));
-      yield* inputs.check;
+      yield* inputs.checkFiles([...candidates, physical]);
       if (sealed)
         return yield* new Unsupported({ path: importer, reason: "Sealed" });
       yield* Ref.update(observations, (current) => [

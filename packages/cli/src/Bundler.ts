@@ -30,12 +30,14 @@ import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 import * as CompiledModule from "./CompiledModule";
 import * as Compilation from "./Compilation";
+import * as CompilationBackend from "./CompilationBackend";
 import * as CompilationPlugin from "./CompilationPlugin";
 import * as CompilationState from "./CompilationState";
 import type * as CompilationConfig from "./CompilationConfig";
 import { logCoalescedBuildWarnings } from "./log";
 
 export type Bundled = CompiledModule.LoadedModule;
+export { prepare } from "./CompilationBackend";
 
 /**
  * `bundle-require` sets `absWorkingDir: cwd` on the underlying esbuild build,
@@ -630,6 +632,22 @@ export const withBatch = <A, E, R>(
       const entryKeys = HashSet.fromIterable(
         entryPoints.map((entry) => path.resolve(entry)),
       );
+      const backend = yield* Effect.serviceOption(CompilationBackend.Service);
+      if (Option.isSome(backend)) {
+        const current = yield* Effect.serviceOption(CompilationBackend.Roots);
+        if (
+          Option.isSome(current) &&
+          entryPoints.every((entry) =>
+            current.value.includes(path.resolve(entry)),
+          )
+        )
+          return yield* effect;
+        return yield* Effect.provideService(
+          effect,
+          CompilationBackend.Roots,
+          Array.dedupe(entryPoints.map((entry) => path.resolve(entry))),
+        );
+      }
       const current = yield* Effect.serviceOption(Batch);
       if (
         Option.isSome(current) &&
@@ -994,15 +1012,36 @@ const findMetafileInputKey = Effect.fnUntraced(function* (
 
 /**
  * Returns `true` when the module bundled from `sourceAbsolutePath` declares a
- * direct import of `targetAbsolutePath` (according to the bundle's esbuild
- * metafile). Returns `false` if either path is missing from the metafile.
+ * direct import of `targetAbsolutePath` according to the artifact's import
+ * graph. Returns `false` if either path is missing from the graph.
  */
 export const directlyImports = Effect.fnUntraced(function* (
-  bundled: Pick<Bundled, "metafile">,
+  bundled: CompiledModule.ModuleGraph,
   sourceAbsolutePath: string,
   targetAbsolutePath: string,
 ) {
   const path = yield* Path.Path;
+  if ("graph" in bundled) {
+    const fs = yield* FileSystem.FileSystem;
+    const find = Effect.fnUntraced(function* (absolutePath: string) {
+      const resolved = path.resolve(absolutePath);
+      const direct = bundled.graph.nodes.filter(
+        (node) => node.path === resolved,
+      );
+      if (direct.length > 0) return direct;
+      const real = yield* fs
+        .realPath(resolved)
+        .pipe(Effect.orElseSucceed(() => resolved));
+      return bundled.graph.nodes.filter((node) => node.path === real);
+    });
+    const source = yield* find(sourceAbsolutePath);
+    const targets = HashSet.fromIterable(
+      (yield* find(targetAbsolutePath)).map((node) => node.id),
+    );
+    return source.some((node) =>
+      node.imports.some((imported) => HashSet.has(targets, imported.id)),
+    );
+  }
   const sourceKey = yield* findMetafileInputKey(
     bundled.metafile,
     sourceAbsolutePath,
@@ -1043,11 +1082,26 @@ export const directlyImports = Effect.fnUntraced(function* (
  * imports are not reported.
  */
 export const importersOfPackage = (
-  bundled: Pick<Bundled, "metafile">,
+  bundled: CompiledModule.ModuleGraph,
   packageName: string,
   where: (absolutePath: string) => boolean,
 ): ReadonlyArray<string> => {
   const subpathPrefix = `${packageName}/`;
+
+  if ("graph" in bundled)
+    return Array.dedupe(
+      bundled.graph.nodes.flatMap((node) =>
+        node.path !== undefined &&
+        where(node.path) &&
+        node.imports.some(
+          (imported) =>
+            imported.original === packageName ||
+            imported.original?.startsWith(subpathPrefix) === true,
+        )
+          ? [node.path]
+          : [],
+      ),
+    );
 
   return Object.entries(bundled.metafile.inputs)
     .filter(

@@ -234,8 +234,12 @@ leave those runtime calls outside the compiled graph; preparation validation is
 not evaluation freshness. Raw external-resolution probes are conservatively
 ineligible for certified preparation reuse. These results are positive feasibility
 evidence, not completion of the qualification gates below: PnP is rejected, the
-read guard remains Linux-only, and the live development coordinator is not wired
-to the candidate.
+read guard remains Linux-only, and warm-cache provenance remains unqualified.
+The subsequent private live launcher now wires the candidate to the existing
+development coordinator without changing the production default. Its bounded
+tests cover generated-code ownership, mixed configurations, real component
+definitions, edit/recovery/restart behavior and scoped receipt accounting. They
+do not establish performance parity or general production readiness.
 
 Prefer assessing the supported filesystem boundary over extending a compiler or
 building another JavaScript loader. Rspack is a candidate for a native integration;

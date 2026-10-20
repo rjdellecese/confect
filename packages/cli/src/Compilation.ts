@@ -32,6 +32,15 @@ class PreparedRevisions extends Context.Service<
   ReadonlyArray<CompilationState.Receipt>
 >()("@confect/cli/Compilation/PreparedRevisions") {}
 
+export const expectedRevision = (context: number) =>
+  Effect.serviceOption(PreparedRevisions).pipe(
+    Effect.map((prepared) =>
+      Option.flatMap(prepared, (receipts) =>
+        Array.findFirst(receipts, (receipt) => receipt.context === context),
+      ),
+    ),
+  );
+
 export interface Request {
   readonly roots: ReadonlyArray<string>;
   readonly profile: CompilationState.Profile;
@@ -252,13 +261,7 @@ export const layer = (options: {
               yield* Ref.set(contexts, Array.append(retained, entry));
               return entry;
             }).pipe(Effect.uninterruptible);
-            const prepared = yield* Effect.serviceOption(PreparedRevisions);
-            const expected = Option.flatMap(prepared, (receipts) =>
-              Array.findFirst(
-                receipts,
-                (receipt) => receipt.context === selected.id,
-              ),
-            );
+            const expected = yield* expectedRevision(selected.id);
             const outcome = yield* selected
               .consume(Option.getOrUndefined(expected))
               .pipe(Effect.provide(services), Effect.result);

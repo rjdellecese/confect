@@ -16,6 +16,30 @@ export interface CompiledModule {
   readonly origin?: Receipt;
 }
 
+export interface ImportGraph {
+  readonly nodes: ReadonlyArray<{
+    readonly id: string;
+    readonly path?: string;
+    readonly imports: ReadonlyArray<{
+      readonly id: string;
+      readonly original?: string;
+    }>;
+  }>;
+}
+
+export interface NativeArtifact {
+  readonly url: string;
+  readonly graph: ImportGraph;
+  readonly warnings: ReadonlyArray<esbuild.Message>;
+  readonly origin?: Receipt;
+}
+
+export type PreparedModule = CompiledModule | NativeArtifact;
+
+export type ModuleGraph =
+  | Pick<CompiledModule, "metafile">
+  | Pick<NativeArtifact, "graph">;
+
 export class Consumption extends Context.Service<
   Consumption,
   {
@@ -23,9 +47,9 @@ export class Consumption extends Context.Service<
   }
 >()("@confect/cli/CompiledModule/Consumption") {}
 
-export const consume = Effect.fn("CompiledModule.consume")(function* (
-  compiled: CompiledModule,
-) {
+export const consume = Effect.fn("CompiledModule.consume")(function* <
+  A extends { readonly origin?: Receipt },
+>(compiled: A) {
   if (!compiled.origin) return;
   const consumption = yield* Effect.serviceOption(Consumption);
   if (Option.isSome(consumption))

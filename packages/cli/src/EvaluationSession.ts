@@ -117,7 +117,7 @@ const compile = Effect.fn("EvaluationSession.compile")(function* (
 ) {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
-  return yield* Bundler.compile(
+  return yield* Bundler.prepare(
     path.resolve(confectDirectory, relativePath),
   ).pipe(Effect.mapError((error) => fromBundlerError(relativePath, error)));
 });
@@ -313,7 +313,7 @@ export const components = Effect.fn("EvaluationSession.components")(function* (
 ) {
   const path = yield* Path.Path;
   const { client, requestContext } = yield* ModuleEvaluation;
-  const artifact = yield* Bundler.compile(absolutePath, {
+  const artifact = yield* Bundler.prepare(absolutePath, {
     profile: "component-config",
     plugins: [ConvexConfig.componentConfigPlugin(path)],
   }).pipe(Effect.mapError((error) => fromBundlerError(displayPath, error)));
@@ -329,7 +329,7 @@ export const previous = Effect.fn("EvaluationSession.previous")(function* (
   absolutePath: string,
 ) {
   const { client, requestContext } = yield* ModuleEvaluation;
-  const artifact = yield* Bundler.compile(absolutePath).pipe(
+  const artifact = yield* Bundler.prepare(absolutePath).pipe(
     Effect.mapError((error) => fromBundlerError(absolutePath, error)),
   );
   return yield* client

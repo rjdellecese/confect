@@ -58,6 +58,55 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("RspackInputs", () => {
   it.effect(
+    "hides scoped artifacts without hiding authored directory changes",
+    () =>
+      Effect.gen(function* () {
+        const root = yield* temporary;
+        const adapter = RspackInputs.make({ hideArtifacts: true });
+        yield* call(adapter, "stat", root);
+        yield* call(adapter, "readdir", root);
+        const captured = yield* adapter.capture;
+        const artifact = path.join(root, ".confect-artifacts-probe");
+        yield* Effect.promise(() => fs.promises.mkdir(artifact));
+        yield* captured.validate;
+        const hidden = yield* Effect.result(
+          call(RspackInputs.make({ hideArtifacts: true }), "stat", artifact),
+        );
+        expect(hidden).toMatchObject({
+          _tag: "Failure",
+          failure: { code: "ENOENT" },
+        });
+        yield* Effect.promise(() =>
+          fs.promises.rm(artifact, { recursive: true }),
+        );
+        yield* captured.validate;
+        yield* Effect.promise(() =>
+          fs.promises.writeFile(
+            path.join(root, "authored.ts"),
+            "export default 1",
+          ),
+        );
+        yield* expectChanged(captured, "stat", root);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect("retains directory identity in the artifact-filtered view", () =>
+    Effect.gen(function* () {
+      const root = yield* temporary;
+      const directory = path.join(root, "source");
+      yield* Effect.promise(() => fs.promises.mkdir(directory));
+      const adapter = RspackInputs.make({ hideArtifacts: true });
+      yield* call(adapter, "stat", directory);
+      const captured = yield* adapter.capture;
+      yield* Effect.promise(() =>
+        fs.promises.rename(directory, path.join(root, "old")),
+      );
+      yield* Effect.promise(() => fs.promises.mkdir(directory));
+      yield* expectChanged(captured, "stat", directory);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect(
     "captures all six default callback forms and replays them without atime self-invalidation",
     () =>
       Effect.gen(function* () {

@@ -7,6 +7,10 @@ import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as esbuild from "esbuild";
 import * as Bundler from "@confect/cli/Bundler";
+import * as CompilationBackend from "@confect/cli/CompilationBackend";
+import * as CompiledModule from "@confect/cli/CompiledModule";
+import type { Receipt } from "@confect/cli/CompilationState";
+import * as Ref from "effect/Ref";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
@@ -20,6 +24,7 @@ import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import {
   codegenHandler,
+  compileOptionalModules,
   generateWithSnapshot,
   updateDeclarations,
 } from "@confect/cli/confect/codegen";
@@ -47,6 +52,49 @@ vi.mock("esbuild", (importOriginal) =>
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect(
+      "prepares and consumes optional native modules without evaluating them",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const path = yield* Path.Path;
+          for (const name of ["http.ts", "crons.ts", "auth.ts"])
+            yield* project.write(`confect/${name}`, "not valid JavaScript");
+          const requests = yield* Ref.make<
+            ReadonlyArray<CompilationBackend.Preparation>
+          >([]);
+          const consumed = yield* Ref.make<ReadonlyArray<Receipt>>([]);
+          const origin = { context: 1, revision: 2, roots: ["optional"] };
+          yield* compileOptionalModules.pipe(
+            Effect.provideService(ConfectDirectory, {
+              get: Effect.succeed(path.join(project.root, "confect")),
+            }),
+            Effect.provideService(CompilationBackend.Service, {
+              prepare: (request) =>
+                Ref.update(requests, (current) => [...current, request]).pipe(
+                  Effect.as({
+                    url: 'data:text/javascript,throw new Error("must not evaluate")',
+                    graph: { nodes: [] },
+                    warnings: [],
+                    origin,
+                  }),
+                ),
+            }),
+            Effect.provideService(CompiledModule.Consumption, {
+              record: (receipt) =>
+                Ref.update(consumed, (current) => [...current, receipt]),
+            }),
+          );
+          const roots = ["http.ts", "crons.ts", "auth.ts"].map((name) =>
+            path.join(project.root, "confect", name),
+          );
+          expect(yield* Ref.get(requests)).toEqual(
+            roots.map((entry) => ({ entry, roots, profile: "modules" })),
+          );
+          expect(yield* Ref.get(consumed)).toEqual([origin, origin, origin]);
+        }).pipe(Effect.scoped),
+    );
+
     it.effect(
       "passes inherited aliases and per-entry options through one resolved config",
       () =>

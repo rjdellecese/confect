@@ -62,98 +62,108 @@ export const writtenFiles = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     return yield* Ref.get(writes);
   });
 
-export const make = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const root = yield* fs.makeTempDirectoryScoped({
-    directory: import.meta.dirname,
-    prefix: "consumer-",
-  });
-  const write = (file: string, contents: string) =>
-    fs.writeFileString(path.join(root, file), contents);
-  yield* fs.makeDirectory(path.join(root, "confect", "tables"), {
-    recursive: true,
-  });
-  yield* fs.makeDirectory(path.join(root, "convex"));
-  yield* write("package.json", '{"type":"module"}');
-  yield* write(
-    "tsconfig.json",
-    '{"compilerOptions":{"moduleResolution":"Bundler"}}',
-  );
-  yield* write("confect/tables/notes.ts", table);
-  yield* write("confect/notes.spec.ts", spec);
-  yield* write("confect/notes.impl.ts", impl);
+export const makeWithLauncher = (devArguments?: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const root = yield* fs.makeTempDirectoryScoped({
+      directory: import.meta.dirname,
+      prefix: "consumer-",
+    });
+    const write = (file: string, contents: string) =>
+      fs.writeFileString(path.join(root, file), contents);
+    yield* fs.makeDirectory(path.join(root, "confect", "tables"), {
+      recursive: true,
+    });
+    yield* fs.makeDirectory(path.join(root, "convex"));
+    yield* write("package.json", '{"type":"module"}');
+    yield* write(
+      "tsconfig.json",
+      '{"compilerOptions":{"moduleResolution":"Bundler"}}',
+    );
+    yield* write("confect/tables/notes.ts", table);
+    yield* write("confect/notes.spec.ts", spec);
+    yield* write("confect/notes.impl.ts", impl);
 
-  const start = Effect.fnUntraced(function* (command: "dev" | "codegen") {
-    const spawner = yield* ChildProcessSpawner;
-    const handle = yield* spawner.spawn(
-      ChildProcess.make(
-        process.execPath,
-        [path.resolve(import.meta.dirname, "../../bin/confect.mjs"), command],
-        { cwd: root, extendEnv: true, env: { NO_COLOR: "1" } },
-      ),
-    );
-    const output = yield* Ref.make("");
-    const lines = yield* Queue.unbounded<string>();
-    yield* Stream.merge(
-      handle.stdout.pipe(Stream.decodeText(), Stream.splitLines),
-      handle.stderr.pipe(Stream.decodeText(), Stream.splitLines),
-    ).pipe(
-      Stream.runForEach((line) =>
-        Ref.update(output, (previous) => `${previous}${line}\n`).pipe(
-          Effect.andThen(Queue.offer(lines, line)),
-        ),
-      ),
-      Effect.forkScoped,
-    );
-    const waitFor = (text: string) =>
-      Queue.take(lines).pipe(
-        Effect.repeat({ while: (line) => !line.includes(text) }),
-        Effect.timeoutOption("15 seconds"),
-        Effect.flatMap((result) =>
-          Ref.get(output).pipe(
-            Effect.map((log) => {
-              expect(result._tag, `Waiting for ${text}:\n${log}`).toBe("Some");
-            }),
-          ),
+    const start = Effect.fnUntraced(function* (command: "dev" | "codegen") {
+      const spawner = yield* ChildProcessSpawner;
+      const handle = yield* spawner.spawn(
+        ChildProcess.make(
+          process.execPath,
+          command === "dev" && devArguments
+            ? devArguments
+            : [
+                path.resolve(import.meta.dirname, "../../bin/confect.mjs"),
+                command,
+              ],
+          { cwd: root, extendEnv: true, env: { NO_COLOR: "1" } },
         ),
       );
-    return { handle, output, waitFor };
-  });
-  const generatedFiles = Effect.gen(function* () {
-    const files = yield* Effect.forEach(
-      ["confect/_generated", "convex"],
-      (directory) =>
-        fs
-          .readDirectory(path.join(root, directory), { recursive: true })
-          .pipe(
-            Effect.map((entries) =>
-              entries
-                .filter((entry) => entry.endsWith(".ts"))
-                .map((entry) => path.join(directory, entry)),
+      const output = yield* Ref.make("");
+      const lines = yield* Queue.unbounded<string>();
+      yield* Stream.merge(
+        handle.stdout.pipe(Stream.decodeText(), Stream.splitLines),
+        handle.stderr.pipe(Stream.decodeText(), Stream.splitLines),
+      ).pipe(
+        Stream.runForEach((line) =>
+          Ref.update(output, (previous) => `${previous}${line}\n`).pipe(
+            Effect.andThen(Queue.offer(lines, line)),
+          ),
+        ),
+        Effect.forkScoped,
+      );
+      const waitFor = (text: string) =>
+        Queue.take(lines).pipe(
+          Effect.repeat({ while: (line) => !line.includes(text) }),
+          Effect.timeoutOption("15 seconds"),
+          Effect.flatMap((result) =>
+            Ref.get(output).pipe(
+              Effect.map((log) => {
+                expect(result._tag, `Waiting for ${text}:\n${log}`).toBe(
+                  "Some",
+                );
+              }),
             ),
           ),
-    );
-    return Object.fromEntries(
-      yield* Effect.forEach(files.flat(), (file) =>
-        fs
-          .readFileString(path.join(root, file))
-          .pipe(Effect.map((contents) => [file, contents] as const)),
-      ),
-    );
+        );
+      return { handle, output, waitFor };
+    });
+    const generatedFiles = Effect.gen(function* () {
+      const files = yield* Effect.forEach(
+        ["confect/_generated", "convex"],
+        (directory) =>
+          fs
+            .readDirectory(path.join(root, directory), { recursive: true })
+            .pipe(
+              Effect.map((entries) =>
+                entries
+                  .filter((entry) => entry.endsWith(".ts"))
+                  .map((entry) => path.join(directory, entry)),
+              ),
+            ),
+      );
+      return Object.fromEntries(
+        yield* Effect.forEach(files.flat(), (file) =>
+          fs
+            .readFileString(path.join(root, file))
+            .pipe(Effect.map((contents) => [file, contents] as const)),
+        ),
+      );
+    });
+    const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+      effect.pipe(
+        Effect.provideService(ProjectRoot, { get: Effect.succeed(root) }),
+        Effect.provideService(ConfectDirectory, {
+          get: Effect.succeed(path.join(root, "confect")),
+        }),
+        Effect.provideService(ConvexDirectory, {
+          get: Effect.succeed(path.join(root, "convex")),
+        }),
+      );
+    return { root, write, start, generatedFiles, provide };
   });
-  const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(
-      Effect.provideService(ProjectRoot, { get: Effect.succeed(root) }),
-      Effect.provideService(ConfectDirectory, {
-        get: Effect.succeed(path.join(root, "confect")),
-      }),
-      Effect.provideService(ConvexDirectory, {
-        get: Effect.succeed(path.join(root, "convex")),
-      }),
-    );
-  return { root, write, start, generatedFiles, provide };
-});
+
+export const make = makeWithLauncher();
 
 export const makeConfigProfiles = Effect.gen(function* () {
   const project = yield* make;

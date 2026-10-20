@@ -76,6 +76,8 @@ export const fingerprints = Effect.fn("RspackGraph.fingerprints")(function* (
   graph: Graph,
   observations: ReadonlyArray<RspackInputs.Observation>,
   external: ReadonlyArray<RspackExternals.Observation>,
+  owned: (file: string) => boolean = () => false,
+  virtual: (file: string) => boolean = () => false,
 ) {
   const crypto = yield* Crypto.Crypto;
   const bytes = new Map(
@@ -94,7 +96,12 @@ export const fingerprints = Effect.fn("RspackGraph.fingerprints")(function* (
   }
   for (const module of graph.modules) {
     const input = module.file && bytes.get(module.file);
-    if (module.file && module.source !== undefined && !input) {
+    if (
+      module.file &&
+      !virtual(module.file) &&
+      module.source !== undefined &&
+      !input
+    ) {
       return yield* new Failed({
         reason: "UnobservedSource",
         module: module.id,
@@ -106,8 +113,8 @@ export const fingerprints = Effect.fn("RspackGraph.fingerprints")(function* (
         id: module.id,
         type: module.type,
         file: module.file,
-        input,
-        source: module.source,
+        input: module.file && owned(module.file) ? undefined : input,
+        source: module.file && owned(module.file) ? undefined : module.source,
         external: [
           ...new Set(
             external

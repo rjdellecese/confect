@@ -140,7 +140,7 @@ type DevelopmentEvent =
     }
   | { readonly _tag: "Filesystem"; readonly event: DevelopmentEvents.Event };
 
-const runSession = Effect.gen(function* () {
+export const runSession = Effect.gen(function* () {
   yield* logPending("Performing initial sync…");
   const previous = yield* Evaluation.loadPreviousFunctionPaths;
   const compiler = yield* Compilation.Service;

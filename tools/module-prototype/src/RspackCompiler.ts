@@ -12,10 +12,18 @@ import * as RspackInputs from "./RspackInputs.ts";
 import * as RspackGraph from "./RspackGraph.ts";
 import * as RspackExternals from "./RspackExternals.ts";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import type * as CompilationConfig from "../../../packages/cli/src/CompilationConfig.ts";
+import * as RspackOwnership from "./RspackOwnership.ts";
+import * as RspackComponents from "./RspackComponents.ts";
 
 export class Failed extends Schema.TaggedError<Failed>()(
   "RspackPrototypeCompilationFailed",
-  { stage: Schema.String, path: Schema.String, cause: Schema.Unknown },
+  {
+    stage: Schema.String,
+    path: Schema.String,
+    cause: Schema.Unknown,
+    observations: Schema.optionalKey(Schema.Array(RspackInputs.Observation)),
+  },
 ) {
   override get message() {
     return `${this.stage} failed for ${this.path}: ${String(this.cause)}`;
@@ -60,6 +68,9 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
     options?: {
       readonly inputs: CompilationInputs.Inputs;
       readonly conditions: ReadonlyArray<string>;
+      readonly configuration?: CompilationConfig.Discovery;
+      readonly ownership?: RspackOwnership.Options;
+      readonly profile?: "modules" | "component-config";
     },
   ) {
     const fs = yield* FileSystem.FileSystem;
@@ -76,8 +87,9 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
       options?.inputs ?? (yield* CompilationInputs.make("Once", conditions));
     const externalPolicy = yield* RspackExternals.make({ inputs, conditions });
     for (const root of entries) yield* externalPolicy.check(root);
-    const selected = yield* inputs.configuration(entry);
-    for (const root of entries) {
+    const selected =
+      options?.configuration ?? (yield* inputs.configuration(entry));
+    for (const root of options?.configuration ? [] : entries) {
       const other = yield* inputs.configuration(root);
       if (other.configuration !== selected.configuration)
         return yield* new Failed({
@@ -89,21 +101,40 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
     yield* inputs.check;
     const directory = yield* fs.makeTempDirectoryScoped({
       directory: path.dirname(entry),
-      prefix: ".rspack-prototype-",
+      prefix: ".confect-artifacts-",
     });
-    const configuration = path.join(
-      yield* fs.makeTempDirectoryScoped(),
-      "tsconfig.json",
-    );
+    const configurationDirectory = yield* fs.makeTempDirectoryScoped({
+      prefix: ".confect-compiler-",
+    });
+    const configuration = path.join(configurationDirectory, "tsconfig.json");
     yield* fs.writeFileString(
       configuration,
       yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(
         selected.tsconfigRaw,
       ),
     );
-    const recording = RspackInputs.make();
+    const recording = RspackInputs.make({
+      hideArtifacts: true,
+      visibleArtifacts: [configurationDirectory, configuration],
+    });
+    const components =
+      options?.profile === "component-config"
+        ? RspackComponents.make(path)
+        : undefined;
+    const ownership = RspackOwnership.make(
+      path,
+      options?.ownership ?? { ownedDirectories: [], authoredFiles: [] },
+    );
+    const owned = (file: string) =>
+      ownership.owns(file) && !components?.isDefinition(file);
+    const retained = (item: RspackInputs.Observation) =>
+      item.path !== configuration &&
+      item.path !== configurationDirectory &&
+      (!owned(item.path) ||
+        item.method === "realpath" ||
+        item.method === "readlink");
     const loader = createRequire(import.meta.url).resolve("esbuild-loader");
-    const graph = yield* Effect.acquireUseRelease(
+    const outcome = yield* Effect.acquireUseRelease(
       Effect.try({
         try: () => {
           const value = rspack({
@@ -118,7 +149,14 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
             incremental: false,
             experiments: { useInputFileSystem: [/.*/] },
             externalsPresets: { node: false },
-            externals: externalPolicy.externals,
+            externals: (data, callback) =>
+              components &&
+              data.request &&
+              (components.isDefinition(data.request) ||
+                components.isWrapper(data.request) ||
+                components.isSource(data.request))
+                ? callback()
+                : externalPolicy.externals(data, callback),
             resolve: {
               tsConfig: { configFile: configuration },
               extensions: [".tsx", ".ts", ".jsx", ".js", ".json"],
@@ -141,8 +179,10 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
                 },
               },
               rules: [
+                ...ownership.rules,
+                ...(components?.rules ?? []),
                 {
-                  test: /\.[cm]?[jt]sx?$/,
+                  test: /\.([mc]?[tj]s|[tj]sx)$/,
                   type: "javascript/auto",
                   resolve: { fullySpecified: false },
                   use: (info) => {
@@ -187,6 +227,8 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
                 : {}),
             },
             plugins: [
+              ownership.plugin,
+              ...(components ? [components.plugin] : []),
               externalPolicy.plugin,
               (engine: Compiler) => {
                 engine.hooks.normalModuleFactory.tap(
@@ -235,7 +277,19 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
         run(value, entry).pipe(
           Effect.flatMap((stats) =>
             Effect.try({
-              try: () => RspackGraph.capture(stats, entries),
+              try: () => ({
+                graph: RspackGraph.capture(stats, entries),
+                warnings: (
+                  stats.toJson({ all: false, warnings: true }).warnings ?? []
+                ).map((warning): esbuild.Message => ({
+                  id: "confect:rspack",
+                  pluginName: "rspack",
+                  text: warning.message,
+                  location: null,
+                  notes: [],
+                  detail: warning,
+                })),
+              }),
               catch: (cause) =>
                 new Failed({ stage: "graph", path: entry, cause }),
             }),
@@ -253,8 +307,17 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
             ),
           );
         }).pipe(Effect.orDie),
-    );
+    ).pipe(Effect.result);
     const captured = yield* recording.capture;
+    yield* inputs.check;
+    if (outcome._tag === "Failure")
+      return yield* new Failed({
+        stage: outcome.failure.stage,
+        path: outcome.failure.path,
+        cause: outcome.failure.cause,
+        observations: captured.observations.filter(retained),
+      });
+    const { graph, warnings } = outcome.success;
     const external = yield* externalPolicy.capture;
     yield* captured.validate;
     yield* inputs.track(
@@ -272,6 +335,8 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
       graph,
       captured.observations,
       external.observations,
+      owned,
+      components?.isWrapper,
     );
     return {
       urls: Object.fromEntries(
@@ -281,12 +346,15 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
         ]),
       ),
       fingerprints,
+      warnings,
       graph,
       reusable: external.reusable,
       external: external.observations,
-      observations: captured.observations,
+      observations: captured.observations.filter(retained),
       validate: inputs.check.pipe(
-        Effect.andThen(captured.validate),
+        Effect.andThen(
+          recording.validate(captured.observations.filter(retained)),
+        ),
         Effect.andThen(inputs.check),
       ),
     };
