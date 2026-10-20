@@ -121,7 +121,7 @@ capture, replay, sealing and read-safety cases.
 
 ### Bounded warm-session experiment
 
-The private session now retains a compiler per compatible configuration/profile
+The `b4912a94` experiment retains a compiler per compatible configuration/profile
 context. Every native run has a new acquisition recorder. Validation reads never
 enter that recorder: cached modules retain their original evidence, and only
 actual native callbacks replace observation keys in a conservative union.
@@ -216,8 +216,53 @@ summary: `9df6681d7a956dfe52e482d9c94e40bcc07cfc78d1b54bbca4e0d30d2906d4cd`;
 gate manifest: `6f50998936be75d884b83acd9eb5fee1571fa24a42732716ea2dff4c0bcf29ac`.
 The preserved scratch harness retains 44 sequential-await errors and 55
 Effect-style warnings across eight scripts; repository source has zero lint
-diagnostics. Production remains esbuild. No further implementation or timing
-work is running.
+diagnostics. Production remains esbuild. Those measurements are complete; the
+follow-up below supersedes that checkpoint's stopped-work status.
+
+### Observed-runtime follow-up
+
+The private live session now attempts runtime target selection through Rspack's
+public resolver and the guarded acquisition filesystem. Native resolution still
+chooses targets. Admission requires conservative explicit exports shapes,
+separate governing-package metadata, no source self-reference, canonical
+containment, and agreement between strict and legacy resolution. Strict mode
+disables extensions, index names **and main fields**. Null denials may coexist
+with admitted siblings; blocked requests remain unproven. Unsafe strings,
+arrays and ambiguous packages retain raw-runtime resolution and prohibit reuse.
+Guard failures never authorize that fallback.
+
+Actual metadata-byte acquisitions use a bounded per-capture cache. Original
+observations survive native cache hits. Runtime-only discovery changes force
+cold recapture because these calls are not native compilation dependencies;
+source-only changes may rebuild warm. External evidence survives cached importers
+and their reintroduction, while fingerprints and returned observations include
+only active request/kind edges. Acquisitions that disagree with preflight are
+rejected rather than relabeling cached modules with later bytes. Fingerprinting
+indexes modules and external observations instead of repeatedly scanning them.
+
+The separate discovery-cache screening of `3d7e8643` passed the original scale
+invariants in 42.912s startup / 30.701s reload, but used six distinct native
+instances without reuse. These instrumented times are not matched acceptance
+results. Its copied evidence manifest is
+`cc22662611890e9d16ee4cd564b7cc30e239181a80510c048435f6de6557ee8b`.
+The combined observed-runtime candidate needs a new frozen comparison; earlier
+timings do not establish its performance.
+
+Compatibility remains a separate adoption gate. Additive probes preserve a known
+mismatch: a handled deferred import of a require-only package whose target needs
+extension inference compiles under esbuild and reports
+`ERR_PACKAGE_PATH_NOT_EXPORTED` when invoked, but Rspack rejects compilation.
+Public dynamic-import modes do not repair this; optional missing imports can
+instead emit `MODULE_NOT_FOUND`, a different error. Ignored imports lose discovery
+and relocated-relative semantics. Blanket `module-import` externalization admits
+static and unhandled imports the oracle rejects, and inspected public hooks
+expose no selective optionality flag.
+
+Independent enhanced-resolve probes also found target-selection disagreements.
+Raw Node hooks and exsolve lack complete acquisition evidence; known-file guards
+miss higher-priority negative discovery and acquisition A/B/A changes. These
+alternatives do not justify weakening receipts or implementing a custom resolver.
+Production remains esbuild, with no adoption or merge authorized.
 
 ### Corrected cold startup and reload profile
 

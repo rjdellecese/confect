@@ -27,6 +27,25 @@ Keep esbuild as the production backend and compatibility oracle while assessing
 the alternatives. Its remaining performance regression is not accepted as the
 long-term endpoint.
 
+## Current Rspack qualification boundary
+
+The private observed-runtime experiment admits conservative explicit package
+exports through supported native resolver calls on the guarded filesystem.
+Metadata predicates reject ambiguous forms; they do not select targets or
+conditions. Unproven forms retain raw resolution and force cold preparation.
+Runtime discovery changes also force cold recapture because those calls are not
+native compilation dependencies. Cached modules retain original observations;
+active external edges come from the native graph, not parsed source text.
+
+This is not full compatibility. Handled deferred imports of require-only packages
+with extension-inferred targets remain a demonstrated compilation mismatch.
+Public parser modes, ignored imports and blanket externalization change errors,
+discovery or the accepted program set. Tested alternative resolvers lack either
+target parity or a complete supported observation boundary. Those failures do
+not authorize a custom resolver, fork, diagnostic suppression or weaker freshness.
+The combined candidate needs its own frozen end-to-end comparison; earlier
+measurements do not establish its performance.
+
 ## Ownership
 
 | Owner            | Responsibility                                                                                                                                                                                                 |

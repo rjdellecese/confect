@@ -268,6 +268,7 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
             }),
           );
           context.compiler = yield* RspackCompiler.make(context.roots, {
+            observedExternals: true,
             inputs: resolutionInputs,
             conditions,
             configuration: context.discovery,

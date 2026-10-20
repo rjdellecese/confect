@@ -91,13 +91,21 @@ export const fingerprints = Effect.fn("RspackGraph.fingerprints")(function* (
       .map((item) => [item.path, item.fingerprint]),
   );
   const modules = new Map(graph.modules.map((module) => [module.id, module]));
+  const files = new Set(graph.modules.map((module) => module.file));
+  const externalByImporter = new Map<string | undefined, Set<string>>();
   const serialized = new Map<string, string>();
   for (const observation of external) {
-    if (!graph.modules.some((module) => module.file === observation.importer))
+    if (!files.has(observation.importer))
       return yield* new Failed({
         reason: "UnassignedExternal",
         module: observation.importer,
       });
+    let imported = externalByImporter.get(observation.importer);
+    if (!imported) {
+      imported = new Set();
+      externalByImporter.set(observation.importer, imported);
+    }
+    imported.add(serialize(observation));
   }
   for (const module of graph.modules) {
     const input = module.file && bytes.get(module.file);
@@ -120,13 +128,7 @@ export const fingerprints = Effect.fn("RspackGraph.fingerprints")(function* (
         file: module.file,
         input: module.file && owned(module.file) ? undefined : input,
         source: module.file && owned(module.file) ? undefined : module.source,
-        external: [
-          ...new Set(
-            external
-              .filter((observation) => observation.importer === module.file)
-              .map((observation) => serialize(observation)),
-          ),
-        ].sort(),
+        external: [...(externalByImporter.get(module.file) ?? [])].sort(),
         imports: module.imports.map((edge) => serialize(edge)).sort(),
       }),
     );

@@ -8,7 +8,9 @@ import * as Runner from "./Runner.ts";
 const report = await Effect.runPromise(
   Compatibility.runWith((entry, invoke) =>
     Effect.gen(function* () {
-      const prepared = yield* RspackCompiler.compile(entry);
+      const prepared = yield* RspackCompiler.compile(entry, {
+        observedExternals: true,
+      });
       yield* prepared.validate;
       const value = yield* Runner.evaluateNative({
         _tag: "Native",
@@ -25,6 +27,7 @@ process.stdout.write(
   Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))({
     ...report,
     scope: "cold-semantic-gate",
+    runtimeResolution: "observed-with-cold-fallback",
     productionQualified: false,
   }) + "\n",
 );
