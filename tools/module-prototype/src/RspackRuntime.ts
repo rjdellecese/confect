@@ -47,10 +47,10 @@ const safeSegments = (value: string, wildcard: boolean) =>
 
 const safeExports = (value: unknown, subpaths = true, depth = 0): boolean => {
   if (depth > 16) return false;
+  if (value === null) return !subpaths;
   if (typeof value === "string")
     return value.startsWith("./") && safeSegments(value.slice(2), true);
-  if (value === null || typeof value !== "object" || Array.isArray(value))
-    return false;
+  if (typeof value !== "object" || Array.isArray(value)) return false;
   const entries = Object.entries(value);
   if (entries.length === 0) return false;
   const keys = entries.map(([key]) => key);

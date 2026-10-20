@@ -212,6 +212,80 @@ const probe = Effect.fn("RspackRuntimeTest.probe")(function* (
 layer(NodeServices.layer, { excludeTestServices: true })(
   "RspackRuntime",
   (it) => {
+    it.effect.each([
+      { request: "dependency/public", target: "dist/public.js" },
+      { request: "dependency/internal/private", target: null },
+      { request: "dependency/index", target: null },
+      { request: "dependency/feature/index", target: null },
+    ])("keeps native null-denial selection for $request", (testCase) =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "entry.js": `import "${testCase.request}";`,
+          "node_modules/dependency/package.json":
+            '{"exports":{"./*":"./dist/*.js","./internal/*":null,"./index":null,"./*/index":null}}',
+          "node_modules/dependency/dist/public.js": 'module.exports="public";',
+          "node_modules/dependency/dist/internal/private.js":
+            'module.exports="blocked";',
+          "node_modules/dependency/dist/index.js": 'module.exports="blocked";',
+          "node_modules/dependency/dist/feature/index.js":
+            'module.exports="blocked";',
+        });
+        const prepared = yield* probe(file("entry.js"));
+        if (testCase.target)
+          expect(prepared.results[0]?.result).toEqual(
+            Result.succeed({
+              required: file(`node_modules/dependency/${testCase.target}`),
+              imported: file(`node_modules/dependency/${testCase.target}`),
+            }),
+          );
+        else
+          expect(prepared.results[0]?.result).toMatchObject({
+            _tag: "Failure",
+            failure: {
+              _tag: "RspackRuntimeUnproven",
+              reason: "NativeResolution",
+            },
+          });
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect.each([
+      {
+        name: "inactive denial",
+        exports: '{"browser":null,"default":"./index.js"}',
+        admitted: true,
+      },
+      {
+        name: "active denial",
+        exports: '{"import":null,"require":"./index.js"}',
+        admitted: false,
+      },
+    ])("keeps native condition selection for $name", (testCase) =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "entry.js": 'import "dependency";',
+          "node_modules/dependency/package.json": `{"exports":${testCase.exports}}`,
+          "node_modules/dependency/index.js": 'module.exports="value";',
+        });
+        const prepared = yield* probe(file("entry.js"));
+        if (testCase.admitted)
+          expect(prepared.results[0]?.result).toEqual(
+            Result.succeed({
+              required: file("node_modules/dependency/index.js"),
+              imported: file("node_modules/dependency/index.js"),
+            }),
+          );
+        else
+          expect(prepared.results[0]?.result).toMatchObject({
+            _tag: "Failure",
+            failure: {
+              _tag: "RspackRuntimeUnproven",
+              reason: "NativeResolution",
+            },
+          });
+      }).pipe(Effect.scoped),
+    );
+
     it.effect(
       "admits exact conditional exports and ignores bundler aliases and loader context",
       () =>
