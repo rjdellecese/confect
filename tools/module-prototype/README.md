@@ -151,7 +151,8 @@ receipts, pending siblings/newer revisions, and no acknowledgment after failed
 post-evaluation validation. These tests exercise the accounting boundary; the
 separate live integration below exercises the development coordinator.
 
-**The live candidate failed the representative scale gate; production remains
+**The original live candidate failed the representative scale gate. A corrected
+batch-boundary candidate is undergoing the same gate; production remains
 unchanged.** PnP projects
 are explicitly rejected before configuration discovery without evaluating their
 loaders. Full diagnostics/runtime-condition coverage, warm-cache provenance and
@@ -178,14 +179,16 @@ From a disposable consumer project, run Node with the absolute path to
 launcher needs this checkout's dependencies and built evaluation worker; it is
 not a distributable CLI. The private test command rebuilds it before testing.
 
-`RspackSession` partitions lexical entry configurations, cold-compiles each
-preparation and retains only validation evidence between jobs. Artifacts are
+`RspackSession` partitions lexical entry configurations once per explicit batch,
+cold-compiles its configuration groups and retains only validation evidence
+between jobs. Artifacts are
 immutable and shared only inside an evaluation's `ArtifactScope`. Native graphs
 are projected to the requested entry before package-import checks, so an impl
 compiled in the same batch cannot contaminate its spec's graph. The adapter uses
 the existing receipt, failed-attempt and pending-root protocols, with at most
-eight stabilization attempts. A 250ms polling interval replays observations;
-unchanged evidence does not rebuild, but idle validation still incurs I/O.
+eight stabilization attempts. A 250ms polling interval replays observations
+outside active batches; unchanged evidence does not rebuild, but idle validation
+still incurs I/O. Active batches validate before publishing their buffered receipts.
 
 Generated ownership follows canonical resolved paths and explicit authored
 exceptions. Generated JavaScript and TypeScript execute through the ordinary
@@ -306,6 +309,45 @@ Its manifest digest is
 `8bf130f53c1b7ca1d13b643e21bc66facc8bdc8b7af22b4e13bf637f42a8101c`.
 The scratch profiler/controller have zero lint errors and three remaining
 Effect-style warnings for deliberate Node filesystem/timer instrumentation.
+
+### Batch-boundary correction
+
+Frozen candidate `6a0f3b5735d0ebe0a38b869a2d09c11f8b79d909` implements the
+profile-derived correction. Its scale results are pending; the older timeout
+above remains evidence about `e341d9ad`, not a measurement of this revision.
+
+An optional native batch hook leaves the existing esbuild batch path unchanged.
+The native hook records lexical `lstat`/`realpath` provenance and configuration
+partitions once, indexes the captured graph once, and serves immutable per-entry
+artifacts without repeating whole-batch filesystem work. Direct preparations
+outside a batch retain their per-call guards.
+
+Each boundary validates its captures and root plan before releasing consumption
+receipts. A stable authored evaluation failure still acknowledges the roots it
+actually evaluated; a failed freshness check releases none. Nested disjoint
+batches, outside-root entries and older captures remain included in the outer
+boundary's checks. Polling pauses while a batch is active rather than competing
+with the same checks; configuration guards and the closing validation remain
+authoritative.
+
+Lexical root bindings also survive in the compiler context. A changed root target
+requests the existing resolution-input restart and clears the prepared receipt,
+so an acknowledged old canonical target cannot silently leave the coordinator
+idle after a symlink retarget. Ordinary source edits remain on the incremental
+development path.
+
+The regression fixture exercises twelve roots with four-way concurrency and
+nested subsets. It requires one native compilation, one guarded root resolution
+per root per boundary, at most three retained-capture validation calls on the
+first boundary and two on the next unchanged boundary. Additional cases cover
+mid-batch source/config edits, retargets and fresh-session recovery, deferred
+receipts, stable authored failures, nested/outside captures and multiple retained
+revisions. All existing assertions and budgets remain unchanged.
+
+The frozen correction passes 165 private tests, 1,424 default CLI runtime/type
+checks and all seventeen semantic oracle controls, plus exact/inexact typechecks,
+the workspace build, formatting and lint. These checks authorize the repeated
+scale experiment, not adoption or a performance-parity claim.
 
 ## Vite module-oriented adapter
 

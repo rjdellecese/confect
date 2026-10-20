@@ -252,6 +252,13 @@ the table batch built in 12.2 seconds, while its full validation phase took
 that fixing the duplication would achieve parity; see the
 [profile and proposed corrective experiment](./README.md#startup-profile-repeated-batch-work-in-the-adapter).
 
+The resulting [batch-boundary correction](./README.md#batch-boundary-correction)
+is implemented in frozen candidate `6a0f3b57`, with explicit validation boundaries,
+buffered receipts and retained lexical root provenance. Its full regression suite
+passes; the representative scale gate and matched measurements are pending. The
+older candidate's timeout must not be presented as this revision's measurement,
+and a bounded-work unit test is not a substitute for the scale gate.
+
 Prefer assessing the supported filesystem boundary over extending a compiler or
 building another JavaScript loader. Rspack is a candidate for a native integration;
 webpack provides a stable public-API comparison. Neither is selected for production.
