@@ -68,6 +68,110 @@ const expectFresh = Effect.fn("RspackCompiler.test.expectFresh")(function* (
 
 describe("Rspack bounded warm provenance", () => {
   it.effect(
+    "retains explicit discovery invalidation for native module lookups",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "entry.ts":
+            'import { value } from "./choice"; export const probe = () => value;',
+          "choice.js": "export const value = 1;",
+        });
+        const run = vi.spyOn(Compiler.prototype, "run");
+        const engine = yield* RspackCompiler.make([entry]);
+        const original = yield* engine.compile();
+        yield* fs.writeFileString(
+          path.join(root, "choice.ts"),
+          "export const value = 2;",
+        );
+        const next = yield* engine.compile();
+        expect(run).toHaveBeenCalledTimes(2);
+        expect(run.mock.instances[1]).toBe(run.mock.instances[0]);
+        yield* expectFresh(entry, next, 2);
+        expect(yield* evaluate(original.urls[entry])).toBe(1);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "rejects acquisition that would relabel cached state after preflight",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "entry.ts":
+            'import { value } from "./shared"; export const probe = () => value;',
+          "shared.ts": "export const value = 1;",
+        });
+        const source = path.join(root, "shared.ts");
+        const engine = yield* RspackCompiler.make([entry]);
+        const original = yield* engine.compile();
+        yield* fs.writeFileString(
+          entry,
+          'import { value } from "./shared"; export const probe = () => value; // edit',
+        );
+        const context = yield* Effect.context<never>();
+        const spy = vi.spyOn(Compiler.prototype, "run");
+        spy.mockImplementationOnce(function (
+          this: Compiler,
+          callback,
+          options,
+        ) {
+          const input = this.inputFileSystem;
+          assert(input !== null);
+          this.hooks.beforeRun.tapPromise(
+            "confect:test-cached-acquisition-race",
+            () =>
+              Effect.runPromiseWith(context)(
+                Effect.gen(function* () {
+                  yield* fs.writeFileString(source, "export const value = 2;");
+                  for (const method of ["stat", "lstat", "readFile"] as const) {
+                    const operation:
+                      | ((
+                          name: string,
+                          callback: (
+                            cause: NodeJS.ErrnoException | null,
+                            value?: unknown,
+                          ) => void,
+                        ) => void)
+                      | undefined = input[method];
+                    assert(operation !== undefined);
+                    yield* Effect.callback<void, RspackCompiler.Failed>(
+                      (resume) => {
+                        operation(source, (cause: unknown) =>
+                          resume(
+                            cause
+                              ? Effect.fail(
+                                  new RspackCompiler.Failed({
+                                    stage: "test-reread",
+                                    path: source,
+                                    cause,
+                                  }),
+                                )
+                              : Effect.void,
+                          ),
+                        );
+                      },
+                    );
+                  }
+                }),
+              ),
+          );
+          spy.mockRestore();
+          this.run(callback, options);
+        });
+        const raced = yield* engine.compile().pipe(Effect.result);
+        if (Result.isSuccess(raced))
+          expect(yield* evaluate(raced.success.urls[entry])).toBe(2);
+        expect(Result.isFailure(raced)).toBe(true);
+        if (Result.isFailure(raced))
+          expect(raced.failure).toMatchObject({
+            _tag: "RspackInputsChanged",
+            path: source,
+          });
+        yield* expectFresh(entry, yield* engine.compile(), 2);
+        expect(yield* evaluate(original.urls[entry])).toBe(1);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
     "detects same-size restored-mtime edits without mutating prior receipts",
     () =>
       Effect.gen(function* () {

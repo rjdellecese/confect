@@ -44,6 +44,8 @@ class UnsupportedAttributes extends Schema.TaggedError<UnsupportedAttributes>()(
   }
 }
 
+const observationKey = (method: string, path: string) => `${method}\0${path}`;
+
 const run = (
   compiler: Compiler,
   entry: string,
@@ -425,6 +427,31 @@ export const make = Effect.fn("RspackPrototype.make")(function* (
         Effect.result,
       );
       const captured = yield* recording.capture;
+      if (previous) {
+        const expected = new Map(
+          previous.observations.map((item) => [
+            observationKey(item.method, item.path),
+            item.fingerprint,
+          ]),
+        );
+        for (const changed of changes)
+          expected.set(
+            observationKey(changed.method, changed.path),
+            changed.actual,
+          );
+        for (const item of captured.observations) {
+          const fingerprint = expected.get(
+            observationKey(item.method, item.path),
+          );
+          if (fingerprint !== undefined && fingerprint !== item.fingerprint)
+            return yield* new RspackInputs.Changed({
+              method: item.method,
+              path: item.path,
+              expected: fingerprint,
+              actual: item.fingerprint,
+            });
+        }
+      }
       yield* inputs.check;
       if (outcome._tag === "Failure") {
         const warm = previous !== undefined;
@@ -445,7 +472,7 @@ export const make = Effect.fn("RspackPrototype.make")(function* (
       const observations = [
         ...new Map(
           [...(previous?.observations ?? []), ...captured.observations].map(
-            (item) => [JSON.stringify([item.method, item.path]), item],
+            (item) => [observationKey(item.method, item.path), item],
           ),
         ).values(),
       ];
