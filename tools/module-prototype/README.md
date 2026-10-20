@@ -51,8 +51,10 @@ and fresh child processes for both evaluations. **All seventeen oracle controls
 and Rspack results match.** The report marks its scope as `cold-semantic-gate`
 and explicitly reports `productionQualified: false`.
 
-`RspackCompiler` creates a fresh Rspack 2.2.9 compiler for each preparation, with
-both caching and incremental reuse disabled. It supplies the already selected,
+The frozen cold candidate `6a0f3b57` creates a fresh Rspack 2.2.9 compiler for each
+preparation, with both caching and incremental reuse disabled. The subsequent
+[bounded warm experiment](#bounded-warm-session-experiment) changes that lifetime
+without switching production. Both supply the already selected,
 flattened configuration to the resolver through a temporary owned configuration
 artifact and to `esbuild-loader` through `tsconfigRaw`. The loader uses the
 project's existing esbuild implementation for syntax transformation; Rspack owns
@@ -96,7 +98,7 @@ changes and directory replacement still invalidate the view. The scoped flattene
 configuration is visible only at its exact internal paths; its observations are
 checked during compilation but not retained after that scope closes.
 
-The seven real-engine tests in `rspackBoundary.test.ts` also qualify public API
+The original seven real-engine tests in `rspackBoundary.test.ts` qualify public API
 behavior separately from this cold adapter:
 
 - Source/package reads, missing candidates, context directory enumeration and
@@ -111,11 +113,81 @@ behavior separately from this cold adapter:
   bytes, not a later reread. Rspack does not itself reject this race; Confect's
   capture validation is responsible for detecting it.
 
-The cold adapter avoids warm-cache provenance assumptions rather than claiming
+The frozen cold adapter avoids warm-cache provenance assumptions rather than claiming
 to have solved them. Its unit coverage additionally checks exact physical file
 scope, owned configuration without nested rediscovery, missing-export failures,
 fresh evaluation and comment-only invalidation. The filesystem tests exercise
 capture, replay, sealing and read-safety cases.
+
+### Bounded warm-session experiment
+
+The private session now retains a compiler per compatible configuration/profile
+context. Every native run has a new acquisition recorder. Validation reads never
+enter that recorder: cached modules retain their original evidence, and only
+actual native callbacks replace observation keys in a conservative union.
+`RspackInputs.changes` compares every original fact, including bytes and negative
+discovery, and supplies changed paths through the public second argument to
+`compiler.run`. Directory changes and removals are explicit inputs too.
+
+An unchanged, reusable capture skips linking but materializes a fresh scoped
+artifact tree. Evaluation still uses the existing fresh-process protocol. A
+changed capture rebuilds incrementally, then validates the complete union. If a
+changed fact was not reacquired, the attempt is discarded and rebuilt with a new
+compiler. Warm failures also recapture cold before publishing failure evidence.
+Neither missing callbacks nor the public dependency collections authorize
+dropping old facts. A new compiler retires obsolete evidence after 32 native
+builds, or sooner if the union exceeds twice its initial observation count.
+Context retirement/reset closes its compiler; old materialized artifacts remain
+owned by their original job scopes.
+
+Eleven added native-boundary probes compare full emitted assets, module sources,
+entry roots, dependency edges and all three dependency collections against fresh
+compilations. Unchanged native runs can perform zero filesystem callbacks.
+Ordinary/shared-source edits reacquire their changed keys in these fixtures;
+missing recovery, symlink retargets and deleting a former dependency can leave
+changed prior observations unacquired. The probes use raw callback stat metadata;
+the adapter separately tests its guarded, artifact-filtered filesystem.
+
+Raw external runtime lookups remain outside the injected filesystem. Such
+captures still report `reusable: false`, close their native compiler and force a
+cold preparation next time. This limitation applies to the real Confect workload,
+so warm native capability alone is not evidence of a whole-loop speedup. PnP,
+portable read protection and broader runtime compatibility remain unqualified.
+
+Before scale measurement, this candidate passed 195 private tests in 15 files,
+the 1,424 default CLI runtime/type tests in 86 files, all seventeen fresh-process
+semantic oracle controls, exact/inexact CLI and prototype typechecks, workspace
+build, repository lint and formatting, and frozen installation. The 44 compiler
+and session tests also passed five additional sequential runs. Adversarial tests
+cover restored-mtime edits, missing recovery, extension shadows, glob membership,
+symlink retargeting, compile/evaluation races and retained immutable receipts.
+Graph snapshots canonically order modules and edges; native iteration order is
+not a semantic difference. The representative warm-candidate scale comparison
+has not yet run, so these checks do not establish its performance.
+
+### Corrected cold startup and reload profile
+
+A separate diagnostic run of frozen `6a0f3b57` completed startup and one `g0`
+implementation reload with all generated hashes matching, 390 initial evaluations,
+only `g0` reevaluated, no surviving processes, and identical before/after frozen
+source/build/runtime fingerprints. The first profiling attempt was interrupted by
+a machine restart and is excluded. The successful run took 65.383s to startup
+readiness and 47.275s from edit to reload readiness **with profiling enabled**;
+these are not acceptance timings or a speedup comparison.
+
+The startup contained five native runs totaling 39.675s inside 51.473s of
+`compileEntries`; reload contained two native runs totaling 31.420s inside 40.664s
+of preparation. These nested intervals must not be added together. Across both
+phases, input-validation spans totaled 15.479s and graph-fingerprint spans 6.633s.
+The native-run intervals include JavaScript hooks and filesystem callbacks, not
+just Rust compilation. The external resolver ran 21,743 times; its concurrent
+span durations overlap heavily and are not wall-clock attribution. The evidence
+supports reducing repeated preparation, not a claim about optimal Rspack cost.
+
+The successful profile, CPU samples, event clocks, controller and integrity
+records are preserved in `~/.capy/work/rspack-corrected-profile-evidence` on the
+measurement and parent machines. Its manifest digest is
+`3512ecb67e36cd393d21ec2833e3f352492a0d9361ca580d08bb848616c2dde9`.
 
 ### External policy and revision qualification
 
@@ -248,7 +320,8 @@ retained in the run evidence directory `rspack-live-comparison`. Its
 `e045d8d7a639bb8e8b1656ec7ab48cf991e22b31302f20f7a9e540614d4f4a4d`.
 The preserved benchmark-only Node harness retains 22 sequential-await lint errors
 and 25 Effect-style warnings; the separately checked repository source has no
-remaining lint diagnostics. No further timing or implementation work is running.
+remaining lint diagnostics at that checkpoint. Later experiments below supersede
+that checkpoint's stopped-work status.
 
 ### Startup profile: repeated batch work in the adapter
 
@@ -394,8 +467,9 @@ but Rspack is still **3.6–3.7 times slower at startup and about 4.53 times slo
 on reload than consolidated esbuild**, with roughly 25% higher sampled peaks.
 This cold integration does not earn adoption. The timings do not identify the
 remaining cost's internal phases or establish the performance of an unqualified
-warm-cache design. Production remains esbuild; no further implementation or
-timing work is running.
+warm-cache design. Production remains esbuild. The subsequent bounded warm
+experiment and corrected-candidate profile are documented above; neither changes
+these frozen cold results.
 
 These are only two repetitions per version/edit mode. RSS was sampled every
 250ms without forced GC or added idle settling, so short peaks can be missed.

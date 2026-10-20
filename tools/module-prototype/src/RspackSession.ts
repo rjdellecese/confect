@@ -46,6 +46,8 @@ interface Capture {
 }
 
 interface NativeContext extends CompilationState.Topology {
+  compiler: Effect.Success<ReturnType<typeof RspackCompiler.make>> | undefined;
+  compilerScope: Scope.Closeable | undefined;
   readonly discovery: CompilationConfig.Discovery;
   readonly bindings: Map<string, RspackInputs.Observation>;
   revision: number;
@@ -252,6 +254,30 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
       ) {
         context.prepared = Option.none();
         const target = yield* Scope.Scope;
+        if (!context.compiler) {
+          const compilerScope = yield* Scope.fork(
+            contexts.includes(context) ? owner : target,
+            "sequential",
+          );
+          context.compilerScope = compilerScope;
+          yield* Scope.addFinalizer(
+            compilerScope,
+            Effect.sync(() => {
+              context.compiler = undefined;
+              context.compilerScope = undefined;
+            }),
+          );
+          context.compiler = yield* RspackCompiler.make(context.roots, {
+            inputs: resolutionInputs,
+            conditions,
+            configuration: context.discovery,
+            ownership: { ownedDirectories, authoredFiles },
+            profile: context.profile,
+          }).pipe(
+            Effect.provide(services),
+            Effect.provideService(Scope.Scope, compilerScope),
+          );
+        }
         for (let attempt = 0; attempt < 8; attempt++) {
           yield* ensure;
           yield* verifyBindings(context);
@@ -264,6 +290,7 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
             configuration: context.discovery,
             ownership: { ownedDirectories, authoredFiles },
             profile: context.profile,
+            compiler: context.compiler,
           }).pipe(
             Effect.provide(services),
             Effect.provideService(Scope.Scope, scope),
@@ -373,6 +400,8 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
             ),
           } satisfies Capture;
         }
+        if (context.compilerScope)
+          yield* Scope.close(context.compilerScope, Exit.void);
         return yield* new Failed({
           reason: "UnstableInputs",
           context: context.id,
@@ -430,7 +459,10 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
         restarts: resolutionInputs.events,
         restartRequired: resolutionInputs.pending,
         reset: lock.withPermit(
-          Effect.sync(() => {
+          Effect.gen(function* () {
+            for (const context of contexts)
+              if (context.compilerScope)
+                yield* Scope.close(context.compilerScope, Exit.void);
             contexts = [];
           }),
         ),
@@ -494,6 +526,8 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
           );
           if (!selected) {
             selected = {
+              compiler: undefined,
+              compilerScope: undefined,
               id: ++nextId,
               profile: request.profile,
               configuration: discovery.configuration,
@@ -506,10 +540,11 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
               failed: false,
               validate: Effect.void,
             };
-            contexts = [
-              ...CompilationState.retain(contexts, selected),
-              selected,
-            ];
+            const retained = CompilationState.retain(contexts, selected);
+            for (const context of contexts)
+              if (!retained.includes(context) && context.compilerScope)
+                yield* Scope.close(context.compilerScope, Exit.void);
+            contexts = [...retained, selected];
           }
           const context = selected;
           for (const binding of selection.bindings)
@@ -562,8 +597,17 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
             yield* resolutionInputs.check;
           }
           cached.set(context.id, capture);
-          if (!previous)
-            contexts = [...CompilationState.retain(contexts, context), context];
+          if (!previous) {
+            const retained = CompilationState.retain(contexts, context);
+            for (const retired of contexts)
+              if (
+                retired !== context &&
+                !retained.includes(retired) &&
+                retired.compilerScope
+              )
+                yield* Scope.close(retired.compilerScope, Exit.void);
+            contexts = [...retained, context];
+          }
           const url = capture.output.urls[entry];
           if (!url)
             return yield* new Failed({

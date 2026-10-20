@@ -1,5 +1,6 @@
 import { assert, describe, expect, it } from "@effect/vitest";
 import { vi } from "vitest";
+import { Compiler } from "@rspack/core";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -68,6 +69,42 @@ const evaluateBatchEntry = (entry: string) =>
   });
 
 describe("Rspack native batch boundaries", () => {
+  it.effect(
+    "closes retained compilers on reset without destroying job-owned artifacts",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs } = yield* fixture({
+          "entry.ts": "export const value = 1;",
+        });
+        const closed = vi.spyOn(Compiler.prototype, "close");
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => closed.mockRestore()),
+        );
+        yield* scopeJob(
+          Effect.gen(function* () {
+            const artifact = yield* prepare(entry);
+            const service = yield* Compilation.Service;
+            expect(closed).not.toHaveBeenCalled();
+            yield* service.reset;
+            expect(closed).toHaveBeenCalledTimes(1);
+            expect(yield* fs.exists(fileURLToPath(artifact.url))).toBe(true);
+            expect((yield* CompiledModule.namespace(artifact.url)).value).toBe(
+              1,
+            );
+            const replacement = yield* prepare(entry);
+            expect(replacement.url).not.toBe(artifact.url);
+            expect(
+              (yield* CompiledModule.namespace(replacement.url)).value,
+            ).toBe(1);
+          }),
+        ).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
   it.effect(
     "bounds root planning and capture replay across concurrent nested subsets",
     () =>

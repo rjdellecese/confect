@@ -58,6 +58,195 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("RspackInputs", () => {
   it.effect(
+    "collects every changed key while validate still fails at the first",
+    () =>
+      Effect.gen(function* () {
+        const root = yield* temporary;
+        const first = path.join(root, "first.ts");
+        const second = path.join(root, "second.ts");
+        yield* Effect.promise(() => fs.promises.writeFile(first, "one"));
+        yield* Effect.promise(() => fs.promises.writeFile(second, "two"));
+        const adapter = RspackInputs.make();
+        yield* call(adapter, "readFile", first);
+        yield* call(adapter, "stat", first);
+        yield* call(adapter, "readFile", second);
+        const captured = yield* adapter.capture;
+        yield* Effect.promise(() =>
+          fs.promises.writeFile(first, "first-changed"),
+        );
+        yield* Effect.promise(() =>
+          fs.promises.writeFile(second, "second-changed"),
+        );
+        const changed = yield* adapter.changes(captured.observations);
+        expect(changed).toHaveLength(3);
+        const current = RspackInputs.make();
+        for (const observation of captured.observations)
+          yield* call(current, observation.method, observation.path);
+        const acquired = yield* current.capture;
+        expect(changed).toEqual(
+          captured.observations.map(
+            (observation, index) =>
+              new RspackInputs.Changed({
+                method: observation.method,
+                path: observation.path,
+                expected: observation.fingerprint,
+                actual: acquired.observations[index].fingerprint,
+              }),
+          ),
+        );
+        const open = vi.spyOn(fs.promises, "open");
+        const stat = vi.spyOn(fs.promises, "stat");
+        const validation = yield* adapter
+          .validate(captured.observations)
+          .pipe(Effect.result);
+        expect(validation).toMatchObject({
+          _tag: "Failure",
+          failure: changed[0],
+        });
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(open.mock.calls[0][0]).toBe(first);
+        expect(stat).not.toHaveBeenCalled();
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "returns no changes for unchanged or empty recorded observations",
+    () =>
+      Effect.gen(function* () {
+        const root = yield* temporary;
+        const source = path.join(root, "source.ts");
+        yield* Effect.promise(() => fs.promises.writeFile(source, "unchanged"));
+        const adapter = RspackInputs.make();
+        yield* call(adapter, "readFile", source);
+        yield* call(adapter, "stat", source);
+        yield* call(adapter, "readdir", root);
+        const captured = yield* adapter.capture;
+        expect(yield* adapter.changes(captured.observations)).toEqual([]);
+        expect(yield* adapter.changes(captured.observations)).toEqual([]);
+        yield* captured.validate;
+        const realpath = vi.spyOn(fs.promises, "realpath");
+        expect(yield* adapter.changes([])).toEqual([]);
+        expect(realpath).not.toHaveBeenCalled();
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "discovers every changed negative observation and directory listing",
+    () =>
+      Effect.gen(function* () {
+        const root = yield* temporary;
+        const source = path.join(root, "missing.ts");
+        const adapter = RspackInputs.make();
+        for (const method of ["readFile", "stat"] as const)
+          expect(
+            yield* call(adapter, method, source).pipe(Effect.result),
+          ).toMatchObject({
+            _tag: "Failure",
+            failure: { code: "ENOENT" },
+          });
+        yield* call(adapter, "readdir", root);
+        const captured = yield* adapter.capture;
+        expect(yield* adapter.changes(captured.observations)).toEqual([]);
+        yield* Effect.promise(() =>
+          fs.promises.writeFile(source, "discovered"),
+        );
+        const changed = yield* adapter.changes(captured.observations);
+        expect(changed.map(({ method, path: name }) => [method, name])).toEqual(
+          [
+            ["readFile", source],
+            ["stat", source],
+            ["readdir", root],
+          ],
+        );
+        for (const [index, change] of changed.entries()) {
+          expect(change).toBeInstanceOf(RspackInputs.Changed);
+          expect(change.expected).toBe(
+            captured.observations[index].fingerprint,
+          );
+          expect(change.actual).not.toBe(change.expected);
+        }
+        expect(changed[0].expected).toContain("ENOENT");
+        expect(changed[1].expected).toContain("ENOENT");
+        expect(changed[0].actual).not.toContain("ENOENT");
+        expect(changed[1].actual).not.toContain("ENOENT");
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "keeps changes reads outside fresh and sealed acquisition captures",
+    () =>
+      Effect.gen(function* () {
+        const root = yield* temporary;
+        const source = path.join(root, "source.ts");
+        const retained = path.join(root, "retained.ts");
+        yield* Effect.promise(() => fs.promises.writeFile(source, "original"));
+        yield* Effect.promise(() =>
+          fs.promises.writeFile(retained, "retained"),
+        );
+        const previous = RspackInputs.make();
+        yield* call(previous, "readFile", source);
+        const recorded = (yield* previous.capture).observations;
+        const expected = recorded[0].fingerprint;
+        yield* Effect.promise(() => fs.promises.writeFile(source, "changed"));
+        const current = RspackInputs.make();
+        yield* call(current, "readFile", retained);
+        const changed = yield* current.changes(recorded);
+        expect(changed).toHaveLength(1);
+        expect(changed[0].expected).toBe(expected);
+        const captured = yield* current.capture;
+        expect(
+          captured.observations.map(({ method, path: name }) => [method, name]),
+        ).toEqual([["readFile", retained]]);
+        expect(yield* current.changes(recorded)).toEqual(changed);
+        expect(yield* current.capture).toBe(captured);
+        expect(captured.observations).toHaveLength(1);
+        expect(recorded[0].fingerprint).toBe(expected);
+        yield* captured.validate;
+        const empty = RspackInputs.make();
+        expect(yield* empty.changes(recorded)).toEqual(changed);
+        expect((yield* empty.capture).observations).toEqual([]);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "uses guarded discovery and rejects a newly protected alias before opening bytes",
+    () =>
+      Effect.gen(function* () {
+        const root = yield* temporary;
+        const source = path.join(root, "source.ts");
+        const blocked = path.join(root, "denied-fixture");
+        const alias = path.join(root, "alias.ts");
+        yield* Effect.promise(() => fs.promises.writeFile(source, "original"));
+        yield* Effect.promise(() =>
+          fs.promises.writeFile(blocked, "innocuous fixture"),
+        );
+        yield* Effect.promise(() => fs.promises.symlink(source, alias));
+        const previous = RspackInputs.make();
+        yield* call(previous, "readFile", alias);
+        const recorded = (yield* previous.capture).observations;
+        yield* Effect.promise(() => fs.promises.unlink(alias));
+        yield* Effect.promise(() => fs.promises.symlink(blocked, alias));
+        const current = RspackInputs.make({
+          deniedBasenames: ["denied-fixture"],
+        });
+        const open = vi.spyOn(fs.promises, "open");
+        expect(
+          yield* current.changes(recorded).pipe(Effect.result),
+        ).toMatchObject({
+          _tag: "Failure",
+          failure: {
+            _tag: "RspackInputsFailed",
+            method: "readFile",
+            path: alias,
+            reason: "ProtectedRealpath",
+          },
+        });
+        expect(open).not.toHaveBeenCalled();
+        expect((yield* current.capture).observations).toEqual([]);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
     "records lexical root identity and rejects retargeted aliases",
     () =>
       Effect.gen(function* () {

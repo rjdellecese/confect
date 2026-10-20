@@ -290,29 +290,45 @@ export const make = (
     realpath,
     readdir: wrap("readdir", fs.readdir),
   };
+  const check = Effect.fn("RspackInputs.check")(function* (
+    observation: Observation,
+  ) {
+    const result = yield* Effect.tryPromise({
+      try: () => request(observation.method, observation.path),
+      catch: (cause) =>
+        Schema.is(Failed)(cause)
+          ? cause
+          : fail(
+              observation.method,
+              observation.path,
+              "ValidationFailed",
+              cause,
+            ),
+    });
+    if (result.fingerprint !== observation.fingerprint)
+      return new Changed({
+        method: observation.method,
+        path: observation.path,
+        expected: observation.fingerprint,
+        actual: result.fingerprint,
+      });
+  });
+  const changes = Effect.fn("RspackInputs.changes")(function* (
+    recorded: ReadonlyArray<Observation>,
+  ) {
+    const changed: Changed[] = [];
+    for (const observation of recorded) {
+      const result = yield* check(observation);
+      if (result !== undefined) changed.push(result);
+    }
+    return changed;
+  });
   const validate = Effect.fn("RspackInputs.validate")(function* (
     recorded: ReadonlyArray<Observation>,
   ) {
     for (const observation of recorded) {
-      const result = yield* Effect.tryPromise({
-        try: () => request(observation.method, observation.path),
-        catch: (cause) =>
-          Schema.is(Failed)(cause)
-            ? cause
-            : fail(
-                observation.method,
-                observation.path,
-                "ValidationFailed",
-                cause,
-              ),
-      });
-      if (result.fingerprint !== observation.fingerprint)
-        return yield* new Changed({
-          method: observation.method,
-          path: observation.path,
-          expected: observation.fingerprint,
-          actual: result.fingerprint,
-        });
+      const result = yield* check(observation);
+      if (result !== undefined) return yield* result;
     }
   });
   let receipt: Capture | undefined;
@@ -344,5 +360,5 @@ export const make = (
       });
     }),
   );
-  return { fileSystem, capture, validate, resolve };
+  return { fileSystem, capture, changes, validate, resolve };
 };

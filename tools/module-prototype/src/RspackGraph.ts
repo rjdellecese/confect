@@ -45,30 +45,35 @@ export const capture = (stats: Stats, roots: ReadonlyArray<string>): Graph => {
         return [root, module.identifier()];
       }),
     ),
-    modules: [...compilation.modules].map((module) => ({
-      id: module.identifier(),
-      type: module.type,
-      file: module.nameForCondition(),
-      source: module.originalSource()?.source().toString(),
-      imports: compilation.moduleGraph
-        .getOutgoingConnections(module)
-        .flatMap((connection) => {
-          const target = connection.module;
-          if (!target) return [];
-          const dependency = connection.dependency;
-          return [
-            {
-              id: target.identifier(),
-              request: dependency.request,
-              type: dependency.type,
-              category: dependency.category,
-              attributes: Object.entries(dependency.attributes ?? {}).sort(
-                ([a], [b]) => a.localeCompare(b),
-              ),
-            },
-          ];
-        }),
-    })),
+    modules: [...compilation.modules]
+      .map((module) => ({
+        id: module.identifier(),
+        type: module.type,
+        file: module.nameForCondition(),
+        source: module.originalSource()?.source().toString(),
+        imports: compilation.moduleGraph
+          .getOutgoingConnections(module)
+          .flatMap((connection) => {
+            const target = connection.module;
+            if (!target) return [];
+            const dependency = connection.dependency;
+            return [
+              {
+                id: target.identifier(),
+                request: dependency.request,
+                type: dependency.type,
+                category: dependency.category,
+                attributes: Object.entries(dependency.attributes ?? {}).sort(
+                  ([a], [b]) => a.localeCompare(b),
+                ),
+              },
+            ];
+          })
+          .sort((left, right) =>
+            serialize(left).localeCompare(serialize(right)),
+          ),
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
   };
 };
 

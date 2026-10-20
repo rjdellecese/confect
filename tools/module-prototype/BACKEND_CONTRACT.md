@@ -262,6 +262,16 @@ The [measured correction](./README.md#corrected-scale-result) fixes the timeout
 but fails the practical adoption criterion. The older timeout is not this
 revision's result, and unqualified warm caching is not an assumed remedy.
 
+The subsequent [bounded warm experiment](./README.md#bounded-warm-session-experiment)
+retains native contexts and original acquisition evidence for reusable captures.
+Changed observations drive public rebuild inputs; only actual native callbacks
+replace facts. Unreacquired changes and warm failures force a cold recapture,
+while a bounded native-build epoch retires obsolete evidence. Artifacts remain
+job-scoped and evaluation remains fresh. Raw external runtime probes still
+prohibit reuse, including in the representative Confect workload. This establishes
+a narrower warm path, not complete provenance for arbitrary loaders or a measured
+whole-loop performance improvement.
+
 Prefer assessing the supported filesystem boundary over extending a compiler or
 building another JavaScript loader. Rspack is a candidate for a native integration;
 webpack provides a stable public-API comparison. Neither is selected for production.

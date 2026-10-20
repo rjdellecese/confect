@@ -199,6 +199,409 @@ const fixture = Effect.fn("RspackBoundary.fixture")(function* (
   };
 });
 
+const observationKey = (observation: Pick<Observation, "operation" | "path">) =>
+  `${observation.operation} ${observation.path}`;
+
+const serializeObservation = Schema.encodeSync(
+  Schema.fromJsonString(Schema.Unknown),
+);
+
+const observationFingerprint = ({ operation, error, value }: Observation) => {
+  if (error) {
+    assert(typeof error === "object" && "code" in error);
+    return serializeObservation({ error: error.code });
+  }
+  if (operation === "stat" || operation === "lstat") {
+    const stat = value as ReturnType<Volume["statSync"]>;
+    assert(stat !== undefined);
+    return serializeObservation({
+      kind: [stat.isFile(), stat.isDirectory(), stat.isSymbolicLink()],
+      dev: stat.dev,
+      ino: stat.ino,
+      mode: stat.mode,
+      nlink: stat.nlink,
+      uid: stat.uid,
+      gid: stat.gid,
+      rdev: stat.rdev,
+      size: stat.size,
+      mtimeMs: stat.mtimeMs,
+      ctimeMs: stat.ctimeMs,
+      birthtimeMs: stat.birthtimeMs,
+    });
+  }
+  return serializeObservation(
+    Buffer.isBuffer(value)
+      ? value.toString("utf8")
+      : Array.isArray(value)
+        ? [...value].sort((a, b) => String(a).localeCompare(String(b)))
+        : value,
+  );
+};
+
+const observationReceipt = (observations: ReadonlyArray<Observation>) =>
+  new Map(
+    observations.map((observation) => [
+      observationKey(observation),
+      { observation, fingerprint: observationFingerprint(observation) },
+    ]),
+  );
+
+const validateReceipt = (
+  volume: Volume,
+  receipt: ReturnType<typeof observationReceipt>,
+) => {
+  const fs = createFsFromVolume(volume);
+  return new Map(
+    [...receipt].map(([key, { observation }]) => {
+      let value: unknown;
+      let error: unknown;
+      try {
+        const method = Reflect.get(fs, `${observation.operation}Sync`);
+        assert(typeof method === "function");
+        value = Reflect.apply(method, fs, [observation.path]);
+      } catch (cause) {
+        error = cause;
+      }
+      return [key, observationFingerprint({ ...observation, value, error })];
+    }),
+  );
+};
+
+const compilationSnapshot = (stats: Stats) => {
+  const compilation = stats.compilation;
+  return {
+    assets: compilation
+      .getAssets()
+      .map(({ name, source }) => {
+        assert(source !== undefined);
+        return { name, bytes: source.buffer().toString("base64") };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    entries: [...compilation.entries]
+      .map(([name, item]) => ({
+        name,
+        modules: item.dependencies.map((itemDependency) =>
+          compilation.moduleGraph.getModule(itemDependency)?.identifier(),
+        ),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    modules: [...compilation.modules]
+      .map((module) => ({
+        id: module.identifier(),
+        type: module.type,
+        file: module.nameForCondition(),
+        source: module.originalSource()?.source().toString(),
+        edges: compilation.moduleGraph
+          .getOutgoingConnections(module)
+          .map((edge) => ({
+            target: edge.module?.identifier(),
+            request: edge.dependency.request,
+            type: edge.dependency.type,
+            category: edge.dependency.category,
+            attributes: Object.entries(edge.dependency.attributes ?? {}).sort(
+              ([a], [b]) => a.localeCompare(b),
+            ),
+          }))
+          .sort((a, b) =>
+            serializeObservation(a).localeCompare(serializeObservation(b)),
+          ),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    dependencies: {
+      files: [...compilation.fileDependencies].sort(),
+      contexts: [...compilation.contextDependencies].sort(),
+      missing: [...compilation.missingDependencies].sort(),
+    },
+  };
+};
+
+const warmFiles = {
+  "entry.js":
+    'import left from "./left.js"; import right from "./right.js"; import choice from "./choice"; import linked from "./alias.js"; import packaged from "fixture-package"; const parts = require.context("./parts", false, /\\.js$/); export const result = [left, right, choice, linked, packaged, parts.keys()];',
+  "left.js": 'export { default } from "./shared.js";',
+  "right.js": 'export { default } from "./shared.js";',
+  "shared.js": 'export default "shared-one";',
+  "choice.js": 'export default "choice-javascript";',
+  "link-one.js": 'export default "link-one";',
+  "link-two.js": 'export default "link-two";',
+  "parts/one.js": 'export default "part-one";',
+  "node_modules/fixture-package/package.json": '{"main":"./one.js"}',
+  "node_modules/fixture-package/one.js": 'export default "package-one";',
+  "node_modules/fixture-package/two.js": 'export default "package-two";',
+};
+
+const prepareWarmVolume = (volume: Volume) => {
+  volume.symlinkSync(`${root}/link-one.js`, `${root}/alias.js`);
+  for (const file of Object.keys(warmFiles))
+    volume.utimesSync(`${root}/${file}`, 1_000_000_000, 1_000_000_000);
+  for (const directory of [root, `${root}/parts`])
+    volume.utimesSync(directory, 1_000_000_000, 1_000_000_000);
+};
+
+const keysAt = (path: string, ...operations: ReadonlyArray<string>) =>
+  operations.map((operation) => `${operation} ${root}${path}`);
+
+const warmCases: ReadonlyArray<{
+  readonly name: string;
+  readonly missing?: boolean;
+  readonly reacquired: ReadonlyArray<string>;
+  readonly unproven: ReadonlyArray<string>;
+  readonly mutate: (volume: Volume) => {
+    readonly modifiedFiles?: ReadonlySet<string>;
+    readonly removedFiles?: ReadonlySet<string>;
+  };
+}> = [
+  {
+    name: "ordinary source edit",
+    reacquired: keysAt("/choice.js", "lstat", "readFile", "stat"),
+    unproven: [],
+    mutate(volume) {
+      volume.writeFileSync(
+        `${root}/choice.js`,
+        'export default "choice-edited";',
+      );
+      return { modifiedFiles: new Set([`${root}/choice.js`]) };
+    },
+  },
+  {
+    name: "shared dependency edit",
+    reacquired: keysAt("/shared.js", "lstat", "readFile", "stat"),
+    unproven: [],
+    mutate(volume) {
+      volume.writeFileSync(`${root}/shared.js`, 'export default "shared-two";');
+      return { modifiedFiles: new Set([`${root}/shared.js`]) };
+    },
+  },
+  {
+    name: "same-metadata source edit",
+    reacquired: keysAt("/shared.js", "lstat", "readFile", "stat"),
+    unproven: [],
+    mutate(volume) {
+      const path = `${root}/shared.js`;
+      const before = volume.statSync(path);
+      volume.writeFileSync(path, 'export default "shared-two";');
+      volume.utimesSync(path, 1_000_000_000, 1_000_000_000);
+      const after = volume.statSync(path);
+      expect([after.ino, after.size, after.mtimeMs]).toEqual([
+        before.ino,
+        before.size,
+        before.mtimeMs,
+      ]);
+      return { modifiedFiles: new Set([path]) };
+    },
+  },
+  {
+    name: "missing dependency recovery",
+    missing: true,
+    reacquired: [
+      ...keysAt("", "lstat", "stat"),
+      ...keysAt("/shared.js", "stat"),
+    ],
+    unproven: keysAt("", "readdir"),
+    mutate(volume) {
+      volume.writeFileSync(
+        `${root}/shared.js`,
+        'export default "shared-recovered";',
+      );
+      return { modifiedFiles: new Set([`${root}/shared.js`, root]) };
+    },
+  },
+  {
+    name: "new extension shadow",
+    reacquired: [
+      ...keysAt("", "lstat", "stat"),
+      ...keysAt("/choice.ts", "stat"),
+    ],
+    unproven: [],
+    mutate(volume) {
+      volume.writeFileSync(
+        `${root}/choice.ts`,
+        'export default "choice-typescript";',
+      );
+      return { modifiedFiles: new Set([`${root}/choice.ts`, root]) };
+    },
+  },
+  {
+    name: "new glob member",
+    reacquired: keysAt("/parts", "lstat", "readdir", "stat"),
+    unproven: [],
+    mutate(volume) {
+      volume.writeFileSync(
+        `${root}/parts/two.js`,
+        'export default "part-two";',
+      );
+      return {
+        modifiedFiles: new Set([`${root}/parts/two.js`, `${root}/parts`]),
+      };
+    },
+  },
+  {
+    name: "same-metadata manifest edit",
+    reacquired: keysAt(
+      "/node_modules/fixture-package/package.json",
+      "readFile",
+    ),
+    unproven: [],
+    mutate(volume) {
+      const path = `${root}/node_modules/fixture-package/package.json`;
+      const before = volume.statSync(path);
+      volume.writeFileSync(path, '{"main":"./two.js"}');
+      volume.utimesSync(path, 1_000_000_000, 1_000_000_000);
+      const after = volume.statSync(path);
+      expect([after.ino, after.size, after.mtimeMs]).toEqual([
+        before.ino,
+        before.size,
+        before.mtimeMs,
+      ]);
+      return { modifiedFiles: new Set([path]) };
+    },
+  },
+  {
+    name: "symlink retarget",
+    reacquired: [
+      ...keysAt("", "stat"),
+      ...keysAt("/alias.js", "lstat", "realpath", "stat"),
+    ],
+    unproven: keysAt("", "lstat"),
+    mutate(volume) {
+      const alias = `${root}/alias.js`;
+      volume.unlinkSync(alias);
+      volume.symlinkSync(`${root}/link-two.js`, alias);
+      return { modifiedFiles: new Set([alias, root]) };
+    },
+  },
+  {
+    name: "removed import with unchanged former source",
+    reacquired: [
+      ...keysAt("/left.js", "lstat", "readFile", "stat"),
+      ...keysAt("/right.js", "lstat", "readFile", "stat"),
+    ],
+    unproven: [],
+    mutate(volume) {
+      volume.writeFileSync(
+        `${root}/left.js`,
+        'export default "left-detached";',
+      );
+      volume.writeFileSync(
+        `${root}/right.js`,
+        'export default "right-detached";',
+      );
+      return {
+        modifiedFiles: new Set([`${root}/left.js`, `${root}/right.js`]),
+      };
+    },
+  },
+  {
+    name: "removed import and source",
+    reacquired: [
+      ...keysAt("", "lstat", "stat"),
+      ...keysAt("/left.js", "lstat", "readFile", "stat"),
+      ...keysAt("/right.js", "lstat", "readFile", "stat"),
+    ],
+    unproven: keysAt("/shared.js", "lstat", "readFile", "stat"),
+    mutate(volume) {
+      volume.writeFileSync(
+        `${root}/left.js`,
+        'export default "left-detached";',
+      );
+      volume.writeFileSync(
+        `${root}/right.js`,
+        'export default "right-detached";',
+      );
+      volume.unlinkSync(`${root}/shared.js`);
+      return {
+        modifiedFiles: new Set([`${root}/left.js`, `${root}/right.js`, root]),
+        removedFiles: new Set([`${root}/shared.js`]),
+      };
+    },
+  },
+];
+
+describe("Rspack supported warm-build acquisition evidence", () => {
+  it.effect(
+    "retains complete public artifacts, graph and dependency sets without fresh callbacks",
+    () =>
+      Effect.gen(function* () {
+        const probe = yield* fixture(warmFiles, {
+          cache: true,
+          incremental: true,
+        });
+        prepareWarmVolume(probe.volume);
+        const first = compilationSnapshot(yield* probe.run());
+        const receipt = observationReceipt(probe.observations);
+        const before = probe.observations.length;
+        const warm = compilationSnapshot(yield* probe.run());
+        expect(probe.observations.slice(before)).toEqual([]);
+        expect(warm).toEqual(first);
+        expect(validateReceipt(probe.volume, receipt)).toEqual(
+          new Map([...receipt].map(([key, value]) => [key, value.fingerprint])),
+        );
+        const fresh = yield* fixture(warmFiles, {
+          cache: false,
+          incremental: false,
+        });
+        prepareWarmVolume(fresh.volume);
+        expect(warm).toEqual(compilationSnapshot(yield* fresh.run()));
+        expect(warm.assets).toHaveLength(1);
+        expect(warm.dependencies.files).toContain(`${root}/shared.js`);
+        expect(warm.dependencies.contexts).toContain(`${root}/parts`);
+        expect(warm.dependencies.missing).toContain(`${root}/choice.ts`);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect.each(warmCases)(
+    "records previous changed keys actually reacquired for $name",
+    (scenario) =>
+      Effect.gen(function* () {
+        const probe = yield* fixture(warmFiles, {
+          cache: true,
+          incremental: true,
+        });
+        prepareWarmVolume(probe.volume);
+        if (scenario.missing) probe.volume.unlinkSync(`${root}/shared.js`);
+        const initial = yield* probe.run().pipe(Effect.result);
+        expect(Result.isFailure(initial)).toBe(scenario.missing === true);
+        const receipt = observationReceipt(probe.observations);
+        const changes = scenario.mutate(probe.volume);
+        const before = probe.observations.length;
+        const validated = validateReceipt(probe.volume, receipt);
+        expect(probe.observations).toHaveLength(before);
+        const changed = [...receipt]
+          .filter(([key, value]) => validated.get(key) !== value.fingerprint)
+          .map(([key]) => key)
+          .sort();
+        expect(changed.length).toBeGreaterThan(0);
+        const warm = compilationSnapshot(yield* probe.run(changes));
+        const acquired = observationReceipt(probe.observations.slice(before));
+        const reacquired = changed.filter(
+          (key) => acquired.get(key)?.fingerprint === validated.get(key),
+        );
+        const unproven = changed.filter((key) => !reacquired.includes(key));
+        expect(reacquired).toEqual([...scenario.reacquired].sort());
+        expect(unproven).toEqual([...scenario.unproven].sort());
+        expect([...receipt.keys()].some((key) => !acquired.has(key))).toBe(
+          true,
+        );
+        const union = new Map([...receipt, ...acquired]);
+        const stillChanged = [...validateReceipt(probe.volume, union)]
+          .filter(([key, value]) => union.get(key)?.fingerprint !== value)
+          .map(([key]) => key)
+          .sort();
+        expect(stillChanged).toEqual(unproven);
+        const fresh = yield* fixture(warmFiles, {
+          cache: false,
+          incremental: false,
+        });
+        prepareWarmVolume(fresh.volume);
+        if (scenario.missing) fresh.volume.unlinkSync(`${root}/shared.js`);
+        scenario.mutate(fresh.volume);
+        const cold = compilationSnapshot(yield* fresh.run());
+        expect(warm).toEqual(cold);
+        expect(probe.code()).toEqual(fresh.code());
+      }).pipe(Effect.scoped),
+  );
+});
+
 const sources = (stats: Stats) =>
   new Map(
     [...stats.compilation.modules].map((module) => [
