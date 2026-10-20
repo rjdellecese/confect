@@ -15,6 +15,7 @@ import { RpcClientError } from "effect/rpc/RpcClientError";
 import { WorkerError } from "effect/workers/WorkerError";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
 import * as Bundler from "./Bundler";
+import * as CompilationBackend from "./CompilationBackend";
 import * as CompiledModule from "./CompiledModule";
 import * as CodegenError from "./CodegenError";
 import * as ConvexConfig from "./ConvexConfig";
@@ -23,7 +24,7 @@ import * as LeafModule from "./LeafModule";
 import * as SpecModulePath from "./SpecModulePath";
 import type { ImplModulePath } from "./ImplModulePath";
 import type { TableModule } from "./TableModule";
-import { fromBundlerError } from "./BuildError";
+import { BundlerError, fromBundlerError } from "./BuildError";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import { ProjectRoot } from "./ProjectRoot";
@@ -129,9 +130,13 @@ export const withBatch = <A, E, R>(
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const confectDirectory = yield* ConfectDirectory.get;
-    return yield* Bundler.withBatch(
+    return yield* CompilationBackend.withBatch(
       paths.map((relative) => path.resolve(confectDirectory, relative)),
       effect,
+    ).pipe(
+      Effect.catchIf(Schema.is(BundlerError), (error) =>
+        Effect.fail(fromBundlerError(paths[0] ?? confectDirectory, error)),
+      ),
     );
   });
 

@@ -18,6 +18,7 @@ import * as CompilationState from "../../../packages/cli/src/CompilationState.ts
 import * as CompiledModule from "../../../packages/cli/src/CompiledModule.ts";
 import * as RspackSession from "../src/RspackSession.ts";
 import * as RspackCompiler from "../src/RspackCompiler.ts";
+import * as RspackInputs from "../src/RspackInputs.ts";
 
 const fixture = (files: Readonly<Record<string, string>>) =>
   Effect.gen(function* () {
@@ -56,6 +57,576 @@ const prepare = (entry: string, roots: ReadonlyArray<string> = [entry]) =>
   Effect.flatMap(CompilationBackend.Service, (backend) =>
     backend.prepare({ entry, roots, profile: "modules" }),
   );
+
+const evaluateBatchEntry = (entry: string) =>
+  Effect.gen(function* () {
+    const artifact = yield* CompilationBackend.prepare(entry);
+    const module = yield* CompiledModule.namespace(artifact.url).pipe(
+      Effect.ensuring(CompiledModule.consume(artifact)),
+    );
+    return { artifact, module };
+  });
+
+describe("Rspack native batch boundaries", () => {
+  it.effect(
+    "bounds root planning and capture replay across concurrent nested subsets",
+    () =>
+      Effect.gen(function* () {
+        const names = Array.from(
+          { length: 12 },
+          (_, index) => `entry-${index}.ts`,
+        );
+        const { path, root } = yield* fixture(
+          Object.fromEntries(
+            names.map((name, index) => [
+              name,
+              `export const value = ${index};`,
+            ]),
+          ),
+        );
+        const roots = names.map((name) => path.join(root, name));
+        let resolutions = 0;
+        let replays = 0;
+        const originalMake = RspackInputs.make;
+        const inputsSpy = vi
+          .spyOn(RspackInputs, "make")
+          .mockImplementation((options) => {
+            const recording = originalMake(options);
+            return {
+              ...recording,
+              resolve: (file) =>
+                Effect.sync(() => {
+                  resolutions++;
+                }).pipe(Effect.andThen(recording.resolve(file))),
+            };
+          });
+        const originalCompile = RspackCompiler.compileEntries;
+        const compilerSpy = vi
+          .spyOn(RspackCompiler, "compileEntries")
+          .mockImplementation((entries, options) =>
+            originalCompile(entries, options).pipe(
+              Effect.map((output) => ({
+                ...output,
+                validate: Effect.sync(() => {
+                  replays++;
+                }).pipe(Effect.andThen(output.validate)),
+              })),
+            ),
+          );
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            inputsSpy.mockRestore();
+            compilerSpy.mockRestore();
+          }),
+        );
+        yield* scopeJob(
+          Effect.gen(function* () {
+            for (let boundary = 0; boundary < 2; boundary++) {
+              const before = replays;
+              const outcome = yield* Compilation.runJob(
+                CompilationBackend.withBatch(
+                  roots,
+                  Effect.forEach(
+                    roots,
+                    (entry) =>
+                      CompilationBackend.withBatch(
+                        [entry],
+                        evaluateBatchEntry(entry),
+                      ),
+                    { concurrency: 4 },
+                  ),
+                ),
+              );
+              assert(Exit.isSuccess(outcome.exit));
+              expect(
+                outcome.exit.value.map((evaluated) => evaluated.module.value),
+              ).toEqual(Array.from({ length: 12 }, (_, index) => index));
+              expect(
+                outcome.receipts.flatMap((receipt) => receipt.roots).sort(),
+              ).toEqual([...roots].sort());
+              expect(resolutions).toBe(roots.length * (boundary + 1));
+              expect(replays - before).toBeLessThanOrEqual(
+                boundary === 0 ? 3 : 2,
+              );
+              expect(replays - before).toBeGreaterThanOrEqual(2);
+              expect(compilerSpy).toHaveBeenCalledTimes(1);
+            }
+          }),
+        ).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "keeps mid-batch source snapshots immutable and withholds stale receipts",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "entry.ts": 'export { value } from "./shared";',
+          "sibling.ts": 'export { value } from "./shared";',
+          "shared.ts": "export const value = 1;",
+        });
+        const sibling = path.join(root, "sibling.ts");
+        const roots = [entry, sibling];
+        yield* Effect.gen(function* () {
+          const events = yield* observe;
+          const values: unknown[] = [];
+          const stale = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch(
+                roots,
+                Effect.gen(function* () {
+                  values.push((yield* evaluateBatchEntry(entry)).module.value);
+                  yield* fs.writeFileString(
+                    path.join(root, "shared.ts"),
+                    "export const value = 2;",
+                  );
+                  values.push(
+                    (yield* evaluateBatchEntry(sibling)).module.value,
+                  );
+                }),
+              ),
+            ),
+          );
+          expect(values).toEqual([1, 1]);
+          expect(Exit.isFailure(stale.exit)).toBe(true);
+          expect(stale.receipts).toEqual([]);
+          expect(stale.failedReceipts).toEqual([]);
+          yield* Queue.take(events);
+          const changed = yield* Queue.take(events);
+          expect(changed.affectedRoots).toEqual(roots);
+          expect(CompilationState.acknowledged(changed, stale.receipts)).toBe(
+            false,
+          );
+          const fresh = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch(
+                roots,
+                Effect.forEach(roots, evaluateBatchEntry, { concurrency: 4 }),
+              ),
+            ),
+          );
+          assert(Exit.isSuccess(fresh.exit));
+          expect(
+            fresh.exit.value.map((evaluated) => evaluated.module.value),
+          ).toEqual([2, 2]);
+          expect(CompilationState.acknowledged(changed, fresh.receipts)).toBe(
+            true,
+          );
+        }).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "requests restart after a root symlink retarget and recovers in a fresh service",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "old.ts": "export const value = 1;",
+          "new.ts": "export const value = 2;",
+        });
+        const oldTarget = path.join(root, "old.ts");
+        const newTarget = path.join(root, "new.ts");
+        yield* fs.symlink(oldTarget, entry);
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const values: unknown[] = [];
+          const stale = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch(
+                [entry],
+                Effect.gen(function* () {
+                  values.push((yield* evaluateBatchEntry(entry)).module.value);
+                  yield* fs.remove(entry);
+                  yield* fs.symlink(newTarget, entry);
+                  values.push((yield* evaluateBatchEntry(entry)).module.value);
+                }),
+              ),
+            ),
+          );
+          expect(values).toEqual([1, 1]);
+          expect(Exit.isFailure(stale.exit)).toBe(true);
+          expect(stale.receipts).toEqual([]);
+          const restart = yield* compiler.restartRequired;
+          assert(Option.isSome(restart));
+          expect(restart.value).toEqual({
+            reason: "ResolutionInputsChanged",
+            paths: [entry],
+          });
+          expect(yield* Stream.runHead(compiler.restarts)).toEqual(restart);
+          expect(yield* compiler.preparedRevisions).toEqual([]);
+          const blocked = yield* compiler.verify.pipe(Effect.result);
+          assert(Result.isFailure(blocked));
+          expect(blocked.failure).toMatchObject({
+            _tag: "BundlerError",
+            cause: { _tag: "CompilationRestartRequired", paths: [entry] },
+          });
+        }).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+        yield* Effect.gen(function* () {
+          const fresh = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch([entry], evaluateBatchEntry(entry)),
+            ),
+          );
+          assert(Exit.isSuccess(fresh.exit));
+          expect(fresh.exit.value.module.value).toBe(2);
+          expect(fresh.receipts.flatMap((receipt) => receipt.roots)).toEqual([
+            newTarget,
+          ]);
+        }).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "requests restart when a previously acknowledged root alias changes mid-batch",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "old.ts": "export const value = 1;",
+          "new.ts": "export const value = 2;",
+        });
+        yield* fs.symlink(path.join(root, "old.ts"), entry);
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const events = yield* observe;
+          const initial = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch([entry], evaluateBatchEntry(entry)),
+            ),
+          );
+          assert(Exit.isSuccess(initial.exit));
+          const first = yield* Queue.take(events);
+          expect(CompilationState.acknowledged(first, initial.receipts)).toBe(
+            true,
+          );
+          const stale = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch(
+                [entry],
+                Effect.gen(function* () {
+                  yield* evaluateBatchEntry(entry);
+                  yield* fs.remove(entry);
+                  yield* fs.symlink(path.join(root, "new.ts"), entry);
+                }),
+              ),
+            ),
+          );
+          expect(Exit.isFailure(stale.exit)).toBe(true);
+          expect(stale.receipts).toEqual([]);
+          const restart = yield* compiler.restartRequired;
+          assert(Option.isSome(restart));
+          expect(restart.value).toEqual({
+            reason: "ResolutionInputsChanged",
+            paths: [entry],
+          });
+          expect(yield* Stream.runHead(compiler.restarts)).toEqual(restart);
+          expect(yield* compiler.preparedRevisions).toEqual([]);
+          const blocked = yield* compiler.verify.pipe(Effect.result);
+          assert(Result.isFailure(blocked));
+          expect(blocked.failure).toMatchObject({
+            _tag: "BundlerError",
+            cause: { _tag: "CompilationRestartRequired", paths: [entry] },
+          });
+        }).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+        yield* Effect.gen(function* () {
+          const fresh = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch([entry], evaluateBatchEntry(entry)),
+            ),
+          );
+          assert(Exit.isSuccess(fresh.exit));
+          expect(fresh.exit.value.module.value).toBe(2);
+          expect(fresh.receipts.flatMap((receipt) => receipt.roots)).toEqual([
+            path.join(root, "new.ts"),
+          ]);
+        }).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "records evaluated roots when authored evaluation fails with stable inputs",
+    () =>
+      Effect.gen(function* () {
+        const { entry, path, root } = yield* fixture({
+          "entry.ts":
+            'export const value = 1; throw { _tag: "AuthoredEvaluationFailed" };',
+          "sibling.ts": "export const value = 2;",
+        });
+        const sibling = path.join(root, "sibling.ts");
+        yield* Effect.gen(function* () {
+          const events = yield* observe;
+          const failed = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch(
+                [entry, sibling],
+                evaluateBatchEntry(entry),
+              ),
+            ),
+          );
+          expect(Exit.isFailure(failed.exit)).toBe(true);
+          expect(failed.receipts).toEqual([
+            { context: 1, revision: 1, roots: [entry] },
+          ]);
+          expect(failed.failedReceipts).toEqual([]);
+          const revision = yield* Queue.take(events);
+          expect(
+            CompilationState.unacknowledgedRoots(revision, failed.receipts),
+          ).toEqual([sibling]);
+        }).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "requests a restart and drops buffered receipts after a mid-batch config edit",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "tsconfig.json": '{"compilerOptions":{"strict":true}}',
+          "entry.ts": "export const value = 1;",
+        });
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const stale = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch(
+                [entry],
+                Effect.gen(function* () {
+                  yield* evaluateBatchEntry(entry);
+                  yield* fs.writeFileString(
+                    path.join(root, "tsconfig.json"),
+                    '{"compilerOptions":{"strict":false}}',
+                  );
+                }),
+              ),
+            ),
+          );
+          expect(Exit.isFailure(stale.exit)).toBe(true);
+          expect(stale.receipts).toEqual([]);
+          const restart = yield* compiler.restartRequired;
+          assert(Option.isSome(restart));
+          expect(restart.value.paths).toContain(
+            path.join(root, "tsconfig.json"),
+          );
+        }).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "revalidates a pre-existing capture at each fresh same-scope batch boundary",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "entry.ts": 'export { value } from "./shared";',
+          "shared.ts": "export const value = 1;",
+        });
+        yield* scopeJob(
+          Effect.gen(function* () {
+            const first = yield* Compilation.runJob(
+              CompilationBackend.withBatch([entry], evaluateBatchEntry(entry)),
+            );
+            assert(Exit.isSuccess(first.exit));
+            yield* fs.writeFileString(
+              path.join(root, "shared.ts"),
+              "export const value = 2;",
+            );
+            const stale = yield* Compilation.runJob(
+              CompilationBackend.withBatch([entry], evaluateBatchEntry(entry)),
+            );
+            expect(Exit.isFailure(stale.exit)).toBe(true);
+            expect(stale.receipts).toEqual([]);
+            expect(
+              (yield* CompiledModule.namespace(first.exit.value.artifact.url))
+                .value,
+            ).toBe(1);
+            const fresh = yield* Compilation.runJob(
+              scopeJob(
+                CompilationBackend.withBatch(
+                  [entry],
+                  evaluateBatchEntry(entry),
+                ),
+              ),
+            );
+            assert(Exit.isSuccess(fresh.exit));
+            expect(fresh.exit.value.module.value).toBe(2);
+          }),
+        ).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "does not flush nested disjoint-batch receipts through a stale outer boundary",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "entry.ts": 'export { value } from "./shared";',
+          "shared.ts": "export const value = 1;",
+          "disjoint.ts": "export const value = 2;",
+        });
+        const disjoint = path.join(root, "disjoint.ts");
+        yield* Effect.gen(function* () {
+          const values: unknown[] = [];
+          const stale = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch(
+                [entry],
+                Effect.gen(function* () {
+                  values.push((yield* evaluateBatchEntry(entry)).module.value);
+                  values.push(
+                    (yield* CompilationBackend.withBatch(
+                      [disjoint],
+                      evaluateBatchEntry(disjoint),
+                    )).module.value,
+                  );
+                  yield* fs.writeFileString(
+                    disjoint,
+                    "export const value = 3;",
+                  );
+                }),
+              ),
+            ),
+          );
+          expect(values).toEqual([1, 2]);
+          expect(Exit.isFailure(stale.exit)).toBe(true);
+          expect(stale.receipts).toEqual([]);
+          expect(stale.failedReceipts).toEqual([]);
+        }).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+});
+
+describe("Rspack native batch boundaries outside entries", () => {
+  it.effect(
+    "revalidates an entry outside outer roots before flushing any receipts",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "entry.ts": "export const value = 1;",
+          "outside.ts": 'export { value } from "./outside-helper";',
+          "outside-helper.ts": "export const value = 2;",
+        });
+        const outside = path.join(root, "outside.ts");
+        yield* Effect.gen(function* () {
+          const values: unknown[] = [];
+          const stale = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch(
+                [entry],
+                Effect.gen(function* () {
+                  values.push((yield* evaluateBatchEntry(entry)).module.value);
+                  values.push(
+                    (yield* evaluateBatchEntry(outside)).module.value,
+                  );
+                  yield* fs.writeFileString(
+                    path.join(root, "outside-helper.ts"),
+                    "export const value = 3;",
+                  );
+                }),
+              ),
+            ),
+          );
+          expect(values).toEqual([1, 2]);
+          expect(Exit.isFailure(stale.exit)).toBe(true);
+          expect(stale.receipts).toEqual([]);
+          const recovered = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch(
+                [entry],
+                evaluateBatchEntry(outside),
+              ),
+            ),
+          );
+          assert(Exit.isSuccess(recovered.exit));
+          expect(recovered.exit.value.module.value).toBe(3);
+          expect(
+            recovered.receipts.flatMap((receipt) => receipt.roots),
+          ).toEqual([outside]);
+        }).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "keeps older captures in the exit check when a child scope builds a newer revision",
+    () =>
+      Effect.gen(function* () {
+        const { entry, fs, path, root } = yield* fixture({
+          "entry.ts": 'export { value } from "./shared";',
+          "sibling.ts": 'export { value } from "./shared";',
+          "shared.ts": "export const value = 1;",
+        });
+        const sibling = path.join(root, "sibling.ts");
+        yield* Effect.gen(function* () {
+          const values: unknown[] = [];
+          const stale = yield* Compilation.runJob(
+            scopeJob(
+              CompilationBackend.withBatch(
+                [entry, sibling],
+                Effect.gen(function* () {
+                  values.push((yield* evaluateBatchEntry(entry)).module.value);
+                  yield* fs.writeFileString(
+                    path.join(root, "shared.ts"),
+                    "export const value = 2;",
+                  );
+                  values.push(
+                    (yield* scopeJob(evaluateBatchEntry(sibling))).module.value,
+                  );
+                }),
+              ),
+            ),
+          );
+          expect(values).toEqual([1, 2]);
+          expect(Exit.isFailure(stale.exit)).toBe(true);
+          expect(stale.receipts).toEqual([]);
+        }).pipe(
+          Effect.provide(
+            RspackSession.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+});
 
 describe("Rspack native compilation session", () => {
   it.effect(

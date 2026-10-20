@@ -11,6 +11,7 @@ import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import * as EvaluationSession from "../EvaluationSession";
 import * as Bundler from "../Bundler";
+import * as CompilationBackend from "../CompilationBackend";
 import * as CompiledModule from "../CompiledModule";
 import * as CompilationSession from "../CompilationSession";
 import { fromBundlerError } from "../BuildError";
@@ -206,7 +207,7 @@ export const compileOptionalModules = Effect.gen(function* () {
     ["http.ts", "crons.ts", "auth.ts"],
     (relativePath) => fs.exists(path.resolve(confectDirectory, relativePath)),
   );
-  yield* Bundler.withBatch(
+  yield* CompilationBackend.withBatch(
     paths.map((relativePath) => path.resolve(confectDirectory, relativePath)),
     Effect.forEach(
       paths,

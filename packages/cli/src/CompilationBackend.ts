@@ -7,7 +7,7 @@ import * as Scope from "effect/Scope";
 import type * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 import * as CompiledModule from "./CompiledModule";
-import { compile } from "./Bundler";
+import { compile, withBatch as withBundlerBatch } from "./Bundler";
 
 export interface Preparation {
   readonly entry: string;
@@ -18,6 +18,10 @@ export interface Preparation {
 export class Service extends Context.Service<
   Service,
   {
+    readonly withBatch?: <A, E, R>(
+      roots: ReadonlyArray<string>,
+      effect: Effect.Effect<A, E, R>,
+    ) => Effect.Effect<A, E | BundlerError, R>;
     readonly prepare: (
       request: Preparation,
     ) => Effect.Effect<
@@ -31,6 +35,27 @@ export class Service extends Context.Service<
 export class Roots extends Context.Service<Roots, ReadonlyArray<string>>()(
   "@confect/cli/CompilationBackend/Roots",
 ) {}
+
+export const withBatch = <A, E, R>(
+  roots: ReadonlyArray<string>,
+  effect: Effect.Effect<A, E, R>,
+) =>
+  Effect.gen(function* () {
+    const backend = yield* Effect.serviceOption(Service);
+    if (Option.isNone(backend) || !backend.value.withBatch)
+      return yield* withBundlerBatch(roots, effect);
+    const path = yield* Path.Path;
+    const current = yield* Effect.serviceOption(Roots);
+    if (
+      Option.isSome(current) &&
+      roots.every((root) => current.value.includes(path.resolve(root)))
+    )
+      return yield* effect;
+    return yield* backend.value.withBatch(
+      roots,
+      withBundlerBatch(roots, effect),
+    );
+  });
 
 export const prepare = Effect.fnUntraced(function* (
   entryPoint: string,

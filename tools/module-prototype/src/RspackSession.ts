@@ -42,16 +42,42 @@ interface Capture {
   readonly output: Output;
   readonly receipt: CompilationState.Receipt;
   readonly warnings: ReadonlyArray<esbuild.Message>;
+  readonly modules: ReadonlyMap<string, Output["graph"]["modules"][number]>;
 }
 
 interface NativeContext extends CompilationState.Topology {
   readonly discovery: CompilationConfig.Discovery;
+  readonly bindings: Map<string, RspackInputs.Observation>;
   revision: number;
   values: CompilationState.Values;
   prepared: Option.Option<CompilationState.Receipt>;
   failed: boolean;
   validate: Effect.Effect<void, RspackInputs.Failed | RspackInputs.Changed>;
 }
+
+interface Selection {
+  readonly entry: string;
+  readonly roots: ReadonlyArray<string>;
+  readonly discovery: CompilationConfig.Discovery;
+  readonly bindings: ReadonlyArray<RspackInputs.Observation>;
+}
+
+interface Plan {
+  readonly entries: ReadonlyMap<string, Selection>;
+  readonly validate: Effect.Effect<
+    void,
+    RspackInputs.Failed | RspackInputs.Changed
+  >;
+}
+
+class Batch extends Context.Service<
+  Batch,
+  {
+    readonly plan: Plan;
+    readonly plans: Set<Plan>;
+    readonly captures: Map<Capture, NativeContext>;
+  }
+>()("module-prototype/RspackSession/Batch") {}
 
 const bundlerError = (cause: unknown) =>
   Schema.is(BundlerError)(cause) ? cause : new BundlerError({ cause });
@@ -110,10 +136,68 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
       let nextId = 0;
       let terminal: BundlerError | undefined;
       const artifacts = new WeakMap<Scope.Scope, Map<number, Capture>>();
+      let activeBatches = 0;
 
       const ensure = Effect.gen(function* () {
         if (terminal) return yield* terminal;
         yield* resolutionInputs.ensure;
+      });
+
+      const plan = Effect.fn("RspackSession.plan")(function* (
+        requested: ReadonlyArray<string>,
+      ) {
+        const recording = RspackInputs.make({ hideArtifacts: true });
+        const selected = yield* Effect.forEach(
+          [...new Set(requested.map((root) => path.resolve(root)))],
+          (lexical) =>
+            Effect.gen(function* () {
+              const discovery = yield* resolutionInputs.configuration(lexical);
+              const entry = yield* recording.resolve(lexical);
+              yield* resolutionInputs.trackSource(entry);
+              return { lexical, entry, discovery };
+            }),
+        );
+        const groups = new Map<string | undefined, Set<string>>();
+        for (const item of selected) {
+          const group =
+            groups.get(item.discovery.configuration) ?? new Set<string>();
+          group.add(item.entry);
+          groups.set(item.discovery.configuration, group);
+        }
+        const roots = new Map(
+          [...groups].map(([configuration, entries]) => [
+            configuration,
+            [...entries].sort((left, right) => left.localeCompare(right)),
+          ]),
+        );
+        const capture = yield* recording.capture;
+        const bindings = new Map<
+          string | undefined,
+          RspackInputs.Observation[]
+        >();
+        const lexical = new Map(selected.map((item) => [item.lexical, item]));
+        for (const observation of capture.observations) {
+          if (observation.method !== "realpath") continue;
+          const item = lexical.get(observation.path);
+          if (!item) continue;
+          const group = bindings.get(item.discovery.configuration) ?? [];
+          group.push(observation);
+          bindings.set(item.discovery.configuration, group);
+        }
+        return {
+          entries: new Map(
+            selected.map((item) => [
+              item.lexical,
+              {
+                entry: item.entry,
+                roots: roots.get(item.discovery.configuration) ?? [],
+                discovery: item.discovery,
+                bindings: bindings.get(item.discovery.configuration) ?? [],
+              },
+            ]),
+          ),
+          validate: capture.validate,
+        } satisfies Plan;
       });
 
       const publish = Effect.fn("RspackSession.publish")(function* (
@@ -146,6 +230,23 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
         return receipt;
       });
 
+      const verifyBindings = Effect.fn("RspackSession.verifyBindings")(
+        (context: NativeContext) =>
+          evidence.validate([...context.bindings.values()]).pipe(
+            Effect.catchTag("RspackInputsChanged", (changed) =>
+              Effect.gen(function* () {
+                context.prepared = Option.none();
+                const notification = yield* resolutionInputs.requestRestart([
+                  changed.path,
+                ]);
+                return yield* new CompilationInputs.RestartRequired({
+                  paths: notification.paths,
+                });
+              }),
+            ),
+          ),
+      );
+
       const build = Effect.fn("RspackSession.build")(function* (
         context: NativeContext,
       ) {
@@ -153,6 +254,7 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
         const target = yield* Scope.Scope;
         for (let attempt = 0; attempt < 8; attempt++) {
           yield* ensure;
+          yield* verifyBindings(context);
           yield* resolutionInputs.check;
           const generation = yield* resolutionInputs.generation;
           const scope = yield* Scope.fork(target, "sequential");
@@ -266,6 +368,9 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
             output: result.success,
             receipt,
             warnings,
+            modules: new Map(
+              result.success.graph.modules.map((module) => [module.id, module]),
+            ),
           } satisfies Capture;
         }
         return yield* new Failed({
@@ -277,6 +382,7 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
       const verifyContext = Effect.fn("RspackSession.verifyContext")(function* (
         context: NativeContext,
       ) {
+        yield* verifyBindings(context);
         const checked = yield* context.validate.pipe(Effect.result);
         if (Result.isSuccess(checked)) return;
         if (!Schema.is(RspackInputs.Changed)(checked.failure))
@@ -299,7 +405,9 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
         .pipe(Effect.mapError(bundlerError));
 
       if ((options.mode ?? "Watch") === "Watch") {
-        yield* verify.pipe(
+        yield* Effect.suspend(() =>
+          activeBatches > 0 ? Effect.void : verify,
+        ).pipe(
           Effect.repeat(Schedule.spaced("250 millis")),
           Effect.catch((error) =>
             Effect.gen(function* () {
@@ -356,26 +464,24 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
         function* (request: CompilationBackend.Preparation) {
           yield* ensure;
           const lexicalEntry = path.resolve(request.entry);
-          const requestedRoots = [
-            ...new Set(request.roots.map((root) => path.resolve(root))),
-          ];
-          if (!requestedRoots.includes(lexicalEntry))
+          const batch = yield* Effect.serviceOption(Batch);
+          if (
+            !request.roots.some((root) => path.resolve(root) === lexicalEntry)
+          )
             return yield* new Failed({ reason: "MissingEntry", context: 0 });
-          const discovery = yield* resolutionInputs.configuration(lexicalEntry);
-          const matching: string[] = [];
-          for (const root of requestedRoots) {
-            const other = yield* resolutionInputs.configuration(root);
-            if (other.configuration === discovery.configuration)
-              matching.push(root);
-          }
-          const roots = [
-            ...new Set(
-              yield* Effect.forEach(matching, Compilation.canonicalPath),
-            ),
-          ].sort((left, right) => left.localeCompare(right));
-          const entry = yield* Compilation.canonicalPath(lexicalEntry);
-          for (const root of roots) yield* resolutionInputs.trackSource(root);
-          yield* resolutionInputs.check;
+          const planned =
+            Option.isSome(batch) &&
+            request.roots.every((root) =>
+              batch.value.plan.entries.has(path.resolve(root)),
+            )
+              ? batch.value.plan
+              : yield* plan(request.roots);
+          if (Option.isSome(batch)) batch.value.plans.add(planned);
+          const selection = planned.entries.get(lexicalEntry);
+          if (!selection)
+            return yield* new Failed({ reason: "MissingEntry", context: 0 });
+          const { entry, roots, discovery } = selection;
+          if (Option.isNone(batch)) yield* resolutionInputs.check;
           let selected = contexts.find(
             (context) =>
               CompilationState.compatible(
@@ -393,6 +499,7 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
               configuration: discovery.configuration,
               roots,
               discovery,
+              bindings: new Map(),
               revision: 0,
               values: {},
               prepared: Option.none(),
@@ -405,6 +512,9 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
             ];
           }
           const context = selected;
+          for (const binding of selection.bindings)
+            if (!context.bindings.has(binding.path))
+              context.bindings.set(binding.path, binding);
           const supplied = yield* Effect.serviceOption(
             CompiledModule.ArtifactScope,
           );
@@ -430,7 +540,12 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
               Effect.provideService(Scope.Scope, scope),
               Effect.catchTag("CompilationFailed", Compilation.fail(entry)),
             ));
-          const checked = yield* capture.output.validate.pipe(Effect.result);
+          const alreadyChecked =
+            Option.isSome(batch) && batch.value.captures.has(capture);
+          if (!alreadyChecked) yield* verifyBindings(context);
+          const checked = yield* (
+            alreadyChecked ? ensure : capture.output.validate
+          ).pipe(Effect.result);
           if (Result.isFailure(checked)) {
             if (!Schema.is(RspackInputs.Changed)(checked.failure))
               return yield* checked.failure;
@@ -441,7 +556,11 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
             });
           }
           yield* ensure;
-          yield* resolutionInputs.check;
+          if (Option.isSome(batch)) batch.value.captures.set(capture, context);
+          else {
+            yield* planned.validate;
+            yield* resolutionInputs.check;
+          }
           cached.set(context.id, capture);
           if (!previous)
             contexts = [...CompilationState.retain(contexts, context), context];
@@ -457,9 +576,7 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
             expected.value.revision > capture.receipt.revision
               ? undefined
               : { ...capture.receipt, roots: [entry] };
-          const modules = new Map(
-            capture.output.graph.modules.map((module) => [module.id, module]),
-          );
+          const modules = capture.modules;
           const reachable = new Set<string>();
           const pending = [capture.output.graph.roots[entry]];
           for (let index = 0; index < pending.length; index++) {
@@ -473,19 +590,21 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
           return {
             url,
             graph: {
-              nodes: capture.output.graph.modules
-                .filter((module) => reachable.has(module.id))
-                .map((module) => {
-                  const imports = module.imports.map((edge) => ({
-                    id: edge.id,
-                    ...(edge.request !== undefined
-                      ? { original: edge.request }
-                      : {}),
-                  }));
-                  return module.file && path.isAbsolute(module.file)
+              nodes: [...reachable].flatMap((id) => {
+                const module = modules.get(id);
+                if (!module) return [];
+                const imports = module.imports.map((edge) => ({
+                  id: edge.id,
+                  ...(edge.request !== undefined
+                    ? { original: edge.request }
+                    : {}),
+                }));
+                return [
+                  module.file && path.isAbsolute(module.file)
                     ? { id: module.id, path: module.file, imports }
-                    : { id: module.id, imports };
-                }),
+                    : { id: module.id, imports },
+                ];
+              }),
             },
             warnings: capture.warnings,
             ...(origin ? { origin } : {}),
@@ -496,10 +615,98 @@ export const layer = (options: Parameters<typeof Compilation.layer>[0]) =>
             .withPermit(effect)
             .pipe(Effect.provide(services), Effect.mapError(bundlerError)),
       );
+      const withBatch = <A, E, R>(
+        roots: ReadonlyArray<string>,
+        effect: Effect.Effect<A, E, R>,
+      ): Effect.Effect<A, E | BundlerError, R> =>
+        Effect.acquireUseRelease(
+          Effect.sync(() => {
+            activeBatches++;
+          }),
+          () =>
+            Effect.gen(function* () {
+              const parent = yield* Effect.serviceOption(Batch);
+              const planned = yield* lock
+                .withPermit(
+                  ensure.pipe(
+                    Effect.andThen(resolutionInputs.check),
+                    Effect.andThen(plan(roots)),
+                  ),
+                )
+                .pipe(Effect.mapError(bundlerError));
+              const batch = {
+                plan: planned,
+                plans: new Set([planned]),
+                captures: new Map<Capture, NativeContext>(),
+              };
+              const consumption = yield* Effect.serviceOption(
+                CompiledModule.Consumption,
+              );
+              let receipts: ReadonlyArray<CompilationState.Receipt> = [];
+              const result = yield* Effect.exit(
+                effect.pipe(
+                  Effect.provideService(Batch, batch),
+                  Effect.provideService(CompiledModule.Consumption, {
+                    record: (receipt) =>
+                      Effect.sync(() => {
+                        receipts = CompilationState.consume(
+                          receipts,
+                          receipt,
+                          receipt.roots,
+                        );
+                      }),
+                  }),
+                ),
+              );
+              yield* lock
+                .withPermit(
+                  Effect.gen(function* () {
+                    yield* ensure;
+                    for (const [capture, context] of batch.captures) {
+                      yield* verifyBindings(context);
+                      const checked = yield* capture.output.validate.pipe(
+                        Effect.result,
+                      );
+                      if (Result.isFailure(checked)) {
+                        if (!Schema.is(RspackInputs.Changed)(checked.failure))
+                          return yield* checked.failure;
+                        yield* verifyContext(context);
+                        return yield* new Failed({
+                          reason: "StaleArtifact",
+                          context: context.id,
+                        });
+                      }
+                    }
+                    yield* Effect.forEach(
+                      batch.plans,
+                      (recorded) => recorded.validate,
+                    );
+                    yield* resolutionInputs.check;
+                  }),
+                )
+                .pipe(Effect.mapError(bundlerError));
+              if (Option.isSome(parent)) {
+                for (const recorded of batch.plans)
+                  parent.value.plans.add(recorded);
+                for (const [capture, context] of batch.captures)
+                  parent.value.captures.set(capture, context);
+              }
+              if (Option.isSome(consumption))
+                yield* Effect.forEach(receipts, consumption.value.record);
+              return yield* Exit.match(result, {
+                onSuccess: Effect.succeed,
+                onFailure: Effect.failCause,
+              });
+            }),
+          () =>
+            Effect.sync(() => {
+              activeBatches--;
+            }),
+        );
       return Context.make(Compilation.Service, compilation).pipe(
         Context.add(
           CompilationBackend.Service,
-          CompilationBackend.Service.of({ prepare }),
+          CompilationBackend.Service.of({ prepare, withBatch }),
         ),
       );
     }),

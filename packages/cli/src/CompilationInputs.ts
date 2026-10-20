@@ -313,6 +313,7 @@ export const make = Effect.fn("CompilationInputs.make")(
       generation: Ref.get(generation),
       events: Stream.fromQueue(events),
       pending: Ref.get(pending),
+      requestRestart: notify,
       check,
       ensure,
       checkFiles: verify,

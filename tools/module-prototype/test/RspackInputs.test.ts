@@ -58,6 +58,59 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("RspackInputs", () => {
   it.effect(
+    "records lexical root identity and rejects retargeted aliases",
+    () =>
+      Effect.gen(function* () {
+        const root = yield* temporary;
+        const first = path.join(root, "first.ts");
+        const second = path.join(root, "second.ts");
+        const alias = path.join(root, "entry.ts");
+        yield* Effect.promise(() =>
+          fs.promises.writeFile(first, "export default 1"),
+        );
+        yield* Effect.promise(() =>
+          fs.promises.writeFile(second, "export default 2"),
+        );
+        yield* Effect.promise(() => fs.promises.symlink(first, alias));
+        const adapter = RspackInputs.make();
+        expect(yield* adapter.resolve(alias)).toBe(first);
+        const capture = yield* adapter.capture;
+        expect(
+          capture.observations.map(({ method, path: name }) => [method, name]),
+        ).toEqual([
+          ["lstat", alias],
+          ["realpath", alias],
+        ]);
+        yield* Effect.promise(() => fs.promises.unlink(alias));
+        yield* Effect.promise(() => fs.promises.symlink(second, alias));
+        yield* expectChanged(capture, "lstat", alias);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect("rejects protected root aliases before reading any bytes", () =>
+    Effect.gen(function* () {
+      const root = yield* temporary;
+      const source = path.join(root, "protected-fixture.ts");
+      const alias = path.join(root, "entry.ts");
+      yield* Effect.promise(() =>
+        fs.promises.writeFile(source, "protected fixture"),
+      );
+      yield* Effect.promise(() => fs.promises.symlink(source, alias));
+      const read = vi.spyOn(fs.promises, "readFile");
+      const adapter = RspackInputs.make({
+        deniedBasenames: ["protected-fixture.ts"],
+      });
+      const result = yield* adapter.resolve(alias).pipe(Effect.result);
+      expect(result).toMatchObject({
+        _tag: "Failure",
+        failure: { _tag: "RspackInputsFailed", reason: "ProtectedRealpath" },
+      });
+      expect(read).not.toHaveBeenCalled();
+      expect((yield* adapter.capture.pipe(Effect.result))._tag).toBe("Failure");
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect(
     "hides scoped artifacts without hiding authored directory changes",
     () =>
       Effect.gen(function* () {

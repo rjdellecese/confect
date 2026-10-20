@@ -280,12 +280,14 @@ export const make = (
       },
     });
 
+  const lstat = wrap("lstat", fs.lstat);
+  const realpath = wrap("realpath", fs.realpath);
   const fileSystem: NonNullable<Compiler["inputFileSystem"]> = {
     readFile: wrap("readFile", fs.readFile),
     stat: wrap("stat", fs.stat),
-    lstat: wrap("lstat", fs.lstat),
+    lstat,
     readlink: wrap("readlink", fs.readlink),
-    realpath: wrap("realpath", fs.realpath),
+    realpath,
     readdir: wrap("readdir", fs.readdir),
   };
   const validate = Effect.fn("RspackInputs.validate")(function* (
@@ -328,5 +330,19 @@ export const make = (
       return Effect.succeed(receipt);
     },
   );
-  return { fileSystem, capture, validate };
+  const resolve = Effect.fn("RspackInputs.resolve")((name: string) =>
+    Effect.callback<string, Failed | Changed>((resume) => {
+      const rejected = (cause: unknown) =>
+        Schema.is(Failed)(cause) || Schema.is(Changed)(cause)
+          ? cause
+          : fail("resolve", name, "RequestFailed", cause);
+      lstat(name, (cause) => {
+        if (cause) return resume(Effect.fail(rejected(cause)));
+        realpath(name, (error, value) =>
+          resume(error ? Effect.fail(rejected(error)) : Effect.succeed(value)),
+        );
+      });
+    }),
+  );
+  return { fileSystem, capture, validate, resolve };
 };
