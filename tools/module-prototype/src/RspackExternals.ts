@@ -19,6 +19,7 @@ import * as Schema from "effect/Schema";
 import * as Hex from "effect/encoding/Hex";
 import { resolveModulePath } from "exsolve";
 import * as CompilationInputs from "../../../packages/cli/src/CompilationInputs.ts";
+import * as RspackRuntime from "./RspackRuntime.ts";
 
 export class Failed extends Schema.TaggedError<Failed>()(
   "RspackExternalsFailed",
@@ -78,11 +79,18 @@ export const make = Effect.fn("RspackExternals.make")(
   function* (options: {
     readonly inputs: CompilationInputs.Inputs;
     readonly conditions: ReadonlyArray<string>;
+    readonly runtime?: Omit<
+      Parameters<typeof RspackRuntime.make>[0],
+      "conditions"
+    >;
   }) {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const crypto = yield* Crypto.Crypto;
     const { inputs, conditions } = options;
+    const observedRuntime = options.runtime
+      ? yield* RspackRuntime.make({ ...options.runtime, conditions })
+      : undefined;
     const observations = yield* Ref.make<ReadonlyArray<Observation>>([]);
     let sealed = false;
     let runtimeResolution = false;
@@ -188,10 +196,25 @@ export const make = Effect.fn("RspackExternals.make")(
       )
         return;
       if (!resolved && !bare) return;
-      yield* inputs.checkFiles(candidates);
-      runtimeResolution = true;
-      const requiredPath = requireTarget(request, importer);
-      const importedPath = importTarget(request, importer, conditions);
+      const observed = observedRuntime
+        ? yield* observedRuntime.resolve(data).pipe(
+            Effect.map(Option.some),
+            Effect.catchTag("RspackRuntimeUnproven", () =>
+              Effect.succeed(Option.none()),
+            ),
+          )
+        : Option.none();
+      let requiredPath: Option.Option<string>;
+      let importedPath: Option.Option<string>;
+      if (Option.isSome(observed)) {
+        requiredPath = Option.some(observed.value.required);
+        importedPath = Option.some(observed.value.imported);
+      } else {
+        yield* inputs.checkFiles(candidates);
+        runtimeResolution = true;
+        requiredPath = requireTarget(request, importer);
+        importedPath = importTarget(request, importer, conditions);
+      }
       if (!resolved && (!bare || Option.isNone(requiredPath))) return;
       if (Option.isNone(requiredPath) && Option.isNone(importedPath)) return;
       const physical = Option.getOrElse(
@@ -216,9 +239,12 @@ export const make = Effect.fn("RspackExternals.make")(
           path: physical,
           reason: "ForbiddenFile",
         });
-      const bytes = yield* fs.readFile(canonical);
+      const bytes = yield* Option.isSome(observed) && options.runtime
+        ? options.runtime.readFile(physical)
+        : fs.readFile(canonical);
       const sha256 = Hex.encode(yield* crypto.digest("SHA-256", bytes));
-      yield* inputs.checkFiles([...candidates, physical]);
+      if (Option.isNone(observed))
+        yield* inputs.checkFiles([...candidates, physical]);
       if (sealed)
         return yield* new Unsupported({ path: importer, reason: "Sealed" });
       yield* Ref.update(observations, (current) => [

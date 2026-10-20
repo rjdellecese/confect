@@ -73,11 +73,12 @@ const run = (
 export const make = Effect.fn("RspackPrototype.make")(function* (
   entries: ReadonlyArray<string>,
   options?: {
-    readonly inputs: CompilationInputs.Inputs;
-    readonly conditions: ReadonlyArray<string>;
+    readonly inputs?: CompilationInputs.Inputs;
+    readonly conditions?: ReadonlyArray<string>;
     readonly configuration?: CompilationConfig.Discovery;
     readonly ownership?: RspackOwnership.Options;
     readonly profile?: "modules" | "component-config";
+    readonly observedExternals?: boolean;
   },
 ) {
   const fs = yield* FileSystem.FileSystem;
@@ -114,6 +115,11 @@ export const make = Effect.fn("RspackPrototype.make")(function* (
     prefix: ".confect-compiler-",
   });
   const configuration = path.join(configurationDirectory, "tsconfig.json");
+  const runtimeConfiguration = options?.observedExternals
+    ? path.join(configurationDirectory, "runtime.json")
+    : undefined;
+  if (runtimeConfiguration)
+    yield* fs.writeFileString(runtimeConfiguration, "{}");
   yield* fs.writeFileString(
     configuration,
     yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(
@@ -122,7 +128,11 @@ export const make = Effect.fn("RspackPrototype.make")(function* (
   );
   const recordingOptions = {
     hideArtifacts: true,
-    visibleArtifacts: [configurationDirectory, configuration],
+    visibleArtifacts: [
+      configurationDirectory,
+      configuration,
+      ...(runtimeConfiguration ? [runtimeConfiguration] : []),
+    ],
   };
   let recording = RspackInputs.make(recordingOptions);
   const inputFileSystem: NonNullable<Compiler["inputFileSystem"]> = {
@@ -173,6 +183,7 @@ export const make = Effect.fn("RspackPrototype.make")(function* (
     ownership.owns(file) && !components?.isDefinition(file);
   const retained = (item: RspackInputs.Observation) =>
     item.path !== configuration &&
+    item.path !== runtimeConfiguration &&
     item.path !== configurationDirectory &&
     (!owned(item.path) ||
       item.method === "realpath" ||
@@ -362,14 +373,41 @@ export const make = Effect.fn("RspackPrototype.make")(function* (
       ? yield* recording.changes(previous.observations)
       : [];
     if (previous?.reusable && changes.length === 0) return previous;
-    if (!previous?.reusable || builds >= 32) {
+    const nativeSourceFiles = new Set(
+      previous?.graph.modules.flatMap((module) =>
+        module.file && module.source !== undefined ? [module.file] : [],
+      ) ?? [],
+    );
+    if (
+      !previous?.reusable ||
+      builds >= 32 ||
+      (previous.external.length > 0 &&
+        changes.some(
+          (change) =>
+            !nativeSourceFiles.has(change.path) ||
+            change.method === "realpath" ||
+            change.method === "readlink",
+        ))
+    ) {
       previous = undefined;
       builds = 0;
       yield* close;
     }
     for (let attempt = 0; attempt < 2; attempt++) {
       recording = RspackInputs.make(recordingOptions);
-      externalPolicy = yield* RspackExternals.make({ inputs, conditions });
+      externalPolicy = yield* RspackExternals.make({
+        inputs,
+        conditions,
+        ...(runtimeConfiguration
+          ? {
+              runtime: {
+                configuration: runtimeConfiguration,
+                readFile: recording.readFile,
+                ensure: recording.ensure,
+              },
+            }
+          : {}),
+      });
       for (const root of entries) yield* externalPolicy.check(root);
       if (!compiler) compiler = yield* create;
       const modifiedFiles = new Set(
@@ -505,10 +543,22 @@ export const make = Effect.fn("RspackPrototype.make")(function* (
       );
       yield* inputs.check;
       yield* captured.validate;
+      const files = new Set(graph.modules.map((module) => module.file));
+      const allExternal = [
+        ...new Map(
+          [...(previous?.external ?? []), ...external.observations].map(
+            (item) => [JSON.stringify(item), item],
+          ),
+        ).values(),
+      ];
       const fingerprints = yield* RspackGraph.fingerprints(
         graph,
         observations,
-        external.observations,
+        [
+          ...(previous?.external.filter((item) => files.has(item.importer)) ??
+            []),
+          ...external.observations,
+        ],
         owned,
         components?.isWrapper,
       );
@@ -517,7 +567,7 @@ export const make = Effect.fn("RspackPrototype.make")(function* (
         warnings,
         assets,
         observations,
-        external: external.observations,
+        external: allExternal,
         reusable: external.reusable,
         fingerprints,
       };
@@ -563,6 +613,7 @@ export const make = Effect.fn("RspackPrototype.make")(function* (
       yield* fs.writeFile(file, asset.bytes);
     }
     const observations = output.observations.filter(retained);
+    const files = new Set(output.graph.modules.map((module) => module.file));
     const validate = inputs.check.pipe(
       Effect.andThen(recording.validate(observations)),
       Effect.andThen(inputs.check),
@@ -579,7 +630,7 @@ export const make = Effect.fn("RspackPrototype.make")(function* (
       warnings: output.warnings,
       graph: output.graph,
       reusable: output.reusable,
-      external: output.external,
+      external: output.external.filter((item) => files.has(item.importer)),
       observations,
       validate,
     };
@@ -608,7 +659,8 @@ export const compileEntries = Effect.fn("RspackPrototype.compileEntries")(
 
 export const compile = Effect.fn("RspackPrototype.compile")(function* (
   entry: string,
+  options?: { readonly observedExternals?: boolean },
 ) {
-  const prepared = yield* compileEntries([entry]);
+  const prepared = yield* compileEntries([entry], options);
   return { ...prepared, url: prepared.urls[entry] };
 });

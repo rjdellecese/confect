@@ -58,6 +58,64 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("RspackInputs", () => {
   it.effect(
+    "records policy-consumed bytes and refuses reads after sealing",
+    () =>
+      Effect.gen(function* () {
+        const root = yield* temporary;
+        const source = path.join(root, "metadata.json");
+        yield* Effect.promise(() =>
+          fs.promises.writeFile(source, '{"exports":"./index.js"}'),
+        );
+        const recording = RspackInputs.make();
+        expect(
+          new TextDecoder().decode(yield* recording.readFile(source)),
+        ).toBe('{"exports":"./index.js"}');
+        yield* recording.ensure;
+        const captured = yield* recording.capture;
+        expect(captured.observations).toEqual([
+          expect.objectContaining({ method: "readFile", path: source }),
+        ]);
+        expect(yield* recording.ensure.pipe(Effect.result)).toMatchObject({
+          _tag: "Failure",
+          failure: { reason: "Sealed" },
+        });
+        expect(
+          yield* recording.readFile(source).pipe(Effect.result),
+        ).toMatchObject({ _tag: "Failure", failure: { reason: "Sealed" } });
+        yield* captured.validate;
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "keeps a protected policy read poisoned before any bytes are opened",
+    () =>
+      Effect.gen(function* () {
+        const root = yield* temporary;
+        const source = path.join(root, "protected-fixture.json");
+        const alias = path.join(root, "metadata.json");
+        yield* Effect.promise(() =>
+          fs.promises.writeFile(source, "protected fixture"),
+        );
+        yield* Effect.promise(() => fs.promises.symlink(source, alias));
+        const opened = vi.spyOn(fs.promises, "open");
+        const recording = RspackInputs.make({
+          deniedBasenames: ["protected-fixture.json"],
+        });
+        expect(
+          yield* recording.readFile(alias).pipe(Effect.result),
+        ).toMatchObject({
+          _tag: "Failure",
+          failure: { reason: "ProtectedRealpath" },
+        });
+        expect(yield* recording.ensure.pipe(Effect.result)).toMatchObject({
+          _tag: "Failure",
+          failure: { reason: "ProtectedRealpath" },
+        });
+        expect(opened).not.toHaveBeenCalled();
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
     "collects every changed key while validate still fails at the first",
     () =>
       Effect.gen(function* () {

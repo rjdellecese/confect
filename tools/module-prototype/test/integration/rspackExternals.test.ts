@@ -2,6 +2,8 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import { rspack, type Compiler, type Module, type Stats } from "@rspack/core";
 import { createRequire } from "node:module";
+import { isBuiltin } from "node:module";
+import type { ExternalItemFunctionData, ResolveOptions } from "@rspack/core";
 import { pathToFileURL } from "node:url";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
@@ -16,6 +18,7 @@ import * as CompilationInputs from "../../../../packages/cli/src/CompilationInpu
 import * as NodeConditions from "../../../../packages/cli/src/NodeConditions.ts";
 import * as RspackExternals from "../../src/RspackExternals.ts";
 import * as RspackInputs from "../../src/RspackInputs.ts";
+import * as RspackCompiler from "../../src/RspackCompiler.ts";
 import * as Runner from "../../src/Runner.ts";
 
 class Failed extends Schema.TaggedError<Failed>()("RspackExternalsTestFailed", {
@@ -192,6 +195,1064 @@ const oracle = Effect.fn("RspackExternalsTest.oracle")(
     return yield* load(prepared.url);
   },
   Effect.provide(Compilation.layer({ mode: "Once", ownedDirectories: [] })),
+);
+
+interface NativeProbe {
+  readonly request: string;
+  readonly importer: string;
+  readonly native: string | undefined;
+  readonly required: string | undefined;
+  readonly imported: string | undefined;
+  readonly physical: string | undefined;
+  readonly emitted: string | undefined;
+  readonly errors: ReadonlyArray<string>;
+}
+
+const nativeProbe = Effect.fn("RspackExternalsTest.nativeProbe")(function* (
+  entry: string,
+  api: "getResolve" | "factory",
+  options: {
+    readonly fullySpecified?: boolean;
+    readonly requireFullySpecified?: boolean;
+    readonly exact?: boolean;
+    readonly metadataProbe?: boolean;
+    readonly allRequests?: boolean;
+    readonly tsconfig?: string;
+  } = {},
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const conditions = yield* NodeConditions.current;
+  const output = yield* fs.makeTempDirectoryScoped({
+    directory: path.dirname(entry),
+    prefix: ".confect-artifacts-native-probe-",
+  });
+  const emptyConfig = path.join(output, "tsconfig.json");
+  yield* fs.writeFileString(emptyConfig, "{}");
+  const recording = RspackInputs.make();
+  const probes: NativeProbe[] = [];
+  const files = new Set<string>();
+  const missing = new Set<string>();
+  const descriptions: Array<{
+    mode: string;
+    request: string;
+    path: string;
+    descriptionFilePath: string | undefined;
+    descriptionFileData: unknown;
+  }> = [];
+  const services = yield* Effect.context<never>();
+  const resolveOptions = (mode: "import" | "require"): ResolveOptions => ({
+    alias: false,
+    fallback: false,
+    aliasFields: [],
+    extensionAlias: {},
+    tsConfig: { configFile: emptyConfig },
+    mainFields: ["main"],
+    mainFiles: options.exact ? [] : ["index"],
+    extensions: options.exact ? [] : [".js", ".json", ".node"],
+    conditionNames: [mode, ...conditions],
+    fullySpecified:
+      mode === "import"
+        ? options.fullySpecified === true
+        : options.requireFullySpecified === true,
+    symlinks: true,
+    modules: ["node_modules"],
+    preferRelative: false,
+    preferAbsolute: false,
+    exportsFields: ["exports"],
+    importsFields: ["imports"],
+    byDependency: {},
+  });
+  const resolve = (
+    data: ExternalItemFunctionData,
+    mode: "import" | "require",
+    overrides: ResolveOptions = {},
+  ): Promise<string | undefined> =>
+    Effect.runPromiseWith(services)(
+      Effect.callback<string | undefined, Failed>((resume) => {
+        const { context, request, getResolve } = data;
+        assert(context && request && getResolve);
+        const callback = (
+          error: Error | null,
+          result?: string | false,
+          resolved?: {
+            path: string;
+            descriptionFilePath?: string;
+            descriptionFileData?: unknown;
+          },
+        ) => {
+          if (resolved)
+            descriptions.push({
+              mode,
+              request,
+              path: resolved.path,
+              descriptionFilePath: resolved.descriptionFilePath,
+              descriptionFileData: resolved.descriptionFileData,
+            });
+          resume(
+            error
+              ? Effect.fail(new Failed({ cause: error }))
+              : Effect.succeed(resolved?.path ?? (result || undefined)),
+          );
+        };
+        if (api === "getResolve")
+          getResolve({ ...resolveOptions(mode), ...overrides })(
+            context,
+            request,
+            callback,
+          );
+        else
+          engine.resolverFactory
+            .get("normal", {
+              ...resolveOptions(mode),
+              ...overrides,
+              dependencyType: mode === "import" ? "esm" : "commonjs",
+            })
+            .resolve(
+              {},
+              context,
+              request,
+              { fileDependencies: files, missingDependencies: missing },
+              callback,
+            );
+      }),
+    );
+  const engine = yield* Effect.acquireRelease(
+    Effect.try({
+      try: () =>
+        rspack({
+          context: path.dirname(entry),
+          entry,
+          mode: "development",
+          target: "node",
+          cache: false,
+          incremental: false,
+          devtool: false,
+          experiments: { useInputFileSystem: [/.*/] },
+          externalsPresets: { node: false },
+          externals: (data) =>
+            Effect.runPromiseWith(services)(
+              Effect.gen(function* () {
+                const { request, context, getResolve } = data;
+                const importer = data.contextInfo?.issuer;
+                if (!request || !context || !getResolve || !importer) return;
+                const commonjs = data.dependencyType === "commonjs";
+                if (isBuiltin(request))
+                  return `${commonjs ? "node-commonjs" : "module-import"} ${request}`;
+                const errors: string[] = [];
+                const attempt = (work: Promise<string | undefined>) =>
+                  Effect.tryPromise({
+                    try: () => work,
+                    catch: (cause) => new Failed({ cause }),
+                  }).pipe(
+                    Effect.catch((error) =>
+                      Effect.sync(() => {
+                        errors.push(String(error.cause));
+                        return undefined;
+                      }),
+                    ),
+                  );
+                const native = yield* attempt(getResolve()(context, request));
+                if (
+                  !options.allRequests &&
+                  native &&
+                  !/[\\/]node_modules[\\/]/.test(native)
+                )
+                  return;
+                if (
+                  native &&
+                  (request.startsWith(".") || path.isAbsolute(request)) &&
+                  !/[\\/]node_modules[\\/]/.test(request)
+                )
+                  return;
+                const bare =
+                  !request.startsWith(".") &&
+                  !request.startsWith("#") &&
+                  !path.isAbsolute(request);
+                if (!options.allRequests && !native && !bare) return;
+                if (options.metadataProbe && bare) {
+                  const packageName = request
+                    .split("/")
+                    .slice(0, request.startsWith("@") ? 2 : 1)
+                    .join("/");
+                  yield* attempt(
+                    resolve(
+                      { ...data, request: `${packageName}/package.json` },
+                      "require",
+                      { exportsFields: [], extensions: [], mainFiles: [] },
+                    ),
+                  );
+                }
+                const required = yield* attempt(resolve(data, "require"));
+                const imported = yield* attempt(resolve(data, "import"));
+                const physical =
+                  !native && !required
+                    ? undefined
+                    : !required && !imported
+                      ? undefined
+                      : ((commonjs || !native ? required : imported) ?? native);
+                const emitted = !physical
+                  ? undefined
+                  : commonjs
+                    ? physical
+                    : native && imported
+                      ? pathToFileURL(imported).href
+                      : request;
+                probes.push({
+                  request,
+                  importer,
+                  native,
+                  required,
+                  imported,
+                  physical,
+                  emitted,
+                  errors,
+                });
+                return emitted
+                  ? `${commonjs ? "node-commonjs" : "module-import"} ${emitted}`
+                  : undefined;
+              }),
+            ),
+          module: {
+            rules: [
+              {
+                test: /\.[cm]?js$/,
+                type: "javascript/auto",
+                resolve: { fullySpecified: false },
+              },
+            ],
+          },
+          resolve: {
+            ...(options.tsconfig
+              ? { tsConfig: { configFile: options.tsconfig } }
+              : {}),
+            extensions: [".js", ".json", ".cjs", ".mjs"],
+            mainFields: ["main"],
+            conditionNames: [...conditions],
+            byDependency: {
+              esm: { conditionNames: ["import", ...conditions] },
+              commonjs: { conditionNames: ["require", ...conditions] },
+            },
+          },
+          optimization: { minimize: false, nodeEnv: false },
+          output: {
+            path: output,
+            filename: "entry.mjs",
+            module: true,
+            library: { type: "module" },
+          },
+        }),
+      catch: (cause) => new Failed({ cause }),
+    }),
+    (compiler: Compiler) =>
+      Effect.callback<void, Failed>((resume) => {
+        compiler.close((cause) =>
+          resume(cause ? Effect.fail(new Failed({ cause })) : Effect.void),
+        );
+      }).pipe(Effect.orDie),
+  );
+  engine.inputFileSystem = recording.fileSystem;
+  const completed = yield* Effect.callback<Stats, Failed>((resume) => {
+    engine.run((cause, stats) =>
+      resume(
+        cause || !stats
+          ? Effect.fail(new Failed({ cause }))
+          : Effect.succeed(stats),
+      ),
+    );
+  });
+  const capture = yield* recording.capture;
+  return {
+    probes,
+    descriptions,
+    capture,
+    files: [...files],
+    missing: [...missing],
+    compilationFiles: [...completed.compilation.fileDependencies],
+    compilationMissing: [...completed.compilation.missingDependencies],
+    errors: completed.hasErrors()
+      ? completed.toString({ all: false, errors: true })
+      : undefined,
+    url: pathToFileURL(path.join(output, "entry.mjs")).href,
+  };
+});
+
+layer(NodeServices.layer, { excludeTestServices: true })(
+  "Rspack supported native runtime resolver probes",
+  (it) => {
+    it.effect.each(["getResolve", "factory"] as const)(
+      "%s reveals manifest-free shadow and self-reference metadata ambiguity",
+      (api) =>
+        Effect.gen(function* () {
+          const shadow = yield* fixture({
+            "nested/entry.js": 'export {default as probe} from "dependency";',
+            "nested/node_modules/dependency/index.js":
+              'module.exports="shadow";',
+            "node_modules/dependency/package.json": '{"exports":"./index.js"}',
+            "node_modules/dependency/index.js": 'module.exports="ancestor";',
+          });
+          const shadowed = yield* nativeProbe(
+            shadow.file("nested/entry.js"),
+            api,
+            { metadataProbe: true },
+          );
+          expect(shadowed.probes[0]?.physical).toBe(
+            shadow.file("nested/node_modules/dependency/index.js"),
+          );
+          expect(shadowed.descriptions).toContainEqual(
+            expect.objectContaining({
+              request: "dependency/package.json",
+              path: shadow.file("node_modules/dependency/package.json"),
+            }),
+          );
+          const self = yield* fixture({
+            "package.json": '{"name":"dependency","exports":"./local.js"}',
+            "entry.js": 'export {default as probe} from "dependency";',
+            "local.js": 'module.exports="self";',
+            "node_modules/dependency/package.json": '{"exports":"./index.js"}',
+            "node_modules/dependency/index.js": 'module.exports="installed";',
+          });
+          const referenced = yield* nativeProbe(self.file("entry.js"), api, {
+            metadataProbe: true,
+            allRequests: true,
+          });
+          expect(referenced.probes[0]?.physical).toBe(self.file("local.js"));
+          expect(referenced.descriptions).toContainEqual(
+            expect.objectContaining({
+              request: "dependency/package.json",
+              path: self.file("node_modules/dependency/package.json"),
+            }),
+          );
+        }).pipe(Effect.scoped),
+    );
+
+    for (const api of ["getResolve", "factory"] as const) {
+      it.effect.each(["shadow", "metadata", "symlink"] as const)(
+        `${api} invalidates admitted exact targets after %s changes`,
+        (change) =>
+          Effect.gen(function* () {
+            const fs = yield* FileSystem.FileSystem;
+            const { file } = yield* fixture({
+              "nested/entry.js": 'export {default as probe} from "dependency";',
+              "node_modules/store-one/package.json": '{"exports":"./one.js"}',
+              "node_modules/store-one/one.js": 'module.exports="one";',
+              "node_modules/store-one/two.js": 'module.exports="two";',
+              "node_modules/store-two/package.json": '{"exports":"./one.js"}',
+              "node_modules/store-two/one.js": 'module.exports="retargeted";',
+            });
+            yield* fs.symlink(
+              file("node_modules/store-one"),
+              file("node_modules/dependency"),
+            );
+            const candidate = yield* nativeProbe(file("nested/entry.js"), api, {
+              exact: true,
+              metadataProbe: true,
+            });
+            expect(candidate.probes[0]?.physical).toBe(
+              file("node_modules/store-one/one.js"),
+            );
+            expect(candidate.descriptions).toContainEqual(
+              expect.objectContaining({
+                request: "dependency/package.json",
+                path: file("node_modules/store-one/package.json"),
+              }),
+            );
+            expect(candidate.capture.observations).toContainEqual(
+              expect.objectContaining({
+                method: "lstat",
+                path: file("node_modules/dependency"),
+                fingerprint: expect.stringContaining(
+                  file("node_modules/store-one"),
+                ),
+              }),
+            );
+            yield* candidate.capture.validate;
+            if (change === "metadata")
+              yield* fs.writeFileString(
+                file("node_modules/store-one/package.json"),
+                '{"exports":"./two.js"}',
+              );
+            if (change === "symlink") {
+              yield* fs.remove(file("node_modules/dependency"));
+              yield* fs.symlink(
+                file("node_modules/store-two"),
+                file("node_modules/dependency"),
+              );
+            }
+            if (change === "shadow") {
+              yield* fs.makeDirectory(file("nested/node_modules/dependency"), {
+                recursive: true,
+              });
+              yield* fs.writeFileString(
+                file("nested/node_modules/dependency/package.json"),
+                '{"exports":"./index.js"}',
+              );
+              yield* fs.writeFileString(
+                file("nested/node_modules/dependency/index.js"),
+                'module.exports="shadow";',
+              );
+            }
+            const changed = yield* candidate.capture.validate.pipe(
+              Effect.result,
+            );
+            assert(Result.isFailure(changed));
+            expect(changed.failure._tag).toBe("RspackInputsChanged");
+          }).pipe(Effect.scoped),
+      );
+    }
+    it.effect.each(["./main.js", "./main"])(
+      "checks actual compiler placement for deferred require-only target %s",
+      (target) =>
+        Effect.gen(function* () {
+          const { file } = yield* fixture({
+            "entry.js":
+              'export const probe = () => import("dependency").then(() => "loaded", e => e.code);',
+            "node_modules/dependency/package.json": `{"exports":{"require":"${target}"}}`,
+            "node_modules/dependency/main.js": 'module.exports = "value";',
+          });
+          const baseline = yield* Bundler.compile(file("entry.js")).pipe(
+            Effect.provide(
+              Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+            ),
+          );
+          const evaluate = (url: string) =>
+            Runner.evaluateNative({
+              _tag: "Native",
+              url,
+              exportName: "probe",
+              invoke: true,
+            });
+          expect(yield* evaluate(baseline.url)).toBe(
+            "ERR_PACKAGE_PATH_NOT_EXPORTED",
+          );
+          const actual = yield* RspackCompiler.compile(file("entry.js")).pipe(
+            Effect.result,
+          );
+          if (target === "./main.js") {
+            assert(Result.isSuccess(actual));
+            expect(yield* evaluate(actual.success.url)).toBe(
+              "ERR_PACKAGE_PATH_NOT_EXPORTED",
+            );
+          } else {
+            assert(Result.isFailure(actual));
+            expect(actual.failure._tag).toBe(
+              "RspackPrototypeCompilationFailed",
+            );
+          }
+        }).pipe(Effect.scoped),
+    );
+    it.effect.each(["getResolve", "factory"] as const)(
+      "%s keeps conditional targets, nested installs, aliases and workspace classification",
+      (api) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const { file } = yield* fixture({
+            "package.json":
+              '{"name":"self","type":"module","exports":{"./local":"./local.js"},"imports":{"#local":"./local.js"}}',
+            "tsconfig.json":
+              '{"compilerOptions":{"paths":{"dependency":["./node_modules/alias/index.js"]}}}',
+            "entry.js":
+              'import dependency from "dependency"; import nested from "./nested/index.js"; import workspace from "workspace"; import self from "self/local"; import local from "#local"; import conditional from "conditional"; const required = require("conditional"); export const probe = [dependency,nested,workspace,self,local,conditional,required];',
+            "local.js": 'export default "local";',
+            "nested/index.js": 'export {default} from "dependency";',
+            "node_modules/alias/package.json": '{"type":"module"}',
+            "node_modules/alias/index.js": 'export default "alias";',
+            "node_modules/dependency/package.json":
+              '{"type":"module","exports":"./index.js"}',
+            "node_modules/dependency/index.js": 'export default "runtime";',
+            "nested/node_modules/dependency/package.json":
+              '{"type":"module","exports":"./index.js"}',
+            "nested/node_modules/dependency/index.js":
+              'export default "nested";',
+            "node_modules/conditional/package.json":
+              '{"exports":{"import":{"custom":"./custom.js","default":"./import.js"},"require":"./require.js"}}',
+            "node_modules/conditional/custom.js": 'module.exports = "custom";',
+            "node_modules/conditional/import.js": 'module.exports = "import";',
+            "node_modules/conditional/require.js":
+              'module.exports = "require";',
+            "workspace/package.json":
+              '{"type":"module","exports":"./index.js"}',
+            "workspace/index.js": 'export default "workspace";',
+          });
+          yield* fs.symlink(file("workspace"), file("node_modules/workspace"));
+          const baseline = yield* oracle(file("entry.js"));
+          const current = yield* compile(file("entry.js"));
+          const candidate = yield* nativeProbe(file("entry.js"), api, {
+            exact: true,
+            tsconfig: file("tsconfig.json"),
+          });
+          expect(candidate.errors).toBeUndefined();
+          const evaluated = yield* Runner.evaluateNative({
+            _tag: "Native",
+            url: candidate.url,
+            exportName: "probe",
+            invoke: false,
+          });
+          expect(evaluated).toEqual(baseline.probe);
+          expect(evaluated).toEqual([
+            "runtime",
+            "nested",
+            "workspace",
+            "local",
+            "local",
+            "custom",
+            "require",
+          ]);
+          expect(
+            candidate.probes
+              .filter(({ physical }) => physical)
+              .map(({ physical, emitted }) => ({ physical, emitted }))
+              .sort((a, b) =>
+                (a.physical ?? "").localeCompare(b.physical ?? ""),
+              ),
+          ).toEqual(
+            current.observations
+              .map(({ physical, emitted }) => ({ physical, emitted }))
+              .sort((a, b) => a.physical.localeCompare(b.physical)),
+          );
+        }).pipe(
+          Effect.provide(
+            ConfigProvider.layer(
+              ConfigProvider.fromUnknown({
+                NODE_OPTIONS: "--conditions=custom",
+              }),
+            ),
+          ),
+          Effect.scoped,
+        ),
+    );
+
+    it.effect.each(["getResolve", "factory"] as const)(
+      "%s exposes root metadata separately from misleading target metadata",
+      (api) =>
+        Effect.gen(function* () {
+          const { file } = yield* fixture({
+            "entry.js": 'export {default as probe} from "dependency";',
+            "node_modules/dependency/package.json":
+              '{"exports":"./nested/value"}',
+            "node_modules/dependency/nested/package.json": "{}",
+            "node_modules/dependency/nested/value.js":
+              'module.exports = "value";',
+          });
+          const candidate = yield* nativeProbe(file("entry.js"), api, {
+            metadataProbe: true,
+          });
+          expect(candidate.descriptions).toContainEqual(
+            expect.objectContaining({
+              request: "dependency",
+              descriptionFilePath: file("node_modules/dependency/nested"),
+              descriptionFileData: {},
+            }),
+          );
+          expect(candidate.descriptions).toContainEqual(
+            expect.objectContaining({
+              request: "dependency/package.json",
+              path: file("node_modules/dependency/package.json"),
+              descriptionFileData: { exports: "./nested/value" },
+            }),
+          );
+          expect(candidate.capture.observations).toContainEqual(
+            expect.objectContaining({
+              method: "readFile",
+              path: file("node_modules/dependency/package.json"),
+            }),
+          );
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each(["getResolve", "factory"] as const)(
+      "%s cannot use permissive exports without changing singleton identity",
+      (api) =>
+        Effect.gen(function* () {
+          const { file } = yield* fixture({
+            "entry.js":
+              'import imported from "dependency"; const direct = require("./node_modules/dependency/main.js"); export const probe = imported === direct;',
+            "node_modules/dependency/package.json": '{"exports":"./main"}',
+            "node_modules/dependency/main.js": "module.exports = {};",
+          });
+          const current = yield* compile(file("entry.js"));
+          const loose = yield* nativeProbe(file("entry.js"), api);
+          const exact = yield* nativeProbe(file("entry.js"), api, {
+            exact: true,
+          });
+          const evaluate = (url: string) =>
+            Runner.evaluateNative({
+              _tag: "Native",
+              url,
+              exportName: "probe",
+              invoke: false,
+            });
+          expect(yield* evaluate(current.url)).toBe(false);
+          expect(yield* evaluate(loose.url)).toBe(true);
+          expect(yield* evaluate(exact.url)).toBe(false);
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each(["getResolve", "factory"] as const)(
+      "%s observes failed runtime-only targets and invalidates later creation",
+      (api) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const { file } = yield* fixture({
+            "entry.js": 'export {default as probe} from "dependency";',
+            "node_modules/dependency/package.json":
+              '{"exports":{"import":"./index.js","require":"./missing.js"}}',
+            "node_modules/dependency/index.js": 'module.exports = "value";',
+          });
+          const candidate = yield* nativeProbe(file("entry.js"), api, {
+            exact: true,
+          });
+          expect(candidate.probes[0]?.required).toBeUndefined();
+          expect(candidate.capture.observations).toContainEqual(
+            expect.objectContaining({
+              method: "stat",
+              path: file("node_modules/dependency/missing.js"),
+              fingerprint: expect.stringContaining("ENOENT"),
+            }),
+          );
+          expect(candidate.files).not.toContain(
+            file("node_modules/dependency/missing.js"),
+          );
+          expect(candidate.compilationMissing).not.toContain(
+            file("node_modules/dependency/missing.js"),
+          );
+          yield* candidate.capture.validate;
+          yield* fs.writeFileString(
+            file("node_modules/dependency/missing.js"),
+            'module.exports = "now present";',
+          );
+          const changed = yield* candidate.capture.validate.pipe(Effect.result);
+          assert(Result.isFailure(changed));
+          expect(changed.failure._tag).toBe("RspackInputsChanged");
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each(["getResolve", "factory"] as const)(
+      "%s does not make explicit require.resolve a Node path",
+      (api) =>
+        Effect.gen(function* () {
+          const { file } = yield* fixture({
+            "entry.js": 'export const probe = require.resolve("dependency");',
+            "node_modules/dependency/package.json": '{"exports":"./main.js"}',
+            "node_modules/dependency/main.js": 'module.exports = "value";',
+          });
+          const baseline = yield* oracle(file("entry.js"));
+          const candidate = yield* nativeProbe(file("entry.js"), api, {
+            exact: true,
+          });
+          expect(baseline.probe).toBe(file("node_modules/dependency/main.js"));
+          expect(
+            yield* Runner.evaluateNative({
+              _tag: "Native",
+              url: candidate.url,
+              exportName: "probe",
+              invoke: false,
+            }),
+          ).toBe("dependency");
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each(["getResolve", "factory"] as const)(
+      "%s requires exact options for package imports targets",
+      (api) =>
+        Effect.gen(function* () {
+          const { file } = yield* fixture({
+            "package.json": '{"imports":{"#local":"./local"}}',
+            "entry.js": 'export const probe = require("#local");',
+            "local.js": 'module.exports = "local";',
+          });
+          expect(() =>
+            createRequire(file("entry.js")).resolve("#local"),
+          ).toThrow();
+          const loose = yield* nativeProbe(file("entry.js"), api, {
+            allRequests: true,
+          });
+          const exact = yield* nativeProbe(file("entry.js"), api, {
+            allRequests: true,
+            exact: true,
+          });
+          expect(
+            loose.probes.find(({ request }) => request === "#local")?.required,
+          ).toBe(file("local.js"));
+          expect(
+            exact.probes.find(({ request }) => request === "#local")?.required,
+          ).toBeUndefined();
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each(["getResolve", "factory"] as const)(
+      "%s observes runtime-only positive and negative discovery",
+      (api) =>
+        Effect.gen(function* () {
+          const { file } = yield* fixture({
+            "entry.js": 'export { default as probe } from "dependency";',
+            "node_modules/dependency/package.json":
+              '{"exports":{"import":"./import.js","require":"./require"}}',
+            "node_modules/dependency/import.js": 'module.exports = "import";',
+            "node_modules/dependency/require.js": 'module.exports = "require";',
+          });
+          const candidate = yield* nativeProbe(file("entry.js"), api);
+          expect(candidate.capture.observations).toContainEqual(
+            expect.objectContaining({
+              method: "stat",
+              path: file("node_modules/dependency/require"),
+              fingerprint: expect.stringContaining("ENOENT"),
+            }),
+          );
+          expect(candidate.capture.observations).toContainEqual(
+            expect.objectContaining({
+              method: "stat",
+              path: file("node_modules/dependency/require.js"),
+            }),
+          );
+          expect(candidate.compilationFiles).not.toContain(
+            file("node_modules/dependency/require.js"),
+          );
+          if (api === "factory") {
+            expect(candidate.files).toContain(
+              file("node_modules/dependency/require.js"),
+            );
+            expect(candidate.missing).toContain(
+              file("node_modules/dependency/require"),
+            );
+          }
+          expect(candidate.errors).toBeUndefined();
+        }).pipe(Effect.scoped),
+    );
+
+    const cases: ReadonlyArray<{
+      name: string;
+      metadata: string;
+      request: string;
+      source: string;
+      deferred?: boolean;
+      extra?: Readonly<Record<string, string>>;
+    }> = [
+      {
+        name: "query export",
+        metadata: '{"exports":"./main.js?query"}',
+        request: "dependency",
+        source: "main.js",
+        extra: {
+          "node_modules/dependency/main.js?query": 'module.exports="literal";',
+        },
+      },
+      {
+        name: "hash export",
+        metadata: '{"exports":"./main.js#hash"}',
+        request: "dependency",
+        source: "main.js",
+        extra: {
+          "node_modules/dependency/main.js#hash": 'module.exports="literal";',
+        },
+      },
+      {
+        name: "backslash export",
+        metadata: '{"exports":"./nested\\\\main.js"}',
+        request: "dependency",
+        source: "nested/main.js",
+        extra: {
+          "node_modules/dependency/nested\\main.js":
+            'module.exports="literal";',
+        },
+      },
+      {
+        name: "encoded request",
+        metadata: '{"exports":{"./a%20b.js":"./main.js"}}',
+        request: "dependency/a%20b.js",
+        source: "main.js",
+      },
+      {
+        name: "query request",
+        metadata: '{"exports":{"./main.js":"./main.js"}}',
+        request: "dependency/main.js?query",
+        source: "main.js",
+      },
+      {
+        name: "hash request",
+        metadata: '{"exports":{"./main.js":"./main.js"}}',
+        request: "dependency/main.js#hash",
+        source: "main.js",
+      },
+      {
+        name: "backslash request",
+        metadata: "{}",
+        request: "dependency\\\\main.js",
+        source: "main.js",
+      },
+      {
+        name: "encoded space export",
+        metadata: '{"exports":"./a%20b.js"}',
+        request: "dependency",
+        source: "a%20b.js",
+        extra: {
+          "node_modules/dependency/a b.js": 'module.exports = "decoded";',
+        },
+      },
+      {
+        name: "encoded hash export",
+        metadata: '{"exports":"./a%23b.js"}',
+        request: "dependency",
+        source: "a%23b.js",
+        extra: {
+          "node_modules/dependency/a#b.js": 'module.exports = "decoded";',
+        },
+      },
+      {
+        name: "nested manifest export",
+        metadata: '{"exports":"./nested/value"}',
+        request: "dependency",
+        source: "nested/value.js",
+        extra: { "node_modules/dependency/nested/package.json": "{}" },
+      },
+      {
+        name: "manifest-free file package",
+        metadata: "{}",
+        request: "filepkg",
+        source: "main.js",
+        extra: { "node_modules/filepkg.js": 'module.exports = "value";' },
+      },
+      {
+        name: "main extension",
+        metadata: '{"main":"./main"}',
+        request: "dependency",
+        source: "main.js",
+      },
+      {
+        name: "main directory",
+        metadata: '{"main":"./main"}',
+        request: "dependency",
+        source: "main/index.js",
+      },
+      {
+        name: "missing main index fallback",
+        metadata: '{"main":"./missing"}',
+        request: "dependency",
+        source: "index.js",
+      },
+      {
+        name: "no main index fallback",
+        metadata: "{}",
+        request: "dependency",
+        source: "index.js",
+      },
+      {
+        name: "legacy subpath extension",
+        metadata: "{}",
+        request: "dependency/main",
+        source: "main.js",
+      },
+      {
+        name: "legacy subpath directory",
+        metadata: "{}",
+        request: "dependency/main",
+        source: "main/index.js",
+      },
+      {
+        name: "exports exact",
+        metadata: '{"exports":"./main.js"}',
+        request: "dependency",
+        source: "main.js",
+      },
+      {
+        name: "exports extension",
+        metadata: '{"exports":"./main"}',
+        request: "dependency",
+        source: "main.js",
+      },
+      {
+        name: "exports directory",
+        metadata: '{"exports":"./main"}',
+        request: "dependency",
+        source: "main/index.js",
+      },
+      {
+        name: "exports missing fallback",
+        metadata: '{"exports":["./missing.js","./main.js"]}',
+        request: "dependency",
+        source: "main.js",
+      },
+      {
+        name: "exports invalid fallback",
+        metadata: '{"exports":["invalid","./main.js"]}',
+        request: "dependency",
+        source: "main.js",
+      },
+      {
+        name: "exports null fallback",
+        metadata: '{"exports":[null,"./main.js"]}',
+        request: "dependency",
+        source: "main.js",
+      },
+      {
+        name: "require-only deferred",
+        metadata: '{"exports":{"require":"./main.js"}}',
+        request: "dependency",
+        source: "main.js",
+        deferred: true,
+      },
+      {
+        name: "require-only invalid deferred",
+        metadata: '{"exports":{"require":"./main"}}',
+        request: "dependency",
+        source: "main.js",
+        deferred: true,
+      },
+      {
+        name: "import only",
+        metadata: '{"exports":{"import":"./main.js"}}',
+        request: "dependency",
+        source: "main.js",
+      },
+      {
+        name: "missing package",
+        metadata: "{}",
+        request: "missing-dependency",
+        source: "main.js",
+        deferred: true,
+      },
+    ];
+    it.effect.each(cases)("$name", (testCase) =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "entry.js": testCase.deferred
+            ? `export const probe = () => import("${testCase.request}").then(m => m.default, e => e.code);`
+            : `import value from "${testCase.request}"; export const probe = value;`,
+          "node_modules/dependency/package.json": testCase.metadata,
+          [`node_modules/dependency/${testCase.source}`]:
+            'module.exports = "value";',
+          ...testCase.extra,
+        });
+        const evaluate = (url: string) =>
+          Runner.evaluateNative({
+            _tag: "Native",
+            url,
+            exportName: "probe",
+            invoke: testCase.deferred === true,
+          }).pipe(Effect.result);
+        const baseline = yield* Bundler.compile(file("entry.js")).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+          Effect.result,
+        );
+        const current = yield* compile(file("entry.js")).pipe(Effect.result);
+        const alwaysFails = [
+          "exports missing fallback",
+          "missing package",
+          "backslash request",
+        ].includes(testCase.name);
+        const inferredExport = [
+          "exports extension",
+          "exports directory",
+          "nested manifest export",
+        ].includes(testCase.name);
+        const legacyMain = [
+          "main extension",
+          "main directory",
+          "missing main index fallback",
+          "no main index fallback",
+        ].includes(testCase.name);
+        const legacySubpath = testCase.name.startsWith("legacy subpath");
+        const encodedTarget =
+          testCase.name.startsWith("encoded ") &&
+          testCase.name.endsWith(" export");
+        const specialTarget = [
+          "query export",
+          "hash export",
+          "backslash export",
+        ].includes(testCase.name);
+        const invalidDeferred =
+          testCase.name === "require-only invalid deferred";
+        expect(Result.isFailure(baseline)).toBe(
+          inferredExport ||
+            ["exports missing fallback", "backslash request"].includes(
+              testCase.name,
+            ),
+        );
+        expect(Result.isFailure(current)).toBe(alwaysFails || invalidDeferred);
+        if (Result.isSuccess(baseline)) {
+          const evaluated = yield* evaluate(baseline.success.url);
+          if (legacySubpath || testCase.name === "manifest-free file package")
+            assert(Result.isFailure(evaluated));
+          else {
+            assert(Result.isSuccess(evaluated));
+            expect(evaluated.success).toBe(
+              encodedTarget
+                ? "decoded"
+                : testCase.name === "missing package"
+                  ? "ERR_MODULE_NOT_FOUND"
+                  : testCase.deferred
+                    ? "ERR_PACKAGE_PATH_NOT_EXPORTED"
+                    : "value",
+            );
+          }
+        }
+        for (const api of ["getResolve", "factory"] as const) {
+          for (const variant of [
+            "legacy",
+            "fullySpecified",
+            "nodeLike",
+            "exact",
+          ] as const) {
+            const candidate = yield* nativeProbe(file("entry.js"), api, {
+              fullySpecified:
+                variant === "fullySpecified" || variant === "nodeLike",
+              requireFullySpecified: variant === "fullySpecified",
+              exact: variant === "exact",
+            });
+            expect(candidate.errors !== undefined).toBe(
+              alwaysFails || (invalidDeferred && variant === "exact"),
+            );
+            const targets = candidate.probes
+              .filter(({ physical }) => physical)
+              .map(({ physical, emitted }) => ({ physical, emitted }));
+            if (Result.isSuccess(current)) {
+              const policy = current.success.observations.map(
+                ({ physical, emitted }) => ({ physical, emitted }),
+              );
+              const matches =
+                encodedTarget ||
+                specialTarget ||
+                [
+                  "manifest-free file package",
+                  "query request",
+                  "hash request",
+                ].includes(testCase.name)
+                  ? false
+                  : inferredExport
+                    ? variant === "exact"
+                    : legacyMain
+                      ? variant !== "exact"
+                      : legacySubpath
+                        ? variant === "nodeLike"
+                        : true;
+              if (matches)
+                expect(targets, `${api}/${variant}/${testCase.name}`).toEqual(
+                  policy,
+                );
+              else
+                expect(
+                  targets,
+                  `${api}/${variant}/${testCase.name}`,
+                ).not.toEqual(policy);
+            }
+            if (!candidate.errors) {
+              const evaluated = yield* evaluate(candidate.url);
+              if (specialTarget || (legacySubpath && variant === "nodeLike"))
+                assert(Result.isFailure(evaluated));
+              else {
+                assert(Result.isSuccess(evaluated));
+                expect(evaluated.success).toBe(
+                  testCase.deferred ? "ERR_PACKAGE_PATH_NOT_EXPORTED" : "value",
+                );
+              }
+            }
+          }
+        }
+      }).pipe(Effect.scoped),
+    );
+  },
 );
 
 layer(NodeServices.layer, { excludeTestServices: true })(
