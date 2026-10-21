@@ -12,6 +12,13 @@ Rolldown probes; it does not promote the adapter below.
 The subsequent [Rspack experiment](#rspack-cold-compilation-experiment) uses a
 whole compiler with a supported filesystem boundary, not the Vite adapter.
 
+**Current conclusion:** the final measured candidate `3359ab92` demonstrates
+observed runtime resolution and same-instance native reload without dropping
+freshness checks, but remains slower than both esbuild baselines. A handled
+optional-import incompatibility also remains. See the
+[final scale result](#registry-initialization-scale-result-3359ab92).
+Do not adopt this backend on the present evidence.
+
 ## Run the checks
 
 From the repository root, with the workspace dependencies and packages built:
@@ -307,8 +314,8 @@ when publishing group registries after validation.
 
 The follow-up initializes that owned directory before compilation instead of
 ignoring its changed observation. It changes generator ordering, not resolution,
-freshness or receipt policy. It requires a new frozen comparison; the table above
-does not measure it. No adoption follows from these results or the initialization
+freshness or receipt policy. The separate comparison below measures that frozen
+follow-up; the table above does not. No adoption follows from the initialization
 fix, and the optional-import compatibility gap remains.
 
 The initialization follow-up passed 321 private tests, 1,426 default CLI
@@ -326,6 +333,65 @@ The directory diagnostic manifest is
 `227dc6d616dd9ca932ae2d4e3c1b58bc0898e8033587cd635a7fab6d9665c378`.
 Diagnostic timings are excluded from acceptance; scratch/generated-code lint
 diagnostics are retained separately from repository lint results.
+
+### Registry-initialization scale result (`3359ab92`)
+
+The separate gate now proves same-instance native recompilation: two native
+instances ran at startup, and the group instance ran again on reload. Both
+instances closed exactly once, only during shutdown. Its 29.576s startup /
+13.595s reload are diagnostic timings, excluded from acceptance. This observer
+does not count unchanged-capture returns; the earlier candidate's three capture
+hits are not attributed to this revision.
+
+All twelve subsequent trials used plain Node without instrumentation, the
+original 390-group/275-table workload and unchanged 180-second budgets. Each row
+is the mean of two runs; times are seconds and memory is process-tree MiB.
+
+| Edit | Version              | Startup | Reload | Startup RSS | Reload RSS | Sampled peak |
+| ---- | -------------------- | ------: | -----: | ----------: | ---------: | -----------: |
+| Impl | 10.3.1               |  10.642 |  3.238 |       388.4 |      424.7 |        834.8 |
+| Impl | Consolidated esbuild |  17.107 |  8.702 |       751.0 |      793.8 |        918.4 |
+| Impl | Registry-init Rspack |  28.508 | 12.119 |       838.1 |      892.6 |       1081.9 |
+| Spec | 10.3.1               |  10.630 |  3.628 |       386.5 |      410.4 |        876.7 |
+| Spec | Consolidated esbuild |  15.815 |  8.866 |       739.5 |      766.2 |        925.7 |
+| Spec | Registry-init Rspack |  30.173 | 12.619 |       867.2 |      880.5 |       1121.1 |
+
+The final candidate remains **1.67–1.91 times slower at startup and 1.39–1.42
+times slower on reload than consolidated esbuild**, and **2.68–2.84 / 3.48–3.74
+times slower than 10.3.1**, respectively. Earlier candidate timings are not
+matched treatment controls, so they do not quantify this fix's isolated speedup.
+
+All 24 output trees matched all 1,064 hashes, including aggregate
+`84552d0933d648c6f603aa13c7115a30eb65bd27cec5ee33d166b168e7e39b9b`.
+Every run evaluated 390 groups initially and only `g0` on reload, emitted two
+readiness messages and one reload, had zero late evaluations, stayed at four
+processes or fewer and shut down without forced killing. The parent independently
+verified the raw hashes, timings, evaluation logs, memory/process samples, means
+and native lifetime events. Two repetitions and 250ms sampling do not establish
+a broad timing distribution or capture every brief memory peak.
+
+Before/after source, build and runtime fingerprints match. All 71 launcher
+bindings and shared identities were checked. Only `confect/codegen.mjs` and its
+map differ from the preceding CLI build; the candidate's rebuilt worker and shim
+were verified rather than assumed. Earlier frozen candidates and evidence remain
+intact. Copied preparation, gate and comparison manifests all verified:
+
+- Preparation: `d9106ac13ea9871a160666788f4acb43dde7da84f560d5b13a5afb22674fd386`.
+- Gate: `f6f7a7245e05ce61c861eac1d4aef3987dd4593d406604798227bf1105921e90`.
+- Comparison: `c5c698ef7a6dfdf2a33e93329ce05dcaa25c9e286894840b8c76d0e0007eaefd`.
+- Identical fingerprints: `0e00309676eb4b12988b3dda521bde4552a6a6b6035e7c7cb8b2a285074278ca`.
+- Evidence archive: `ebeaa498351f47cd055b82d8a3e1dc347786e2fa8cf891101d2a6ed15b3a249a`.
+
+This completes the investigated paths: native observed resolution, independent
+resolver alternatives, discovery/validation and graph-indexing overhead, bounded
+native reuse, and the generated-directory ordering correction. These supported
+changes do not meet the replacement bar without accepting slower operation and
+the remaining optional-import semantic mismatch. This is a conclusion about the
+tested designs and workload, not a proof that no future Rspack design can improve.
+Production remains esbuild; its own consolidated regression is still unaccepted.
+No further experiments or implementation work are running. Scratch controllers
+retain 30 sequential-await errors and nine Effect-style warnings, separately from
+the clean repository lint result.
 
 ### Corrected cold startup and reload profile
 

@@ -7,6 +7,14 @@ Keep a mature compiler responsible for module semantics. Do not promote the
 thin Vite adapter, replace native resolution with a Confect resolver, or equate
 watcher silence with freshness.
 
+The completed supported-path experiment does **not** justify switching to Rspack.
+Final measured candidate `3359ab92` retains the native compiler across reload and
+preserves the tested receipt/evaluation guarantees, but remains 1.67–1.91 times
+slower at startup and 1.39–1.42 times slower on reload than consolidated esbuild.
+It is also slower than 10.3.1, and handled optional imports still expose a semantic
+mismatch. These results reject adoption of the tested design, not every possible
+future Rspack implementation.
+
 Upstream compiler changes and private compiler forks are out of scope. The prior
 recommendation to pursue a native refresh/capture extension is withdrawn.
 Emission-free validation is an optimization hypothesis, not a requirement that
@@ -43,13 +51,13 @@ Public parser modes, ignored imports and blanket externalization change errors,
 discovery or the accepted program set. Tested alternative resolvers lack either
 target parity or a complete supported observation boundary. Those failures do
 not authorize a custom resolver, fork, diagnostic suppression or weaker freshness.
-The frozen observed-runtime candidate `115a9c83` passes the scale assertions but
-remains 1.72–1.74 times slower at startup and 1.69–2.18 times slower on reload than
-consolidated esbuild. Separate diagnostics prove unchanged-capture reuse and no
-raw fallbacks. Reload still cold-recaptures after codegen adds the registry
-directory to an observed parent. Initializing that owned directory before
-capture is the next experiment; it retains the conservative guard and needs
-its own measurements.
+The observed-runtime candidate `115a9c83` demonstrated unchanged-capture reuse and
+no raw fallbacks in its diagnostic, but late creation of the registry directory
+forced a cold reload. The final `3359ab92` initializes that owned directory before
+capture without weakening the guard. Its separate gate proves same-instance
+native reload; all twelve uninstrumented matched trials pass the original scale
+assertions but remain slower than both baselines. The README records exact
+revision-specific timings, memory, evidence manifests and small-sample limits.
 
 ## Ownership
 
