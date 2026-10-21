@@ -43,8 +43,13 @@ Public parser modes, ignored imports and blanket externalization change errors,
 discovery or the accepted program set. Tested alternative resolvers lack either
 target parity or a complete supported observation boundary. Those failures do
 not authorize a custom resolver, fork, diagnostic suppression or weaker freshness.
-The combined candidate needs its own frozen end-to-end comparison; earlier
-measurements do not establish its performance.
+The frozen observed-runtime candidate `115a9c83` passes the scale assertions but
+remains 1.72–1.74 times slower at startup and 1.69–2.18 times slower on reload than
+consolidated esbuild. Separate diagnostics prove unchanged-capture reuse and no
+raw fallbacks. Reload still cold-recaptures after codegen adds the registry
+directory to an observed parent. Initializing that owned directory before
+capture is the next experiment; it retains the conservative guard and needs
+its own measurements.
 
 ## Ownership
 
