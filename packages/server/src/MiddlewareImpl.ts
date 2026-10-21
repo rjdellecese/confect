@@ -4,9 +4,11 @@ import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Registry from "./Registry";
 import type { FunctionType } from "convex/server";
 import * as Context from "effect/Context";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
+import * as Record from "effect/Record";
 import type * as Auth from "./Auth";
 import type * as DatabaseReader from "./DatabaseReader";
 import type * as DatabaseSchema from "./DatabaseSchema";
@@ -177,17 +179,7 @@ export const make = <
     MiddlewareSpec.Options<MiddlewareSpec_>
   >,
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
-  layerFromImpls(
-    middlewareSpec,
-    Object.fromEntries(
-      MiddlewareSpec.allFunctionTypes
-        .filter((functionType) => middlewareSpec.functionTypes[functionType])
-        .map((functionType) => [
-          functionType,
-          impl as MiddlewareSpec.AnyMiddlewareImpl,
-        ]),
-    ),
-  );
+  forSchema<DatabaseSchema_>().make(middlewareSpec, impl);
 
 /**
  * Provide a middleware's implementation with one strategy per declared function
@@ -214,10 +206,7 @@ export const makeByFunctionType = <
     >;
   },
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
-  layerFromImpls(
-    middlewareSpec,
-    impls as MiddlewareRegistryItem.MiddlewareRegistryItem["impls"],
-  );
+  forSchema<DatabaseSchema_>().makeByFunctionType(middlewareSpec, impls);
 
 /**
  * Sugar over {@link make} for the flagship "run something, provide a service"
@@ -230,7 +219,7 @@ export const provides = <
   MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
   Shape,
 >(
-  databaseSchema: DatabaseSchema_,
+  _databaseSchema: DatabaseSchema_,
   middlewareSpec: MiddlewareSpec_,
   tag: Context.Key<MiddlewareSpec.Provides<MiddlewareSpec_>, Shape>,
   effect: Effect.Effect<
@@ -243,5 +232,84 @@ export const provides = <
     | MiddlewareSpec.Requires<MiddlewareSpec_>
   >,
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
-  make(databaseSchema, middlewareSpec, ((handlerEffect: Effect.Effect<any>) =>
-    Effect.provideServiceEffect(handlerEffect, tag, effect)) as any);
+  forSchema<DatabaseSchema_>().provides(middlewareSpec, tag, effect);
+
+export const forSchema = <
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+>() => {
+  const makeCommon = <MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
+    middlewareSpec: MiddlewareSpec_,
+    impl: MiddlewareSpec.MiddlewareImpl<
+      MiddlewareSpec.Provides<MiddlewareSpec_>,
+      MiddlewareSpec.Error<MiddlewareSpec_>,
+      | CommonServices<
+          DatabaseSchema_,
+          MiddlewareSpec.FunctionTypes<MiddlewareSpec_>
+        >
+      | MiddlewareSpec.Requires<MiddlewareSpec_>,
+      MiddlewareSpec.Options<MiddlewareSpec_>
+    >,
+  ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
+    layerFromImpls(
+      middlewareSpec,
+      Record.fromEntries(
+        Array.map(
+          Array.filter(
+            MiddlewareSpec.allFunctionTypes,
+            (functionType) => middlewareSpec.functionTypes[functionType],
+          ),
+          (functionType) => [
+            functionType,
+            impl as MiddlewareSpec.AnyMiddlewareImpl,
+          ],
+        ),
+      ),
+    );
+
+  const makePerFunctionType = <
+    MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
+  >(
+    middlewareSpec: MiddlewareSpec_,
+    impls: {
+      readonly [
+        FunctionType_ in MiddlewareSpec.FunctionTypes<MiddlewareSpec_>
+      ]: MiddlewareSpec.MiddlewareImpl<
+        MiddlewareSpec.Provides<MiddlewareSpec_>,
+        MiddlewareSpec.Error<MiddlewareSpec_>,
+        | FunctionTypeServices<DatabaseSchema_, FunctionType_>
+        | MiddlewareSpec.Requires<MiddlewareSpec_>,
+        MiddlewareSpec.Options<MiddlewareSpec_>
+      >;
+    },
+  ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
+    layerFromImpls(
+      middlewareSpec,
+      impls as MiddlewareRegistryItem.MiddlewareRegistryItem["impls"],
+    );
+
+  const provideService = <
+    MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
+    Shape,
+  >(
+    middlewareSpec: MiddlewareSpec_,
+    tag: Context.Key<MiddlewareSpec.Provides<MiddlewareSpec_>, Shape>,
+    effect: Effect.Effect<
+      Shape,
+      MiddlewareSpec.Error<MiddlewareSpec_>,
+      | CommonServices<
+          DatabaseSchema_,
+          MiddlewareSpec.FunctionTypes<MiddlewareSpec_>
+        >
+      | MiddlewareSpec.Requires<MiddlewareSpec_>
+    >,
+  ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
+    makeCommon(middlewareSpec, (handlerEffect) =>
+      Effect.provideServiceEffect(handlerEffect, tag, effect),
+    );
+
+  return {
+    make: makeCommon,
+    makeByFunctionType: makePerFunctionType,
+    provides: provideService,
+  } as const;
+};
