@@ -3,6 +3,8 @@ import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as esbuild from "esbuild";
 import * as Effect from "effect/Effect";
+import * as ConfigProvider from "effect/ConfigProvider";
+import * as Layer from "effect/Layer";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Option from "effect/Option";
@@ -25,6 +27,84 @@ vi.mock("esbuild", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationSession",
   (it) => {
+    it.effect.each(
+      (["Once", "Watch"] as const).flatMap((mode) =>
+        ["--conditions=custom", '-C "custom"'].map((nodeOptions) => ({
+          mode,
+          nodeOptions,
+        })),
+      ),
+    )(
+      "shares one $mode build with NODE_OPTIONS=$nodeOptions",
+      ({ mode, nodeOptions }) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const path = yield* Path.Path;
+          yield* project.write(
+            "package.json",
+            '{"type":"module","name":"condition-fixture","exports":{"custom":"./custom.ts","default":"./default.ts"}}',
+          );
+          yield* project.write(
+            "custom.ts",
+            'export const shared = { condition: "custom" };',
+          );
+          yield* project.write(
+            "default.ts",
+            'export const shared = { condition: "default" };',
+          );
+          const entries = yield* Effect.forEach(
+            Array.from({ length: 8 }, (_, index) => index),
+            (index) =>
+              Effect.gen(function* () {
+                const relative = `confect/entry${index}.ts`;
+                yield* project.write(
+                  relative,
+                  'export { shared } from "condition-fixture";',
+                );
+                return path.join(project.root, relative);
+              }),
+          );
+          const context = vi.mocked(esbuild.context);
+          const before = context.mock.calls.length;
+          yield* project.provide(
+            Effect.gen(function* () {
+              const compiler = yield* Compilation.Service;
+              const job = yield* Compilation.runJob(
+                Bundler.withBatch(
+                  entries,
+                  Effect.forEach(entries, (entry) => Bundler.bundle(entry)),
+                ),
+              );
+              const loaded = yield* job.exit;
+              expect(loaded).toHaveLength(8);
+              for (const bundled of loaded) {
+                expect(bundled.module.shared).toEqual({ condition: "custom" });
+                expect(bundled.module.shared).toBe(loaded[0]?.module.shared);
+              }
+              expect(job.receipts).toHaveLength(1);
+              expect(job.receipts[0]?.roots).toEqual(entries);
+              expect(job.failedReceipts).toEqual([]);
+              expect(yield* compiler.topology).toHaveLength(1);
+              yield* compiler.verify;
+              expect(context.mock.calls.slice(before)).toHaveLength(1);
+              expect(context.mock.calls[before]?.[0].conditions).toContain(
+                "custom",
+              );
+            }).pipe(
+              Effect.provide(
+                CompilationSession.layer(mode).pipe(
+                  Layer.provide(
+                    ConfigProvider.layer(
+                      ConfigProvider.fromUnknown({ NODE_OPTIONS: nodeOptions }),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).pipe(Effect.scoped),
+    );
+
     it.effect.each(["Once", "Watch"] as const)(
       "guards project resolution metadata before the first compile in %s mode",
       (mode) =>
