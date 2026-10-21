@@ -393,9 +393,14 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     const progress = yield* Ref.make(WatchBuild.initialProgress);
     const initial = yield* Deferred.make<void>();
     const tsconfig = loadTsConfig(projectRoot);
-    const notExternal = tsconfigPathsToRegExp(
-      tsconfig?.data.compilerOptions?.paths ?? {},
-    );
+    const notExternal = [
+      ...tsconfigPathsToRegExp(tsconfig?.data.compilerOptions?.paths ?? {}),
+      ...(yield* Bundler.packageSelfReferencePatterns(projectRoot).pipe(
+        Effect.mapError(
+          (cause) => new OperationError({ operation: "create", cause }),
+        ),
+      )),
+    ];
     const context = yield* Effect.acquireRelease(
       Effect.tryPromise({
         try: () =>
