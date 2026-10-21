@@ -162,6 +162,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             expect(Exit.isSuccess(span.status.exit)).toBe(true);
           }
         }),
+      { timeout: process.platform === "win32" ? 15000 : 5000 },
     );
 
     it.effect.each([

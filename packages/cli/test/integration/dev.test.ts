@@ -355,7 +355,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             ).toBe(1000);
           }
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: process.platform === "win32" ? 60000 : 30000 },
     );
 
     it.effect.each([
