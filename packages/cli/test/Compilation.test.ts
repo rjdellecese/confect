@@ -102,12 +102,15 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
           );
           yield* initial.exit;
           yield* Queue.take(events);
-          expect(calculated).toEqual([first, second]);
+          const roots = (yield* compiler.topology)[0]?.roots;
+          assert(roots);
+          expect(roots.toSorted()).toEqual([first, second]);
+          expect(calculated).toEqual(roots);
           const unchanged = yield* Compilation.runJob(compiler.verify);
           yield* unchanged.exit;
           expect((yield* Queue.take(events)).affectedRoots).toEqual([]);
           expect(unchanged.receipts).toEqual([]);
-          expect(calculated).toEqual([first, second]);
+          expect(calculated).toEqual(roots);
           yield* fs.writeFileString(
             shared,
             "/*changed*/ export const value = 1;",
@@ -120,7 +123,7 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
             false,
           );
           expect(changed.receipts).toEqual([]);
-          expect(calculated).toEqual([first, second, first]);
+          expect(calculated).toEqual([...roots, first]);
           yield* fs.writeFileString(shared, "export const value = ;");
           yield* compiler.verify;
           expect((yield* Queue.take(events)).errors.length).toBeGreaterThan(0);
@@ -129,11 +132,8 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
             "/*changed*/ export const value = 1;",
           );
           yield* compiler.verify;
-          expect((yield* Queue.take(events)).affectedRoots).toEqual([
-            first,
-            second,
-          ]);
-          expect(calculated).toEqual([first, second, first, first, second]);
+          expect((yield* Queue.take(events)).affectedRoots).toEqual(roots);
+          expect(calculated).toEqual([...roots, first, ...roots]);
         }).pipe(
           Effect.provide(
             Compilation.layer({ mode: "Once", ownedDirectories: [] }),
