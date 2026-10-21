@@ -1,5 +1,5 @@
 import { createRequire, findPackageJSON, isBuiltin } from "node:module";
-import { injectFileScopePlugin } from "bundle-require";
+import { injectFileScopePlugin, JS_EXT_RE } from "bundle-require";
 import { pathToFileURL } from "node:url";
 import { resolveModulePath } from "exsolve";
 import * as Effect from "effect/Effect";
@@ -48,7 +48,27 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
   authoredFiles: ReadonlyArray<string>,
   conditions: ReadonlyArray<string>,
   inputs: CompilationInputs.Inputs,
+  canonicalEntries: ReadonlyArray<string> = [],
 ) {
+  const owned = (file: string) =>
+    !Array.contains(authoredFiles, file) &&
+    Array.some(ownedDirectories, (directory) => {
+      const relative = path.relative(directory, file);
+      return (
+        relative !== ".." &&
+        !relative.startsWith(`..${path.sep}`) &&
+        !path.isAbsolute(relative)
+      );
+    });
+  const directEntries = new Set(
+    canonicalEntries.filter(
+      (file) =>
+        path.isAbsolute(file) &&
+        JS_EXT_RE.test(file) &&
+        !/[?#]/.test(file) &&
+        !owned(file),
+    ),
+  );
   const imports = yield* Ref.make(
     HashMap.empty<
       string,
@@ -262,6 +282,24 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
               return undefined;
             if (isBuiltin(args.path))
               return { path: args.path, external: true };
+            if (
+              args.kind === "entry-point" &&
+              (args.namespace === "file" || args.namespace === "") &&
+              directEntries.has(args.path) &&
+              Record.size(args.with) === 0
+            ) {
+              const direct = yield* fs.realPath(args.path).pipe(
+                Effect.flatMap((real) =>
+                  real === args.path
+                    ? fs
+                        .stat(real)
+                        .pipe(Effect.map((stat) => stat.type === "File"))
+                    : Effect.succeed(false),
+                ),
+                Effect.orElseSucceed(() => false),
+              );
+              if (direct) return undefined;
+            }
             const resolved = yield* probe(build, args);
             if (resolved.errors.length > 0) {
               if (!args.path.startsWith(".") && !path.isAbsolute(args.path)) {
@@ -285,18 +323,7 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
               return undefined;
             }
             if (resolved.external) return resolved;
-            if (
-              !Array.contains(authoredFiles, resolved.path) &&
-              Array.some(ownedDirectories, (directory) => {
-                const relative = path.relative(directory, resolved.path);
-                return (
-                  relative !== ".." &&
-                  !relative.startsWith(`..${path.sep}`) &&
-                  !path.isAbsolute(relative)
-                );
-              })
-            )
-              return { ...resolved, namespace };
+            if (owned(resolved.path)) return { ...resolved, namespace };
             if (
               args.kind !== "entry-point" &&
               /[\\/]node_modules[\\/]/.test(resolved.path)

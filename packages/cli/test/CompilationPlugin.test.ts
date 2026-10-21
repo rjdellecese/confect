@@ -1,5 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { expect, layer } from "@effect/vitest";
+import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -8,6 +8,7 @@ import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
 import * as esbuild from "esbuild";
 import { resolveModulePath } from "exsolve";
 import * as CompilationInputs from "@confect/cli/CompilationInputs";
@@ -19,6 +20,293 @@ vi.mock("exsolve", { spy: true });
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationPlugin",
   (it) => {
+    it.effect(
+      "checks restart authority before taking the entry fast path",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const entry = path.join(root, "entry.ts");
+          yield* fs.writeFileString(entry, "export default 1;");
+          let checked = 0;
+          const observedFs = {
+            ...fs,
+            realPath: (file: string) => {
+              if (file === entry) checked++;
+              return fs.realPath(file);
+            },
+          };
+          const inputs = yield* CompilationInputs.make("Once");
+          const resolver = yield* CompilationPlugin.make(
+            path,
+            observedFs,
+            [],
+            [],
+            ["node"],
+            {
+              ...inputs,
+              ensure: Effect.fail(
+                new CompilationInputs.RestartRequired({ paths: [entry] }),
+              ),
+            },
+            [entry],
+          );
+          const result = yield* Effect.tryPromise({
+            try: () =>
+              esbuild.build({
+                entryPoints: [entry],
+                outdir: path.join(root, "output"),
+                bundle: true,
+                platform: "node",
+                format: "esm",
+                write: false,
+                logLevel: "silent",
+                plugins: [resolver.plugin],
+              }),
+            catch: (cause) => new BundlerError({ cause }),
+          }).pipe(Effect.result);
+          expect(Result.isFailure(result)).toBe(true);
+          expect(checked).toBe(0);
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each([
+      {
+        name: "regular TypeScript",
+        kind: "regular",
+        extension: "ts",
+        probes: 0,
+      },
+      {
+        name: "regular JavaScript",
+        kind: "regular",
+        extension: "js",
+        probes: 0,
+      },
+      { name: "special path", kind: "special", extension: "ts", probes: 1 },
+      {
+        name: "unavailable identity stat",
+        kind: "stat-error",
+        extension: "ts",
+        probes: 1,
+      },
+      {
+        name: "generated entry",
+        kind: "generated",
+        extension: "ts",
+        probes: 1,
+      },
+      {
+        name: "authored exception",
+        kind: "authored",
+        extension: "ts",
+        probes: 0,
+      },
+      {
+        name: "symlink into generated files",
+        kind: "symlink",
+        extension: "ts",
+        probes: 1,
+      },
+      {
+        name: "JavaScript beside a generated TypeScript symlink",
+        kind: "shadow",
+        extension: "js",
+        probes: 0,
+      },
+      {
+        name: "directory entry",
+        kind: "directory",
+        extension: "ts",
+        probes: 1,
+      },
+      { name: "missing entry", kind: "missing", extension: "ts", probes: 1 },
+    ])("preserves native entry semantics for $name", (testCase) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const generated = path.join(root, "generated");
+        yield* fs.makeDirectory(generated);
+        const target = path.join(generated, "entry.ts");
+        yield* fs.writeFileString(target, "export default 2;");
+        const entry = ["generated", "authored"].includes(testCase.kind)
+          ? target
+          : path.join(
+              root,
+              testCase.kind === "special"
+                ? "entry#name.ts"
+                : `entry.${testCase.extension}`,
+            );
+        if (testCase.kind === "symlink") yield* fs.symlink(target, entry);
+        else if (testCase.kind === "directory") {
+          yield* fs.makeDirectory(entry);
+          yield* fs.writeFileString(
+            path.join(entry, "index.js"),
+            "export default 3;",
+          );
+        } else if (
+          !["missing", "generated", "authored"].includes(testCase.kind)
+        ) {
+          yield* fs.writeFileString(entry, "export default 1;");
+          if (testCase.kind === "shadow")
+            yield* fs.symlink(target, path.join(root, "entry.ts"));
+          else if (testCase.extension === "js")
+            yield* fs.writeFileString(
+              path.join(root, "entry.ts"),
+              "export default 99;",
+            );
+        }
+        const compile = (selected: ReadonlyArray<string>) =>
+          Effect.gen(function* () {
+            const inputs = yield* CompilationInputs.make("Once");
+            const resolver = yield* CompilationPlugin.make(
+              path,
+              testCase.kind === "stat-error"
+                ? {
+                    ...fs,
+                    stat: (file) =>
+                      fs.stat(
+                        file === entry ? path.join(root, "unavailable") : file,
+                      ),
+                  }
+                : fs,
+              [generated],
+              testCase.kind === "authored" ? [entry] : [],
+              ["node"],
+              inputs,
+              selected,
+            );
+            let probes = 0;
+            const result = yield* Effect.tryPromise({
+              try: () =>
+                esbuild.build({
+                  absWorkingDir: root,
+                  entryPoints: [entry],
+                  outdir: path.join(root, "output"),
+                  bundle: true,
+                  format: "esm",
+                  platform: "node",
+                  write: false,
+                  metafile: true,
+                  logLevel: "silent",
+                  plugins: [
+                    {
+                      name: resolver.plugin.name,
+                      setup(build) {
+                        return resolver.plugin.setup({
+                          ...build,
+                          resolve(specifier, options) {
+                            if (options?.kind === "entry-point") probes++;
+                            return build.resolve(specifier, options);
+                          },
+                        });
+                      },
+                    },
+                  ],
+                }),
+              catch: (cause) => new BundlerError({ cause }),
+            }).pipe(Effect.result);
+            return { result, probes };
+          });
+        const original = yield* compile([]);
+        const selected = yield* compile([entry]);
+        expect(original.probes).toBe(1);
+        expect(selected.probes).toBe(testCase.probes);
+        expect(selected.result._tag).toBe(original.result._tag);
+        if (Result.isSuccess(original.result)) {
+          assert(Result.isSuccess(selected.result));
+          expect(selected.result.success.metafile).toEqual(
+            original.result.success.metafile,
+          );
+          expect(
+            selected.result.success.outputFiles?.map((file) => file.text),
+          ).toEqual(
+            original.result.success.outputFiles?.map((file) => file.text),
+          );
+          expect(selected.result.success.warnings).toEqual(
+            original.result.success.warnings,
+          );
+        } else {
+          assert(Result.isFailure(selected.result));
+          const diagnostics = Schema.decodeUnknownEffect(
+            Schema.Struct({ errors: Schema.Array(Schema.Unknown) }),
+          );
+          expect(yield* diagnostics(selected.result.failure.cause)).toEqual(
+            yield* diagnostics(original.result.failure.cause),
+          );
+        }
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect("rechecks selected entry identity on every rebuild", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const generated = path.join(root, "generated");
+        yield* fs.makeDirectory(generated);
+        const entry = path.join(root, "entry.ts");
+        const target = path.join(generated, "target.ts");
+        yield* fs.writeFileString(entry, "export default 1;");
+        yield* fs.writeFileString(target, "export default 2;");
+        const inputs = yield* CompilationInputs.make("Once");
+        const resolver = yield* CompilationPlugin.make(
+          path,
+          fs,
+          [generated],
+          [],
+          ["node"],
+          inputs,
+          [entry],
+        );
+        let probes = 0;
+        const engine = yield* Effect.acquireRelease(
+          Effect.promise(() =>
+            esbuild.context({
+              entryPoints: [entry],
+              outdir: path.join(root, "output"),
+              bundle: true,
+              platform: "node",
+              format: "esm",
+              write: false,
+              metafile: true,
+              logLevel: "silent",
+              plugins: [
+                {
+                  name: resolver.plugin.name,
+                  setup(build) {
+                    return resolver.plugin.setup({
+                      ...build,
+                      resolve(specifier, options) {
+                        if (options?.kind === "entry-point") probes++;
+                        return build.resolve(specifier, options);
+                      },
+                    });
+                  },
+                },
+              ],
+            }),
+          ),
+          (context) => Effect.promise(() => context.dispose()),
+        );
+        yield* Effect.promise(() => engine.rebuild());
+        expect(probes).toBe(0);
+        yield* fs.remove(entry);
+        yield* fs.symlink(target, entry);
+        const redirected = yield* Effect.promise(() => engine.rebuild());
+        expect(probes).toBe(1);
+        expect(Object.keys(redirected.metafile?.inputs ?? {})).toContain(
+          `${CompilationPlugin.namespace}:${target}`,
+        );
+        yield* fs.remove(entry);
+        yield* fs.writeFileString(entry, "export default 3;");
+        yield* Effect.promise(() => engine.rebuild());
+        expect(probes).toBe(1);
+      }).pipe(Effect.scoped),
+    );
+
     it.effect("keeps missing-import diagnostics at each importing source", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;

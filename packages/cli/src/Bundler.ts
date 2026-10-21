@@ -380,6 +380,7 @@ const compileLive = Effect.fn("Bundler.compileLive")(
       service.authoredFiles,
       conditions,
       service.resolutionInputs,
+      options?.plugins?.length ? [] : roots,
     );
     const result = yield* service.compile({
       roots,
