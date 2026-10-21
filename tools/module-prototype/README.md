@@ -245,8 +245,8 @@ invariants in 42.912s startup / 30.701s reload, but used six distinct native
 instances without reuse. These instrumented times are not matched acceptance
 results. Its copied evidence manifest is
 `cc22662611890e9d16ee4cd564b7cc30e239181a80510c048435f6de6557ee8b`.
-The combined observed-runtime candidate needs a new frozen comparison; earlier
-timings do not establish its performance.
+The combined observed-runtime candidate was frozen as `115a9c83`; its separate
+matched comparison follows below.
 
 Before freezing this candidate, verification passed 321 private tests across
 18 files, all 1,424 default CLI runtime/type checks across 86 files, the seventeen
@@ -270,6 +270,55 @@ Raw Node hooks and exsolve lack complete acquisition evidence; known-file guards
 miss higher-priority negative discovery and acquisition A/B/A changes. These
 alternatives do not justify weakening receipts or implementing a custom resolver.
 Production remains esbuild, with no adoption or merge authorized.
+
+### Observed-runtime scale result (`115a9c83`)
+
+All twelve fresh, sequential, uninstrumented matched trials passed the original
+390-group/275-table workload and 180-second budgets. Means of two runs per row
+are shown in seconds; memory is process-tree MiB.
+
+| Edit | Version              | Startup | Reload | Reload RSS | Sampled peak |
+| ---- | -------------------- | ------: | -----: | ---------: | -----------: |
+| Impl | 10.3.1               |  10.463 |  3.676 |      405.5 |        813.9 |
+| Impl | Consolidated esbuild |  16.661 |  8.324 |      893.8 |        977.8 |
+| Impl | Observed Rspack      |  29.030 | 18.179 |      964.1 |       1187.7 |
+| Spec | 10.3.1               |  10.091 |  3.255 |      404.1 |        819.2 |
+| Spec | Consolidated esbuild |  16.026 | 10.699 |      821.6 |        949.3 |
+| Spec | Observed Rspack      |  27.629 | 18.046 |      986.6 |       1214.8 |
+
+Observed Rspack remains 1.72–1.74 times slower at startup and 1.69–2.18 times
+slower on reload than consolidated esbuild. Every trial matched all 1,064 output
+hashes, evaluated exactly 390 groups initially and only `g0` on reload, emitted
+two readiness messages and one reload, had no late evaluations, stayed within
+four processes and shut down cleanly. The parent independently recomputed every
+output-tree hash, timing mean and sampled memory peak. Before/after frozen
+fingerprints match. Two repetitions and 250ms sampling retain the usual limits.
+
+A separate diagnostic proves three unchanged-capture returns (two startup, one
+reload), 3,278 observed resolutions and zero raw fallbacks. It also records three
+first native runs and no repeated native calls: complete-capture reuse is not
+the same measurement as same-instance native recompilation. The group context
+survives reload, but the conservative guard replaces its native compiler because
+the captured `_generated` directory acquired one new member,
+`registeredFunctions`, after initial compilation. A metadata-only follow-up
+proves that membership is the only changed `stat`/`lstat` field; directory identity
+and all other recorded fields stayed unchanged. Codegen creates that directory
+when publishing group registries after validation.
+
+The follow-up initializes that owned directory before compilation instead of
+ignoring its changed observation. It changes generator ordering, not resolution,
+freshness or receipt policy. It requires a new frozen comparison; the table above
+does not measure it. No adoption follows from these results or the initialization
+fix, and the optional-import compatibility gap remains.
+
+Copied evidence manifests verified: matched comparison
+`66a86ca9b45f979ceae59f7435f64c47c8a65a2d0e8d7f3e19a69417aff26100`;
+capture diagnostic
+`7c96828443af7ced0c72c9a5b1cad3a23992afd916f596fce8bfeb9cd97e08ea`.
+The directory diagnostic manifest is
+`227dc6d616dd9ca932ae2d4e3c1b58bc0898e8033587cd635a7fab6d9665c378`.
+Diagnostic timings are excluded from acceptance; scratch/generated-code lint
+diagnostics are retained separately from repository lint results.
 
 ### Corrected cold startup and reload profile
 

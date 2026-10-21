@@ -52,6 +52,43 @@ vi.mock("esbuild", (importOriginal) =>
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect("initializes registry directories before compiling groups", () =>
+      Effect.gen(function* () {
+        const project = yield* Project.make;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const registry = path.join(
+          project.root,
+          "confect",
+          "_generated",
+          "registeredFunctions",
+        );
+        const original = Bundler.compile;
+        let checked = 0;
+        yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            vi.spyOn(Bundler, "compile").mockImplementation((entry, options) =>
+              Effect.gen(function* () {
+                if (entry.endsWith(".spec.ts") || entry.endsWith(".impl.ts")) {
+                  expect(yield* fs.exists(registry).pipe(Effect.orDie)).toBe(
+                    true,
+                  );
+                  checked++;
+                }
+                return yield* original(entry, options);
+              }),
+            ),
+          ),
+          (spy) => Effect.sync(() => spy.mockRestore()),
+        );
+        yield* project.provide(codegenHandler);
+        expect(checked).toBeGreaterThan(0);
+        const generated = yield* project.generatedFiles;
+        yield* project.provide(codegenHandler);
+        expect(yield* project.generatedFiles).toEqual(generated);
+      }).pipe(Effect.scoped),
+    );
+
     it.effect(
       "prepares and consumes optional native modules without evaluating them",
       () =>

@@ -133,6 +133,11 @@ const runCodegen = Effect.gen(function* () {
     ),
   );
   yield* generateConfectGeneratedDirectory;
+  if (leaves.length > 0)
+    yield* fs.makeDirectory(
+      path.join(confectDirectory, "_generated", "registeredFunctions"),
+      { recursive: true },
+    );
   yield* warnIfNoTables(tableModules);
   yield* generateIdConstructor(tableModules);
   yield* generateTableWrappers(tableModules);
