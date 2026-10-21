@@ -18,6 +18,7 @@ import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
 import * as Bundler from "@confect/cli/Bundler";
 import * as Compilation from "@confect/cli/Compilation";
+import * as CompilationPlugin from "@confect/cli/CompilationPlugin";
 import * as CompilationState from "@confect/cli/CompilationState";
 import * as CompiledModule from "@confect/cli/CompiledModule";
 import * as ConvexConfig from "@confect/cli/ConvexConfig";
@@ -1753,5 +1754,44 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
           expect(yield* (yield* Compilation.Service).topology).toEqual([]);
         }).pipe(Effect.provide(Compilation.layer({ ownedDirectories: [] })));
       }).pipe(Effect.scoped),
+  );
+  it.effect("preserves file-namespace probes for caller plugins", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped();
+      const generated = path.join(root, "generated");
+      const target = path.join(generated, "value.ts");
+      const entry = path.join(root, "entry.ts");
+      yield* fs.makeDirectory(generated);
+      yield* fs.writeFileString(entry, 'export { default } from "virtual";');
+      yield* fs.writeFileString(target, "export default 42;");
+      let probes = 0;
+      const artifact = yield* Bundler.compile(entry, {
+        profile: "component-config",
+        plugins: [
+          {
+            name: "file-probe-resolution",
+            setup(build) {
+              build.onResolve(
+                { filter: /^virtual$/, namespace: "file" },
+                (args) => {
+                  if (args.pluginData !== CompilationPlugin.nativeProbe)
+                    return undefined;
+                  probes++;
+                  return { path: target };
+                },
+              );
+            },
+          },
+        ],
+      }).pipe(
+        Effect.provide(
+          Compilation.layer({ mode: "Once", ownedDirectories: [generated] }),
+        ),
+      );
+      expect((yield* CompiledModule.namespace(artifact.url)).default).toBe(42);
+      expect(probes).toBeGreaterThan(0);
+    }).pipe(Effect.scoped),
   );
 });

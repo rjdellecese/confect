@@ -49,6 +49,7 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
   conditions: ReadonlyArray<string>,
   inputs: CompilationInputs.Inputs,
   canonicalEntries: ReadonlyArray<string> = [],
+  isolatedProbes = false,
 ) {
   const owned = (file: string) =>
     !Array.contains(authoredFiles, file) &&
@@ -146,7 +147,10 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
       string,
       {
         readonly importer: string;
-        readonly run: Effect.Effect<esbuild.ResolveResult>;
+        readonly run: Effect.Effect<
+          esbuild.ResolveResult,
+          BundlerError | CompilationInputs.RestartRequired
+        >;
       }
     >(),
   );
@@ -159,11 +163,11 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
         importer: args.importer,
         resolveDir: args.resolveDir,
         kind: args.kind,
-        namespace: "file",
+        namespace: isolatedProbes ? "confect-native-probe" : "file",
         pluginData: nativeProbe,
         with: args.with,
       }),
-    );
+    ).pipe(Effect.tap(() => (isolatedProbes ? inputs.ensure : Effect.void)));
     if (args.kind === "entry-point" || Record.size(args.with) > 0)
       return yield* resolve;
     const key = `${path.dirname(args.importer)}\0${args.path}\0${args.resolveDir}\0${args.kind}\0${args.namespace}`;
@@ -269,7 +273,7 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
           );
         },
       });
-      build.onResolve({ filter: /.*/ }, (args) =>
+      const resolve = (args: esbuild.OnResolveArgs) =>
         Effect.runPromiseWith(Context.empty())(
           Effect.gen(function* () {
             yield* inputs.ensure;
@@ -359,8 +363,11 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
             }
             return undefined;
           }),
-        ),
-      );
+        );
+      for (const sourceNamespace of isolatedProbes
+        ? ["file", namespace, "dataurl"]
+        : [""])
+        build.onResolve({ filter: /.*/, namespace: sourceNamespace }, resolve);
       build.onLoad({ filter: /.*/, namespace }, (args) =>
         Effect.runPromiseWith(Context.empty())(
           fs.readFile(args.path).pipe(

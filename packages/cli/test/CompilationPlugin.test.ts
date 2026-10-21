@@ -20,6 +20,253 @@ vi.mock("exsolve", { spy: true });
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationPlugin",
   (it) => {
+    it.effect.each([
+      {
+        name: "relative import",
+        source: 'export { default } from "./shared";',
+      },
+      {
+        name: "JavaScript shadow",
+        source: 'export { default } from "./shadow.js";',
+      },
+      { name: "configured alias", source: 'export { default } from "alias";' },
+      {
+        name: "package import",
+        source: 'export { default } from "dependency";',
+      },
+      {
+        name: "package require",
+        source: 'export default require("dependency");',
+      },
+      {
+        name: "dynamic import",
+        source: 'export const load = () => import("dependency");',
+      },
+      {
+        name: "generated import",
+        source: 'export { default } from "./generated/value";',
+      },
+      {
+        name: "authored exception",
+        source: 'export { default } from "./generated/authored";',
+      },
+      {
+        name: "symlink into generated files",
+        source: 'export { default } from "./link";',
+      },
+      {
+        name: "data URL",
+        source:
+          'export { default } from "data:text/javascript,export default 1";',
+      },
+      {
+        name: "import attributes",
+        source:
+          'import value from "./value.json" with { type: "json" }; export default value;',
+      },
+      {
+        name: "missing relative import",
+        source: 'export { default } from "./missing";',
+      },
+      {
+        name: "handled missing package",
+        source:
+          'export const load = () => { try { return require("missing"); } catch { return null; } };',
+      },
+    ])("isolates native probes without changing $name", ({ source }) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        const generated = path.join(root, "generated");
+        const authored = path.join(generated, "authored.ts");
+        for (const [name, contents] of Object.entries({
+          "entry.ts": source,
+          "shared.ts": "export default 1;",
+          "shadow.js": "export default 'javascript';",
+          "shadow.ts": "export default 'typescript';",
+          "generated/value.ts": "export default 2;",
+          "generated/authored.ts": "export default 3;",
+          "value.json": '{"value":4}',
+          "node_modules/dependency/package.json":
+            '{"type":"module","exports":{"import":"./value.js","require":"./value.cjs"}}',
+          "node_modules/dependency/value.js": "export default 5;",
+          "node_modules/dependency/value.cjs": "module.exports = 6;",
+        })) {
+          const file = path.join(root, name);
+          yield* fs.makeDirectory(path.dirname(file), { recursive: true });
+          yield* fs.writeFileString(file, contents);
+        }
+        yield* fs.symlink(
+          path.join(generated, "value.ts"),
+          path.join(root, "link.ts"),
+        );
+        const compile = Effect.fnUntraced(function* (isolated: boolean) {
+          const inputs = yield* CompilationInputs.make("Once");
+          const resolver = yield* CompilationPlugin.make(
+            path,
+            fs,
+            [generated],
+            [authored],
+            ["node"],
+            inputs,
+            [entry],
+            isolated,
+          );
+          let probes = 0;
+          let reentries = 0;
+          const result = yield* Effect.tryPromise({
+            try: () =>
+              esbuild.build({
+                absWorkingDir: root,
+                entryPoints: [entry],
+                outdir: path.join(root, "output"),
+                bundle: true,
+                platform: "node",
+                format: "esm",
+                write: false,
+                metafile: true,
+                logLevel: "silent",
+                tsconfigRaw: {
+                  compilerOptions: { paths: { alias: ["./shared.ts"] } },
+                },
+                plugins: [
+                  {
+                    name: resolver.plugin.name,
+                    setup(build) {
+                      return resolver.plugin.setup({
+                        ...build,
+                        resolve(specifier, options) {
+                          probes++;
+                          return build.resolve(specifier, options);
+                        },
+                        onResolve(options, callback) {
+                          build.onResolve(options, (args) => {
+                            if (
+                              args.pluginData === CompilationPlugin.nativeProbe
+                            )
+                              reentries++;
+                            return callback(args);
+                          });
+                        },
+                      });
+                    },
+                  },
+                ],
+              }),
+            catch: (cause) => new BundlerError({ cause }),
+          }).pipe(Effect.result);
+          return { result, probes, reentries };
+        });
+        const original = yield* compile(false);
+        const isolated = yield* compile(true);
+        expect(original.probes).toBeGreaterThan(0);
+        expect(original.reentries).toBe(original.probes);
+        expect(isolated.probes).toBe(original.probes);
+        expect(isolated.reentries).toBe(0);
+        expect(isolated.result._tag).toBe(original.result._tag);
+        if (Result.isSuccess(original.result)) {
+          assert(Result.isSuccess(isolated.result));
+          expect(isolated.result.success.metafile).toEqual(
+            original.result.success.metafile,
+          );
+          expect(
+            isolated.result.success.outputFiles?.map((file) => file.text),
+          ).toEqual(
+            original.result.success.outputFiles?.map((file) => file.text),
+          );
+          expect(isolated.result.success.warnings).toEqual(
+            original.result.success.warnings,
+          );
+        } else {
+          assert(Result.isFailure(isolated.result));
+          const diagnostics = Schema.decodeUnknownEffect(
+            Schema.Struct({ errors: Schema.Array(Schema.Unknown) }),
+          );
+          expect(yield* diagnostics(isolated.result.failure.cause)).toEqual(
+            yield* diagnostics(original.result.failure.cause),
+          );
+        }
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect(
+      "checks restart authority after an isolated native query returns",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const entry = path.join(root, "entry.ts");
+          const dependency = path.join(root, "dependency.ts");
+          yield* fs.writeFileString(
+            entry,
+            'export { default } from "./dependency";',
+          );
+          yield* fs.writeFileString(dependency, "export default 1;");
+          const inputs = yield* CompilationInputs.make("Once");
+          let restarted = false;
+          let loads = 0;
+          const resolver = yield* CompilationPlugin.make(
+            path,
+            fs,
+            [],
+            [],
+            ["node"],
+            {
+              ...inputs,
+              ensure: Effect.suspend(() =>
+                restarted
+                  ? Effect.fail(
+                      new CompilationInputs.RestartRequired({
+                        paths: [dependency],
+                      }),
+                    )
+                  : inputs.ensure,
+              ),
+            },
+            [entry],
+            true,
+          );
+          const result = yield* Effect.tryPromise({
+            try: () =>
+              esbuild.build({
+                entryPoints: [entry],
+                bundle: true,
+                write: false,
+                logLevel: "silent",
+                plugins: [
+                  {
+                    name: resolver.plugin.name,
+                    setup(build) {
+                      build.onLoad({ filter: /dependency\.ts$/ }, () => {
+                        loads++;
+                        return undefined;
+                      });
+                      return resolver.plugin.setup({
+                        ...build,
+                        resolve(specifier, options) {
+                          return build
+                            .resolve(specifier, options)
+                            .then((resolved) => {
+                              restarted = true;
+                              return resolved;
+                            });
+                        },
+                      });
+                    },
+                  },
+                ],
+              }),
+            catch: (cause) => new BundlerError({ cause }),
+          }).pipe(Effect.result);
+          expect(restarted).toBe(true);
+          expect(Result.isFailure(result)).toBe(true);
+          expect(loads).toBe(0);
+        }).pipe(Effect.scoped),
+    );
+
     it.effect(
       "checks restart authority before taking the entry fast path",
       () =>
