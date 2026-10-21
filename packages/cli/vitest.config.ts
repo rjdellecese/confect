@@ -9,6 +9,7 @@ export default mergeConfig(
     test: {
       root: import.meta.dirname,
       include: ["test/*.test.ts", "test/integration/*.test.ts"],
+      maxWorkers: 1,
     },
   }),
 );

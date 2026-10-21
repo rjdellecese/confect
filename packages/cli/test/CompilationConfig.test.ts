@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import * as esbuild from "esbuild";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
@@ -17,10 +18,16 @@ const fixture = Effect.fn("CompilationConfig.test.fixture")(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const root = yield* fs.makeTempDirectoryScoped();
+  const encodedRoot = yield* Schema.encodeEffect(
+    Schema.fromJsonString(Schema.String),
+  )(root);
   for (const [name, contents] of Object.entries(files)) {
     const file = path.join(root, name);
     yield* fs.makeDirectory(path.dirname(file), { recursive: true });
-    yield* fs.writeFileString(file, contents.replaceAll("ROOT", root));
+    yield* fs.writeFileString(
+      file,
+      contents.replaceAll("ROOT", encodedRoot.slice(1, -1)),
+    );
   }
   return { root, source: path.join(root, "src/entry.tsx"), fs, path };
 });
@@ -249,7 +256,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           });
           const resolved = yield* CompilationConfig.discover(source);
           expect(resolved.tsconfigRaw.compilerOptions?.paths?.["@/*"]).toEqual([
-            `${root}${path.sep}fixtures/*/../value.ts`,
+            `${path.resolve(root)}${path.sep}fixtures/*/../value.ts`,
           ]);
           expect(
             (yield* buildRaw(source, resolved.tsconfigRaw)).outputFiles?.[0]
