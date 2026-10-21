@@ -2,7 +2,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import * as Schema from "effect/Schema";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
-import { expect, layer } from "@effect/vitest";
+import { assert, expect, layer } from "@effect/vitest";
+import { vi } from "vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
@@ -22,6 +23,13 @@ import * as CompilationState from "@confect/cli/CompilationState";
 import * as CompiledModule from "@confect/cli/CompiledModule";
 import * as ConvexConfig from "@confect/cli/ConvexConfig";
 import type * as CompilationInputs from "@confect/cli/CompilationInputs";
+
+vi.mock("@confect/cli/CompilationState", (importOriginal) =>
+  importOriginal<typeof CompilationState>().then((original) => ({
+    ...original,
+    makeInputFingerprinter: vi.fn(original.makeInputFingerprinter),
+  })),
+);
 
 const observe = Effect.gen(function* () {
   const compiler = yield* Compilation.Service;
@@ -54,6 +62,127 @@ const compileAndLoad = Effect.fn("Compilation.test.compileAndLoad")(function* (
 layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
+  it.effect(
+    "reuses only unaffected fingerprints after fresh native verification",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const first = path.join(root, "first.ts");
+        const second = path.join(root, "second.ts");
+        const shared = path.join(root, "shared.ts");
+        yield* fs.writeFileString(first, 'export { value } from "./shared";');
+        yield* fs.writeFileString(second, "export const value = 2;");
+        yield* fs.writeFileString(shared, "export const value = 1;");
+        const calculated: string[] = [];
+        const makeFingerprint = vi.mocked(
+          CompilationState.makeInputFingerprinter,
+        );
+        const original = makeFingerprint.getMockImplementation();
+        assert(original);
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => makeFingerprint.mockImplementation(original)),
+        );
+        makeFingerprint.mockImplementation((...args) => {
+          const fingerprint = original(...args);
+          return (input) => {
+            calculated.push(input);
+            return fingerprint(input);
+          };
+        });
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const events = yield* observe;
+          const initial = yield* Compilation.runJob(
+            Bundler.withBatch(
+              [first, second],
+              Effect.forEach([first, second], (entry) => Bundler.bundle(entry)),
+            ),
+          );
+          yield* initial.exit;
+          yield* Queue.take(events);
+          expect(calculated).toEqual([first, second]);
+          const unchanged = yield* Compilation.runJob(compiler.verify);
+          yield* unchanged.exit;
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([]);
+          expect(unchanged.receipts).toEqual([]);
+          expect(calculated).toEqual([first, second]);
+          yield* fs.writeFileString(
+            shared,
+            "/*changed*/ export const value = 1;",
+          );
+          const changed = yield* Compilation.runJob(compiler.verify);
+          yield* changed.exit;
+          const pending = yield* Queue.take(events);
+          expect(pending.affectedRoots).toEqual([first]);
+          expect(CompilationState.acknowledged(pending, initial.receipts)).toBe(
+            false,
+          );
+          expect(changed.receipts).toEqual([]);
+          expect(calculated).toEqual([first, second, first]);
+          yield* fs.writeFileString(shared, "export const value = ;");
+          yield* compiler.verify;
+          expect((yield* Queue.take(events)).errors.length).toBeGreaterThan(0);
+          yield* fs.writeFileString(
+            shared,
+            "/*changed*/ export const value = 1;",
+          );
+          yield* compiler.verify;
+          expect((yield* Queue.take(events)).affectedRoots).toEqual([
+            first,
+            second,
+          ]);
+          expect(calculated).toEqual([first, second, first, first, second]);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "verifies newly preferred relative sources without relying on watcher delivery",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        const original = path.join(root, "choice/index.ts");
+        const preferred = path.join(root, "choice.ts");
+        yield* fs.makeDirectory(path.dirname(original));
+        yield* fs.writeFileString(entry, 'export { default } from "./choice";');
+        yield* fs.writeFileString(original, "export default 1;");
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const events = yield* observe;
+          const initial = yield* Compilation.runJob(Bundler.bundle(entry));
+          expect((yield* initial.exit).module.default).toBe(1);
+          yield* Queue.take(events);
+          yield* fs.writeFileString(preferred, "export default 2;");
+          const verified = yield* Compilation.runJob(compiler.verify);
+          yield* verified.exit;
+          const revision = yield* Queue.take(events);
+          expect(revision.affectedRoots).toEqual([entry]);
+          expect(verified.receipts).toEqual([]);
+          expect(
+            CompilationState.acknowledged(revision, initial.receipts),
+          ).toBe(false);
+          expect((yield* Bundler.bundle(entry)).module.default).toBe(2);
+          expect(yield* fs.readFileString(original)).toBe("export default 1;");
+          expect(yield* fs.readFileString(entry)).toBe(
+            'export { default } from "./choice";',
+          );
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
+
   it.effect(
     "publishes owned configuration diagnostics and guards missing inheritance",
     () =>

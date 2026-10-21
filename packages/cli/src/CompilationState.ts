@@ -148,6 +148,63 @@ const byPath = Order.mapInput(
   (pair: readonly [string, string]) => pair[0],
 );
 
+export type InputSnapshot = Readonly<
+  Record<
+    string,
+    {
+      readonly identity: string;
+      readonly imports: ReadonlyArray<{
+        readonly path: string;
+        readonly external?: boolean;
+      }>;
+    }
+  >
+>;
+
+export const snapshotInputs = (
+  metafile: esbuild.Metafile,
+  hashes: Values,
+  generated: ReadonlyArray<string> = [],
+): InputSnapshot => {
+  const excluded = new Set(generated);
+  return Record.map(metafile.inputs, (metadata, file) => ({
+    identity: JSON.stringify([
+      excluded.has(file),
+      excluded.has(file) ? undefined : hashes[file],
+      metadata.imports,
+    ]),
+    imports: metadata.imports,
+  }));
+};
+
+export const affectedInputs = (
+  before: InputSnapshot | undefined,
+  after: InputSnapshot,
+): ReadonlySet<string> => {
+  if (!before) return new Set(Object.keys(after));
+  const changed = new Set(
+    [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
+      (file) => before[file]?.identity !== after[file]?.identity,
+    ),
+  );
+  if (changed.size === 0) return changed;
+  const dependents = new Map<string, Set<string>>();
+  for (const inputs of [before, after]) {
+    for (const [file, metadata] of Object.entries(inputs)) {
+      for (const imported of metadata.imports) {
+        if (imported.external) continue;
+        const parents = dependents.get(imported.path) ?? new Set<string>();
+        parents.add(file);
+        dependents.set(imported.path, parents);
+      }
+    }
+  }
+  for (const file of changed) {
+    for (const parent of dependents.get(file) ?? []) changed.add(parent);
+  }
+  return changed;
+};
+
 export const makeInputFingerprinter = (
   metafile: esbuild.Metafile,
   hashes: Values,

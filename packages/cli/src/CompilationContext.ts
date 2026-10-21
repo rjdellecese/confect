@@ -155,7 +155,11 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     if (Option.isSome(failure)) return yield* failure.value;
   });
   const revision = yield* Ref.make(0);
-  const values = yield* Ref.make<CompilationState.Values>({});
+  const fingerprints = yield* Ref.make<{
+    readonly values: CompilationState.Values;
+    readonly inputs: CompilationState.InputSnapshot | undefined;
+    readonly rootInputs: CompilationState.Values;
+  }>({ values: {}, inputs: undefined, rootInputs: {} });
   const failed = yield* Ref.make(false);
   const startedGeneration = yield* Ref.make(0);
   const provisional = new WeakSet<object>();
@@ -212,13 +216,17 @@ export const make = Effect.fn("CompilationContext.make")(function* (
         };
         const errors = [diagnostic(cause)];
         const next = yield* failureValues(errors);
-        const previous = yield* Ref.getAndSet(values, next);
+        const previous = yield* Ref.getAndSet(fingerprints, {
+          values: next,
+          inputs: undefined,
+          rootInputs: {},
+        });
         yield* publish({
           ...receipt,
           errors,
           warnings: [],
           affectedRoots: CompilationState.changedRoots(
-            previous,
+            previous.values,
             next,
             topology.roots,
           ),
@@ -272,10 +280,14 @@ export const make = Effect.fn("CompilationContext.make")(function* (
             .pipe(Effect.map((hash) => [file.path, Hex.encode(hash)] as const)),
         ),
       );
-      const previous = yield* Ref.get(values);
+      const previous = yield* Ref.get(fingerprints);
       const next = yield* Effect.gen(function* () {
         if (!metafile || !result.outputFiles || errors.length > 0)
-          return yield* failureValues(errors);
+          return {
+            values: yield* failureValues(errors),
+            inputs: undefined,
+            rootInputs: {},
+          };
         const raw = result.metafile;
         if (!raw)
           return yield* new IncompleteCompilation({
@@ -316,30 +328,51 @@ export const make = Effect.fn("CompilationContext.make")(function* (
           inputHashes,
           generated,
         );
-        return Record.fromEntries(
-          yield* Effect.forEach(topology.roots, (root) =>
+        const inputs = CompilationState.snapshotInputs(
+          metafile,
+          inputHashes,
+          generated,
+        );
+        const affected = CompilationState.affectedInputs(
+          previous.inputs,
+          inputs,
+        );
+        const roots = yield* Effect.forEach(topology.roots, (root) =>
+          Effect.gen(function* () {
+            const input = metafile.inputs[root]
+              ? Option.some(root)
+              : Array.findFirst(
+                  Record.keys(metafile.inputs),
+                  (file) =>
+                    path.resolve(
+                      options.absWorkingDir ?? ".",
+                      CompilationPlugin.physicalPath(file),
+                    ) === root,
+                );
+            if (Option.isNone(input))
+              return yield* new CompilationSources.Unobserved({
+                paths: [root],
+              });
+            return [root, input.value] as const;
+          }),
+        );
+        const values = Record.fromEntries(
+          yield* Effect.forEach(roots, ([root, input]) =>
             Effect.gen(function* () {
-              const input = metafile.inputs[root]
-                ? Option.some(root)
-                : Array.findFirst(
-                    Record.keys(metafile.inputs),
-                    (file) =>
-                      path.resolve(
-                        options.absWorkingDir ?? ".",
-                        CompilationPlugin.physicalPath(file),
-                      ) === root,
-                  );
-              if (Option.isNone(input))
-                return yield* new CompilationSources.Unobserved({
-                  paths: [root],
-                });
-              const contents = fingerprint(input.value);
+              if (
+                previous.rootInputs[root] === input &&
+                !affected.has(input) &&
+                previous.values[root] !== undefined
+              )
+                return [root, previous.values[root]] as const;
+              const contents = fingerprint(input);
               return yield* crypto
                 .digest("SHA-256", new TextEncoder().encode(contents))
                 .pipe(Effect.map((hash) => [root, Hex.encode(hash)] as const));
             }),
           ),
         );
+        return { values, inputs, rootInputs: Record.fromEntries(roots) };
       });
       const captured = {
         receipt,
@@ -350,7 +383,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       };
       yield* guards.check;
       identities.set(result, captured);
-      yield* Ref.set(values, next);
+      yield* Ref.set(fingerprints, next);
       if (errors.length === 0) yield* Ref.set(prepared, Option.some(captured));
       yield* Ref.set(failed, errors.length > 0);
       yield* Ref.set(needsStabilization, false);
@@ -358,8 +391,8 @@ export const make = Effect.fn("CompilationContext.make")(function* (
         ...receipt,
         roots: topology.roots,
         affectedRoots: CompilationState.changedRoots(
-          previous,
-          next,
+          previous.values,
+          next.values,
           topology.roots,
         ),
         errors,
