@@ -2,6 +2,18 @@
 
 ## Decision
 
+The chosen implementation path is consolidated esbuild. Preserve the shared
+command policy, owned configuration, revision receipts, fresh evaluation and
+explicit publication/recovery model; address its remaining performance regression
+without replacing exact guards with incomplete freshness heuristics.
+
+The Rspack and Vite experiments are parked as evidence, not implementation layers
+to merge into the chosen stack. Webpack is excluded by the project decision.
+No further backend migration or compiler-upstream work is planned. This decision
+does not declare the current esbuild regression acceptable or authorize merging
+the draft consolidation stack; performance and platform readiness still need
+verification.
+
 Keep Confect's owned configuration, revision, publication and recovery model.
 Keep a mature compiler responsible for module semantics. Do not promote the
 thin Vite adapter, replace native resolution with a Confect resolver, or equate
@@ -21,7 +33,7 @@ Emission-free validation is an optimization hypothesis, not a requirement that
 justifies maintaining compiler internals. Ordinary full preparation remains a
 valid implementation when exact freshness cannot be established more cheaply.
 
-The alternative worth qualifying is a **supported input-filesystem boundary**.
+The alternative investigated was a **supported input-filesystem boundary**.
 Confect records the filesystem facts supplied to a whole compiler, while that
 compiler retains resolution, loading and linking. Unchanged complete observations
 could validate an existing preparation without invoking the compiler; changed

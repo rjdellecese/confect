@@ -4,6 +4,12 @@ This private workspace package evaluates a compiler architecture. It is not
 published, used by `confect dev` or `confect codegen`, or a production fallback.
 The existing compiler remains the compatibility oracle.
 
+**Disposition:** consolidated esbuild is the chosen implementation path. This
+package and its backend-specific integration remain a parked experiment. Retain
+the evidence, but do not merge the prototype merely to continue the consolidation.
+The chosen stack still needs performance and platform-readiness work; no merge
+is authorized by the backend decision.
+
 See [the backend contract and capability assessment](./BACKEND_CONTRACT.md) for
 the subsequent native validation-boundary investigation. It distinguishes
 freshness validation from semantic preparation and records real esbuild and
