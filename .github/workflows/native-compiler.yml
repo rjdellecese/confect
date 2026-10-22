@@ -1,0 +1,37 @@
+name: Experimental native compiler
+
+on:
+  pull_request:
+    paths:
+      - "tools/native-compiler/**"
+      - "packages/cli/src/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/native-compiler.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/native-compiler/**"
+      - "packages/cli/src/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/native-compiler.yml"
+
+jobs:
+  qualify:
+    name: Qualify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/confect-setup
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.27.2"
+          cache-dependency-path: tools/native-compiler/native/go.sum
+      - run: pnpm --filter confect-native-compiler qualify
+      - run: pnpm --filter confect-native-compiler test:go
+      - if: runner.os == 'Linux'
+        run: pnpm --filter confect-native-compiler test:go:race

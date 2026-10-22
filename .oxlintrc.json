@@ -87,7 +87,8 @@
         "packages/cli/test/Evaluation.test.ts",
         "packages/cli/src/DevSupervisor.ts",
         "packages/cli/test/DevSupervisor.test.ts",
-        "packages/cli/test/integration/DevSupervisor.test.ts"
+        "packages/cli/test/integration/DevSupervisor.test.ts",
+        "tools/native-compiler/src/NativeService.ts"
       ],
       "rules": {
         "effecttsgo/node-builtin-import": "off"

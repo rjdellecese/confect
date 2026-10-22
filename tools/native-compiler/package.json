@@ -1,0 +1,23 @@
+{
+  "name": "confect-native-compiler",
+  "description": "Private qualification of the experimental public-Go compiler boundary.",
+  "version": "0.0.0",
+  "devDependencies": {
+    "@effect/platform-node": "4.0.4",
+    "@effect/vitest": "4.0.4",
+    "effect": "4.0.4",
+    "esbuild": "0.28.2",
+    "vitest": "5.0.3"
+  },
+  "private": true,
+  "scripts": {
+    "build:native": "cd native && go build -o ../bin/native-compiler.exe .",
+    "qualify": "pnpm build:native && pnpm test && pnpm typecheck && pnpm typecheck:inexact",
+    "test": "vitest run --config vitest.config.ts",
+    "test:go": "cd native && go test -timeout 120s ./...",
+    "test:go:race": "cd native && go test -race -timeout 120s ./...",
+    "typecheck": "tsc --project tsconfig.json",
+    "typecheck:inexact": "tsc --project tsconfig.json --exactOptionalPropertyTypes false"
+  },
+  "type": "module"
+}
