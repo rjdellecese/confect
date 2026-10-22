@@ -3,11 +3,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const preload = fileURLToPath(
-  new URL("./windowsRealpathExperiment.mjs", import.meta.url),
-);
+const preload = new URL("./windowsRealpathExperiment.mjs", import.meta.url)
+  .href;
 
 describe("Windows realpath experiment", () => {
   for (const mode of ["control", "native", "disabled"]) {

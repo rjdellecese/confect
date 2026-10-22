@@ -37,6 +37,11 @@ but does not prove which filesystem operation caused the failed run.
 
 ## Current realpath experiment
 
+The first launch at `a036219` stopped in its preflight tests because Node's
+Windows `--import` option rejected a drive path rather than a file URL. No
+control/native suites ran on that head. The test now preserves the preload
+module's file URL; this harness correction is not timeout evidence.
+
 The integrity-verified published `@effect/platform-node-shared@4.0.4` archive
 uses Node's `fs.realpath`, not `fs.realpath.native`. The cached opensrc tree
 is mislabeled and actually contains 4.0.6, whose Windows adapter uses the

@@ -98,6 +98,7 @@
     {
       "files": ["scripts/windowsRealpathExperiment.mjs"],
       "rules": {
+        "effecttsgo/process-env": "off",
         "effecttsgo/global-date": "off",
         "effecttsgo/global-timers": "off"
       }
