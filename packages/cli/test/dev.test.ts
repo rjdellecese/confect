@@ -2,9 +2,12 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as Command from "effect/cli/Command";
+import * as Clock from "effect/Clock";
+import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
@@ -48,9 +51,97 @@ vi.mock("effect/Console", (importOriginal) =>
   })),
 );
 
+const traceWaits = (summary: Effect.Effect<Readonly<Record<string, number>>>) =>
+  Effect.gen(function* () {
+    const started = yield* Clock.currentTimeMillis;
+    const checkpoints: Array<{
+      readonly phase: string;
+      readonly completed: boolean;
+      readonly elapsedMillis: number;
+    }> = [];
+    yield* Effect.addFinalizer((exit) =>
+      Exit.isFailure(exit)
+        ? Effect.gen(function* () {
+            yield* Console.error("Watcher scenario checkpoints", {
+              checkpoints,
+              summary: yield* summary,
+            });
+          })
+        : Effect.void,
+    );
+    return <A, E, R>(phase: string, effect: Effect.Effect<A, E, R>) =>
+      Effect.gen(function* () {
+        checkpoints.push({
+          phase,
+          completed: false,
+          elapsedMillis: (yield* Clock.currentTimeMillis) - started,
+        });
+        const value = yield* effect;
+        checkpoints.push({
+          phase,
+          completed: true,
+          elapsedMillis: (yield* Clock.currentTimeMillis) - started,
+        });
+        return value;
+      });
+  });
+
 layer(NodeServices.layer, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
+    it.effect.each(["success", "failure", "interruption"] as const)(
+      "reports failed wait checkpoints without changing %s",
+      (outcome) =>
+        Effect.gen(function* () {
+          const messages: Array<ReadonlyArray<unknown>> = [];
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi.spyOn(Console, "error").mockImplementation((...args) =>
+                Effect.sync(() => {
+                  messages.push(args);
+                }),
+              ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          const result = yield* Effect.gen(function* () {
+            const wait = yield* traceWaits(Effect.succeed({ rebuilds: 2 }));
+            return yield* wait(
+              "controlled wait",
+              outcome === "success"
+                ? Effect.succeed(42)
+                : outcome === "failure"
+                  ? Effect.fail("expected failure")
+                  : Effect.interrupt,
+            );
+          }).pipe(Effect.scoped, Effect.exit);
+          if (outcome === "success") {
+            expect(result).toEqual(Exit.succeed(42));
+            expect(messages).toEqual([]);
+          } else {
+            assert(Exit.isFailure(result));
+            if (outcome === "failure")
+              expect(result).toEqual(Exit.fail("expected failure"));
+            else expect(Cause.hasInterruptsOnly(result.cause)).toBe(true);
+            expect(messages).toEqual([
+              [
+                "Watcher scenario checkpoints",
+                {
+                  checkpoints: [
+                    {
+                      phase: "controlled wait",
+                      completed: false,
+                      elapsedMillis: expect.any(Number),
+                    },
+                  ],
+                  summary: { rebuilds: 2 },
+                },
+              ],
+            ]);
+          }
+        }).pipe(Effect.scoped),
+    );
+
     it.effect.each(["none", "edit", "preferred"] as const)(
       "plans dependent declarations before a delayed module revision and verifies a late %s change",
       (lateChange) =>
@@ -77,11 +168,23 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const started = yield* Deferred.make<void>();
           const release = yield* Deferred.make<void>();
           let readyCount = 0;
+          let totalRebuilds = 0;
+          const updates: Array<{
+            readonly declarations: ReadonlyArray<string>;
+            readonly paths: ReadonlyArray<string>;
+          }> = [];
           const contexts = new Set<{
             readonly roots: ReadonlyArray<string>;
             readonly native: esbuild.BuildContext;
             rebuilds: number;
           }>();
+          const wait = yield* traceWaits(
+            Effect.sync(() => ({
+              ready: readyCount,
+              updates: updates.length,
+              rebuilds: totalRebuilds,
+            })),
+          );
           const nativeContext = vi.mocked(esbuild.context);
           const originalContext = nativeContext.getMockImplementation();
           assert(originalContext);
@@ -103,6 +206,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                 watch: () => Promise.resolve(),
                 rebuild: () => {
                   tracked.rebuilds++;
+                  totalRebuilds++;
                   return native.rebuild();
                 },
                 dispose: () => {
@@ -120,10 +224,6 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const update = vi.mocked(Evaluation.updateDeclarations);
           const originalUpdate = update.getMockImplementation();
           assert(originalUpdate);
-          const updates: Array<{
-            readonly declarations: ReadonlyArray<string>;
-            readonly paths: ReadonlyArray<string>;
-          }> = [];
           update.mockImplementation((snapshot, declarations, paths) =>
             Effect.gen(function* () {
               updates.push({
@@ -176,7 +276,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* project
             .provide(Command.runWith(dev, { version: "test" })([]))
             .pipe(Effect.forkScoped);
-          yield* Queue.take(ready);
+          yield* wait("initial readiness", Queue.take(ready));
           const tableContext = [...contexts].find((context) =>
             context.roots.includes(table),
           );
@@ -188,16 +288,23 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(tableContext.roots).toEqual([table]);
           expect(modules.roots.toSorted()).toEqual([spec, impl].toSorted());
           for (const context of contexts) context.rebuilds = 0;
+          totalRebuilds = 0;
           yield* project.write(
             "confect/tables/notes.ts",
             `${Project.table}\n// table edit\n`,
           );
-          yield* Effect.promise(() => tableContext.native.rebuild());
-          yield* Deferred.await(started);
+          yield* wait(
+            "table revision build",
+            Effect.promise(() => tableContext.native.rebuild()),
+          );
+          yield* wait("first update start", Deferred.await(started));
           expect(readyCount).toBe(1);
-          yield* Effect.promise(() => modules.native.rebuild());
+          yield* wait(
+            "module revision build",
+            Effect.promise(() => modules.native.rebuild()),
+          );
           yield* Deferred.succeed(release, undefined);
-          yield* Queue.take(ready);
+          yield* wait("updated readiness", Queue.take(ready));
           expect(readyCount).toBe(2);
           expect(updates).toHaveLength(lateChange === "none" ? 1 : 2);
           expect(updates[0]?.declarations.toSorted()).toEqual(
@@ -348,6 +455,11 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const project = yield* Project.make;
           const ready = yield* Queue.unbounded<void>();
           const rebuilds = yield* Ref.make(0);
+          const wait = yield* traceWaits(
+            Ref.get(rebuilds).pipe(
+              Effect.map((count) => ({ rebuilds: count })),
+            ),
+          );
           const context = vi.mocked(esbuild.context);
           const original = context.getMockImplementation();
           assert(original);
@@ -394,13 +506,13 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             }),
             Effect.forkScoped,
           );
-          yield* Queue.take(ready);
+          yield* wait("initial readiness", Queue.take(ready));
           yield* Ref.set(rebuilds, 0);
           yield* project.write(
             `confect/notes.${kind}.ts`,
             `${source}\n// authored edit\n`,
           );
-          yield* Queue.take(ready);
+          yield* wait("edited readiness", Queue.take(ready));
           expect(yield* Ref.get(rebuilds)).toBe(2);
         }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
       { timeout: 25000 },
