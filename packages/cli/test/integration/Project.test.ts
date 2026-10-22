@@ -151,6 +151,59 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       { timeout: 30000 },
     );
 
+    it.effect(
+      "withholds readiness and preserves the record after an output path failure, then repairs on retry",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const recordPath = path.join(
+            project.root,
+            "confect/_generated/.confect-generation.json",
+          );
+          const registry = path.join(
+            project.root,
+            "confect/_generated/registeredFunctions/notes.ts",
+          );
+          const wrapper = path.join(project.root, "convex/notes.ts");
+          const initial = yield* project.start("codegen");
+          yield* initial.waitFor("Generated files are up-to-date");
+          expect(Number(yield* initial.handle.exitCode)).toBe(0);
+          const record = yield* fs.readFileString(recordPath);
+          const previousRegistry = yield* fs.readFileString(registry);
+          yield* project.write(
+            "confect/notes.spec.ts",
+            Project.spec.replace('name: "list"', 'name: "latest"'),
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace('"list"', '"latest"'),
+          );
+          yield* fs.remove(wrapper);
+          yield* fs.makeDirectory(wrapper);
+          const failed = yield* project.start("codegen");
+          yield* failed.waitFor("UnexpectedType");
+          expect(Number(yield* failed.handle.exitCode)).not.toBe(0);
+          expect(yield* Ref.get(failed.output)).not.toContain(
+            "Generated files are up-to-date",
+          );
+          expect(yield* fs.readFileString(recordPath)).toBe(record);
+          expect(yield* fs.readFileString(registry)).toBe(previousRegistry);
+          expect((yield* fs.stat(wrapper)).type).toBe("Directory");
+          yield* fs.remove(wrapper, { recursive: true });
+          const repaired = yield* project.start("codegen");
+          yield* repaired.waitFor("Generated files are up-to-date");
+          expect(Number(yield* repaired.handle.exitCode)).toBe(0);
+          expect(yield* fs.readFileString(recordPath)).not.toBe(record);
+          expect(yield* fs.readFileString(registry)).toContain("latest");
+          expect(yield* fs.readFileString(wrapper)).toContain(
+            "export const latest",
+          );
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect.each([
       { failure: "missing implementation", error: "has no sibling impl" },
       {
