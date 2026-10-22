@@ -1,4 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as GenerationRecord from "@confect/cli/GenerationRecord";
+import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
@@ -47,6 +49,61 @@ const fixture = Effect.gen(function* () {
 layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect codegen generation records",
   (it) => {
+    it.effect.each(["codegen", "dev"] as const)(
+      "persists history for configured sibling function roots in %s",
+      (command) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const backend = yield* fs.makeTempDirectoryScoped({
+            directory: path.dirname(project.root),
+            prefix: "backend-",
+          });
+          yield* fs.writeFileString(
+            path.join(backend, "package.json"),
+            '{"type":"module"}',
+          );
+          for (const directory of ["confect", "convex"])
+            yield* fs.rename(
+              path.join(project.root, directory),
+              path.join(backend, directory),
+            );
+          yield* project.write(
+            "convex.json",
+            yield* Schema.encodeEffect(
+              Schema.fromJsonString(
+                Schema.Struct({ functions: Schema.String }),
+              ),
+            )({
+              functions: path.relative(
+                project.root,
+                path.join(backend, "convex"),
+              ),
+            }),
+          );
+          const running = yield* project.start(command);
+          yield* running.waitFor("Generated files are up-to-date");
+          if (command === "codegen")
+            expect(Number(yield* running.handle.exitCode)).toBe(0);
+          const history = GenerationRecord.parse(
+            yield* fs.readFileString(
+              path.join(backend, "confect/_generated/.confect-generation.json"),
+            ),
+          );
+          assert(history._tag === "Loaded");
+          expect(
+            [...GenerationSnapshot.functionPaths(history.record.snapshot)].map(
+              ({ name }) => name,
+            ),
+          ).toEqual(["list"]);
+          expect(
+            yield* fs.readFileString(path.join(backend, "convex/notes.ts")),
+          ).toContain("export const list");
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "persists identical records for fresh projects and repeated generation",
       () =>

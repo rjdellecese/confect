@@ -1,5 +1,6 @@
 import * as GenerationRecord from "@confect/cli/GenerationRecord";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
+import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
@@ -115,6 +116,59 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             GenerationRecord.History.Missing(),
           );
         }).pipe(Effect.scoped),
+    );
+
+    it.effect("supports sibling configured roots while rejecting aliases", () =>
+      Effect.gen(function* () {
+        const project = yield* Project.make;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const frontend = path.join(project.root, "frontend");
+        yield* fs.makeDirectory(frontend);
+        const provideRoot = Effect.provideService(ProjectRoot, {
+          get: Effect.succeed(frontend),
+        });
+        yield* project.provide(
+          GenerationRecord.write(yield* snapshot("list")).pipe(provideRoot),
+        );
+        const history = yield* project.provide(
+          GenerationRecord.read.pipe(provideRoot),
+        );
+        assert(history._tag === "Loaded");
+        expect(
+          [...GenerationSnapshot.functionPaths(history.record.snapshot)].map(
+            ({ name }) => name,
+          ),
+        ).toEqual(["list"]);
+        const confect = path.join(project.root, "confect");
+        const moved = path.join(project.root, "moved");
+        yield* fs.rename(confect, moved);
+        yield* fs.symlink(moved, confect);
+        for (const operation of [
+          GenerationRecord.read,
+          GenerationRecord.write(yield* snapshot("after")),
+        ]) {
+          const result = yield* project
+            .provide(operation.pipe(provideRoot))
+            .pipe(
+              Effect.provideService(FileSystem.FileSystem, {
+                ...fs,
+                readFileString: () =>
+                  Effect.die("read through configured alias"),
+                writeFileString: () =>
+                  Effect.die("wrote through configured alias"),
+              }),
+              Effect.result,
+            );
+          assert(Result.isFailure(result));
+          expect(result.failure).toEqual(
+            new GenerationRecord.PathError({
+              path: confect,
+              reason: "SymbolicLink",
+            }),
+          );
+        }
+      }).pipe(Effect.scoped),
     );
 
     it.effect("writes a record and skips identical replacement", () =>

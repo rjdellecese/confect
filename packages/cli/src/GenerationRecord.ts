@@ -126,16 +126,21 @@ const nonLink = Schema.decodeUnknownOption(
 
 const location = Effect.gen(function* () {
   const path = yield* Path.Path;
-  const root = path.resolve(yield* ProjectRoot.get);
+  let root = path.resolve(yield* ProjectRoot.get);
   const confect = path.resolve(yield* ConfectDirectory.get);
-  const relative = path.relative(root, confect);
-  if (
-    relative === ".." ||
-    relative.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(relative)
-  )
-    return yield* new PathError({ path: confect, reason: "EscapedPath" });
-  return { root, file: path.join(confect, "_generated", filename) };
+  while (true) {
+    const relative = path.relative(root, confect);
+    if (
+      relative !== ".." &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative)
+    )
+      return { root, file: path.join(confect, "_generated", filename) };
+    const parent = path.dirname(root);
+    if (parent === root)
+      return yield* new PathError({ path: confect, reason: "EscapedPath" });
+    root = parent;
+  }
 });
 
 const inspect = Effect.fn("GenerationRecord.inspect")(function* (
