@@ -1,8 +1,4 @@
 import {
-  compileArgsSchema,
-  compileReturnsSchema,
-} from "@confect/core/SchemaToValidator";
-import {
   actionGeneric,
   type DefaultFunctionArgs,
   type FunctionVisibility,
@@ -46,6 +42,7 @@ import * as Scheduler from "./Scheduler";
 import * as Storage from "./Storage";
 import type { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
+import { argsValidator, returnsValidator } from "./internal/validators";
 
 export type Definition = Data.TaggedEnum<{
   PublicQuery: ReturnType<typeof queryFunction>;
@@ -215,8 +212,8 @@ const queryFunction = <
   >;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
-  args: compileArgsSchema(args),
-  returns: compileReturnsSchema(returns),
+  args: argsValidator(name, args),
+  returns: returnsValidator(name, returns),
   handler: (
     ctx: GenericQueryCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
@@ -347,8 +344,8 @@ const mutationFunction = <
   ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
-  args: compileArgsSchema(args),
-  returns: compileReturnsSchema(returns),
+  args: argsValidator(name, args),
+  returns: returnsValidator(name, returns),
   handler: (
     ctx: GenericMutationCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>

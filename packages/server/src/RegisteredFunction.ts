@@ -2,10 +2,6 @@ import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import {
-  compileArgsSchema,
-  compileReturnsSchema,
-} from "@confect/core/SchemaToValidator";
-import {
   type DefaultFunctionArgs,
   type FunctionVisibility,
   type GenericActionCtx,
@@ -40,6 +36,7 @@ import * as StorageActionWriter from "./StorageActionWriter";
 import type * as StorageReader from "./StorageReader";
 import * as StorageWriter from "./StorageWriter";
 import * as VectorSearch from "./VectorSearch";
+import { argsValidator, returnsValidator } from "./internal/validators";
 
 export type Any =
   | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
@@ -282,8 +279,8 @@ export const actionFunctionBase = <
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
   ) => Layer.Layer<R>;
 }) => ({
-  args: compileArgsSchema(args),
-  returns: compileReturnsSchema(returns),
+  args: argsValidator(name, args),
+  returns: returnsValidator(name, returns),
   handler: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexArgs,
