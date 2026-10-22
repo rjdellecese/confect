@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeServices from "./NodeServices";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as Effect from "effect/Effect";
 import { cliApp } from "./cliApp";
