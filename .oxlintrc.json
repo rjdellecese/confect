@@ -87,10 +87,20 @@
         "packages/cli/test/Evaluation.test.ts",
         "packages/cli/src/DevSupervisor.ts",
         "packages/cli/test/DevSupervisor.test.ts",
-        "packages/cli/test/integration/DevSupervisor.test.ts"
+        "packages/cli/test/integration/DevSupervisor.test.ts",
+        "scripts/windowsRealpathExperiment.mjs",
+        "scripts/windowsRealpathExperiment.test.mjs"
       ],
       "rules": {
         "effecttsgo/node-builtin-import": "off"
+      }
+    },
+    {
+      "files": ["scripts/windowsRealpathExperiment.mjs"],
+      "rules": {
+        "effecttsgo/process-env": "off",
+        "effecttsgo/global-date": "off",
+        "effecttsgo/global-timers": "off"
       }
     },
     {

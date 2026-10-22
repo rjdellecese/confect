@@ -17,6 +17,7 @@ import * as PlatformError from "effect/PlatformError";
 import * as CompilationState from "@confect/cli/CompilationState";
 import * as Compilation from "@confect/cli/Compilation";
 import * as CompilationContext from "@confect/cli/CompilationContext";
+import * as CompilationTrace from "@confect/cli/CompilationTrace";
 import * as CompilationInputs from "@confect/cli/CompilationInputs";
 import * as esbuild from "esbuild";
 
@@ -103,6 +104,32 @@ const preparedFixture = Effect.gen(function* () {
 });
 
 describe("CompilationContext", () => {
+  it.live(
+    "retains the trace captured before native callbacks enter an empty context",
+    () =>
+      Effect.gen(function* () {
+        const fixture = yield* preparedFixture;
+        const phases = yield* Ref.make<ReadonlyArray<string>>([]);
+        const context = yield* fixture.make([], fixture.fs, "Once").pipe(
+          Effect.provideService(CompilationTrace.Service, {
+            span: (phase, effect) =>
+              Ref.update(phases, (previous) => [...previous, phase]).pipe(
+                Effect.andThen(effect),
+              ),
+          }),
+        );
+        yield* context.verify;
+        expect(yield* Ref.get(phases)).toContain(
+          "CompilationContext.nativeStart",
+        );
+        expect(yield* Ref.get(phases)).toContain("CompilationContext.capture");
+        expect(yield* Ref.get(phases)).toContain("CompilationContext.publish");
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(Layer.merge(NodeFileSystem.layer, NodePath.layer)),
+      ),
+  );
+
   it.live(
     "uses captured dependency hints without filesystem or native work and drops failed snapshots",
     () =>

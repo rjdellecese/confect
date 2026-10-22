@@ -1,0 +1,83 @@
+name: Windows CLI investigation
+
+on:
+  pull_request:
+
+jobs:
+  source-waits:
+    if: github.head_ref == 'capy/windows-cli-timeout-investigation'
+    name: Realpath source suite (${{ matrix.order }})
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        order: [control-first, compatible-first]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/confect-setup
+      - name: Run the fixed paired experiment
+        shell: pwsh
+        env:
+          EXPERIMENT_ORDER: ${{ matrix.order }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+          $root = Join-Path $env:RUNNER_TEMP 'source-waits'
+          $null = New-Item -ItemType Directory -Path $root -Force
+          $modes = if ($env:EXPERIMENT_ORDER -eq 'control-first') { @('control', 'compatible') } else { @('compatible', 'control') }
+          $previousOptions = $env:NODE_OPTIONS
+          $preload = ([Uri](Resolve-Path 'scripts/windowsRealpathExperiment.mjs').Path).AbsoluteUri
+          bun test ./scripts/windowsRealpathExperiment.test.mjs
+          $preflightCode = $LASTEXITCODE
+          $failed = $preflightCode -ne 0
+          @{
+            exitCode = $preflightCode
+            node = (node --version)
+            head = '${{ github.event.pull_request.head.sha }}'
+            checkout = (git rev-parse HEAD)
+          } | ConvertTo-Json | Set-Content (Join-Path $root 'preflight.json')
+          Push-Location packages/cli
+          try {
+            foreach ($mode in $modes) {
+                $directory = Join-Path $root $mode
+                $null = New-Item -ItemType Directory -Path $directory -Force
+                $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY = $null
+                $env:CONFECT_REALPATH_EXPERIMENT = $mode
+                $env:CONFECT_REALPATH_METRICS_DIRECTORY = $directory
+                $env:NODE_OPTIONS = "$previousOptions --import=$preload"
+                $start = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+                pnpm exec vitest run test/dev.test.ts --reporter=default --reporter=json --outputFile.json="$directory/result.json"
+                $code = $LASTEXITCODE
+                $end = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+                $measured = @(Get-ChildItem $directory -Filter 'realpath-*.json' | ForEach-Object { Get-Content $_.FullName -Raw | ConvertFrom-Json } | Where-Object { $_.calls -gt 100 -and $_.active })
+                $observed = $measured.Count -gt 0
+                if ($mode -eq 'compatible') { $observed = $observed -and @($measured | Where-Object { $_.nativeAccepted -gt 0 }).Count -gt 0 }
+                @{
+                  mode = $mode
+                  case = 'source-suite'
+                  start = $start
+                  end = $end
+                  exitCode = $code
+                  observed = $observed
+                  head = '${{ github.event.pull_request.head.sha }}'
+                  checkout = (git rev-parse HEAD)
+                  order = $env:EXPERIMENT_ORDER
+                } | ConvertTo-Json | Set-Content (Join-Path $directory 'invocation.json')
+                if ($code -ne 0 -or -not $observed) { $failed = $true }
+            }
+          } finally {
+            $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY = $null
+            $env:CONFECT_REALPATH_EXPERIMENT = $null
+            $env:CONFECT_REALPATH_METRICS_DIRECTORY = $null
+            $env:NODE_OPTIONS = $previousOptions
+            Pop-Location
+          }
+          if ($failed) { exit 1 }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: source-waits-${{ matrix.order }}
+          path: ${{ runner.temp }}/source-waits/
+          if-no-files-found: error
+          retention-days: 7

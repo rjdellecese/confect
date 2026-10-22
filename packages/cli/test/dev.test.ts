@@ -7,6 +7,7 @@ import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -15,6 +16,7 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as esbuild from "esbuild";
 import * as Evaluation from "@confect/cli/Evaluation";
+import * as CompilationTrace from "@confect/cli/CompilationTrace";
 import type * as DevSupervisor from "@confect/cli/DevSupervisor";
 import { dev } from "@confect/cli/confect/dev";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -54,6 +56,7 @@ vi.mock("effect/Console", (importOriginal) =>
 const traceWaits = (summary: Effect.Effect<Readonly<Record<string, number>>>) =>
   Effect.gen(function* () {
     const started = yield* Clock.currentTimeMillis;
+    const trace = yield* CompilationTrace.Service;
     const checkpoints: Array<{
       readonly phase: string;
       readonly completed: boolean;
@@ -76,7 +79,9 @@ const traceWaits = (summary: Effect.Effect<Readonly<Record<string, number>>>) =>
           completed: false,
           elapsedMillis: (yield* Clock.currentTimeMillis) - started,
         });
-        const value = yield* effect;
+        const value = yield* trace.span("Test.wait", effect, {
+          attempt: (checkpoints.length + 1) / 2,
+        });
         checkpoints.push({
           phase,
           completed: true,
@@ -86,7 +91,11 @@ const traceWaits = (summary: Effect.Effect<Readonly<Record<string, number>>>) =>
       });
   });
 
-layer(NodeServices.layer, { excludeTestServices: true })(
+const services = CompilationTrace.layer.pipe(
+  Layer.provideMerge(NodeServices.layer),
+);
+
+layer(services, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
     it.effect.each(["success", "failure", "interruption"] as const)(
