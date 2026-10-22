@@ -188,8 +188,16 @@ export const affectedInputs = (
     ),
   );
   if (changed.size === 0) return changed;
+  return dependentInputs([before, after], changed);
+};
+
+const dependentInputs = (
+  snapshots: ReadonlyArray<InputSnapshot>,
+  seeds: Iterable<string>,
+): ReadonlySet<string> => {
+  const changed = new Set(seeds);
   const dependents = new Map<string, Set<string>>();
-  for (const inputs of [before, after]) {
+  for (const inputs of snapshots) {
     for (const [file, metadata] of Object.entries(inputs)) {
       for (const imported of metadata.imports) {
         if (imported.external) continue;
@@ -203,6 +211,18 @@ export const affectedInputs = (
     for (const parent of dependents.get(file) ?? []) changed.add(parent);
   }
   return changed;
+};
+
+export const dependentRoots = (
+  inputs: InputSnapshot | undefined,
+  rootInputs: Values,
+  changed: ReadonlyArray<string>,
+): ReadonlyArray<string> => {
+  if (!inputs || changed.length === 0) return [];
+  const affected = dependentInputs([inputs], changed);
+  return Object.entries(rootInputs)
+    .filter(([, input]) => affected.has(input))
+    .map(([root]) => root);
 };
 
 export const makeInputFingerprinter = (

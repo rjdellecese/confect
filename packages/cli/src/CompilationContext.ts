@@ -569,6 +569,21 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   return {
     ...topology,
     failed: Ref.get(failed),
+    dependentRoots: Effect.fn("CompilationContext.dependentRoots")(function* (
+      changed: ReadonlyArray<string>,
+    ) {
+      if (
+        (yield* Ref.get(failed)) ||
+        Option.isSome(yield* Ref.get(terminalFailure))
+      )
+        return [];
+      const current = yield* Ref.get(fingerprints);
+      return CompilationState.dependentRoots(
+        current.inputs,
+        current.rootInputs,
+        changed,
+      );
+    }),
     preparedRevision: Ref.get(prepared).pipe(
       Effect.map(Option.map((captured) => captured.receipt)),
     ),

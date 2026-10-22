@@ -11,6 +11,7 @@ import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as esbuild from "esbuild";
+import * as Evaluation from "@confect/cli/Evaluation";
 import type * as DevSupervisor from "@confect/cli/DevSupervisor";
 import { dev } from "@confect/cli/confect/dev";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -32,6 +33,13 @@ vi.mock("esbuild", (importOriginal) =>
   })),
 );
 
+vi.mock("@confect/cli/Evaluation", (importOriginal) =>
+  importOriginal<typeof Evaluation>().then((original) => ({
+    ...original,
+    updateDeclarations: vi.fn(original.updateDeclarations),
+  })),
+);
+
 vi.mock("effect/Console", (importOriginal) =>
   importOriginal<typeof Console>().then((original) => ({
     ...original,
@@ -43,6 +51,173 @@ vi.mock("effect/Console", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
+    it.effect.each(["none", "edit", "preferred"] as const)(
+      "plans dependent declarations before a delayed module revision and verifies a late %s change",
+      (lateChange) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const spec = path.join(project.root, "confect/notes.spec.ts");
+          const impl = path.join(project.root, "confect/notes.impl.ts");
+          const table = path.join(project.root, "confect/tables/notes.ts");
+          yield* project.write(
+            "confect/choice.js",
+            'export const name = "list";',
+          );
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { name } from "./choice";\n${Project.spec.replace('name: "list"', "name")}`,
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            `import { name } from "./choice";\n${Project.impl.replace('"list"', "name")}`,
+          );
+          const ready = yield* Queue.unbounded<void>();
+          const started = yield* Deferred.make<void>();
+          const release = yield* Deferred.make<void>();
+          let readyCount = 0;
+          const contexts = new Set<{
+            readonly roots: ReadonlyArray<string>;
+            readonly native: esbuild.BuildContext;
+            rebuilds: number;
+          }>();
+          const nativeContext = vi.mocked(esbuild.context);
+          const originalContext = nativeContext.getMockImplementation();
+          assert(originalContext);
+          nativeContext.mockImplementation((options) =>
+            originalContext(options).then((native) => {
+              const entries = options.entryPoints ?? [];
+              const tracked = {
+                roots: Array.isArray(entries)
+                  ? entries.map((entry) =>
+                      typeof entry === "string" ? entry : entry.in,
+                    )
+                  : Object.values(entries),
+                native,
+                rebuilds: 0,
+              };
+              contexts.add(tracked);
+              return {
+                ...native,
+                watch: () => Promise.resolve(),
+                rebuild: () => {
+                  tracked.rebuilds++;
+                  return native.rebuild();
+                },
+                dispose: () => {
+                  contexts.delete(tracked);
+                  return native.dispose();
+                },
+              };
+            }),
+          );
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() =>
+              nativeContext.mockImplementation(originalContext),
+            ),
+          );
+          const update = vi.mocked(Evaluation.updateDeclarations);
+          const originalUpdate = update.getMockImplementation();
+          assert(originalUpdate);
+          const updates: Array<{
+            readonly declarations: ReadonlyArray<string>;
+            readonly paths: ReadonlyArray<string>;
+          }> = [];
+          update.mockImplementation((snapshot, declarations, paths) =>
+            Effect.gen(function* () {
+              updates.push({
+                declarations: declarations.map((entry) => entry.relativePath),
+                paths,
+              });
+              if (updates.length === 1) {
+                yield* Deferred.succeed(started, undefined);
+                yield* Deferred.await(release);
+              }
+              const result = yield* originalUpdate(
+                snapshot,
+                declarations,
+                paths,
+              );
+              if (updates.length === 1 && lateChange !== "none") {
+                expect(readyCount).toBe(1);
+                yield* project
+                  .write(
+                    `confect/choice.${lateChange === "preferred" ? "ts" : "js"}`,
+                    'export const name = "latest";',
+                  )
+                  .pipe(Effect.orDie);
+              }
+              return result;
+            }),
+          );
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() => update.mockImplementation(originalUpdate)),
+          );
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi.spyOn(Console, "log").mockImplementation((...args) =>
+                args.some(
+                  (arg) =>
+                    typeof arg === "string" &&
+                    arg.includes("Generated files are up-to-date"),
+                )
+                  ? Effect.sync(() => {
+                      readyCount++;
+                    }).pipe(
+                      Effect.andThen(Queue.offer(ready, undefined)),
+                      Effect.asVoid,
+                    )
+                  : Effect.void,
+              ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          yield* project
+            .provide(Command.runWith(dev, { version: "test" })([]))
+            .pipe(Effect.forkScoped);
+          yield* Queue.take(ready);
+          const tableContext = [...contexts].find((context) =>
+            context.roots.includes(table),
+          );
+          const modules = [...contexts].find(
+            (context) =>
+              context.roots.includes(spec) && context.roots.includes(impl),
+          );
+          assert(tableContext && modules);
+          expect(tableContext.roots).toEqual([table]);
+          expect(modules.roots.toSorted()).toEqual([spec, impl].toSorted());
+          for (const context of contexts) context.rebuilds = 0;
+          yield* project.write(
+            "confect/tables/notes.ts",
+            `${Project.table}\n// table edit\n`,
+          );
+          yield* Effect.promise(() => tableContext.native.rebuild());
+          yield* Deferred.await(started);
+          expect(readyCount).toBe(1);
+          yield* Effect.promise(() => modules.native.rebuild());
+          yield* Deferred.succeed(release, undefined);
+          yield* Queue.take(ready);
+          expect(readyCount).toBe(2);
+          expect(updates).toHaveLength(lateChange === "none" ? 1 : 2);
+          expect(updates[0]?.declarations.toSorted()).toEqual(
+            ["notes.spec.ts", path.join("tables", "notes.ts")].toSorted(),
+          );
+          expect(updates[0]?.paths).toEqual(["notes.impl.ts"]);
+          if (lateChange === "none") {
+            expect(modules.rebuilds).toBe(2);
+            expect(tableContext.rebuilds).toBe(1);
+          } else {
+            expect(
+              yield* fs.readFileString(
+                path.join(project.root, "convex/notes.ts"),
+              ),
+            ).toContain("export const latest =");
+          }
+        }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
+      { timeout: 25000 },
+    );
+
     it.effect(
       "discards a generation record dirtied while its temporary write is blocked",
       () =>
