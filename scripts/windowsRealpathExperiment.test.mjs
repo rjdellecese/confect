@@ -7,7 +7,7 @@ const preload = new URL("./windowsRealpathExperiment.mjs", import.meta.url)
   .href;
 
 describe("Windows realpath experiment", () => {
-  for (const mode of ["control", "native", "disabled"]) {
+  for (const mode of ["control", "native", "compatible", "disabled"]) {
     it(`preserves canonical paths, callback errors and encoding in ${mode} mode`, () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "realpath-test-"));
       try {
@@ -40,8 +40,12 @@ describe("Windows realpath experiment", () => {
               assert.equal(await realpath(path.join(root, "alias", "file.txt")), canonical);
               assert.deepEqual(await realpath(file, { encoding: "buffer" }), Buffer.from(canonical));
               await assert.rejects(realpath(path.join(root, "missing")), { code: "ENOENT" });
-              await assert.rejects(realpath(path.join(file, "child")), { code: "ENOTDIR" });
-              assert.equal(await promisify(fs.realpath.native)(file), canonical);
+              const nonDirectory = path.join(file, "child");
+              let expectedCode;
+              try { fs.realpathSync(nonDirectory); } catch (error) { expectedCode = error.code; }
+              assert.equal(typeof expectedCode, "string");
+              await assert.rejects(realpath(nonDirectory), { code: expectedCode });
+              assert.equal(await promisify(fs.realpath.native)(file), fs.realpathSync.native(file));
               const deep = path.join(root, ...Array(6).fill("directory".repeat(6)), "file.txt");
               assert.equal(await realpath(deep), fs.realpathSync(deep));
             `,
@@ -58,7 +62,7 @@ describe("Windows realpath experiment", () => {
         );
         const reports = fs
           .readdirSync(root)
-          .filter((name) => /^realpath-\d+\.json$/.test(name));
+          .filter((name) => /^realpath-\d+-0\.json$/.test(name));
         if (mode === "disabled") {
           expect(reports).toEqual([]);
         } else {
@@ -74,6 +78,10 @@ describe("Windows realpath experiment", () => {
           });
           expect(JSON.stringify(report)).not.toContain(root);
           expect(report.totalMilliseconds).toBeGreaterThanOrEqual(0);
+          if (mode === "compatible") {
+            expect(report.nativeAttempts).toBe(5);
+            expect(report.nativeAccepted + report.originalFallbacks).toBe(6);
+          }
         }
       } finally {
         fs.rmSync(root, { recursive: true, force: true });

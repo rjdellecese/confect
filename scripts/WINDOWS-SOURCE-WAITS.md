@@ -37,6 +37,47 @@ but does not prove which filesystem operation caused the failed run.
 
 ## Current realpath experiment
 
+The current comparison is **control versus compatible fast path**, not a
+blanket native replacement. The fast path tries native resolution only for
+the ordinary string/callback overload. It accepts a result only when it is
+identical to the resolved absolute input. A changed spelling, native error,
+synchronous rejection or other overload goes through the original API.
+This preserves short-name and symlink spelling behavior and leaves error
+conversion with the original adapter. Counters distinguish native attempts,
+accepted results and original fallbacks. Nothing is cached across calls.
+An `active` marker records whether the wrapper remains installed, and the
+workflow requires an active report with more than 100 calls (plus an accepted
+native result in compatible mode) before treating collection as available.
+Missing or overwritten metrics cannot silently become a successful control.
+
+The preflight compares non-directory errors to the untouched synchronous
+API on the same platform rather than assuming Linux's `ENOTDIR`. It also
+checks the untouched `.native` member against its native synchronous counterpart.
+The raw-native mode's strict original-spelling assertion remains and is
+expected to fail for Windows short names; a new compatible-mode case must
+pass the original-spelling checks. Existing Confect scenario assertions and
+time limits are unchanged.
+
+### Completed raw-native comparison at `b283e36`
+
+Both runners completed both source suites with the same checkout
+`7c7019a24d21c3fe27c5399dd45c4ce4f3721adb`. Both native suites passed all
+15 cases. One control passed all cases; the other failed the preferred-change
+case at 20.098 seconds while waiting for updated readiness after two updates.
+The native preferred-change cases took 15.241 and 14.787 seconds; controls
+took 17.887 and 20.098 seconds. Late-edit controls took 17.354 and 16.432
+seconds versus 15.410 and 15.346 seconds with native resolution.
+
+Each worker recorded about 38,000 callback calls. Aggregate overlapping
+callback durations were 518–521 seconds for controls and 96–98 seconds for
+native mode (roughly 13.6 versus 2.5 milliseconds per call). Two worker files
+are final exit records and two are last periodic samples. These totals are
+not wall time. The data demonstrates a repeatable filesystem cost contributor
+and a reproduced deadline crossing, not a universal explanation for every
+historical timeout or justification for the incompatible raw replacement.
+
+### Earlier launches and provenance
+
 The first launch at `a036219` stopped in its preflight tests because Node's
 Windows `--import` option rejected a drive path rather than a file URL. No
 control/native suites ran on that head. The test now preserves the preload
@@ -62,9 +103,9 @@ is mislabeled and actually contains 4.0.6, whose Windows adapter uses the
 native API. The published 4.0.5 archive still uses `fs.realpath`; upgrading to
 that release would not test this mechanism.
 
-The workflow now tests that specific lead, without selecting a production
+The workflow tests that specific lead, without selecting a production
 fix. Each of two Windows jobs runs the complete source watcher file once
-with the original API and once with the native API, reversing their order
+with the original API and once with the compatible fast path, reversing their order
 on the second runner. There are four suite executions (60 runtime cases),
 no retries, and no changes to assertions or deadlines. Every nonzero exit
 fails its job after the remaining planned comparison. Normal full-suite CI
@@ -76,8 +117,8 @@ Effect's existing error conversion remains in place. It affects all callback
 `fs.realpath` consumers in that process, including inherited child processes,
 not exclusively the guard; do not attribute its entire effect to one caller.
 Both modes use the same lightweight callback timing wrapper. Metric records
-contain only PID, parent PID, mode, call/completion/error counts and aggregate
-elapsed milliseconds, with one small file per process overwritten once per
+contain only PID, parent PID, Node worker-thread ID, mode, call/completion/error counts and aggregate
+elapsed milliseconds, with one small file per thread overwritten once per
 second and on orderly exit. Sampling uses an unreferenced timer and never
 keeps a process alive, and periodic writes stop after ten minutes. A final flag distinguishes exit records from the last
 sample of a forcibly terminated worker. Concurrent callback
