@@ -74,16 +74,20 @@ func jsonString(text string) string {
 
 func fileURL(path string) string {
 	path = filepath.ToSlash(path)
+	u := url.URL{Scheme: "file"}
 	if strings.HasPrefix(path, "//") {
 		parts := strings.SplitN(strings.TrimPrefix(path, "//"), "/", 2)
 		if len(parts) == 2 {
-			return (&url.URL{Scheme: "file", Host: parts[0], Path: "/" + parts[1]}).String()
+			u.Host = parts[0]
+			path = "/" + parts[1]
 		}
 	}
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
-	return (&url.URL{Scheme: "file", Path: path}).String()
+	u.Path = path
+	u.RawPath = strings.NewReplacer("~", "%7E", "%21", "!", "%27", "'", "%28", "(", "%29", ")", "%2A", "*").Replace(u.EscapedPath())
+	return u.String()
 }
 
 func toLocation(l *api.Location) *location {

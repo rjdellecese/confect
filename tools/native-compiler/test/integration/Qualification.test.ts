@@ -222,6 +222,43 @@ const executeFresh = Effect.fn("Qualification.executeFresh")(function* (
 layer(services, { excludeTestServices: true })(
   "native production-plugin qualification",
   (it) => {
+    it.effect("matches Node file URL escaping in injected source bytes", () =>
+      Effect.gen(function* () {
+        const fixture = yield* setup();
+        const name = "url ~!'()+,;=@&$ []é.ts";
+        const source = fixture.path.join(fixture.root, name);
+        yield* fixture.fs.writeFileString(
+          source,
+          "export default import.meta.url;",
+        );
+        yield* fixture.fs.writeFileString(
+          fixture.entry,
+          `export { default } from ${yield* Schema.encodeEffect(Schema.fromJsonString(Schema.String))(`./${name}`)};`,
+        );
+        const comparator = yield* stock(fixture);
+        yield* fixture.authority.begin(1);
+        const first = yield* fixture.native.rebuild({ buildId: 1, epoch: 1 });
+        yield* fixture.authority.check(first).pipe(Effect.result);
+        yield* fixture.authority.begin(2);
+        const capture = yield* fixture.native.rebuild({ buildId: 2, epoch: 2 });
+        const accepted = yield* Capture.accept(capture, fixture.authority);
+        const expected = yield* comparator.rebuild;
+        expect(accepted.metafile).toEqual(expected.metafile);
+        expect(capture.outputs.map((output) => output.bytesBase64)).toEqual(
+          expected.outputs.map((output) =>
+            Buffer.from(output.contents).toString("base64"),
+          ),
+        );
+        const loaded = capture.sources.find((item) => item.path === source);
+        expect(loaded).toBeDefined();
+        expect(
+          loaded && Buffer.from(loaded.bytesBase64, "base64").toString(),
+        ).toContain(
+          `const __injected_import_meta_url__ = ${yield* Schema.encodeEffect(Schema.fromJsonString(Schema.String))(pathToFileURL(source).href)};`,
+        );
+      }).pipe(Effect.scoped),
+    );
+
     it.effect(
       "matches actual plugins, loader bytes, normalized metafiles and fresh ESM across retained rebuilds",
       () =>

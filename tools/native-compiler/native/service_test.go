@@ -27,6 +27,14 @@ type discardCloser struct{}
 func (discardCloser) Write(b []byte) (int, error) { return len(b), nil }
 func (discardCloser) Close() error                { return nil }
 
+func TestFileURLMatchesNodeEscaping(t *testing.T) {
+	path := `/tmp/space ~!'()*;:@&=+$,[ ]#?%|^` + "`{}<>\"é.ts"
+	want := "file:///tmp/space%20%7E!'()*;:@&=+$,%5B%20%5D%23%3F%25%7C%5E%60%7B%7D%3C%3E%22%C3%A9.ts"
+	if got := fileURL(path); got != want {
+		t.Fatalf("file URL differs from Node: got %s, want %s", got, want)
+	}
+}
+
 func TestDirectEntryKeepsExplicitJSExtension(t *testing.T) {
 	root := fixture(t, `export default "typescript"`)
 	writeFixture(t, root, "entry.js", `export default "javascript"`)
