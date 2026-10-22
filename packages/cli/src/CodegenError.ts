@@ -156,7 +156,21 @@ export class InvalidConvexConfigError extends Schema.TaggedError<InvalidConvexCo
   },
 ) {}
 
+export class ScopedRefsPathOccupiedError extends Schema.TaggedError<ScopedRefsPathOccupiedError>()(
+  "ScopedRefsPathOccupiedError",
+  {
+    path: Schema.String,
+    reason: Schema.Literals([
+      "UnownedFile",
+      "SymbolicLink",
+      "EscapedPath",
+      "UnexpectedType",
+    ]),
+  },
+) {}
+
 export const CodegenError = Schema.Union([
+  ScopedRefsPathOccupiedError,
   SnapshotError,
   BuildError,
   MissingImplFileError,
@@ -373,6 +387,35 @@ const renderParentChildNameCollisionError = (
 export const renderCodegenError = (error: CodegenError): string => {
   if (isBuildError(error)) return renderBuildError(error);
   return Match.value(error).pipe(
+    Match.tag("ScopedRefsPathOccupiedError", ({ path, reason }) =>
+      singleLine(
+        "Cannot generate scoped references at ",
+        formatPath(path),
+        Match.value(reason).pipe(
+          Match.when(
+            "UnownedFile",
+            () =>
+              ": this file is not owned by Confect. Move it before running codegen again.",
+          ),
+          Match.when(
+            "SymbolicLink",
+            () =>
+              ": symbolic links are not supported in scoped-reference output paths.",
+          ),
+          Match.when(
+            "EscapedPath",
+            () =>
+              ": the resolved path differs from its location inside the Confect directory.",
+          ),
+          Match.when(
+            "UnexpectedType",
+            () =>
+              ": scoped-reference output requires regular files and directories.",
+          ),
+          Match.exhaustive,
+        ),
+      ),
+    ),
     Match.tag("SnapshotError", ({ reason, relativePath, pathSegments }) =>
       singleLine(
         `Invalid generation metadata (${reason})`,

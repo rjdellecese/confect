@@ -6,7 +6,7 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as OpenApi from "effect/http-api/OpenApi";
-import refs from "../_generated/refs";
+import refs from "../_generated/refs/notes_and_random/notes";
 import { QueryRunner } from "../_generated/services";
 import notes from "../_generated/tables/notes";
 
@@ -39,10 +39,7 @@ const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
     Effect.gen(function* () {
       const { runQuery } = yield* QueryRunner;
 
-      const firstNote = yield* runQuery(
-        refs.public.notes_and_random.notes.getFirst,
-        {},
-      );
+      const firstNote = yield* runQuery(refs.public.getFirst, {});
 
       return firstNote;
     }).pipe(Effect.orDie),

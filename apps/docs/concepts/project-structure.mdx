@@ -15,6 +15,13 @@ description: "Understand the structure of a Confect project."
       <Tree.File name="schema.ts" />
       <Tree.File name="services.ts" />
       <Tree.File name="spec.ts" />
+      <Tree.Folder name="refs" defaultOpen>
+        <Tree.File name="notes_and_random.ts" />
+        <Tree.Folder name="notes_and_random" defaultOpen>
+          <Tree.File name="notes.ts" />
+          <Tree.File name="random.ts" />
+        </Tree.Folder>
+      </Tree.Folder>
       <Tree.Folder name="registeredFunctions" defaultOpen>
         <Tree.File name="env.ts" />
         <Tree.Folder name="notes_and_random" defaultOpen>
@@ -80,6 +87,38 @@ Contains one module per group (for example `registeredFunctions/notes_and_random
 #### `refs.ts`
 
 Contains a single default `Refs` export, which is a map of your Convex functions and their [function names](https://docs.convex.dev/api/modules/server#getfunctionname) and args/returns `Schema`s. Use this to invoke your Convex functions from the client or inside Convex functions using the `*Runner` services (`QueryRunner`, `MutationRunner`, and `ActionRunner`).
+
+The aggregate import remains available with its existing shape, such as `refs.public.notes_and_random.notes.list`. For consumers that only need one group, use a scoped import instead.
+
+#### `refs/<group-path>.ts`
+
+Contains a default `refs` export scoped to a filesystem group subtree. Run `confect codegen` to generate these modules alongside `refs.ts`. The properties are relative to the selected group:
+
+```ts
+import refs from "./confect/_generated/refs/notes_and_random/notes";
+
+const list = refs.public.list;
+const clearAll = refs.internal.clearAll;
+```
+
+Intermediate directories also have modules: importing `_generated/refs/notes_and_random` gives you `refs.public.notes.list` and `refs.public.random` for that subtree. Nested groups declared inside a single `*.spec.ts` remain properties under that file's scoped module; they do not get separate generated modules.
+
+Use scoped imports in clients and backend handlers to avoid importing the aggregate spec and unrelated groups. The boundary follows the filesystem subtree, not individual functions. Imports you write in specs or their dependencies can still pull in other groups, so scoped references do not guarantee isolation from arbitrary user-authored imports.
+
+To construct references without codegen, use `Refs.fromGroup(namespace, group)` and the `Refs.FromGroup<Group>` type from `@confect/core`:
+
+```ts
+import { Refs } from "@confect/core";
+import notes from "./confect/notes_and_random/notes.spec";
+
+const refs: Refs.FromGroup<typeof notes> = Refs.fromGroup(
+  "notes_and_random/notes",
+  notes,
+);
+const list = refs.public.list;
+```
+
+Pass the full slash-separated Convex module path as `namespace`, without a function name or file extension. It determines the function names the references call; it does not add a property wrapper to the returned `public` and `internal` maps.
 
 #### `schema.ts`
 

@@ -1,6 +1,25 @@
 import { expect, it } from "@effect/vitest";
-import { isCodegenError, renderCodegenError } from "@confect/cli/CodegenError";
+import { stripVTControlCharacters } from "node:util";
+import {
+  isCodegenError,
+  renderCodegenError,
+  ScopedRefsPathOccupiedError,
+} from "@confect/cli/CodegenError";
 import { SnapshotError } from "@confect/cli/SnapshotError";
+
+it("renders an authored scoped-reference path collision", () => {
+  const error = new ScopedRefsPathOccupiedError({
+    path: "/confect/_generated/refs/notes.ts",
+    reason: "UnownedFile",
+  });
+  expect(isCodegenError(error)).toBe(true);
+  expect(renderCodegenError(error)).toContain(
+    "this file is not owned by Confect",
+  );
+  expect(stripVTControlCharacters(renderCodegenError(error))).toContain(
+    error.path,
+  );
+});
 
 it("recognizes and renders structured snapshot failures without dumping their cause", () => {
   const error = new SnapshotError({
