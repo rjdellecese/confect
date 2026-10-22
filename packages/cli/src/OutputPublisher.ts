@@ -47,8 +47,16 @@ const makeInspector = Effect.fn("OutputPublisher.makeInspector")(function* (
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  let root = projectRoot;
+  let roots = HashMap.make([
+    physicalKey(path, path.parse(projectRoot).root),
+    projectRoot,
+  ]);
   for (const owner of owners) {
+    const volume = physicalKey(path, path.parse(owner).root);
+    let root = Option.getOrElse(
+      HashMap.get(roots, volume),
+      () => path.parse(owner).root,
+    );
     while (true) {
       const relative = path.relative(root, owner);
       if (
@@ -62,12 +70,13 @@ const makeInspector = Effect.fn("OutputPublisher.makeInspector")(function* (
         return yield* new PathError({ path: owner, reason: "EscapedPath" });
       root = parent;
     }
+    roots = HashMap.set(roots, volume, root);
   }
   let observations = HashMap.empty<
     string,
     Option.Option<FileSystem.File.Type>
   >();
-  let realRoot = root;
+  let realRoots = HashMap.empty<string, string>();
   const inspect: (
     file: string,
     type: "File" | "Directory" | "OwnedEntry" | "UnownedEntry",
@@ -75,6 +84,11 @@ const makeInspector = Effect.fn("OutputPublisher.makeInspector")(function* (
     Option.Option<FileSystem.File.Type>,
     PlatformError | PathError
   > = Effect.fn("OutputPublisher.inspect")(function* (file, type) {
+    const volume = physicalKey(path, path.parse(file).root);
+    const anchor = HashMap.get(roots, volume);
+    if (Option.isNone(anchor))
+      return yield* new PathError({ path: file, reason: "EscapedPath" });
+    const root = anchor.value;
     const relative = path.relative(root, file);
     if (
       relative === ".." ||
@@ -115,7 +129,11 @@ const makeInspector = Effect.fn("OutputPublisher.makeInspector")(function* (
           if (link === "Link")
             return yield* new PathError({ path: file, reason: "SymbolicLink" });
           const real = yield* fs.realPath(file);
-          if (relative === "") realRoot = real;
+          if (relative === "") realRoots = HashMap.set(realRoots, volume, real);
+          const realRoot = Option.getOrElse(
+            HashMap.get(realRoots, volume),
+            () => root,
+          );
           if (path.relative(path.resolve(realRoot, relative), real) !== "") {
             return yield* new PathError({ path: file, reason: "EscapedPath" });
           }

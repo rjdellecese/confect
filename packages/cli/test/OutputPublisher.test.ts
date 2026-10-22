@@ -35,6 +35,125 @@ const fixture = Effect.gen(function* () {
   return { root, confect, convex, provide: Effect.provide(directories) };
 });
 
+layer(NodePath.layerWin32)("OutputPublisher volume boundaries", (it) => {
+  for (const confect of ["C:\\output\\confect", "\\\\server\\share\\confect"]) {
+    it.effect.each([
+      "Valid",
+      "SymbolicLink",
+      "EscapedPath",
+      "UnexpectedType",
+    ] as const)(
+      `checks ${confect} independently of the project volume: %s`,
+      (scenario) =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const root = "D:\\project";
+          const convex = path.join(root, "convex");
+          const targets = [
+            path.join(confect, "_generated", "components.ts"),
+            path.join(convex, "schema.ts"),
+          ];
+          const inspections: string[] = [];
+          const writes: string[] = [];
+          const plan = yield* Effect.fromResult(
+            OutputPlan.make([
+              OutputPlan.Operation.Write({
+                target: OutputPlan.Target.Binding({
+                  relativePath: "components.ts",
+                }),
+                contents: "components",
+              }),
+              OutputPlan.Operation.Write({
+                target: OutputPlan.Target.ConvexBinding({
+                  relativePath: "schema.ts",
+                }),
+                contents: "schema",
+              }),
+            ]),
+          );
+          const result = yield* OutputPublisher.publish(plan).pipe(
+            Effect.provideService(ProjectRoot, { get: Effect.succeed(root) }),
+            Effect.provideService(ConfectDirectory, {
+              get: Effect.succeed(confect),
+            }),
+            Effect.provideService(ConvexDirectory, {
+              get: Effect.succeed(convex),
+            }),
+            Effect.provideService(
+              FileSystem.FileSystem,
+              FileSystem.makeNoop({
+                readLink: (file) =>
+                  Effect.suspend(() => {
+                    inspections.push(file);
+                    if (file === confect && scenario === "SymbolicLink")
+                      return Effect.succeed("E:\\outside");
+                    return Effect.fail(
+                      PlatformError.systemError({
+                        _tag: targets.includes(file) ? "NotFound" : "Unknown",
+                        module: "FileSystem",
+                        method: "readLink",
+                        pathOrDescriptor: file,
+                        cause: {
+                          code: targets.includes(file) ? "ENOENT" : "EINVAL",
+                        },
+                      }),
+                    );
+                  }),
+                realPath: (file) =>
+                  Effect.succeed(
+                    file === confect && scenario === "EscapedPath"
+                      ? "E:\\outside"
+                      : file,
+                  ),
+                stat: (file) =>
+                  Effect.succeed({
+                    type:
+                      file === confect && scenario === "UnexpectedType"
+                        ? "File"
+                        : "Directory",
+                    mtime: Option.none(),
+                    atime: Option.none(),
+                    birthtime: Option.none(),
+                    dev: 0,
+                    ino: Option.none(),
+                    mode: 0,
+                    nlink: Option.none(),
+                    uid: Option.none(),
+                    gid: Option.none(),
+                    rdev: Option.none(),
+                    size: ByteSize.zero,
+                    blksize: Option.none(),
+                    blocks: Option.none(),
+                  }),
+                makeDirectory: () => Effect.void,
+                writeFileString: (file) =>
+                  Effect.sync(() => {
+                    writes.push(file);
+                  }),
+              }),
+            ),
+            Effect.result,
+          );
+          if (scenario === "Valid") {
+            assert(Result.isSuccess(result));
+            expect(writes).toEqual(targets);
+            expect(inspections).toContain(path.parse(confect).root);
+            expect(inspections).toContain(confect);
+            expect(inspections).toContain(root);
+          } else {
+            assert(Result.isFailure(result));
+            expect(result.failure).toMatchObject({
+              _tag: "OutputPathError",
+              path: confect,
+              reason: scenario,
+            });
+            expect(writes).toEqual([]);
+          }
+        }),
+    );
+  }
+});
+
 for (const platform of [
   {
     name: "Windows",
