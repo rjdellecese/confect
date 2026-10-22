@@ -7,10 +7,7 @@ import * as Effect from "effect/Effect";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import * as String from "effect/String";
-import { logFileAdded, logFileModified } from "./log";
-import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
-import * as templates from "./templates";
 
 export const removePathExtension = Effect.fnUntraced(function* (
   pathStr: string,
@@ -36,23 +33,6 @@ export const toModuleImportPath = Effect.fnUntraced(function* (
     yield* removePathExtension(relativePath),
   );
   return String.startsWith(".")(withoutExt) ? withoutExt : `./${withoutExt}`;
-});
-
-export const writeFileStringAndLog = Effect.fnUntraced(function* (
-  filePath: string,
-  contents: string,
-) {
-  const fs = yield* FileSystem.FileSystem;
-  if (!(yield* fs.exists(filePath))) {
-    yield* fs.writeFileString(filePath, contents);
-    yield* logFileAdded(filePath);
-    return;
-  }
-  const existing = yield* fs.readFileString(filePath);
-  if (existing !== contents) {
-    yield* fs.writeFileString(filePath, contents);
-    yield* logFileModified(filePath);
-  }
 });
 
 export const findProjectRoot = Effect.gen(function* () {
@@ -134,49 +114,3 @@ export const touchConvexSchema = Effect.gen(function* () {
   const now = yield* DateTime.nowAsDate;
   yield* fs.utimes(schemaPath, now, now);
 });
-
-const generateOptionalFile = Effect.fnUntraced(function* (
-  confectFile: string,
-  convexFile: string,
-  generateContents: (importPath: string) => Effect.Effect<string>,
-) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const convexDirectory = yield* ConvexDirectory.get;
-
-  const confectFilePath = path.join(confectDirectory, confectFile);
-
-  if (!(yield* fs.exists(confectFilePath))) {
-    return Option.none();
-  }
-
-  const convexFilePath = path.join(convexDirectory, convexFile);
-  const relativeImportPath = path.relative(
-    path.dirname(convexFilePath),
-    confectFilePath,
-  );
-  const contents = yield* generateContents(
-    yield* toModuleImportPath(relativeImportPath),
-  );
-  const change = yield* writeFileString(convexFilePath, contents);
-  return Option.some({ change, convexFilePath });
-});
-
-export const generateHttp = generateOptionalFile(
-  "http.ts",
-  "http.ts",
-  (importPath) => templates.http({ httpImportPath: importPath }),
-);
-
-export const generateCrons = generateOptionalFile(
-  "crons.ts",
-  "crons.ts",
-  (importPath) => templates.crons({ cronsImportPath: importPath }),
-);
-
-export const generateAuthConfig = generateOptionalFile(
-  "auth.ts",
-  "auth.config.ts",
-  (importPath) => templates.authConfig({ authImportPath: importPath }),
-);

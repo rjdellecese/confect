@@ -23,9 +23,11 @@ import * as String from "effect/String";
 import {
   codegenHandler,
   generateWithSnapshot,
+  planOptionalBindings,
   updateDeclarations,
 } from "@confect/cli/confect/codegen";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
+import * as OutputPublisher from "@confect/cli/OutputPublisher";
 import { SpecModulePath } from "@confect/cli/SpecModulePath";
 import { TableModulePath } from "@confect/cli/TableModulePath";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
@@ -55,6 +57,103 @@ vi.mock("esbuild", (importOriginal) =>
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect(
+      "finishes held refs publication before observing or evaluating component config",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* project.write(
+            "convex/convex.config.ts",
+            `import { defineApp } from "convex/server";
+import refs from "../confect/_generated/refs";
+if (!refs.public.notes.list) throw new Error("Generated refs unavailable");
+export default defineApp();
+`,
+          );
+          const started = yield* Deferred.make<void>();
+          const release = yield* Deferred.make<void>();
+          const componentObservations = yield* Ref.make<ReadonlyArray<boolean>>(
+            [],
+          );
+          const published = yield* Ref.make(false);
+          const fiber = yield* project.provide(codegenHandler).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              exists: (file) =>
+                file === path.join(project.root, "convex/convex.config.ts")
+                  ? Effect.gen(function* () {
+                      const ready = yield* Ref.get(published);
+                      yield* Ref.update(componentObservations, (values) => [
+                        ...values,
+                        ready,
+                      ]);
+                      return yield* fs.exists(file);
+                    })
+                  : fs.exists(file),
+              writeFileString: (file, contents, options) =>
+                file === path.join(project.root, "confect/_generated/refs.ts")
+                  ? Effect.gen(function* () {
+                      yield* Deferred.succeed(started, undefined);
+                      yield* Deferred.await(release);
+                      yield* fs.writeFileString(file, contents, options);
+                      yield* Ref.set(published, true);
+                    })
+                  : fs.writeFileString(file, contents, options),
+            }),
+            Effect.forkScoped,
+          );
+          yield* Deferred.await(started);
+          expect(yield* Ref.get(componentObservations)).toEqual([]);
+          yield* Deferred.succeed(release, undefined);
+          yield* Fiber.join(fiber);
+          expect(yield* Ref.get(componentObservations)).toEqual([true]);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "preserves absent optionals during full codegen and removes only selected missing watch roots",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          for (const file of ["http.ts", "crons.ts", "auth.config.ts"])
+            yield* project.write(`convex/${file}`, `authored ${file}\r\n`);
+          yield* project.provide(codegenHandler);
+          for (const file of ["http.ts", "crons.ts", "auth.config.ts"])
+            expect(
+              yield* fs.readFileString(path.join(project.root, "convex", file)),
+            ).toBe(`authored ${file}\r\n`);
+          const plan = yield* project.provide(
+            planOptionalBindings(["Http"], "Remove"),
+          );
+          expect(plan.operations).toEqual([
+            {
+              _tag: "Remove",
+              target: { _tag: "ConvexBinding", relativePath: "http.ts" },
+            },
+          ]);
+          yield* project.provide(OutputPublisher.publish(plan));
+          expect(
+            yield* fs.exists(path.join(project.root, "convex/http.ts")),
+          ).toBe(false);
+          expect(
+            yield* fs.readFileString(
+              path.join(project.root, "convex/crons.ts"),
+            ),
+          ).toBe("authored crons.ts\r\n");
+          expect(
+            yield* fs.readFileString(
+              path.join(project.root, "convex/auth.config.ts"),
+            ),
+          ).toBe("authored auth.config.ts\r\n");
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "passes inherited aliases and per-entry options through one resolved config",
       () =>

@@ -9,6 +9,54 @@ const write = OutputPlan.Operation.Write({
   contents: "registry",
 });
 
+it.each(["schema.ts", "http.ts", "crons.ts", "auth.config.ts"] as const)(
+  "claims the fixed Convex binding %s separately from function modules",
+  (relativePath) => {
+    const target = OutputPlan.Target.ConvexBinding({ relativePath });
+    const operation = OutputPlan.Operation.Write({
+      target,
+      contents: "binding",
+    });
+    expect(Result.isSuccess(OutputPlan.make([operation]))).toBe(true);
+    expect(
+      Result.isFailure(
+        OutputPlan.make([operation, OutputPlan.Operation.Remove({ target })]),
+      ),
+    ).toBe(true);
+    expect(
+      Result.isFailure(
+        OutputPlan.make([
+          OutputPlan.Operation.Remove({
+            target: OutputPlan.Target.ConvexModule({ relativePath }),
+          }),
+        ]),
+      ),
+    ).toBe(true);
+  },
+);
+
+it.each([
+  "convex.config.ts",
+  "other.ts",
+  "HTTP.ts",
+  "nested/http.ts",
+  "../http.ts",
+])("rejects a forged fixed Convex binding %s", (relativePath) => {
+  const result = OutputPlan.make([
+    OutputPlan.Operation.Remove({
+      target: OutputPlan.Target.ConvexBinding({
+        relativePath: relativePath as "http.ts",
+      }),
+    }),
+  ]);
+  assert(Result.isFailure(result));
+  expect(result.failure).toMatchObject({
+    _tag: "OutputPlanError",
+    namespace: "ConvexBinding",
+    relativePath,
+  });
+});
+
 it("rejects scoped duplicate and parent-child targets while keeping aggregate ownership separate", () => {
   const scoped = OutputPlan.Operation.Write({
     target: OutputPlan.Target.ScopedRef({ relativePath: "notes.ts" }),
@@ -97,6 +145,7 @@ it.each([
   "services.ts",
   "spec.ts",
   "refs.ts",
+  "components.ts",
 ] as const)(
   "accepts only the fixed binding %s and rejects conflicting operations",
   (relativePath) => {
@@ -123,7 +172,6 @@ it.each([
 
 it.each([
   "other.ts",
-  "components.ts",
   "api.ts",
   "ID.ts",
   "nested/id.ts",
