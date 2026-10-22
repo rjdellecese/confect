@@ -29,8 +29,14 @@ jobs:
           $previousOptions = $env:NODE_OPTIONS
           $preload = ([Uri](Resolve-Path 'scripts/windowsRealpathExperiment.mjs').Path).AbsoluteUri
           bun test ./scripts/windowsRealpathExperiment.test.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $failed = $false
+          $preflightCode = $LASTEXITCODE
+          $failed = $preflightCode -ne 0
+          @{
+            exitCode = $preflightCode
+            node = (node --version)
+            head = '${{ github.event.pull_request.head.sha }}'
+            checkout = (git rev-parse HEAD)
+          } | ConvertTo-Json | Set-Content (Join-Path $root 'preflight.json')
           Push-Location packages/cli
           try {
             foreach ($mode in $modes) {

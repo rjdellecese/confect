@@ -42,6 +42,20 @@ Windows `--import` option rejected a drive path rather than a file URL. No
 control/native suites ran on that head. The test now preserves the preload
 module's file URL; this harness correction is not timeout evidence.
 
+At `0f68431`, both Windows runners reached the preflight and demonstrated a
+real string-level compatibility difference: native realpath expands the
+`RUNNER~1` short-name ancestor to `runneradmin`, while the original API
+preserves it. The original and disabled controls also returned `ENOENT` for
+a child beneath a regular file, contrary to the probe's Linux `ENOTDIR`
+expectation. No timing suites ran. These failures do not prove a timeout cause
+and prohibit treating the native API as an interchangeable production fix.
+
+The workflow retains the exact preflight assertions and records its exit code
+and Node version, but now runs the planned timing suites even if preflight
+fails. Its aggregate result remains a failure whenever preflight or any suite
+fails. This separates the compatibility gate from the latency observation;
+a faster run does not erase the recorded semantic difference.
+
 The integrity-verified published `@effect/platform-node-shared@4.0.4` archive
 uses Node's `fs.realpath`, not `fs.realpath.native`. The cached opensrc tree
 is mislabeled and actually contains 4.0.6, whose Windows adapter uses the
