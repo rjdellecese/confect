@@ -8,6 +8,15 @@ import * as String from "effect/String";
 export type Target = Data.TaggedEnum<{
   Registry: { readonly relativePath: string };
   ConvexModule: { readonly relativePath: string };
+  TableWrapper: { readonly relativePath: string };
+  Binding: {
+    readonly relativePath:
+      | "id.ts"
+      | "schema.ts"
+      | "convexSchema.ts"
+      | "docs.ts"
+      | "services.ts";
+  };
 }>;
 export const Target = Data.taggedEnum<Target>();
 
@@ -21,7 +30,12 @@ export type Write = Extract<Operation, { readonly _tag: "Write" }>;
 export class PlanError extends Schema.TaggedError<PlanError>()(
   "OutputPlanError",
   {
-    namespace: Schema.Literals(["Registry", "ConvexModule"]),
+    namespace: Schema.Literals([
+      "Registry",
+      "ConvexModule",
+      "TableWrapper",
+      "Binding",
+    ]),
     relativePath: Schema.String,
     reason: Schema.Literals([
       "InvalidPath",
@@ -41,6 +55,14 @@ const reservedConvexNames = HashSet.make(
   "crons.ts",
   "auth.config.ts",
   "convex.config.ts",
+);
+
+const bindingNames = HashSet.make(
+  "id.ts",
+  "schema.ts",
+  "convexSchema.ts",
+  "docs.ts",
+  "services.ts",
 );
 
 export const isOwnedConvexModule = (relativePath: string): boolean => {
@@ -66,7 +88,8 @@ const validateTarget = (target: Target): Result.Result<Target, PlanError> => {
     );
   if (
     invalid ||
-    (target._tag === "ConvexModule" && !isOwnedConvexModule(relativePath))
+    (target._tag === "ConvexModule" && !isOwnedConvexModule(relativePath)) ||
+    (target._tag === "Binding" && !HashSet.has(bindingNames, relativePath))
   ) {
     return Result.fail(
       new PlanError({

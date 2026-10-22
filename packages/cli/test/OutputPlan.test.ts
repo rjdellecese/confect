@@ -37,6 +37,7 @@ it.each([
   for (const target of [
     OutputPlan.Target.Registry({ relativePath }),
     OutputPlan.Target.ConvexModule({ relativePath }),
+    OutputPlan.Target.TableWrapper({ relativePath }),
   ]) {
     const plan = OutputPlan.make([OutputPlan.Operation.Remove({ target })]);
     assert(Result.isFailure(plan));
@@ -46,6 +47,95 @@ it.each([
       relativePath,
     });
   }
+});
+
+it.each([
+  "id.ts",
+  "schema.ts",
+  "convexSchema.ts",
+  "docs.ts",
+  "services.ts",
+] as const)(
+  "accepts only the fixed binding %s and rejects conflicting operations",
+  (relativePath) => {
+    const target = OutputPlan.Target.Binding({ relativePath });
+    const bindingWrite = OutputPlan.Operation.Write({
+      target,
+      contents: relativePath,
+    });
+    const remove = OutputPlan.Operation.Remove({ target });
+    const plan = OutputPlan.make([bindingWrite]);
+    assert(Result.isSuccess(plan));
+    expect(plan.success.operations).toEqual([bindingWrite]);
+    for (const operations of [
+      [bindingWrite, bindingWrite],
+      [remove, remove],
+      [bindingWrite, remove],
+    ]) {
+      const conflict = OutputPlan.make(operations);
+      assert(Result.isFailure(conflict));
+      expect(conflict.failure.reason).toBe("ConflictingTarget");
+    }
+  },
+);
+
+it.each([
+  "other.ts",
+  "spec.ts",
+  "api.ts",
+  "ID.ts",
+  "nested/id.ts",
+  "../id.ts",
+  "/id.ts",
+  "id.js",
+])("rejects a forged runtime binding %s", (relativePath) => {
+  const target = OutputPlan.Target.Binding({
+    relativePath: relativePath as "id.ts",
+  });
+  const plan = OutputPlan.make([OutputPlan.Operation.Remove({ target })]);
+  assert(Result.isFailure(plan));
+  expect(plan.failure).toMatchObject({
+    _tag: "OutputPlanError",
+    namespace: "Binding",
+    relativePath,
+  });
+});
+
+it("keeps table and binding ownership separate and rejects table conflicts", () => {
+  const table = OutputPlan.Target.TableWrapper({ relativePath: "schema.ts" });
+  const binding = OutputPlan.Target.Binding({ relativePath: "schema.ts" });
+  const tableWrite = OutputPlan.Operation.Write({
+    target: table,
+    contents: "table",
+  });
+  const remove = OutputPlan.Operation.Remove({ target: table });
+  const child = OutputPlan.Operation.Remove({
+    target: OutputPlan.Target.TableWrapper({
+      relativePath: "schema.ts/child.ts",
+    }),
+  });
+  for (const operations of [
+    [tableWrite, tableWrite],
+    [remove, remove],
+    [tableWrite, remove],
+    [tableWrite, child],
+    [child, tableWrite],
+  ]) {
+    const plan = OutputPlan.make(operations);
+    assert(Result.isFailure(plan));
+    expect(plan.failure.reason).toBe("ConflictingTarget");
+  }
+  const desired = [
+    tableWrite,
+    OutputPlan.Operation.Write({ target: binding, contents: "binding" }),
+  ];
+  const obsolete = OutputPlan.Target.TableWrapper({ relativePath: "old.ts" });
+  const result = OutputPlan.diff(desired, [table, obsolete]);
+  assert(Result.isSuccess(result));
+  expect(result.success.operations).toEqual([
+    ...desired,
+    OutputPlan.Operation.Remove({ target: obsolete }),
+  ]);
 });
 
 it.each([

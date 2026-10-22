@@ -5,7 +5,7 @@ import * as OutputPublisher from "@confect/cli/OutputPublisher";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodePath from "@effect/platform-node/NodePath";
-import { assert, expect, layer } from "@effect/vitest";
+import { assert, expect, expectTypeOf, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as ByteSize from "effect/ByteSize";
@@ -51,6 +51,102 @@ for (const platform of [
   layer(platform.layer)(
     `OutputPublisher physical targets on ${platform.name}`,
     (it) => {
+      it.effect.each([
+        {
+          namespace: "TableWrapper",
+          relativePath: "notes.ts",
+          other: "NOTES.ts",
+          directory: "tables",
+        },
+        {
+          namespace: "TableWrapper",
+          relativePath: "notes.ts",
+          other: "NOTES.ts/child.ts",
+          directory: "tables",
+        },
+        {
+          namespace: "TableWrapper",
+          relativePath: "notes.ts/child.ts",
+          other: "NOTES.ts",
+          directory: "tables",
+        },
+        {
+          namespace: "Binding",
+          relativePath: "id.ts",
+          other: "ID.ts",
+          directory: "",
+        },
+        {
+          namespace: "Binding",
+          relativePath: "id.ts",
+          other: "ID.ts/child.ts",
+          directory: "",
+        },
+      ] as const)(
+        "checks $namespace cross-namespace physical collision with $other",
+        ({ namespace, relativePath, other, directory }) =>
+          Effect.gen(function* () {
+            const path = yield* Path.Path;
+            const confect = path.join(platform.root, "confect");
+            const convex = path.join(confect, "_generated", directory);
+            const target =
+              namespace === "Binding"
+                ? OutputPlan.Target.Binding({ relativePath })
+                : OutputPlan.Target.TableWrapper({ relativePath });
+            const writes = yield* Ref.make<ReadonlyArray<string>>([]);
+            const inspections = yield* Ref.make(0);
+            const missing = FileSystem.makeNoop({});
+            const plan = yield* Effect.fromResult(
+              OutputPlan.make([
+                OutputPlan.Operation.Write({ target, contents: "static" }),
+                OutputPlan.Operation.Remove({
+                  target: OutputPlan.Target.ConvexModule({
+                    relativePath: other,
+                  }),
+                }),
+              ]),
+            );
+            const result = yield* OutputPublisher.publish(plan).pipe(
+              Effect.provideService(ProjectRoot, {
+                get: Effect.succeed(platform.root),
+              }),
+              Effect.provideService(ConfectDirectory, {
+                get: Effect.succeed(confect),
+              }),
+              Effect.provideService(ConvexDirectory, {
+                get: Effect.succeed(convex),
+              }),
+              Effect.provideService(
+                FileSystem.FileSystem,
+                FileSystem.makeNoop({
+                  readLink: (file) =>
+                    Ref.update(inspections, (count) => count + 1).pipe(
+                      Effect.andThen(missing.readLink(file)),
+                    ),
+                  makeDirectory: () => Effect.void,
+                  writeFileString: (file) =>
+                    Ref.update(writes, (previous) => [...previous, file]),
+                }),
+              ),
+              Effect.result,
+            );
+            if (platform.conflicts) {
+              assert(Result.isFailure(result));
+              expect(result.failure).toMatchObject({
+                _tag: "OutputPathError",
+                reason: "ConflictingTarget",
+              });
+              expect(yield* Ref.get(inspections)).toBe(0);
+              expect(yield* Ref.get(writes)).toEqual([]);
+            } else {
+              assert(Result.isSuccess(result));
+              expect(yield* Ref.get(writes)).toEqual([
+                path.join(convex, relativePath),
+              ]);
+            }
+          }),
+      );
+
       it.effect.each(["SCHEMA.ts", "nested/HTTP.ts", "_GENERATED/API.ts"])(
         "checks reserved-equivalent writes and removals for %s before filesystem access",
         (relativePath) =>
@@ -342,6 +438,310 @@ const metadataCalls = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   });
 
 layer(NodeServices.layer)("OutputPublisher", (it) => {
+  it.effect(
+    "publishes bounded static outputs and cleans up only discovered table TypeScript files",
+    () =>
+      Effect.gen(function* () {
+        expectTypeOf<
+          Parameters<typeof OutputPublisher.discover>[0]
+        >().toEqualTypeOf<"Registry" | "ConvexModule" | "TableWrapper">();
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const project = yield* fixture;
+        const directory = path.join(project.confect, "_generated");
+        const tables = path.join(directory, "tables");
+        for (const relative of [
+          "old.ts",
+          "nested/stale.ts",
+          "keep.txt",
+          "nested/keep.js",
+        ]) {
+          const file = path.join(tables, relative);
+          yield* fs.makeDirectory(path.dirname(file), { recursive: true });
+          yield* fs.writeFileString(file, "sentinel");
+        }
+        for (const relative of [
+          "api.ts",
+          "spec.ts",
+          "registeredFunctions/keep.ts",
+        ]) {
+          const file = path.join(directory, relative);
+          yield* fs.makeDirectory(path.dirname(file), { recursive: true });
+          yield* fs.writeFileString(file, "unowned");
+        }
+        const desired = [
+          OutputPlan.Operation.Write({
+            target: OutputPlan.Target.TableWrapper({
+              relativePath: "nested/current.ts",
+            }),
+            contents: "table\n",
+          }),
+          ...(
+            [
+              "id.ts",
+              "schema.ts",
+              "convexSchema.ts",
+              "docs.ts",
+              "services.ts",
+            ] as const
+          ).map((relativePath) =>
+            OutputPlan.Operation.Write({
+              target: OutputPlan.Target.Binding({ relativePath }),
+              contents: relativePath,
+            }),
+          ),
+        ];
+        const discovered = yield* metadataCalls(
+          project.provide(OutputPublisher.discover("TableWrapper")),
+        );
+        expect(
+          discovered.value.map(({ relativePath }) => relativePath).sort(),
+        ).toEqual(["nested/stale.ts", "old.ts"]);
+        const plan = yield* Effect.fromResult(
+          OutputPlan.diff(desired, discovered.value),
+        );
+        const published = yield* metadataCalls(
+          project.provide(OutputPublisher.publish(plan)),
+        );
+        for (const { calls } of [discovered, published]) {
+          for (const method of ["readLink", "realPath", "stat"]) {
+            const files = calls
+              .filter((call) => call.method === method)
+              .map((call) => call.file);
+            expect(HashSet.size(HashSet.fromIterable(files))).toBe(
+              files.length,
+            );
+          }
+        }
+        for (const { target, contents } of desired) {
+          expect(
+            yield* fs.readFileString(
+              path.join(
+                target._tag === "TableWrapper" ? tables : directory,
+                target.relativePath,
+              ),
+            ),
+          ).toBe(contents);
+        }
+        expect(
+          yield* Project.writtenFiles(
+            project.provide(OutputPublisher.publish(plan)),
+          ),
+        ).toEqual([]);
+        expect(yield* fs.exists(path.join(tables, "old.ts"))).toBe(false);
+        expect(yield* fs.exists(path.join(tables, "nested/stale.ts"))).toBe(
+          false,
+        );
+        expect(yield* fs.readFileString(path.join(tables, "keep.txt"))).toBe(
+          "sentinel",
+        );
+        expect(
+          yield* fs.readFileString(path.join(tables, "nested/keep.js")),
+        ).toBe("sentinel");
+        for (const relative of [
+          "api.ts",
+          "spec.ts",
+          "registeredFunctions/keep.ts",
+        ]) {
+          expect(yield* fs.readFileString(path.join(directory, relative))).toBe(
+            "unowned",
+          );
+        }
+        const cleanup = yield* Effect.fromResult(
+          OutputPlan.diff(
+            [],
+            desired.map(({ target }) => target),
+          ),
+        );
+        yield* project.provide(OutputPublisher.publish(cleanup));
+        yield* project.provide(OutputPublisher.publish(cleanup));
+        expect(
+          yield* project.provide(OutputPublisher.discover("TableWrapper")),
+        ).toEqual([]);
+        expect(yield* fs.exists(path.join(directory, "id.ts"))).toBe(false);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect.each([
+    {
+      namespace: "TableWrapper",
+      alias: "tables/nested/notes.ts",
+      kind: "file",
+    },
+    {
+      namespace: "TableWrapper",
+      alias: "tables/nested/notes.ts",
+      kind: "dangling",
+    },
+    { namespace: "TableWrapper", alias: "tables/nested", kind: "directory" },
+    { namespace: "TableWrapper", alias: "tables", kind: "directory" },
+    { namespace: "Binding", alias: "id.ts", kind: "file" },
+    { namespace: "Binding", alias: "id.ts", kind: "dangling" },
+    { namespace: "Binding", alias: "", kind: "directory" },
+  ] as const)(
+    "rejects $namespace $kind alias at $alias before any publication",
+    ({ namespace, alias: relativeAlias, kind }) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const project = yield* fixture;
+        const destination = path.join(project.root, "untouched");
+        if (kind === "file") yield* fs.writeFileString(destination, "sentinel");
+        if (kind === "directory") {
+          yield* fs.makeDirectory(destination);
+          yield* fs.writeFileString(
+            path.join(destination, "keep.ts"),
+            "sentinel",
+          );
+        }
+        const alias = path.join(project.confect, "_generated", relativeAlias);
+        yield* fs.makeDirectory(path.dirname(alias), { recursive: true });
+        yield* fs.symlink(destination, alias);
+        const target =
+          namespace === "Binding"
+            ? OutputPlan.Target.Binding({ relativePath: "id.ts" })
+            : OutputPlan.Target.TableWrapper({
+                relativePath: "nested/notes.ts",
+              });
+        for (const operation of [
+          OutputPlan.Operation.Write({ target, contents: "overwrite" }),
+          OutputPlan.Operation.Remove({ target }),
+        ]) {
+          const plan = yield* Effect.fromResult(
+            OutputPlan.make([
+              OutputPlan.Operation.Write({
+                target: OutputPlan.Target.ConvexModule({
+                  relativePath: "first.ts",
+                }),
+                contents: "first",
+              }),
+              operation,
+            ]),
+          );
+          const result = yield* project
+            .provide(OutputPublisher.publish(plan))
+            .pipe(
+              Effect.provideService(FileSystem.FileSystem, {
+                ...fs,
+                readFileString: () =>
+                  Effect.die("Must not read through aliases"),
+                writeFileString: () =>
+                  Effect.die("Must preflight all targets before writing"),
+                remove: () =>
+                  Effect.die("Must preflight all targets before removing"),
+              }),
+              Effect.result,
+            );
+          assert(Result.isFailure(result));
+          expect(result.failure).toMatchObject({
+            _tag: "OutputPathError",
+            reason: "SymbolicLink",
+            path: alias,
+          });
+        }
+        if (namespace === "TableWrapper") {
+          const result = yield* project
+            .provide(OutputPublisher.discover("TableWrapper"))
+            .pipe(Effect.result);
+          if (relativeAlias === "tables/nested") {
+            assert(Result.isSuccess(result));
+            expect(result.success).toEqual([]);
+          } else {
+            assert(Result.isFailure(result));
+            expect(result.failure).toMatchObject({
+              reason: "SymbolicLink",
+              path: alias,
+            });
+          }
+        }
+        expect(yield* fs.readLink(alias)).toBe(destination);
+        if (kind !== "dangling")
+          expect(
+            yield* fs.readFileString(
+              kind === "file" ? destination : path.join(destination, "keep.ts"),
+            ),
+          ).toBe("sentinel");
+        expect(yield* fs.exists(path.join(project.convex, "first.ts"))).toBe(
+          false,
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect.each(["readLink", "realPath", "stat", "readDirectory"] as const)(
+    "propagates static output %s observation failures without modifying files",
+    (method) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const project = yield* fixture;
+        const tables = path.join(project.confect, "_generated/tables");
+        yield* fs.makeDirectory(tables, { recursive: true });
+        for (const namespace of ["TableWrapper", "Binding"] as const) {
+          const target =
+            namespace === "TableWrapper"
+              ? OutputPlan.Target.TableWrapper({ relativePath: "notes.ts" })
+              : OutputPlan.Target.Binding({ relativePath: "id.ts" });
+          const file = path.join(
+            namespace === "TableWrapper" ? tables : path.dirname(tables),
+            target.relativePath,
+          );
+          yield* fs.writeFileString(file, "sentinel");
+          const plan = yield* Effect.fromResult(
+            OutputPlan.make([OutputPlan.Operation.Remove({ target })]),
+          );
+          const failure = PlatformError.systemError({
+            _tag: "PermissionDenied",
+            module: "FileSystem",
+            method,
+            pathOrDescriptor: method === "readDirectory" ? tables : file,
+            cause: { code: "EACCES" },
+          });
+          const failing: FileSystem.FileSystem = {
+            ...fs,
+            readLink: (entry) =>
+              method === "readLink" && entry === file
+                ? Effect.fail(failure)
+                : fs.readLink(entry),
+            realPath: (entry) =>
+              method === "realPath" && entry === file
+                ? Effect.fail(failure)
+                : fs.realPath(entry),
+            stat: (entry) =>
+              method === "stat" && entry === file
+                ? Effect.fail(failure)
+                : fs.stat(entry),
+            readDirectory: (entry, options) =>
+              method === "readDirectory" && entry === tables
+                ? Effect.fail(failure)
+                : fs.readDirectory(entry, options),
+            writeFileString: () =>
+              Effect.die("Must not write after an observation failure"),
+            remove: () =>
+              Effect.die("Must not remove after an observation failure"),
+          };
+          const runs = [
+            ...(method === "readDirectory"
+              ? []
+              : [OutputPublisher.publish(plan)]),
+            ...(namespace === "TableWrapper"
+              ? [OutputPublisher.discover("TableWrapper").pipe(Effect.asVoid)]
+              : []),
+          ];
+          for (const run of runs) {
+            const result = yield* project
+              .provide(run)
+              .pipe(
+                Effect.provideService(FileSystem.FileSystem, failing),
+                Effect.result,
+              );
+            assert(Result.isFailure(result));
+            expect(result.failure).toBe(failure);
+          }
+          expect(yield* fs.readFileString(file)).toBe("sentinel");
+        }
+      }).pipe(Effect.scoped),
+  );
+
   it.effect("succeeds when the target convex module does not exist", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -378,6 +778,10 @@ layer(NodeServices.layer)("OutputPublisher", (it) => {
         const module = OutputPlan.Target.ConvexModule({
           relativePath: "nested/notes.ts",
         });
+        const table = OutputPlan.Target.TableWrapper({
+          relativePath: "nested/notes.ts",
+        });
+        const binding = OutputPlan.Target.Binding({ relativePath: "id.ts" });
         const plan = yield* Effect.fromResult(
           OutputPlan.make([
             OutputPlan.Operation.Write({
@@ -385,6 +789,11 @@ layer(NodeServices.layer)("OutputPublisher", (it) => {
               contents: "registry",
             }),
             OutputPlan.Operation.Write({ target: module, contents: "module" }),
+            OutputPlan.Operation.Write({ target: table, contents: "table" }),
+            OutputPlan.Operation.Write({
+              target: binding,
+              contents: "binding",
+            }),
           ]),
         );
         yield* project.provide(
@@ -395,6 +804,9 @@ layer(NodeServices.layer)("OutputPublisher", (it) => {
             ]);
             expect(yield* OutputPublisher.discover("ConvexModule")).toEqual([
               module,
+            ]);
+            expect(yield* OutputPublisher.discover("TableWrapper")).toEqual([
+              table,
             ]);
           }).pipe(
             Effect.provideService(ProjectRoot, {
@@ -410,6 +822,16 @@ layer(NodeServices.layer)("OutputPublisher", (it) => {
             ),
           ),
         ).toBe("registry");
+        expect(
+          yield* fs.readFileString(
+            path.join(project.confect, "_generated/tables/nested/notes.ts"),
+          ),
+        ).toBe("table");
+        expect(
+          yield* fs.readFileString(
+            path.join(project.confect, "_generated/id.ts"),
+          ),
+        ).toBe("binding");
         expect(
           yield* fs.readFileString(
             path.join(project.convex, "nested/notes.ts"),
@@ -708,7 +1130,7 @@ layer(NodeServices.layer)("OutputPublisher", (it) => {
       }).pipe(Effect.scoped),
   );
 
-  it.effect.each(["Registry", "ConvexModule"] as const)(
+  it.effect.each(["Registry", "ConvexModule", "TableWrapper"] as const)(
     "preserves aliases outside %s ownership without following them",
     (namespace) =>
       Effect.gen(function* () {
@@ -718,7 +1140,9 @@ layer(NodeServices.layer)("OutputPublisher", (it) => {
         const directory =
           namespace === "Registry"
             ? path.join(project.confect, "_generated/registeredFunctions")
-            : project.convex;
+            : namespace === "TableWrapper"
+              ? path.join(project.confect, "_generated/tables")
+              : project.convex;
         const target = path.join(project.root, "untouched");
         yield* fs.makeDirectory(target);
         yield* fs.writeFileString(

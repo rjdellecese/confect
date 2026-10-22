@@ -29,6 +29,7 @@ import * as GenerationRecord from "../GenerationRecord";
 import * as OutputPlan from "../OutputPlan";
 import * as OutputPublisher from "../OutputPublisher";
 import * as RegisteredFunctions from "../RegisteredFunctions";
+import * as StaticBindings from "../StaticBindings";
 import * as EntryPoint from "../EntryPoint";
 import type { ImplModulePath } from "../ImplModulePath";
 import { implPathForSpec, type LeafModule } from "../LeafModule";
@@ -65,20 +66,11 @@ const GENERATED_DIRNAME = "_generated";
 const GENERATED_SPEC_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "spec.ts"),
 );
-const GENERATED_SCHEMA_PATH = Effect.map(Path.Path, (path) =>
-  path.join(GENERATED_DIRNAME, "schema.ts"),
-);
 const GENERATED_CONVEX_SCHEMA_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "convexSchema.ts"),
 );
-const GENERATED_ID_PATH = Effect.map(Path.Path, (path) =>
-  path.join(GENERATED_DIRNAME, "id.ts"),
-);
 const GENERATED_COMPONENTS_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "components.ts"),
-);
-const GENERATED_TABLES_DIRNAME = Effect.map(Path.Path, (path) =>
-  path.join(GENERATED_DIRNAME, "tables"),
 );
 
 const LEGACY_PATHS = Effect.gen(function* () {
@@ -138,12 +130,20 @@ const runCodegen = Effect.gen(function* () {
       ),
     ),
   );
-  yield* generateConfectGeneratedDirectory;
   yield* warnIfNoTables(tableModules);
-  yield* generateIdConstructor(tableModules);
-  yield* generateTableWrappers(tableModules);
-  yield* removeObsoleteTableWrappers(tableModules);
-  yield* generateRuntimeSchema(tableModules);
+  const staticBindings = yield* StaticBindings.renderPlan(tableModules);
+  const ownedTables = yield* OutputPublisher.discover("TableWrapper");
+  const staticPlan = yield* Effect.fromResult(
+    OutputPlan.diff(
+      Array.filter(
+        staticBindings.operations,
+        OutputPlan.Operation.$is("Write"),
+      ),
+      ownedTables,
+    ),
+  );
+  yield* generateConfectGeneratedDirectory;
+  yield* OutputPublisher.publish(staticPlan);
   yield* removeLegacyFiles;
   yield* generateAssembledSpecs(leaves);
   // `_generated/api.ts`/`nodeApi.ts` are no longer imported by generated or
@@ -156,9 +156,6 @@ const runCodegen = Effect.gen(function* () {
       generateRefs,
       generateScopedRefs(leaves, scopedRefFiles),
       removeGeneratedNodeApi,
-      generateDocs(tableModules),
-      generateServices,
-      generateConvexSchema(tableModules),
       // Must land before impl validation: impls may import the generated
       // components registry, so it has to exist when their bundles are built.
       generateComponents,
@@ -422,160 +419,6 @@ const warnIfNoTables = (
       )
     : Effect.void;
 
-const tableModuleBindings = Effect.fnUntraced(function* (
-  tableModules: ReadonlyArray<TableModule.TableModule>,
-  generatedFilePath: string,
-) {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const generatedDir = path.dirname(generatedFilePath);
-
-  const generatedTablesDirname = yield* GENERATED_TABLES_DIRNAME;
-
-  return yield* Effect.forEach(
-    tableModules,
-    Effect.fnUntraced(function* (tableModule: TableModule.TableModule) {
-      const wrapperAbsolutePath = path.join(
-        confectDirectory,
-        generatedTablesDirname,
-        `${tableModule.tableName}.ts`,
-      );
-      const importPath = yield* toModuleImportPath(
-        path.relative(generatedDir, wrapperAbsolutePath),
-      );
-      return {
-        importPath,
-        tableName: tableModule.tableName,
-      };
-    }),
-  );
-});
-
-const generateIdConstructor = Effect.fnUntraced(function* (
-  tableModules: ReadonlyArray<TableModule.TableModule>,
-) {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const generatedIdPath = yield* GENERATED_ID_PATH;
-  const idPath = path.join(confectDirectory, generatedIdPath);
-
-  const tableNames = Array.map(
-    tableModules,
-    (tableModule) => tableModule.tableName,
-  );
-  const contents = yield* templates.id({ tableNames });
-
-  yield* writeFileStringAndLog(idPath, contents);
-});
-
-const generateTableWrappers = Effect.fnUntraced(function* (
-  tableModules: ReadonlyArray<TableModule.TableModule>,
-) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const generatedTablesDirname = yield* GENERATED_TABLES_DIRNAME;
-  const wrappersDir = path.join(confectDirectory, generatedTablesDirname);
-
-  if (!(yield* fs.exists(wrappersDir))) {
-    yield* fs.makeDirectory(wrappersDir, { recursive: true });
-  }
-
-  yield* Effect.forEach(
-    tableModules,
-    Effect.fnUntraced(function* (tableModule: TableModule.TableModule) {
-      const wrapperPath = path.join(
-        confectDirectory,
-        generatedTablesDirname,
-        `${tableModule.tableName}.ts`,
-      );
-      const unnamedAbsolutePath = path.join(
-        confectDirectory,
-        tableModule.relativePath,
-      );
-      const unnamedImportPath = yield* toModuleImportPath(
-        path.relative(path.dirname(wrapperPath), unnamedAbsolutePath),
-      );
-      const contents = yield* templates.tableWrapper({
-        tableName: tableModule.tableName,
-        unnamedImportPath,
-      });
-      yield* writeFileStringAndLog(wrapperPath, contents);
-    }),
-    { concurrency: "unbounded" },
-  );
-});
-
-/**
- * Remove any stale `_generated/tables/*.ts` wrapper whose source table has been
- * deleted or renamed. Mirrors `removeObsoleteRegisteredFunctions` for the
- * wrapper directory.
- */
-const removeObsoleteTableWrappers = Effect.fnUntraced(function* (
-  tableModules: ReadonlyArray<TableModule.TableModule>,
-) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const generatedTablesDirname = yield* GENERATED_TABLES_DIRNAME;
-  const wrappersDir = path.join(confectDirectory, generatedTablesDirname);
-
-  if (!(yield* fs.exists(wrappersDir))) {
-    return;
-  }
-
-  const expected = new Set(
-    Array.map(tableModules, (tableModule) => `${tableModule.tableName}.ts`),
-  );
-  const existing = yield* fs.readDirectory(wrappersDir, { recursive: true });
-  yield* Effect.forEach(existing, (entry) => {
-    if (path.extname(entry) !== ".ts") {
-      return Effect.void;
-    }
-    if (!expected.has(entry)) {
-      return Effect.gen(function* () {
-        const absolutePath = path.join(wrappersDir, entry);
-        if (yield* fs.exists(absolutePath)) {
-          yield* removePathIfExists(absolutePath);
-          yield* logFileRemoved(absolutePath);
-        }
-      });
-    }
-    return Effect.void;
-  });
-});
-
-const generateRuntimeSchema = Effect.fnUntraced(function* (
-  tableModules: ReadonlyArray<TableModule.TableModule>,
-) {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const generatedSchemaPath = yield* GENERATED_SCHEMA_PATH;
-  const schemaPath = path.join(confectDirectory, generatedSchemaPath);
-
-  const bindings = yield* tableModuleBindings(tableModules, schemaPath);
-  const contents = yield* templates.runtimeSchema({ tableModules: bindings });
-
-  yield* writeFileStringAndLog(schemaPath, contents);
-});
-
-const generateConvexSchema = Effect.fnUntraced(function* (
-  tableModules: ReadonlyArray<TableModule.TableModule>,
-) {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const generatedConvexSchemaPath = yield* GENERATED_CONVEX_SCHEMA_PATH;
-  const convexSchemaPath = path.join(
-    confectDirectory,
-    generatedConvexSchemaPath,
-  );
-
-  const bindings = yield* tableModuleBindings(tableModules, convexSchemaPath);
-  const contents = yield* templates.convexSchema({ tableModules: bindings });
-
-  yield* writeFileStringAndLog(convexSchemaPath, contents);
-});
-
 const generateConvexSchemaReexport = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
@@ -597,28 +440,6 @@ const generateConvexSchemaReexport = Effect.gen(function* () {
   });
 
   yield* writeFileStringAndLog(convexSchemaPath, schemaContents);
-});
-
-const generateServices = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-
-  const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
-
-  const servicesPath = path.join(confectGeneratedDirectory, "services.ts");
-  const generatedSchemaPath = yield* GENERATED_SCHEMA_PATH;
-  const schemaImportPath = yield* toModuleImportPath(
-    path.relative(
-      path.dirname(servicesPath),
-      path.join(confectDirectory, generatedSchemaPath),
-    ),
-  );
-
-  const servicesContentsString = yield* templates.services({
-    schemaImportPath,
-  });
-
-  yield* writeFileStringAndLog(servicesPath, servicesContentsString);
 });
 
 /**
@@ -646,34 +467,6 @@ const validateNoDocNameCollisions = Effect.fnUntraced(function* (
   if (Array.isReadonlyArrayNonEmpty(collisions)) {
     return yield* new CodegenError.ConflictingDocNameError({ collisions });
   }
-});
-
-const generateDocs = Effect.fnUntraced(function* (
-  tableModules: ReadonlyArray<TableModule.TableModule>,
-) {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-
-  const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
-
-  const docsPath = path.join(confectGeneratedDirectory, "docs.ts");
-  const generatedSchemaPath = yield* GENERATED_SCHEMA_PATH;
-  const schemaImportPath = yield* toModuleImportPath(
-    path.relative(
-      path.dirname(docsPath),
-      path.join(confectDirectory, generatedSchemaPath),
-    ),
-  );
-
-  const docsContentsString = yield* templates.docs({
-    schemaImportPath,
-    tables: Array.map(tableModules, (tableModule) => ({
-      tableName: tableModule.tableName,
-      docName: DocName.fromTableName(tableModule.tableName),
-    })),
-  });
-
-  yield* writeFileStringAndLog(docsPath, docsContentsString);
 });
 
 const generateRefs = Effect.gen(function* () {
