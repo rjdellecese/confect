@@ -63,6 +63,126 @@ layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
   it.effect(
+    "limits dependency hints to active module contexts without consuming revisions",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        const sibling = path.join(root, "sibling.ts");
+        const helper = path.join(root, "helper.ts");
+        const oldHelper = path.join(root, "old.ts");
+        const config = path.join(root, "config.ts");
+        yield* fs.writeFileString(entry, 'export { default } from "./old";');
+        yield* fs.writeFileString(
+          sibling,
+          'export { default } from "./helper";',
+        );
+        yield* fs.writeFileString(config, 'export { default } from "./old";');
+        yield* fs.writeFileString(oldHelper, "export default 0;");
+        yield* fs.writeFileString(helper, "export default 1;");
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const events = yield* observe;
+          expect(yield* compiler.dependentRoots([helper])).toEqual([]);
+          yield* Bundler.compile(entry);
+          yield* Bundler.compile(config, { profile: "component-config" });
+          yield* fs.writeFileString(
+            entry,
+            'export { default } from "./helper";',
+          );
+          yield* Bundler.withBatch([entry, sibling], Bundler.compile(entry));
+          const active = yield* compiler.topology;
+          expect(
+            active.filter((context) => context.profile === "modules"),
+          ).toHaveLength(1);
+          const prepared = yield* compiler.preparedRevisions;
+          yield* Queue.clear(events);
+          const hints = yield* Compilation.runJob(
+            compiler.dependentRoots([helper]),
+          );
+          expect((yield* hints.exit).toSorted()).toEqual(
+            [entry, sibling].toSorted(),
+          );
+          expect(hints.receipts).toEqual([]);
+          expect(yield* compiler.preparedRevisions).toEqual(prepared);
+          expect(yield* compiler.dependentRoots([oldHelper])).toEqual([]);
+          expect(yield* Queue.poll(events)).toEqual(Option.none());
+          yield* fs.writeFileString(helper, "export default ;");
+          yield* compiler.verify;
+          expect(yield* compiler.dependentRoots([helper])).toEqual([]);
+          yield* compiler.reset;
+          expect(yield* compiler.dependentRoots([helper])).toEqual([]);
+          expect(yield* compiler.topology).toEqual([]);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "rebuilds contexts containing newly planned roots while preserving other prepared revisions",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const table = path.join(root, "table.ts");
+        const spec = path.join(root, "spec.ts");
+        const impl = path.join(root, "impl.ts");
+        yield* fs.writeFileString(table, "export default 1;");
+        yield* fs.writeFileString(spec, 'export { default } from "./table";');
+        yield* fs.writeFileString(impl, 'export { default } from "./spec";');
+        yield* Effect.gen(function* () {
+          const compiler = yield* Compilation.Service;
+          const batch = Bundler.withBatch(
+            [spec, impl],
+            Effect.forEach([spec, impl], (entry) => Bundler.bundle(entry)),
+          );
+          yield* Bundler.bundle(table);
+          yield* batch;
+          const initial = yield* compiler.preparedRevisions;
+          const tableReceipt = initial.find((receipt) =>
+            receipt.roots.includes(table),
+          );
+          const moduleReceipt = initial.find((receipt) =>
+            receipt.roots.includes(impl),
+          );
+          assert(tableReceipt && moduleReceipt);
+          yield* fs.writeFileString(table, "export default 2;");
+          const job = yield* Compilation.runJob(
+            Compilation.withPreparedRevisions(
+              Effect.gen(function* () {
+                const reused = yield* Bundler.bundle(table);
+                const refreshed = yield* batch;
+                return { reused, refreshed };
+              }),
+              [spec],
+            ),
+          );
+          const results = yield* job.exit;
+          expect(results.reused.module.default).toBe(1);
+          expect(
+            results.refreshed.map((loaded) => loaded.module.default),
+          ).toEqual([2, 2]);
+          expect(job.receipts).toContainEqual(tableReceipt);
+          expect(
+            job.receipts.find(
+              (receipt) => receipt.context === moduleReceipt.context,
+            )?.revision,
+          ).toBeGreaterThan(moduleReceipt.revision);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
     "reuses only unaffected fingerprints after fresh native verification",
     () =>
       Effect.gen(function* () {

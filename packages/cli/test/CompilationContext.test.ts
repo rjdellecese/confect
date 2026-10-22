@@ -15,6 +15,7 @@ import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as PlatformError from "effect/PlatformError";
 import * as CompilationState from "@confect/cli/CompilationState";
+import * as Compilation from "@confect/cli/Compilation";
 import * as CompilationContext from "@confect/cli/CompilationContext";
 import * as CompilationInputs from "@confect/cli/CompilationInputs";
 import * as esbuild from "esbuild";
@@ -102,6 +103,63 @@ const preparedFixture = Effect.gen(function* () {
 });
 
 describe("CompilationContext", () => {
+  it.live(
+    "uses captured dependency hints without filesystem or native work and drops failed snapshots",
+    () =>
+      Effect.gen(function* () {
+        const fixture = yield* preparedFixture;
+        const helper = fixture.path.join(fixture.root, "helper.ts");
+        yield* fixture.fs.writeFileString(helper, "export default 1;");
+        yield* fixture.fs.writeFileString(
+          fixture.entry,
+          'export { default } from "./helper";',
+        );
+        const operations: string[] = [];
+        const context = yield* fixture.make(
+          [],
+          {
+            ...fixture.fs,
+            readFile: (...args) => {
+              operations.push("readFile");
+              return fixture.fs.readFile(...args);
+            },
+            readFileString: (...args) => {
+              operations.push("readFileString");
+              return fixture.fs.readFileString(...args);
+            },
+            stat: (...args) => {
+              operations.push("stat");
+              return fixture.fs.stat(...args);
+            },
+            realPath: (...args) => {
+              operations.push("realPath");
+              return fixture.fs.realPath(...args);
+            },
+          },
+          "Once",
+        );
+        expect(yield* context.dependentRoots([helper])).toEqual([]);
+        yield* context.verify;
+        const reads = operations.length;
+        const builds = yield* Ref.get(fixture.builds);
+        const prepared = yield* context.preparedRevision;
+        const hints = yield* Compilation.runJob(
+          context.dependentRoots([helper]),
+        );
+        expect(yield* hints.exit).toEqual([fixture.entry]);
+        expect(hints.receipts).toEqual([]);
+        expect(yield* context.preparedRevision).toEqual(prepared);
+        expect(operations).toHaveLength(reads);
+        expect(yield* Ref.get(fixture.builds)).toBe(builds);
+        yield* fixture.fs.writeFileString(helper, "export default ;");
+        yield* context.verify;
+        expect(yield* context.dependentRoots([helper])).toEqual([]);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+      ),
+  );
+
   it.live("writes artifacts only when a captured revision is consumed", () =>
     Effect.gen(function* () {
       const fixture = yield* preparedFixture;

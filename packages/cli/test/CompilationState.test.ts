@@ -2,6 +2,49 @@ import { describe, expect, it } from "@effect/vitest";
 import * as CompilationState from "@confect/cli/CompilationState";
 
 describe("CompilationState", () => {
+  it("plans transitive dependent roots through cycles and generated inputs without mutation", () => {
+    const inputs: CompilationState.InputSnapshot = {
+      table: { identity: "table", imports: [] },
+      generated: { identity: "generated", imports: [{ path: "table" }] },
+      spec: {
+        identity: "spec",
+        imports: [{ path: "generated" }, { path: "impl" }],
+      },
+      impl: { identity: "impl", imports: [{ path: "spec" }] },
+      external: {
+        identity: "external",
+        imports: [{ path: "table", external: true }],
+      },
+      unrelated: { identity: "unrelated", imports: [] },
+    };
+    const roots = {
+      "/table": "table",
+      "/spec": "spec",
+      "/impl": "impl",
+      "/external": "external",
+      "/unrelated": "unrelated",
+    };
+    const changed = ["table"];
+    const before = JSON.stringify({ inputs, roots, changed });
+    expect(CompilationState.dependentRoots(inputs, roots, changed)).toEqual([
+      "/table",
+      "/spec",
+      "/impl",
+    ]);
+    expect(CompilationState.dependentRoots(inputs, roots, ["impl"])).toEqual([
+      "/spec",
+      "/impl",
+    ]);
+    expect(CompilationState.dependentRoots(inputs, roots, ["missing"])).toEqual(
+      [],
+    );
+    expect(CompilationState.dependentRoots(inputs, roots, [])).toEqual([]);
+    expect(CompilationState.dependentRoots(undefined, roots, changed)).toEqual(
+      [],
+    );
+    expect(JSON.stringify({ inputs, roots, changed })).toBe(before);
+  });
+
   it("limits fresh-observation changes to their old and new dependents", () => {
     const edge = (path: string, external = false) => ({
       path,
