@@ -130,6 +130,37 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
     );
 
     it.effect(
+      "reads each document once per patch, as Convex's patch does",
+      () =>
+        Effect.gen(function* () {
+          const { client } = yield* LocalBackend.LocalBackend;
+          const caseId = "patch-reads";
+          const count = 20;
+          const patchAll = (via: "confect" | "convex") =>
+            Effect.gen(function* () {
+              yield* Effect.promise(() =>
+                client.mutation(Ref.getFunctionReference(functions.seed), {
+                  caseId,
+                  count,
+                }),
+              );
+              return yield* Effect.promise(() =>
+                client.mutation(Ref.getFunctionReference(functions.patchAll), {
+                  caseId,
+                  via,
+                }),
+              );
+            });
+
+          const convex = yield* patchAll("convex");
+          const confect = yield* patchAll("confect");
+
+          expect(convex.documentsRead).toBe(2 * count);
+          expect(confect).toEqual(convex);
+        }),
+    );
+
+    it.effect(
       "uses the mutation's pending writes unless a stale snapshot is requested",
       () =>
         Effect.gen(function* () {
