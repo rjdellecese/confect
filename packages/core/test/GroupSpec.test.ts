@@ -166,10 +166,57 @@ describe("addGroupsAt", () => {
     expect(Object.getPrototypeOf(group.groups)).toBe(Object.prototype);
   });
 
-  it("checks group inputs without accumulating their types", () => {
-    expectTypeOf(
-      GroupSpec.addGroupsAt,
-    ).returns.toEqualTypeOf<GroupSpec.AnyWithProps>();
+  it("infers named children while preserving the parent's types", () => {
+    class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("Gate", {
+      functionTypes: { query: true, mutation: true, action: true },
+    }) {}
+    const get = FunctionSpec.publicQuery({
+      name: "get",
+      returns: () => Schema.String,
+    });
+    const send = FunctionSpec.publicNodeAction({
+      name: "send",
+      returns: () => Schema.Null,
+    });
+    const leaf = GroupSpec.make().middleware(Gate).addFunction(get);
+    const node = GroupSpec.makeNode().addFunction(send);
+    const parent = GroupSpec.withName(
+      "parent",
+      GroupSpec.addGroupsAt(leaf, { keep: leaf, replace: leaf }),
+    );
+    const assembled = GroupSpec.addGroupsAt(parent, {
+      replace: node,
+      extra: leaf,
+    });
+    expectTypeOf(assembled).toEqualTypeOf<
+      GroupSpec.AddGroups<
+        typeof parent,
+        | GroupSpec.NamedAt<typeof node, "replace">
+        | GroupSpec.NamedAt<typeof leaf, "extra">
+      >
+    >();
+    expectTypeOf(assembled.name).toEqualTypeOf<"parent">();
+    expectTypeOf(assembled.runtime).toEqualTypeOf<"Convex">();
+    expectTypeOf<GroupSpec.Functions<typeof assembled>>().toEqualTypeOf<
+      typeof get
+    >();
+    expectTypeOf<GroupSpec.MiddlewareSpecs<typeof assembled>>().toEqualTypeOf<
+      typeof Gate
+    >();
+    expectTypeOf<GroupSpec.GroupNames<typeof assembled>>().toEqualTypeOf<
+      "keep" | "replace" | "extra"
+    >();
+    expectTypeOf(assembled.groups.replace).toEqualTypeOf<
+      GroupSpec.NamedAt<typeof node, "replace">
+    >();
+    expectTypeOf(assembled.groups.keep).toEqualTypeOf<
+      GroupSpec.NamedAt<typeof leaf, "keep">
+    >();
+    const empty = GroupSpec.addGroupsAt(assembled, {});
+    expectTypeOf(empty).toEqualTypeOf<typeof assembled>();
+  });
+
+  it("checks group inputs", () => {
     expectTypeOf<GroupSpec.Any>().not.toExtend<
       Parameters<typeof GroupSpec.addGroupsAt>[0]
     >();

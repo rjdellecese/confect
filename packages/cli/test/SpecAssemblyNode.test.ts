@@ -2,11 +2,20 @@ import * as NodePath from "@effect/platform-node/NodePath";
 import { describe, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Result from "effect/Result";
+import { GroupSpec } from "@confect/core";
 import {
   specImportPathFromGenerated,
   type LeafModule,
 } from "@confect/cli/LeafModule";
-import { assemblyNodesFromLeaves, render } from "@confect/cli/SpecAssemblyNode";
+import {
+  assemblyNodesFromLeaves,
+  render,
+  renderScopedRefs,
+  scopedNodesFromLeaves,
+  SCOPED_REFS_HEADER,
+} from "@confect/cli/SpecAssemblyNode";
 
 const leaf = (
   relativePath: string,
@@ -20,6 +29,233 @@ const leaf = (
 });
 
 describe("SpecAssemblyNode", () => {
+  it.effect(
+    "plans every filesystem node, including intermediate directories",
+    () =>
+      Effect.gen(function* () {
+        const scopes = yield* scopedNodesFromLeaves([
+          leaf("notes/archived/legacy.spec.ts", [
+            "notes",
+            "archived",
+            "legacy",
+          ]),
+          leaf("notes.spec.ts", ["notes"]),
+          leaf("env.spec.ts", ["env"]),
+        ]);
+
+        expect(scopes.map(({ path }) => path.pathSegments)).toEqual([
+          ["env"],
+          ["notes"],
+          ["notes", "archived"],
+          ["notes", "archived", "legacy"],
+        ]);
+        const [env, notes, archived, legacy] = scopes;
+        expect(Option.isSome(env!.node.importBinding)).toBe(true);
+        expect(Option.isSome(notes!.node.importBinding)).toBe(true);
+        expect(Option.isNone(archived!.node.importBinding)).toBe(true);
+        expect(Option.isSome(legacy!.node.importBinding)).toBe(true);
+        expect(notes!.node.children[0]).toBe(archived!.node);
+        expect(archived!.node.children[0]).toBe(legacy!.node);
+      }),
+  );
+
+  it.effect(
+    "plans no files for declaration-internal groups or empty inputs",
+    () =>
+      Effect.gen(function* () {
+        const declaration = {
+          ...leaf("notes.spec.ts", ["notes"]),
+          spec: GroupSpec.addGroupsAt(GroupSpec.make(), {
+            internal: GroupSpec.make(),
+          }),
+        };
+        const scopes = yield* scopedNodesFromLeaves([declaration]);
+
+        expect(scopes.map(({ path }) => path.pathSegments)).toEqual([
+          ["notes"],
+        ]);
+        expect(scopes[0]!.node.children).toEqual([]);
+        expect(yield* scopedNodesFromLeaves([])).toEqual([]);
+      }),
+  );
+
+  it.effect("derives scoped paths from parsed declaration paths", () =>
+    Effect.gen(function* () {
+      const scopes = yield* scopedNodesFromLeaves([
+        leaf("notes/archived.spec.ts", ["stale"]),
+      ]);
+
+      expect(scopes.map(({ path }) => path.pathSegments)).toEqual([
+        ["notes"],
+        ["notes", "archived"],
+      ]);
+      const { node, path } = scopes[1]!;
+      const contents = yield* renderScopedRefs(node, path);
+      expect(contents).toContain(
+        'import declaration_0 from "../../../notes/archived.spec";',
+      );
+      expect(contents).not.toContain("stale");
+    }),
+  );
+
+  it.effect(
+    "rejects noncanonical declaration paths through snapshot parsing",
+    () =>
+      Effect.gen(function* () {
+        for (const relativePath of [
+          "schema.spec.ts",
+          "bad-dir/notes.spec.ts",
+          "notes/..spec.ts",
+          ".spec.ts",
+          "../notes.spec.ts",
+          "notes//list.spec.ts",
+          "notes/./list.spec.ts",
+          "notes.ts",
+        ]) {
+          const result = yield* Effect.result(
+            scopedNodesFromLeaves([leaf(relativePath, ["notes"])]),
+          );
+          expect(Result.isFailure(result)).toBe(true);
+          if (Result.isFailure(result)) {
+            expect(result.failure).toMatchObject({
+              _tag: "SnapshotError",
+              reason: "NoncanonicalPath",
+              relativePath,
+            });
+          }
+        }
+      }),
+  );
+
+  it.effect("renders only subtree imports at each scoped module depth", () =>
+    Effect.gen(function* () {
+      const scopes = yield* scopedNodesFromLeaves([
+        leaf("notes.spec.ts", ["notes"]),
+        leaf("notes/archived/legacy.spec.ts", ["notes", "archived", "legacy"]),
+        leaf("notes/recent.spec.ts", ["notes", "recent"]),
+        leaf("other.spec.ts", ["other"]),
+      ]);
+      const [notes, archived, legacy] = scopes;
+      const parentContents = yield* renderScopedRefs(notes!.node, notes!.path);
+      const intermediateContents = yield* renderScopedRefs(
+        archived!.node,
+        archived!.path,
+      );
+      const leafContents = yield* renderScopedRefs(legacy!.node, legacy!.path);
+
+      expect(parentContents).toContain(
+        'import declaration_0 from "../../notes.spec";',
+      );
+      expect(parentContents).toContain(
+        'import declaration_0_0_0 from "../../notes/archived/legacy.spec";',
+      );
+      expect(parentContents).toContain(
+        'import declaration_0_1 from "../../notes/recent.spec";',
+      );
+      expect(parentContents)
+        .toContain(`const group = GroupSpec.addGroupsAt(declaration_0, {
+  ["archived"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
+    ["legacy"]: declaration_0_0_0,
+  }),
+  ["recent"]: declaration_0_1,
+});`);
+      expect(parentContents).toContain('Refs.fromGroup("notes", group);');
+      expect(intermediateContents).toContain(
+        'import declaration_0_0 from "../../../notes/archived/legacy.spec";',
+      );
+      expect(intermediateContents)
+        .toContain(`const group = GroupSpec.addGroupsAt(GroupSpec.make(), {
+  ["legacy"]: declaration_0_0,
+});`);
+      expect(intermediateContents).toContain(
+        'Refs.fromGroup("notes/archived", group);',
+      );
+      expect(leafContents).toContain(
+        'import declaration_0 from "../../../../notes/archived/legacy.spec";',
+      );
+      expect(leafContents).toContain("const group = declaration_0;");
+      expect(leafContents).toContain('import { Refs } from "@confect/core";');
+      expect(leafContents).not.toContain("GroupSpec");
+      for (const contents of [parentContents, intermediateContents]) {
+        expect(contents).toContain(
+          'import { GroupSpec, Refs } from "@confect/core";',
+        );
+      }
+      expect(leafContents).toContain(
+        'Refs.fromGroup("notes/archived/legacy", group);',
+      );
+      for (const contents of [
+        parentContents,
+        intermediateContents,
+        leafContents,
+      ]) {
+        expect(contents.startsWith(`${SCOPED_REFS_HEADER}\n`)).toBe(true);
+        expect(contents).toContain(
+          "const refs: Refs.FromGroup<typeof group> = Refs.fromGroup(",
+        );
+        expect(contents).toContain("export default refs;");
+        expect(contents).not.toContain("other");
+        expect(contents).not.toMatch(/\bas\b/);
+        expect(contents).not.toContain("spec.ts");
+      }
+      for (const contents of [intermediateContents, leafContents]) {
+        expect(contents).not.toContain('/notes.spec"');
+        expect(contents).not.toContain('/notes/recent.spec"');
+      }
+    }),
+  );
+
+  it.effect(
+    "keeps input leaves and assembly trees unchanged across renders",
+    () =>
+      Effect.gen(function* () {
+        const leaves = [
+          leaf("notes/recent.spec.ts", ["notes", "recent"]),
+          leaf("notes.spec.ts", ["notes"]),
+        ];
+        const originalLeaves = structuredClone(leaves);
+        const scopes = yield* scopedNodesFromLeaves(leaves);
+        const originalTree = structuredClone(scopes.map(({ node }) => node));
+        for (const { node, path } of scopes) {
+          const first = yield* renderScopedRefs(node, path);
+          expect(yield* renderScopedRefs(node, path)).toBe(first);
+        }
+        expect(leaves).toEqual(originalLeaves);
+        expect(scopes.map(({ node }) => node)).toEqual(originalTree);
+      }),
+  );
+
+  it.effect(
+    "avoids declaration names that collide with generated bindings",
+    () =>
+      Effect.gen(function* () {
+        const scopes = yield* scopedNodesFromLeaves([
+          leaf("group.spec.ts", ["group"]),
+          ...["refs", "Refs", "GroupSpec", "declaration_0"].map((name) =>
+            leaf(`group/${name}.spec.ts`, ["group", name]),
+          ),
+        ]);
+        const root = scopes[0]!;
+        const contents = yield* renderScopedRefs(root.node, root.path);
+        const imports = contents
+          .split("\n")
+          .filter((line) => line.startsWith("import declaration_"));
+        expect(imports).toHaveLength(5);
+        expect(new Set(imports.map((line) => line.split(" ")[1])).size).toBe(5);
+        expect(contents).toContain(
+          'import declaration_0 from "../../group.spec";',
+        );
+        expect(contents).toContain(
+          "const group = GroupSpec.addGroupsAt(declaration_0, {",
+        );
+        for (const { node, path } of scopes.slice(1)) {
+          const child = yield* renderScopedRefs(node, path);
+          expect(child).toContain("const group = declaration_0;");
+          expect(child).toContain('import { Refs } from "@confect/core";');
+        }
+      }),
+  );
+
   it.effect("assembledSpec builds nested imports from leaf modules", () =>
     Effect.gen(function* () {
       const nodes = assemblyNodesFromLeaves([
@@ -311,6 +547,29 @@ for (const { name, pathLayer, sep } of [
         );
         expect(contents).toContain('import env from "../env.spec";');
         expect(contents).not.toContain("\\");
+
+        const scoped = yield* scopedNodesFromLeaves([
+          yield* discovered(`notesAndRandom${sep}notes.spec.ts`, [
+            "notesAndRandom",
+            "notes",
+          ]),
+        ]);
+        expect(scoped.map(({ path }) => path.pathSegments)).toEqual([
+          ["notesAndRandom"],
+          ["notesAndRandom", "notes"],
+        ]);
+        const nested = scoped[1]!;
+        const scopedContents = yield* renderScopedRefs(
+          nested.node,
+          nested.path,
+        );
+        expect(scopedContents).toContain(
+          'import declaration_0 from "../../../notesAndRandom/notes.spec";',
+        );
+        expect(scopedContents).toContain(
+          'Refs.fromGroup("notesAndRandom/notes", group);',
+        );
+        expect(scopedContents).not.toContain("\\");
       }),
     );
   });
