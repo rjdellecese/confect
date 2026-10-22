@@ -2,6 +2,9 @@ import {
   FunctionImpl,
   GroupImpl,
   MiddlewareImpl,
+  MiddlewareRegistryItem,
+  Registry,
+  type RegistryItems,
   RegisteredFunctions,
 } from "@confect/server";
 import type * as DatabaseReaderModule from "@confect/server/DatabaseReader";
@@ -17,7 +20,9 @@ import type { StorageWriter } from "@confect/server/StorageWriter";
 import type { StorageActionWriter } from "@confect/server/StorageActionWriter";
 import type { GenericId } from "convex/values";
 import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
-import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
+import * as Context from "effect/Context";
+import * as Ref from "effect/Ref";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -678,5 +683,139 @@ describe("registry key namespacing", () => {
     );
 
     expect(registered.clash).toBeDefined();
+  });
+});
+
+describe("MiddlewareImpl.forSchema", () => {
+  const middleware = MiddlewareImpl.forSchema<typeof databaseSchema>();
+
+  class Label extends MiddlewareSpec.MiddlewareSpec<Label>()("Label", {
+    options: () => Schema.Struct({ label: Schema.String }),
+    functionTypes: { query: true, mutation: true, action: false },
+  }) {}
+
+  it("preserves common-strategy option and environment inference", () => {
+    const layer = middleware.make(Label, (effect, { options }) => {
+      expectTypeOf(options).toEqualTypeOf<{ readonly label: string }>();
+      return effect;
+    });
+    expectTypeOf(layer).toEqualTypeOf<
+      Layer.Layer<MiddlewareImpl.MiddlewareImpl<"Label">>
+    >();
+    type Strategy = Parameters<typeof middleware.make<typeof Label>>[1];
+    expectTypeOf<Effect.Services<ReturnType<Strategy>>>().toEqualTypeOf<
+      MiddlewareImpl.CommonServices<typeof databaseSchema, "query" | "mutation">
+    >();
+    expectTypeOf<
+      Extract<
+        Effect.Services<ReturnType<Strategy>>,
+        DatabaseWriterModule.DatabaseWriter<typeof databaseSchema>
+      >
+    >().toBeNever();
+  });
+
+  it("preserves per-function strategy coverage and service restrictions", () => {
+    type Strategies = Parameters<
+      typeof middleware.makeByFunctionType<typeof Label>
+    >[1];
+    expectTypeOf<keyof Strategies>().toEqualTypeOf<"query" | "mutation">();
+    expectTypeOf<
+      Effect.Services<ReturnType<Strategies["query"]>>
+    >().toEqualTypeOf<Handler.QueryServices<typeof databaseSchema>>();
+    expectTypeOf<
+      Effect.Services<ReturnType<Strategies["mutation"]>>
+    >().toEqualTypeOf<Handler.MutationServices<typeof databaseSchema>>();
+    middleware.makeByFunctionType(Label, {
+      query: (effect, { options }) => {
+        expectTypeOf(options.label).toBeString();
+        return effect;
+      },
+      mutation: (effect, { options }) => {
+        expectTypeOf(options.label).toBeString();
+        return effect;
+      },
+    });
+  });
+
+  it.effect(
+    "registers only the declared function types without mutating the spec",
+    () =>
+      Effect.gen(function* () {
+        const registry = yield* Ref.make<RegistryItems.RegistryItems>({});
+        const originalTypes = Label.functionTypes;
+        yield* Layer.build(middleware.make(Label, (effect) => effect)).pipe(
+          Effect.provideService(Registry.Registry, registry),
+          Effect.scoped,
+        );
+        const item = (yield* Ref.get(registry))[
+          MiddlewareRegistryItem.registryKey(Label.key)
+        ];
+        assert(MiddlewareRegistryItem.isMiddlewareRegistryItem(item));
+        expect(item.middlewareSpec).toBe(Label);
+        expect(Object.keys(item.impls)).toEqual(["query", "mutation"]);
+        expect(Label.functionTypes).toBe(originalTypes);
+      }),
+  );
+
+  it.effect("registers service provision without acquiring the service", () =>
+    Effect.gen(function* () {
+      class Name extends Context.Service<Name, { readonly value: string }>()(
+        "@confect/server/test/MiddlewareImpl.test/Name",
+      ) {}
+      class ProvideName extends MiddlewareSpec.MiddlewareSpec<
+        ProvideName,
+        { provides: Name }
+      >()("ProvideName", {
+        error: () => Schema.String,
+        functionTypes: { query: true, mutation: false, action: false },
+      }) {}
+      const registry = yield* Ref.make<RegistryItems.RegistryItems>({});
+      const acquisitions = yield* Ref.make(0);
+      yield* Layer.build(
+        middleware.provides(
+          ProvideName,
+          Name,
+          Ref.update(acquisitions, (count) => count + 1).pipe(
+            Effect.as({ value: "provided" }),
+          ),
+        ),
+      ).pipe(Effect.provideService(Registry.Registry, registry), Effect.scoped);
+      const item = (yield* Ref.get(registry))[
+        MiddlewareRegistryItem.registryKey(ProvideName.key)
+      ];
+      assert(MiddlewareRegistryItem.isMiddlewareRegistryItem(item));
+      assert(item.impls.query);
+      expect(item.middlewareSpec).toBe(ProvideName);
+      expect(Object.keys(item.impls)).toEqual(["query"]);
+      expect(yield* Ref.get(acquisitions)).toBe(0);
+    }),
+  );
+
+  it("composes typed function and middleware constructors into a finalized group", () => {
+    const implementation = FunctionImpl.forSchema<typeof databaseSchema>()(
+      coveredGroup,
+      "viewerName",
+      () => Effect.map(Viewer, ({ username }) => username),
+    );
+    const layer = GroupImpl.fromSpec(coveredGroup).pipe(
+      Layer.provide(implementation),
+      Layer.provide(
+        middleware.provides(
+          ProvideViewer,
+          Viewer,
+          Effect.succeed({ username: "static" }),
+        ),
+      ),
+      GroupImpl.finalize,
+    );
+    expectTypeOf(layer).toEqualTypeOf<
+      Layer.Layer<GroupImpl.GroupImpl<"Finalized">>
+    >();
+    expect(
+      RegisteredFunctions.buildForGroup<typeof coveredGroup>(
+        databaseSchema,
+        layer,
+      ).viewerName,
+    ).toBeDefined();
   });
 });

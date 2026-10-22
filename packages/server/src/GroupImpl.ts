@@ -96,6 +96,18 @@ export const make = <
   GroupImpl<"Unfinalized">,
   never,
   FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
+> => fromSpec<Group>(_group);
+
+export const fromSpec = <Group extends GroupSpec.AnyWithProps>(
+  _group: Group &
+    MiddlewareSpec.ValidateImplRequires<
+      GroupSpec.Functions<Group>,
+      GroupSpec.MiddlewareSpecs<Group>
+    >,
+): Layer.Layer<
+  GroupImpl<"Unfinalized">,
+  never,
+  FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
 > =>
   Layer.succeed(
     GroupImpl<"Unfinalized">({ finalizationStatus: "Unfinalized" }),

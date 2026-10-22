@@ -398,6 +398,23 @@ export default MiddlewareImpl.makeByFunctionType(databaseSchema, RequireUser, {
 });
 ```
 
+### Type-only schema bindings
+
+Use `MiddlewareImpl.forSchema` to bind the database schema's type without importing its runtime value. The returned `make`, `makeByFunctionType`, and `provides` operations accept the same arguments as the existing constructors, except for the leading database-schema value. Their service restrictions, options, and error types are unchanged.
+
+```ts confect/middleware/RequireUser.impl.ts
+import { MiddlewareImpl } from "@confect/server";
+import type databaseSchema from "../_generated/schema";
+import RequireUser, { CurrentUser } from "./RequireUser.spec";
+import { loadCurrentUser } from "./loadCurrentUser";
+
+const middleware = MiddlewareImpl.forSchema<typeof databaseSchema>();
+
+export default middleware.provides(RequireUser, CurrentUser, loadCurrentUser);
+```
+
+Here, `loadCurrentUser` is your effect that loads the declared service value using the services available to `RequireUser`'s function types. It runs when the middleware handles an invocation, not when the implementation layer is constructed. Existing value-taking constructors remain supported.
+
 ### Providing to the group layer
 
 Provide the middleware implementation to the group's impl layer like any function implementation. `GroupImpl.finalize` only typechecks once every attached middleware's implementation has been provided, and `confect codegen` reports a missing one by name.

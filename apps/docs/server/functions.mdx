@@ -149,6 +149,35 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
   function evaluates at cold start, even when you use only a small part of it.
 </Note>
 
+### Type-only schema bindings
+
+Use `FunctionImpl.forSchema` and `GroupImpl.fromSpec` when the database schema is needed only for handler types. An `import type` keeps the schema module out of the implementation's runtime imports while preserving argument, return, error, and service inference.
+
+```ts confect/notes.impl.ts
+import { FunctionImpl, GroupImpl } from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import type databaseSchema from "./_generated/schema";
+import { DatabaseReader } from "./_generated/services";
+import notes from "./notes.spec";
+
+const makeFunction = FunctionImpl.forSchema<typeof databaseSchema>();
+
+const list = makeFunction(notes, "list", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    return yield* reader.table("notes").collect();
+  }).pipe(Effect.orDie),
+);
+
+export default GroupImpl.fromSpec(notes).pipe(
+  Layer.provide(list),
+  GroupImpl.finalize,
+);
+```
+
+The existing `FunctionImpl.make(databaseSchema, ...)` and `GroupImpl.make(databaseSchema, group)` constructors remain supported. `GroupImpl.fromSpec` preserves the same function and middleware completeness requirements. Generated runtime registrations still supply the database schema where codecs need its value; other runtime imports in your implementation can also reach table schemas.
+
 ## Logging
 
 Use `Effect.log*` in your handlers. Confect routes logs through Convex's console
