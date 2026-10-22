@@ -52,6 +52,61 @@ for (const platform of [
   layer(platform.layer)(
     `OutputPublisher physical targets on ${platform.name}`,
     (it) => {
+      it.effect.each(["schema.ts", "SCHEMA.ts", "SCHEMA.ts/child.ts"])(
+        "checks fixed Convex bindings against cross-namespace target %s before observations",
+        (relativePath) =>
+          Effect.gen(function* () {
+            const path = yield* Path.Path;
+            const owner = path.join(platform.root, "confect/_generated");
+            const inspections = yield* Ref.make(0);
+            const plan = yield* Effect.fromResult(
+              OutputPlan.make([
+                OutputPlan.Operation.Write({
+                  target: OutputPlan.Target.ConvexBinding({
+                    relativePath: "schema.ts",
+                  }),
+                  contents: "schema",
+                }),
+                OutputPlan.Operation.Remove({
+                  target: OutputPlan.Target.Registry({ relativePath }),
+                }),
+              ]),
+            );
+            const missing = FileSystem.makeNoop({});
+            const result = yield* OutputPublisher.publish(plan).pipe(
+              Effect.provideService(ProjectRoot, {
+                get: Effect.succeed(platform.root),
+              }),
+              Effect.provideService(ConfectDirectory, {
+                get: Effect.succeed(path.join(platform.root, "confect")),
+              }),
+              Effect.provideService(ConvexDirectory, {
+                get: Effect.succeed(path.join(owner, "registeredFunctions")),
+              }),
+              Effect.provideService(
+                FileSystem.FileSystem,
+                FileSystem.makeNoop({
+                  readLink: (file) =>
+                    Ref.update(inspections, (count) => count + 1).pipe(
+                      Effect.andThen(missing.readLink(file)),
+                    ),
+                  makeDirectory: () => Effect.void,
+                  writeFileString: () => Effect.void,
+                }),
+              ),
+              Effect.result,
+            );
+            if (platform.conflicts || relativePath === "schema.ts") {
+              assert(Result.isFailure(result));
+              expect(result.failure).toMatchObject({
+                _tag: "OutputPathError",
+                reason: "ConflictingTarget",
+              });
+              expect(yield* Ref.get(inspections)).toBe(0);
+            } else assert(Result.isSuccess(result));
+          }),
+      );
+
       it.effect.each([
         {
           namespace: "ScopedRef",
@@ -471,6 +526,121 @@ const metadataCalls = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   });
 
 layer(NodeServices.layer)("OutputPublisher", (it) => {
+  it.effect(
+    "retains partial fixed binding writes and observes actual files on removal retry",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const project = yield* fixture;
+        const http = path.join(project.convex, "http.ts");
+        const auth = path.join(project.convex, "auth.config.ts");
+        const components = path.join(
+          project.confect,
+          "_generated/components.ts",
+        );
+        yield* fs.writeFileString(http, "previous HTTP");
+        yield* fs.writeFileString(auth, "unselected authored auth\r\n");
+        const plan = yield* Effect.fromResult(
+          OutputPlan.make([
+            OutputPlan.Operation.Write({
+              target: OutputPlan.Target.Binding({
+                relativePath: "components.ts",
+              }),
+              contents: "components",
+            }),
+            OutputPlan.Operation.Remove({
+              target: OutputPlan.Target.ConvexBinding({
+                relativePath: "http.ts",
+              }),
+            }),
+          ]),
+        );
+        const failure = PlatformError.systemError({
+          _tag: "PermissionDenied",
+          module: "FileSystem",
+          method: "remove",
+          pathOrDescriptor: http,
+          cause: { code: "EACCES" },
+        });
+        const result = yield* project
+          .provide(OutputPublisher.publish(plan))
+          .pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              remove: (file, options) =>
+                file === http ? Effect.fail(failure) : fs.remove(file, options),
+            }),
+            Effect.result,
+          );
+        assert(Result.isFailure(result));
+        expect(result.failure).toBe(failure);
+        expect(yield* fs.readFileString(components)).toBe("components");
+        expect(yield* fs.readFileString(http)).toBe("previous HTTP");
+        yield* fs.writeFileString(
+          components,
+          "changed after partial publication",
+        );
+        expect(
+          yield* Project.writtenFiles(
+            project.provide(OutputPublisher.publish(plan)),
+          ),
+        ).toEqual([components]);
+        expect(yield* fs.exists(http)).toBe(false);
+        expect(yield* fs.readFileString(auth)).toBe(
+          "unselected authored auth\r\n",
+        );
+        expect(
+          yield* Project.writtenFiles(
+            project.provide(OutputPublisher.publish(plan)),
+          ),
+        ).toEqual([]);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect.each(["Write", "Remove"] as const)(
+    "rejects a fixed optional %s through an alias before publishing components",
+    (action) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const project = yield* fixture;
+        const outside = path.join(project.root, "authored.ts");
+        const alias = path.join(project.convex, "http.ts");
+        yield* fs.writeFileString(outside, "authored");
+        yield* fs.symlink(outside, alias);
+        const target = OutputPlan.Target.ConvexBinding({
+          relativePath: "http.ts",
+        });
+        const plan = yield* Effect.fromResult(
+          OutputPlan.make([
+            OutputPlan.Operation.Write({
+              target: OutputPlan.Target.Binding({
+                relativePath: "components.ts",
+              }),
+              contents: "components",
+            }),
+            action === "Write"
+              ? OutputPlan.Operation.Write({ target, contents: "http" })
+              : OutputPlan.Operation.Remove({ target }),
+          ]),
+        );
+        const result = yield* project
+          .provide(OutputPublisher.publish(plan))
+          .pipe(Effect.result);
+        assert(Result.isFailure(result));
+        expect(result.failure).toMatchObject({
+          _tag: "OutputPathError",
+          reason: "SymbolicLink",
+          path: alias,
+        });
+        expect(yield* fs.exists(path.join(project.confect, "_generated"))).toBe(
+          false,
+        );
+        expect(yield* fs.readFileString(outside)).toBe("authored");
+      }).pipe(Effect.scoped),
+  );
+
   it.effect.each(["unowned.txt", "stale.ts"])(
     "rejects nonregular scoped entry %s before reading contents",
     (relativePath) =>

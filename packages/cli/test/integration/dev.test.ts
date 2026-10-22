@@ -788,6 +788,48 @@ if (existsSync(block)) {
     );
 
     it.effect(
+      "retains selected optional removal after publication fails and leaves unselected outputs untouched",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.write(
+            "confect/auth.ts",
+            "export default { providers: [] };\n",
+          );
+          yield* project.write("convex/http.ts", "authored HTTP\r\n");
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const generated = path.join(project.root, "convex/auth.config.ts");
+          const original = yield* fs.readFileString(generated);
+          const authored = path.join(project.root, "preserved.ts");
+          yield* fs.writeFileString(authored, "authored target\r\n");
+          yield* fs.remove(generated);
+          yield* fs.symlink(authored, generated);
+          yield* Ref.set(watching.output, "");
+          yield* fs.remove(path.join(project.root, "confect/auth.ts"));
+          yield* watching.waitFor("SymbolicLink");
+          expect(yield* Ref.get(watching.output)).not.toContain(success);
+          expect(yield* fs.readFileString(authored)).toBe(
+            "authored target\r\n",
+          );
+          yield* fs.remove(generated);
+          yield* fs.writeFileString(generated, original);
+          yield* project.write("confect/notes.impl.ts", `${Project.impl}\n`);
+          yield* watching.waitFor(success);
+          expect(yield* fs.exists(generated)).toBe(false);
+          expect(
+            yield* fs.readFileString(path.join(project.root, "convex/http.ts")),
+          ).toBe("authored HTTP\r\n");
+          expect(yield* fs.readFileString(authored)).toBe(
+            "authored target\r\n",
+          );
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "does not hide a failing impl when an unrelated impl is edited",
       () =>
         Effect.gen(function* () {

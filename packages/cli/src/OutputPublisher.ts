@@ -13,8 +13,8 @@ import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import { ProjectRoot } from "./ProjectRoot";
 import * as OutputPlan from "./OutputPlan";
-import { logFileRemoved } from "./log";
-import { removePathIfExists, writeFileStringAndLog } from "./utils";
+import { logFileAdded, logFileModified, logFileRemoved } from "./log";
+import { removePathIfExists, writeFileString } from "./utils";
 
 export class PathError extends Schema.TaggedError<PathError>()(
   "OutputPathError",
@@ -220,7 +220,7 @@ const isOwnedScopedRef = (contents: string) =>
   contents.startsWith(SCOPED_REFS_HEADER + "\r\n");
 
 export const discover = Effect.fn("OutputPublisher.discover")(function* (
-  namespace: Exclude<OutputPlan.Target["_tag"], "Binding">,
+  namespace: Exclude<OutputPlan.Target["_tag"], "Binding" | "ConvexBinding">,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -306,6 +306,15 @@ export const discover = Effect.fn("OutputPublisher.discover")(function* (
 
 export const publish = Effect.fn("OutputPublisher.publish")(function* (
   plan: OutputPlan.OutputPlan,
+  logChange: (
+    change: "Added" | "Modified" | "Removed",
+    file: string,
+  ) => Effect.Effect<void, never, ProjectRoot | Path.Path> = (change, file) =>
+    ({
+      Added: logFileAdded,
+      Modified: logFileModified,
+      Removed: logFileRemoved,
+    })[change](file),
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -320,6 +329,7 @@ export const publish = Effect.fn("OutputPublisher.publish")(function* (
         Registry: ({ relativePath }) =>
           path.join(confect, "_generated", "registeredFunctions", relativePath),
         ConvexModule: ({ relativePath }) => path.join(convex, relativePath),
+        ConvexBinding: ({ relativePath }) => path.join(convex, relativePath),
         TableWrapper: ({ relativePath }) =>
           path.join(confect, "_generated", "tables", relativePath),
         ScopedRef: ({ relativePath }) =>
@@ -400,7 +410,8 @@ export const publish = Effect.fn("OutputPublisher.publish")(function* (
                 yield* fs.makeDirectory(directory, { recursive: true });
               preparedDirectories = HashSet.add(preparedDirectories, key);
             }
-            yield* writeFileStringAndLog(file, contents);
+            const change = yield* writeFileString(file, contents);
+            if (change !== "Unchanged") yield* logChange(change, file);
           }),
         Remove: ({ target }) =>
           Effect.gen(function* () {
@@ -412,7 +423,7 @@ export const publish = Effect.fn("OutputPublisher.publish")(function* (
             if (target._tag === "ConvexModule")
               yield* Effect.logDebug(`Group '${target.relativePath}' removed`);
             if (exists || target._tag === "ConvexModule")
-              yield* logFileRemoved(file);
+              yield* logChange("Removed", file);
           }),
       }),
   );

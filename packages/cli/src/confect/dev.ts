@@ -1,5 +1,4 @@
 import * as Command from "effect/cli/Command";
-import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
@@ -32,7 +31,8 @@ import * as DevSupervisor from "../DevSupervisor";
 import * as EntryPoint from "../EntryPoint";
 import * as SpecModulePath from "../SpecModulePath";
 import { ConfectDirectory } from "../ConfectDirectory";
-import { compileOptionalModules } from "./codegen";
+import { compileOptionalModules, planOptionalBindings } from "./codegen";
+import * as OutputPublisher from "../OutputPublisher";
 import * as Evaluation from "../Evaluation";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
@@ -49,12 +49,7 @@ import {
   logSuccess,
 } from "../log";
 import { ProjectRoot } from "../ProjectRoot";
-import {
-  generateAuthConfig,
-  generateCrons,
-  generateHttp,
-  touchConvexSchema,
-} from "../utils";
+import { touchConvexSchema } from "../utils";
 
 const changeChar = (change: "Added" | "Removed" | "Modified") =>
   Match.value(change).pipe(
@@ -502,20 +497,11 @@ const syncLoop = Effect.fnUntraced(function* (
         ),
       );
       yield* Effect.gen(function* () {
-        yield* Effect.all(
-          [
-            ...(HashSet.has(optional, "Http")
-              ? [syncOptionalFile(generateHttp, "http.ts")]
-              : []),
-            ...(HashSet.has(optional, "Crons")
-              ? [syncOptionalFile(generateCrons, "crons.ts")]
-              : []),
-            ...(HashSet.has(optional, "Auth")
-              ? [syncOptionalFile(generateAuthConfig, "auth.config.ts")]
-              : []),
-          ],
-          { concurrency: "unbounded" },
+        const optionalPlan = yield* planOptionalBindings(
+          Array.fromIterable(optional),
+          "Remove",
         );
+        yield* OutputPublisher.publish(optionalPlan, logFileChangeIndented);
         if (
           SyncState.Operation.$is("Update")(operation) ||
           !HashSet.isEmpty(optional)
@@ -601,32 +587,3 @@ const syncLoop = Effect.fnUntraced(function* (
     }
   }
 });
-
-const syncOptionalFile = (generate: typeof generateHttp, convexFile: string) =>
-  pipe(
-    generate,
-    Effect.andThen(
-      Option.match({
-        onSome: ({ change, convexFilePath }) =>
-          Match.value(change).pipe(
-            Match.when("Unchanged", () => Effect.void),
-            Match.whenOr("Added", "Modified", (addedOrModified) =>
-              logFileChangeIndented(addedOrModified, convexFilePath),
-            ),
-            Match.exhaustive,
-          ),
-        onNone: () =>
-          Effect.gen(function* () {
-            const fs = yield* FileSystem.FileSystem;
-            const path = yield* Path.Path;
-            const convexDirectory = yield* ConvexDirectory.get;
-            const convexFilePath = path.join(convexDirectory, convexFile);
-
-            if (yield* fs.exists(convexFilePath)) {
-              yield* fs.remove(convexFilePath);
-              yield* logFileChangeIndented("Removed", convexFilePath);
-            }
-          }),
-      }),
-    ),
-  );

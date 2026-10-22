@@ -6,8 +6,6 @@ import * as Effect from "effect/Effect";
 import { pipe } from "effect/Function";
 import * as HashSet from "effect/HashSet";
 import * as HashMap from "effect/HashMap";
-import * as Match from "effect/Match";
-import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import * as EvaluationSession from "../EvaluationSession";
 import * as Bundler from "../Bundler";
@@ -29,12 +27,13 @@ import * as OutputPublisher from "../OutputPublisher";
 import * as RegisteredFunctions from "../RegisteredFunctions";
 import * as ReferenceBindings from "../ReferenceBindings";
 import * as StaticBindings from "../StaticBindings";
+import * as ComponentBindings from "../ComponentBindings";
+import * as ConvexBindings from "../ConvexBindings";
 import * as EntryPoint from "../EntryPoint";
 import type { ImplModulePath } from "../ImplModulePath";
 import { implPathForSpec } from "../LeafModule";
 import {
   logFileAdded,
-  logFileModified,
   logFileRemoved,
   logPending,
   logSuccess,
@@ -44,25 +43,9 @@ import {
 import { ProjectRoot } from "../ProjectRoot";
 import { SpecModulePath } from "../SpecModulePath";
 import * as TableModule from "../TableModule";
-import * as templates from "../templates";
-import {
-  generateAuthConfig,
-  generateCrons,
-  generateHttp,
-  removePathIfExists,
-  toModuleImportPath,
-  touchConvexSchema,
-  writeFileStringAndLog,
-} from "../utils";
+import { removePathIfExists, touchConvexSchema } from "../utils";
 
 const GENERATED_DIRNAME = "_generated";
-
-const GENERATED_CONVEX_SCHEMA_PATH = Effect.map(Path.Path, (path) =>
-  path.join(GENERATED_DIRNAME, "convexSchema.ts"),
-);
-const GENERATED_COMPONENTS_PATH = Effect.map(Path.Path, (path) =>
-  path.join(GENERATED_DIRNAME, "components.ts"),
-);
 
 const LEGACY_PATHS = Effect.gen(function* () {
   const path = yield* Path.Path;
@@ -134,22 +117,11 @@ const runCodegen = Effect.gen(function* () {
     ),
   );
   const referenceBindings = yield* ReferenceBindings.renderPlan(leaves);
-  const specPlan = yield* Effect.fromResult(
-    OutputPlan.make(
-      referenceBindings.operations.filter(
-        ({ target }) =>
-          target._tag === "Binding" && target.relativePath === "spec.ts",
-      ),
-    ),
-  );
   const refsPlan = yield* Effect.fromResult(
     OutputPlan.diff(
       Array.filter(
         referenceBindings.operations,
         OutputPlan.Operation.$is("Write"),
-      ).filter(
-        ({ target }) =>
-          target._tag !== "Binding" || target.relativePath !== "spec.ts",
       ),
       scopedRefFiles,
     ),
@@ -157,7 +129,7 @@ const runCodegen = Effect.gen(function* () {
   yield* generateConfectGeneratedDirectory;
   yield* OutputPublisher.publish(staticPlan);
   yield* removeLegacyFiles;
-  yield* OutputPublisher.publish(specPlan);
+  yield* OutputPublisher.publish(refsPlan);
   // `_generated/api.ts`/`nodeApi.ts` are no longer imported by generated or
   // impl code (impls take the database schema from `_generated/schema`
   // directly), so remove any copies left over from earlier versions before
@@ -165,7 +137,6 @@ const runCodegen = Effect.gen(function* () {
   yield* Effect.all(
     [
       removeGeneratedApi,
-      OutputPublisher.publish(refsPlan),
       removeGeneratedNodeApi,
       // Must land before impl validation: impls may import the generated
       // components registry, so it has to exist when their bundles are built.
@@ -199,16 +170,22 @@ const runCodegen = Effect.gen(function* () {
       [...ownedRegistries, ...ownedModules],
     ),
   );
-  yield* OutputPublisher.publish(outputPlan);
-  yield* Effect.all(
-    [
-      generateConvexSchemaReexport,
-      logGenerated(generateHttp),
-      logGenerated(generateCrons),
-      logGenerated(generateAuthConfig),
-    ],
-    { concurrency: "unbounded" },
+  const schemaPlan = yield* ConvexBindings.renderSchema(
+    confectDirectory,
+    yield* ConvexDirectory.get,
   );
+  const optionalPlan = yield* planOptionalBindings(
+    ["Http", "Crons", "Auth"],
+    "Preserve",
+  );
+  const validatedPlan = yield* Effect.fromResult(
+    OutputPlan.make([
+      ...outputPlan.operations,
+      ...schemaPlan.operations,
+      ...optionalPlan.operations,
+    ]),
+  );
+  yield* OutputPublisher.publish(validatedPlan);
   yield* compileOptionalModules;
   return {
     functionPaths: GenerationSnapshot.functionPaths(snapshot),
@@ -254,6 +231,32 @@ export const compileOptionalModules = Effect.gen(function* () {
     ),
   );
 }).pipe(Effect.scoped);
+
+export const planOptionalBindings = Effect.fn("Cli.planOptionalBindings")(
+  function* (
+    files: ReadonlyArray<EntryPoint.OptionalFile>,
+    missing: "Preserve" | "Remove",
+  ) {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const confect = yield* ConfectDirectory.get;
+    const convex = yield* ConvexDirectory.get;
+    const intents = yield* Effect.forEach(files, (file) =>
+      Effect.gen(function* () {
+        if (yield* fs.exists(path.join(confect, ConvexBindings.source[file])))
+          return [{ file, action: "Write" as const }];
+        return missing === "Remove"
+          ? [{ file, action: "Remove" as const }]
+          : [];
+      }),
+    );
+    return yield* ConvexBindings.renderOptionals(
+      Array.flatten(intents),
+      confect,
+      convex,
+    );
+  },
+);
 
 export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
   function* (
@@ -411,29 +414,6 @@ const warnIfNoTables = (
       )
     : Effect.void;
 
-const generateConvexSchemaReexport = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const convexDirectory = yield* ConvexDirectory.get;
-  const generatedConvexSchemaRelativePath = yield* GENERATED_CONVEX_SCHEMA_PATH;
-
-  const convexSchemaPath = path.join(convexDirectory, "schema.ts");
-  const generatedConvexSchemaPath = path.join(
-    confectDirectory,
-    generatedConvexSchemaRelativePath,
-  );
-
-  const convexSchemaImportPath = yield* toModuleImportPath(
-    path.relative(path.dirname(convexSchemaPath), generatedConvexSchemaPath),
-  );
-
-  const schemaContents = yield* templates.schema({
-    convexSchemaImportPath,
-  });
-
-  yield* writeFileStringAndLog(convexSchemaPath, schemaContents);
-});
-
 /**
  * Two tables whose names fold to the same PascalCase document type name (e.g.
  * `user_profiles` and `userProfiles` → `UserProfilesDoc`) would emit duplicate
@@ -475,13 +455,6 @@ export const generateComponents = Effect.gen(function* () {
   const convexDirectory = yield* ConvexDirectory.get;
   const projectRoot = yield* ProjectRoot.get;
 
-  const confectGeneratedDirectory = path.join(
-    confectDirectory,
-    GENERATED_DIRNAME,
-  );
-  const generatedComponentsPath = yield* GENERATED_COMPONENTS_PATH;
-  const componentsPath = path.join(confectDirectory, generatedComponentsPath);
-
   const convexConfigPath = path.join(
     convexDirectory,
     ConvexConfig.CONVEX_CONFIG_FILENAME,
@@ -494,35 +467,7 @@ export const generateComponents = Effect.gen(function* () {
       )
     : [];
 
-  const contents = yield* templates.components({
-    components: Array.map(
-      installedComponents,
-      ({ name, componentDefinitionPath }) => ({
-        name,
-        typeImportPath: ConvexConfig.typeImportPath(
-          path,
-          componentDefinitionPath,
-          confectGeneratedDirectory,
-        ),
-      }),
-    ),
-  });
-
-  yield* writeFileStringAndLog(componentsPath, contents);
-}).pipe(EvaluationSession.provide);
-
-const logGenerated = (effect: typeof generateHttp) =>
-  effect.pipe(
-    Effect.tap(
-      Option.match({
-        onNone: () => Effect.void,
-        onSome: ({ change, convexFilePath }) =>
-          Match.value(change).pipe(
-            Match.when("Added", () => logFileAdded(convexFilePath)),
-            Match.when("Modified", () => logFileModified(convexFilePath)),
-            Match.when("Unchanged", () => Effect.void),
-            Match.exhaustive,
-          ),
-      }),
-    ),
+  yield* OutputPublisher.publish(
+    yield* ComponentBindings.renderPlan(installedComponents, confectDirectory),
   );
+}).pipe(EvaluationSession.provide);
