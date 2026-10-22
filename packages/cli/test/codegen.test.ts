@@ -1424,6 +1424,86 @@ ${Project.impl}`,
       { timeout: 30000 },
     );
 
+    it.effect(
+      "recovers partial scoped publication before recording or notifying a successful generation",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* project.provide(codegenHandler);
+          const generated = path.join(project.root, "confect/_generated");
+          const recordPath = path.join(generated, ".confect-generation.json");
+          const record = yield* fs.readFileString(recordPath);
+          const deployment = path.join(project.root, "convex/schema.ts");
+          const timestamp = DateTime.toDateUtc(DateTime.makeUnsafe(1000));
+          yield* fs.utimes(deployment, timestamp, timestamp);
+          yield* fs.makeDirectory(path.join(project.root, "confect/notes"));
+          yield* project.write(
+            "confect/notes/child.spec.ts",
+            Project.spec.replaceAll('"./_generated/', '"../_generated/'),
+          );
+          yield* project.write(
+            "confect/notes/child.impl.ts",
+            Project.impl
+              .replaceAll('"./_generated/', '"../_generated/')
+              .replace('"./notes.spec"', '"./child.spec"'),
+          );
+          const stale = path.join(generated, "refs/stale.ts");
+          yield* fs.writeFileString(stale, SCOPED_REFS_HEADER + "\nold");
+          const child = path.join(generated, "refs/notes/child.ts");
+          const failure = PlatformError.systemError({
+            _tag: "PermissionDenied",
+            module: "FileSystem",
+            method: "writeFileString",
+            pathOrDescriptor: child,
+            cause: { code: "EACCES" },
+          });
+          const result = yield* project.provide(codegenHandler).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              writeFileString: (...args) =>
+                args[0] === child
+                  ? Effect.fail(failure)
+                  : fs.writeFileString(...args),
+            }),
+            Effect.result,
+          );
+          assert(Result.isFailure(result));
+          expect(result.failure).toBe(failure);
+          expect(
+            yield* fs.readFileString(path.join(generated, "spec.ts")),
+          ).toContain("notes/child.spec");
+          expect(
+            yield* fs.readFileString(path.join(generated, "refs/notes.ts")),
+          ).toContain("notes/child.spec");
+          expect(yield* fs.exists(child)).toBe(false);
+          expect(yield* fs.exists(stale)).toBe(true);
+          expect(yield* fs.readFileString(recordPath)).toBe(record);
+          expect(
+            Option.getOrThrow((yield* fs.stat(deployment)).mtime).getTime(),
+          ).toBe(1000);
+          yield* fs.writeFileString(stale, "authored replacement");
+          yield* TestClock.setTime(2000);
+          const writes = yield* Project.writtenFiles(
+            project.provide(codegenHandler),
+          );
+          expect(writes).toContain(child);
+          expect(writes).not.toContain(path.join(generated, "spec.ts"));
+          expect(writes).not.toContain(path.join(generated, "refs.ts"));
+          expect(writes).not.toContain(path.join(generated, "refs/notes.ts"));
+          expect(yield* fs.readFileString(stale)).toBe("authored replacement");
+          expect(yield* fs.readFileString(recordPath)).not.toBe(record);
+          expect(
+            Option.getOrThrow((yield* fs.stat(deployment)).mtime).getTime(),
+          ).toBe(2000);
+          expect(
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect.each([
       {
         name: "generated directory alias",
@@ -1452,6 +1532,20 @@ ${Project.impl}`,
         kind: "File",
         reason: "SymbolicLink",
         targetExists: true,
+      },
+      {
+        name: "unowned non-TypeScript alias",
+        alias: "confect/_generated/refs/authored.txt",
+        kind: "File",
+        reason: "SymbolicLink",
+        targetExists: true,
+      },
+      {
+        name: "dangling non-TypeScript alias",
+        alias: "confect/_generated/refs/authored.txt",
+        kind: "File",
+        reason: "SymbolicLink",
+        targetExists: false,
       },
       {
         name: "dangling file alias",
