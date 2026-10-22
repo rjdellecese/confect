@@ -86,6 +86,7 @@
         "packages/cli/src/EvaluationSession.ts",
         "packages/cli/test/Evaluation.test.ts",
         "packages/cli/src/DevSupervisor.ts",
+        "packages/cli/src/NodeServices.ts",
         "packages/cli/test/DevSupervisor.test.ts",
         "packages/cli/test/integration/DevSupervisor.test.ts"
       ],

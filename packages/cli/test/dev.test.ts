@@ -1,4 +1,4 @@
-import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeServices from "@confect/cli/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as Command from "effect/cli/Command";
