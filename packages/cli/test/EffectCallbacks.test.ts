@@ -9,6 +9,7 @@ import type { EvaluationError } from "@confect/cli/Evaluation";
 import type * as FunctionPaths from "@confect/cli/FunctionPaths";
 import type * as GroupPath from "@confect/cli/GroupPath";
 import type * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
+import type * as GenerationRecord from "@confect/cli/GenerationRecord";
 import type { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as TableModule from "@confect/cli/TableModule";
 import { codegenHandler } from "@confect/cli/confect/codegen";
@@ -73,6 +74,8 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
       | CompilationInputs.RestartRequired
       | EvaluationError
       | GroupPath.GroupModulePathIsNotATypeScriptFileError
+      | GenerationRecord.EncodingError
+      | GenerationRecord.PathError
       | PlatformError,
       GenerationServices | ProjectRoot
     >
@@ -84,6 +87,8 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
       {},
       | BundlerError
       | ConfigError
+      | GenerationRecord.EncodingError
+      | GenerationRecord.PathError
       | EvaluationError
       | PlatformError
       | DevSupervisor.MissingSessionIpc

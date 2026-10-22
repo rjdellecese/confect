@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "snapshot": [
+    [
+      "groups/cacheControl.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "control",
+            "provenance": "Convex"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/cacheStubbed.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "confectNoTime",
+            "provenance": "Confect"
+          },
+          {
+            "name": "confectWithClock",
+            "provenance": "Confect"
+          },
+          {
+            "name": "confectWithLog",
+            "provenance": "Confect"
+          },
+          {
+            "name": "confectWithRawDateNow",
+            "provenance": "Confect"
+          },
+          {
+            "name": "confectWithSpan",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/metadata.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "actionMetadata",
+            "provenance": "Confect"
+          },
+          {
+            "name": "mutationMetadata",
+            "provenance": "Confect"
+          },
+          {
+            "name": "queryMetadata",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/scheduling.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "manyOpsMutation",
+            "provenance": "Confect"
+          },
+          {
+            "name": "manyOpsQuery",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/storage.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "deleteBlob",
+            "provenance": "Confect"
+          },
+          {
+            "name": "generateUploadUrl",
+            "provenance": "Confect"
+          },
+          {
+            "name": "get",
+            "provenance": "Confect"
+          },
+          {
+            "name": "getUrl",
+            "provenance": "Confect"
+          },
+          {
+            "name": "store",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/transactions.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "limitedRead",
+            "provenance": "Confect"
+          },
+          {
+            "name": "limitedReadFromMutation",
+            "provenance": "Confect"
+          },
+          {
+            "name": "limitedWrite",
+            "provenance": "Confect"
+          },
+          {
+            "name": "read",
+            "provenance": "Confect"
+          },
+          {
+            "name": "rollback",
+            "provenance": "Confect"
+          },
+          {
+            "name": "seed",
+            "provenance": "Confect"
+          },
+          {
+            "name": "staleRead",
+            "provenance": "Confect"
+          },
+          {
+            "name": "write",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "metadataNode.spec.ts",
+      {
+        "runtime": "Node",
+        "functions": [
+          {
+            "name": "metadata",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ]
+  ]
+}

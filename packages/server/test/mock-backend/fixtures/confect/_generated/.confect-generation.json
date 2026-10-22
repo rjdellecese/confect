@@ -1,0 +1,295 @@
+{
+  "version": 1,
+  "snapshot": [
+    [
+      "databaseReader.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "getNote",
+            "provenance": "Confect"
+          },
+          {
+            "name": "listNotes",
+            "provenance": "Confect"
+          },
+          {
+            "name": "paginateNotes",
+            "provenance": "Confect"
+          },
+          {
+            "name": "paginateNotesOrFail",
+            "provenance": "Confect"
+          },
+          {
+            "name": "paginateNotesWithFilter",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/aliasImporter.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "echo",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/cjsImporter.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "now",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/middleware.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "firstNoteForViewer",
+            "provenance": "Confect"
+          },
+          {
+            "name": "shoutName",
+            "provenance": "Confect"
+          },
+          {
+            "name": "viewerName",
+            "provenance": "Confect"
+          },
+          {
+            "name": "viewerNameAction",
+            "provenance": "Confect"
+          },
+          {
+            "name": "viewerNameMutation",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/middlewareHelpers.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "firstUsername",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/middlewareOptions.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "action",
+            "provenance": "Confect"
+          },
+          {
+            "name": "longName",
+            "provenance": "Confect"
+          },
+          {
+            "name": "mutation",
+            "provenance": "Confect"
+          },
+          {
+            "name": "shortName",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/middlewareOrder.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "record",
+            "provenance": "Confect"
+          },
+          {
+            "name": "recordPlain",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/notes.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "delete_",
+            "provenance": "Confect"
+          },
+          {
+            "name": "getFirst",
+            "provenance": "Confect"
+          },
+          {
+            "name": "insert",
+            "provenance": "Confect"
+          },
+          {
+            "name": "internalGetFirst",
+            "provenance": "Confect"
+          },
+          {
+            "name": "list",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/random.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "getNumber",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/random/stats.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "count",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/runners.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "countNotesViaRunner",
+            "provenance": "Confect"
+          },
+          {
+            "name": "getNumberViaRunner",
+            "provenance": "Confect"
+          },
+          {
+            "name": "insertNoteViaRunner",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/scheduling.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "manyOpsMutation",
+            "provenance": "Confect"
+          },
+          {
+            "name": "manyOpsQuery",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "groups/typedErrors.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "deleteNoteOrFail",
+            "provenance": "Confect"
+          },
+          {
+            "name": "failingAction",
+            "provenance": "Confect"
+          },
+          {
+            "name": "getNoteOrFail",
+            "provenance": "Confect"
+          },
+          {
+            "name": "insertThenFail",
+            "provenance": "Confect"
+          },
+          {
+            "name": "internalGetNoteOrFail",
+            "provenance": "Confect"
+          },
+          {
+            "name": "tryDeleteNote",
+            "provenance": "Confect"
+          },
+          {
+            "name": "tryFailingAction",
+            "provenance": "Confect"
+          },
+          {
+            "name": "tryGetNote",
+            "provenance": "Confect"
+          },
+          {
+            "name": "tryInternalGetNote",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "typedErrorsNode.spec.ts",
+      {
+        "runtime": "Node",
+        "functions": [
+          {
+            "name": "failingNodeAction",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ]
+  ]
+}

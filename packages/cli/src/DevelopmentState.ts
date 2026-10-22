@@ -80,23 +80,49 @@ export const acknowledgeFailures = (
     })),
   );
 
+const inventoryKey = (entry: EntryPoint): string =>
+  `${entry._tag}:${entry.absolutePath}:${entry.inputPath}`;
+
+export const onlyConsumedImplsAdded = (
+  before: ReadonlyArray<EntryPoint>,
+  after: ReadonlyArray<EntryPoint>,
+  consumed: ReadonlyArray<Receipt>,
+  topology: ReadonlyArray<Topology>,
+): boolean => {
+  if (after.length <= before.length) return false;
+  const previous = HashSet.fromIterable(Array.map(before, inventoryKey));
+  const current = HashSet.fromIterable(Array.map(after, inventoryKey));
+  if (
+    !Array.every(before, (entry) => HashSet.has(current, inventoryKey(entry)))
+  )
+    return false;
+  const contexts = HashSet.fromIterable(
+    Array.flatMap(topology, (context) =>
+      context.profile === "modules" ? [context.id] : [],
+    ),
+  );
+  const covered = HashSet.fromIterable(
+    Array.flatMap(consumed, (receipt) =>
+      HashSet.has(contexts, receipt.context) ? receipt.roots : [],
+    ),
+  );
+  return Array.every(
+    after,
+    (entry) =>
+      HashSet.has(previous, inventoryKey(entry)) ||
+      (entry._tag === "Impl" &&
+        entry.absolutePath === entry.inputPath &&
+        HashSet.has(covered, entry.inputPath)),
+  );
+};
+
 export const sameInventory = (
   before: ReadonlyArray<EntryPoint>,
   after: ReadonlyArray<EntryPoint>,
 ): boolean => {
-  const keys = HashSet.fromIterable(
-    Array.map(
-      before,
-      (entry) => `${entry._tag}:${entry.absolutePath}:${entry.inputPath}`,
-    ),
-  );
+  const keys = HashSet.fromIterable(Array.map(before, inventoryKey));
   return (
     HashSet.size(keys) === after.length &&
-    Array.every(after, (entry) =>
-      HashSet.has(
-        keys,
-        `${entry._tag}:${entry.absolutePath}:${entry.inputPath}`,
-      ),
-    )
+    Array.every(after, (entry) => HashSet.has(keys, inventoryKey(entry)))
   );
 };

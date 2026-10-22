@@ -7,7 +7,6 @@ import * as Rpc from "effect/rpc/Rpc";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import * as CodegenError from "./CodegenError";
 import * as GenerationSnapshot from "./GenerationSnapshot";
-import { FunctionPaths } from "./FunctionPaths";
 import { SpecModulePath } from "./SpecModulePath";
 
 export const RequestContext = Schema.Struct({
@@ -26,11 +25,6 @@ export class EvaluationError extends Schema.TaggedError<EvaluationError>()(
 const Error = Schema.Union([CodegenError.CodegenError, EvaluationError]);
 
 export const requests = RpcGroup.make(
-  Rpc.make("Previous", {
-    payload: Schema.Struct({ ...RequestContext.fields, url: Schema.String }),
-    success: FunctionPaths,
-    error: Error,
-  }),
   Rpc.make("LoadSpec", {
     payload: Schema.Struct({
       ...RequestContext.fields,
