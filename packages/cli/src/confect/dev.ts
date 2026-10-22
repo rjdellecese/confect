@@ -257,16 +257,27 @@ const syncLoop = Effect.fnUntraced(function* (
   const lastLoggedErrors = yield* Ref.make("");
   const lastLoggedWarnings = yield* Ref.make("");
 
-  const rescan = Effect.gen(function* () {
+  const rescan = Effect.fnUntraced(function* (
+    consumed: ReadonlyArray<CompilationState.Receipt> = [],
+  ) {
     const previous = yield* Ref.get(inventoryRef);
     const current = yield* EntryPoint.discover;
     if (DevelopmentState.sameInventory(previous, current)) return;
+    yield* Ref.set(inventoryRef, current);
+    if (
+      DevelopmentState.onlyConsumedImplsAdded(
+        previous,
+        current,
+        consumed,
+        yield* compiler.topology,
+      )
+    )
+      return;
     const removed = previous.filter(
       (entry) =>
         EntryPoint.isOptional(entry) &&
         !current.some((next) => next.absolutePath === entry.absolutePath),
     );
-    yield* Ref.set(inventoryRef, current);
     yield* Ref.update(pendingRef, (pending) =>
       SyncState.add(pending, removed, true),
     );
@@ -318,7 +329,7 @@ const syncLoop = Effect.fnUntraced(function* (
         return;
       }
       const change = event.event;
-      if (change.kind !== "Update") yield* rescan;
+      if (change.kind !== "Update") yield* rescan();
       const phase = yield* Ref.get(phaseRef);
       if (change.file === path.join(confect, "schema.ts")) {
         yield* Ref.update(pendingRef, SyncState.full);
@@ -509,7 +520,9 @@ const syncLoop = Effect.fnUntraced(function* (
       yield* Ref.set(functionPathsRef, nextPaths);
       yield* Ref.set(optionalPendingRef, HashSet.empty());
       yield* compiler.verify;
-      yield* rescan;
+      yield* rescan(
+        SyncState.Operation.$is("Generate")(operation) ? job.receipts : [],
+      );
       yield* drain;
       if (SyncState.needsDeploymentNotification(phase))
         yield* touchConvexSchema;
