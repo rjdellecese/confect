@@ -997,14 +997,6 @@ if (existsSync(block)) {
             ).toHaveLength(2);
           }).pipe(Effect.scoped);
           const record = yield* generationRecord(project.root);
-          const fresh = yield* Project.make;
-          const once = yield* fresh.start("codegen");
-          yield* once.waitFor(success);
-          expect(Number(yield* once.handle.exitCode)).toBe(0);
-          expect(yield* generationRecord(fresh.root)).toBe(record);
-          expect(yield* fresh.generatedFiles).toEqual(
-            yield* project.generatedFiles,
-          );
           const repeated = yield* project.start("codegen");
           yield* repeated.waitFor(success);
           expect(yield* repeated.handle.exitCode).toBe(0);
@@ -1016,6 +1008,28 @@ if (existsSync(block)) {
           expect(
             (yield* Ref.get(restarted.output)).split(success),
           ).toHaveLength(2);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "matches generation records across fresh dev and codegen projects",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* Effect.gen(function* () {
+            const watching = yield* project.start("dev");
+            yield* watching.waitFor(success);
+          }).pipe(Effect.scoped);
+          const record = yield* generationRecord(project.root);
+          const fresh = yield* Project.make;
+          const once = yield* fresh.start("codegen");
+          yield* once.waitFor(success);
+          expect(Number(yield* once.handle.exitCode)).toBe(0);
+          expect(yield* generationRecord(fresh.root)).toBe(record);
+          expect(yield* fresh.generatedFiles).toEqual(
+            yield* project.generatedFiles,
+          );
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );

@@ -6,6 +6,7 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
@@ -227,9 +228,12 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         Effect.gen(function* () {
           const project = yield* Project.make;
           const fs = yield* FileSystem.FileSystem;
-          const target = `${project.root}/untouched`;
-          yield* fs.makeDirectory(`${project.root}/confect/_generated`);
-          const alias = `${project.root}/${relative}`;
+          const path = yield* Path.Path;
+          const target = path.join(project.root, "untouched");
+          yield* fs.makeDirectory(
+            path.join(project.root, "confect/_generated"),
+          );
+          const alias = path.join(project.root, relative);
           yield* fs.remove(alias, { recursive: true, force: true });
           yield* fs.symlink(target, alias);
           const guarded = {
@@ -345,14 +349,15 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       Effect.gen(function* () {
         const project = yield* Project.make;
         const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
         yield* project.provide(GenerationRecord.write(yield* snapshot("list")));
-        const directory = `${project.root}/confect/_generated`;
+        const directory = path.join(project.root, "confect/_generated");
         const result = yield* project.provide(GenerationRecord.read).pipe(
           Effect.provideService(FileSystem.FileSystem, {
             ...fs,
             realPath: (file) =>
               file === directory
-                ? Effect.succeed(`${project.root}/elsewhere`)
+                ? Effect.succeed(path.join(project.root, "elsewhere"))
                 : fs.realPath(file),
             readFileString: () =>
               Effect.die("read content outside expected directory"),
@@ -410,7 +415,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         Effect.gen(function* () {
           const project = yield* Project.make;
           const fs = yield* FileSystem.FileSystem;
-          const file = `${project.root}/${relativeFile}`;
+          const path = yield* Path.Path;
+          const file = path.join(project.root, relativeFile);
           yield* fs.makeDirectory(file, { recursive: true });
           const result = yield* project.provide(GenerationRecord.read).pipe(
             Effect.provideService(FileSystem.FileSystem, {
