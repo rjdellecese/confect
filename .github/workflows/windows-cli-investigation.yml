@@ -6,13 +6,13 @@ on:
 jobs:
   source-waits:
     if: github.head_ref == 'capy/windows-cli-timeout-investigation'
-    name: Source waits (${{ matrix.order }})
+    name: Realpath source suite (${{ matrix.order }})
     runs-on: windows-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        order: [control-first, trace-first]
+        order: [control-first, native-first]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
@@ -25,26 +25,28 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $false
           $root = Join-Path $env:RUNNER_TEMP 'source-waits'
           $null = New-Item -ItemType Directory -Path $root -Force
-          $modes = if ($env:EXPERIMENT_ORDER -eq 'control-first') { @('control', 'trace') } else { @('trace', 'control') }
-          $cases = @(
-            @{ id = 'late-edit'; pattern = 'plans dependent declarations before a delayed module revision and verifies a late edit change' },
-            @{ id = 'observed-impl'; pattern = 'uses the observed impl revision without another consumption build' }
-          )
+          $modes = if ($env:EXPERIMENT_ORDER -eq 'control-first') { @('control', 'native') } else { @('native', 'control') }
+          $previousOptions = $env:NODE_OPTIONS
+          $preload = ([Uri](Resolve-Path 'scripts/windowsRealpathExperiment.mjs').Path).AbsoluteUri
+          bun test ./scripts/windowsRealpathExperiment.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $failed = $false
           Push-Location packages/cli
           try {
             foreach ($mode in $modes) {
-              foreach ($case in $cases) {
-                $directory = Join-Path $root "$mode-$($case.id)"
+                $directory = Join-Path $root $mode
                 $null = New-Item -ItemType Directory -Path $directory -Force
-                $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY = if ($mode -eq 'trace') { $directory } else { $null }
+                $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY = $null
+                $env:CONFECT_REALPATH_EXPERIMENT = $mode
+                $env:CONFECT_REALPATH_METRICS_DIRECTORY = $directory
+                $env:NODE_OPTIONS = "$previousOptions --import=$preload"
                 $start = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-                pnpm exec vitest run test/dev.test.ts -t $case.pattern --reporter=default --reporter=json --outputFile.json="$directory/result.json"
+                pnpm exec vitest run test/dev.test.ts --reporter=default --reporter=json --outputFile.json="$directory/result.json"
                 $code = $LASTEXITCODE
                 $end = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
                 @{
                   mode = $mode
-                  case = $case.id
+                  case = 'source-suite'
                   start = $start
                   end = $end
                   exitCode = $code
@@ -53,10 +55,12 @@ jobs:
                   order = $env:EXPERIMENT_ORDER
                 } | ConvertTo-Json | Set-Content (Join-Path $directory 'invocation.json')
                 if ($code -ne 0) { $failed = $true }
-              }
             }
           } finally {
             $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY = $null
+            $env:CONFECT_REALPATH_EXPERIMENT = $null
+            $env:CONFECT_REALPATH_METRICS_DIRECTORY = $null
+            $env:NODE_OPTIONS = $previousOptions
             Pop-Location
           }
           if ($failed) { exit 1 }

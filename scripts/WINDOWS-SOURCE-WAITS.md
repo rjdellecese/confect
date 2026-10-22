@@ -4,10 +4,10 @@ This investigation starts from `098087542592cca2805e02529b4e783b90d539d5`.
 Its production behavior matches the failing `6d235a85` head; its additional
 failure-only checkpoints are not a timeout fix. The root cause is unproven.
 
-## Fixed comparison
+## Initial comparison at `3f3c8c21`
 
-`windows-cli-investigation.yml` runs only for the investigation branch. Two
-Windows jobs each execute the latest failing late-edit and observed-impl
+The first revision ran only for the investigation branch. Two
+Windows jobs each executed the latest failing late-edit and observed-impl
 source scenarios once without tracing and once with tracing. One job runs
 controls first, the other traces first. Both modes use the same checkout,
 dependencies, assertions, 20-second Effect deadlines and 25-second test budgets.
@@ -21,6 +21,57 @@ do not reproduce its accumulated process state, ordering or load. A passing
 isolated run cannot rule out a full-suite failure, and the comparison is not a
 benchmark. Reversed ordering controls one possible warm-up effect; it does not
 make two hosted runners identical or prove runner variability.
+
+All eight isolated invocations passed, but the unchanged full-suite Windows
+job failed the late-edit case at 20 seconds and watcher-operation recovery
+at 15 seconds. The late-edit checkpoints completed initial readiness at
+8.688 seconds and the injected module build at 11.386 seconds, then expired
+waiting for updated readiness with two updates and five rebuilds recorded.
+That failure was not fixture teardown or a blocked injected release.
+
+The isolated late-edit controls took 17.320 and 18.221 seconds. Traced runs
+took 17.850 and 18.915 seconds. Inside-lock guard verification occupied
+4.507/4.824 seconds of the initial wait and 5.149/5.188 seconds of the updated
+wait, measured as clipped unions, not sums. This identifies a costly phase
+but does not prove which filesystem operation caused the failed run.
+
+## Current realpath experiment
+
+The integrity-verified published `@effect/platform-node-shared@4.0.4` archive
+uses Node's `fs.realpath`, not `fs.realpath.native`. The cached opensrc tree
+is mislabeled and actually contains 4.0.6, whose Windows adapter uses the
+native API. The published 4.0.5 archive still uses `fs.realpath`; upgrading to
+that release would not test this mechanism.
+
+The workflow now tests that specific lead, without selecting a production
+fix. Each of two Windows jobs runs the complete source watcher file once
+with the original API and once with the native API, reversing their order
+on the second runner. There are four suite executions (60 runtime cases),
+no retries, and no changes to assertions or deadlines. Every nonzero exit
+fails its job after the remaining planned comparison. Normal full-suite CI
+still has no preloader or phase tracing enabled.
+
+`windowsRealpathExperiment.mjs` is an explicitly enabled, test-only Node
+preloader. It selects the callback implementation before Effect loads, so
+Effect's existing error conversion remains in place. It affects all callback
+`fs.realpath` consumers in that process, including inherited child processes,
+not exclusively the guard; do not attribute its entire effect to one caller.
+Both modes use the same lightweight callback timing wrapper. Metric records
+contain only PID, parent PID, mode, call/completion/error counts and aggregate
+elapsed milliseconds, with one small file per process overwritten once per
+second and on orderly exit. Sampling uses an unreferenced timer and never
+keeps a process alive, and periodic writes stop after ten minutes. A final flag distinguishes exit records from the last
+sample of a forcibly terminated worker. Concurrent callback
+durations overlap and must not be added to phase wall time. Missing reports
+can mean forced termination or collection failure. No path or error text is
+recorded. The preloader does nothing without both explicit experiment values.
+
+Before the comparisons, the workflow checks callback, symlink/junction,
+missing/non-directory path and buffer-encoding behavior in both modes. Phase
+tracing is disabled for this comparison so serialized trace writes cannot be
+mistaken for filesystem-adapter overhead. A timing improvement alone is not
+proof that every historical timeout shares this cause; retain failed controls
+and verify the specific source scenarios against the unchanged deadlines.
 
 ## Evidence
 
