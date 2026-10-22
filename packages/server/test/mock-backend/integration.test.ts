@@ -411,6 +411,46 @@ describe("DatabaseReader", () => {
       assertEquals(notes[9]?.text, "1");
     }).pipe(Effect.provide(TestConfect.layer)),
   );
+
+  it.effect("first and take accept any n, as Stream.take does", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+          const texts = (n: number) =>
+            reader
+              .table("notes")
+              .index("by_text")
+              .take(n)
+              .pipe(Effect.map(Array.map((note) => note.text)));
+
+          expect(yield* reader.table("notes").index("by_text").first()).toEqual(
+            Option.none(),
+          );
+          yield* Effect.forEach(["a", "b", "c"], (text) =>
+            writer.table("notes").insert({ text }),
+          );
+
+          const first = yield* reader.table("notes").index("by_text").first();
+          expect(Option.map(first, (note) => note.text)).toEqual(
+            Option.some("a"),
+          );
+          expect(yield* texts(2)).toEqual(["a", "b"]);
+          expect(yield* texts(2.5)).toEqual(["a", "b"]);
+          expect(yield* texts(0)).toEqual([]);
+          expect(yield* texts(-1)).toEqual([]);
+          expect(yield* texts(Number.POSITIVE_INFINITY)).toEqual([
+            "a",
+            "b",
+            "c",
+          ]);
+        }).pipe(Effect.orDie),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
 });
 
 describe("DatabaseWriter", () => {
