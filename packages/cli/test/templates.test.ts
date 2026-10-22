@@ -9,6 +9,7 @@ import {
   scopedNodesFromLeaves,
 } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
+import { toPosixPath } from "@confect/cli/utils";
 import { FunctionSpec, GroupSpec, Refs, Spec } from "@confect/core";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, it, layer } from "@effect/vitest";
@@ -616,9 +617,11 @@ jobs.public.run;
             returns: 0,
             error: 0,
           });
-          const importedDeclarations = Object.keys(bundled.metafile.inputs)
+          const inputs = Object.keys(bundled.metafile.inputs).map((input) =>
+            toPosixPath(path, path.relative(directory, input)),
+          );
+          const importedDeclarations = inputs
             .filter((input) => input.endsWith(".spec.ts"))
-            .map((input) => path.relative(directory, input))
             .sort();
           expect(importedDeclarations).toEqual(
             leaves
@@ -632,9 +635,7 @@ jobs.public.run;
               .map((leaf) => leaf.relativePath)
               .sort(),
           );
-          expect(Object.keys(bundled.metafile.inputs)).not.toContain(
-            path.join(directory, "_generated/spec.ts"),
-          );
+          expect(inputs).not.toContain("_generated/spec.ts");
         }
         const aggregateSnapshot = refSnapshot(aggregate.module.default);
         expect(aggregateSnapshot).toMatchObject({
@@ -663,9 +664,11 @@ jobs.public.run;
         const isolated = yield* Bundler.bundle(
           path.join(directory, "scoped-notes.ts"),
         );
-        expect(Object.keys(isolated.metafile.inputs)).not.toContain(
-          path.join(directory, "unrelated.spec.ts"),
-        );
+        expect(
+          Object.keys(isolated.metafile.inputs).map((input) =>
+            toPosixPath(path, path.relative(directory, input)),
+          ),
+        ).not.toContain("unrelated.spec.ts");
         const failedAggregate = yield* Effect.result(
           Bundler.bundle(aggregateEntry),
         );

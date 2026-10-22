@@ -29,7 +29,12 @@ import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import { SpecModulePath } from "@confect/cli/SpecModulePath";
 import { TableModulePath } from "@confect/cli/TableModulePath";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
-import { SCOPED_REFS_HEADER } from "@confect/cli/SpecAssemblyNode";
+import {
+  SCOPED_REFS_HEADER,
+  scopedNodesFromLeaves,
+} from "@confect/cli/SpecAssemblyNode";
+import { toLeafModule } from "@confect/cli/LeafModule";
+import * as templates from "@confect/cli/templates";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
@@ -1247,12 +1252,16 @@ ${Project.impl}`,
         const project = yield* Project.make;
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        yield* project.provide(codegenHandler);
+        const scopes = yield* scopedNodesFromLeaves([
+          yield* toLeafModule("notes.spec.ts"),
+        ]);
+        const scope = Option.getOrThrow(Array.head(scopes));
         const currentPath = path.join(
           project.root,
           "confect/_generated/refs/notes.ts",
         );
-        const current = yield* fs.readFileString(currentPath);
+        const current = yield* templates.scopedRefs(scope);
+        yield* fs.makeDirectory(path.dirname(currentPath), { recursive: true });
         yield* fs.writeFileString(
           currentPath,
           current.replaceAll("\n", "\r\n"),
