@@ -82,6 +82,17 @@
   },
   "overrides": [
     {
+      "files": ["tools/windows-qualification/probe.mjs"],
+      "rules": {
+        "no-await-in-loop": "off",
+        "effecttsgo/async-function": "off",
+        "effecttsgo/global-console": "off",
+        "effecttsgo/global-date": "off",
+        "effecttsgo/global-timers": "off",
+        "effecttsgo/node-builtin-import": "off"
+      }
+    },
+    {
       "files": [
         "packages/cli/src/EvaluationSession.ts",
         "packages/cli/test/Evaluation.test.ts",

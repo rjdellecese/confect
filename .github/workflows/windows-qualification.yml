@@ -1,0 +1,33 @@
+name: Windows apparatus qualification
+
+on:
+  pull_request:
+    paths:
+      - tools/windows-qualification/**
+      - .github/workflows/windows-qualification.yml
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic:
+    runs-on: windows-2025
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.21.0
+      - name: Check classifier
+        run: node tools/windows-qualification/probe.mjs --self-test
+      - name: Qualify public shutdown and observation APIs
+        run: node tools/windows-qualification/probe.mjs "${{ runner.temp }}/windows-qualification"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-apparatus-qualification
+          path: ${{ runner.temp }}/windows-qualification
+          if-no-files-found: error
+          retention-days: 7
