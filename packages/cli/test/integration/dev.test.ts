@@ -1052,7 +1052,8 @@ if (existsSync(block)) {
           const impl = `import refs from "${directory ? "../" : "./"}_generated/refs/${directory}notes";
 import { Ref } from "@confect/core";
 if (Ref.getConvexFunctionName(refs.public.list) !== "${directory}notes:list") throw new Error("Incorrect scoped reference");
-${directory ? Project.impl.replaceAll('"./_generated/', '"../_generated/') : Project.impl}`;
+${directory ? Project.impl.replaceAll('"./_generated/', '"../_generated/') : Project.impl}
+console.log("RECOVERED_IMPL_EVALUATED");`;
           if (directory) {
             yield* fs.makeDirectory(
               path.join(project.root, "confect", directory),
@@ -1086,6 +1087,12 @@ ${directory ? Project.impl.replaceAll('"./_generated/', '"../_generated/') : Pro
           expect(yield* fs.exists(recordPath)).toBe(false);
           yield* project.write(missingFile, missing === "spec" ? spec : impl);
           yield* watching.waitFor(success);
+          if (missing === "impl")
+            expect(
+              (yield* Ref.get(watching.output)).split(
+                "RECOVERED_IMPL_EVALUATED",
+              ),
+            ).toHaveLength(2);
           expect(
             yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(
               yield* generationRecord(project.root),
