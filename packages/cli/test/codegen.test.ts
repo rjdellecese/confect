@@ -336,6 +336,55 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
     );
 
     it.effect(
+      "retains the successful generation record when deployment notification fails",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.provide(codegenHandler);
+          const recordPath = path.join(
+            project.root,
+            "confect/_generated/.confect-generation.json",
+          );
+          const before = yield* fs.readFileString(recordPath);
+          yield* project.write(
+            "confect/notes.spec.ts",
+            Project.spec.replace('name: "list"', 'name: "latest"'),
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace('"list"', '"latest"'),
+          );
+          const schema = path.join(project.root, "convex/schema.ts");
+          const failure = PlatformError.systemError({
+            _tag: "PermissionDenied",
+            module: "FileSystem",
+            method: "utimes",
+            pathOrDescriptor: schema,
+            cause: { code: "EACCES" },
+          });
+          const result = yield* project.provide(codegenHandler).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              utimes: (...args) =>
+                args[0] === schema ? Effect.fail(failure) : fs.utimes(...args),
+            }),
+            Effect.result,
+          );
+          assert(Result.isFailure(result));
+          expect(result.failure).toBe(failure);
+          expect(
+            (yield* project.generatedFiles)[path.join("convex", "notes.ts")],
+          ).toContain("export const latest");
+          expect(yield* fs.readFileString(recordPath)).toBe(before);
+          yield* project.provide(codegenHandler);
+          expect(yield* fs.readFileString(recordPath)).not.toBe(before);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "updates a spec without evaluating unrelated modules and matches full generation",
       () =>
         Effect.gen(function* () {

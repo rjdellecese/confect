@@ -324,18 +324,3 @@ export const components = Effect.fn("EvaluationSession.components")(function* (
       Effect.ensuring(CompiledModule.consume(artifact)),
     );
 });
-
-export const previous = Effect.fn("EvaluationSession.previous")(function* (
-  absolutePath: string,
-) {
-  const { client, requestContext } = yield* ModuleEvaluation;
-  const artifact = yield* Bundler.compile(absolutePath).pipe(
-    Effect.mapError((error) => fromBundlerError(absolutePath, error)),
-  );
-  return yield* client
-    .Previous({ ...requestContext, url: artifact.url })
-    .pipe(
-      Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)),
-      Effect.ensuring(CompiledModule.consume(artifact)),
-    );
-});

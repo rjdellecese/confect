@@ -136,6 +136,14 @@ Contains Effect service wrappers for Convex platform capabilities, scoped to you
 
 Contains your assembled Confect spec—every function group, of any runtime (including Node action groups)—used to build `refs.ts`.
 
+#### `.confect-generation.json`
+
+Records the function topology from the last successful `confect codegen` command or clean `confect dev` sync. Dev reads this versioned JSON to report added and removed functions at startup; it never imports generated code to recover history.
+
+This is generated metadata, not a cache that skips generation or proof that your files are current. Both commands still perform full initial generation and validation. Missing history starts with no previous functions. Malformed or unsupported history produces a warning and the same recovery, with no executable fallback; filesystem access and unsafe-path errors still fail.
+
+The record has no timestamps or machine-specific paths, so you can commit it alongside other generated outputs. Confect does not change your `.gitignore`. Failed or incomplete work keeps the previous successful record, and identical history is not rewritten. Replacing this one file does not publish all generated files atomically: a later edit remains pending even when history exists.
+
 ### `auth.ts`
 
 <Badge color="yellow">Optional</Badge>

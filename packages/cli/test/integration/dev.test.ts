@@ -1,18 +1,136 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { expect, layer } from "@effect/vitest";
+import { assert, expect, layer } from "@effect/vitest";
+import * as GenerationRecord from "@confect/cli/GenerationRecord";
+import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import * as Effect from "effect/Effect";
 import * as DateTime from "effect/DateTime";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Project from "./Project";
 
 const success = "Generated files are up-to-date";
 
+const generationRecord = (root: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    return yield* fs.readFileString(
+      path.join(root, "confect/_generated/.confect-generation.json"),
+    );
+  });
+
 layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
+    it.effect.each(["malformed", "unsupported", "valid stale"] as const)(
+      "reconstructs current outputs and history after %s startup history",
+      (history) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const path = yield* Path.Path;
+          const initial = yield* project.start("codegen");
+          yield* initial.waitFor(success);
+          expect(Number(yield* initial.handle.exitCode)).toBe(0);
+          const before = yield* generationRecord(project.root);
+          const historical =
+            history === "malformed"
+              ? "{"
+              : history === "unsupported"
+                ? before.replace('"version": 1', '"version": 2')
+                : before;
+          yield* project.write(
+            "confect/_generated/.confect-generation.json",
+            historical,
+          );
+          yield* project.write(
+            "confect/notes.spec.ts",
+            Project.spec.replace('name: "list"', 'name: "latest"'),
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace('"list"', '"latest"'),
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const output = yield* Ref.get(watching.output);
+          if (history !== "valid stale")
+            expect(output).toContain(`Ignoring ${history} generation history`);
+          expect(output.match(/Performing initial sync/g)).toHaveLength(1);
+          const files = yield* project.generatedFiles;
+          expect(files[path.join("convex", "notes.ts")]).toContain(
+            "export const latest",
+          );
+          expect(files[path.join("convex", "notes.ts")]).not.toContain(
+            "export const list",
+          );
+          expect(
+            files[
+              path.join(
+                "confect",
+                "_generated",
+                "registeredFunctions",
+                "notes.ts",
+              )
+            ],
+          ).toContain('"latest"');
+          const parsed = GenerationRecord.parse(
+            yield* generationRecord(project.root),
+          );
+          assert(parsed._tag === "Loaded");
+          expect(
+            [...GenerationSnapshot.functionPaths(parsed.record.snapshot)].map(
+              ({ name }) => name,
+            ),
+          ).toEqual(["latest"]);
+          expect(yield* generationRecord(project.root)).not.toBe(before);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "does not certify an invalid current implementation from valid startup history",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const path = yield* Path.Path;
+          const initial = yield* project.start("codegen");
+          yield* initial.waitFor(success);
+          expect(Number(yield* initial.handle.exitCode)).toBe(0);
+          const before = yield* generationRecord(project.root);
+          yield* project.write(
+            "confect/notes.spec.ts",
+            Project.spec.replace('name: "list"', 'name: "latest"'),
+          );
+          yield* project.write("confect/notes.impl.ts", Project.emptyImpl);
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor("does not implement every function");
+          expect(yield* Ref.get(watching.output)).not.toContain(success);
+          expect(yield* generationRecord(project.root)).toBe(before);
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace('"list"', '"latest"'),
+          );
+          yield* watching.waitFor(success);
+          expect(
+            (yield* project.generatedFiles)[path.join("convex", "notes.ts")],
+          ).toContain("export const latest");
+          const parsed = GenerationRecord.parse(
+            yield* generationRecord(project.root),
+          );
+          assert(parsed._tag === "Loaded");
+          expect(
+            [...GenerationSnapshot.functionPaths(parsed.record.snapshot)].map(
+              ({ name }) => name,
+            ),
+          ).toEqual(["latest"]);
+          expect(yield* generationRecord(project.root)).not.toBe(before);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "ignores shadowed configs while continuing to compile imported helpers",
       () =>
@@ -381,17 +499,20 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
           const before = yield* project.generatedFiles;
+          const record = yield* generationRecord(project.root);
           const schema = path.join(project.root, "convex/schema.ts");
           const timestamp = DateTime.toDateUtc(DateTime.makeUnsafe(1000));
           yield* fs.utimes(schema, timestamp, timestamp);
           yield* project.write(file, broken);
           yield* watching.waitFor(error);
+          expect(yield* generationRecord(project.root)).toBe(record);
           expect(
             Option.getOrThrow((yield* fs.stat(schema)).mtime).getTime(),
           ).toBe(1000);
           yield* project.write(file, repaired);
           yield* watching.waitFor(success);
           expect(yield* project.generatedFiles).toEqual(before);
+          expect(yield* generationRecord(project.root)).toBe(record);
           expect(
             Option.getOrThrow((yield* fs.stat(schema)).mtime).getTime(),
           ).toBeGreaterThan(1000);
@@ -492,12 +613,18 @@ if (existsSync(block)) {
           yield* project.write("confect/notes.impl.ts", Project.impl + gate);
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
+          const record = yield* generationRecord(project.root);
           yield* project.write("block", "");
           yield* project.write(
             "confect/notes.spec.ts",
-            `${Project.spec}\n// first declaration edit\n`,
+            Project.spec.replace('name: "list"', 'name: "pending"'),
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace('"list"', '"pending"') + gate,
           );
           yield* watching.waitFor("DECLARATION_BLOCKED");
+          expect(yield* generationRecord(project.root)).toBe(record);
           yield* project.write(
             "confect/notes.spec.ts",
             Project.spec.replace('name: "list"', 'name: "latest"'),
@@ -506,8 +633,28 @@ if (existsSync(block)) {
             "confect/notes.impl.ts",
             Project.impl.replace('"list"', '"latest"') + gate,
           );
+          expect(yield* generationRecord(project.root)).toBe(record);
           yield* project.write("release", "");
           yield* watching.waitFor(success);
+          const settledRecord = yield* generationRecord(project.root);
+          expect(settledRecord).not.toBe(record);
+          expect(
+            yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(
+              settledRecord,
+            ),
+          ).toEqual({
+            version: 1,
+            snapshot: [
+              [
+                "notes.spec.ts",
+                {
+                  runtime: "Convex",
+                  functions: [{ name: "latest", provenance: "Confect" }],
+                  groups: {},
+                },
+              ],
+            ],
+          });
           const output = yield* fs.readFileString(
             path.join(project.root, "convex", "notes.ts"),
           );
@@ -518,6 +665,7 @@ if (existsSync(block)) {
           yield* fresh.waitFor(success);
           expect(Number(yield* fresh.handle.exitCode)).toBe(0);
           expect(yield* project.generatedFiles).toEqual(incremental);
+          expect(yield* generationRecord(project.root)).toBe(settledRecord);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -652,8 +800,16 @@ if (existsSync(block)) {
           yield* project.write("confect/other.impl.ts", otherImpl);
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
+          const record = yield* generationRecord(project.root);
           yield* project.write("confect/notes.impl.ts", Project.emptyImpl);
           yield* watching.waitFor("does not implement every function");
+          expect(yield* generationRecord(project.root)).toBe(record);
+          yield* project.write(
+            "confect/notes.spec.ts",
+            Project.spec.replace('name: "list"', 'name: "latest"'),
+          );
+          yield* watching.waitFor("does not implement every function");
+          expect(yield* generationRecord(project.root)).toBe(record);
           const before = yield* Ref.get(watching.output);
           yield* project.write(
             "confect/other.impl.ts",
@@ -663,8 +819,13 @@ if (existsSync(block)) {
           expect(
             (yield* Ref.get(watching.output)).slice(before.length),
           ).not.toContain(success);
-          yield* project.write("confect/notes.impl.ts", Project.impl);
+          expect(yield* generationRecord(project.root)).toBe(record);
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace('"list"', '"latest"'),
+          );
           yield* watching.waitFor(success);
+          expect(yield* generationRecord(project.root)).not.toBe(record);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -835,11 +996,22 @@ if (existsSync(block)) {
               (yield* Ref.get(process.output)).split(success),
             ).toHaveLength(2);
           }).pipe(Effect.scoped);
+          const record = yield* generationRecord(project.root);
+          const fresh = yield* Project.make;
+          const once = yield* fresh.start("codegen");
+          yield* once.waitFor(success);
+          expect(Number(yield* once.handle.exitCode)).toBe(0);
+          expect(yield* generationRecord(fresh.root)).toBe(record);
+          expect(yield* fresh.generatedFiles).toEqual(
+            yield* project.generatedFiles,
+          );
           const repeated = yield* project.start("codegen");
           yield* repeated.waitFor(success);
           expect(yield* repeated.handle.exitCode).toBe(0);
+          expect(yield* generationRecord(project.root)).toBe(record);
           const restarted = yield* project.start("dev");
           yield* restarted.waitFor(success);
+          expect(yield* generationRecord(project.root)).toBe(record);
           yield* Effect.sleep("2 seconds");
           expect(
             (yield* Ref.get(restarted.output)).split(success),
@@ -879,12 +1051,17 @@ ${directory ? Project.impl.replaceAll('"./_generated/', '"../_generated/') : Pro
             yield* project.write("confect/notes.impl.ts", impl);
           }
           const missingFile = `confect/${directory}notes.${missing}.ts`;
+          const recordPath = path.join(
+            project.root,
+            "confect/_generated/.confect-generation.json",
+          );
           yield* fs.remove(path.join(project.root, missingFile));
           yield* Effect.gen(function* () {
             const once = yield* project.start("codegen");
             yield* once.waitFor(`has no sibling ${missing}`);
             expect(yield* once.handle.exitCode).not.toBe(0);
             expect(yield* Ref.get(once.output)).not.toContain(success);
+            expect(yield* fs.exists(recordPath)).toBe(false);
           }).pipe(Effect.scoped);
           yield* fs.remove(path.join(project.root, "confect/_generated"), {
             recursive: true,
@@ -892,8 +1069,26 @@ ${directory ? Project.impl.replaceAll('"./_generated/', '"../_generated/') : Pro
           const watching = yield* project.start("dev");
           yield* watching.waitFor(`has no sibling ${missing}`);
           expect(yield* Ref.get(watching.output)).not.toContain(success);
+          expect(yield* fs.exists(recordPath)).toBe(false);
           yield* project.write(missingFile, missing === "spec" ? spec : impl);
           yield* watching.waitFor(success);
+          expect(
+            yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(
+              yield* generationRecord(project.root),
+            ),
+          ).toEqual({
+            version: 1,
+            snapshot: [
+              [
+                `${directory}notes.spec.ts`,
+                {
+                  runtime: "Convex",
+                  functions: [{ name: "list", provenance: "Confect" }],
+                  groups: {},
+                },
+              ],
+            ],
+          });
           expect(
             yield* fs.exists(
               path.join(project.root, `convex/${directory}notes.ts`),

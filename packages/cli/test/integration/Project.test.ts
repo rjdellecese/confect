@@ -5,6 +5,8 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Sink from "effect/Sink";
@@ -41,6 +43,109 @@ const fixture = Effect.gen(function* () {
   );
   return { spawner, cleanupLogs };
 });
+
+layer(NodeServices.layer, { excludeTestServices: true })(
+  "built confect codegen generation records",
+  (it) => {
+    it.effect(
+      "persists identical records for fresh projects and repeated generation",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const first = yield* Project.make;
+          const second = yield* Project.make;
+          const records: Array<string> = [];
+          for (const project of [first, second, first]) {
+            const once = yield* project.start("codegen");
+            yield* once.waitFor("Generated files are up-to-date");
+            expect(Number(yield* once.handle.exitCode)).toBe(0);
+            const record = yield* fs.readFileString(
+              path.join(
+                project.root,
+                "confect/_generated/.confect-generation.json",
+              ),
+            );
+            expect(
+              yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(
+                record,
+              ),
+            ).toEqual({
+              version: 1,
+              snapshot: [
+                [
+                  "notes.spec.ts",
+                  {
+                    runtime: "Convex",
+                    functions: [{ name: "list", provenance: "Confect" }],
+                    groups: {},
+                  },
+                ],
+              ],
+            });
+            records.push(record);
+          }
+          expect(records[1]).toBe(records[0]);
+          expect(records[2]).toBe(records[0]);
+          expect(yield* second.generatedFiles).toEqual(
+            yield* first.generatedFiles,
+          );
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect.each([
+      { failure: "missing implementation", error: "has no sibling impl" },
+      {
+        failure: "invalid implementation",
+        error: "does not implement every function",
+      },
+      { failure: "invalid table", error: "must default-export a Table" },
+    ])(
+      "retains the successful record after $failure",
+      ({ failure, error }) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const recordPath = path.join(
+            project.root,
+            "confect/_generated/.confect-generation.json",
+          );
+          const initial = yield* project.start("codegen");
+          yield* initial.waitFor("Generated files are up-to-date");
+          expect(Number(yield* initial.handle.exitCode)).toBe(0);
+          const before = yield* fs.readFileString(recordPath);
+          yield* project.write(
+            "confect/notes.spec.ts",
+            Project.spec.replace('name: "list"', 'name: "latest"'),
+          );
+          if (failure === "missing implementation") {
+            yield* fs.remove(path.join(project.root, "confect/notes.impl.ts"));
+          } else if (failure === "invalid implementation") {
+            yield* project.write("confect/notes.impl.ts", Project.emptyImpl);
+          } else {
+            yield* project.write(
+              "confect/notes.impl.ts",
+              Project.impl.replace('"list"', '"latest"'),
+            );
+            yield* project.write(
+              "confect/tables/notes.ts",
+              "export default {};\n",
+            );
+          }
+          const failed = yield* project.start("codegen");
+          yield* failed.waitFor(error);
+          expect(Number(yield* failed.handle.exitCode)).not.toBe(0);
+          expect(yield* Ref.get(failed.output)).not.toContain(
+            "Generated files are up-to-date",
+          );
+          expect(yield* fs.readFileString(recordPath)).toBe(before);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+  },
+);
 
 layer(NodeServices.layer)("Project process diagnostics", (it) => {
   it.effect(

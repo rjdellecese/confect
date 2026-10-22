@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "snapshot": [
+    [
+      "email.spec.ts",
+      {
+        "runtime": "Node",
+        "functions": [
+          {
+            "name": "getInbox",
+            "provenance": "Confect"
+          },
+          {
+            "name": "send",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "env.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "readEnvVar",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "notes_and_random/notes.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "clearAll",
+            "provenance": "Confect"
+          },
+          {
+            "name": "delete_",
+            "provenance": "Confect"
+          },
+          {
+            "name": "feed",
+            "provenance": "Confect"
+          },
+          {
+            "name": "getFirst",
+            "provenance": "Confect"
+          },
+          {
+            "name": "getOrFail",
+            "provenance": "Confect"
+          },
+          {
+            "name": "insert",
+            "provenance": "Confect"
+          },
+          {
+            "name": "insertAuthored",
+            "provenance": "Confect"
+          },
+          {
+            "name": "insertDefault",
+            "provenance": "Confect"
+          },
+          {
+            "name": "internalGetFirst",
+            "provenance": "Confect"
+          },
+          {
+            "name": "list",
+            "provenance": "Confect"
+          },
+          {
+            "name": "listPaginated",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "notes_and_random/random.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "getNumber",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "users.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "clearAll",
+            "provenance": "Confect"
+          },
+          {
+            "name": "create",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "viewer.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "postNote",
+            "provenance": "Confect"
+          },
+          {
+            "name": "whoAmI",
+            "provenance": "Confect"
+          }
+        ],
+        "groups": {}
+      }
+    ],
+    [
+      "workpool.spec.ts",
+      {
+        "runtime": "Convex",
+        "functions": [
+          {
+            "name": "backgroundWork",
+            "provenance": "Convex"
+          },
+          {
+            "name": "enqueue",
+            "provenance": "Convex"
+          },
+          {
+            "name": "onComplete",
+            "provenance": "Convex"
+          },
+          {
+            "name": "status",
+            "provenance": "Convex"
+          }
+        ],
+        "groups": {}
+      }
+    ]
+  ]
+}

@@ -37,6 +37,7 @@ import * as Evaluation from "../Evaluation";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
 import * as GenerationSnapshot from "../GenerationSnapshot";
+import * as GenerationRecord from "../GenerationRecord";
 import type * as GroupPath from "../GroupPath";
 import type * as GroupPaths from "../GroupPaths";
 import {
@@ -512,8 +513,19 @@ const syncLoop = Effect.fnUntraced(function* (
       yield* drain;
       if (SyncState.needsDeploymentNotification(phase))
         yield* touchConvexSchema;
-      if (!SyncState.isDirty(yield* Ref.get(pendingRef)))
-        yield* logSuccess("Generated files are up-to-date");
+      yield* drain;
+      if (!SyncState.isDirty(yield* Ref.get(pendingRef))) {
+        yield* GenerationRecord.write(
+          outcome.snapshot,
+          Effect.gen(function* () {
+            yield* drain;
+            return !SyncState.isDirty(yield* Ref.get(pendingRef));
+          }),
+        );
+        yield* drain;
+        if (!SyncState.isDirty(yield* Ref.get(pendingRef)))
+          yield* logSuccess("Generated files are up-to-date");
+      }
     }
   }
 });
