@@ -22,6 +22,7 @@ import * as CompilationState from "./CompilationState";
 import type * as CompilationInputs from "./CompilationInputs";
 import * as CompilationSources from "./CompilationSources";
 import * as CompilationPlugin from "./CompilationPlugin";
+import * as CompilationTrace from "./CompilationTrace";
 
 export interface Snapshot {
   readonly receipt: CompilationState.Receipt;
@@ -137,6 +138,13 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     Effect.void,
   configurationWarnings: ReadonlyArray<esbuild.PartialMessage> = [],
 ) {
+  const trace = yield* CompilationTrace.Service;
+  const details = {
+    context: topology.id,
+    profile: topology.profile,
+    roots: topology.roots.length,
+    mode,
+  };
   const fs = yield* FileSystem.FileSystem;
   const crypto = yield* Crypto.Crypto;
   const path = yield* Path.Path;
@@ -387,19 +395,32 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       if (errors.length === 0) yield* Ref.set(prepared, Option.some(captured));
       yield* Ref.set(failed, errors.length > 0);
       yield* Ref.set(needsStabilization, false);
-      yield* publish({
-        ...receipt,
-        roots: topology.roots,
-        affectedRoots: CompilationState.changedRoots(
-          previous.values,
-          next.values,
-          topology.roots,
-        ),
-        errors,
-        warnings: result.warnings,
-      });
+      yield* trace.span(
+        "CompilationContext.publish",
+        publish({
+          ...receipt,
+          roots: topology.roots,
+          affectedRoots: CompilationState.changedRoots(
+            previous.values,
+            next.values,
+            topology.roots,
+          ),
+          errors,
+          warnings: result.warnings,
+        }),
+        {
+          ...details,
+          revision: number,
+          outputs: result.outputFiles?.length ?? 0,
+        },
+      );
     },
     (effect) => lock.withPermit(effect),
+    (effect, result) =>
+      trace.span("CompilationContext.capture", effect, {
+        ...details,
+        outputs: result.outputFiles?.length ?? 0,
+      }),
   );
   const native = yield* Effect.acquireRelease(
     Effect.tryPromise({
@@ -419,6 +440,11 @@ export const make = Effect.fn("CompilationContext.make")(function* (
                 build.onStart(() =>
                   Effect.runPromiseWith(Context.empty())(
                     Effect.gen(function* () {
+                      yield* trace.span(
+                        "CompilationContext.nativeStart",
+                        Effect.void,
+                        details,
+                      );
                       yield* Ref.set(
                         startedGeneration,
                         yield* guards.generation ?? Effect.succeed(0),
@@ -462,7 +488,14 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       const outcome = yield* Effect.tryPromise({
         try: () => native.rebuild(),
         catch: (cause) => new BundlerError({ cause }),
-      }).pipe(Effect.result);
+      }).pipe(
+        (effect) =>
+          trace.span("CompilationContext.nativeRebuild", effect, {
+            ...details,
+            attempt: attempt + 1,
+          }),
+        Effect.result,
+      );
       yield* ensureActive;
       yield* guards.ensure;
       yield* sources.ensure.pipe(
@@ -536,16 +569,21 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       cause: new UnstableInputs({ context: topology.id, attempts: 8 }),
     });
   });
-  const rebuild = () => rebuildLock.withPermit(runBuild());
+  const rebuild = () =>
+    trace.span(
+      "CompilationContext.rebuild",
+      rebuildLock.withPermit(runBuild()),
+      details,
+    );
   if (mode === "Watch") {
     yield* Stream.fromQueue(stabilization).pipe(
       Stream.runForEach(() =>
         rebuildLock.withPermit(
           Effect.gen(function* () {
             if (!(yield* Ref.get(needsStabilization))) return;
-            yield* runBuild().pipe(
-              Effect.catchTag("CompilationFailed", () => Effect.void),
-            );
+            yield* trace
+              .span("CompilationContext.rebuild", runBuild(), details)
+              .pipe(Effect.catchTag("CompilationFailed", () => Effect.void));
           }),
         ),
       ),
@@ -590,6 +628,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     verify: rebuild().pipe(
       Effect.catchTag("CompilationFailed", () => Effect.void),
       Effect.asVoid,
+      (effect) => trace.span("CompilationContext.verify", effect, details),
     ),
     consume: Effect.fn("CompilationContext.consume")(
       function* (expected?: CompilationState.Receipt) {
@@ -684,6 +723,11 @@ export const make = Effect.fn("CompilationContext.make")(function* (
             ? cause
             : new BundlerError({ cause }),
         ),
+      (effect, expected?: CompilationState.Receipt) =>
+        trace.span("CompilationContext.consume", effect, {
+          ...details,
+          ...(expected === undefined ? {} : { revision: expected.revision }),
+        }),
     ),
   };
 }, Effect.provide(NodeCrypto.layer));

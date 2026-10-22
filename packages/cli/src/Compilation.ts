@@ -16,6 +16,7 @@ import * as Option from "effect/Option";
 import type * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 import * as CompilationContext from "./CompilationContext";
+import * as CompilationTrace from "./CompilationTrace";
 import * as CompilationState from "./CompilationState";
 import * as CompiledModule from "./CompiledModule";
 import * as CompilationInputs from "./CompilationInputs";
@@ -105,6 +106,7 @@ export const layer = (options: {
   Layer.effect(
     Service,
     Effect.gen(function* () {
+      const trace = yield* CompilationTrace.Service;
       const owner = yield* Scope.Scope;
       const conditions = yield* NodeConditions.current.pipe(
         Effect.mapError((cause) => new BundlerError({ cause })),
@@ -117,7 +119,10 @@ export const layer = (options: {
       const services = Context.make(
         FileSystem.FileSystem,
         yield* FileSystem.FileSystem,
-      ).pipe(Context.add(Path.Path, yield* Path.Path));
+      ).pipe(
+        Context.add(Path.Path, yield* Path.Path),
+        Context.add(CompilationTrace.Service, trace),
+      );
       const events = yield* Queue.unbounded<
         CompilationState.Revision,
         BundlerError
@@ -192,6 +197,7 @@ export const layer = (options: {
             }),
           )
           .pipe(
+            (effect) => trace.span("Compilation.verify", effect),
             Effect.mapError((cause) =>
               Schema.is(BundlerError)(cause)
                 ? cause
@@ -302,6 +308,12 @@ export const layer = (options: {
               : new BundlerError({ cause }),
           ),
           (effect) => lock.withPermit(effect),
+          (effect, request) =>
+            trace.span("Compilation.compile", effect, {
+              roots: request.roots.length,
+              profile: request.profile,
+              mode: options.mode ?? "Watch",
+            }),
         ),
       });
     }),

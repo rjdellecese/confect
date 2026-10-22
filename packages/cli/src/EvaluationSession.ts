@@ -16,6 +16,7 @@ import { WorkerError } from "effect/workers/WorkerError";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
 import * as Bundler from "./Bundler";
 import * as CompiledModule from "./CompiledModule";
+import * as CompilationTrace from "./CompilationTrace";
 import * as CodegenError from "./CodegenError";
 import * as ConvexConfig from "./ConvexConfig";
 import type * as GenerationSnapshot from "./GenerationSnapshot";
@@ -139,6 +140,7 @@ export const loadSpecs = Effect.fn("EvaluationSession.loadSpecs")(function* (
   paths: ReadonlyArray<SpecModulePath.SpecModulePath>,
 ) {
   const { client, requestContext } = yield* ModuleEvaluation;
+  const trace = yield* CompilationTrace.Service;
   return yield* withBatch(
     paths,
     Effect.forEach(
@@ -154,6 +156,7 @@ export const loadSpecs = Effect.fn("EvaluationSession.loadSpecs")(function* (
               serverImporters: yield* LeafModule.serverImporters(artifact),
             })
             .pipe(
+              (effect) => trace.span("Evaluation.spec", effect),
               Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)),
               Effect.ensuring(CompiledModule.consume(artifact)),
             );
@@ -169,16 +172,22 @@ export const snapshot = Effect.fn("EvaluationSession.snapshot")(function* (
   previous?: GenerationSnapshot.GenerationSnapshot,
 ) {
   const { client, requestContext } = yield* ModuleEvaluation;
-  return yield* client.Snapshot({
-    ...requestContext,
-    paths,
-    ...(previous === undefined ? {} : { previous }),
-  });
+  const trace = yield* CompilationTrace.Service;
+  return yield* trace.span(
+    "Evaluation.snapshot",
+    client.Snapshot({
+      ...requestContext,
+      paths,
+      ...(previous === undefined ? {} : { previous }),
+    }),
+    { roots: paths.length },
+  );
 });
 
 export const validateImpls = Effect.fn("EvaluationSession.validateImpls")(
   function* (leaves: ReadonlyArray<LeafModule.LeafModule>) {
     const { client, requestContext } = yield* ModuleEvaluation;
+    const trace = yield* CompilationTrace.Service;
     const path = yield* Path.Path;
     const pairs = yield* Effect.forEach(leaves, (leaf) =>
       LeafModule.implPathForSpec(leaf.relativePath).pipe(
@@ -207,6 +216,7 @@ export const validateImpls = Effect.fn("EvaluationSession.validateImpls")(
                 ),
               })
               .pipe(
+                (effect) => trace.span("Evaluation.impl", effect),
                 Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)),
                 Effect.ensuring(CompiledModule.consume(artifact)),
               );
@@ -283,6 +293,7 @@ export const validateSiblings = Effect.fn("EvaluationSession.validateSiblings")(
 export const validateTables = Effect.fn("EvaluationSession.validateTables")(
   function* (tables: ReadonlyArray<TableModule>) {
     const { client, requestContext } = yield* ModuleEvaluation;
+    const trace = yield* CompilationTrace.Service;
     yield* withBatch(
       tables.map(({ relativePath }) => relativePath),
       Effect.forEach(
@@ -297,6 +308,7 @@ export const validateTables = Effect.fn("EvaluationSession.validateTables")(
                 url: artifact.url,
               })
               .pipe(
+                (effect) => trace.span("Evaluation.table", effect),
                 Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)),
                 Effect.ensuring(CompiledModule.consume(artifact)),
               );
@@ -313,6 +325,7 @@ export const components = Effect.fn("EvaluationSession.components")(function* (
 ) {
   const path = yield* Path.Path;
   const { client, requestContext } = yield* ModuleEvaluation;
+  const trace = yield* CompilationTrace.Service;
   const artifact = yield* Bundler.compile(absolutePath, {
     profile: "component-config",
     plugins: [ConvexConfig.componentConfigPlugin(path)],
@@ -320,6 +333,7 @@ export const components = Effect.fn("EvaluationSession.components")(function* (
   return yield* client
     .Components({ ...requestContext, displayPath, url: artifact.url })
     .pipe(
+      (effect) => trace.span("Evaluation.components", effect),
       Effect.ensuring(logCoalescedBuildWarnings(artifact.warnings)),
       Effect.ensuring(CompiledModule.consume(artifact)),
     );

@@ -1,0 +1,69 @@
+name: Windows CLI investigation
+
+on:
+  pull_request:
+
+jobs:
+  source-waits:
+    if: github.head_ref == 'capy/windows-cli-timeout-investigation'
+    name: Source waits (${{ matrix.order }})
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        order: [control-first, trace-first]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/confect-setup
+      - name: Run the fixed paired experiment
+        shell: pwsh
+        env:
+          EXPERIMENT_ORDER: ${{ matrix.order }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+          $root = Join-Path $env:RUNNER_TEMP 'source-waits'
+          $null = New-Item -ItemType Directory -Path $root -Force
+          $modes = if ($env:EXPERIMENT_ORDER -eq 'control-first') { @('control', 'trace') } else { @('trace', 'control') }
+          $cases = @(
+            @{ id = 'late-edit'; pattern = 'plans dependent declarations before a delayed module revision and verifies a late edit change' },
+            @{ id = 'observed-impl'; pattern = 'uses the observed impl revision without another consumption build' }
+          )
+          $failed = $false
+          Push-Location packages/cli
+          try {
+            foreach ($mode in $modes) {
+              foreach ($case in $cases) {
+                $directory = Join-Path $root "$mode-$($case.id)"
+                $null = New-Item -ItemType Directory -Path $directory -Force
+                $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY = if ($mode -eq 'trace') { $directory } else { $null }
+                $start = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+                pnpm exec vitest run test/dev.test.ts -t $case.pattern --reporter=default --reporter=json --outputFile.json="$directory/result.json"
+                $code = $LASTEXITCODE
+                $end = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+                @{
+                  mode = $mode
+                  case = $case.id
+                  start = $start
+                  end = $end
+                  exitCode = $code
+                  head = '${{ github.event.pull_request.head.sha }}'
+                  checkout = (git rev-parse HEAD)
+                  order = $env:EXPERIMENT_ORDER
+                } | ConvertTo-Json | Set-Content (Join-Path $directory 'invocation.json')
+                if ($code -ne 0) { $failed = $true }
+              }
+            }
+          } finally {
+            $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY = $null
+            Pop-Location
+          }
+          if ($failed) { exit 1 }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: source-waits-${{ matrix.order }}
+          path: ${{ runner.temp }}/source-waits/
+          if-no-files-found: error
+          retention-days: 7
