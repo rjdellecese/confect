@@ -17,6 +17,8 @@ import * as Fiber from "effect/Fiber";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import * as Ref from "effect/Ref";
+import * as PlatformError from "effect/PlatformError";
 import * as String from "effect/String";
 import {
   codegenHandler,
@@ -1163,6 +1165,81 @@ ${Project.impl}`,
           expect((yield* fs.stat(alias)).type).toBe(scenario.kind);
         }
       }).pipe(Effect.scoped),
+    );
+
+    it.effect.each([
+      { reason: "PermissionDenied", code: "EACCES" },
+      { reason: "Unknown", code: "EIO" },
+    ] as const)(
+      "preserves readLink $reason observations before further I/O",
+      ({ reason, code }) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const generated = path.join(project.root, "confect/_generated");
+          yield* fs.makeDirectory(path.join(generated, "refs"), {
+            recursive: true,
+          });
+          const failure = PlatformError.systemError({
+            _tag: reason,
+            module: "FileSystem",
+            method: "readLink",
+            pathOrDescriptor: generated,
+            cause: { code },
+          });
+          const observationFailed = yield* Ref.make(false);
+          const accesses = yield* Ref.make<ReadonlyArray<string>>([]);
+          const guard = <A, E, R>(
+            operation: string,
+            file: string,
+            effect: Effect.Effect<A, E, R>,
+          ) =>
+            Effect.gen(function* () {
+              if (yield* Ref.get(observationFailed)) {
+                yield* Ref.update(accesses, (previous) => [
+                  ...previous,
+                  `${operation}:${file}`,
+                ]);
+                return yield* Effect.die(
+                  "I/O followed a failed link observation",
+                );
+              }
+              return yield* effect;
+            });
+          const result = yield* project.provide(codegenHandler).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              readLink: (file) =>
+                file === generated
+                  ? Ref.set(observationFailed, true).pipe(
+                      Effect.andThen(Effect.fail(failure)),
+                    )
+                  : guard("readLink", file, fs.readLink(file)),
+              realPath: (...args) =>
+                guard("realPath", args[0], fs.realPath(...args)),
+              stat: (...args) => guard("stat", args[0], fs.stat(...args)),
+              readFileString: (...args) =>
+                guard("readFileString", args[0], fs.readFileString(...args)),
+              readFile: (...args) =>
+                guard("readFile", args[0], fs.readFile(...args)),
+              readDirectory: (...args) =>
+                guard("readDirectory", args[0], fs.readDirectory(...args)),
+              writeFileString: (...args) =>
+                guard("writeFileString", args[0], fs.writeFileString(...args)),
+              writeFile: (...args) =>
+                guard("writeFile", args[0], fs.writeFile(...args)),
+              remove: (...args) => guard("remove", args[0], fs.remove(...args)),
+              makeDirectory: (...args) =>
+                guard("makeDirectory", args[0], fs.makeDirectory(...args)),
+            }),
+            Effect.result,
+          );
+          assert(Result.isFailure(result));
+          expect(result.failure).toBe(failure);
+          expect(yield* Ref.get(observationFailed)).toBe(true);
+          expect(yield* Ref.get(accesses)).toEqual([]);
+        }).pipe(Effect.scoped),
     );
 
     it.effect("recognizes CRLF ownership without deleting authored files", () =>

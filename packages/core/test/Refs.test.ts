@@ -406,6 +406,14 @@ describe("fromGroup", () => {
     const refs = Refs.fromGroup("admin/notes", group);
 
     expectTypeOf(refs).toEqualTypeOf<Refs.FromGroup<typeof group>>();
+    expectTypeOf(refs).toEqualTypeOf<{
+      readonly public: typeof refs.public;
+      readonly internal: typeof refs.internal;
+    }>();
+    expectTypeOf(refs).not.toEqualTypeOf<{
+      public: typeof refs.public;
+      internal: typeof refs.internal;
+    }>();
     expectTypeOf<keyof typeof refs.public>().toEqualTypeOf<
       "get" | "search" | "publicOnly" | "nested"
     >();

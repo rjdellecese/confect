@@ -10,6 +10,7 @@ import * as HashMap from "effect/HashMap";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
+import * as Schema from "effect/Schema";
 import * as EvaluationSession from "../EvaluationSession";
 import * as Bundler from "../Bundler";
 import * as CompiledModule from "../CompiledModule";
@@ -781,13 +782,25 @@ const generateRefs = Effect.gen(function* () {
   yield* writeFileStringAndLog(refsPath, refsContents);
 });
 
+const decodeNonLinkCause = Schema.decodeUnknownOption(
+  Schema.Struct({ code: Schema.Literal("EINVAL") }),
+);
+
 const inspectScopedRefFiles = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = path.resolve(yield* ConfectDirectory.get);
   const realConfectDirectory = yield* fs.realPath(confectDirectory);
   const inspect = Effect.fnUntraced(function* (file: string) {
-    const link = yield* fs.readLink(file).pipe(Effect.option);
+    const link = yield* fs.readLink(file).pipe(
+      Effect.asSome,
+      Effect.catchIf(
+        (error) =>
+          error.reason._tag === "Unknown" &&
+          Option.isSome(decodeNonLinkCause(error.reason.cause)),
+        () => Effect.succeedNone,
+      ),
+    );
     if (Option.isSome(link)) {
       return yield* new CodegenError.ScopedRefsPathOccupiedError({
         path: file,

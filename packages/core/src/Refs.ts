@@ -17,8 +17,8 @@ export interface FromSpec<Spec_ extends Spec.AnyWithProps> {
 }
 
 export interface FromGroup<Group extends GroupSpec.AnyWithProps> {
-  public: GroupRefs<Group, Ref.AnyPublic>;
-  internal: GroupRefs<Group, Ref.AnyInternal>;
+  readonly public: GroupRefs<Group, Ref.AnyPublic>;
+  readonly internal: GroupRefs<Group, Ref.AnyInternal>;
 }
 
 type GroupRefs<
