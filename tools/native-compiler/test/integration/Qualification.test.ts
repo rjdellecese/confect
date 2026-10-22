@@ -665,10 +665,13 @@ layer(services, { excludeTestServices: true })(
                 kind,
                 external: true,
                 original: "native-condition",
-                path: fixture.path.join(
-                  fixture.root,
-                  "node_modules/native-condition/selected.js",
-                ),
+                path: fixture.path
+                  .join(
+                    fixture.root,
+                    "node_modules/native-condition/selected.js",
+                  )
+                  .split(fixture.path.sep)
+                  .join("/"),
               }),
             );
           for (const kind of ["require-call"])
