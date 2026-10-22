@@ -26,13 +26,12 @@ import * as FunctionPaths from "../FunctionPaths";
 import * as FunctionModule from "../FunctionModule";
 import * as GenerationSnapshot from "../GenerationSnapshot";
 import * as GenerationRecord from "../GenerationRecord";
+import * as OutputPlan from "../OutputPlan";
+import * as OutputPublisher from "../OutputPublisher";
+import * as RegisteredFunctions from "../RegisteredFunctions";
 import * as EntryPoint from "../EntryPoint";
 import type { ImplModulePath } from "../ImplModulePath";
-import {
-  implPathForSpec,
-  registeredFunctionsRelativePath,
-  type LeafModule,
-} from "../LeafModule";
+import { implPathForSpec, type LeafModule } from "../LeafModule";
 import {
   logFileAdded,
   logFileModified,
@@ -177,11 +176,24 @@ const runCodegen = Effect.gen(function* () {
       return inspected;
     }),
   );
-  yield* generateGroupRegisteredFunctions(snapshot.leaves);
-  yield* removeObsoleteRegisteredFunctions(leaves);
-  const [functionPaths] = yield* Effect.all(
+  const ownedRegistries = yield* OutputPublisher.discover("Registry");
+  const ownedModules = yield* OutputPublisher.discover("ConvexModule");
+  const registries = yield* RegisteredFunctions.renderPlan(snapshot.leaves);
+  const modules = yield* FunctionModule.renderPlan(
+    GenerationSnapshot.plan(snapshot, []),
+  );
+  const outputPlan = yield* Effect.fromResult(
+    OutputPlan.diff(
+      Array.filter(
+        [...registries.operations, ...modules.operations],
+        OutputPlan.Operation.$is("Write"),
+      ),
+      [...ownedRegistries, ...ownedModules],
+    ),
+  );
+  yield* OutputPublisher.publish(outputPlan);
+  yield* Effect.all(
     [
-      FunctionModule.generateFunctions(snapshot),
       generateConvexSchemaReexport,
       logGenerated(generateHttp),
       logGenerated(generateCrons),
@@ -191,7 +203,7 @@ const runCodegen = Effect.gen(function* () {
   );
   yield* compileOptionalModules;
   return {
-    functionPaths,
+    functionPaths: GenerationSnapshot.functionPaths(snapshot),
     snapshot,
   };
 });
@@ -258,14 +270,18 @@ export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
         const updatedPaths = HashSet.fromIterable(
           Array.map(leaves, (leaf) => leaf.relativePath.replaceAll("\\", "/")),
         );
-        yield* generateGroupRegisteredFunctions(
+        const registries = yield* RegisteredFunctions.renderPlan(
           HashMap.filter(next.leaves, (_, relativePath) =>
             HashSet.has(updatedPaths, relativePath),
           ),
         );
-        yield* FunctionModule.applyFunctionPlan(
+        const modules = yield* FunctionModule.renderPlan(
           GenerationSnapshot.diff(snapshot, next),
         );
+        const outputPlan = yield* Effect.fromResult(
+          OutputPlan.make([...registries.operations, ...modules.operations]),
+        );
+        yield* OutputPublisher.publish(outputPlan);
         return next;
       }),
     );
@@ -321,105 +337,6 @@ const generateAssembledSpecs = Effect.fnUntraced(function* (
     path.join(confectDirectory, generatedSpecPath),
     specContents,
   );
-});
-
-const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
-  leaves: Iterable<readonly [SpecModulePath, GenerationSnapshot.GroupTree]>,
-) {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-
-  yield* Effect.forEach(
-    leaves,
-    Effect.fnUntraced(function* ([relativePath, group]) {
-      const registryRelativePath = path.join(
-        "registeredFunctions",
-        relativePath.slice(0, -".spec.ts".length) + ".ts",
-      );
-      const registryPath = path.join(
-        confectDirectory,
-        "_generated",
-        registryRelativePath,
-      );
-      const registryDir = path.dirname(registryPath);
-      const fs = yield* FileSystem.FileSystem;
-      if (!(yield* fs.exists(registryDir))) {
-        yield* fs.makeDirectory(registryDir, { recursive: true });
-      }
-
-      const implRelativePath = yield* implPathForSpec(relativePath);
-      const schemaImportPath = yield* toModuleImportPath(
-        path.relative(
-          path.dirname(registryPath),
-          path.join(confectDirectory, "_generated", "schema.ts"),
-        ),
-      );
-      // The group's own leaf spec (sibling of its impl), referenced
-      // type-only by the registry to shape its returned record.
-      const specImportPath = yield* toModuleImportPath(
-        path.relative(
-          path.dirname(registryPath),
-          path.join(confectDirectory, relativePath),
-        ),
-      );
-      const implImportPath = yield* toModuleImportPath(
-        path.relative(
-          path.dirname(registryPath),
-          path.join(confectDirectory, implRelativePath),
-        ),
-      );
-
-      const contents = yield* templates.registeredFunctionsForGroup({
-        group,
-        schemaImportPath,
-        specImportPath,
-        implImportPath,
-      });
-
-      yield* writeFileStringAndLog(registryPath, contents);
-    }),
-  );
-});
-
-const removeObsoleteRegisteredFunctions = Effect.fnUntraced(function* (
-  leaves: ReadonlyArray<LeafModule>,
-) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const registryRoot = path.join(
-    confectDirectory,
-    "_generated",
-    "registeredFunctions",
-  );
-
-  if (!(yield* fs.exists(registryRoot))) {
-    return;
-  }
-
-  const expected = new Set(
-    yield* Effect.forEach(leaves, (leaf) =>
-      registeredFunctionsRelativePath(leaf),
-    ),
-  );
-
-  const existing = yield* fs.readDirectory(registryRoot, { recursive: true });
-  yield* Effect.forEach(existing, (relativePath) => {
-    if (path.extname(relativePath) !== ".ts") {
-      return Effect.void;
-    }
-    const normalized = path.join("registeredFunctions", relativePath);
-    if (!expected.has(normalized)) {
-      return Effect.gen(function* () {
-        const absolutePath = path.join(registryRoot, relativePath);
-        if (yield* fs.exists(absolutePath)) {
-          yield* removePathIfExists(absolutePath);
-          yield* logFileRemoved(absolutePath);
-        }
-      });
-    }
-    return Effect.void;
-  });
 });
 
 const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
