@@ -16,6 +16,7 @@ import {
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
+import * as ProcessTrace from "./ProcessTrace";
 
 type ProcessPhase = Data.TaggedEnum<{
   Started: {};
@@ -116,11 +117,15 @@ export const make = Effect.gen(function* () {
 
   const start = Effect.fnUntraced(function* (command: "dev" | "codegen") {
     const spawner = yield* ChildProcessSpawner;
-    const handle = yield* spawner.spawn(
-      ChildProcess.make(
-        process.execPath,
-        [path.resolve(import.meta.dirname, "../../bin/confect.mjs"), command],
-        { cwd: root, extendEnv: true, env: { NO_COLOR: "1" } },
+    const trace = yield* ProcessTrace.make(path.basename(root), command);
+    const handle = yield* ProcessTrace.spawn(
+      trace,
+      spawner.spawn(
+        ChildProcess.make(
+          process.execPath,
+          [path.resolve(import.meta.dirname, "../../bin/confect.mjs"), command],
+          { cwd: root, extendEnv: true, env: { NO_COLOR: "1" } },
+        ),
       ),
     );
     const output = yield* Ref.make("");
@@ -161,11 +166,13 @@ export const make = Effect.gen(function* () {
     const waitFor = Effect.fnUntraced(function* (text: string) {
       const attempt = yield* Ref.updateAndGet(waits, (count) => count + 1);
       yield* Ref.set(phase, ProcessPhase.WaitingForOutput({ text, attempt }));
+      yield* trace.record("WaitingForOutput", handle.pid, { attempt });
       const result = yield* Queue.take(lines).pipe(
         Effect.repeat({ while: (line) => !line.includes(text) }),
         Effect.timeoutOption("15 seconds"),
       );
       if (result._tag === "None") {
+        yield* trace.record("ReadinessTimeout", handle.pid, { attempt });
         return yield* new ReadinessTimeout({
           command,
           text,
@@ -174,11 +181,14 @@ export const make = Effect.gen(function* () {
         });
       }
       yield* Ref.set(phase, ProcessPhase.OutputReceived({ text, attempt }));
+      yield* trace.record("OutputReceived", handle.pid, { attempt });
     });
     const exitCode = Effect.gen(function* () {
       yield* Ref.set(phase, ProcessPhase.WaitingForExit());
+      yield* trace.record("WaitingForExit", handle.pid);
       const code = yield* handle.exitCode;
       yield* Ref.set(phase, ProcessPhase.Exited({ code: Number(code) }));
+      yield* trace.record("Exited", handle.pid, { code: Number(code) });
       return code;
     });
     return { handle: makeHandle({ ...handle, exitCode }), output, waitFor };
