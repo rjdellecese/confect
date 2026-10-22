@@ -1,7 +1,6 @@
 import * as Command from "effect/cli/Command";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
-import type { PlatformError } from "effect/PlatformError";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import { pipe } from "effect/Function";
@@ -10,7 +9,6 @@ import * as HashMap from "effect/HashMap";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
-import * as Schema from "effect/Schema";
 import * as EvaluationSession from "../EvaluationSession";
 import * as Bundler from "../Bundler";
 import * as CompiledModule from "../CompiledModule";
@@ -29,10 +27,11 @@ import * as GenerationRecord from "../GenerationRecord";
 import * as OutputPlan from "../OutputPlan";
 import * as OutputPublisher from "../OutputPublisher";
 import * as RegisteredFunctions from "../RegisteredFunctions";
+import * as ReferenceBindings from "../ReferenceBindings";
 import * as StaticBindings from "../StaticBindings";
 import * as EntryPoint from "../EntryPoint";
 import type { ImplModulePath } from "../ImplModulePath";
-import { implPathForSpec, type LeafModule } from "../LeafModule";
+import { implPathForSpec } from "../LeafModule";
 import {
   logFileAdded,
   logFileModified,
@@ -43,11 +42,6 @@ import {
   logCoalescedBuildWarnings,
 } from "../log";
 import { ProjectRoot } from "../ProjectRoot";
-import {
-  assemblyNodesFromLeaves,
-  scopedNodesFromLeaves,
-  SCOPED_REFS_HEADER,
-} from "../SpecAssemblyNode";
 import { SpecModulePath } from "../SpecModulePath";
 import * as TableModule from "../TableModule";
 import * as templates from "../templates";
@@ -63,9 +57,6 @@ import {
 
 const GENERATED_DIRNAME = "_generated";
 
-const GENERATED_SPEC_PATH = Effect.map(Path.Path, (path) =>
-  path.join(GENERATED_DIRNAME, "spec.ts"),
-);
 const GENERATED_CONVEX_SCHEMA_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "convexSchema.ts"),
 );
@@ -107,7 +98,7 @@ export const codegen = Command.make("codegen", {}, () =>
 );
 
 const runCodegen = Effect.gen(function* () {
-  const scopedRefFiles = yield* inspectScopedRefFiles;
+  const scopedRefFiles = yield* OutputPublisher.discover("ScopedRef");
   yield* rejectLegacySchemaFile;
   const tableModules = yield* TableModule.discover;
   yield* validateNoDocNameCollisions(tableModules);
@@ -142,10 +133,31 @@ const runCodegen = Effect.gen(function* () {
       ownedTables,
     ),
   );
+  const referenceBindings = yield* ReferenceBindings.renderPlan(leaves);
+  const specPlan = yield* Effect.fromResult(
+    OutputPlan.make(
+      referenceBindings.operations.filter(
+        ({ target }) =>
+          target._tag === "Binding" && target.relativePath === "spec.ts",
+      ),
+    ),
+  );
+  const refsPlan = yield* Effect.fromResult(
+    OutputPlan.diff(
+      Array.filter(
+        referenceBindings.operations,
+        OutputPlan.Operation.$is("Write"),
+      ).filter(
+        ({ target }) =>
+          target._tag !== "Binding" || target.relativePath !== "spec.ts",
+      ),
+      scopedRefFiles,
+    ),
+  );
   yield* generateConfectGeneratedDirectory;
   yield* OutputPublisher.publish(staticPlan);
   yield* removeLegacyFiles;
-  yield* generateAssembledSpecs(leaves);
+  yield* OutputPublisher.publish(specPlan);
   // `_generated/api.ts`/`nodeApi.ts` are no longer imported by generated or
   // impl code (impls take the database schema from `_generated/schema`
   // directly), so remove any copies left over from earlier versions before
@@ -153,8 +165,7 @@ const runCodegen = Effect.gen(function* () {
   yield* Effect.all(
     [
       removeGeneratedApi,
-      generateRefs,
-      generateScopedRefs(leaves, scopedRefFiles),
+      OutputPublisher.publish(refsPlan),
       removeGeneratedNodeApi,
       // Must land before impl validation: impls may import the generated
       // components registry, so it has to exist when their bundles are built.
@@ -317,25 +328,6 @@ const removeLegacyFiles = Effect.gen(function* () {
   );
 });
 
-const generateAssembledSpecs = Effect.fnUntraced(function* (
-  leaves: ReadonlyArray<LeafModule>,
-) {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const generatedSpecPath = yield* GENERATED_SPEC_PATH;
-
-  // A single assembled spec holds every group regardless of runtime—a Node
-  // group's `makeNode()` lives in its imported leaf spec, so the assembled
-  // file is runtime-agnostic. Always emit it (even empty) so downstream
-  // readers (`loadGeneratedSpec`, `generateRefs`) always find a spec module.
-  const nodes = assemblyNodesFromLeaves(leaves);
-  const specContents = yield* templates.assembledSpec({ nodes });
-  yield* writeFileStringAndLog(
-    path.join(confectDirectory, generatedSpecPath),
-    specContents,
-  );
-});
-
 const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
 
 export const loadPreviousFunctionPaths = Effect.gen(function* () {
@@ -467,164 +459,6 @@ const validateNoDocNameCollisions = Effect.fnUntraced(function* (
   if (Array.isReadonlyArrayNonEmpty(collisions)) {
     return yield* new CodegenError.ConflictingDocNameError({ collisions });
   }
-});
-
-const generateRefs = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-
-  const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
-  const refsPath = path.join(confectGeneratedDirectory, "refs.ts");
-  const refsDir = path.dirname(refsPath);
-  const generatedSpecPath = yield* GENERATED_SPEC_PATH;
-
-  const specImportPath = yield* toModuleImportPath(
-    path.relative(refsDir, path.join(confectDirectory, generatedSpecPath)),
-  );
-
-  const refsContents = yield* templates.refs({ specImportPath });
-
-  yield* writeFileStringAndLog(refsPath, refsContents);
-});
-
-const decodeNonLinkCause = Schema.decodeUnknownOption(
-  Schema.Struct({ code: Schema.Literal("EINVAL") }),
-);
-
-const inspectScopedRefFiles = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = path.resolve(yield* ConfectDirectory.get);
-  const realConfectDirectory = yield* fs.realPath(confectDirectory);
-  const inspect = Effect.fnUntraced(function* (file: string) {
-    const link = yield* fs.readLink(file).pipe(
-      Effect.asSome,
-      Effect.catchIf(
-        (error) =>
-          error.reason._tag === "Unknown" &&
-          Option.isSome(decodeNonLinkCause(error.reason.cause)),
-        () => Effect.succeedNone,
-      ),
-    );
-    if (Option.isSome(link)) {
-      return yield* new CodegenError.ScopedRefsPathOccupiedError({
-        path: file,
-        reason: "SymbolicLink",
-      });
-    }
-    const real = yield* fs.realPath(file);
-    const expected = path.resolve(
-      realConfectDirectory,
-      path.relative(confectDirectory, file),
-    );
-    if (path.relative(expected, real) !== "") {
-      return yield* new CodegenError.ScopedRefsPathOccupiedError({
-        path: file,
-        reason: "EscapedPath",
-      });
-    }
-    return yield* fs.stat(file);
-  });
-  const generated = path.join(confectDirectory, "_generated");
-  const directory = path.join(generated, "refs");
-  for (const file of [generated, directory]) {
-    const info = yield* inspect(file).pipe(
-      Effect.asSome,
-      Effect.catchIf(
-        (error) =>
-          error._tag === "PlatformError" && error.reason._tag === "NotFound",
-        () => Effect.succeedNone,
-      ),
-    );
-    if (Option.isNone(info)) return [];
-    if (info.value.type !== "Directory") {
-      return yield* new CodegenError.ScopedRefsPathOccupiedError({
-        path: file,
-        reason: "UnexpectedType",
-      });
-    }
-  }
-  const visit: (
-    current: string,
-  ) => Effect.Effect<
-    ReadonlyArray<string>,
-    PlatformError | CodegenError.ScopedRefsPathOccupiedError
-  > = Effect.fnUntraced(function* (current) {
-    const entries = yield* fs.readDirectory(current);
-    return Array.flatten(
-      yield* Effect.forEach(
-        entries,
-        Effect.fnUntraced(function* (entry) {
-          const file = path.join(current, entry);
-          const info = yield* inspect(file);
-          if (info.type === "Directory") return yield* visit(file);
-          if (info.type !== "File") {
-            return yield* new CodegenError.ScopedRefsPathOccupiedError({
-              path: file,
-              reason: "UnexpectedType",
-            });
-          }
-          return file.endsWith(".ts") ? [path.relative(directory, file)] : [];
-        }),
-      ),
-    );
-  });
-  return yield* visit(directory);
-});
-
-const isOwnedScopedRef = (contents: string) =>
-  contents.startsWith(SCOPED_REFS_HEADER + "\n") ||
-  contents.startsWith(SCOPED_REFS_HEADER + "\r\n");
-
-const generateScopedRefs = Effect.fn("Cli.generateScopedRefs")(function* (
-  leaves: ReadonlyArray<LeafModule>,
-  existing: ReadonlyArray<string>,
-) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const directory = path.join(confectDirectory, "_generated", "refs");
-  const scopes = yield* scopedNodesFromLeaves(leaves);
-  const expected = HashSet.fromIterable(
-    scopes.map((scope) => path.join(...scope.path.pathSegments) + ".ts"),
-  );
-
-  yield* Effect.forEach(
-    scopes,
-    Effect.fnUntraced(function* (scope) {
-      const file = path.join(directory, ...scope.path.pathSegments) + ".ts";
-      if (yield* fs.exists(file)) {
-        if ((yield* fs.stat(file)).type !== "File") {
-          return yield* new CodegenError.ScopedRefsPathOccupiedError({
-            path: file,
-            reason: "UnexpectedType",
-          });
-        }
-        const contents = yield* fs.readFileString(file);
-        if (!isOwnedScopedRef(contents)) {
-          return yield* new CodegenError.ScopedRefsPathOccupiedError({
-            path: file,
-            reason: "UnownedFile",
-          });
-        }
-      }
-      yield* fs.makeDirectory(path.dirname(file), { recursive: true });
-      yield* writeFileStringAndLog(file, yield* templates.scopedRefs(scope));
-    }),
-  );
-
-  yield* Effect.forEach(
-    existing,
-    Effect.fnUntraced(function* (relativePath) {
-      if (!relativePath.endsWith(".ts") || HashSet.has(expected, relativePath))
-        return;
-      const file = path.join(directory, relativePath);
-      const contents = yield* fs.readFileString(file);
-      if (!isOwnedScopedRef(contents)) return;
-      yield* fs.remove(file);
-      yield* logFileRemoved(file);
-    }),
-  );
 });
 
 /**

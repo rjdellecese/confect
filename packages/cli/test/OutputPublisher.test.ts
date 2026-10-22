@@ -2,6 +2,7 @@ import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import * as OutputPlan from "@confect/cli/OutputPlan";
 import * as OutputPublisher from "@confect/cli/OutputPublisher";
+import { SCOPED_REFS_HEADER } from "@confect/cli/SpecAssemblyNode";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodePath from "@effect/platform-node/NodePath";
@@ -53,6 +54,36 @@ for (const platform of [
     (it) => {
       it.effect.each([
         {
+          namespace: "ScopedRef",
+          relativePath: "notes.ts",
+          other: "NOTES.ts",
+          directory: "refs",
+        },
+        {
+          namespace: "ScopedRef",
+          relativePath: "notes.ts",
+          other: "NOTES.ts/child.ts",
+          directory: "refs",
+        },
+        {
+          namespace: "ScopedRef",
+          relativePath: "notes.ts/child.ts",
+          other: "NOTES.ts",
+          directory: "refs",
+        },
+        {
+          namespace: "Binding",
+          relativePath: "spec.ts",
+          other: "SPEC.ts",
+          directory: "",
+        },
+        {
+          namespace: "Binding",
+          relativePath: "refs.ts",
+          other: "REFS.ts/child.ts",
+          directory: "",
+        },
+        {
           namespace: "TableWrapper",
           relativePath: "notes.ts",
           other: "NOTES.ts",
@@ -92,7 +123,9 @@ for (const platform of [
             const target =
               namespace === "Binding"
                 ? OutputPlan.Target.Binding({ relativePath })
-                : OutputPlan.Target.TableWrapper({ relativePath });
+                : namespace === "ScopedRef"
+                  ? OutputPlan.Target.ScopedRef({ relativePath })
+                  : OutputPlan.Target.TableWrapper({ relativePath });
             const writes = yield* Ref.make<ReadonlyArray<string>>([]);
             const inspections = yield* Ref.make(0);
             const missing = FileSystem.makeNoop({});
@@ -438,13 +471,300 @@ const metadataCalls = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   });
 
 layer(NodeServices.layer)("OutputPublisher", (it) => {
+  it.effect.each(["unowned.txt", "stale.ts"])(
+    "rejects nonregular scoped entry %s before reading contents",
+    (relativePath) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const project = yield* fixture;
+        const directory = path.join(project.confect, "_generated", "refs");
+        const file = path.join(directory, relativePath);
+        yield* fs.makeDirectory(directory, { recursive: true });
+        yield* fs.writeFileString(file, "sentinel");
+        const result = yield* project
+          .provide(OutputPublisher.discover("ScopedRef"))
+          .pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              stat: (entry) =>
+                fs
+                  .stat(entry)
+                  .pipe(
+                    Effect.map((info) =>
+                      entry === file
+                        ? { ...info, type: "Socket" as const }
+                        : info,
+                    ),
+                  ),
+              readFileString: () =>
+                Effect.die(
+                  "Must reject nonregular entries before reading contents",
+                ),
+            }),
+            Effect.result,
+          );
+        assert(Result.isFailure(result));
+        expect(result.failure).toMatchObject({
+          _tag: "ScopedRefsPathOccupiedError",
+          path: file,
+          reason: "UnexpectedType",
+        });
+        expect(yield* fs.readFileString(file)).toBe("sentinel");
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "preflights every scoped ownership claim before any reference write",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const project = yield* fixture;
+        const directory = path.join(project.confect, "_generated", "refs");
+        yield* fs.makeDirectory(directory, { recursive: true });
+        const occupied = path.join(directory, "occupied.ts");
+        yield* fs.writeFileString(occupied, "authored");
+        const plan = yield* Effect.fromResult(
+          OutputPlan.make([
+            OutputPlan.Operation.Write({
+              target: OutputPlan.Target.Binding({ relativePath: "refs.ts" }),
+              contents: "aggregate",
+            }),
+            OutputPlan.Operation.Write({
+              target: OutputPlan.Target.ScopedRef({ relativePath: "first.ts" }),
+              contents: SCOPED_REFS_HEADER + "\nfirst",
+            }),
+            OutputPlan.Operation.Write({
+              target: OutputPlan.Target.ScopedRef({
+                relativePath: "occupied.ts",
+              }),
+              contents: SCOPED_REFS_HEADER + "\nreplacement",
+            }),
+          ]),
+        );
+        const result = yield* project
+          .provide(OutputPublisher.publish(plan))
+          .pipe(Effect.result);
+        assert(Result.isFailure(result));
+        expect(result.failure).toMatchObject({
+          _tag: "ScopedRefsPathOccupiedError",
+          path: occupied,
+          reason: "UnownedFile",
+        });
+        expect(yield* fs.readFileString(occupied)).toBe("authored");
+        expect(yield* fs.exists(path.join(directory, "first.ts"))).toBe(false);
+        expect(
+          yield* fs.exists(path.join(project.confect, "_generated", "refs.ts")),
+        ).toBe(false);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "rechecks scoped ownership rather than trusting discovery or earlier publications",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const project = yield* fixture;
+        expect(
+          yield* project.provide(OutputPublisher.discover("ScopedRef")),
+        ).toEqual([]);
+        const directory = path.join(project.confect, "_generated", "refs");
+        yield* fs.makeDirectory(directory, { recursive: true });
+        const owned = SCOPED_REFS_HEADER + "\r\nold";
+        for (const file of ["stale.ts", "changed.ts", "missing.ts"])
+          yield* fs.writeFileString(path.join(directory, file), owned);
+        yield* fs.writeFileString(
+          path.join(directory, "authored.ts"),
+          "authored",
+        );
+        yield* fs.writeFileString(path.join(directory, "other.txt"), owned);
+        const discovered = yield* project.provide(
+          OutputPublisher.discover("ScopedRef"),
+        );
+        expect(
+          discovered.map(({ relativePath }) => relativePath).sort(),
+        ).toEqual(["changed.ts", "missing.ts", "stale.ts"]);
+        const plan = yield* Effect.fromResult(OutputPlan.diff([], discovered));
+        yield* fs.writeFileString(
+          path.join(directory, "changed.ts"),
+          "authored replacement",
+        );
+        yield* fs.remove(path.join(directory, "missing.ts"));
+        yield* project.provide(OutputPublisher.publish(plan));
+        expect(yield* fs.exists(path.join(directory, "stale.ts"))).toBe(false);
+        expect(
+          yield* fs.readFileString(path.join(directory, "changed.ts")),
+        ).toBe("authored replacement");
+        expect(
+          yield* fs.readFileString(path.join(directory, "authored.ts")),
+        ).toBe("authored");
+        expect(
+          yield* fs.readFileString(path.join(directory, "other.txt")),
+        ).toBe(owned);
+        yield* project.provide(OutputPublisher.publish(plan));
+        yield* fs.symlink(
+          path.join(directory, "authored.ts"),
+          path.join(directory, "stale.ts"),
+        );
+        const result = yield* project
+          .provide(OutputPublisher.publish(plan))
+          .pipe(Effect.result);
+        assert(Result.isFailure(result));
+        expect(result.failure).toMatchObject({
+          _tag: "ScopedRefsPathOccupiedError",
+          reason: "SymbolicLink",
+          path: path.join(directory, "stale.ts"),
+        });
+        expect(
+          yield* fs.readFileString(path.join(directory, "authored.ts")),
+        ).toBe("authored");
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect.each(["generated", "root", "parent", "file", "dangling"] as const)(
+    "preserves scoped errors for a newly introduced %s alias",
+    (kind) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const project = yield* fixture;
+        expect(
+          yield* project.provide(OutputPublisher.discover("ScopedRef")),
+        ).toEqual([]);
+        const generated = path.join(project.confect, "_generated");
+        const directory = path.join(generated, "refs");
+        const alias =
+          kind === "generated"
+            ? generated
+            : kind === "root"
+              ? directory
+              : kind === "parent"
+                ? path.join(directory, "nested")
+                : path.join(directory, "nested", "notes.ts");
+        const destination = path.join(project.root, "untouched");
+        if (kind === "file") yield* fs.writeFileString(destination, "authored");
+        else if (kind !== "dangling") yield* fs.makeDirectory(destination);
+        yield* fs.makeDirectory(path.dirname(alias), { recursive: true });
+        yield* fs.symlink(destination, alias);
+        const plan = yield* Effect.fromResult(
+          OutputPlan.make([
+            OutputPlan.Operation.Write({
+              target: OutputPlan.Target.ScopedRef({
+                relativePath: "nested/notes.ts",
+              }),
+              contents: SCOPED_REFS_HEADER + "\nnew",
+            }),
+          ]),
+        );
+        const result = yield* project
+          .provide(OutputPublisher.publish(plan))
+          .pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              readFileString: () => Effect.die("Must not read aliases"),
+              writeFileString: () => Effect.die("Must not write aliases"),
+            }),
+            Effect.result,
+          );
+        assert(Result.isFailure(result));
+        expect(result.failure).toMatchObject({
+          _tag: "ScopedRefsPathOccupiedError",
+          reason: "SymbolicLink",
+          path: alias,
+        });
+        expect(yield* fs.readLink(alias)).toBe(destination);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "retains partial reference publication and retries without deleting authored files",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const project = yield* fixture;
+        const directory = path.join(project.confect, "_generated", "refs");
+        yield* fs.makeDirectory(directory, { recursive: true });
+        const stale = path.join(directory, "stale.ts");
+        yield* fs.writeFileString(stale, SCOPED_REFS_HEADER + "\nold");
+        const target = path.join(directory, "nested", "notes.ts");
+        const plan = yield* Effect.fromResult(
+          OutputPlan.make([
+            OutputPlan.Operation.Write({
+              target: OutputPlan.Target.Binding({ relativePath: "refs.ts" }),
+              contents: "aggregate",
+            }),
+            OutputPlan.Operation.Write({
+              target: OutputPlan.Target.ScopedRef({ relativePath: "first.ts" }),
+              contents: SCOPED_REFS_HEADER + "\nfirst",
+            }),
+            OutputPlan.Operation.Write({
+              target: OutputPlan.Target.ScopedRef({
+                relativePath: "nested/notes.ts",
+              }),
+              contents: SCOPED_REFS_HEADER + "\nnotes",
+            }),
+            OutputPlan.Operation.Remove({
+              target: OutputPlan.Target.ScopedRef({ relativePath: "stale.ts" }),
+            }),
+          ]),
+        );
+        const failure = PlatformError.systemError({
+          _tag: "PermissionDenied",
+          module: "FileSystem",
+          method: "writeFileString",
+          pathOrDescriptor: target,
+          cause: { code: "EACCES" },
+        });
+        const result = yield* project
+          .provide(OutputPublisher.publish(plan))
+          .pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              writeFileString: (...args) =>
+                args[0] === target
+                  ? Effect.fail(failure)
+                  : fs.writeFileString(...args),
+            }),
+            Effect.result,
+          );
+        assert(Result.isFailure(result));
+        expect(result.failure).toBe(failure);
+        expect(
+          yield* fs.readFileString(
+            path.join(project.confect, "_generated", "refs.ts"),
+          ),
+        ).toBe("aggregate");
+        expect(yield* fs.readFileString(path.join(directory, "first.ts"))).toBe(
+          SCOPED_REFS_HEADER + "\nfirst",
+        );
+        expect(yield* fs.exists(stale)).toBe(true);
+        yield* fs.writeFileString(stale, "authored replacement");
+        expect(
+          yield* Project.writtenFiles(
+            project.provide(OutputPublisher.publish(plan)),
+          ),
+        ).toEqual([target]);
+        expect(yield* fs.readFileString(stale)).toBe("authored replacement");
+        expect(
+          yield* Project.writtenFiles(
+            project.provide(OutputPublisher.publish(plan)),
+          ),
+        ).toEqual([]);
+      }).pipe(Effect.scoped),
+  );
+
   it.effect(
     "publishes bounded static outputs and cleans up only discovered table TypeScript files",
     () =>
       Effect.gen(function* () {
         expectTypeOf<
           Parameters<typeof OutputPublisher.discover>[0]
-        >().toEqualTypeOf<"Registry" | "ConvexModule" | "TableWrapper">();
+        >().toEqualTypeOf<
+          "Registry" | "ConvexModule" | "TableWrapper" | "ScopedRef"
+        >();
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const project = yield* fixture;

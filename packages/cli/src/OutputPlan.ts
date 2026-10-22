@@ -9,13 +9,16 @@ export type Target = Data.TaggedEnum<{
   Registry: { readonly relativePath: string };
   ConvexModule: { readonly relativePath: string };
   TableWrapper: { readonly relativePath: string };
+  ScopedRef: { readonly relativePath: string };
   Binding: {
     readonly relativePath:
       | "id.ts"
       | "schema.ts"
       | "convexSchema.ts"
       | "docs.ts"
-      | "services.ts";
+      | "services.ts"
+      | "spec.ts"
+      | "refs.ts";
   };
 }>;
 export const Target = Data.taggedEnum<Target>();
@@ -34,6 +37,7 @@ export class PlanError extends Schema.TaggedError<PlanError>()(
       "Registry",
       "ConvexModule",
       "TableWrapper",
+      "ScopedRef",
       "Binding",
     ]),
     relativePath: Schema.String,
@@ -63,6 +67,8 @@ const bindingNames = HashSet.make(
   "convexSchema.ts",
   "docs.ts",
   "services.ts",
+  "spec.ts",
+  "refs.ts",
 );
 
 export const isOwnedConvexModule = (relativePath: string): boolean => {
