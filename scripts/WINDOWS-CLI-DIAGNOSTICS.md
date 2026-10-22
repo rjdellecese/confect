@@ -14,6 +14,14 @@ and normal local tests do not enable tracing. Windows CLI jobs always upload
   precreates the file and opts in through `CONFECT_CLI_PROCESS_TRACE`.
   Writes are serialized within the CLI suite's existing single worker and
   stop before 4 MiB. Missing or unwritable files disable records, not tests.
+- `phase-PID.jsonl` records compilation, native rebuild/capture, evaluation RPC,
+  and development-sync phase beginnings and endings. The wrapper opts in with
+  `CONFECT_CLI_PHASE_TRACE_DIRECTORY`; without it the CLI does no diagnostic
+  filesystem work. Each process appends at most 512 KiB, with monotonically
+  assigned operation IDs, epoch timestamps, static phase/outcome tags, and
+  whitelisted context/revision IDs, profiles, modes, work tags, and counts.
+  No paths, sources, conditions, or error text are recorded. Native callbacks
+  retain the trace captured before entering their empty Effect context.
 - `processes.jsonl` samples Windows processes outside the test worker, roughly
   once per second plus query time. It selects `node.exe`, `esbuild.exe`, and
   `taskkill.exe`, plus up to 16 ancestry levels. Each process row contains only
@@ -38,6 +46,30 @@ remaining in a snapshot does not establish that it owns a fixture handle or
 caused an earlier slowdown. These resource records are diagnostic observations,
 not performance measurements: tracing adds IO and process queries, and missing
 records can mean a budget limit, collection failure, or cancellation.
+
+Phase endings describe the wrapped Effect's outcome, not a semantic guarantee
+that an entire build succeeded. Handled compilation failures may produce a
+successful outer verification phase; inspect its nested native phases too.
+`CompilationContext.nativeRebuild` brackets a request to the native rebuild API,
+not every native build. `CompilationContext.nativeStart` is a zero-work marker
+from the existing native onStart callback, including watch-triggered builds.
+Associate starts with capture/onEnd records by context. Spans can overlap: a
+request can wait for native work already in progress, and capture/publication
+can occur within another outstanding phase. Do not sum overlapping spans or
+count rebuild requests as native build cycles.
+`CompilationInputs.check` brackets the existing shared input-verification
+operation, including its lock wait, so guard work remains distinguishable from
+the native rebuild and capture phases that invoke it.
+Phase files can end between a beginning and ending when the process exits or
+the byte budget is exhausted. Operation IDs are local to a process lifetime;
+correlate PIDs with the process snapshots to account for PID reuse. Source tests
+use an unconfigured no-op trace by default, and recorder tests provide their own
+temporary sinks rather than inheriting CI's sink.
+
+Phase tracing adds serialized append operations at observed boundaries. It does
+not add polling, retries, stabilization attempts, or process waits, but its IO
+can affect timing. A traced Linux recovery test validates the instrumentation,
+not the cause of a Windows timeout.
 
 The PowerShell collector requires Windows and has no Linux execution coverage.
 Deterministic fixture tests cover serialization, opt-out behavior, finalizer

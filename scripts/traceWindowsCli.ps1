@@ -76,6 +76,7 @@ if ($Monitor) {
 }
 
 $previousTrace = $env:CONFECT_CLI_PROCESS_TRACE
+$previousPhaseTrace = $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY
 $monitorProcess = $null
 $exitCode = 1
 try {
@@ -85,6 +86,7 @@ try {
         $null = New-Item -ItemType Directory -Path $TraceDirectory -Force
         $TraceDirectory = [IO.Path]::GetFullPath($TraceDirectory)
         $env:CONFECT_CLI_PROCESS_TRACE = Join-Path $TraceDirectory 'fixtures.jsonl'
+        $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY = $TraceDirectory
         [IO.File]::WriteAllText($env:CONFECT_CLI_PROCESS_TRACE, '')
         [IO.File]::WriteAllText((Join-Path $TraceDirectory 'processes.jsonl'), '')
         $monitorProcess = Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') -ArgumentList @(
@@ -93,6 +95,7 @@ try {
     } catch {
         Write-Warning 'Process diagnostics setup failed; running tests unchanged.'
         $env:CONFECT_CLI_PROCESS_TRACE = $null
+        $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY = $null
     }
     Push-Location (Join-Path $PSScriptRoot '../packages/cli')
     try {
@@ -103,6 +106,7 @@ try {
     }
 } finally {
     $env:CONFECT_CLI_PROCESS_TRACE = $previousTrace
+    $env:CONFECT_CLI_PHASE_TRACE_DIRECTORY = $previousPhaseTrace
     if ($null -ne $monitorProcess) {
         try {
             if (-not $monitorProcess.HasExited) { $monitorProcess.Kill() }

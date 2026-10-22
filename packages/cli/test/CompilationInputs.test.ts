@@ -2,6 +2,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as Effect from "effect/Effect";
+import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
@@ -14,6 +15,7 @@ import * as PlatformError from "effect/PlatformError";
 import * as Stream from "effect/Stream";
 import * as CompilationInputs from "@confect/cli/CompilationInputs";
 import * as CompilationConfig from "@confect/cli/CompilationConfig";
+import * as CompilationTrace from "@confect/cli/CompilationTrace";
 
 vi.mock("@confect/cli/CompilationConfig", (importOriginal) =>
   importOriginal<typeof CompilationConfig>().then((original) => ({
@@ -25,6 +27,26 @@ vi.mock("@confect/cli/CompilationConfig", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationInputs",
   (it) => {
+    it.effect(
+      "retains the captured check trace in an empty callback context",
+      () =>
+        Effect.gen(function* () {
+          const phases = yield* Ref.make<ReadonlyArray<string>>([]);
+          const inputs = yield* CompilationInputs.make("Once").pipe(
+            Effect.provideService(CompilationTrace.Service, {
+              span: (phase, effect) =>
+                Ref.update(phases, (previous) => [...previous, phase]).pipe(
+                  Effect.andThen(effect),
+                ),
+            }),
+          );
+          yield* Effect.promise(() =>
+            Effect.runPromiseWith(Context.empty())(inputs.check),
+          );
+          expect(yield* Ref.get(phases)).toEqual(["CompilationInputs.check"]);
+        }).pipe(Effect.scoped),
+    );
+
     it.effect.each(["base", "selection"] as const)(
       "guards same-size %s edits without mutating the resolved configuration",
       (kind) =>
