@@ -17,6 +17,7 @@ import * as Stream from "effect/Stream";
 import { BundlerError } from "./BuildError";
 import type { Mode } from "./CompilationState";
 import * as CompilationConfig from "./CompilationConfig";
+import * as CompilationTrace from "./CompilationTrace";
 
 export interface RestartNotification {
   readonly reason: "ResolutionInputsChanged";
@@ -83,6 +84,7 @@ export const ancestors = (
 
 export const make = Effect.fn("CompilationInputs.make")(
   function* (mode: Mode = "Watch", conditions?: ReadonlyArray<string>) {
+    const trace = yield* CompilationTrace.Service;
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const crypto = yield* Crypto.Crypto;
@@ -234,7 +236,10 @@ export const make = Effect.fn("CompilationInputs.make")(
           const notification = yield* notify(paths);
           return yield* new RestartRequired({ paths: notification.paths });
         }
-      }).pipe((effect) => lock.withPermit(effect));
+      }).pipe(
+        (effect) => lock.withPermit(effect),
+        (effect) => trace.span("CompilationInputs.check", effect),
+      );
     const check = verify();
 
     const track = Effect.fn("CompilationInputs.track")(

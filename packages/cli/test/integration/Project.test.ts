@@ -3,11 +3,13 @@ import * as GenerationRecord from "@confect/cli/GenerationRecord";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Cause from "effect/Cause";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
@@ -204,7 +206,104 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   },
 );
 
-layer(NodeServices.layer)("Project process diagnostics", (it) => {
+layer(
+  Layer.merge(
+    NodeServices.layer,
+    ConfigProvider.layer(
+      ConfigProvider.fromUnknown({ CONFECT_CLI_PROCESS_TRACE: "" }),
+    ),
+  ),
+)("Project process diagnostics", (it) => {
+  it.effect(
+    "records fixture waits and leader exit without output or paths",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const directory = yield* fs.makeTempDirectoryScoped();
+        const file = path.join(directory, "trace.jsonl");
+        yield* fs.writeFileString(file, "");
+        const { spawner } = yield* fixture;
+        const completed = ChildProcessSpawner.make((command) =>
+          spawner.spawn(command).pipe(
+            Effect.map((handle) =>
+              ChildProcessSpawner.makeHandle({
+                ...handle,
+                exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(0)),
+              }),
+            ),
+          ),
+        );
+        yield* TestClock.setTime(1234);
+        const root = yield* Effect.gen(function* () {
+          const project = yield* Project.make;
+          const child = yield* project.start("codegen");
+          yield* child.waitFor("fixture");
+          expect(Number(yield* child.handle.exitCode)).toBe(0);
+          return project.root;
+        }).pipe(
+          Effect.scoped,
+          Effect.provideService(
+            ChildProcessSpawner.ChildProcessSpawner,
+            completed,
+          ),
+          Effect.provide(
+            ConfigProvider.layer(
+              ConfigProvider.fromUnknown({ CONFECT_CLI_PROCESS_TRACE: file }),
+            ),
+          ),
+        );
+        const contents = yield* fs.readFileString(file);
+        const records = yield* Effect.forEach(
+          contents.trim().split("\n"),
+          (line) =>
+            Schema.decodeEffect(
+              Schema.fromJsonString(
+                Schema.Struct({
+                  fixture: Schema.String,
+                  command: Schema.String,
+                  timestamp: Schema.Finite,
+                  pid: Schema.NullOr(Schema.Finite),
+                  phase: Schema.String,
+                }),
+              ),
+            )(line),
+        );
+        expect(records.map((record) => record.phase)).toEqual([
+          "SpawnStart",
+          "Spawned",
+          "WaitingForOutput",
+          "OutputReceived",
+          "WaitingForExit",
+          "Exited",
+          "ReleaseStart",
+          "ReleaseComplete",
+        ]);
+        expect(
+          records.every(
+            (record) =>
+              record.fixture === path.basename(root) &&
+              record.command === "codegen" &&
+              record.timestamp === 1234,
+          ),
+        ).toBe(true);
+        expect(records.map((record) => record.pid)).toEqual([
+          null,
+          123,
+          123,
+          123,
+          123,
+          123,
+          123,
+          123,
+        ]);
+        expect(contents).not.toContain(root);
+        expect(contents).not.toContain("fixture stdout");
+        expect(contents).not.toContain("fixture stderr");
+        expect(yield* fs.exists(root)).toBe(false);
+      }).pipe(Effect.scoped),
+  );
+
   it.effect(
     "keeps the readiness deadline and returns a typed failure with output",
     () =>

@@ -3,7 +3,9 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import { cliApp } from "./cliApp";
+import * as CompilationTrace from "./CompilationTrace";
 
 // Track if we received SIGINT so we can re-raise it after cleanup.
 // This ensures proper terminal state restoration when run via e.g. `pnpm`.
@@ -19,4 +21,9 @@ process.on("exit", () => {
   }
 });
 
-cliApp.pipe(Effect.provide(NodeServices.layer), NodeRuntime.runMain);
+cliApp.pipe(
+  Effect.provide(
+    CompilationTrace.layer.pipe(Layer.provideMerge(NodeServices.layer)),
+  ),
+  NodeRuntime.runMain,
+);

@@ -23,6 +23,7 @@ import * as Ansi from "../Ansi";
 import * as SyncState from "../SyncState";
 import type { OptionalFile } from "../EntryPoint";
 import * as Compilation from "../Compilation";
+import * as CompilationTrace from "../CompilationTrace";
 import * as CompilationSession from "../CompilationSession";
 import * as CompilationInputs from "../CompilationInputs";
 import type * as CompilationState from "../CompilationState";
@@ -242,6 +243,7 @@ const syncLoop = Effect.fnUntraced(function* (
   initialInventory: ReadonlyArray<EntryPoint.EntryPoint>,
   events: Queue.Queue<DevelopmentEvent>,
 ) {
+  const trace = yield* CompilationTrace.Service;
   const compiler = yield* Compilation.Service;
   const path = yield* Path.Path;
   const confect = yield* ConfectDirectory.get;
@@ -257,33 +259,35 @@ const syncLoop = Effect.fnUntraced(function* (
   const lastLoggedErrors = yield* Ref.make("");
   const lastLoggedWarnings = yield* Ref.make("");
 
-  const rescan = Effect.fnUntraced(function* (
-    consumed: ReadonlyArray<CompilationState.Receipt> = [],
-  ) {
-    const previous = yield* Ref.get(inventoryRef);
-    const current = yield* EntryPoint.discover;
-    if (DevelopmentState.sameInventory(previous, current)) return;
-    yield* Ref.set(inventoryRef, current);
-    if (
-      DevelopmentState.onlyConsumedImplsAdded(
-        previous,
-        current,
-        consumed,
-        yield* compiler.topology,
+  const rescan = Effect.fnUntraced(
+    function* (consumed: ReadonlyArray<CompilationState.Receipt> = []) {
+      const previous = yield* Ref.get(inventoryRef);
+      const current = yield* EntryPoint.discover;
+      if (DevelopmentState.sameInventory(previous, current)) return;
+      yield* Ref.set(inventoryRef, current);
+      if (
+        DevelopmentState.onlyConsumedImplsAdded(
+          previous,
+          current,
+          consumed,
+          yield* compiler.topology,
+        )
       )
-    )
-      return;
-    const removed = previous.filter(
-      (entry) =>
-        EntryPoint.isOptional(entry) &&
-        !current.some((next) => next.absolutePath === entry.absolutePath),
-    );
-    yield* Ref.update(pendingRef, (pending) =>
-      SyncState.add(pending, removed, true),
-    );
-    yield* compiler.reset;
-    yield* Ref.set(receiptsRef, DevelopmentState.empty);
-  });
+        return;
+      const removed = previous.filter(
+        (entry) =>
+          EntryPoint.isOptional(entry) &&
+          !current.some((next) => next.absolutePath === entry.absolutePath),
+      );
+      yield* Ref.update(pendingRef, (pending) =>
+        SyncState.add(pending, removed, true),
+      );
+      yield* compiler.reset;
+      yield* Ref.set(receiptsRef, DevelopmentState.empty);
+    },
+    (effect, _consumed?: ReadonlyArray<CompilationState.Receipt>) =>
+      trace.span("Dev.rescan", effect),
+  );
 
   const processEvent = (event: DevelopmentEvent) =>
     Effect.gen(function* () {
@@ -351,7 +355,16 @@ const syncLoop = Effect.fnUntraced(function* (
 
   const drain = Effect.gen(function* () {
     const queued = yield* Queue.clear(events);
-    yield* Effect.forEach(queued, processEvent, { discard: true });
+    yield* trace.span(
+      "Dev.drain",
+      Effect.forEach(queued, processEvent, { discard: true }),
+      { events: queued.length },
+    );
+    const pending = yield* Ref.get(pendingRef);
+    yield* trace.span("Dev.pending", Effect.void, {
+      work: pending.work._tag,
+      optional: HashSet.size(pending.optional),
+    });
   });
 
   while (true) {
@@ -475,7 +488,14 @@ const syncLoop = Effect.fnUntraced(function* (
       return nextSnapshot;
     });
 
-    const job = yield* Compilation.runJob(program);
+    const job = yield* Compilation.runJob(
+      trace.span("Dev.sync", program, {
+        operation: operation._tag,
+        work: pending.work._tag,
+        roots: HashSet.size(plannedRoots),
+        optional: HashSet.size(optional),
+      }),
+    );
     if (Option.isSome(yield* compiler.restartRequired))
       return yield* DevSupervisor.requestRestart;
     const topology = yield* compiler.topology;
@@ -519,25 +539,31 @@ const syncLoop = Effect.fnUntraced(function* (
       yield* logFunctionPathDiff(yield* Ref.get(functionPathsRef), nextPaths);
       yield* Ref.set(functionPathsRef, nextPaths);
       yield* Ref.set(optionalPendingRef, HashSet.empty());
-      yield* compiler.verify;
+      yield* trace.span("Dev.verify", compiler.verify);
       yield* rescan(
         SyncState.Operation.$is("Generate")(operation) ? job.receipts : [],
       );
       yield* drain;
       if (SyncState.needsDeploymentNotification(phase))
-        yield* touchConvexSchema;
+        yield* trace.span("Dev.notification", touchConvexSchema);
       yield* drain;
       if (!SyncState.isDirty(yield* Ref.get(pendingRef))) {
-        yield* GenerationRecord.write(
-          outcome.snapshot,
-          Effect.gen(function* () {
-            yield* drain;
-            return !SyncState.isDirty(yield* Ref.get(pendingRef));
-          }),
+        yield* trace.span(
+          "Dev.history",
+          GenerationRecord.write(
+            outcome.snapshot,
+            Effect.gen(function* () {
+              yield* drain;
+              return !SyncState.isDirty(yield* Ref.get(pendingRef));
+            }),
+          ),
         );
         yield* drain;
         if (!SyncState.isDirty(yield* Ref.get(pendingRef)))
-          yield* logSuccess("Generated files are up-to-date");
+          yield* trace.span(
+            "Dev.readiness",
+            logSuccess("Generated files are up-to-date"),
+          );
       }
     }
   }
