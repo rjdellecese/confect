@@ -1,5 +1,6 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Equivalence from "effect/Equivalence";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -243,7 +244,14 @@ export const layer = (options: {
               );
               const entry = { ...created, scope };
               yield* Effect.forEach(
-                Array.filter(current, (context) => !retained.includes(context)),
+                Array.filter(
+                  current,
+                  (context) =>
+                    !Array.containsWith(Equivalence.strictEqual())(
+                      retained,
+                      context,
+                    ),
+                ),
                 (context) => Scope.close(context.scope, Exit.void),
               );
               yield* Ref.set(contexts, Array.append(retained, entry));
@@ -267,7 +275,11 @@ export const layer = (options: {
                 Array.filter(
                   current,
                   (context) =>
-                    context !== selected && !retained.includes(context),
+                    context !== selected &&
+                    !Array.containsWith(Equivalence.strictEqual())(
+                      retained,
+                      context,
+                    ),
                 ),
                 (context) => Scope.close(context.scope, Exit.void),
               );
