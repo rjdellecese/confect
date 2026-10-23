@@ -293,6 +293,93 @@ export default implementation;`,
   );
 });
 
+layer(NodeServices.layer)("schema boundaries", (test) => {
+  test.effect(
+    "constructs application validators only in the deployment schema",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const directory = yield* fs
+          .makeTempDirectoryScoped({
+            directory: import.meta.dirname,
+            prefix: "schema-boundary-",
+          })
+          .pipe(Effect.flatMap(fs.realPath));
+        yield* fs.makeDirectory(path.join(directory, "tables"));
+        yield* fs.writeFileString(
+          path.join(directory, "reads.ts"),
+          "export const reads = { fields: 0 };\n",
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "tables/notes.ts"),
+          `import { Table } from "@confect/core";
+import * as Schema from "effect/Schema";
+import { reads } from "../reads";
+
+export default Table.make(() => {
+  reads.fields++;
+  return Schema.Struct({ title: Schema.String });
+})("notes");
+`,
+        );
+        const tableModules = [
+          { tableName: "notes", importPath: "./tables/notes" },
+        ];
+        const runtimeSource = yield* templates.runtimeSchema({ tableModules });
+        const deploySource = yield* templates.convexSchema({ tableModules });
+        yield* fs.writeFileString(
+          path.join(directory, "schema.ts"),
+          runtimeSource,
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "convexSchema.ts"),
+          deploySource,
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "runtime.ts"),
+          `export { default } from "./schema";
+export { reads } from "./reads";
+import notes from "./tables/notes";
+export const fields = () => notes.Fields;
+`,
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "deploy.ts"),
+          `export { default } from "./convexSchema";
+export { reads } from "./reads";
+`,
+        );
+
+        const runtime = yield* Bundler.bundle(
+          path.join(directory, "runtime.ts"),
+        );
+        expect(runtime.module.reads).toEqual({ fields: 0 });
+        expect(Object.keys(runtime.metafile.inputs)).not.toContain(
+          path.join(directory, "convexSchema.ts"),
+        );
+        assert(Predicate.isFunction(runtime.module.fields));
+        expect(runtime.module.fields()).toBe(runtime.module.fields());
+        expect(runtime.module.reads).toEqual({ fields: 1 });
+
+        const deploy = yield* Bundler.bundle(path.join(directory, "deploy.ts"));
+        expect(deploySource).toContain(
+          'import { Table as $Table } from "@confect/server";',
+        );
+        expect(deploy.module.reads).toEqual({ fields: 1 });
+        expect(Object.keys(deploy.metafile.inputs)).toContain(
+          path.join(directory, "convexSchema.ts"),
+        );
+        expect(Object.keys(deploy.metafile.inputs)).not.toContain(
+          path.join(directory, "schema.ts"),
+        );
+        assert(Predicate.isObject(deploy.module.default));
+        assert(Predicate.isObject(deploy.module.default.tables));
+        expect(Object.keys(deploy.module.default.tables)).toEqual(["notes"]);
+      }).pipe(Effect.scoped),
+  );
+});
+
 layer(NodeServices.layer)("id", (test) => {
   test.effect.each([{ tableNames: [] }, { tableNames: ["notes", "users"] }])(
     "exports matching ID types and schemas for $tableNames and system tables",
