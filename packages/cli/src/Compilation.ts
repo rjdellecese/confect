@@ -243,10 +243,7 @@ export const layer = (options: {
               );
               const entry = { ...created, scope };
               yield* Effect.forEach(
-                Array.filter(
-                  current,
-                  (context) => !Array.contains(retained, context),
-                ),
+                Array.filter(current, (context) => !retained.includes(context)),
                 (context) => Scope.close(context.scope, Exit.void),
               );
               yield* Ref.set(contexts, Array.append(retained, entry));
@@ -270,7 +267,7 @@ export const layer = (options: {
                 Array.filter(
                   current,
                   (context) =>
-                    context !== selected && !Array.contains(retained, context),
+                    context !== selected && !retained.includes(context),
                 ),
                 (context) => Scope.close(context.scope, Exit.void),
               );

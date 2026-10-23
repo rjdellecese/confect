@@ -6,6 +6,8 @@ import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Equal from "effect/Equal";
+import * as Hash from "effect/Hash";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -19,10 +21,18 @@ import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
 import * as Bundler from "@confect/cli/Bundler";
 import * as Compilation from "@confect/cli/Compilation";
+import * as CompilationContext from "@confect/cli/CompilationContext";
 import * as CompilationState from "@confect/cli/CompilationState";
 import * as CompiledModule from "@confect/cli/CompiledModule";
 import * as ConvexConfig from "@confect/cli/ConvexConfig";
 import type * as CompilationInputs from "@confect/cli/CompilationInputs";
+
+vi.mock("@confect/cli/CompilationContext", (importOriginal) =>
+  importOriginal<typeof CompilationContext>().then((original) => ({
+    ...original,
+    make: vi.fn(original.make),
+  })),
+);
 
 vi.mock("@confect/cli/CompilationState", (importOriginal) =>
   importOriginal<typeof CompilationState>().then((original) => ({
@@ -62,6 +72,67 @@ const compileAndLoad = Effect.fn("Compilation.test.compileAndLoad")(function* (
 layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
+  it.effect("retains and disposes live contexts by identity", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped();
+      const files = ["first.ts", "second.ts", "third.ts"].map((name) =>
+        path.join(root, name),
+      );
+      for (const file of files)
+        yield* fs.writeFileString(file, "export default 1;");
+      const makeContext = vi.mocked(CompilationContext.make);
+      const original = makeContext.getMockImplementation();
+      assert(original);
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => makeContext.mockImplementation(original)),
+      );
+      let structuralComparisons = 0;
+      const disposed: number[] = [];
+      makeContext.mockImplementation((...args) =>
+        original(...args).pipe(
+          Effect.tap(() =>
+            Effect.addFinalizer(() =>
+              Effect.sync(() => disposed.push(args[0].id)),
+            ),
+          ),
+          Effect.map((context) => ({
+            ...context,
+            [Hash.symbol]() {
+              structuralComparisons++;
+              return 0;
+            },
+            [Equal.symbol](that: unknown) {
+              structuralComparisons++;
+              return this === that;
+            },
+          })),
+        ),
+      );
+      yield* Effect.gen(function* () {
+        const compiler = yield* Compilation.Service;
+        for (const file of files)
+          expect((yield* Bundler.bundle(file)).module.default).toBe(1);
+        expect(yield* compiler.topology).toHaveLength(3);
+        expect(disposed).toEqual([]);
+        yield* Bundler.withBatch(
+          files.slice(0, 2),
+          Effect.forEach(files.slice(0, 2), (file) => Bundler.bundle(file)),
+        );
+        expect(yield* compiler.topology).toHaveLength(2);
+        expect(disposed.toSorted((a, b) => a - b)).toEqual([1, 2]);
+        yield* compiler.reset;
+        expect(disposed.toSorted((a, b) => a - b)).toEqual([1, 2, 3, 4]);
+        expect(structuralComparisons).toBe(0);
+      }).pipe(
+        Effect.provide(
+          Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+        ),
+      );
+    }).pipe(Effect.scoped),
+  );
+
   it.effect(
     "reuses only unaffected fingerprints after fresh native verification",
     () =>
