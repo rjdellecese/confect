@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig, mergeConfig } from "vitest/config";
 import sharedConfig from "../../vitest.shared";
@@ -9,7 +10,7 @@ export default mergeConfig(
     test: {
       root: import.meta.dirname,
       include: ["test/*.test.ts", "test/integration/*.test.ts"],
-      maxWorkers: 1,
+      maxWorkers: Math.min(2, availableParallelism()),
     },
   }),
 );

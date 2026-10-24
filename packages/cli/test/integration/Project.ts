@@ -69,6 +69,20 @@ export const make = Effect.gen(function* () {
     directory: import.meta.dirname,
     prefix: "consumer-",
   });
+  for (const name of ["core", "server"]) {
+    const source = path.resolve(import.meta.dirname, "../../../", name);
+    const installed = path.join(root, "node_modules", "@confect", name);
+    yield* fs.makeDirectory(installed, { recursive: true });
+    yield* fs.copyFile(
+      path.join(source, "package.json"),
+      path.join(installed, "package.json"),
+    );
+    yield* fs.copy(path.join(source, "dist"), path.join(installed, "dist"));
+    yield* fs.symlink(
+      path.join(source, "node_modules"),
+      path.join(installed, "node_modules"),
+    );
+  }
   const write = (file: string, contents: string) =>
     fs.writeFileString(path.join(root, file), contents);
   yield* fs.makeDirectory(path.join(root, "confect", "tables"), {

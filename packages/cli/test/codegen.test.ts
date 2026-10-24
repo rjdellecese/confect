@@ -48,6 +48,54 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
     it.effect(
+      "matches fresh output with workspace-linked dependencies",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const installed = yield* Project.make;
+          yield* installed.provide(codegenHandler);
+          const expected = yield* installed.generatedFiles;
+          const installedBundle = yield* installed.provide(
+            Bundler.bundle(
+              path.join(installed.root, "confect/tables/notes.ts"),
+            ),
+          );
+          expect(
+            Array.dedupe(
+              Object.values(installedBundle.metafile.inputs)
+                .flatMap((input) => input.imports)
+                .filter((imported) => imported.original === "@confect/core")
+                .map((imported) => Boolean(imported.external)),
+            ),
+          ).toEqual([true]);
+          const workspace = yield* Project.make;
+          yield* fs.remove(path.join(workspace.root, "node_modules"), {
+            recursive: true,
+          });
+          yield* workspace.provide(codegenHandler);
+          expect(yield* workspace.generatedFiles).toEqual(expected);
+          const workspaceBundle = yield* workspace.provide(
+            Bundler.bundle(
+              path.join(workspace.root, "confect/tables/notes.ts"),
+            ),
+          );
+          expect(
+            Array.dedupe(
+              Object.values(workspaceBundle.metafile.inputs)
+                .flatMap((input) => input.imports)
+                .filter((imported) => imported.original === "@confect/core")
+                .map((imported) => Boolean(imported.external)),
+            ),
+          ).toEqual([false]);
+          expect(
+            Object.keys(installedBundle.metafile.inputs).length,
+          ).toBeLessThan(Object.keys(workspaceBundle.metafile.inputs).length);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "passes inherited aliases and per-entry options through one resolved config",
       () =>
         Effect.gen(function* () {
