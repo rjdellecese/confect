@@ -1,5 +1,6 @@
 import * as Array from "effect/Array";
 import * as Crypto from "effect/Crypto";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as HashMap from "effect/HashMap";
@@ -174,7 +175,7 @@ export const make = Effect.fn("CompilationInputs.make")(
       if (Option.isSome(required))
         return yield* new RestartRequired({ paths: required.value.paths });
     });
-    const verify = (files?: ReadonlyArray<string>) =>
+    const verifyFiles = (files?: ReadonlyArray<string>) =>
       Effect.gen(function* () {
         yield* ensure;
         const current = yield* Ref.get(baseline);
@@ -234,8 +235,44 @@ export const make = Effect.fn("CompilationInputs.make")(
           const notification = yield* notify(paths);
           return yield* new RestartRequired({ paths: notification.paths });
         }
-      }).pipe((effect) => lock.withPermit(effect));
+      });
+    const verify = (files?: ReadonlyArray<string>) =>
+      lock.withPermit(verifyFiles(files));
     const check = verify();
+    const checks = yield* Queue.unbounded<{
+      readonly files: ReadonlyArray<string> | undefined;
+      readonly result: Deferred.Deferred<void, BundlerError | RestartRequired>;
+    }>();
+    yield* Effect.gen(function* () {
+      const first = yield* Queue.take(checks);
+      yield* Effect.yieldNow;
+      yield* lock.withPermit(
+        Effect.gen(function* () {
+          const requests = [first, ...(yield* Queue.clear(checks))];
+          const files = requests.some((request) => request.files === undefined)
+            ? undefined
+            : Array.dedupe(requests.flatMap((request) => request.files ?? []));
+          const result = yield* Effect.exit(verifyFiles(files));
+          yield* Effect.forEach(
+            requests,
+            (request) => Deferred.done(request.result, result),
+            {
+              discard: true,
+            },
+          );
+        }),
+      );
+    }).pipe(Effect.forever, Effect.forkScoped);
+    const checkFiles = (files?: ReadonlyArray<string>) =>
+      Effect.gen(function* () {
+        yield* ensure;
+        const result = yield* Deferred.make<
+          void,
+          BundlerError | RestartRequired
+        >();
+        yield* Queue.offer(checks, { files, result });
+        return yield* Deferred.await(result);
+      });
 
     const track = Effect.fn("CompilationInputs.track")(
       function* (files: ReadonlyArray<string>) {
@@ -315,7 +352,7 @@ export const make = Effect.fn("CompilationInputs.make")(
       pending: Ref.get(pending),
       check,
       ensure,
-      checkFiles: verify,
+      checkFiles,
       track,
       trackSource: Effect.fn("CompilationInputs.trackSource")(function* (
         file: string,

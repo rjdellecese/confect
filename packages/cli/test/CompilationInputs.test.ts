@@ -25,6 +25,216 @@ vi.mock("@confect/cli/CompilationConfig", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationInputs",
   (it) => {
+    it.effect.each(["Once", "Watch"] as const)(
+      "shares fresh verification work across concurrent requests in %s mode",
+      (mode) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const manifest = path.join(root, "package.json");
+          yield* fs.writeFileString(manifest, "{}");
+          let reads = 0;
+          const inputs = yield* CompilationInputs.make(mode).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              watch: () => Stream.never,
+              readFile: (file) => {
+                if (file === manifest) reads++;
+                return fs.readFile(file);
+              },
+            }),
+          );
+          yield* inputs.track([manifest]);
+          reads = 0;
+          yield* Effect.all(
+            Array.from({ length: 390 }, () => inputs.checkFiles([manifest])),
+            { concurrency: "unbounded" },
+          );
+          expect(reads).toBe(1);
+          yield* inputs.checkFiles([manifest]);
+          expect(reads).toBe(2);
+          yield* fs.writeFileString(manifest, '{"changed":true}');
+          expect(
+            yield* Effect.flip(inputs.checkFiles([manifest])),
+          ).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [manifest],
+          });
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect(
+      "does not reuse a verification for requests arriving after its reads began",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const manifest = path.join(root, "package.json");
+          yield* fs.writeFileString(manifest, '{"value":1}');
+          const read = yield* Deferred.make<void>();
+          const release = yield* Deferred.make<void>();
+          let block = false;
+          const inputs = yield* CompilationInputs.make("Once").pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              readFile: (file) =>
+                Effect.gen(function* () {
+                  const contents = yield* fs.readFile(file);
+                  if (file === manifest && block) {
+                    block = false;
+                    yield* Deferred.succeed(read, undefined);
+                    yield* Deferred.await(release);
+                  }
+                  return contents;
+                }),
+            }),
+          );
+          yield* inputs.track([manifest]);
+          block = true;
+          const first = yield* inputs
+            .checkFiles([manifest])
+            .pipe(Effect.forkScoped);
+          yield* Deferred.await(read);
+          yield* fs.writeFileString(manifest, '{"value":2}');
+          const later = yield* inputs
+            .checkFiles([manifest])
+            .pipe(Effect.result, Effect.forkScoped);
+          yield* Effect.yieldNow;
+          yield* Deferred.succeed(release, undefined);
+          yield* Fiber.join(first);
+          const result = yield* Fiber.join(later);
+          assert(Result.isFailure(result));
+          expect(result.failure).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [manifest],
+          });
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect(
+      "verifies the union of concurrent subsets and full-check requests",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const files = ["a.json", "b.json", "c.json"].map((name) =>
+            path.join(root, name),
+          );
+          for (const file of files) yield* fs.writeFileString(file, "{}");
+          const reads: string[] = [];
+          const inputs = yield* CompilationInputs.make("Once").pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              readFile: (file) => {
+                reads.push(file);
+                return fs.readFile(file);
+              },
+            }),
+          );
+          yield* inputs.track(files);
+          reads.length = 0;
+          yield* Effect.all(
+            [
+              inputs.checkFiles([files[0]]),
+              inputs.checkFiles([files[1], files[0]]),
+              inputs.checkFiles(),
+            ],
+            { concurrency: "unbounded" },
+          );
+          expect(reads.toSorted()).toEqual(files.toSorted());
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect(
+      "keeps other verification requests alive when one caller is interrupted",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const file = path.join(root, "package.json");
+          yield* fs.writeFileString(file, "{}");
+          const read = yield* Deferred.make<void>();
+          const release = yield* Deferred.make<void>();
+          let block = false;
+          const inputs = yield* CompilationInputs.make("Once").pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              readFile: (candidate) =>
+                Effect.gen(function* () {
+                  if (candidate === file && block) {
+                    block = false;
+                    yield* Deferred.succeed(read, undefined);
+                    yield* Deferred.await(release);
+                  }
+                  return yield* fs.readFile(candidate);
+                }),
+            }),
+          );
+          yield* inputs.track([file]);
+          block = true;
+          const first = yield* inputs
+            .checkFiles([file])
+            .pipe(Effect.forkScoped);
+          yield* Deferred.await(read);
+          const second = yield* inputs
+            .checkFiles([file])
+            .pipe(Effect.forkScoped);
+          yield* Fiber.interrupt(first);
+          yield* Deferred.succeed(release, undefined);
+          yield* Fiber.join(second);
+          yield* inputs.checkFiles([file]);
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect(
+      "propagates typed observation failures to every queued verifier",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const file = path.join(root, "package.json");
+          yield* fs.writeFileString(file, "{}");
+          let reject = false;
+          const failure = PlatformError.systemError({
+            _tag: "PermissionDenied",
+            module: "FileSystem",
+            method: "readFile",
+            pathOrDescriptor: file,
+          });
+          const inputs = yield* CompilationInputs.make("Once").pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              readFile: (candidate) =>
+                candidate === file && reject
+                  ? Effect.fail(failure)
+                  : fs.readFile(candidate),
+            }),
+          );
+          yield* inputs.track([file]);
+          reject = true;
+          const results = yield* Effect.all(
+            Array.from({ length: 20 }, () =>
+              Effect.result(inputs.checkFiles([file])),
+            ),
+            { concurrency: "unbounded" },
+          );
+          for (const result of results) {
+            assert(Result.isFailure(result));
+            assert(result.failure._tag === "BundlerError");
+            expect(result.failure.cause).toBe(failure);
+          }
+          reject = false;
+          const sticky = yield* Effect.flip(inputs.checkFiles([file]));
+          assert(sticky._tag === "BundlerError");
+          expect(sticky.cause).toBe(failure);
+        }).pipe(Effect.scoped),
+    );
+
     it.effect.each(["base", "selection"] as const)(
       "guards same-size %s edits without mutating the resolved configuration",
       (kind) =>
