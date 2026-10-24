@@ -25,6 +25,50 @@ vi.mock("@confect/cli/CompilationConfig", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationInputs",
   (it) => {
+    it.effect.each(["package.json", "node_modules"])(
+      "guards a shared resolution scope against later %s creation",
+      (name) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const inputs = yield* CompilationInputs.make("Once");
+          yield* inputs.trackSource(path.join(root, "entry.ts"));
+          expect(yield* inputs.canShareResolution(root)).toBe(true);
+          const added = path.join(root, name);
+          if (name === "node_modules") yield* fs.makeDirectory(added);
+          else yield* fs.writeFileString(added, "{}");
+          expect(yield* Effect.flip(inputs.check)).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [added],
+          });
+          yield* fs.remove(added, { recursive: true });
+          expect(
+            yield* Effect.flip(inputs.canShareResolution(root)),
+          ).toMatchObject({ _tag: "CompilationRestartRequired" });
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each([
+      ".pnp.cjs",
+      ".pnp.js",
+      ".pnp.loader.mjs",
+      ".pnp.data.json",
+    ])("does not share package lookups under an ancestor %s marker", (name) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const nested = path.join(root, "nested");
+        yield* fs.makeDirectory(nested);
+        yield* fs.writeFileString(path.join(root, name), "{}");
+        const inputs = yield* CompilationInputs.make("Once");
+        yield* inputs.trackSource(path.join(nested, "entry.ts"));
+        expect(yield* inputs.canSharePackageLookups).toBe(false);
+        expect(yield* inputs.canShareResolution(nested)).toBe(false);
+      }).pipe(Effect.scoped),
+    );
+
     it.effect.each(["Once", "Watch"] as const)(
       "shares fresh verification work across concurrent requests in %s mode",
       (mode) =>

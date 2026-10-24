@@ -381,6 +381,7 @@ const compileLive = Effect.fn("Bundler.compileLive")(
       conditions,
       service.resolutionInputs,
       options?.plugins?.length ? [] : roots,
+      !options?.plugins?.length,
     );
     const result = yield* service.compile({
       roots,

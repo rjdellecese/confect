@@ -20,6 +20,143 @@ vi.mock("exsolve", { spy: true });
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationPlugin",
   (it) => {
+    it.effect.each([
+      "shared",
+      "package-scope",
+      "node-modules",
+      "css-relative",
+    ] as const)(
+      "preserves native lookup results with a %s boundary",
+      (boundary) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          yield* fs.writeFileString(path.join(root, "package.json"), "{}");
+          const dependency = path.join(root, "node_modules", "dependency");
+          yield* fs.makeDirectory(dependency, { recursive: true });
+          yield* fs.writeFileString(
+            path.join(dependency, "package.json"),
+            '{"name":"dependency","exports":"./index.js","type":"module"}',
+          );
+          yield* fs.writeFileString(
+            path.join(dependency, "index.js"),
+            "export default 1;",
+          );
+          const entries: string[] = [];
+          for (const directory of ["a", "b", "c"]) {
+            const folder = path.join(root, directory);
+            yield* fs.makeDirectory(folder);
+            const entry = path.join(
+              folder,
+              boundary === "css-relative" ? "entry.css" : "entry.ts",
+            );
+            entries.push(entry);
+            yield* fs.writeFileString(
+              entry,
+              boundary === "css-relative"
+                ? '@import "dependency";'
+                : 'import value from "dependency"; export default value;',
+            );
+            if (boundary === "css-relative") {
+              yield* fs.writeFileString(
+                path.join(folder, "dependency.css"),
+                `.${directory} { color: red; }`,
+              );
+              continue;
+            }
+            if (directory !== "a" || boundary === "shared") continue;
+            const local =
+              boundary === "package-scope"
+                ? folder
+                : path.join(folder, "node_modules", "dependency");
+            yield* fs.makeDirectory(local, { recursive: true });
+            yield* fs.writeFileString(
+              path.join(local, "package.json"),
+              '{"name":"dependency","exports":"./index.js","type":"module"}',
+            );
+            yield* fs.writeFileString(
+              path.join(local, "index.js"),
+              "export default 2;",
+            );
+          }
+          const compile = (share: boolean) =>
+            Effect.gen(function* () {
+              const inputs = yield* CompilationInputs.make("Once");
+              yield* Effect.forEach(entries, inputs.trackSource);
+              const resolver = yield* CompilationPlugin.make(
+                path,
+                fs,
+                [],
+                [],
+                ["node"],
+                inputs,
+                entries,
+                share,
+              );
+              let probes = 0;
+              const native = yield* Effect.acquireRelease(
+                Effect.tryPromise({
+                  try: () =>
+                    esbuild.context({
+                      absWorkingDir: root,
+                      entryPoints: entries,
+                      outdir: path.join(root, "output"),
+                      bundle: true,
+                      format: "esm",
+                      platform: "node",
+                      tsconfigRaw: {},
+                      write: false,
+                      metafile: true,
+                      logLevel: "silent",
+                      plugins: [
+                        {
+                          name: resolver.plugin.name,
+                          setup(build) {
+                            return resolver.plugin.setup({
+                              ...build,
+                              resolve(specifier, options) {
+                                if (specifier === "dependency") probes++;
+                                return build.resolve(specifier, options);
+                              },
+                            });
+                          },
+                        },
+                      ],
+                    }),
+                  catch: (cause) => new BundlerError({ cause }),
+                }),
+                (context) => Effect.promise(() => context.dispose()),
+              );
+              const result = yield* Effect.tryPromise({
+                try: () => native.rebuild(),
+                catch: (cause) => new BundlerError({ cause }),
+              });
+              yield* inputs.check;
+              const firstProbes = probes;
+              const rebuilt = yield* Effect.tryPromise({
+                try: () => native.rebuild(),
+                catch: (cause) => new BundlerError({ cause }),
+              });
+              expect(probes).toBe(firstProbes * 2);
+              expect(rebuilt.metafile).toEqual(result.metafile);
+              yield* inputs.check;
+              return { result, probes: firstProbes };
+            });
+          const original = yield* compile(false);
+          const shared = yield* compile(true);
+          expect(original.probes).toBe(3);
+          expect(shared.probes).toBe(
+            boundary === "shared" ? 1 : boundary === "css-relative" ? 3 : 2,
+          );
+          expect(shared.result.metafile).toEqual(original.result.metafile);
+          expect(shared.result.outputFiles?.map((file) => file.text)).toEqual(
+            original.result.outputFiles?.map((file) => file.text),
+          );
+          expect(shared.result.warnings).toEqual(original.result.warnings);
+        }).pipe(Effect.scoped),
+    );
+
     it.effect(
       "checks restart authority before taking the entry fast path",
       () =>

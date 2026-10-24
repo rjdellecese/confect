@@ -45,6 +45,8 @@ class ObservationRejected extends Schema.TaggedError<ObservationRejected>()(
   },
 ) {}
 
+const pnpNames = [".pnp.cjs", ".pnp.js", ".pnp.loader.mjs", ".pnp.data.json"];
+
 const names = [
   "package.json",
   "package-lock.json",
@@ -54,10 +56,7 @@ const names = [
   "yarn.lock",
   "bun.lock",
   "bun.lockb",
-  ".pnp.cjs",
-  ".pnp.js",
-  ".pnp.loader.mjs",
-  ".pnp.data.json",
+  ...pnpNames,
   ".npmrc",
   ".yarnrc.yml",
   "node_modules/.modules.yaml",
@@ -354,6 +353,42 @@ export const make = Effect.fn("CompilationInputs.make")(
       ensure,
       checkFiles,
       track,
+      canSharePackageLookups: Ref.get(baseline).pipe(
+        Effect.map(
+          (current) =>
+            !HashMap.some(
+              current,
+              (value, file) =>
+                value !== "missing" && pnpNames.includes(path.basename(file)),
+            ),
+        ),
+      ),
+      canShareResolution: Effect.fn("CompilationInputs.canShareResolution")(
+        function* (directory: string) {
+          yield* ensure;
+          const current = yield* Ref.get(baseline);
+          for (const ancestor of ancestors(path, directory)) {
+            for (const name of pnpNames) {
+              if (
+                Option.getOrUndefined(
+                  HashMap.get(current, path.join(ancestor, name)),
+                ) !== "missing"
+              )
+                return false;
+            }
+          }
+          const modules = path.join(directory, "node_modules");
+          const files = [path.join(directory, "package.json"), modules];
+          yield* Ref.update(configDirectories, HashSet.add(modules));
+          yield* track(files);
+          yield* checkFiles(files);
+          const observed = yield* Ref.get(baseline);
+          return files.every(
+            (file) =>
+              Option.getOrUndefined(HashMap.get(observed, file)) === "missing",
+          );
+        },
+      ),
       trackSource: Effect.fn("CompilationInputs.trackSource")(function* (
         file: string,
       ) {
