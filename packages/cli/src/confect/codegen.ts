@@ -25,6 +25,7 @@ import * as DocName from "../DocName";
 import * as FunctionPaths from "../FunctionPaths";
 import * as FunctionModule from "../FunctionModule";
 import * as GenerationSnapshot from "../GenerationSnapshot";
+import * as GenerationRecord from "../GenerationRecord";
 import * as EntryPoint from "../EntryPoint";
 import type { ImplModulePath } from "../ImplModulePath";
 import {
@@ -202,6 +203,7 @@ export const generateWithSnapshot = runCodegen.pipe(
 
 export const codegenHandler = generateWithSnapshot.pipe(
   Effect.tap(() => touchConvexSchema),
+  Effect.tap(({ snapshot }) => GenerationRecord.write(snapshot)),
   Effect.map(({ functionPaths }) => ({ functionPaths })),
   Effect.provide(CompilationSession.layer("Once")),
 );
@@ -420,30 +422,23 @@ const removeObsoleteRegisteredFunctions = Effect.fnUntraced(function* (
   });
 });
 
-const getGeneratedSpecPath = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const generatedSpecPath = yield* GENERATED_SPEC_PATH;
-  return path.join(confectDirectory, generatedSpecPath);
-});
-
 const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
 
 export const loadPreviousFunctionPaths = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const specPath = yield* getGeneratedSpecPath;
-
-  if (!(yield* fs.exists(specPath))) {
-    return emptyFunctionPaths;
-  }
-
-  return yield* EvaluationSession.previous(specPath).pipe(
-    EvaluationSession.provide,
-    Effect.catchTags({
-      BundleFailedError: () => Effect.succeed(emptyFunctionPaths),
-      ImportFailedError: () => Effect.succeed(emptyFunctionPaths),
-    }),
-  );
+  const history = yield* GenerationRecord.read;
+  return yield* GenerationRecord.History.$match(history, {
+    Missing: () => Effect.succeed(emptyFunctionPaths),
+    Malformed: () =>
+      logWarn(
+        "Ignoring malformed generation history; performing full initial generation.",
+      ).pipe(Effect.as(emptyFunctionPaths)),
+    Unsupported: () =>
+      logWarn(
+        "Ignoring unsupported generation history version; performing full initial generation.",
+      ).pipe(Effect.as(emptyFunctionPaths)),
+    Loaded: ({ record }) =>
+      Effect.succeed(GenerationSnapshot.functionPaths(record.snapshot)),
+  });
 });
 
 /**

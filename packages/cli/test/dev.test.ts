@@ -9,6 +9,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Stream from "effect/Stream";
 import * as esbuild from "esbuild";
 import type * as DevSupervisor from "@confect/cli/DevSupervisor";
 import { dev } from "@confect/cli/confect/dev";
@@ -42,6 +43,125 @@ vi.mock("effect/Console", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
+    it.effect(
+      "discards a generation record dirtied while its temporary write is blocked",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const convex = path.join(project.root, "convex");
+          const recordPath = path.join(
+            project.root,
+            "confect/_generated/.confect-generation.json",
+          );
+          const config =
+            'import { defineApp } from "convex/server"; export default defineApp();\n';
+          yield* project.write("convex/convex.config.ts", config);
+          const ready = yield* Queue.unbounded<void>();
+          const readyCount = yield* Ref.make(0);
+          const blocked = yield* Queue.unbounded<Deferred.Deferred<void>>();
+          const configEvents = yield* Queue.unbounded<FileSystem.WatchEvent>();
+          const delivered = yield* Deferred.make<void>();
+          const blockWrites = yield* Ref.make(false);
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi
+                .spyOn(Console, "log")
+                .mockImplementation((...args) =>
+                  args.some(
+                    (arg) =>
+                      typeof arg === "string" &&
+                      arg.includes("Generated files are up-to-date"),
+                  )
+                    ? Ref.update(readyCount, (count) => count + 1).pipe(
+                        Effect.andThen(Queue.offer(ready, undefined)),
+                        Effect.asVoid,
+                      )
+                    : Effect.void,
+                ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          yield* project
+            .provide(Command.runWith(dev, { version: "test" })([]))
+            .pipe(
+              Effect.provideService(FileSystem.FileSystem, {
+                ...fs,
+                watch: (directory, options) =>
+                  directory === convex
+                    ? Stream.fromQueue(configEvents).pipe(
+                        Stream.flatMap((event) =>
+                          Stream.make(event).pipe(
+                            Stream.concat(
+                              Stream.fromEffect(
+                                Deferred.succeed(delivered, undefined),
+                              ).pipe(Stream.drain),
+                            ),
+                          ),
+                        ),
+                      )
+                    : fs.watch(directory, options),
+                writeFileString: (...args) =>
+                  Effect.gen(function* () {
+                    yield* fs.writeFileString(...args);
+                    if (
+                      path
+                        .basename(args[0])
+                        .startsWith(".confect-generation-") &&
+                      (yield* Ref.get(blockWrites))
+                    ) {
+                      const release = yield* Deferred.make<void>();
+                      yield* Queue.offer(blocked, release);
+                      yield* Deferred.await(release);
+                    }
+                  }),
+              }),
+              Effect.forkScoped,
+            );
+          yield* Queue.take(ready).pipe(Effect.timeout("15 seconds"));
+          const before = yield* fs.readFileString(recordPath);
+          yield* Ref.set(blockWrites, true);
+          yield* project.write(
+            "confect/notes.spec.ts",
+            Project.spec.replace('name: "list"', 'name: "latest"'),
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace('"list"', '"latest"'),
+          );
+          const releaseDirty = yield* Queue.take(blocked).pipe(
+            Effect.timeout("15 seconds"),
+          );
+          expect(yield* fs.readFileString(recordPath)).toBe(before);
+          expect(yield* Ref.get(readyCount)).toBe(1);
+          yield* project.write("convex/convex.config.ts", `${config}\n`);
+          yield* Queue.offer(configEvents, {
+            _tag: "Update",
+            path: "convex.config.ts",
+          });
+          yield* Deferred.await(delivered).pipe(Effect.timeout("15 seconds"));
+          yield* Deferred.succeed(releaseDirty, undefined);
+          const releaseClean = yield* Queue.take(blocked).pipe(
+            Effect.timeout("15 seconds"),
+          );
+          expect(yield* fs.readFileString(recordPath)).toBe(before);
+          expect(yield* Ref.get(readyCount)).toBe(1);
+          yield* Ref.set(blockWrites, false);
+          yield* Deferred.succeed(releaseClean, undefined);
+          yield* Queue.take(ready).pipe(Effect.timeout("15 seconds"));
+          expect(yield* Ref.get(readyCount)).toBe(2);
+          const after = yield* fs.readFileString(recordPath);
+          expect(after).not.toBe(before);
+          expect(after).toContain('"latest"');
+          expect(after).not.toContain('"list"');
+          expect(
+            (yield* project.generatedFiles)[path.join("convex", "notes.ts")],
+          ).toContain("export const latest");
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect.each([
       { kind: "syntax", message: "Unexpected" },
       { kind: "unlocated", message: "unlocated watcher failure" },

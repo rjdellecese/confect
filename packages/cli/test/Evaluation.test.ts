@@ -31,7 +31,9 @@ import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { FunctionPaths } from "@confect/cli/FunctionPaths";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
+import * as GenerationRecord from "@confect/cli/GenerationRecord";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
+import * as LeafModule from "@confect/cli/LeafModule";
 import { SpecModulePath } from "@confect/cli/SpecModulePath";
 import { TableModulePath } from "@confect/cli/TableModulePath";
 import * as Project from "./integration/Project";
@@ -587,6 +589,7 @@ Effect.gen(function* () {
           first[path.join("confect", "_generated", "components.ts")],
         ).toContain('"waitlist"');
         expectWorkersExited();
+        yield* project.provide(GenerationRecord.write(snapshot));
         expect(
           Equal.equals(
             yield* project.provide(Evaluation.loadPreviousFunctionPaths),
@@ -661,12 +664,7 @@ Effect.gen(function* () {
         });
         yield* project.provide(
           Effect.gen(function* () {
-            const entry = path.join(
-              project.root,
-              "confect",
-              "_generated",
-              "spec.ts",
-            );
+            const entry = path.join(project.root, "confect", "notes.spec.ts");
             const { client, requestContext } =
               yield* EvaluationSession.ModuleEvaluation;
             const batch = yield* Bundler.withBatch(
@@ -682,11 +680,22 @@ Effect.gen(function* () {
             );
             for (const artifact of [batch, individual]) {
               expect(yield* fs.exists(fileURLToPath(artifact.url))).toBe(true);
-              const previous = yield* client.Previous({
+              const relativePath = SpecModulePath.make("notes.spec.ts");
+              yield* client.LoadSpec({
                 ...requestContext,
+                relativePath,
                 url: artifact.url,
+                serverImporters: yield* LeafModule.serverImporters(artifact),
               });
-              expect([...previous].map((fn) => fn.name)).toEqual(["list"]);
+              const snapshot = yield* client.Snapshot({
+                ...requestContext,
+                paths: [relativePath],
+              });
+              expect(
+                [...GenerationSnapshot.functionPaths(snapshot)].map(
+                  (fn) => fn.name,
+                ),
+              ).toEqual(["list"]);
             }
           }).pipe(EvaluationSession.provide),
         );
@@ -879,14 +888,30 @@ Effect.gen(function* () {
   );
 
   it.effect(
-    "does not start an evaluator when no previous generated spec exists",
+    "does not start an evaluator when no generation record exists",
     () =>
       Effect.gen(function* () {
         const project = yield* setup;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
         const previous = yield* project.provide(
           Evaluation.loadPreviousFunctionPaths,
         );
         expect(HashSet.size(previous)).toBe(0);
+        yield* fs.makeDirectory(
+          path.join(project.root, "confect", "_generated"),
+        );
+        for (const source of [
+          'throw new Error("Legacy source must not run");',
+          "process.exit(23);",
+        ]) {
+          yield* project.write("confect/_generated/spec.ts", source);
+          expect(
+            HashSet.size(
+              yield* project.provide(Evaluation.loadPreviousFunctionPaths),
+            ),
+          ).toBe(0);
+        }
         expect(vi.mocked(fork)).not.toHaveBeenCalled();
       }).pipe(Effect.scoped),
   );
@@ -896,15 +921,18 @@ Effect.gen(function* () {
     () =>
       Effect.gen(function* () {
         const project = yield* setup;
-        const first = yield* project.provide(Evaluation.generate);
+        const snapshot = yield* project.provide(Evaluation.generateSnapshot);
+        const first = GenerationSnapshot.functionPaths(snapshot);
         expect(Schema.is(FunctionPaths)(first)).toBe(true);
         expect(HashSet.size(first)).toBe(1);
         expectWorkersExited();
+        yield* project.provide(GenerationRecord.write(snapshot));
+        vi.mocked(fork).mockClear();
         const previous = yield* project.provide(
           Evaluation.loadPreviousFunctionPaths,
         );
         expect(Equal.equals(previous, first)).toBe(true);
-        expectWorkersExited();
+        expect(vi.mocked(fork)).not.toHaveBeenCalled();
         const second = yield* project.provide(Evaluation.generate);
         expect(Equal.equals(second, first)).toBe(true);
         expectWorkersExited();
@@ -912,31 +940,97 @@ Effect.gen(function* () {
     { timeout: 30000 },
   );
 
+  it.effect.each([
+    {
+      content: '{"private":"history-privacy-sentinel",',
+      warning: "malformed generation history",
+    },
+    {
+      content: '{"version":1,"snapshot":"history-privacy-sentinel"}',
+      warning: "malformed generation history",
+    },
+    {
+      content: '{"version":2,"snapshot":"history-privacy-sentinel"}',
+      warning: "unsupported generation history version",
+    },
+  ])(
+    "ignores $warning without evaluating generated source",
+    ({ content, warning }) =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        yield* fs.makeDirectory(
+          path.join(project.root, "confect", "_generated"),
+        );
+        yield* project.write(
+          `confect/_generated/${GenerationRecord.filename}`,
+          content,
+        );
+        yield* project.write("confect/_generated/spec.ts", "process.exit(23);");
+        const output = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            vi.spyOn(console, "log").mockImplementation(() => {}),
+          ),
+          (spy) => Effect.sync(() => spy.mockRestore()),
+        );
+        const previous = yield* project.provide(
+          Evaluation.loadPreviousFunctionPaths,
+        );
+        expect(HashSet.size(previous)).toBe(0);
+        expect(vi.mocked(fork)).not.toHaveBeenCalled();
+        const logged = output.mock.calls.flat().join("\n");
+        expect(logged).toContain(warning);
+        expect(logged).toContain("performing full initial generation");
+        expect(logged).not.toContain("history-privacy-sentinel");
+        expect(logged).not.toContain(content);
+        expect(
+          yield* fs.readFileString(
+            path.join(
+              project.root,
+              "confect",
+              "_generated",
+              GenerationRecord.filename,
+            ),
+          ),
+        ).toBe(content);
+      }).pipe(Effect.scoped),
+  );
+
   it.effect(
-    "ignores unbuildable previous specs but reports invalid exports and worker exits",
+    "loads recorded history without compiling or evaluating generated source",
     () =>
       Effect.gen(function* () {
         const project = yield* setup;
         yield* project.provide(Evaluation.generateSnapshot);
-        yield* project.write(
-          "confect/_generated/spec.ts",
-          'import "./missing";\nexport default {};\n',
+        const recorded = yield* Effect.fromResult(
+          GenerationSnapshot.parse([
+            [
+              "historical.spec.ts",
+              {
+                runtime: "Convex",
+                functions: [{ name: "previous", provenance: "Confect" }],
+                groups: {},
+              },
+            ],
+          ]),
         );
-        expect(
-          HashSet.size(
-            yield* project.provide(Evaluation.loadPreviousFunctionPaths),
-          ),
-        ).toBe(0);
-        for (const source of ["export default {};", "process.exit(23);"]) {
+        yield* project.provide(GenerationRecord.write(recorded));
+        vi.mocked(fork).mockClear();
+        for (const source of [
+          'import "./missing";\nexport default {};\n',
+          "export default {};",
+          'throw new Error("Generated source must not run");',
+          "process.exit(23);",
+        ]) {
           yield* project.write("confect/_generated/spec.ts", source);
-          const failed = yield* project
-            .provide(Evaluation.loadPreviousFunctionPaths)
-            .pipe(Effect.result);
-          assert(Result.isFailure(failed));
-          expect(failed.failure.diagnostic).toContain(
-            source.startsWith("process") ? "23" : "valid Spec",
+          const previous = yield* project.provide(
+            Evaluation.loadPreviousFunctionPaths,
           );
-          expectWorkersExited();
+          expect(
+            Equal.equals(previous, GenerationSnapshot.functionPaths(recorded)),
+          ).toBe(true);
+          expect(vi.mocked(fork)).not.toHaveBeenCalled();
         }
       }).pipe(Effect.scoped),
     { timeout: 30000 },

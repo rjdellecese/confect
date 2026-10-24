@@ -1,7 +1,6 @@
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeWorkerRunner from "@effect/platform-node/NodeWorkerRunner";
-import { Spec } from "@confect/core";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -12,7 +11,6 @@ import * as RpcServer from "effect/rpc/RpcServer";
 import * as CodegenError from "./CodegenError";
 import * as CompiledModule from "./CompiledModule";
 import * as ConvexConfig from "./ConvexConfig";
-import * as FunctionPaths from "./FunctionPaths";
 import * as GenerationSnapshot from "./GenerationSnapshot";
 import * as TableModule from "./TableModule";
 import { fromBundlerError } from "./BuildError";
@@ -70,18 +68,6 @@ const handlers = requests.toLayer(
       return leaf.value;
     });
     return {
-      Previous: (request) =>
-        evaluate(
-          request,
-          Effect.gen(function* () {
-            const module = yield* load(request.url, "_generated/spec.ts");
-            if (!Spec.isSpec(module.default))
-              return yield* new EvaluationError({
-                diagnostic: "_generated/spec.ts does not export a valid Spec",
-              });
-            return FunctionPaths.make(module.default);
-          }),
-        ),
       LoadSpec: (request) =>
         evaluate(
           request,
