@@ -2,6 +2,7 @@ import { availableParallelism } from "node:os";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig, mergeConfig } from "vitest/config";
 import sharedConfig from "../../vitest.shared";
+import CliTestSequencer from "../../scripts/cliTestSequencer";
 
 export default mergeConfig(
   sharedConfig,
@@ -11,7 +12,7 @@ export default mergeConfig(
       root: import.meta.dirname,
       include: ["test/*.test.ts", "test/integration/*.test.ts"],
       maxWorkers: Math.min(2, availableParallelism()),
-      sequence: { groupOrder: 1 },
+      sequence: { groupOrder: 1, sequencer: CliTestSequencer },
     },
   }),
 );
