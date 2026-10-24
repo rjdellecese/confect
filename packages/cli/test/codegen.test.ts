@@ -17,6 +17,8 @@ import * as Fiber from "effect/Fiber";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import * as Ref from "effect/Ref";
+import * as PlatformError from "effect/PlatformError";
 import * as String from "effect/String";
 import {
   codegenHandler,
@@ -27,6 +29,12 @@ import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import { SpecModulePath } from "@confect/cli/SpecModulePath";
 import { TableModulePath } from "@confect/cli/TableModulePath";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
+import {
+  SCOPED_REFS_HEADER,
+  scopedNodesFromLeaves,
+} from "@confect/cli/SpecAssemblyNode";
+import { toLeafModule } from "@confect/cli/LeafModule";
+import * as templates from "@confect/cli/templates";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
@@ -381,6 +389,13 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
         Effect.gen(function* () {
           const path = yield* Path.Path;
           const project = yield* Project.make;
+          const scopedImpl = (
+            name: string,
+          ) => `import refs from "./_generated/refs/notes";
+import { Ref } from "@confect/core";
+if (Ref.getConvexFunctionName(refs.public.${name}) !== "notes:${name}") throw new Error("Stale scoped reference");
+${Project.impl.replace('"list"', JSON.stringify(name))}`;
+          yield* project.write("confect/notes.impl.ts", scopedImpl("list"));
           yield* project.write("confect/other.spec.ts", Project.spec);
           yield* project.write(
             "confect/other.impl.ts",
@@ -391,10 +406,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             "confect/notes.spec.ts",
             Project.spec.replace('name: "list"', 'name: "latest"'),
           );
-          yield* project.write(
-            "confect/notes.impl.ts",
-            Project.impl.replace('"list"', '"latest"'),
-          );
+          yield* project.write("confect/notes.impl.ts", scopedImpl("latest"));
           const bundle = yield* Effect.acquireRelease(
             Effect.sync(() => vi.spyOn(Bundler, "compile")),
             (spy) => Effect.sync(() => spy.mockRestore()),
@@ -908,6 +920,13 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const project = yield* Project.make;
+          yield* project.write(
+            "confect/notes.impl.ts",
+            `import refs from "./_generated/refs/notes";
+import { Ref } from "@confect/core";
+if (Ref.getConvexFunctionName(refs.public.list) !== "notes:list") throw new Error("Incorrect scoped reference");
+${Project.impl}`,
+          );
           const confect = path.join(project.root, "confect");
           const run = codegenHandler.pipe(
             Effect.provideService(ProjectRoot, {
@@ -929,6 +948,418 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
           expect(yield* Project.writtenFiles(run)).toEqual([]);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
+    );
+
+    it.effect(
+      "reconciles scoped files through addition, rename and removal without deleting authored paths",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* project.provide(codegenHandler);
+          const authored = "export const authored = true;\n";
+          yield* project.write("confect/_generated/refs/authored.ts", authored);
+          yield* fs.makeDirectory(
+            path.join(project.root, "confect/_generated/refs/keep"),
+          );
+          yield* project.write(
+            "confect/_generated/refs/keep/authored.ts",
+            authored,
+          );
+          yield* fs.makeDirectory(
+            path.join(project.root, "confect/notes/archive"),
+            { recursive: true },
+          );
+          yield* project.write(
+            "confect/notes/archive/old.spec.ts",
+            Project.spec.replaceAll('"./_generated/', '"../../_generated/'),
+          );
+          yield* project.write(
+            "confect/notes/archive/old.impl.ts",
+            Project.impl
+              .replaceAll('"./_generated/', '"../../_generated/')
+              .replace('"./notes.spec"', '"./old.spec"'),
+          );
+          yield* project.provide(codegenHandler);
+          const added = yield* project.generatedFiles;
+          expect(
+            added[path.join("confect/_generated/refs/notes.ts")],
+          ).toContain("GroupSpec.addGroupsAt");
+          expect(
+            added[path.join("confect/_generated/refs/notes/archive.ts")],
+          ).toContain('"notes/archive"');
+          expect(
+            added[path.join("confect/_generated/refs/notes/archive/old.ts")],
+          ).toContain('"notes/archive/old"');
+          yield* fs.rename(
+            path.join(project.root, "confect/notes/archive/old.spec.ts"),
+            path.join(project.root, "confect/notes/archive/recent.spec.ts"),
+          );
+          yield* fs.remove(
+            path.join(project.root, "confect/notes/archive/old.impl.ts"),
+          );
+          yield* project.write(
+            "confect/notes/archive/recent.impl.ts",
+            Project.impl
+              .replaceAll('"./_generated/', '"../../_generated/')
+              .replace('"./notes.spec"', '"./recent.spec"'),
+          );
+          yield* project.provide(codegenHandler);
+          expect(
+            yield* fs.exists(
+              path.join(
+                project.root,
+                "confect/_generated/refs/notes/archive/old.ts",
+              ),
+            ),
+          ).toBe(false);
+          expect(
+            yield* fs.exists(
+              path.join(
+                project.root,
+                "confect/_generated/refs/notes/archive/recent.ts",
+              ),
+            ),
+          ).toBe(true);
+          yield* fs.remove(path.join(project.root, "confect/notes"), {
+            recursive: true,
+          });
+          yield* project.provide(codegenHandler);
+          expect(
+            yield* fs.exists(
+              path.join(
+                project.root,
+                "confect/_generated/refs/notes/archive.ts",
+              ),
+            ),
+          ).toBe(false);
+          expect(
+            yield* fs.exists(
+              path.join(
+                project.root,
+                "confect/_generated/refs/notes/archive/recent.ts",
+              ),
+            ),
+          ).toBe(false);
+          const removed = yield* project.generatedFiles;
+          expect(
+            removed[path.join("confect/_generated/refs/notes.ts")],
+          ).not.toContain("GroupSpec.addGroupsAt");
+          expect(
+            removed[path.join("confect/_generated/refs/authored.ts")],
+          ).toBe(authored);
+          expect(
+            removed[path.join("confect/_generated/refs/keep/authored.ts")],
+          ).toBe(authored);
+          expect(
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect.each([
+      {
+        name: "generated directory alias",
+        alias: "confect/_generated",
+        kind: "Directory",
+        reason: "SymbolicLink",
+        targetExists: true,
+      },
+      {
+        name: "scoped root alias",
+        alias: "confect/_generated/refs",
+        kind: "Directory",
+        reason: "SymbolicLink",
+        targetExists: true,
+      },
+      {
+        name: "expected file alias",
+        alias: "confect/_generated/refs/notes.ts",
+        kind: "File",
+        reason: "SymbolicLink",
+        targetExists: true,
+      },
+      {
+        name: "stale file alias",
+        alias: "confect/_generated/refs/stale.ts",
+        kind: "File",
+        reason: "SymbolicLink",
+        targetExists: true,
+      },
+      {
+        name: "dangling file alias",
+        alias: "confect/_generated/refs/stale.ts",
+        kind: "File",
+        reason: "SymbolicLink",
+        targetExists: false,
+      },
+      {
+        name: "expected directory alias",
+        alias: "confect/_generated/refs/notes",
+        kind: "Directory",
+        reason: "SymbolicLink",
+        targetExists: true,
+      },
+      {
+        name: "stale directory alias",
+        alias: "confect/_generated/refs/stale",
+        kind: "Directory",
+        reason: "SymbolicLink",
+        targetExists: true,
+      },
+      {
+        name: "resolved file escape",
+        alias: "confect/_generated/refs/notes.ts",
+        kind: "File",
+        reason: "EscapedPath",
+        targetExists: true,
+      },
+      {
+        name: "resolved directory escape",
+        alias: "confect/_generated/refs/stale",
+        kind: "Directory",
+        reason: "EscapedPath",
+        targetExists: true,
+      },
+    ] as const)("rejects $name before content access or mutation", (scenario) =>
+      Effect.gen(function* () {
+        const project = yield* Project.make;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const alias = path.join(project.root, scenario.alias);
+        const target = path.join(
+          project.root,
+          scenario.kind === "Directory" ? "outside" : "outside.ts",
+        );
+        const sentinel =
+          SCOPED_REFS_HEADER + "\r\nexport const untouched = true;\r\n";
+        if (scenario.targetExists) {
+          if (scenario.kind === "Directory") {
+            yield* fs.makeDirectory(target);
+            yield* fs.writeFileString(path.join(target, "notes.ts"), sentinel);
+          } else {
+            yield* fs.writeFileString(target, sentinel);
+          }
+        }
+        yield* fs.makeDirectory(path.dirname(alias), { recursive: true });
+        if (scenario.reason === "SymbolicLink") {
+          yield* fs.symlink(target, alias);
+        } else if (scenario.kind === "Directory") {
+          yield* fs.makeDirectory(alias);
+        } else {
+          yield* fs.writeFileString(alias, sentinel);
+        }
+        if (scenario.name === "expected directory alias") {
+          yield* fs.makeDirectory(path.join(project.root, "confect/notes"));
+          yield* project.write(
+            "confect/notes/child.spec.ts",
+            Project.spec.replaceAll('"./_generated/', '"../_generated/'),
+          );
+          yield* project.write(
+            "confect/notes/child.impl.ts",
+            Project.impl
+              .replaceAll('"./_generated/', '"../_generated/')
+              .replace('"./notes.spec"', '"./child.spec"'),
+          );
+        }
+        const accesses: string[] = [];
+        const guard = <A, E, R>(
+          operation: string,
+          file: string,
+          effect: Effect.Effect<A, E, R>,
+        ) =>
+          Effect.suspend(() => {
+            if (
+              [alias, target].some(
+                (blocked) =>
+                  file === blocked || file.startsWith(blocked + path.sep),
+              )
+            ) {
+              accesses.push(`${operation}:${file}`);
+              return Effect.die("Forbidden alias content access or mutation");
+            }
+            return effect;
+          });
+        const result = yield* project.provide(codegenHandler).pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            realPath: (file) =>
+              scenario.reason === "EscapedPath" && file === alias
+                ? Effect.succeed(target)
+                : fs.realPath(file),
+            readFileString: (...args) =>
+              guard("readFileString", args[0], fs.readFileString(...args)),
+            readFile: (...args) =>
+              guard("readFile", args[0], fs.readFile(...args)),
+            readDirectory: (...args) =>
+              guard("readDirectory", args[0], fs.readDirectory(...args)),
+            writeFileString: (...args) =>
+              guard("writeFileString", args[0], fs.writeFileString(...args)),
+            writeFile: (...args) =>
+              guard("writeFile", args[0], fs.writeFile(...args)),
+            remove: (...args) => guard("remove", args[0], fs.remove(...args)),
+            makeDirectory: (...args) =>
+              guard("makeDirectory", args[0], fs.makeDirectory(...args)),
+          }),
+          Effect.result,
+        );
+        assert(Result.isFailure(result));
+        expect(result.failure).toMatchObject({
+          _tag: "ScopedRefsPathOccupiedError",
+          path: alias,
+          reason: scenario.reason,
+        });
+        expect(accesses).toEqual([]);
+        if (scenario.reason === "SymbolicLink") {
+          expect(yield* fs.readLink(alias)).toBe(target);
+        } else {
+          expect((yield* fs.stat(alias)).type).toBe(scenario.kind);
+        }
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect.each([
+      { reason: "PermissionDenied", code: "EACCES" },
+      { reason: "Unknown", code: "EIO" },
+    ] as const)(
+      "preserves readLink $reason observations before further I/O",
+      ({ reason, code }) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const generated = path.join(project.root, "confect/_generated");
+          yield* fs.makeDirectory(path.join(generated, "refs"), {
+            recursive: true,
+          });
+          const failure = PlatformError.systemError({
+            _tag: reason,
+            module: "FileSystem",
+            method: "readLink",
+            pathOrDescriptor: generated,
+            cause: { code },
+          });
+          const observationFailed = yield* Ref.make(false);
+          const accesses = yield* Ref.make<ReadonlyArray<string>>([]);
+          const guard = <A, E, R>(
+            operation: string,
+            file: string,
+            effect: Effect.Effect<A, E, R>,
+          ) =>
+            Effect.gen(function* () {
+              if (yield* Ref.get(observationFailed)) {
+                yield* Ref.update(accesses, (previous) => [
+                  ...previous,
+                  `${operation}:${file}`,
+                ]);
+                return yield* Effect.die(
+                  "I/O followed a failed link observation",
+                );
+              }
+              return yield* effect;
+            });
+          const result = yield* project.provide(codegenHandler).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              readLink: (file) =>
+                file === generated
+                  ? Ref.set(observationFailed, true).pipe(
+                      Effect.andThen(Effect.fail(failure)),
+                    )
+                  : guard("readLink", file, fs.readLink(file)),
+              realPath: (...args) =>
+                guard("realPath", args[0], fs.realPath(...args)),
+              stat: (...args) => guard("stat", args[0], fs.stat(...args)),
+              readFileString: (...args) =>
+                guard("readFileString", args[0], fs.readFileString(...args)),
+              readFile: (...args) =>
+                guard("readFile", args[0], fs.readFile(...args)),
+              readDirectory: (...args) =>
+                guard("readDirectory", args[0], fs.readDirectory(...args)),
+              writeFileString: (...args) =>
+                guard("writeFileString", args[0], fs.writeFileString(...args)),
+              writeFile: (...args) =>
+                guard("writeFile", args[0], fs.writeFile(...args)),
+              remove: (...args) => guard("remove", args[0], fs.remove(...args)),
+              makeDirectory: (...args) =>
+                guard("makeDirectory", args[0], fs.makeDirectory(...args)),
+            }),
+            Effect.result,
+          );
+          assert(Result.isFailure(result));
+          expect(result.failure).toBe(failure);
+          expect(yield* Ref.get(observationFailed)).toBe(true);
+          expect(yield* Ref.get(accesses)).toEqual([]);
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect("recognizes CRLF ownership without deleting authored files", () =>
+      Effect.gen(function* () {
+        const project = yield* Project.make;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const scopes = yield* scopedNodesFromLeaves([
+          yield* toLeafModule("notes.spec.ts"),
+        ]);
+        const scope = Option.getOrThrow(Array.head(scopes));
+        const currentPath = path.join(
+          project.root,
+          "confect/_generated/refs/notes.ts",
+        );
+        const current = yield* templates.scopedRefs(scope);
+        yield* fs.makeDirectory(path.dirname(currentPath), { recursive: true });
+        yield* fs.writeFileString(
+          currentPath,
+          current.replaceAll("\n", "\r\n"),
+        );
+        const stale = path.join(
+          project.root,
+          "confect/_generated/refs/stale.ts",
+        );
+        yield* fs.writeFileString(
+          stale,
+          SCOPED_REFS_HEADER + "\r\nexport default {};\r\n",
+        );
+        const authored = "export const authored = true;\r\n";
+        yield* project.write("confect/_generated/refs/authored.ts", authored);
+        yield* project.provide(codegenHandler);
+        expect(yield* fs.readFileString(currentPath)).toBe(current);
+        expect(yield* fs.exists(stale)).toBe(false);
+        expect(
+          yield* fs.readFileString(
+            path.join(project.root, "confect/_generated/refs/authored.ts"),
+          ),
+        ).toBe(authored);
+      }).pipe(Effect.scoped),
+    );
+
+    it.effect("refuses to overwrite an authored scoped-reference path", () =>
+      Effect.gen(function* () {
+        const project = yield* Project.make;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        yield* fs.makeDirectory(
+          path.join(project.root, "confect/_generated/refs"),
+          { recursive: true },
+        );
+        const authored = "export default { authored: true };\n";
+        yield* project.write("confect/_generated/refs/notes.ts", authored);
+        const result = yield* project
+          .provide(codegenHandler)
+          .pipe(Effect.result);
+        assert(Result.isFailure(result));
+        expect(result.failure).toMatchObject({
+          _tag: "ScopedRefsPathOccupiedError",
+          path: path.join(project.root, "confect/_generated/refs/notes.ts"),
+        });
+        expect(
+          yield* fs.readFileString(
+            path.join(project.root, "confect/_generated/refs/notes.ts"),
+          ),
+        ).toBe(authored);
+      }).pipe(Effect.scoped),
     );
   },
 );

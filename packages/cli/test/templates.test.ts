@@ -4,8 +4,12 @@ import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import * as Schema from "effect/Schema";
 import { loadSpec, type LeafModule } from "@confect/cli/LeafModule";
-import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
+import {
+  assemblyNodesFromLeaves,
+  scopedNodesFromLeaves,
+} from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
+import { toPosixPath } from "@confect/cli/utils";
 import { FunctionSpec, GroupSpec, Refs, Spec } from "@confect/core";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, it, layer } from "@effect/vitest";
@@ -18,6 +22,7 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
+import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
@@ -372,6 +377,305 @@ export const plainString: Id<"_storage"> = "not-an-id";
           Stream.mkString,
         );
         expect(yield* compiler.exitCode, output).toBe(0);
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
+});
+
+layer(NodeServices.layer)("scopedRefs", (test) => {
+  const refSnapshot = (value: unknown): unknown => {
+    assert(Predicate.isObject(value));
+    if (typeof value.convexFunctionName === "string") {
+      const attachments = value.middlewareAttachments;
+      return {
+        name: value.convexFunctionName,
+        provenance: value._tag,
+        kind: value.kind,
+        middleware: Array.isArray(attachments)
+          ? attachments.map((attachment: unknown) => {
+              assert(Predicate.isObject(attachment));
+              assert(Predicate.hasProperty(attachment.spec, "key"));
+              return { key: attachment.spec.key, options: attachment.options };
+            })
+          : [],
+      };
+    }
+    return Object.fromEntries(
+      Object.entries(value).map(([key, child]) => [key, refSnapshot(child)]),
+    );
+  };
+
+  test.effect(
+    "matches aggregate refs without importing unrelated declarations",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const spawner = yield* ChildProcessSpawner;
+        const directory = yield* fs.makeTempDirectoryScoped({
+          directory: import.meta.dirname,
+          prefix: "scoped-refs-",
+        });
+        const fixtures = [
+          {
+            leaf: leafAt(["notes"]),
+            source: `import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+import { schemaReads } from "./schemaReads";
+class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("Gate", {
+  functionTypes: { query: true, mutation: false, action: false },
+  options: () => Schema.Struct({ role: Schema.String }),
+  error: () => { schemaReads.error++; return Schema.String; },
+}) {}
+const get = FunctionSpec.publicQuery({
+  name: "get",
+  args: () => { schemaReads.args++; return { id: Schema.String }; },
+  returns: () => { schemaReads.returns++; return Schema.String; },
+});
+export default GroupSpec.addGroupsAt(GroupSpec.make().middleware(Gate, { role: "admin" }).addFunction(get), {
+  inline: GroupSpec.make().addFunction(get),
+});`,
+          },
+          {
+            leaf: leafAt(["notes", "archived", "legacy"]),
+            source: `import { FunctionSpec, GroupSpec } from "@confect/core";
+import type { RegisteredQuery } from "convex/server";
+import * as Schema from "effect/Schema";
+import { schemaReads } from "../../schemaReads";
+export default GroupSpec.make()
+  .addFunction(FunctionSpec.internalQuery({ name: "get", returns: () => { schemaReads.returns++; return Schema.String; } }))
+  .addFunction(FunctionSpec.convexPublicQuery<RegisteredQuery<"public", { id: string }, string>>()("native"));`,
+          },
+          {
+            leaf: leafAt(["jobs"]),
+            source: `import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+import { schemaReads } from "./schemaReads";
+export default GroupSpec.makeNode().addFunction(FunctionSpec.internalNodeAction({
+  name: "run", returns: () => { schemaReads.returns++; return Schema.String; },
+}));`,
+          },
+          {
+            leaf: leafAt(["unrelated"]),
+            source: `import { GroupSpec } from "@confect/core";
+export default GroupSpec.make();`,
+          },
+        ];
+        const leaves = fixtures.map(({ leaf }) => leaf);
+        yield* fs.makeDirectory(path.join(directory, "_generated"));
+        yield* fs.writeFileString(
+          path.join(directory, "schemaReads.ts"),
+          "export const schemaReads = { args: 0, returns: 0, error: 0 };\n",
+        );
+        for (const { leaf, source } of fixtures) {
+          const target = path.join(directory, leaf.relativePath);
+          yield* fs.makeDirectory(path.dirname(target), { recursive: true });
+          yield* fs.writeFileString(target, source);
+        }
+        yield* fs.writeFileString(
+          path.join(directory, "_generated/spec.ts"),
+          yield* templates.assembledSpec({
+            nodes: assemblyNodesFromLeaves(leaves),
+          }),
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "_generated/refs.ts"),
+          yield* templates.refs({ specImportPath: "./spec" }),
+        );
+        const scopes = yield* scopedNodesFromLeaves(leaves);
+        expect(
+          scopes.map((scope) => scope.path.pathSegments.join("/")),
+        ).toEqual([
+          "jobs",
+          "notes",
+          "notes/archived",
+          "notes/archived/legacy",
+          "unrelated",
+        ]);
+        for (const scope of scopes) {
+          const target = path.join(
+            directory,
+            "_generated/refs",
+            `${scope.path.pathSegments.join("/")}.ts`,
+          );
+          yield* fs.makeDirectory(path.dirname(target), { recursive: true });
+          yield* fs.writeFileString(target, yield* templates.scopedRefs(scope));
+        }
+        expect(
+          yield* fs.exists(
+            path.join(directory, "_generated/refs/notes/inline.ts"),
+          ),
+        ).toBe(false);
+        const collidingLeaves = [
+          leafAt(["group"]),
+          leafAt(["refs"]),
+          leafAt(["GroupSpec"]),
+          leafAt(["group", "Refs"]),
+          leafAt(["group", "declaration_0"]),
+        ];
+        for (const leaf of collidingLeaves) {
+          const target = path.join(directory, leaf.relativePath);
+          yield* fs.makeDirectory(path.dirname(target), { recursive: true });
+          yield* fs.writeFileString(
+            target,
+            'import { GroupSpec } from "@confect/core";\nexport default GroupSpec.make();',
+          );
+        }
+        for (const scope of yield* scopedNodesFromLeaves(collidingLeaves)) {
+          const target = path.join(
+            directory,
+            "_generated/refs",
+            `${scope.path.pathSegments.join("/")}.ts`,
+          );
+          yield* fs.makeDirectory(path.dirname(target), { recursive: true });
+          yield* fs.writeFileString(target, yield* templates.scopedRefs(scope));
+        }
+        yield* fs.writeFileString(
+          path.join(directory, "consumer.ts"),
+          `import { expectTypeOf } from "vitest";
+import notes from "./_generated/refs/notes";
+import archived from "./_generated/refs/notes/archived";
+import legacy from "./_generated/refs/notes/archived/legacy";
+import jobs from "./_generated/refs/jobs";
+expectTypeOf(notes.public.get["~Args"]).toEqualTypeOf<{ readonly id: string }>();
+expectTypeOf(notes.public.get["~Error"]).toEqualTypeOf<string>();
+expectTypeOf(notes.public.inline.get["~Error"]).toEqualTypeOf<never>();
+expectTypeOf(notes.internal.archived.legacy.get).toEqualTypeOf(legacy.internal.get);
+expectTypeOf(archived.public.legacy.native).toEqualTypeOf(legacy.public.native);
+expectTypeOf(legacy.public.native["~Args"]).toEqualTypeOf<{ id: string }>();
+expectTypeOf(jobs.internal.run["~RuntimeAndFunctionType"]).toEqualTypeOf<{ readonly runtime: "Node"; readonly functionType: "action" }>();
+// @ts-expect-error
+notes.public.archived.legacy.get;
+// @ts-expect-error
+notes.public.unrelated;
+// @ts-expect-error
+jobs.public.run;
+`,
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "tsconfig.json"),
+          `{
+        "compilerOptions": { "strict": true, "noEmit": true, "noUnusedLocals": true, "skipLibCheck": true, "module": "ESNext", "moduleResolution": "Bundler", "target": "ESNext", "exactOptionalPropertyTypes": true },
+        "include": ["**/*.ts"]
+      }`,
+        );
+        const compiler = yield* spawner.spawn(
+          ChildProcess.make(process.execPath, [
+            fileURLToPath(
+              new URL(
+                "bin/tsc",
+                import.meta.resolve("typescript/package.json"),
+              ),
+            ),
+            "-p",
+            directory,
+          ]),
+        );
+        const compilerOutput = yield* compiler.all.pipe(
+          Stream.decodeText(),
+          Stream.mkString,
+        );
+        expect(yield* compiler.exitCode, compilerOutput).toBe(0);
+        const aggregateEntry = path.join(directory, "aggregate.ts");
+        yield* fs.writeFileString(
+          aggregateEntry,
+          'export { default } from "./_generated/refs";\nexport { schemaReads } from "./schemaReads";',
+        );
+        const aggregate = yield* Bundler.bundle(aggregateEntry);
+        assert(Predicate.isObject(aggregate.module.default));
+        expect(aggregate.module.schemaReads).toEqual({
+          args: 0,
+          returns: 0,
+          error: 0,
+        });
+        for (const scope of scopes) {
+          const namespace = scope.path.pathSegments.join("/");
+          const entry = path.join(
+            directory,
+            `scoped-${scope.path.pathSegments.join("-")}.ts`,
+          );
+          yield* fs.writeFileString(
+            entry,
+            `export { default } from "./_generated/refs/${namespace}";\nexport { schemaReads } from "./schemaReads";`,
+          );
+          const bundled = yield* Bundler.bundle(entry);
+          assert(Predicate.isObject(bundled.module.default));
+          for (const visibility of ["public", "internal"]) {
+            const expected = scope.path.pathSegments.reduce<unknown>(
+              (parent, segment) => {
+                assert(Predicate.isObject(parent));
+                return parent[segment];
+              },
+              aggregate.module.default[visibility],
+            );
+            expect(refSnapshot(bundled.module.default[visibility])).toEqual(
+              refSnapshot(expected),
+            );
+          }
+          expect(bundled.module.schemaReads).toEqual({
+            args: 0,
+            returns: 0,
+            error: 0,
+          });
+          const inputs = Object.keys(bundled.metafile.inputs).map((input) =>
+            toPosixPath(path, path.relative(directory, input)),
+          );
+          const importedDeclarations = inputs
+            .filter((input) => input.endsWith(".spec.ts"))
+            .sort();
+          expect(importedDeclarations).toEqual(
+            leaves
+              .filter(
+                (leaf) =>
+                  leaf.groupPathDot === scope.path.pathSegments.join(".") ||
+                  leaf.groupPathDot.startsWith(
+                    `${scope.path.pathSegments.join(".")}.`,
+                  ),
+              )
+              .map((leaf) => leaf.relativePath)
+              .sort(),
+          );
+          expect(inputs).not.toContain("_generated/spec.ts");
+        }
+        const aggregateSnapshot = refSnapshot(aggregate.module.default);
+        expect(aggregateSnapshot).toMatchObject({
+          public: {
+            notes: {
+              get: {
+                middleware: [{ key: "Gate", options: { role: "admin" } }],
+              },
+              inline: { get: { middleware: [] } },
+              archived: {
+                legacy: {
+                  get: { middleware: [] },
+                  native: {
+                    provenance: "Convex",
+                    name: "notes/archived/legacy:native",
+                  },
+                },
+              },
+            },
+          },
+        });
+        yield* fs.writeFileString(
+          path.join(directory, "unrelated.spec.ts"),
+          `throw new Error("unrelated declaration evaluated");\n${fixtures[3]!.source}`,
+        );
+        const isolated = yield* Bundler.bundle(
+          path.join(directory, "scoped-notes.ts"),
+        );
+        expect(
+          Object.keys(isolated.metafile.inputs).map((input) =>
+            toPosixPath(path, path.relative(directory, input)),
+          ),
+        ).not.toContain("unrelated.spec.ts");
+        const failedAggregate = yield* Effect.result(
+          Bundler.bundle(aggregateEntry),
+        );
+        assert(Result.isFailure(failedAggregate));
+        expect(String(failedAggregate.failure.cause)).toContain(
+          "unrelated declaration evaluated",
+        );
       }).pipe(Effect.scoped),
     { timeout: 30000 },
   );

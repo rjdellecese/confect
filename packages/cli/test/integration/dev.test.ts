@@ -602,6 +602,13 @@ if (existsSync(block)) {
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
           expect(
+            yield* fs.exists(
+              path.join(project.root, "confect/_generated/refs/notes.ts"),
+            ),
+          ).toBe(true);
+          const authored = "export const keep = true;\n";
+          yield* project.write("confect/_generated/refs/authored.ts", authored);
+          expect(
             yield* fs.exists(path.join(project.root, "convex/auth.config.ts")),
           ).toBe(true);
           yield* fs.remove(path.join(project.root, "confect/auth.ts"));
@@ -618,6 +625,16 @@ if (existsSync(block)) {
           expect(
             yield* fs.exists(path.join(project.root, "convex/notes.ts")),
           ).toBe(false);
+          expect(
+            yield* fs.exists(
+              path.join(project.root, "confect/_generated/refs/notes.ts"),
+            ),
+          ).toBe(false);
+          expect(
+            yield* fs.readFileString(
+              path.join(project.root, "confect/_generated/refs/authored.ts"),
+            ),
+          ).toBe(authored);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -846,9 +863,10 @@ if (existsSync(block)) {
           const spec = directory
             ? Project.spec.replaceAll('"./_generated/', '"../_generated/')
             : Project.spec;
-          const impl = directory
-            ? Project.impl.replaceAll('"./_generated/', '"../_generated/')
-            : Project.impl;
+          const impl = `import refs from "${directory ? "../" : "./"}_generated/refs/${directory}notes";
+import { Ref } from "@confect/core";
+if (Ref.getConvexFunctionName(refs.public.list) !== "${directory}notes:list") throw new Error("Incorrect scoped reference");
+${directory ? Project.impl.replaceAll('"./_generated/', '"../_generated/') : Project.impl}`;
           if (directory) {
             yield* fs.makeDirectory(
               path.join(project.root, "confect", directory),
@@ -857,6 +875,8 @@ if (existsSync(block)) {
             yield* fs.remove(path.join(project.root, "confect/notes.impl.ts"));
             yield* project.write(`confect/${directory}notes.spec.ts`, spec);
             yield* project.write(`confect/${directory}notes.impl.ts`, impl);
+          } else {
+            yield* project.write("confect/notes.impl.ts", impl);
           }
           const missingFile = `confect/${directory}notes.${missing}.ts`;
           yield* fs.remove(path.join(project.root, missingFile));

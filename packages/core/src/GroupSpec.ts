@@ -294,11 +294,23 @@ export function withName(name: string, group: Any): AnyWithProps {
   });
 }
 
-export const addGroupsAt = (
+export function addGroupsAt<
+  Group extends AnyWithProps,
+  const Children extends Record.ReadonlyRecord<string, AnyWithProps>,
+>(
+  group: Group,
+  children: Children,
+): AddGroups<
+  Group,
+  {
+    [Name in keyof Children & string]: NamedAt<Children[Name], Name>;
+  }[keyof Children & string]
+>;
+export function addGroupsAt(
   group: AnyWithProps,
   children: Record.ReadonlyRecord<string, AnyWithProps>,
-): AnyWithProps =>
-  makeProto({
+): AnyWithProps {
+  return makeProto({
     runtime: group.runtime,
     name: group.name,
     functions: group.functions,
@@ -309,6 +321,7 @@ export const addGroupsAt = (
     ),
     middlewareAttachments: group.middlewareAttachments,
   });
+}
 
 export const validateMiddleware = (
   group: AnyWithProps,

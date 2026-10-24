@@ -5,8 +5,10 @@ import type { GroupTree } from "./GenerationSnapshot";
 import { CodeBlockWriter } from "./CodeBlockWriter";
 import {
   render as renderSpecAssembly,
+  renderScopedRefs,
   type SpecAssemblyNode,
 } from "./SpecAssemblyNode";
+import type { GroupPath } from "./GroupPath";
 
 /**
  * Emit `convex/schema.ts` as a one-line re-export of the codegen-emitted deploy
@@ -359,6 +361,14 @@ const componentsEffect = Effect.fnUntraced(function* ({
 
 export const refs = ({ specImportPath }: Parameters<typeof refsEffect>[0]) =>
   refsEffect({ specImportPath });
+
+export const scopedRefs = ({
+  node,
+  path,
+}: {
+  readonly node: SpecAssemblyNode;
+  readonly path: GroupPath;
+}) => renderScopedRefs(node, path);
 
 const refsEffect = Effect.fnUntraced(function* ({
   specImportPath,

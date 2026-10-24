@@ -1,6 +1,7 @@
 import * as Command from "effect/cli/Command";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import type { PlatformError } from "effect/PlatformError";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import { pipe } from "effect/Function";
@@ -9,6 +10,7 @@ import * as HashMap from "effect/HashMap";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
+import * as Schema from "effect/Schema";
 import * as EvaluationSession from "../EvaluationSession";
 import * as Bundler from "../Bundler";
 import * as CompiledModule from "../CompiledModule";
@@ -40,7 +42,11 @@ import {
   logCoalescedBuildWarnings,
 } from "../log";
 import { ProjectRoot } from "../ProjectRoot";
-import { assemblyNodesFromLeaves } from "../SpecAssemblyNode";
+import {
+  assemblyNodesFromLeaves,
+  scopedNodesFromLeaves,
+  SCOPED_REFS_HEADER,
+} from "../SpecAssemblyNode";
 import { SpecModulePath } from "../SpecModulePath";
 import * as TableModule from "../TableModule";
 import * as templates from "../templates";
@@ -109,6 +115,7 @@ export const codegen = Command.make("codegen", {}, () =>
 );
 
 const runCodegen = Effect.gen(function* () {
+  const scopedRefFiles = yield* inspectScopedRefFiles;
   yield* rejectLegacySchemaFile;
   const tableModules = yield* TableModule.discover;
   yield* validateNoDocNameCollisions(tableModules);
@@ -147,6 +154,7 @@ const runCodegen = Effect.gen(function* () {
     [
       removeGeneratedApi,
       generateRefs,
+      generateScopedRefs(leaves, scopedRefFiles),
       removeGeneratedNodeApi,
       generateDocs(tableModules),
       generateServices,
@@ -772,6 +780,146 @@ const generateRefs = Effect.gen(function* () {
   const refsContents = yield* templates.refs({ specImportPath });
 
   yield* writeFileStringAndLog(refsPath, refsContents);
+});
+
+const decodeNonLinkCause = Schema.decodeUnknownOption(
+  Schema.Struct({ code: Schema.Literal("EINVAL") }),
+);
+
+const inspectScopedRefFiles = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = path.resolve(yield* ConfectDirectory.get);
+  const realConfectDirectory = yield* fs.realPath(confectDirectory);
+  const inspect = Effect.fnUntraced(function* (file: string) {
+    const link = yield* fs.readLink(file).pipe(
+      Effect.asSome,
+      Effect.catchIf(
+        (error) =>
+          error.reason._tag === "Unknown" &&
+          Option.isSome(decodeNonLinkCause(error.reason.cause)),
+        () => Effect.succeedNone,
+      ),
+    );
+    if (Option.isSome(link)) {
+      return yield* new CodegenError.ScopedRefsPathOccupiedError({
+        path: file,
+        reason: "SymbolicLink",
+      });
+    }
+    const real = yield* fs.realPath(file);
+    const expected = path.resolve(
+      realConfectDirectory,
+      path.relative(confectDirectory, file),
+    );
+    if (path.relative(expected, real) !== "") {
+      return yield* new CodegenError.ScopedRefsPathOccupiedError({
+        path: file,
+        reason: "EscapedPath",
+      });
+    }
+    return yield* fs.stat(file);
+  });
+  const generated = path.join(confectDirectory, "_generated");
+  const directory = path.join(generated, "refs");
+  for (const file of [generated, directory]) {
+    const info = yield* inspect(file).pipe(
+      Effect.asSome,
+      Effect.catchIf(
+        (error) =>
+          error._tag === "PlatformError" && error.reason._tag === "NotFound",
+        () => Effect.succeedNone,
+      ),
+    );
+    if (Option.isNone(info)) return [];
+    if (info.value.type !== "Directory") {
+      return yield* new CodegenError.ScopedRefsPathOccupiedError({
+        path: file,
+        reason: "UnexpectedType",
+      });
+    }
+  }
+  const visit: (
+    current: string,
+  ) => Effect.Effect<
+    ReadonlyArray<string>,
+    PlatformError | CodegenError.ScopedRefsPathOccupiedError
+  > = Effect.fnUntraced(function* (current) {
+    const entries = yield* fs.readDirectory(current);
+    return Array.flatten(
+      yield* Effect.forEach(
+        entries,
+        Effect.fnUntraced(function* (entry) {
+          const file = path.join(current, entry);
+          const info = yield* inspect(file);
+          if (info.type === "Directory") return yield* visit(file);
+          if (info.type !== "File") {
+            return yield* new CodegenError.ScopedRefsPathOccupiedError({
+              path: file,
+              reason: "UnexpectedType",
+            });
+          }
+          return file.endsWith(".ts") ? [path.relative(directory, file)] : [];
+        }),
+      ),
+    );
+  });
+  return yield* visit(directory);
+});
+
+const isOwnedScopedRef = (contents: string) =>
+  contents.startsWith(SCOPED_REFS_HEADER + "\n") ||
+  contents.startsWith(SCOPED_REFS_HEADER + "\r\n");
+
+const generateScopedRefs = Effect.fn("Cli.generateScopedRefs")(function* (
+  leaves: ReadonlyArray<LeafModule>,
+  existing: ReadonlyArray<string>,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const directory = path.join(confectDirectory, "_generated", "refs");
+  const scopes = yield* scopedNodesFromLeaves(leaves);
+  const expected = HashSet.fromIterable(
+    scopes.map((scope) => path.join(...scope.path.pathSegments) + ".ts"),
+  );
+
+  yield* Effect.forEach(
+    scopes,
+    Effect.fnUntraced(function* (scope) {
+      const file = path.join(directory, ...scope.path.pathSegments) + ".ts";
+      if (yield* fs.exists(file)) {
+        if ((yield* fs.stat(file)).type !== "File") {
+          return yield* new CodegenError.ScopedRefsPathOccupiedError({
+            path: file,
+            reason: "UnexpectedType",
+          });
+        }
+        const contents = yield* fs.readFileString(file);
+        if (!isOwnedScopedRef(contents)) {
+          return yield* new CodegenError.ScopedRefsPathOccupiedError({
+            path: file,
+            reason: "UnownedFile",
+          });
+        }
+      }
+      yield* fs.makeDirectory(path.dirname(file), { recursive: true });
+      yield* writeFileStringAndLog(file, yield* templates.scopedRefs(scope));
+    }),
+  );
+
+  yield* Effect.forEach(
+    existing,
+    Effect.fnUntraced(function* (relativePath) {
+      if (!relativePath.endsWith(".ts") || HashSet.has(expected, relativePath))
+        return;
+      const file = path.join(directory, relativePath);
+      const contents = yield* fs.readFileString(file);
+      if (!isOwnedScopedRef(contents)) return;
+      yield* fs.remove(file);
+      yield* logFileRemoved(file);
+    }),
+  );
 });
 
 /**

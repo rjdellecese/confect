@@ -1,6 +1,4 @@
 import type { Types } from "effect";
-import { pipe } from "effect/Function";
-import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as GroupSpec from "./GroupSpec";
@@ -16,6 +14,11 @@ export type Refs<
 export interface FromSpec<Spec_ extends Spec.AnyWithProps> {
   public: Refs<Spec_, Ref.AnyPublic>;
   internal: Refs<Spec_, Ref.AnyInternal>;
+}
+
+export interface FromGroup<Group extends GroupSpec.AnyWithProps> {
+  readonly public: GroupRefs<Group, Ref.AnyPublic>;
+  readonly internal: GroupRefs<Group, Ref.AnyInternal>;
 }
 
 type GroupRefs<
@@ -105,35 +108,38 @@ export const make = <Spec_ extends Spec.AnyWithProps>(
   };
 };
 
+export const fromGroup = <Group extends GroupSpec.AnyWithProps>(
+  convexFunctionNamespace: string,
+  group: Group,
+): FromGroup<Group> => {
+  const refs = makeGroupHelper(convexFunctionNamespace, group);
+  return {
+    public: refs as GroupRefs<Group, Ref.AnyPublic>,
+    internal: refs as GroupRefs<Group, Ref.AnyInternal>,
+  };
+};
+
 const makeHelper = (
   groups: Record.ReadonlyRecord<string, GroupSpec.Any>,
-  convexFunctionNamespace: Option.Option<string> = Option.none(),
+  namespacePrefix = "",
 ): Any =>
-  pipe(
+  Record.map(
     groups as Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
-    Record.map((group, name) => {
-      const currentConvexFunctionNamespace = Option.match(
-        convexFunctionNamespace,
-        {
-          onNone: () => name,
-          onSome: (parentNamespace) => `${parentNamespace}/${name}`,
-        },
-      );
+    (group, name) => makeGroupHelper(`${namespacePrefix}${name}`, group),
+  );
 
-      return Record.union(
-        makeHelper(group.groups, Option.some(currentConvexFunctionNamespace)),
-        Record.map(group.functions, (function_) =>
-          Ref.make(
-            currentConvexFunctionNamespace,
-            function_,
-            group.middlewareAttachments,
-          ),
-        ),
-        (_subGroup, _function) => {
-          throw new Error(
-            `Group and function at same level have same name ('${Ref.getConvexFunctionName(_function)}')`,
-          );
-        },
+const makeGroupHelper = (
+  convexFunctionNamespace: string,
+  group: GroupSpec.AnyWithProps,
+): Any =>
+  Record.union(
+    makeHelper(group.groups, `${convexFunctionNamespace}/`),
+    Record.map(group.functions, (function_) =>
+      Ref.make(convexFunctionNamespace, function_, group.middlewareAttachments),
+    ),
+    (_subGroup, _function) => {
+      throw new Error(
+        `Group and function at same level have same name ('${Ref.getConvexFunctionName(_function)}')`,
       );
-    }),
+    },
   );
