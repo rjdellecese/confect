@@ -1,15 +1,45 @@
 import * as Effect from "effect/Effect";
+import * as Console from "effect/Console";
+import * as Data from "effect/Data";
+import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
-import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
-import { expect } from "@effect/vitest";
+import {
+  ChildProcessSpawner,
+  makeHandle,
+} from "effect/process/ChildProcessSpawner";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
+
+type ProcessPhase = Data.TaggedEnum<{
+  Started: {};
+  WaitingForOutput: { readonly text: string; readonly attempt: number };
+  OutputReceived: { readonly text: string; readonly attempt: number };
+  WaitingForExit: {};
+  Exited: { readonly code: number };
+}>;
+
+const ProcessPhase = Data.taggedEnum<ProcessPhase>();
+
+export class ReadinessTimeout extends Schema.TaggedError<ReadinessTimeout>()(
+  "ReadinessTimeout",
+  {
+    command: Schema.Literals(["dev", "codegen"]),
+    text: Schema.String,
+    attempt: Schema.Int,
+    output: Schema.String,
+  },
+) {
+  override get message() {
+    return `confect ${this.command}: waiting for ${this.text} (wait ${this.attempt}, 15 seconds):\n${this.output}`;
+  }
+}
 
 export const table = `import { Table } from "@confect/core";
 import * as Schema from "effect/Schema";
@@ -114,6 +144,8 @@ export const make = Effect.gen(function* () {
       ),
     );
     const output = yield* Ref.make("");
+    const phase = yield* Ref.make<ProcessPhase>(ProcessPhase.Started());
+    const waits = yield* Ref.make(0);
     const lines = yield* Queue.unbounded<string>();
     yield* Stream.merge(
       handle.stdout.pipe(Stream.decodeText(), Stream.splitLines),
@@ -126,19 +158,50 @@ export const make = Effect.gen(function* () {
       ),
       Effect.forkScoped,
     );
-    const waitFor = (text: string) =>
-      Queue.take(lines).pipe(
+    yield* Effect.addFinalizer((exit) =>
+      Exit.isFailure(exit)
+        ? Effect.gen(function* () {
+            const current = yield* Ref.get(phase);
+            const log = yield* Ref.get(output);
+            const description = ProcessPhase.$match(current, {
+              Started: () => "started",
+              WaitingForOutput: ({ text, attempt }) =>
+                `waiting for output ${text} (wait ${attempt})`,
+              OutputReceived: ({ text, attempt }) =>
+                `received output ${text} (wait ${attempt}); no process wait active`,
+              WaitingForExit: () => "waiting for exit",
+              Exited: ({ code }) => `exited with code ${code}`,
+            });
+            yield* Console.error(
+              `confect ${command} (pid ${handle.pid}) scope ${Exit.hasInterrupts(exit) ? "interrupted" : "failed"}; phase: ${description}\n${log}`,
+            );
+          })
+        : Effect.void,
+    );
+    const waitFor = Effect.fnUntraced(function* (text: string) {
+      const attempt = yield* Ref.updateAndGet(waits, (count) => count + 1);
+      yield* Ref.set(phase, ProcessPhase.WaitingForOutput({ text, attempt }));
+      const result = yield* Queue.take(lines).pipe(
         Effect.repeat({ while: (line) => !line.includes(text) }),
         Effect.timeoutOption("15 seconds"),
-        Effect.flatMap((result) =>
-          Ref.get(output).pipe(
-            Effect.map((log) => {
-              expect(result._tag, `Waiting for ${text}:\n${log}`).toBe("Some");
-            }),
-          ),
-        ),
       );
-    return { handle, output, waitFor };
+      if (result._tag === "None") {
+        return yield* new ReadinessTimeout({
+          command,
+          text,
+          attempt,
+          output: yield* Ref.get(output),
+        });
+      }
+      yield* Ref.set(phase, ProcessPhase.OutputReceived({ text, attempt }));
+    });
+    const exitCode = Effect.gen(function* () {
+      yield* Ref.set(phase, ProcessPhase.WaitingForExit());
+      const code = yield* handle.exitCode;
+      yield* Ref.set(phase, ProcessPhase.Exited({ code: Number(code) }));
+      return code;
+    });
+    return { handle: makeHandle({ ...handle, exitCode }), output, waitFor };
   });
   const generatedFiles = Effect.gen(function* () {
     const files = yield* Effect.forEach(
