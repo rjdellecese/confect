@@ -359,6 +359,83 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
       { timeout: 30000 },
     );
 
+    it.effect.each(["full", "incremental"] as const)(
+      "leaves registries and wrappers untouched when the %s output plan is invalid",
+      (mode) =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const { snapshot } = yield* project.provide(generateWithSnapshot);
+          const before = yield* project.generatedFiles;
+          yield* project.write(
+            "confect/notes.spec.ts",
+            'import type { RegisteredQuery } from "convex/server";\n' +
+              Project.spec
+                .replace('name: "list"', 'name: "latest"')
+                .replace("export default ", "const notes = ") +
+              '\nexport default GroupSpec.addGroupsAt(notes, { _generated: GroupSpec.addGroupsAt(GroupSpec.make(), { child: GroupSpec.make().addFunction(FunctionSpec.convexPublicQuery<RegisteredQuery<"public", {}, null>>()("read")) }) });\n',
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace('"list"', '"latest"'),
+          );
+          const run =
+            mode === "full"
+              ? project.provide(codegenHandler).pipe(Effect.asVoid)
+              : project
+                  .provide(
+                    updateDeclarations(
+                      snapshot,
+                      [
+                        {
+                          _tag: "Spec",
+                          relativePath: SpecModulePath.make("notes.spec.ts"),
+                        },
+                      ],
+                      [],
+                    ),
+                  )
+                  .pipe(Effect.asVoid);
+          const writes = yield* Project.writtenFiles(
+            run.pipe(
+              Effect.result,
+              Effect.tap((result) =>
+                Effect.sync(() => {
+                  assert(Result.isFailure(result));
+                  expect(result.failure).toMatchObject({
+                    _tag: "OutputPlanError",
+                    namespace: "ConvexModule",
+                    relativePath: "notes/_generated/child.ts",
+                    reason: "ReservedPath",
+                  });
+                }),
+              ),
+            ),
+          );
+          const registry = path.join(
+            "confect",
+            "_generated",
+            "registeredFunctions",
+          );
+          expect(
+            writes.filter(
+              (file) =>
+                file.startsWith(path.join(project.root, registry) + path.sep) ||
+                file.startsWith(path.join(project.root, "convex") + path.sep),
+            ),
+          ).toEqual([]);
+          const after = yield* project.generatedFiles;
+          for (const [file, contents] of Object.entries(before)) {
+            if (
+              file.startsWith(registry + path.sep) ||
+              file.startsWith("convex" + path.sep)
+            )
+              expect(after[file]).toBe(contents);
+          }
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "notifies Convex after explicit codegen even when generated contents are unchanged",
       () =>
@@ -368,6 +445,18 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           const project = yield* Project.make;
           yield* project.provide(codegenHandler);
           const before = yield* project.generatedFiles;
+          const recordPath = path.join(
+            project.root,
+            "confect/_generated/.confect-generation.json",
+          );
+          const record = yield* fs.readFileString(recordPath);
+          const obsolete = [
+            "confect/_generated/registeredFunctions/orphan.ts",
+            "convex/orphan.ts",
+          ];
+          expect(record).not.toContain("orphan");
+          for (const file of obsolete)
+            yield* project.write(file, "export const stale = true;\n");
           const schema = path.join(project.root, "convex/schema.ts");
           const timestamp = DateTime.toDateUtc(DateTime.makeUnsafe(1000));
           yield* fs.utimes(schema, timestamp, timestamp);
@@ -376,9 +465,74 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             yield* Project.writtenFiles(project.provide(codegenHandler)),
           ).toEqual([]);
           expect(yield* project.generatedFiles).toEqual(before);
+          for (const file of obsolete)
+            expect(yield* fs.exists(path.join(project.root, file))).toBe(false);
+          expect(yield* fs.readFileString(recordPath)).toBe(record);
           expect(
             Option.getOrThrow((yield* fs.stat(schema)).mtime).getTime(),
           ).toBe(2000);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "retains partial publication and the successful record until fresh codegen repairs a wrapper failure",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.provide(codegenHandler);
+          const recordPath = path.join(
+            project.root,
+            "confect/_generated/.confect-generation.json",
+          );
+          const record = yield* fs.readFileString(recordPath);
+          const registry = path.join(
+            project.root,
+            "confect/_generated/registeredFunctions/notes.ts",
+          );
+          const wrapper = path.join(project.root, "convex/notes.ts");
+          const previousRegistry = yield* fs.readFileString(registry);
+          const previousWrapper = yield* fs.readFileString(wrapper);
+          yield* project.write(
+            "confect/notes.spec.ts",
+            Project.spec.replace('name: "list"', 'name: "latest"'),
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            Project.impl.replace('"list"', '"latest"'),
+          );
+          const failure = PlatformError.systemError({
+            _tag: "PermissionDenied",
+            module: "FileSystem",
+            method: "writeFileString",
+            pathOrDescriptor: wrapper,
+            cause: { code: "EACCES" },
+          });
+          const result = yield* project.provide(codegenHandler).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              writeFileString: (...args) =>
+                args[0] === wrapper
+                  ? Effect.fail(failure)
+                  : fs.writeFileString(...args),
+            }),
+            Effect.result,
+          );
+          assert(Result.isFailure(result));
+          expect(result.failure).toBe(failure);
+          const publishedRegistry = yield* fs.readFileString(registry);
+          expect(publishedRegistry).not.toBe(previousRegistry);
+          expect(publishedRegistry).toContain("latest");
+          expect(yield* fs.readFileString(wrapper)).toBe(previousWrapper);
+          expect(yield* fs.readFileString(recordPath)).toBe(record);
+          yield* project.provide(codegenHandler);
+          expect(yield* fs.readFileString(registry)).toBe(publishedRegistry);
+          expect(yield* fs.readFileString(wrapper)).toContain(
+            "export const latest",
+          );
+          expect(yield* fs.readFileString(recordPath)).not.toBe(record);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );

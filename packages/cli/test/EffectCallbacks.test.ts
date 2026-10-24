@@ -7,14 +7,15 @@ import type { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import type { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import type { EvaluationError } from "@confect/cli/Evaluation";
 import type * as FunctionPaths from "@confect/cli/FunctionPaths";
-import type * as GroupPath from "@confect/cli/GroupPath";
+import type * as OutputPlan from "@confect/cli/OutputPlan";
+import type * as OutputPublisher from "@confect/cli/OutputPublisher";
 import type * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import type * as GenerationRecord from "@confect/cli/GenerationRecord";
 import type { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as TableModule from "@confect/cli/TableModule";
 import { codegenHandler } from "@confect/cli/confect/codegen";
 import { dev, type SyncJobError } from "@confect/cli/confect/dev";
-import { generateFunctions, writeGroups } from "@confect/cli/FunctionModule";
+import { renderPlan } from "@confect/cli/FunctionModule";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -48,20 +49,14 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
       FileServices | ConfectDirectory
     >
   >();
-  expectTypeOf(writeGroups).parameters.toEqualTypeOf<
-    [groups: ReadonlyArray<GenerationSnapshot.GroupSummary>]
+  expectTypeOf(renderPlan).parameters.toEqualTypeOf<
+    [plan: GenerationSnapshot.ModulePlan]
   >();
-  expectTypeOf(writeGroups).returns.toEqualTypeOf<
-    Effect.Effect<Array<void>, PlatformError, GenerationServices | ProjectRoot>
-  >();
-  expectTypeOf(generateFunctions).parameters.toEqualTypeOf<
-    [snapshot: GenerationSnapshot.GenerationSnapshot]
-  >();
-  expectTypeOf(generateFunctions).returns.toEqualTypeOf<
+  expectTypeOf(renderPlan).returns.toEqualTypeOf<
     Effect.Effect<
-      FunctionPaths.FunctionPaths,
-      GroupPath.GroupModulePathIsNotATypeScriptFileError | PlatformError,
-      GenerationServices | ProjectRoot
+      OutputPlan.OutputPlan,
+      OutputPlan.PlanError,
+      Path.Path | ConfectDirectory | ConvexDirectory
     >
   >();
   expectTypeOf(codegenHandler).toEqualTypeOf<
@@ -73,7 +68,8 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
       | BundlerError
       | CompilationInputs.RestartRequired
       | EvaluationError
-      | GroupPath.GroupModulePathIsNotATypeScriptFileError
+      | OutputPlan.PlanError
+      | OutputPublisher.PathError
       | GenerationRecord.EncodingError
       | GenerationRecord.PathError
       | PlatformError,
