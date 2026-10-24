@@ -62,6 +62,25 @@ export const writtenFiles = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     return yield* Ref.get(writes);
   });
 
+export const installPackages = Effect.fnUntraced(function* (root: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  for (const name of ["core", "server"]) {
+    const source = path.resolve(import.meta.dirname, "../../../", name);
+    const installed = path.join(root, "node_modules", "@confect", name);
+    yield* fs.makeDirectory(installed, { recursive: true });
+    yield* fs.copyFile(
+      path.join(source, "package.json"),
+      path.join(installed, "package.json"),
+    );
+    yield* fs.copy(path.join(source, "dist"), path.join(installed, "dist"));
+    yield* fs.symlink(
+      path.join(source, "node_modules"),
+      path.join(installed, "node_modules"),
+    );
+  }
+});
+
 export const make = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -69,6 +88,7 @@ export const make = Effect.gen(function* () {
     directory: import.meta.dirname,
     prefix: "consumer-",
   });
+  yield* installPackages(root);
   const write = (file: string, contents: string) =>
     fs.writeFileString(path.join(root, file), contents);
   yield* fs.makeDirectory(path.join(root, "confect", "tables"), {
