@@ -2,15 +2,19 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as Command from "effect/cli/Command";
+import * as Clock from "effect/Clock";
+import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as esbuild from "esbuild";
+import * as Evaluation from "@confect/cli/Evaluation";
 import type * as DevSupervisor from "@confect/cli/DevSupervisor";
 import { dev } from "@confect/cli/confect/dev";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -32,6 +36,13 @@ vi.mock("esbuild", (importOriginal) =>
   })),
 );
 
+vi.mock("@confect/cli/Evaluation", (importOriginal) =>
+  importOriginal<typeof Evaluation>().then((original) => ({
+    ...original,
+    updateDeclarations: vi.fn(original.updateDeclarations),
+  })),
+);
+
 vi.mock("effect/Console", (importOriginal) =>
   importOriginal<typeof Console>().then((original) => ({
     ...original,
@@ -40,9 +51,280 @@ vi.mock("effect/Console", (importOriginal) =>
   })),
 );
 
+const traceWaits = (summary: Effect.Effect<Readonly<Record<string, number>>>) =>
+  Effect.gen(function* () {
+    const started = yield* Clock.currentTimeMillis;
+    const checkpoints: Array<{
+      readonly phase: string;
+      readonly completed: boolean;
+      readonly elapsedMillis: number;
+    }> = [];
+    yield* Effect.addFinalizer((exit) =>
+      Exit.isFailure(exit)
+        ? Effect.gen(function* () {
+            yield* Console.error("Watcher scenario checkpoints", {
+              checkpoints,
+              summary: yield* summary,
+            });
+          })
+        : Effect.void,
+    );
+    return <A, E, R>(phase: string, effect: Effect.Effect<A, E, R>) =>
+      Effect.gen(function* () {
+        checkpoints.push({
+          phase,
+          completed: false,
+          elapsedMillis: (yield* Clock.currentTimeMillis) - started,
+        });
+        const value = yield* effect;
+        checkpoints.push({
+          phase,
+          completed: true,
+          elapsedMillis: (yield* Clock.currentTimeMillis) - started,
+        });
+        return value;
+      });
+  });
+
 layer(NodeServices.layer, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
+    it.effect.each(["success", "failure", "interruption"] as const)(
+      "reports failed wait checkpoints without changing %s",
+      (outcome) =>
+        Effect.gen(function* () {
+          const messages: Array<ReadonlyArray<unknown>> = [];
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi.spyOn(Console, "error").mockImplementation((...args) =>
+                Effect.sync(() => {
+                  messages.push(args);
+                }),
+              ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          const result = yield* Effect.gen(function* () {
+            const wait = yield* traceWaits(Effect.succeed({ rebuilds: 2 }));
+            return yield* wait(
+              "controlled wait",
+              outcome === "success"
+                ? Effect.succeed(42)
+                : outcome === "failure"
+                  ? Effect.fail("expected failure")
+                  : Effect.interrupt,
+            );
+          }).pipe(Effect.scoped, Effect.exit);
+          if (outcome === "success") {
+            expect(result).toEqual(Exit.succeed(42));
+            expect(messages).toEqual([]);
+          } else {
+            assert(Exit.isFailure(result));
+            if (outcome === "failure")
+              expect(result).toEqual(Exit.fail("expected failure"));
+            else expect(Cause.hasInterruptsOnly(result.cause)).toBe(true);
+            expect(messages).toEqual([
+              [
+                "Watcher scenario checkpoints",
+                {
+                  checkpoints: [
+                    {
+                      phase: "controlled wait",
+                      completed: false,
+                      elapsedMillis: expect.any(Number),
+                    },
+                  ],
+                  summary: { rebuilds: 2 },
+                },
+              ],
+            ]);
+          }
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each(["none", "edit", "preferred"] as const)(
+      "plans dependent declarations before a delayed module revision and verifies a late %s change",
+      (lateChange) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const spec = path.join(project.root, "confect/notes.spec.ts");
+          const impl = path.join(project.root, "confect/notes.impl.ts");
+          const table = path.join(project.root, "confect/tables/notes.ts");
+          yield* project.write(
+            "confect/choice.js",
+            'export const name = "list";',
+          );
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { name } from "./choice";\n${Project.spec.replace('name: "list"', "name")}`,
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            `import { name } from "./choice";\n${Project.impl.replace('"list"', "name")}`,
+          );
+          const ready = yield* Queue.unbounded<void>();
+          const started = yield* Deferred.make<void>();
+          const release = yield* Deferred.make<void>();
+          let readyCount = 0;
+          let totalRebuilds = 0;
+          const updates: Array<{
+            readonly declarations: ReadonlyArray<string>;
+            readonly paths: ReadonlyArray<string>;
+          }> = [];
+          const contexts = new Set<{
+            readonly roots: ReadonlyArray<string>;
+            readonly native: esbuild.BuildContext;
+            rebuilds: number;
+          }>();
+          const wait = yield* traceWaits(
+            Effect.sync(() => ({
+              ready: readyCount,
+              updates: updates.length,
+              rebuilds: totalRebuilds,
+            })),
+          );
+          const nativeContext = vi.mocked(esbuild.context);
+          const originalContext = nativeContext.getMockImplementation();
+          assert(originalContext);
+          nativeContext.mockImplementation((options) =>
+            originalContext(options).then((native) => {
+              const entries = options.entryPoints ?? [];
+              const tracked = {
+                roots: Array.isArray(entries)
+                  ? entries.map((entry) =>
+                      typeof entry === "string" ? entry : entry.in,
+                    )
+                  : Object.values(entries),
+                native,
+                rebuilds: 0,
+              };
+              contexts.add(tracked);
+              return {
+                ...native,
+                watch: () => Promise.resolve(),
+                rebuild: () => {
+                  tracked.rebuilds++;
+                  totalRebuilds++;
+                  return native.rebuild();
+                },
+                dispose: () => {
+                  contexts.delete(tracked);
+                  return native.dispose();
+                },
+              };
+            }),
+          );
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() =>
+              nativeContext.mockImplementation(originalContext),
+            ),
+          );
+          const update = vi.mocked(Evaluation.updateDeclarations);
+          const originalUpdate = update.getMockImplementation();
+          assert(originalUpdate);
+          update.mockImplementation((snapshot, declarations, paths) =>
+            Effect.gen(function* () {
+              updates.push({
+                declarations: declarations.map((entry) => entry.relativePath),
+                paths,
+              });
+              if (updates.length === 1) {
+                yield* Deferred.succeed(started, undefined);
+                yield* Deferred.await(release);
+              }
+              const result = yield* originalUpdate(
+                snapshot,
+                declarations,
+                paths,
+              );
+              if (updates.length === 1 && lateChange !== "none") {
+                expect(readyCount).toBe(1);
+                yield* project
+                  .write(
+                    `confect/choice.${lateChange === "preferred" ? "ts" : "js"}`,
+                    'export const name = "latest";',
+                  )
+                  .pipe(Effect.orDie);
+              }
+              return result;
+            }),
+          );
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() => update.mockImplementation(originalUpdate)),
+          );
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi.spyOn(Console, "log").mockImplementation((...args) =>
+                args.some(
+                  (arg) =>
+                    typeof arg === "string" &&
+                    arg.includes("Generated files are up-to-date"),
+                )
+                  ? Effect.sync(() => {
+                      readyCount++;
+                    }).pipe(
+                      Effect.andThen(Queue.offer(ready, undefined)),
+                      Effect.asVoid,
+                    )
+                  : Effect.void,
+              ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          yield* project
+            .provide(Command.runWith(dev, { version: "test" })([]))
+            .pipe(Effect.forkScoped);
+          yield* wait("initial readiness", Queue.take(ready));
+          const tableContext = [...contexts].find((context) =>
+            context.roots.includes(table),
+          );
+          const modules = [...contexts].find(
+            (context) =>
+              context.roots.includes(spec) && context.roots.includes(impl),
+          );
+          assert(tableContext && modules);
+          expect(tableContext.roots).toEqual([table]);
+          expect(modules.roots.toSorted()).toEqual([spec, impl].toSorted());
+          for (const context of contexts) context.rebuilds = 0;
+          totalRebuilds = 0;
+          yield* project.write(
+            "confect/tables/notes.ts",
+            `${Project.table}\n// table edit\n`,
+          );
+          yield* wait(
+            "table revision build",
+            Effect.promise(() => tableContext.native.rebuild()),
+          );
+          yield* wait("first update start", Deferred.await(started));
+          expect(readyCount).toBe(1);
+          yield* wait(
+            "module revision build",
+            Effect.promise(() => modules.native.rebuild()),
+          );
+          yield* Deferred.succeed(release, undefined);
+          yield* wait("updated readiness", Queue.take(ready));
+          expect(readyCount).toBe(2);
+          expect(updates).toHaveLength(lateChange === "none" ? 1 : 2);
+          expect(updates[0]?.declarations.toSorted()).toEqual(
+            ["notes.spec.ts", path.join("tables", "notes.ts")].toSorted(),
+          );
+          expect(updates[0]?.paths).toEqual(["notes.impl.ts"]);
+          if (lateChange === "none") {
+            expect(modules.rebuilds).toBe(2);
+            expect(tableContext.rebuilds).toBe(1);
+          } else {
+            expect(
+              yield* fs.readFileString(
+                path.join(project.root, "convex/notes.ts"),
+              ),
+            ).toContain("export const latest =");
+          }
+        }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
+      { timeout: 25000 },
+    );
+
     it.effect(
       "discards a generation record dirtied while its temporary write is blocked",
       () =>
@@ -278,6 +560,11 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const project = yield* Project.make;
           const ready = yield* Queue.unbounded<void>();
           const rebuilds = yield* Ref.make(0);
+          const wait = yield* traceWaits(
+            Ref.get(rebuilds).pipe(
+              Effect.map((count) => ({ rebuilds: count })),
+            ),
+          );
           const context = vi.mocked(esbuild.context);
           const original = context.getMockImplementation();
           assert(original);
@@ -324,13 +611,13 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             }),
             Effect.forkScoped,
           );
-          yield* Queue.take(ready);
+          yield* wait("initial readiness", Queue.take(ready));
           yield* Ref.set(rebuilds, 0);
           yield* project.write(
             `confect/notes.${kind}.ts`,
             `${source}\n// authored edit\n`,
           );
-          yield* Queue.take(ready);
+          yield* wait("edited readiness", Queue.take(ready));
           expect(yield* Ref.get(rebuilds)).toBe(2);
         }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
       { timeout: 25000 },

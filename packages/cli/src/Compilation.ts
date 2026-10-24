@@ -68,6 +68,9 @@ export class Service extends Context.Service<
     readonly reset: Effect.Effect<void>;
     readonly verify: Effect.Effect<void, BundlerError>;
     readonly topology: Effect.Effect<ReadonlyArray<CompilationState.Topology>>;
+    readonly dependentRoots: (
+      changed: ReadonlyArray<string>,
+    ) => Effect.Effect<ReadonlyArray<string>>;
     readonly preparedRevisions: Effect.Effect<
       ReadonlyArray<CompilationState.Receipt>
     >;
@@ -154,6 +157,20 @@ export const layer = (options: {
         restartRequired: resolutionInputs.pending,
         resolutionInputs,
         reset,
+        dependentRoots: Effect.fn("Compilation.dependentRoots")(
+          function* (changed) {
+            const current = yield* Ref.get(contexts);
+            return Array.dedupe(
+              Array.flatten(
+                yield* Effect.forEach(
+                  current.filter((context) => context.profile === "modules"),
+                  (context) => context.dependentRoots(changed),
+                ),
+              ),
+            );
+          },
+          (effect) => lock.withPermit(effect),
+        ),
         preparedRevisions: lock.withPermit(
           Effect.gen(function* () {
             return Array.getSomes(
@@ -301,12 +318,19 @@ export const layer = (options: {
 
 export const withPreparedRevisions = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
+  freshRoots: ReadonlyArray<string> = [],
 ) =>
   Effect.gen(function* () {
     const compiler = yield* Service;
     const receipts = yield* compiler.preparedRevisions;
+    const fresh = new Set(freshRoots);
     return yield* effect.pipe(
-      Effect.provideService(PreparedRevisions, receipts),
+      Effect.provideService(
+        PreparedRevisions,
+        receipts.filter(
+          (receipt) => !receipt.roots.some((root) => fresh.has(root)),
+        ),
+      ),
     );
   });
 

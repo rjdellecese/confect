@@ -370,10 +370,68 @@ const syncLoop = Effect.fnUntraced(function* (
       continue;
     }
 
-    const pending = yield* Ref.getAndSet(pendingRef, SyncState.empty);
+    let pending = yield* Ref.getAndSet(pendingRef, SyncState.empty);
     const phase = yield* Ref.get(phaseRef);
-    const operation = SyncState.plan(phase, pending);
+    let operation = SyncState.plan(phase, pending);
     const inventory = yield* Ref.get(inventoryRef);
+    let freshRoots: ReadonlyArray<string> = [];
+    if (SyncState.Operation.$is("Update")(operation)) {
+      const scheduledRoots = (
+        update: SyncState.Operation & { readonly _tag: "Update" },
+      ) => {
+        const plan = EntryPoint.planDeclarations(
+          update.declarations,
+          update.paths,
+          path,
+        );
+        return new Set([
+          ...plan.tables.map((table) =>
+            path.resolve(confect, table.relativePath),
+          ),
+          ...plan.paths.flatMap((relativePath) => [
+            path.resolve(confect, relativePath),
+            path.resolve(confect, SpecModulePath.fromImpl(relativePath)),
+          ]),
+        ]);
+      };
+      const originalRoots = scheduledRoots(operation);
+      const declarations = new Set(
+        operation.declarations.map((entry) =>
+          path.resolve(confect, entry.relativePath),
+        ),
+      );
+      const hints = new Set(
+        yield* compiler.dependentRoots(
+          inventory
+            .filter((entry) => declarations.has(entry.absolutePath))
+            .flatMap((entry) => [entry.absolutePath, entry.inputPath]),
+        ),
+      );
+      pending = SyncState.add(
+        pending,
+        inventory.filter(
+          (entry) =>
+            (entry._tag === "Spec" ||
+              entry._tag === "Impl" ||
+              entry._tag === "Table") &&
+            (hints.has(entry.inputPath) || hints.has(entry.absolutePath)),
+        ),
+      );
+      operation = SyncState.plan(phase, pending);
+      if (SyncState.Operation.$is("Update")(operation)) {
+        const added = new Set(
+          [...scheduledRoots(operation)].filter(
+            (root) => !originalRoots.has(root),
+          ),
+        );
+        freshRoots = [
+          ...added,
+          ...inventory
+            .filter((entry) => added.has(entry.absolutePath))
+            .map((entry) => entry.inputPath),
+        ];
+      }
+    }
     const optional = yield* Ref.updateAndGet(
       optionalPendingRef,
       HashSet.union(pending.optional),
@@ -427,6 +485,7 @@ const syncLoop = Effect.fnUntraced(function* (
         Update: ({ snapshot, declarations, paths }) =>
           Compilation.withPreparedRevisions(
             Evaluation.updateDeclarations(snapshot, declarations, paths),
+            freshRoots,
           ),
         Validate: ({ snapshot, paths }) =>
           (paths.length === 0
