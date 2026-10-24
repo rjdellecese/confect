@@ -40,13 +40,25 @@ Important any change (chiefly in `packages/cli/src/templates.ts`, the generated
    `_generated/registeredFunctions.ts`) or any cross-group import that pulls one
    group's `.impl` into another group's bundle.
 
-2. **Deploy schema stays out of the runtime bundle.** `_generated/schema.ts`
-   (the runtime `DatabaseSchema`) must import `@confect/server` and never
-   `convex/server`; `_generated/convexSchema.ts` (the deploy `SchemaDefinition`)
-   must import `convex/server`'s `defineSchema` and never `@confect/server`.
-   Flag any runtime code path or template that makes a function bundle reach
-   `convex/server`'s `defineSchema`, or that merges the two schema artifacts
-   back into a single module.
+2. **Application deployment-schema construction stays out of function bundles.**
+   `_generated/schema.ts` (the runtime `DatabaseSchema`) must only assemble
+   table records without forcing their schemas. `_generated/convexSchema.ts`
+   (the deploy `SchemaDefinition`) calls `convex/server`'s `defineSchema` and
+   may import `@confect/server`'s `Table.tableDefinition` to construct Convex
+   validators and indexes. That conversion belongs at deployment time, not
+   at function-module initialization. Keep the two artifacts separate; flag a
+   function runtime path that reaches the application's deployment schema or
+   constructs its deployment validators, including through an aliased helper.
+
+   Check application import reachability and schema evaluation, not a blanket
+   ban on package names or `defineSchema` text. Convex's own internal
+   `_systemSchema` initializer can remain in a plain `convex/server` query
+   bundle without Confect imports. Establish such upstream provenance with a
+   dependency-only control at the same pinned version; it does not excuse
+   application-schema construction or eager application-schema reads. Likewise,
+   the server `Table` module can remain for its system-table definitions while
+   its deployment helper is removed by tree-shaking. Module presence alone
+   does not prove deployment-time construction leaked into a function bundle.
 
 ## Always check: spec/group/table builders stay pure
 
@@ -61,6 +73,8 @@ place, relies on such mutation for object identity, or runs side effects when a
 ## Verification bar
 
 Before posting any "always check" finding above, cite the specific `file:line`
-where the violation occurs—the eager thunk evaluation, the cross-group or
-`convex/server` import, the in-place mutation. Do not infer a violation from
-naming alone.
+where the violation occurs—the eager thunk evaluation, the cross-group import,
+the application deployment-schema dependency or validator construction, or the
+in-place mutation. Use the import graph and runtime schema-read evidence to
+distinguish application code from upstream initialization. Do not infer a
+violation from naming alone.
