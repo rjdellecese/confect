@@ -223,6 +223,216 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
       { timeout: 30000 },
     );
 
+    it.effect(
+      "materializes bootstrap bindings before component evaluation without forcing table schemas",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write(
+            "confect/tables/notes.ts",
+            `import { Table } from "@confect/core";
+import { Id } from "../_generated/id";
+const id = Id("notes");
+export default Table.make(() => { throw new Error("Table schema forced during bootstrap"); });
+export { id };
+`,
+          );
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { GroupSpec } from "@confect/core";
+export default GroupSpec.make();
+`,
+          );
+          yield* project.write("confect/notes.impl.ts", Project.emptyImpl);
+          yield* project.write(
+            "convex/convex.config.ts",
+            `import { defineApp } from "convex/server";
+import { DatabaseSchema } from "@confect/server";
+import schema from "../confect/_generated/schema";
+import { DatabaseReader } from "../confect/_generated/services";
+import notes from "../confect/_generated/tables/notes";
+if (DatabaseSchema.tables(schema).notes !== notes || !DatabaseReader) throw new Error("Bootstrap bindings unavailable");
+export default defineApp();
+`,
+          );
+          yield* project.provide(codegenHandler);
+          expect(
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect.each([
+      {
+        transition: "addition",
+        before: null,
+        after: "user_profiles",
+        docName: "UserProfilesDoc",
+      },
+      {
+        transition: "rename",
+        before: "user_profiles",
+        after: "accounts",
+        docName: "AccountsDoc",
+      },
+      { transition: "removal", before: "accounts", after: null, docName: null },
+    ])(
+      "reconciles a table $transition while preserving unowned content",
+      ({ before, after, docName }) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          if (before !== null)
+            yield* project.write(`confect/tables/${before}.ts`, Project.table);
+          yield* project.provide(codegenHandler);
+          const generated = path.join(
+            project.root,
+            "confect/_generated/tables",
+          );
+          yield* fs.writeFileString(path.join(generated, "README.md"), "keep");
+          const outside = path.join(project.root, "outside");
+          yield* fs.makeDirectory(outside);
+          yield* fs.writeFileString(path.join(outside, "untouched.ts"), "keep");
+          yield* fs.symlink(outside, path.join(generated, "unowned"));
+          if (before !== null) {
+            expect(yield* fs.exists(path.join(generated, `${before}.ts`))).toBe(
+              true,
+            );
+            if (after === null) {
+              yield* fs.remove(
+                path.join(project.root, `confect/tables/${before}.ts`),
+              );
+            } else {
+              yield* fs.rename(
+                path.join(project.root, `confect/tables/${before}.ts`),
+                path.join(project.root, `confect/tables/${after}.ts`),
+              );
+            }
+          } else {
+            yield* project.write(`confect/tables/${after}.ts`, Project.table);
+          }
+          yield* project.provide(codegenHandler);
+          const docs = yield* fs.readFileString(
+            path.join(project.root, "confect/_generated/docs.ts"),
+          );
+          if (after !== null) {
+            expect(
+              yield* fs.readFileString(path.join(generated, `${after}.ts`)),
+            ).toBe(
+              yield* templates.tableWrapper({
+                tableName: after,
+                unnamedImportPath: `../../tables/${after}`,
+              }),
+            );
+            expect(docs).toContain(docName);
+          }
+          if (before !== null) {
+            expect(yield* fs.exists(path.join(generated, `${before}.ts`))).toBe(
+              false,
+            );
+            expect(docs).not.toContain(`${before}:`);
+          }
+          expect(
+            yield* fs.readFileString(path.join(generated, "README.md")),
+          ).toBe("keep");
+          expect(yield* fs.readLink(path.join(generated, "unowned"))).toBe(
+            outside,
+          );
+          expect(
+            yield* fs.readFileString(path.join(outside, "untouched.ts")),
+          ).toBe("keep");
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "skips unchanged static bindings after generating an additional table",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write(
+            "confect/tables/user_profiles.ts",
+            Project.table,
+          );
+          yield* project.provide(codegenHandler);
+          expect(
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
+      "retains partial static writes without notification or history and recovers from observed outputs",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* project.provide(codegenHandler);
+          const before = yield* project.generatedFiles;
+          const generated = path.join(project.root, "confect/_generated");
+          const recordPath = path.join(generated, ".confect-generation.json");
+          const record = yield* fs.readFileString(recordPath);
+          const runtimeSchema = path.join(generated, "schema.ts");
+          const beforeSchema = yield* fs.readFileString(runtimeSchema);
+          const deployment = path.join(project.root, "convex/schema.ts");
+          const timestamp = DateTime.toDateUtc(DateTime.makeUnsafe(1000));
+          yield* fs.utimes(deployment, timestamp, timestamp);
+          yield* project.write("confect/tables/orphan.ts", Project.table);
+          const failure = PlatformError.systemError({
+            _tag: "PermissionDenied",
+            module: "FileSystem",
+            method: "writeFileString",
+            pathOrDescriptor: runtimeSchema,
+            cause: { code: "EACCES" },
+          });
+          const result = yield* project.provide(codegenHandler).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              writeFileString: (...args) =>
+                args[0] === runtimeSchema
+                  ? Effect.fail(failure)
+                  : fs.writeFileString(...args),
+            }),
+            Effect.result,
+          );
+          assert(Result.isFailure(result));
+          expect(result.failure).toBe(failure);
+          expect(
+            yield* fs.readFileString(path.join(generated, "id.ts")),
+          ).toContain('"orphan"');
+          expect(
+            yield* fs.exists(path.join(generated, "tables/orphan.ts")),
+          ).toBe(true);
+          expect(yield* fs.readFileString(runtimeSchema)).toBe(beforeSchema);
+          expect(yield* fs.readFileString(recordPath)).toBe(record);
+          expect(
+            Option.getOrThrow((yield* fs.stat(deployment)).mtime).getTime(),
+          ).toBe(1000);
+          yield* fs.remove(path.join(project.root, "confect/tables/orphan.ts"));
+          yield* TestClock.setTime(2000);
+          yield* project.provide(codegenHandler);
+          expect(
+            yield* fs.exists(path.join(generated, "tables/orphan.ts")),
+          ).toBe(false);
+          expect(
+            yield* fs.readFileString(path.join(generated, "id.ts")),
+          ).not.toContain('"orphan"');
+          expect(yield* fs.readFileString(recordPath)).toBe(record);
+          expect(yield* project.generatedFiles).toEqual(before);
+          expect(
+            Option.getOrThrow((yield* fs.stat(deployment)).mtime).getTime(),
+          ).toBe(2000);
+          expect(
+            yield* Project.writtenFiles(project.provide(codegenHandler)),
+          ).toEqual([]);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect.each([
       { files: ["bad-name.ts"], error: "InvalidTableFilenameError" },
       {

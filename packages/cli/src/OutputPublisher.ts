@@ -133,20 +133,24 @@ const makeInspector = Effect.fn("OutputPublisher.makeInspector")(function* (
 });
 
 export const discover = Effect.fn("OutputPublisher.discover")(function* (
-  namespace: OutputPlan.Target["_tag"],
+  namespace: Exclude<OutputPlan.Target["_tag"], "Binding">,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const root = path.resolve(yield* ProjectRoot.get);
   const owner = path.resolve(
-    yield* namespace === "Registry"
-      ? ConfectDirectory.get
-      : ConvexDirectory.get,
+    yield* namespace === "ConvexModule"
+      ? ConvexDirectory.get
+      : ConfectDirectory.get,
   );
   const directory =
-    namespace === "Registry"
-      ? path.join(owner, "_generated", "registeredFunctions")
-      : owner;
+    namespace === "ConvexModule"
+      ? owner
+      : path.join(
+          owner,
+          "_generated",
+          namespace === "Registry" ? "registeredFunctions" : "tables",
+        );
   const inspect = yield* makeInspector(root, [owner]);
   if (Option.isNone(yield* inspect(directory, "Directory"))) return [];
   const visit: (
@@ -167,7 +171,7 @@ export const discover = Effect.fn("OutputPublisher.discover")(function* (
             .join("/");
           const owned =
             path.extname(file) === ".ts" &&
-            (namespace === "Registry" ||
+            (namespace !== "ConvexModule" ||
               OutputPlan.isOwnedConvexModule(physicalKey(path, relativePath)));
           const observation = yield* inspect(
             file,
@@ -182,11 +186,7 @@ export const discover = Effect.fn("OutputPublisher.discover")(function* (
               path: file,
               reason: "UnexpectedType",
             });
-          return [
-            namespace === "Registry"
-              ? OutputPlan.Target.Registry({ relativePath })
-              : OutputPlan.Target.ConvexModule({ relativePath }),
-          ];
+          return [OutputPlan.Target[namespace]({ relativePath })];
         }),
       ),
     );
@@ -210,6 +210,10 @@ export const publish = Effect.fn("OutputPublisher.publish")(function* (
         Registry: ({ relativePath }) =>
           path.join(confect, "_generated", "registeredFunctions", relativePath),
         ConvexModule: ({ relativePath }) => path.join(convex, relativePath),
+        TableWrapper: ({ relativePath }) =>
+          path.join(confect, "_generated", "tables", relativePath),
+        Binding: ({ relativePath }) =>
+          path.join(confect, "_generated", relativePath),
       });
       if (
         operation.target._tag === "ConvexModule" &&
