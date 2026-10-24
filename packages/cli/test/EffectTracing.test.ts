@@ -37,6 +37,7 @@ const makeProject = Effect.fnUntraced(function* () {
     directory: import.meta.dirname,
     prefix: "tracing-",
   });
+  yield* Project.installPackages(root);
   const confect = path.join(root, "confect");
   const convex = path.join(root, "convex");
   yield* fs.makeDirectory(confect);
