@@ -53,30 +53,52 @@ export const make = <
         >
     >
   >,
-): Layer.Layer<FunctionImpl<Name_>> => {
-  const functionSpec = group.functions[name]!;
+): Layer.Layer<FunctionImpl<Name_>> =>
+  forSchema<DatabaseSchema_>()(group, name, handler);
 
-  return Layer.effect(
-    FunctionImpl<Name_>({ name }),
-    Effect.gen(function* () {
-      const registry = yield* Registry.Registry;
+export const forSchema =
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>() =>
+  <
+    Group extends GroupSpec.AnyWithProps,
+    const Name_ extends FunctionSpec.Name<GroupSpec.Functions<Group>>,
+  >(
+    group: Group,
+    name: Name_,
+    handler: Handler.WithName<
+      DatabaseSchema_,
+      GroupSpec.Functions<Group>,
+      Name_,
+      MiddlewareSpec.Provides<
+        | GroupSpec.MiddlewareSpecs<Group>
+        | FunctionSpec.MiddlewareSpecs<
+            FunctionSpec.WithName<GroupSpec.Functions<Group>, Name_>
+          >
+      >
+    >,
+  ): Layer.Layer<FunctionImpl<Name_>> => {
+    const functionSpec = group.functions[name]!;
 
-      yield* Ref.update(registry, (registryItems) =>
-        setNestedProperty(
-          registryItems,
-          [name],
-          FunctionRegistryItem.make({
-            functionSpec,
-            groupMiddlewareAttachments: group.middlewareAttachments,
-            handler,
-          }),
-        ),
-      );
+    return Layer.effect(
+      FunctionImpl<Name_>({ name }),
+      Effect.gen(function* () {
+        const registry = yield* Registry.Registry;
 
-      return { name };
-    }),
-  );
-};
+        yield* Ref.update(registry, (registryItems) =>
+          setNestedProperty(
+            registryItems,
+            [name],
+            FunctionRegistryItem.make({
+              functionSpec,
+              groupMiddlewareAttachments: group.middlewareAttachments,
+              handler,
+            }),
+          ),
+        );
+
+        return { name };
+      }),
+    );
+  };
 
 /**
  * Get the function implementation service type for a specific function name.

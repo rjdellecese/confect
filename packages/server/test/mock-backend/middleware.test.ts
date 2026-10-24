@@ -15,6 +15,7 @@ import { NameRejected } from "./fixtures/confect/middleware/RequireName.spec";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
+import * as EffectRef from "effect/Ref";
 import * as Schema from "effect/Schema";
 import refs from "./fixtures/confect/_generated/refs";
 import {
@@ -59,6 +60,60 @@ const listNoteTexts = Effect.gen(function* () {
 }).pipe(Effect.orDie);
 
 describe("middleware", () => {
+  it.effect("executes type-only service providers only at invocation", () =>
+    Effect.gen(function* () {
+      class ProvidedName extends Context.Service<ProvidedName, string>()(
+        "@confect/server/test/mock-backend/middleware.test/ProvidedName",
+      ) {}
+      class ProvideName extends MiddlewareSpec.MiddlewareSpec<
+        ProvideName,
+        { provides: ProvidedName }
+      >()("ProvideName", {
+        functionTypes: { query: true, mutation: false, action: false },
+      }) {}
+      const acquisitions = yield* EffectRef.make(0);
+      const query = FunctionSpec.publicQuery({
+        name: "get",
+        returns: () => Schema.String,
+      });
+      const group = GroupSpec.make().middleware(ProvideName).addFunction(query);
+      const groupLayer = GroupImpl.fromSpec(group).pipe(
+        Layer.provide(
+          FunctionImpl.forSchema<typeof databaseSchema>()(
+            group,
+            "get",
+            () => ProvidedName,
+          ),
+        ),
+        Layer.provide(
+          MiddlewareImpl.forSchema<typeof databaseSchema>().provides(
+            ProvideName,
+            ProvidedName,
+            EffectRef.update(acquisitions, (count) => count + 1).pipe(
+              Effect.as("provided"),
+            ),
+          ),
+        ),
+        GroupImpl.finalize,
+      );
+      const registered = RegisteredFunctions.buildForGroup<typeof group>(
+        databaseSchema,
+        groupLayer,
+      );
+      expect(yield* EffectRef.get(acquisitions)).toBe(0);
+      const c = yield* Effect.service(TestConfect.TestConfect).pipe(
+        Effect.provide(
+          TestConfect_.layer(databaseSchema, convexSchema, {
+            ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+            "./fixtures/convex/typeOnly.ts": () => Promise.resolve(registered),
+          }),
+        ),
+      );
+      expect(yield* c.query(Ref.make("typeOnly", query))).toBe("provided");
+      expect(yield* EffectRef.get(acquisitions)).toBe(1);
+    }),
+  );
+
   describe("provides", () => {
     it.effect("provides a service to a query handler", () =>
       Effect.gen(function* () {

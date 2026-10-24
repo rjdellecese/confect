@@ -1,7 +1,8 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Registry, type RegistryItems } from "@confect/server";
 import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { vi } from "vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -116,6 +117,73 @@ describe("GroupImpl.finalize", () => {
         }).pipe(Effect.scoped);
 
         expect([...registeredFunctionNames].sort()).toEqual(["insert", "list"]);
+      }),
+  );
+});
+
+describe("FunctionImpl.forSchema", () => {
+  it.effect(
+    "preserves registration and handler inference without a schema value",
+    () =>
+      Effect.gen(function* () {
+        const group = GroupSpec.make().addFunction(
+          FunctionSpec.publicQuery({
+            name: "read",
+            args: () => ({ value: Schema.Finite }),
+            returns: () => Schema.Finite,
+          }),
+        );
+        const makeFunction = FunctionImpl.forSchema<typeof databaseSchema>();
+        const implementation = makeFunction(group, "read", ({ value }) => {
+          expectTypeOf(value).toEqualTypeOf<number>();
+          return Effect.succeed(value);
+        });
+        expectTypeOf(implementation).toEqualTypeOf<
+          Layer.Layer<FunctionImpl.FunctionImpl<"read">>
+        >();
+        expectTypeOf(makeFunction<typeof group, "read">)
+          .parameter(1)
+          .toEqualTypeOf<"read">();
+        const registered = yield* collectRegistry(implementation);
+        const previous = yield* collectRegistry(
+          FunctionImpl.make(databaseSchema, group, "read", ({ value }) =>
+            Effect.succeed(value),
+          ),
+        );
+        expect(Object.keys(registered)).toEqual(Object.keys(previous));
+        expect(registered.read).toMatchObject({
+          _tag: "Confect",
+          name: "read",
+          functionType: "query",
+          functionVisibility: "public",
+        });
+      }),
+  );
+
+  it.effect(
+    "keeps schema thunks lazy through construction and registration",
+    () =>
+      Effect.gen(function* () {
+        const args = vi.fn(() => ({ value: Schema.Finite }));
+        const returns = vi.fn(() => Schema.Finite);
+        const error = vi.fn(() => Schema.String);
+        const group = GroupSpec.make().addFunction(
+          FunctionSpec.publicQuery({ name: "read", args, returns, error }),
+        );
+        const originalFunctions = group.functions;
+        const implementation = FunctionImpl.forSchema<typeof databaseSchema>()(
+          group,
+          "read",
+          ({ value }) => Effect.succeed(value),
+        );
+        expect(args).not.toHaveBeenCalled();
+        expect(returns).not.toHaveBeenCalled();
+        expect(error).not.toHaveBeenCalled();
+        yield* collectRegistry(implementation);
+        expect(args).not.toHaveBeenCalled();
+        expect(returns).not.toHaveBeenCalled();
+        expect(error).not.toHaveBeenCalled();
+        expect(group.functions).toBe(originalFunctions);
       }),
   );
 });

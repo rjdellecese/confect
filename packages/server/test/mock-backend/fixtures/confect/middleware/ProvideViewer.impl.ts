@@ -2,7 +2,7 @@ import { MiddlewareImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import refs from "../_generated/refs";
-import databaseSchema from "../_generated/schema";
+import type databaseSchema from "../_generated/schema";
 import { DatabaseReader, QueryRunner } from "../_generated/services";
 import ProvideViewer, { NoViewer, Viewer } from "./ProvideViewer.spec";
 
@@ -36,15 +36,13 @@ const viewerViaRunQuery = Effect.gen(function* () {
   return { username };
 });
 
-export default MiddlewareImpl.makeByFunctionType(
-  databaseSchema,
-  ProvideViewer,
-  {
-    query: (effect) =>
-      Effect.provideServiceEffect(effect, Viewer, viewerFromDatabase),
-    mutation: (effect) =>
-      Effect.provideServiceEffect(effect, Viewer, viewerFromDatabase),
-    action: (effect) =>
-      Effect.provideServiceEffect(effect, Viewer, viewerViaRunQuery),
-  },
-);
+export default MiddlewareImpl.forSchema<
+  typeof databaseSchema
+>().makeByFunctionType(ProvideViewer, {
+  query: (effect) =>
+    Effect.provideServiceEffect(effect, Viewer, viewerFromDatabase),
+  mutation: (effect) =>
+    Effect.provideServiceEffect(effect, Viewer, viewerFromDatabase),
+  action: (effect) =>
+    Effect.provideServiceEffect(effect, Viewer, viewerViaRunQuery),
+});
