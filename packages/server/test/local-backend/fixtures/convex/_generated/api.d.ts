@@ -121,6 +121,12 @@ export declare const api: {
         { caseId: string; limit: number },
         null
       >;
+      patchAll: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; via: "confect" | "convex" },
+        { bytesRead: number; documentsRead: number }
+      >;
       rollback: FunctionReference<
         "mutation",
         "public",

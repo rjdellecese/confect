@@ -350,7 +350,12 @@ describe("DatabaseReader", () => {
           ).toEqual([encoded]);
           expect(calls).toBe(10);
 
+          // A patch of a plain struct writes the field without reading the
+          // document, so it decodes nothing.
           yield* writer.patch(id, { text: "patched" });
+          expect(calls).toBe(10);
+          // A patch that takes the get-and-replace path still decodes with it.
+          yield* writer.patch(id, { text: "patched", undeclared: 1 } as never);
           expect(calls).toBe(11);
           expect(evaluations).toBe(1);
           expect(table.Doc).toBe(doc);
