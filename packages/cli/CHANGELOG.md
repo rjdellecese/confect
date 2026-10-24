@@ -1,5 +1,11 @@
 # @confect/cli
 
+## 10.3.3
+
+### Patch Changes
+
+- aef4ffa: Improve `confect codegen` performance for projects with many function directories while retaining dependency-change validation.
+
 ## 10.3.2
 
 ### Patch Changes
