@@ -11,6 +11,7 @@ export default mergeConfig(
       root: import.meta.dirname,
       include: ["test/*.test.ts", "test/integration/*.test.ts"],
       maxWorkers: Math.min(2, availableParallelism()),
+      sequence: { groupOrder: 1 },
     },
   }),
 );
