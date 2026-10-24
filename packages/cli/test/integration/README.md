@@ -25,9 +25,7 @@ CI runs the complete CLI suite in four shards on both Linux and Windows, with at
 pnpm --filter @confect/cli test --shard=1/4
 ```
 
-`scripts/cliTestSequencer.ts` balances files by estimated execution duration and starts the longest files first. The initial weights come from the Windows job in [main run 40092653737](https://github.com/rjdellecese/confect/actions/runs/40092653737); each split integration suite's weight is the sum of its original cases. Runtime and typecheck specifications for the same file stay together. New files are discovered normally and receive a one-second estimate, so the weights are scheduling hints, not an allowlist.
-
-Keep the weights identical across all shards: do not derive assignments from machine-local Vitest caches or runner timings. Otherwise different runners could disagree about which shard owns a file. Update the checked-in estimates from the `cli-results-<os>-<shard>` timing artifacts when the workload changes materially. The sequencer's script tests check complete assignment, runtime/typecheck pairing, platform-independent ordering, and input preservation.
+Vitest's built-in sequencer assigns discovered test files to shards. There is no custom scheduler or timing table to maintain. The split integration suites let Vitest distribute the formerly serial dev-process tests across runners.
 
 Each shard retains coverage collection and writes a Vitest blob report plus JSON timings. One Linux report job merges each operating system's four blobs without rerunning tests and uploads the `cli-coverage` artifact, with separate `linux` and `windows` directories. The report job installs dependencies but does not rebuild packages. Windows coverage uses the JSON reporter, which preserves the original Windows file paths and counters without trying to read Windows source paths on Linux; Linux coverage also includes the standard HTML report. Keeping the coverage maps separate preserves platform-specific branches while avoiding a second Windows runner setup just to merge reports.
 
