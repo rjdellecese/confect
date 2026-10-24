@@ -9,6 +9,45 @@ const write = OutputPlan.Operation.Write({
   contents: "registry",
 });
 
+it("rejects scoped duplicate and parent-child targets while keeping aggregate ownership separate", () => {
+  const scoped = OutputPlan.Operation.Write({
+    target: OutputPlan.Target.ScopedRef({ relativePath: "notes.ts" }),
+    contents: "scoped",
+  });
+  const remove = OutputPlan.Operation.Remove({ target: scoped.target });
+  const child = OutputPlan.Operation.Remove({
+    target: OutputPlan.Target.ScopedRef({ relativePath: "notes.ts/child.ts" }),
+  });
+  for (const operations of [
+    [scoped, scoped],
+    [remove, remove],
+    [scoped, remove],
+    [scoped, child],
+    [child, scoped],
+  ]) {
+    const plan = OutputPlan.make(operations);
+    assert(Result.isFailure(plan));
+    expect(plan.failure).toMatchObject({
+      namespace: "ScopedRef",
+      reason: "ConflictingTarget",
+    });
+  }
+  const desired = [
+    scoped,
+    OutputPlan.Operation.Write({
+      target: OutputPlan.Target.Binding({ relativePath: "refs.ts" }),
+      contents: "aggregate",
+    }),
+  ];
+  const obsolete = OutputPlan.Target.ScopedRef({ relativePath: "refs.ts" });
+  const result = OutputPlan.diff(desired, [scoped.target, obsolete]);
+  assert(Result.isSuccess(result));
+  expect(result.success.operations).toEqual([
+    ...desired,
+    OutputPlan.Operation.Remove({ target: obsolete }),
+  ]);
+});
+
 it("preserves desired bytes and immutable inputs across both namespaces", () => {
   const operations = [
     write,
@@ -38,6 +77,7 @@ it.each([
     OutputPlan.Target.Registry({ relativePath }),
     OutputPlan.Target.ConvexModule({ relativePath }),
     OutputPlan.Target.TableWrapper({ relativePath }),
+    OutputPlan.Target.ScopedRef({ relativePath }),
   ]) {
     const plan = OutputPlan.make([OutputPlan.Operation.Remove({ target })]);
     assert(Result.isFailure(plan));
@@ -55,6 +95,8 @@ it.each([
   "convexSchema.ts",
   "docs.ts",
   "services.ts",
+  "spec.ts",
+  "refs.ts",
 ] as const)(
   "accepts only the fixed binding %s and rejects conflicting operations",
   (relativePath) => {
@@ -81,7 +123,7 @@ it.each([
 
 it.each([
   "other.ts",
-  "spec.ts",
+  "components.ts",
   "api.ts",
   "ID.ts",
   "nested/id.ts",

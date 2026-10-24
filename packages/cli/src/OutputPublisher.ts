@@ -7,6 +7,8 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import * as Schema from "effect/Schema";
+import * as CodegenError from "./CodegenError";
+import { SCOPED_REFS_HEADER } from "./SpecAssemblyNode";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import { ProjectRoot } from "./ProjectRoot";
@@ -132,11 +134,119 @@ const makeInspector = Effect.fn("OutputPublisher.makeInspector")(function* (
   return inspect;
 });
 
+const inspectScopedRefFiles = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = path.resolve(yield* ConfectDirectory.get);
+  const realConfectDirectory = yield* fs.realPath(confectDirectory);
+  const inspect = Effect.fnUntraced(function* (file: string) {
+    const link = yield* fs.readLink(file).pipe(
+      Effect.asSome,
+      Effect.catchIf(
+        (error) =>
+          error.reason._tag === "Unknown" &&
+          Option.isSome(nonLink(error.reason.cause)),
+        () => Effect.succeedNone,
+      ),
+    );
+    if (Option.isSome(link)) {
+      return yield* new CodegenError.ScopedRefsPathOccupiedError({
+        path: file,
+        reason: "SymbolicLink",
+      });
+    }
+    const real = yield* fs.realPath(file);
+    const expected = path.resolve(
+      realConfectDirectory,
+      path.relative(confectDirectory, file),
+    );
+    if (path.relative(expected, real) !== "") {
+      return yield* new CodegenError.ScopedRefsPathOccupiedError({
+        path: file,
+        reason: "EscapedPath",
+      });
+    }
+    return yield* fs.stat(file);
+  });
+  const generated = path.join(confectDirectory, "_generated");
+  const directory = path.join(generated, "refs");
+  for (const file of [generated, directory]) {
+    const info = yield* inspect(file).pipe(
+      Effect.asSome,
+      Effect.catchIf(
+        (error) =>
+          error._tag === "PlatformError" && error.reason._tag === "NotFound",
+        () => Effect.succeedNone,
+      ),
+    );
+    if (Option.isNone(info)) return [];
+    if (info.value.type !== "Directory") {
+      return yield* new CodegenError.ScopedRefsPathOccupiedError({
+        path: file,
+        reason: "UnexpectedType",
+      });
+    }
+  }
+  const visit: (
+    current: string,
+  ) => Effect.Effect<
+    ReadonlyArray<string>,
+    PlatformError | CodegenError.ScopedRefsPathOccupiedError
+  > = Effect.fnUntraced(function* (current) {
+    const entries = yield* fs.readDirectory(current);
+    return Array.flatten(
+      yield* Effect.forEach(
+        entries,
+        Effect.fnUntraced(function* (entry) {
+          const file = path.join(current, entry);
+          const info = yield* inspect(file);
+          if (info.type === "Directory") return yield* visit(file);
+          if (info.type !== "File") {
+            return yield* new CodegenError.ScopedRefsPathOccupiedError({
+              path: file,
+              reason: "UnexpectedType",
+            });
+          }
+          return file.endsWith(".ts") ? [path.relative(directory, file)] : [];
+        }),
+      ),
+    );
+  });
+  return yield* visit(directory);
+});
+
+const isOwnedScopedRef = (contents: string) =>
+  contents.startsWith(SCOPED_REFS_HEADER + "\n") ||
+  contents.startsWith(SCOPED_REFS_HEADER + "\r\n");
+
 export const discover = Effect.fn("OutputPublisher.discover")(function* (
   namespace: Exclude<OutputPlan.Target["_tag"], "Binding">,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  if (namespace === "ScopedRef") {
+    const existing = yield* inspectScopedRefFiles;
+    const directory = path.join(
+      yield* ConfectDirectory.get,
+      "_generated",
+      "refs",
+    );
+    return Array.getSomes(
+      yield* Effect.forEach(existing, (relativePath) =>
+        fs.readFileString(path.join(directory, relativePath)).pipe(
+          Effect.map((contents) =>
+            isOwnedScopedRef(contents)
+              ? Option.some(
+                  OutputPlan.Target.ScopedRef({
+                    relativePath: relativePath.split(path.sep).join("/"),
+                  }),
+                )
+              : Option.none(),
+          ),
+        ),
+      ),
+    );
+  }
   const root = path.resolve(yield* ProjectRoot.get);
   const owner = path.resolve(
     yield* namespace === "ConvexModule"
@@ -212,6 +322,8 @@ export const publish = Effect.fn("OutputPublisher.publish")(function* (
         ConvexModule: ({ relativePath }) => path.join(convex, relativePath),
         TableWrapper: ({ relativePath }) =>
           path.join(confect, "_generated", "tables", relativePath),
+        ScopedRef: ({ relativePath }) =>
+          path.join(confect, "_generated", "refs", relativePath),
         Binding: ({ relativePath }) =>
           path.join(confect, "_generated", relativePath),
       });
@@ -245,36 +357,63 @@ export const publish = Effect.fn("OutputPublisher.publish")(function* (
   );
   const inspect = yield* makeInspector(root, [confect, convex]);
   const inspected = yield* Effect.forEach(resolved, ({ operation, file }) =>
-    inspect(file, "File").pipe(
-      Effect.map((info) => ({ operation, file, exists: Option.isSome(info) })),
-    ),
+    Effect.gen(function* () {
+      const info = yield* inspect(file, "File").pipe(
+        Effect.mapError((error) =>
+          error._tag === "OutputPathError" &&
+          operation.target._tag === "ScopedRef" &&
+          (error.reason === "SymbolicLink" ||
+            error.reason === "EscapedPath" ||
+            error.reason === "UnexpectedType")
+            ? new CodegenError.ScopedRefsPathOccupiedError({
+                path: error.path,
+                reason: error.reason,
+              })
+            : error,
+        ),
+      );
+      const exists = Option.isSome(info);
+      if (exists && operation.target._tag === "ScopedRef") {
+        const contents = yield* fs.readFileString(file);
+        if (!isOwnedScopedRef(contents)) {
+          if (operation._tag === "Remove") return Option.none();
+          return yield* new CodegenError.ScopedRefsPathOccupiedError({
+            path: file,
+            reason: "UnownedFile",
+          });
+        }
+      }
+      return Option.some({ operation, file, exists });
+    }),
   );
   let preparedDirectories = HashSet.empty<string>();
-  yield* Effect.forEach(inspected, ({ operation, file, exists }) =>
-    OutputPlan.Operation.$match(operation, {
-      Write: ({ contents }) =>
-        Effect.gen(function* () {
-          const directory = path.dirname(file);
-          const key = physicalKey(path, directory);
-          if (!HashSet.has(preparedDirectories, key)) {
-            if (!(yield* fs.exists(directory)))
-              yield* fs.makeDirectory(directory, { recursive: true });
-            preparedDirectories = HashSet.add(preparedDirectories, key);
-          }
-          yield* writeFileStringAndLog(file, contents);
-        }),
-      Remove: ({ target }) =>
-        Effect.gen(function* () {
-          if (target._tag === "ConvexModule")
-            yield* Effect.logDebug(
-              `Removing group '${target.relativePath}'...`,
-            );
-          yield* removePathIfExists(file);
-          if (target._tag === "ConvexModule")
-            yield* Effect.logDebug(`Group '${target.relativePath}' removed`);
-          if (exists || target._tag === "ConvexModule")
-            yield* logFileRemoved(file);
-        }),
-    }),
+  yield* Effect.forEach(
+    Array.getSomes(inspected),
+    ({ operation, file, exists }) =>
+      OutputPlan.Operation.$match(operation, {
+        Write: ({ contents }) =>
+          Effect.gen(function* () {
+            const directory = path.dirname(file);
+            const key = physicalKey(path, directory);
+            if (!HashSet.has(preparedDirectories, key)) {
+              if (!(yield* fs.exists(directory)))
+                yield* fs.makeDirectory(directory, { recursive: true });
+              preparedDirectories = HashSet.add(preparedDirectories, key);
+            }
+            yield* writeFileStringAndLog(file, contents);
+          }),
+        Remove: ({ target }) =>
+          Effect.gen(function* () {
+            if (target._tag === "ConvexModule")
+              yield* Effect.logDebug(
+                `Removing group '${target.relativePath}'...`,
+              );
+            yield* removePathIfExists(file);
+            if (target._tag === "ConvexModule")
+              yield* Effect.logDebug(`Group '${target.relativePath}' removed`);
+            if (exists || target._tag === "ConvexModule")
+              yield* logFileRemoved(file);
+          }),
+      }),
   );
 });
