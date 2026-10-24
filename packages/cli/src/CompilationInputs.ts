@@ -356,6 +356,7 @@ export const make = Effect.fn("CompilationInputs.make")(
       canSharePackageLookups: Ref.get(baseline).pipe(
         Effect.map(
           (current) =>
+            mode === "Once" &&
             !HashMap.some(
               current,
               (value, file) =>
