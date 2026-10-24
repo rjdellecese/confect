@@ -3,7 +3,10 @@ import { coverage } from "./vitest.coverage";
 
 export default defineConfig({
   test: {
-    projects: ["packages/*", "tools/oxlint-rules"],
-    coverage,
+    projects: [
+      "packages/*/vitest.config.ts",
+      "tools/oxlint-rules/vitest.config.ts",
+    ],
+    coverage: { ...coverage, enabled: false },
   },
 });

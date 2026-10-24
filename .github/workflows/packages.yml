@@ -82,13 +82,9 @@ jobs:
           if-no-files-found: error
 
   test-cli-report:
-    name: Test (cli reports, ${{ matrix.os }})
+    name: Test (cli reports)
     needs: test-cli
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
@@ -96,13 +92,21 @@ jobs:
           build: "false"
       - uses: actions/download-artifact@v8
         with:
-          pattern: cli-results-${{ matrix.os }}-*
-          path: packages/cli/coverage/shards
+          pattern: cli-results-ubuntu-latest-*
+          path: packages/cli/coverage/shards/linux
           merge-multiple: true
-      - run: pnpm --filter @confect/cli exec vitest run --mergeReports coverage/shards/blobs --coverage.reportsDirectory=coverage/merged --reporter=default --reporter=json --outputFile.json=coverage/merged/results.json
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cli-results-windows-latest-*
+          path: packages/cli/coverage/shards/windows
+          merge-multiple: true
+      - name: Merge Linux results and coverage
+        run: pnpm --filter @confect/cli exec vitest run --mergeReports coverage/shards/linux/blobs --coverage.reportsDirectory=coverage/merged/linux --reporter=default --reporter=json --outputFile.json=coverage/merged/linux/results.json
+      - name: Merge Windows results and coverage
+        run: pnpm --filter @confect/cli exec vitest run --mergeReports coverage/shards/windows/blobs --coverage.reportsDirectory=coverage/merged/windows --coverage.reporter=json --reporter=default --reporter=json --outputFile.json=coverage/merged/windows/results.json
       - uses: actions/upload-artifact@v7
         with:
-          name: cli-coverage-${{ matrix.os }}
+          name: cli-coverage
           path: packages/cli/coverage/merged
           if-no-files-found: error
 
