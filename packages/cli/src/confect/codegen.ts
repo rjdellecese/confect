@@ -1,16 +1,19 @@
-import { Spec } from "@confect/core";
 import * as Command from "effect/cli/Command";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Result from "effect/Result";
 import { pipe } from "effect/Function";
 import * as HashSet from "effect/HashSet";
+import * as HashMap from "effect/HashMap";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
+import * as EvaluationSession from "../EvaluationSession";
 import * as Bundler from "../Bundler";
+import * as CompiledModule from "../CompiledModule";
+import * as CompilationSession from "../CompilationSession";
+import { fromBundlerError } from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import { LegacySchemaFileError } from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
@@ -24,12 +27,8 @@ import * as EntryPoint from "../EntryPoint";
 import type { ImplModulePath } from "../ImplModulePath";
 import {
   implPathForSpec,
-  loadAll,
   registeredFunctionsRelativePath,
-  validateAllImpls,
-  withImplFiles,
   type LeafModule,
-  type LoadedLeafModule,
 } from "../LeafModule";
 import {
   logFileAdded,
@@ -38,9 +37,11 @@ import {
   logPending,
   logSuccess,
   logWarn,
+  logCoalescedBuildWarnings,
 } from "../log";
 import { ProjectRoot } from "../ProjectRoot";
 import { assemblyNodesFromLeaves } from "../SpecAssemblyNode";
+import { SpecModulePath } from "../SpecModulePath";
 import * as TableModule from "../TableModule";
 import * as templates from "../templates";
 import {
@@ -108,31 +109,35 @@ export const codegen = Command.make("codegen", {}, () =>
 );
 
 const runCodegen = Effect.gen(function* () {
-  yield* generateConfectGeneratedDirectory;
-  // Reject a legacy `confect/schema.ts` up front so the user-facing
-  // migration message surfaces before any bundler error from impl
-  // validation (each impl imports `_generated/schema.ts`).
   yield* rejectLegacySchemaFile;
-  // List `confect/tables/*.ts` (filename-only—no bundling yet) so the
-  // `_generated/id.ts` constructor can be emitted *before* we bundle any
-  // user-authored table module. Tables import from `_generated/id.ts` for
-  // cross-table id refs, so it must exist on disk first.
   const tableModules = yield* TableModule.discover;
+  yield* validateNoDocNameCollisions(tableModules);
+  const leaves = yield* EvaluationSession.discoverLeaves;
+  yield* Effect.forEach(leaves, ({ relativePath }) =>
+    Effect.fromResult(
+      GenerationSnapshot.parseRootPath(relativePath.replaceAll("\\", "/")),
+    ),
+  );
+  const specPaths = leaves.map((leaf) =>
+    SpecModulePath.make(leaf.relativePath),
+  );
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const implPaths = yield* Effect.forEach(specPaths, implPathForSpec).pipe(
+    Effect.flatMap((paths) =>
+      Effect.filter(paths, (file) =>
+        fs.exists(path.resolve(confectDirectory, file)),
+      ),
+    ),
+  );
+  yield* generateConfectGeneratedDirectory;
   yield* warnIfNoTables(tableModules);
   yield* generateIdConstructor(tableModules);
-  // Now that `_generated/id.ts` is on disk, bundle each table module and
-  // check its default export is an `UnnamedTable`. Surface diagnostics
-  // here (rather than later) so they appear before impl-validation noise.
-  yield* TableModule.validate(tableModules);
-  yield* validateNoDocNameCollisions(tableModules);
   yield* generateTableWrappers(tableModules);
   yield* removeObsoleteTableWrappers(tableModules);
   yield* generateRuntimeSchema(tableModules);
-  const leaves = yield* loadAll;
   yield* removeLegacyFiles;
-  const snapshot = yield* Effect.fromResult(
-    GenerationSnapshot.fromLoadedLeaves(leaves),
-  );
   yield* generateAssembledSpecs(leaves);
   // `_generated/api.ts`/`nodeApi.ts` are no longer imported by generated or
   // impl code (impls take the database schema from `_generated/schema`
@@ -152,8 +157,18 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
-  yield* validateAllImpls(leaves);
-  yield* generateGroupRegisteredFunctions(leaves);
+  yield* EvaluationSession.validateTables(tableModules);
+  const snapshot = yield* EvaluationSession.withBatch(
+    [...specPaths, ...implPaths],
+    Effect.gen(function* () {
+      yield* EvaluationSession.loadSpecs(specPaths);
+      yield* EvaluationSession.validateSiblings(leaves);
+      const inspected = yield* EvaluationSession.snapshot(specPaths);
+      yield* EvaluationSession.validateImpls(leaves);
+      return inspected;
+    }),
+  );
+  yield* generateGroupRegisteredFunctions(snapshot.leaves);
   yield* removeObsoleteRegisteredFunctions(leaves);
   const [functionPaths] = yield* Effect.all(
     [
@@ -165,6 +180,7 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
+  yield* compileOptionalModules;
   return {
     functionPaths,
     snapshot,
@@ -172,13 +188,42 @@ const runCodegen = Effect.gen(function* () {
 });
 
 export const generateWithSnapshot = runCodegen.pipe(
+  EvaluationSession.provide,
   Effect.withSpan("Cli.codegen"),
 );
 
 export const codegenHandler = generateWithSnapshot.pipe(
   Effect.tap(() => touchConvexSchema),
   Effect.map(({ functionPaths }) => ({ functionPaths })),
+  Effect.provide(CompilationSession.layer("Once")),
 );
+
+export const compileOptionalModules = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const paths = yield* Effect.filter(
+    ["http.ts", "crons.ts", "auth.ts"],
+    (relativePath) => fs.exists(path.resolve(confectDirectory, relativePath)),
+  );
+  yield* Bundler.withBatch(
+    paths.map((relativePath) => path.resolve(confectDirectory, relativePath)),
+    Effect.forEach(
+      paths,
+      (relativePath) =>
+        Effect.gen(function* () {
+          const artifact = yield* Bundler.compile(
+            path.resolve(confectDirectory, relativePath),
+          ).pipe(
+            Effect.mapError((error) => fromBundlerError(relativePath, error)),
+          );
+          yield* logCoalescedBuildWarnings(artifact.warnings);
+          yield* CompiledModule.consume(artifact);
+        }),
+      { concurrency: 4, discard: true },
+    ),
+  );
+}).pipe(Effect.scoped);
 
 export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
   function* (
@@ -192,14 +237,22 @@ export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
       affectedImpls,
       path,
     );
-    yield* TableModule.validate(tables);
-    return yield* withImplFiles(paths, (leaves) =>
+    yield* EvaluationSession.validateTables(tables);
+    return yield* EvaluationSession.withImplFiles(paths, (leaves) =>
       Effect.gen(function* () {
-        const next = yield* Effect.fromResult(
-          GenerationSnapshot.update(snapshot, leaves),
+        const next = yield* EvaluationSession.snapshot(
+          leaves.map((leaf) => SpecModulePath.make(leaf.relativePath)),
+          snapshot,
         );
-        yield* validateAllImpls(leaves);
-        yield* generateGroupRegisteredFunctions(leaves);
+        yield* EvaluationSession.validateImpls(leaves);
+        const updatedPaths = HashSet.fromIterable(
+          Array.map(leaves, (leaf) => leaf.relativePath.replaceAll("\\", "/")),
+        );
+        yield* generateGroupRegisteredFunctions(
+          HashMap.filter(next.leaves, (_, relativePath) =>
+            HashSet.has(updatedPaths, relativePath),
+          ),
+        );
         yield* FunctionModule.applyFunctionPlan(
           GenerationSnapshot.diff(snapshot, next),
         );
@@ -207,6 +260,7 @@ export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
       }),
     );
   },
+  EvaluationSession.provide,
 );
 
 const generateConfectGeneratedDirectory = Effect.gen(function* () {
@@ -260,15 +314,18 @@ const generateAssembledSpecs = Effect.fnUntraced(function* (
 });
 
 const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
-  leaves: ReadonlyArray<LoadedLeafModule>,
+  leaves: Iterable<readonly [SpecModulePath, GenerationSnapshot.GroupTree]>,
 ) {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
   yield* Effect.forEach(
     leaves,
-    Effect.fnUntraced(function* (leaf: LoadedLeafModule) {
-      const registryRelativePath = yield* registeredFunctionsRelativePath(leaf);
+    Effect.fnUntraced(function* ([relativePath, group]) {
+      const registryRelativePath = path.join(
+        "registeredFunctions",
+        relativePath.slice(0, -".spec.ts".length) + ".ts",
+      );
       const registryPath = path.join(
         confectDirectory,
         "_generated",
@@ -280,7 +337,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
         yield* fs.makeDirectory(registryDir, { recursive: true });
       }
 
-      const implRelativePath = yield* implPathForSpec(leaf.relativePath);
+      const implRelativePath = yield* implPathForSpec(relativePath);
       const schemaImportPath = yield* toModuleImportPath(
         path.relative(
           path.dirname(registryPath),
@@ -292,7 +349,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
       const specImportPath = yield* toModuleImportPath(
         path.relative(
           path.dirname(registryPath),
-          path.join(confectDirectory, leaf.relativePath),
+          path.join(confectDirectory, relativePath),
         ),
       );
       const implImportPath = yield* toModuleImportPath(
@@ -303,7 +360,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
       );
 
       const contents = yield* templates.registeredFunctionsForGroup({
-        spec: leaf.spec,
+        group,
         schemaImportPath,
         specImportPath,
         implImportPath,
@@ -362,20 +419,6 @@ const getGeneratedSpecPath = Effect.gen(function* () {
   return path.join(confectDirectory, generatedSpecPath);
 });
 
-const loadGeneratedSpec = Effect.gen(function* () {
-  const specPath = yield* getGeneratedSpecPath;
-  const { module: specModule } = yield* Bundler.bundle(specPath);
-  const spec = specModule.default;
-
-  if (!Spec.isSpec(spec)) {
-    return yield* Effect.die(
-      new Error("_generated/spec.ts does not export a valid Spec"),
-    );
-  }
-
-  return spec;
-});
-
 const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
 
 export const loadPreviousFunctionPaths = Effect.gen(function* () {
@@ -386,12 +429,13 @@ export const loadPreviousFunctionPaths = Effect.gen(function* () {
     return emptyFunctionPaths;
   }
 
-  const specResult = yield* loadGeneratedSpec.pipe(Effect.result);
-
-  return Result.match(specResult, {
-    onFailure: () => emptyFunctionPaths,
-    onSuccess: (spec) => FunctionPaths.make(spec),
-  });
+  return yield* EvaluationSession.previous(specPath).pipe(
+    EvaluationSession.provide,
+    Effect.catchTags({
+      BundleFailedError: () => Effect.succeed(emptyFunctionPaths),
+      ImportFailedError: () => Effect.succeed(emptyFunctionPaths),
+    }),
+  );
 });
 
 /**
@@ -757,7 +801,7 @@ export const generateComponents = Effect.gen(function* () {
   );
 
   const installedComponents = (yield* fs.exists(convexConfigPath))
-    ? yield* ConvexConfig.discoverInstalledComponents(
+    ? yield* EvaluationSession.components(
         convexConfigPath,
         path.relative(projectRoot, convexConfigPath),
       )
@@ -778,7 +822,7 @@ export const generateComponents = Effect.gen(function* () {
   });
 
   yield* writeFileStringAndLog(componentsPath, contents);
-});
+}).pipe(EvaluationSession.provide);
 
 const logGenerated = (effect: typeof generateHttp) =>
   effect.pipe(

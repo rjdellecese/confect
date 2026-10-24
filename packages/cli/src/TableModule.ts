@@ -146,11 +146,7 @@ export const validate = Effect.fnUntraced(function* (
       Effect.mapError((error) => fromBundlerError(relativePath, error)),
     );
 
-    if (!Table.isUnnamedTable(module.default)) {
-      return yield* new InvalidTableDefaultExportError({
-        tablePath: relativePath,
-      });
-    }
+    yield* validateDefault(module.default, relativePath);
   });
 
   const relativePaths = tableModules.map(({ relativePath }) => relativePath);
@@ -161,3 +157,10 @@ export const validate = Effect.fnUntraced(function* (
     Effect.forEach(relativePaths, validateRelativePath, { concurrency: 4 }),
   );
 });
+
+export const validateDefault = (value: unknown, relativePath: string) =>
+  Table.isUnnamedTable(value)
+    ? Effect.void
+    : Effect.fail(
+        new InvalidTableDefaultExportError({ tablePath: relativePath }),
+      );
