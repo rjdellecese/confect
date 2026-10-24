@@ -5,6 +5,7 @@ import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { configDefaults, defineConfig } from "vitest/config";
+import { coverage } from "./vitest.coverage";
 
 const PackageManifest = Schema.fromJsonString(
   Schema.Struct({ name: Schema.String }),
@@ -64,16 +65,6 @@ export default defineConfig({
       enabled: true,
       include: ["test/**/*.test.ts"],
     },
-    coverage: {
-      enabled: true,
-      exclude: [
-        "tsdown.config.ts",
-        "vitest.config.ts",
-        "src/index.ts",
-        "coverage/**/*",
-        "dist/**/*",
-        "test/**/*",
-      ],
-    },
+    coverage,
   },
 });

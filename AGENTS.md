@@ -73,7 +73,7 @@ Build, lint, and format run through Vite+ (`vp`), which orders packages by their
 
 ## Testing
 
-Tests use Vitest with a root-level `vitest.config.ts` (which uses `projects: ["packages/*"]` to discover per-package test projects) and shared config in `vitest.shared.ts`. The core, foldkit, js, react, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
+Tests use Vitest with a root-level `vitest.config.ts` (which discovers `packages/*/vitest.config.ts` plus the oxlint-rules test config) and shared config in `vitest.shared.ts`. Coverage settings are shared with the root through `vitest.coverage.ts`; root runs keep coverage opt-in (`--coverage`), while package runs and CI test lanes collect it. Discover only explicit Vitest configs so packages without tests do not load their Vite+ build plugins into the test runner. The core, foldkit, js, react, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
 
 Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.shared.ts` aliases those to each package's `src/` so suites run against source rather than built `dist/`.
 
