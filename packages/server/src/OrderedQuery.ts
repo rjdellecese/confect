@@ -7,6 +7,7 @@ import type {
 } from "convex/server";
 import { identity, pipe } from "effect/Function";
 import type { Option } from "effect";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as Document from "./Document";
@@ -55,14 +56,24 @@ export const make = <Table_ extends Table.AnyWithProps>(
   const stream: OrderedQueryFunction<"stream"> = () =>
     pipe(streamEncoded, Stream.mapEffect(Document.decode(table)));
 
-  const first: OrderedQueryFunction<"first"> = () =>
-    pipe(stream(), Stream.take(1), Stream.runHead);
-
-  const take: OrderedQueryFunction<"take"> = (n: number) =>
-    pipe(stream(), Stream.take(n), Stream.runCollect);
-
   const collect: OrderedQueryFunction<"collect"> = () =>
     pipe(stream(), Stream.runCollect);
+
+  const take: OrderedQueryFunction<"take"> = (n: number) => {
+    // As in `Stream.take`: floored, 0 or less reads nothing, unbounded reads all.
+    const count = n > 0 ? Math.floor(n) : 0;
+    if (count === 0) return Effect.succeed([]);
+    if (!Number.isSafeInteger(count)) return collect();
+    return pipe(
+      Effect.promise(() => query.take(count)),
+      Effect.flatMap((encoded) =>
+        Effect.forEach(encoded, Document.decode(table)),
+      ),
+    );
+  };
+
+  const first: OrderedQueryFunction<"first"> = () =>
+    Effect.map(take(1), Array.head);
 
   const paginate: OrderedQueryFunction<"paginate"> = Effect.fn(
     "OrderedQuery.paginate",
