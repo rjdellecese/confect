@@ -1,14 +1,8 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Layer from "effect/Layer";
 import databaseSchema from "./_generated/schema";
-import {
-  echoAction,
-  echoMutation,
-  echoQuery,
-  read,
-  write,
-} from "./webSocketClient";
-import spec from "./webSocketClient.spec";
+import { echoAction, echoMutation, echoQuery, read, write } from "./clients";
+import spec from "./clients.spec";
 
 export default GroupImpl.make(databaseSchema, spec).pipe(
   Layer.provide(

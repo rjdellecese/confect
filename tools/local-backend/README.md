@@ -41,7 +41,8 @@ export default defineLocalBackendConfig({
 Tests import the scoped backend from `confect-local-backend/LocalBackend` and,
 when needed, generated function refs from `confect-local-backend/refs`.
 The backend layer provides a Convex HTTP client for accessing the deployment.
-The client suite uses its URL to construct the public WebSocket client layer.
+The client suites use its URL to construct the public HTTP and WebSocket client
+layers.
 
 ## Maintain the fixtures
 

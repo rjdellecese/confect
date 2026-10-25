@@ -26,28 +26,28 @@ const echoDefinition = {
   error: () => MissingValue,
 };
 const query = Ref.make(
-  "webSocketClient",
+  "clients",
   FunctionSpec.publicQuery({
     ...echoDefinition,
     name: "echoQuery",
   }),
 );
 const mutation = Ref.make(
-  "webSocketClient",
+  "clients",
   FunctionSpec.publicMutation({
     ...echoDefinition,
     name: "echoMutation",
   }),
 );
 const action = Ref.make(
-  "webSocketClient",
+  "clients",
   FunctionSpec.publicAction({
     ...echoDefinition,
     name: "echoAction",
   }),
 );
 const read = Ref.make(
-  "webSocketClient",
+  "clients",
   FunctionSpec.publicQuery({
     name: "read",
     args: () => ({ caseId: Schema.String }),
@@ -56,7 +56,7 @@ const read = Ref.make(
   }),
 );
 const write = Ref.make(
-  "webSocketClient",
+  "clients",
   FunctionSpec.publicMutation({
     name: "write",
     args: () => ({
@@ -164,7 +164,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
         expect(
           yield* client.query(
             Ref.make(
-              "webSocketClient",
+              "clients",
               FunctionSpec.publicQuery({ name: "echoQuery", returns }),
             ),
           ),
@@ -172,7 +172,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
         expect(
           yield* client.mutation(
             Ref.make(
-              "webSocketClient",
+              "clients",
               FunctionSpec.publicMutation({ name: "echoMutation", returns }),
             ),
           ),
@@ -180,7 +180,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
         expect(
           yield* client.action(
             Ref.make(
-              "webSocketClient",
+              "clients",
               FunctionSpec.publicAction({ name: "echoAction", returns }),
             ),
           ),
@@ -192,7 +192,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
       Effect.gen(function* () {
         const client = yield* WebSocketClient.WebSocketClient;
         const invalidArgs = Ref.make(
-          "webSocketClient",
+          "clients",
           FunctionSpec.publicQuery({
             name: "echoQuery",
             args: () => ({ value: Schema.String.check(Schema.isNonEmpty()) }),
@@ -205,7 +205,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
         assert(Result.isFailure(encoding));
         expect(encoding.failure).toBeInstanceOf(Schema.SchemaError);
         const invalidReturns = Ref.make(
-          "webSocketClient",
+          "clients",
           FunctionSpec.publicQuery({
             name: "echoQuery",
             args: () => ({ value: Schema.String }),
