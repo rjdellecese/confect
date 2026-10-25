@@ -374,6 +374,27 @@ describe("IsRecord", () => {
 
 describe("IsRecursive", () => {
   describe("recursive types", () => {
+    test("augmented primitive types", () => {
+      type Recursive = { next: Recursive };
+      expectTypeOf<
+        IsRecursive<string & { child: Recursive }>
+      >().toEqualTypeOf<true>();
+      expectTypeOf<
+        IsRecursive<number & { child: Recursive }>
+      >().toEqualTypeOf<true>();
+      expectTypeOf<
+        IsRecursive<boolean & { child: Recursive }>
+      >().toEqualTypeOf<true>();
+    });
+
+    test("readonly arrays and their additional properties", () => {
+      type Recursive = readonly Recursive[];
+      expectTypeOf<IsRecursive<Recursive>>().toEqualTypeOf<true>();
+      expectTypeOf<
+        IsRecursive<readonly string[] & { child: Recursive }>
+      >().toEqualTypeOf<true>();
+    });
+
     test("union", () => {
       type RecursiveUnion = number | { next: RecursiveUnion };
       expectTypeOf<IsRecursive<RecursiveUnion>>().toEqualTypeOf<true>();
@@ -382,10 +403,6 @@ describe("IsRecursive", () => {
     test("array union", () => {
       type RecursiveArrayUnion = number | RecursiveArrayUnion[];
       expectTypeOf<IsRecursive<RecursiveArrayUnion>>().toEqualTypeOf<true>();
-    });
-
-    test("nested arrays with any", () => {
-      expectTypeOf<IsRecursive<any[][]>>().toEqualTypeOf<true>();
     });
 
     test("map", () => {
@@ -452,6 +469,54 @@ describe("IsRecursive", () => {
   });
 
   describe("non-recursive types", () => {
+    test("shared sibling subtrees", () => {
+      type Child = { value: string };
+      expectTypeOf<
+        IsRecursive<{ left: Child; right: Child }>
+      >().toEqualTypeOf<false>();
+    });
+
+    test("branded values and bytes remain leaves", () => {
+      type Recursive = { next: Recursive };
+      expectTypeOf<
+        IsRecursive<{ child: Recursive } & Brand.Brand<"leaf">>
+      >().toEqualTypeOf<false>();
+      expectTypeOf<
+        IsRecursive<ArrayBuffer & { child: Recursive }>
+      >().toEqualTypeOf<false>();
+      expectTypeOf<
+        IsRecursive<GenericId<"users"> & { child: Recursive }>
+      >().toEqualTypeOf<false>();
+    });
+
+    test("mutable arrays only traverse their elements", () => {
+      type Recursive = { next: Recursive };
+      expectTypeOf<
+        IsRecursive<string[] & { child: Recursive }>
+      >().toEqualTypeOf<false>();
+    });
+
+    test("nested arrays with any", () => {
+      expectTypeOf<IsRecursive<any[][]>>().toEqualTypeOf<false>();
+    });
+
+    test("nested struct assignable to its parent", () => {
+      type Sidebar = {
+        badge: string;
+        rows?: Array<{ badge: string }>;
+      };
+      expectTypeOf<IsRecursive<Sidebar>>().toEqualTypeOf<false>();
+    });
+
+    test("nested struct assignable to its parent in both directions", () => {
+      type Filters = {
+        status?: string;
+        archived?: boolean;
+        saved?: Array<{ status?: string }>;
+      };
+      expectTypeOf<IsRecursive<Filters>>().toEqualTypeOf<false>();
+    });
+
     test("simple union", () => {
       type SimpleUnion = number | string;
       expectTypeOf<IsRecursive<SimpleUnion>>().toEqualTypeOf<false>();

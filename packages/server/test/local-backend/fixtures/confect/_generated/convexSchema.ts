@@ -1,3 +1,8 @@
 import { defineSchema as $defineSchema } from "convex/server";
+import { Table as $Table } from "@confect/server";
 
-export default $defineSchema({});
+import transactionNotes from "./tables/transactionNotes";
+
+export default $defineSchema({
+  transactionNotes: $Table.tableDefinition(transactionNotes),
+});

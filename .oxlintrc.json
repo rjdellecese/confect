@@ -42,6 +42,7 @@
     "**/.mintlify/**"
   ],
   "rules": {
+    "confect/require-query-stream-experimental": "error",
     "jsdoc-style/check-alignment": "error",
     "jsdoc-style/check-line-alignment": [
       "error",
@@ -80,6 +81,18 @@
     "effecttsgo/strict-effect-provide": "off"
   },
   "overrides": [
+    {
+      "files": [
+        "packages/cli/src/EvaluationSession.ts",
+        "packages/cli/test/Evaluation.test.ts",
+        "packages/cli/src/DevSupervisor.ts",
+        "packages/cli/test/DevSupervisor.test.ts",
+        "packages/cli/test/integration/DevSupervisor.test.ts"
+      ],
+      "rules": {
+        "effecttsgo/node-builtin-import": "off"
+      }
+    },
     {
       "files": ["**/*.{ts,tsx,mts,cts}"],
       "rules": {
@@ -152,7 +165,8 @@
     {
       "files": ["**/*.test.{ts,tsx,mts,cts}"],
       "rules": {
-        "confect/prefer-effect-vitest": "error"
+        "confect/prefer-effect-vitest": "error",
+        "confect/prefer-test-each": "error"
       }
     }
   ]

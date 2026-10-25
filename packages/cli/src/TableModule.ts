@@ -38,7 +38,7 @@ const tableNameFromRelativePath = Effect.fnUntraced(function* (
   return name;
 });
 
-const listTableFiles = Effect.gen(function* () {
+export const discoverTableFiles = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
@@ -85,7 +85,7 @@ const byTableName = Order.mapInput(
  * `tables/b/notes.ts` would collide).
  */
 export const discover = Effect.gen(function* () {
-  const relativePaths = yield* listTableFiles;
+  const relativePaths = yield* discoverTableFiles;
 
   const tableModules = yield* Effect.forEach(
     relativePaths,
@@ -146,16 +146,21 @@ export const validate = Effect.fnUntraced(function* (
       Effect.mapError((error) => fromBundlerError(relativePath, error)),
     );
 
-    if (!Table.isUnnamedTable(module.default)) {
-      return yield* new InvalidTableDefaultExportError({
-        tablePath: relativePath,
-      });
-    }
+    yield* validateDefault(module.default, relativePath);
   });
 
-  yield* Effect.forEach(
-    tableModules,
-    ({ relativePath }: TableModule) => validateRelativePath(relativePath),
-    { concurrency: "unbounded" },
+  const relativePaths = tableModules.map(({ relativePath }) => relativePath);
+  yield* Bundler.withBatch(
+    relativePaths.map((relativePath) =>
+      path.resolve(confectDirectory, relativePath),
+    ),
+    Effect.forEach(relativePaths, validateRelativePath, { concurrency: 4 }),
   );
 });
+
+export const validateDefault = (value: unknown, relativePath: string) =>
+  Table.isUnnamedTable(value)
+    ? Effect.void
+    : Effect.fail(
+        new InvalidTableDefaultExportError({ tablePath: relativePath }),
+      );

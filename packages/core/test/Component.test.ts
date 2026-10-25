@@ -23,34 +23,39 @@ import { vi } from "vitest";
 const scope = IdScope.component("@example/counter");
 const ItemId = GenericId.GenericId("items", scope);
 const ChildId = GenericId.GenericId("items", IdScope.instance(scope, "child"));
-const spec = Spec.make().add(
-  GroupSpec.makeAt("items")
-    .addFunction(
-      FunctionSpec.publicMutation({
-        name: "create",
-        args: () => ({ count: Schema.FiniteFromString }),
-        returns: () =>
-          Schema.Struct({
-            id: ItemId,
-            child: ChildId,
-            count: Schema.FiniteFromString,
+const spec = {
+  [Spec.TypeId]: {
+    items: GroupSpec.withName(
+      "items",
+      GroupSpec.make()
+        .addFunction(
+          FunctionSpec.publicMutation({
+            name: "create",
+            args: () => ({ count: Schema.FiniteFromString }),
+            returns: () =>
+              Schema.Struct({
+                id: ItemId,
+                child: ChildId,
+                count: Schema.FiniteFromString,
+              }),
           }),
-      }),
-    )
-    .addFunction(
-      FunctionSpec.publicQuery({
-        name: "get",
-        args: () => ({ id: ItemId }),
-        returns: () => Schema.String,
-      }),
-    )
-    .addFunction(
-      FunctionSpec.internalQuery({
-        name: "secret",
-        returns: () => Schema.String,
-      }),
+        )
+        .addFunction(
+          FunctionSpec.publicQuery({
+            name: "get",
+            args: () => ({ id: ItemId }),
+            returns: () => Schema.String,
+          }),
+        )
+        .addFunction(
+          FunctionSpec.internalQuery({
+            name: "secret",
+            returns: () => Schema.String,
+          }),
+        ),
     ),
-);
+  },
+};
 const contract = Component.make(spec, scope, ["items"]);
 const native = componentsGeneric() as unknown as {
   first: Component.Api<typeof spec, "first">;
@@ -67,15 +72,20 @@ describe("published component contracts", () => {
       Schema.Struct({ id: GenericId.GenericId("items", scope) }),
     );
     const unused = vi.fn(() => Schema.String);
-    const lazySpec = Spec.make().add(
-      GroupSpec.makeAt("items")
-        .addFunction(
-          FunctionSpec.publicQuery({ name: "get", args, returns, error }),
-        )
-        .addFunction(
-          FunctionSpec.publicQuery({ name: "unused", returns: unused }),
+    const lazySpec = {
+      [Spec.TypeId]: {
+        items: GroupSpec.withName(
+          "items",
+          GroupSpec.make()
+            .addFunction(
+              FunctionSpec.publicQuery({ name: "get", args, returns, error }),
+            )
+            .addFunction(
+              FunctionSpec.publicQuery({ name: "unused", returns: unused }),
+            ),
         ),
-    );
+      },
+    };
     const lazyContract = Component.make(lazySpec, scope, ["items"]);
     const registry = componentsGeneric() as unknown as {
       first: Component.Api<typeof lazySpec, "first">;
@@ -114,11 +124,16 @@ describe("published component contracts", () => {
   it("keeps paginated schemas lazy when binding and inspecting the kind", () => {
     const args = vi.fn(() => ({ id: GenericId.GenericId("items", scope) }));
     const item = vi.fn(() => GenericId.GenericId("items", scope));
-    const paginatedSpec = Spec.make().add(
-      GroupSpec.makeAt("items").addFunction(
-        FunctionSpec.publicPaginatedQuery({ name: "list", args, item }),
-      ),
-    );
+    const paginatedSpec = {
+      [Spec.TypeId]: {
+        items: GroupSpec.withName(
+          "items",
+          GroupSpec.make().addFunction(
+            FunctionSpec.publicPaginatedQuery({ name: "list", args, item }),
+          ),
+        ),
+      },
+    };
     const registry = componentsGeneric() as unknown as {
       first: Component.Api<typeof paginatedSpec, "first">;
     };
@@ -155,16 +170,21 @@ describe("published component contracts", () => {
     }) {}
     const groupOptions = { role: "group" };
     const functionOptions = { role: "function" };
-    const middlewareSpec = Spec.make().add(
-      GroupSpec.makeAt("items")
-        .middleware(Gate, groupOptions)
-        .addFunction(
-          FunctionSpec.publicQuery({
-            name: "get",
-            returns: () => Schema.String,
-          }).middleware(Gate, functionOptions),
+    const middlewareSpec = {
+      [Spec.TypeId]: {
+        items: GroupSpec.withName(
+          "items",
+          GroupSpec.make()
+            .middleware(Gate, groupOptions)
+            .addFunction(
+              FunctionSpec.publicQuery({
+                name: "get",
+                returns: () => Schema.String,
+              }).middleware(Gate, functionOptions),
+            ),
         ),
-    );
+      },
+    };
     const registry = componentsGeneric() as unknown as {
       first: Component.Api<typeof middlewareSpec, "first">;
       second: Component.Api<typeof middlewareSpec, "second">;
@@ -209,13 +229,22 @@ describe("published component contracts", () => {
     expect(error).toHaveBeenCalledTimes(1);
   });
   it("keeps plain Convex exports on their wire types", () => {
-    const mixedSpec = Spec.make().add(
-      GroupSpec.makeAt("native").addFunction(
-        FunctionSpec.convexPublicQuery<
-          RegisteredQuery<"public", {}, Promise<GenericId.GenericId<"items">>>
-        >()("id"),
-      ),
-    );
+    const mixedSpec = {
+      [Spec.TypeId]: {
+        native: GroupSpec.withName(
+          "native",
+          GroupSpec.make().addFunction(
+            FunctionSpec.convexPublicQuery<
+              RegisteredQuery<
+                "public",
+                {},
+                Promise<GenericId.GenericId<"items">>
+              >
+            >()("id"),
+          ),
+        ),
+      },
+    };
     const mixedContract = Component.make(mixedSpec, scope, ["items"]);
     const registry = componentsGeneric() as unknown as {
       mixed: Component.Api<typeof mixedSpec, "mixed">;
@@ -272,22 +301,27 @@ describe("published component contracts", () => {
   });
 
   it("passes IDs from decoded collections to functions in the same installation", () => {
-    const collectionSpec = Spec.make().add(
-      GroupSpec.makeAt("items")
-        .addFunction(
-          FunctionSpec.publicQuery({
-            name: "list",
-            returns: () => Schema.toCodecJson(Schema.ReadonlySet(ItemId)),
-          }),
-        )
-        .addFunction(
-          FunctionSpec.publicQuery({
-            name: "get",
-            args: () => ({ id: ItemId }),
-            returns: () => Schema.String,
-          }),
+    const collectionSpec = {
+      [Spec.TypeId]: {
+        items: GroupSpec.withName(
+          "items",
+          GroupSpec.make()
+            .addFunction(
+              FunctionSpec.publicQuery({
+                name: "list",
+                returns: () => Schema.toCodecJson(Schema.ReadonlySet(ItemId)),
+              }),
+            )
+            .addFunction(
+              FunctionSpec.publicQuery({
+                name: "get",
+                args: () => ({ id: ItemId }),
+                returns: () => Schema.String,
+              }),
+            ),
         ),
-    );
+      },
+    };
     const collectionContract = Component.make(collectionSpec, scope, ["items"]);
     const registry = componentsGeneric() as unknown as {
       first: Component.Api<typeof collectionSpec, "first">;
@@ -325,26 +359,39 @@ describe("published component contracts", () => {
   });
 
   it("omits empty and internal-only groups while keeping nested public exports", () => {
-    const nestedSpec = Spec.make().add(
-      GroupSpec.makeAt("nested")
-        .addGroup(GroupSpec.makeAt("empty"))
-        .addGroup(
-          GroupSpec.makeAt("privateOnly").addFunction(
-            FunctionSpec.internalQuery({
-              name: "secret",
-              returns: () => Schema.String,
-            }),
-          ),
-        )
-        .addGroup(
-          GroupSpec.makeAt("publicOnly").addFunction(
-            FunctionSpec.publicQuery({
-              name: "get",
-              returns: () => Schema.FiniteFromString,
-            }),
-          ),
-        ),
+    const publicOnly = GroupSpec.withName(
+      "publicOnly",
+      GroupSpec.make().addFunction(
+        FunctionSpec.publicQuery({
+          name: "get",
+          returns: () => Schema.FiniteFromString,
+        }),
+      ),
     );
+    const privateOnly = GroupSpec.withName(
+      "privateOnly",
+      GroupSpec.make().addFunction(
+        FunctionSpec.internalQuery({
+          name: "secret",
+          returns: () => Schema.String,
+        }),
+      ),
+    );
+    const empty = GroupSpec.withName("empty", GroupSpec.make());
+    const nestedSpec = Spec.fromGroups({
+      nested: GroupSpec.addGroupsAt(GroupSpec.make(), {
+        empty,
+        privateOnly,
+        publicOnly,
+      }),
+    }) as Spec.Spec<{
+      nested: GroupSpec.GroupSpec<
+        "Convex",
+        "nested",
+        never,
+        typeof empty | typeof privateOnly | typeof publicOnly
+      >;
+    }>;
     const registry = componentsGeneric() as unknown as {
       nested: Component.Api<typeof nestedSpec, "nested">;
     };
@@ -357,16 +404,17 @@ describe("published component contracts", () => {
   });
 
   it("rejects group/function name collisions even for internal functions", () => {
-    const conflicting = Spec.make().add(
-      GroupSpec.makeAt("nested")
-        .addGroup(GroupSpec.makeAt("conflict"))
-        .addFunction(
+    const conflicting = Spec.fromGroups({
+      nested: GroupSpec.addGroupsAt(
+        GroupSpec.make().addFunction(
           FunctionSpec.internalQuery({
             name: "conflict",
             returns: () => Schema.String,
           }),
         ),
-    );
+        { conflict: GroupSpec.make() },
+      ),
+    });
     expect(() => Component.make(conflicting, scope, [])).toThrow(
       "Group and function at same level have same name ('nested:conflict')",
     );
@@ -377,11 +425,19 @@ describe("published component contracts", () => {
     const nested = Component.bind(contract, native.first, { parentScope });
     const nestedId = Component.id(nested, "items");
     const parent = Component.make(
-      Spec.make().add(
-        GroupSpec.makeAt("parent").addFunction(
-          FunctionSpec.publicQuery({ name: "child", returns: () => nestedId }),
-        ),
-      ),
+      {
+        [Spec.TypeId]: {
+          parent: GroupSpec.withName(
+            "parent",
+            GroupSpec.make().addFunction(
+              FunctionSpec.publicQuery({
+                name: "child",
+                returns: () => nestedId,
+              }),
+            ),
+          ),
+        },
+      },
       parentScope,
       [],
     );

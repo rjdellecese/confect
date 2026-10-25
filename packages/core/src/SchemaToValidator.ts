@@ -13,7 +13,6 @@ import type {
   VLiteral,
   VNull,
   VObject,
-  VOptional,
   VRecord,
   VString,
   VUnion,
@@ -135,121 +134,133 @@ export type ValueToValidator<Vl> = [Vl] extends [never]
   ? never
   : IsAny<Vl> extends true
     ? VAny
+    : [Vl] extends [string | number | bigint | boolean | null | ArrayBuffer]
+      ? ConvertValueToValidator<Vl>
+      : IsRecursive<Vl> extends true
+        ? VAny
+        : [Vl] extends [ReadonlyValue]
+          ? ConvertValueToValidator<Vl>
+          : TypeError<"Provided value is not a valid Convex value", Vl>;
+
+type OptionalValue<Vl, Optionality> = Optionality extends "optional"
+  ? Vl | undefined
+  : Vl;
+
+type ConvertValueToValidator<
+  Vl,
+  Optionality extends "required" | "optional" = "required",
+> = [Vl] extends [never]
+  ? never
+  : IsAny<Vl> extends true
+    ? VAny<any, Optionality>
     : [Vl] extends [null]
-      ? VNull
+      ? VNull<OptionalValue<null, Optionality>, Optionality>
       : [Vl] extends [boolean]
         ? [boolean] extends [Vl]
-          ? VBoolean
-          : VLiteral<Vl>
+          ? VBoolean<OptionalValue<boolean, Optionality>, Optionality>
+          : VLiteral<OptionalValue<Vl, Optionality>, Optionality>
         : IsUnion<Vl> extends true
-          ? IsRecursive<Vl> extends true
-            ? VAny
-            : [Vl] extends [ReadonlyValue]
-              ? UnionValueToValidator<Vl>
-              : TypeError<"Provided value is not a valid Convex value", Vl>
+          ? UnionValueToValidator<Vl, Optionality>
           : [Vl] extends [number]
             ? [number] extends [Vl]
-              ? VFloat64
-              : VLiteral<Vl>
+              ? VFloat64<OptionalValue<number, Optionality>, Optionality>
+              : VLiteral<OptionalValue<Vl, Optionality>, Optionality>
             : [Vl] extends [bigint]
               ? [bigint] extends [Vl]
-                ? VInt64
-                : VLiteral<Vl>
+                ? VInt64<OptionalValue<bigint, Optionality>, Optionality>
+                : VLiteral<OptionalValue<Vl, Optionality>, Optionality>
               : [Vl] extends [string]
-                ? Vl extends ConvexGenericId<string>
-                  ? VId<Vl>
-                  : [string] extends [Vl]
-                    ? VString
-                    : VLiteral<Vl>
+                ? StringValueToValidator<Vl, Optionality>
                 : [Vl] extends [ArrayBuffer]
-                  ? VBytes
+                  ? VBytes<OptionalValue<ArrayBuffer, Optionality>, Optionality>
                   : IsRecursive<Vl> extends true
-                    ? VAny
-                    : [Vl] extends [ReadonlyValue]
-                      ? Vl extends ReadonlyArray<ReadonlyValue>
-                        ? ArrayValueToValidator<Vl>
-                        : Vl extends ReadonlyRecordValue
-                          ? RecordValueToValidator<Vl>
-                          : TypeError<"Unexpected value", Vl>
-                      : TypeError<
-                          "Provided value is not a valid Convex value",
-                          Vl
-                        >;
+                    ? VAny<any, Optionality>
+                    : Vl extends ReadonlyArray<infer El>
+                      ? VArray<
+                          OptionalValue<MutableValue<El[]>, Optionality>,
+                          ConvertValueToValidator<El>,
+                          Optionality
+                        >
+                      : Vl extends object
+                        ? ObjectValueToValidator<Vl, Optionality>
+                        : never;
 
-type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
-  Vl extends ReadonlyArray<infer El extends ReadonlyValue>
-    ? ValueToValidator<El> extends infer Vd extends Validator<any, any, any>
-      ? VArray<MutableValue<El[]>, Vd>
-      : never
-    : never;
+type StringValueToValidator<Vl, Optionality extends "required" | "optional"> =
+  Vl extends ConvexGenericId<string>
+    ? VId<OptionalValue<Vl, Optionality>, Optionality>
+    : [string] extends [Vl]
+      ? VString<OptionalValue<string, Optionality>, Optionality>
+      : VLiteral<OptionalValue<Vl, Optionality>, Optionality>;
 
-type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
-  ? {
-      -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
-        ? IsOptional<Vl, K> extends true
-          ? VOptional<VAny>
-          : VAny
-        : UndefinedOrValueToValidator<Vl[K]>;
-    } extends infer VdRecord extends Record<string, any>
-    ? MutableValue<Vl> extends infer VlRecord extends Record<string, any>
-      ? IsRecord<VlRecord> extends true
-        ? VRecord<VlRecord, VString, VdRecord[keyof VdRecord]>
-        : VObject<VlRecord, VdRecord>
+type ObjectValueToValidator<Vl, Optionality extends "required" | "optional"> =
+  IsRecord<MutableValue<Vl>> extends true
+    ? ValueToValidator<Vl[keyof Vl]> extends infer VdValue extends Validator<
+        any,
+        "required",
+        any
+      >
+      ? VRecord<
+          OptionalValue<MutableValue<Vl>, Optionality>,
+          VString,
+          VdValue,
+          Optionality
+        >
       : never
-    : never
-  : never;
+    : ObjectFieldsToValidators<Vl> extends infer VdFields extends Record<
+          string,
+          any
+        >
+      ? VObject<
+          OptionalValue<MutableValue<Vl>, Optionality>,
+          VdFields,
+          Optionality
+        >
+      : never;
+
+type ObjectFieldsToValidators<Vl> = {
+  -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
+    ? IsOptional<Vl, K> extends true
+      ? VAny<any, "optional">
+      : VAny
+    : undefined extends Vl[K]
+      ? OptionalValueToValidator<Vl[K]>
+      : [Vl[K]] extends [ReadonlyValue]
+        ? ConvertValueToValidator<Vl[K]>
+        : never;
+};
 
 export type UndefinedOrValueToValidator<Vl extends ReadonlyValue | undefined> =
   undefined extends Vl
-    ? [Vl] extends [(infer Val extends ReadonlyValue) | undefined]
-      ? ValueToValidator<Val> extends infer Vd extends Validator<
-          any,
-          "required",
-          any
-        >
-        ? VOptional<Vd>
-        : never
-      : never
+    ? OptionalValueToValidator<Vl>
     : [Vl] extends [ReadonlyValue]
       ? ValueToValidator<Vl>
       : never;
 
-type UnionValueToValidator<Vl extends ReadonlyValue> = [Vl] extends [
-  ReadonlyValue,
-]
-  ? IsUnion<Vl> extends true
-    ? UnionToTuple<Vl> extends infer VlTuple extends
-        ReadonlyArray<ReadonlyValue>
-      ? ValueTupleToValidatorTuple<VlTuple> extends infer VdTuple extends
-          Validator<any, "required", any>[]
-        ? VUnion<MutableValue<Vl>, VdTuple>
-        : TypeError<"Failed to convert value tuple to validator tuple">
-      : TypeError<"Failed to convert union to tuple">
-    : TypeError<"Expected a union of values, but got a single value instead">
-  : TypeError<"Provided value is not a valid Convex value">;
+type UnionValueToValidator<Vl, Optionality extends "required" | "optional"> =
+  IsRecursive<Vl> extends true
+    ? VAny<any, Optionality>
+    : VUnion<
+        OptionalValue<MutableValue<Vl>, Optionality>,
+        ValueTupleToValidatorTuple<UnionToTuple<Vl>>,
+        Optionality
+      >;
 
-type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
-  VlTuple extends
-    | [true, false, ...infer VlRest extends ReadonlyArray<ReadonlyValue>]
-    | [false, true, ...infer VlRest extends ReadonlyArray<ReadonlyValue>]
-    ? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends Validator<
-        any,
-        any,
-        any
-      >[]
-      ? [VBoolean<boolean>, ...VdRest]
-      : never
-    : VlTuple extends [
-          infer Vl extends ReadonlyValue,
-          ...infer VlRest extends ReadonlyArray<ReadonlyValue>,
-        ]
-      ? ValueToValidator<Vl> extends infer Vd extends Validator<any, any, any>
-        ? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends
-            Validator<any, "required", any>[]
-          ? [Vd, ...VdRest]
-          : never
-        : never
-      : [];
+type ValueTupleToValidatorTuple<
+  VlTuple extends readonly unknown[],
+  Acc extends Validator<any, "required", any>[] = [],
+> = VlTuple extends
+  | [true, false, ...infer VlRest]
+  | [false, true, ...infer VlRest]
+  ? ValueTupleToValidatorTuple<VlRest, [...Acc, VBoolean]>
+  : VlTuple extends [infer Vl, ...infer VlRest]
+    ? ValueTupleToValidatorTuple<VlRest, [...Acc, ConvertValueToValidator<Vl>]>
+    : Acc;
+
+type OptionalValueToValidator<Vl> = [Vl] extends [
+  (infer Val extends ReadonlyValue) | undefined,
+]
+  ? ConvertValueToValidator<Val, "optional">
+  : never;
 
 export const compileSchema = <T, E>(
   schema: Schema.Codec<T, E>,

@@ -7,7 +7,7 @@ import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import { m } from "foldkit/message";
+import { defineMessageUnion } from "foldkit/message";
 import * as FoldkitSubscription from "foldkit/subscription";
 import * as Client from "@confect/foldkit/Client";
 import * as PaginatedQuery from "@confect/foldkit/PaginatedQuery";
@@ -42,9 +42,12 @@ interface Model {
   readonly noteId: Option.Option<string>;
 }
 
-const SucceededGetNote = m("SucceededGetNote", { note: Schema.Unknown });
-const FailedGetNote = m("FailedGetNote", { error: Schema.Unknown });
-type Message = typeof SucceededGetNote.Type | typeof FailedGetNote.Type;
+const Message = defineMessageUnion({
+  SucceededGetNote: { note: Schema.Unknown },
+  FailedGetNote: { error: Schema.Unknown },
+});
+const { SucceededGetNote, FailedGetNote } = Message;
+type Message = typeof Message.Type;
 
 const noteHandlers = {
   onSuccess: (note: unknown) => SucceededGetNote({ note }),
@@ -234,9 +237,10 @@ interface PaginatedModel {
   readonly notes: PaginatedState;
 }
 
-const SettledGetNotesPage = m("SettledGetNotesPage", {
-  settlement: Notes.settlement,
+const PaginatedMessage = defineMessageUnion({
+  SettledGetNotesPage: { settlement: Notes.settlement },
 });
+const { SettledGetNotesPage } = PaginatedMessage;
 
 const makePaginatedEntry = () =>
   Subscription.paginatedQuery<PaginatedModel>()(Notes, {

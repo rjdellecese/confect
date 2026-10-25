@@ -2,6 +2,7 @@ import type * as IdScope from "@confect/core/IdScope";
 import { Ref } from "@confect/core";
 import type { GenericId } from "@confect/core/GenericId";
 import type { Scheduler as ConvexScheduler } from "convex/server";
+import type { GenericId as ConvexGenericId } from "convex/values";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -9,6 +10,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 const make = (scheduler: ConvexScheduler) => ({
+  cancel: (id: ConvexGenericId<"_scheduled_functions">) =>
+    Effect.promise(() => scheduler.cancel(id)),
   runAfter: <Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
     delay: Duration.Duration,
     ref: Ref_,
@@ -49,6 +52,7 @@ export const Scheduler = Context.Service<ReturnType<typeof make>>(
 export type Scheduler = typeof Scheduler.Identifier;
 
 export interface Service<Scope extends IdScope.IdScope = IdScope.App> {
+  cancel(id: GenericId<"_scheduled_functions", Scope>): Effect.Effect<void>;
   runAfter<Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
     delay: Duration.Duration,
     ref: Ref_,

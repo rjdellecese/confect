@@ -1,4 +1,7 @@
-import { assert, expect, it } from "@effect/vitest";
+import { assert, expect, expectTypeOf, it } from "@effect/vitest";
+import type { GenericId } from "@confect/core/GenericId";
+import type { scope } from "./fixtures/authored-component/confect/_generated/id";
+import { Id } from "./fixtures/authored-component/confect/_generated/id";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -10,7 +13,32 @@ import { codegenHandler } from "@confect/cli/confect/codegen";
 import * as DirectoryOptions from "@confect/cli/DirectoryOptions";
 
 const fixture = `${import.meta.dirname}/fixtures/authored-component`;
+
+it("keeps generated component ID types consistent with their schemas", () => {
+  expectTypeOf<Id<"counters">>().toEqualTypeOf<
+    GenericId<"counters", typeof scope>
+  >();
+  expectTypeOf(Id("counters").Type).toEqualTypeOf<Id<"counters">>();
+  expectTypeOf(Id("_storage").Type).toEqualTypeOf<Id<"_storage">>();
+});
 const stringLiteral = Schema.encodeSync(Schema.fromJsonString(Schema.String));
+const generatedModificationTimes = Effect.fnUntraced(function* (
+  directory: string,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const generated = `${directory}/confect/_generated`;
+  const files = yield* fs.readDirectory(generated, { recursive: true });
+  return yield* Effect.forEach(files.sort(), (file) =>
+    fs
+      .stat(`${generated}/${file}`)
+      .pipe(
+        Effect.map((stat) => [
+          file,
+          Option.map(stat.mtime, (time) => time.getTime()),
+        ]),
+      ),
+  );
+});
 const freshFixture = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -34,8 +62,7 @@ it.effect(
       const dirs = DirectoryOptions.layer({
         componentDir: Option.some(`${directory}/convex`),
       });
-      const first = yield* codegenHandler.pipe(Effect.provide(dirs));
-      expect(first.anyWritesHappened).toBe(true);
+      yield* codegenHandler.pipe(Effect.provide(dirs));
       const id = yield* fs.readFileString(
         `${directory}/confect/_generated/id.ts`,
       );
@@ -47,15 +74,16 @@ it.effect(
       );
       expect(services).not.toContain("Auth");
       expect(services).toContain("Scheduler_.forScope<typeof scope>()");
+      expect(services).toContain("Storage_.Storage.forScope<typeof scope>()");
       expect(services).toContain("MutationCtx_.MutationCtx<");
       const contract = yield* fs.readFileString(
         `${directory}/confect/_generated/component.ts`,
       );
       expect(contract).toContain("Component.make(spec, scope,");
       expect(contract).not.toContain("impl");
-      expect(
-        (yield* codegenHandler.pipe(Effect.provide(dirs))).anyWritesHappened,
-      ).toBe(false);
+      const before = yield* generatedModificationTimes(directory);
+      yield* codegenHandler.pipe(Effect.provide(dirs));
+      expect(yield* generatedModificationTimes(directory)).toEqual(before);
     }).pipe(Effect.provide(NodeServices.layer)),
 );
 
@@ -83,9 +111,9 @@ export default Table.make(() => Schema.Struct({ name: Schema.String }));
       expect(schema).toContain('import { target as $target } from "./id";');
       expect(schema).toContain("typeof $target");
       expect(schema).toContain("}, $target)");
-      expect(
-        (yield* codegenHandler.pipe(Effect.provide(dirs))).anyWritesHappened,
-      ).toBe(false);
+      const before = yield* generatedModificationTimes(directory);
+      yield* codegenHandler.pipe(Effect.provide(dirs));
+      expect(yield* generatedModificationTimes(directory)).toEqual(before);
     }).pipe(Effect.provide(NodeServices.layer)),
 );
 
@@ -124,9 +152,9 @@ export default Table.make(() => Schema.Struct({ id: Component.id(child, "counter
           `${directory}/confect/_generated/components.ts`,
         ),
       ).toContain('ComponentApi<"child">');
-      expect(
-        (yield* codegenHandler.pipe(Effect.provide(dirs))).anyWritesHappened,
-      ).toBe(false);
+      const before = yield* generatedModificationTimes(directory);
+      yield* codegenHandler.pipe(Effect.provide(dirs));
+      expect(yield* generatedModificationTimes(directory)).toEqual(before);
     }).pipe(Effect.provide(NodeServices.layer)),
 );
 

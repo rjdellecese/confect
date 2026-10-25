@@ -1,7 +1,6 @@
 import { identity } from "effect/Function";
 import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
-import type * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
 import { FunctionSpec, Ref, Table } from "@confect/core";
 import * as ActionRunner from "@confect/server/ActionRunner";
@@ -99,7 +98,10 @@ describe("server operation tracing", () => {
           Stream.suspend(() => {
             reads++;
             return Stream.make(
-              new QueryStream.Element({ doc: Option.some(7), key: ["note"] }),
+              new QueryStream.Element({
+                doc: Option.some(7),
+                keyValues: ["note"],
+              }),
             );
           }),
         ).pipe(QueryStream.map((value) => value + 1));
@@ -118,7 +120,7 @@ describe("server operation tracing", () => {
         expectTypeOf(paginate).toEqualTypeOf<
           Effect.Effect<
             QueryStream.PaginationResult<number>,
-            QueryStreamReadBudget.ReadBudgetExceededError
+            QueryStream.ReadBudgetExceededError
           >
         >();
         expectTypeOf(curried).toEqualTypeOf<typeof paginate>();
@@ -176,8 +178,8 @@ describe("server operation tracing", () => {
           "asc",
           Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
           Stream.make(
-            new QueryStream.Element({ doc: Option.some(1), key: [1] }),
-            new QueryStream.Element({ doc: Option.some(2), key: [2] }),
+            new QueryStream.Element({ doc: Option.some(1), keyValues: [1] }),
+            new QueryStream.Element({ doc: Option.some(2), keyValues: [2] }),
           ),
         );
         const error = yield* QueryStream.unique(source).pipe(
@@ -239,9 +241,9 @@ describe("server operation tracing", () => {
           .mockResolvedValue("7");
 
         yield* Effect.gen(function* () {
-          const runQuery = yield* QueryRunner.QueryRunner;
-          const runMutation = yield* MutationRunner.MutationRunner;
-          const runAction = yield* ActionRunner.ActionRunner;
+          const { runQuery } = yield* QueryRunner.QueryRunner;
+          const { runMutation } = yield* MutationRunner.MutationRunner;
+          const { runAction } = yield* ActionRunner.ActionRunner;
           const query = runQuery(queryRef, { value: 2 });
           const mutation = runMutation(mutationRef, { value: 3 });
           const action = runAction(actionRef, { value: 4 });
@@ -288,10 +290,10 @@ describe("server operation tracing", () => {
         ]);
         expect(recorder.spans.map((span) => span.name)).toEqual([
           "caller",
-          "QueryRunner.run",
-          "MutationRunner.run",
-          "ActionRunner.run",
-          "QueryRunner.run",
+          "QueryRunner.runQuery",
+          "MutationRunner.runMutation",
+          "ActionRunner.runAction",
+          "QueryRunner.runQuery",
         ]);
         for (const span of recorder.spans.slice(1)) {
           expect(Option.getOrThrow(span.parent)).toBe(recorder.spans[0]);
@@ -312,7 +314,7 @@ describe("server operation tracing", () => {
             new ConvexError({ _tag: "OperationFailure", reason: "rejected" }),
           );
         const error = yield* Effect.gen(function* () {
-          const runQuery = yield* QueryRunner.QueryRunner;
+          const { runQuery } = yield* QueryRunner.QueryRunner;
           return yield* Effect.flip(runQuery(queryRef, { value: 2 }));
         }).pipe(
           Effect.provide(
@@ -327,7 +329,7 @@ describe("server operation tracing", () => {
         expect(error.reason).toBe("rejected");
         expect(recorder.spans).toHaveLength(1);
         const span = recorder.spans[0]!;
-        expect(span.name).toBe("QueryRunner.run");
+        expect(span.name).toBe("QueryRunner.runQuery");
         assert(span.status._tag === "Ended");
         assert.isTrue(Exit.isFailure(span.status.exit));
       }),
@@ -429,7 +431,7 @@ describe("server operation tracing", () => {
           ConvexDataModel["notes"]
         >;
         filter.mockReturnValue(query);
-        const operation = OrderedQuery.make(query, "notes", notes.Fields);
+        const operation = OrderedQuery.make(query, notes);
         const predicate: Parameters<typeof operation.paginate>[1] = (q) =>
           q.eq(q.field("value"), "7");
         const options = { numItems: 1, cursor: null };

@@ -3,7 +3,6 @@ import {
   FunctionImpl,
   GroupImpl,
   MiddlewareImpl,
-  RegisteredConvexFunction,
   RegisteredFunctions,
 } from "@confect/server";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -38,6 +37,11 @@ describe("Registered functions", () => {
 });
 
 describe("buildForGroup", () => {
+  it("accepts only the schema and finalized group layer", () => {
+    expectTypeOf<
+      Parameters<typeof RegisteredFunctions.buildForGroup>["length"]
+    >().toEqualTypeOf<2>();
+  });
   it("rejects an implementation registered for a different same-key spec", () => {
     class Policy extends MiddlewareSpec.MiddlewareSpec<Policy>()("Policy", {
       options: () => Schema.Struct({ label: Schema.String }),
@@ -81,11 +85,7 @@ describe("buildForGroup", () => {
         GroupImpl.finalize,
       );
       expect(() =>
-        RegisteredFunctions.buildForGroup<typeof group>(
-          databaseSchema,
-          layer,
-          RegisteredConvexFunction.make,
-        ),
+        RegisteredFunctions.buildForGroup<typeof group>(databaseSchema, layer),
       ).toThrowError(/Middleware "Policy".*function "get".*different spec/);
     }
   });
@@ -118,11 +118,7 @@ describe("buildForGroup", () => {
       GroupImpl.finalize,
     );
     expect(() =>
-      RegisteredFunctions.buildForGroup<typeof group>(
-        databaseSchema,
-        layer,
-        RegisteredConvexFunction.make,
-      ),
+      RegisteredFunctions.buildForGroup<typeof group>(databaseSchema, layer),
     ).toThrowError(/GroupPolicy.*equivalent options.*function "get"/);
   });
 
@@ -130,7 +126,6 @@ describe("buildForGroup", () => {
     const registered = RegisteredFunctions.buildForGroup<typeof notesSpec>(
       databaseSchema,
       notes,
-      RegisteredConvexFunction.make,
     );
 
     expect(registered.list).toBeDefined();

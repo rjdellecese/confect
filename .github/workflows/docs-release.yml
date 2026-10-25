@@ -1,23 +1,12 @@
 name: Docs Release
 
-# Updates one version in the generated `release` branch that Mintlify deploys
-# from. Package releases do this automatically; use this workflow to publish a
-# docs-only update without cutting a new npm release.
-
 on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: Git ref containing the docs to publish
+        description: Full main commit SHA containing the docs to publish
         required: true
         type: string
-      version:
-        description: Documentation version to update
-        options:
-          - v9
-          - v10
-        required: true
-        type: choice
 
 jobs:
   deploy-docs:
@@ -27,4 +16,3 @@ jobs:
     uses: ./.github/workflows/docs-deploy.yml
     with:
       source_ref: ${{ inputs.source_ref }}
-      version: ${{ inputs.version }}

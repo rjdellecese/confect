@@ -1,7 +1,7 @@
+import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import { identity } from "effect/Function";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
-import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import { QueryStream } from "@confect/server";
 import { assert, describe, expect, it } from "@effect/vitest";
 import { getDocumentSize } from "convex/values";
@@ -57,16 +57,16 @@ const tags = <E, R>(stream: Stream.Stream<{ tag?: string }, E, R>) =>
 
 const observeUpstreamEnd = <
   Doc,
-  Key extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
   Direction extends QueryStreamOrderDirection.QueryStreamOrderDirection,
 >(
-  stream: QueryStream.QueryStream<Doc, Key, Direction, E, R>,
+  stream: QueryStream.QueryStream<Doc, Labels, Direction, E, R>,
   onEnd: Effect.Effect<void>,
-): QueryStream.QueryStream<Doc, Key, Direction, E, R> =>
+): QueryStream.QueryStream<Doc, Labels, Direction, E, R> =>
   new QueryStream.QueryStream(
-    stream.order,
+    stream.orderDirection,
     stream.keyLayout,
     stream.annotated.pipe(
       Stream.concat(Stream.fromEffect(onEnd).pipe(Stream.drain)),
@@ -78,13 +78,13 @@ const observeUpstreamEnd = <
 
 const pageTags = Effect.fnUntraced(function* <
   Doc extends { tag?: string },
-  Key extends ReadonlyArray<string>,
+  Labels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
   E,
   R,
 >(
   stream: QueryStream.QueryStream<
     Doc,
-    Key,
+    Labels,
     QueryStreamOrderDirection.QueryStreamOrderDirection,
     E,
     R
@@ -133,15 +133,19 @@ describe("QueryStream distinct representatives", () => {
 
           const a2 = rows.find((row) => row.tag === "a2");
           assert(a2 !== undefined);
-          const key = [a2.text, a2._creationTime, a2._id];
+          const keyValues = [a2.text, a2._creationTime, a2._id];
           expect(
             yield* tags(
-              QueryStream.narrow(distinct, { start: { key, inclusive: true } }),
+              QueryStream.narrow(distinct, {
+                start: { keyValues: keyValues, inclusive: true },
+              }),
             ),
           ).toEqual([]);
           expect(
             yield* tags(
-              QueryStream.narrow(distinct, { end: { key, inclusive: true } }),
+              QueryStream.narrow(distinct, {
+                end: { keyValues: keyValues, inclusive: true },
+              }),
             ),
           ).toEqual(["a1"]);
 
@@ -262,28 +266,30 @@ describe("QueryStream distinct representatives", () => {
             expect(
               yield* tags(
                 QueryStream.narrow(distinct, {
-                  start: { key: key2, inclusive },
+                  start: { keyValues: key2, inclusive },
                 }),
               ),
             ).toEqual(["b1", "c1"]);
             expect(
               yield* tags(
-                QueryStream.narrow(distinct, { end: { key: key2, inclusive } }),
+                QueryStream.narrow(distinct, {
+                  end: { keyValues: key2, inclusive },
+                }),
               ),
             ).toEqual(["a1"]);
             expect(
               yield* tags(
                 QueryStream.narrow(distinct, {
-                  start: { key: key2, inclusive },
-                  end: { key: key3, inclusive },
+                  start: { keyValues: key2, inclusive },
+                  end: { keyValues: key3, inclusive },
                 }),
               ),
             ).toEqual([]);
             expect(
               yield* tags(
                 QueryStream.narrow(QueryStream.reverse(distinct), {
-                  start: { key: key3, inclusive },
-                  end: { key: key2, inclusive },
+                  start: { keyValues: key3, inclusive },
+                  end: { keyValues: key2, inclusive },
                 }),
               ),
             ).toEqual([]);
@@ -300,29 +306,35 @@ describe("QueryStream distinct representatives", () => {
           const { source, rows } = yield* fixture;
           const a1 = rows.find((row) => row.tag === "a1");
           assert(a1 !== undefined);
-          const key = [a1.text, a1._creationTime, a1._id];
+          const keyValues = [a1.text, a1._creationTime, a1._id];
           const distinct = source.pipe(QueryStream.distinct(["text"]));
 
           expect(
             yield* tags(
-              QueryStream.narrow(distinct, { start: { key, inclusive: true } }),
+              QueryStream.narrow(distinct, {
+                start: { keyValues: keyValues, inclusive: true },
+              }),
             ),
           ).toEqual(["a1", "b1", "c1"]);
           expect(
             yield* tags(
               QueryStream.narrow(distinct, {
-                start: { key, inclusive: false },
+                start: { keyValues: keyValues, inclusive: false },
               }),
             ),
           ).toEqual(["b1", "c1"]);
           expect(
             yield* tags(
-              QueryStream.narrow(distinct, { end: { key, inclusive: true } }),
+              QueryStream.narrow(distinct, {
+                end: { keyValues: keyValues, inclusive: true },
+              }),
             ),
           ).toEqual(["a1"]);
           expect(
             yield* tags(
-              QueryStream.narrow(distinct, { end: { key, inclusive: false } }),
+              QueryStream.narrow(distinct, {
+                end: { keyValues: keyValues, inclusive: false },
+              }),
             ),
           ).toEqual([]);
         }),
@@ -343,7 +355,7 @@ describe("QueryStream distinct representatives", () => {
             .pipe(
               QueryStream.narrow({
                 start: {
-                  key: [a2.text, a2._creationTime, a2._id],
+                  keyValues: [a2.text, a2._creationTime, a2._id],
                   inclusive: true,
                 },
               }),
@@ -439,7 +451,7 @@ describe("QueryStream distinct representatives", () => {
                     )
                     .pipe(QueryStream.distinct(["text"])),
                 {
-                  innerLayout: Result.getOrThrowWith(
+                  innerKeyLayout: Result.getOrThrowWith(
                     QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
                     identity,
                   ),
@@ -481,7 +493,7 @@ describe("QueryStream distinct representatives", () => {
                     .table("notes")
                     .stream("by_text", (q) => q.eq("text", row.tag ?? "")),
                 {
-                  innerLayout: Result.getOrThrowWith(
+                  innerKeyLayout: Result.getOrThrowWith(
                     QueryStreamKeyLayout.fromIndex(["_creationTime"]),
                     identity,
                   ),
@@ -649,9 +661,7 @@ describe("QueryStream distinct read budgets", () => {
           }).pipe(Effect.result);
           assert(Result.isFailure(exhausted));
           assert(
-            Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
-              exhausted.failure,
-            ),
+            Schema.is(QueryStream.ReadBudgetExceededError)(exhausted.failure),
           );
           expect(exhausted.failure.rowsRead).toBe(2);
 
@@ -821,12 +831,10 @@ describe("QueryStream distinct read budgets", () => {
           }).pipe(Effect.result);
           assert(Result.isFailure(result));
           expect(result.failure).toBeInstanceOf(
-            QueryStreamReadBudget.ReadBudgetExceededError,
+            QueryStream.ReadBudgetExceededError,
           );
           assert(
-            Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
-              result.failure,
-            ),
+            Schema.is(QueryStream.ReadBudgetExceededError)(result.failure),
           );
           expect(result.failure.rowsRead).toBe(1);
         }),
@@ -847,9 +855,7 @@ describe("QueryStream distinct read budgets", () => {
           ).pipe(Effect.result);
           assert(Result.isFailure(result));
           assert(
-            Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
-              result.failure,
-            ),
+            Schema.is(QueryStream.ReadBudgetExceededError)(result.failure),
           );
           expect(result.failure.rowsRead).toBe(1);
           expect(result.failure.bytesRead).toBe(
@@ -885,9 +891,7 @@ describe("QueryStream distinct read budgets", () => {
           }).pipe(Effect.result);
           assert(Result.isFailure(result));
           assert(
-            Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
-              result.failure,
-            ),
+            Schema.is(QueryStream.ReadBudgetExceededError)(result.failure),
           );
           expect(result.failure.rowsRead).toBe(3);
 
@@ -951,11 +955,7 @@ describe("QueryStream distinct read budgets", () => {
           },
         ).pipe(Effect.result);
         assert(Result.isFailure(result));
-        assert(
-          Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
-            result.failure,
-          ),
-        );
+        assert(Schema.is(QueryStream.ReadBudgetExceededError)(result.failure));
         expect(result.failure.rowsRead).toBe(1);
       }),
     ),
@@ -982,7 +982,7 @@ describe("QueryStream distinct read budgets", () => {
                     )
                     .pipe(QueryStream.distinct(["text"])),
                 {
-                  innerLayout: Result.getOrThrowWith(
+                  innerKeyLayout: Result.getOrThrowWith(
                     QueryStreamKeyLayout.fromIndex(["text", "_creationTime"]),
                     identity,
                   ),
@@ -997,9 +997,7 @@ describe("QueryStream distinct read budgets", () => {
           }).pipe(Effect.result);
           assert(Result.isFailure(result));
           assert(
-            Schema.is(QueryStreamReadBudget.ReadBudgetExceededError)(
-              result.failure,
-            ),
+            Schema.is(QueryStream.ReadBudgetExceededError)(result.failure),
           );
           expect(result.failure.rowsRead).toBe(1);
 

@@ -14,4 +14,25 @@ export default GroupSpec.make()
       args: () => ({ storageId: GenericId.GenericId("_storage") }),
       returns: () => Schema.String,
     }),
+  )
+  .addFunction(
+    FunctionSpec.publicAction({
+      name: "store",
+      args: () => ({ text: Schema.String }),
+      returns: () => GenericId.GenericId("_storage"),
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicAction({
+      name: "get",
+      args: () => ({ storageId: GenericId.GenericId("_storage") }),
+      returns: () => Schema.String,
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicMutation({
+      name: "deleteBlob",
+      args: () => ({ storageId: GenericId.GenericId("_storage") }),
+      returns: () => Schema.Null,
+    }),
   );

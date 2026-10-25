@@ -1,46 +1,13 @@
 import type * as IdScope from "@confect/core/IdScope";
-import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
+import * as Array from "effect/Array";
+import * as Record from "effect/Record";
+import type { GroupTree } from "./GenerationSnapshot";
 import { CodeBlockWriter } from "./CodeBlockWriter";
 import {
-  collectImportBindings,
+  render as renderSpecAssembly,
   type SpecAssemblyNode,
 } from "./SpecAssemblyNode";
-
-export const functions = ({
-  functionNames,
-  registeredFunctionsImportPath,
-  useNode = false,
-}: Parameters<typeof functionsEffect>[0]) =>
-  functionsEffect({ functionNames, registeredFunctionsImportPath, useNode });
-
-const functionsEffect = Effect.fnUntraced(function* ({
-  functionNames,
-  registeredFunctionsImportPath,
-  useNode = false,
-}: {
-  functionNames: string[];
-  registeredFunctionsImportPath: string;
-  useNode?: boolean;
-}) {
-  const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-  if (useNode) {
-    yield* cbw.writeLine(`"use node";`);
-    yield* cbw.blankLine();
-  }
-
-  yield* cbw.writeLine(
-    `import registeredFunctions from "${registeredFunctionsImportPath}";`,
-  );
-  yield* cbw.newLine();
-  yield* Effect.forEach(functionNames, (name) =>
-    cbw.writeLine(`export const ${name} = registeredFunctions.${name};`),
-  );
-
-  return yield* cbw.toString();
-});
 
 /**
  * Emit `convex/schema.ts` as a one-line re-export of the codegen-emitted deploy
@@ -242,6 +209,9 @@ const idEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(
     `import { GenericId${scope === undefined ? "" : ", IdScope"} } from "@confect/core";`,
   );
+  yield* cbw.writeLine(
+    `import type { SystemTableNames } from "convex/server";`,
+  );
   yield* cbw.blankLine();
   if (scope !== undefined) {
     yield* cbw.writeLine(
@@ -261,7 +231,12 @@ const idEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(
-    `export const Id = <const TableName extends TableNames>(`,
+    `export type Id<TableName extends TableNames | SystemTableNames> = GenericId.GenericId<TableName${scope === undefined ? "" : ", typeof scope"}>;`,
+  );
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine(
+    `export const Id = <const TableName extends TableNames | SystemTableNames>(`,
   );
   yield* cbw.indent(cbw.writeLine(`tableName: TableName,`));
   yield* cbw.writeLine(
@@ -517,50 +492,53 @@ const docsEffect = Effect.fnUntraced(function* ({
 });
 
 export const registeredFunctionsForGroup = ({
+  group,
   schemaImportPath,
   specImportPath,
   implImportPath,
-  layerExportName,
-  useNode = false,
 }: Parameters<typeof registeredFunctionsForGroupEffect>[0]) =>
   registeredFunctionsForGroupEffect({
+    group,
     schemaImportPath,
     specImportPath,
     implImportPath,
-    layerExportName,
-    useNode,
   });
 
 const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
+  group,
   schemaImportPath,
   specImportPath,
   implImportPath,
-  layerExportName,
-  useNode = false,
 }: {
+  group: GroupTree;
   schemaImportPath: string;
   specImportPath: string;
   implImportPath: string;
-  layerExportName: string;
-  useNode?: boolean;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+  const useNode = group.runtime === "Node";
+
+  const hasConfectFunctions = (tree: GroupTree): boolean =>
+    Array.some(tree.functions, ({ provenance }) => provenance === "Confect") ||
+    Record.some(tree.groups, hasConfectFunctions);
+  const forwarding = !useNode && hasConfectFunctions(group);
 
   if (useNode) {
     yield* cbw.writeLine(
-      `import { RegisteredFunctions } from "@confect/server";`,
-    );
-    yield* cbw.writeLine(
       `import { RegisteredNodeFunction } from "@confect/server/node";`,
+    );
+  } else if (!forwarding) {
+    yield* cbw.writeLine(
+      `import { RegisteredFunctions } from "@confect/server";`,
     );
   } else {
     yield* cbw.writeLine(
-      `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
+      `import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";`,
     );
   }
 
   yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
-  yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
+  yield* cbw.writeLine(`import groupLayer from "${implImportPath}";`);
   yield* cbw.blankLine();
   // The group's own leaf spec is referenced type-only (`typeof import(...)`),
   // so the spec module is erased at transpile time and never enters the
@@ -568,12 +546,39 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   // imports. Typing from the leaf spec (not the project-wide assembled spec)
   // keeps the registry's type dependent solely on its own group.
   const specType = `typeof import("${specImportPath}")["default"]`;
-  const makeFn = useNode
-    ? "RegisteredNodeFunction.make"
-    : "RegisteredConvexFunction.make";
-  yield* cbw.writeLine(
-    `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
-  );
+  if (useNode) {
+    yield* cbw.writeLine(
+      `export default RegisteredNodeFunction.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
+    );
+  } else if (!forwarding) {
+    yield* cbw.writeLine(
+      `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
+    );
+  } else {
+    const bindings = (tree: GroupTree, path: string): string =>
+      `{
+${[
+  ...Array.map(tree.functions, ({ name, provenance }) => {
+    const key = JSON.stringify(name);
+    const definition = `${path}[${key}]`;
+    return `[${key}]: ${
+      provenance === "Convex"
+        ? `${definition}.handler`
+        : `RegisteredConvexFunction.register({ ...${definition}, handler: forward(${definition}.handler) })`
+    },`;
+  }),
+  ...Array.map(Record.toEntries(tree.groups), ([name, child]) => {
+    const key = JSON.stringify(name);
+    return `[${key}]: ${bindings(child, `${path}[${key}]`)},`;
+  }),
+].join("\n")}
+}`;
+    yield* cbw.writeLine(`const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
+
+const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(databaseSchema, groupLayer);
+
+export default ${bindings(group, "definitions")} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
+  }
 
   return yield* cbw.toString();
 });
@@ -603,14 +608,24 @@ const servicesEffect = Effect.fnUntraced(function* ({
       yield* cbw.writeLine("type DataModel,");
       yield* cbw.writeLine("DatabaseReader as DatabaseReader_,");
       yield* cbw.writeLine("DatabaseWriter as DatabaseWriter_,");
+      yield* cbw.writeLine("ExecutionMetadata as ExecutionMetadata_,");
       yield* cbw.writeLine("MutationCtx as MutationCtx_,");
       yield* cbw.writeLine("MutationRunner as MutationRunner_,");
+      yield* cbw.writeLine(
+        "MutationTransactionContext as MutationTransactionContext_,",
+      );
       yield* cbw.writeLine("QueryCtx as QueryCtx_,");
       yield* cbw.writeLine("QueryRunner as QueryRunner_,");
+      yield* cbw.writeLine(
+        "QueryTransactionContext as QueryTransactionContext_,",
+      );
+      yield* cbw.writeLine("RequestMetadata as RequestMetadata_,");
       yield* cbw.writeLine("Scheduler as Scheduler_,");
+      yield* cbw.writeLine("Storage as Storage_,");
       yield* cbw.writeLine("StorageActionWriter as StorageActionWriter_,");
       yield* cbw.writeLine("StorageReader as StorageReader_,");
       yield* cbw.writeLine("StorageWriter as StorageWriter_,");
+      yield* cbw.writeLine("TransactionMetadata as TransactionMetadata_,");
       yield* cbw.writeLine("VectorSearch as VectorSearch_,");
     }),
   );
@@ -629,6 +644,30 @@ const servicesEffect = Effect.fnUntraced(function* ({
   }
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(
+    "export const ExecutionMetadata = ExecutionMetadata_.ExecutionMetadata;",
+  );
+  yield* cbw.writeLine(
+    "export type ExecutionMetadata = typeof ExecutionMetadata.Identifier;",
+  );
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine(
+    "export const RequestMetadata = RequestMetadata_.RequestMetadata;",
+  );
+  yield* cbw.writeLine(
+    "export type RequestMetadata = typeof RequestMetadata.Identifier;",
+  );
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine(
+    "export const TransactionMetadata = TransactionMetadata_.TransactionMetadata;",
+  );
+  yield* cbw.writeLine(
+    "export type TransactionMetadata = typeof TransactionMetadata.Identifier;",
+  );
+  yield* cbw.blankLine();
+
   // Scheduler
   yield* cbw.writeLine(
     component
@@ -636,6 +675,12 @@ const servicesEffect = Effect.fnUntraced(function* ({
       : "export const Scheduler = Scheduler_.Scheduler;",
   );
   yield* cbw.writeLine("export type Scheduler = typeof Scheduler.Identifier;");
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine(
+    `export const Storage = Storage_.Storage${component ? ".forScope<typeof scope>()" : ""};`,
+  );
+  yield* cbw.writeLine("export type Storage = typeof Storage.Identifier;");
   yield* cbw.blankLine();
 
   // StorageReader
@@ -713,6 +758,21 @@ const servicesEffect = Effect.fnUntraced(function* ({
   );
   yield* cbw.writeLine(
     "export type DatabaseWriter = typeof DatabaseWriter.Identifier;",
+  );
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine(
+    "export const QueryTransactionContext = QueryTransactionContext_.QueryTransactionContext;",
+  );
+  yield* cbw.writeLine(
+    "export type QueryTransactionContext = typeof QueryTransactionContext.Identifier;",
+  );
+  yield* cbw.blankLine();
+  yield* cbw.writeLine(
+    "export const MutationTransactionContext = MutationTransactionContext_.MutationTransactionContext;",
+  );
+  yield* cbw.writeLine(
+    "export type MutationTransactionContext = typeof MutationTransactionContext.Identifier;",
   );
   yield* cbw.blankLine();
 
@@ -798,134 +858,8 @@ const servicesEffect = Effect.fnUntraced(function* ({
   return yield* cbw.toString();
 });
 
-const writeChildAddGroupAt = Effect.fnUntraced(function* (
-  cbw: CodeBlockWriter,
-  child: SpecAssemblyNode,
-  groupFactory: string,
-): Effect.fn.Return<void> {
-  yield* cbw.write(".addGroupAt(");
-  yield* cbw.quote(child.segment);
-  yield* cbw.write(", ");
-  yield* writeGroupAssembly(cbw, child, groupFactory);
-  yield* cbw.write(")");
-});
-
-const writeGroupFactoryCall = Effect.fnUntraced(function* (
-  cbw: CodeBlockWriter,
-  node: SpecAssemblyNode,
-  groupFactory: string,
-): Effect.fn.Return<void> {
-  yield* cbw.write(groupFactory);
-  yield* cbw.write("(");
-  yield* cbw.quote(node.segment);
-  yield* cbw.write(")");
-
-  yield* Effect.forEach(node.children, (child) =>
-    writeChildAddGroupAt(cbw, child, groupFactory),
-  );
-});
-
-const writeGroupAssembly: (
-  cbw: CodeBlockWriter,
-  node: SpecAssemblyNode,
-  groupFactory: string,
-) => Effect.Effect<void> = (cbw, node, groupFactory) =>
-  Option.match(node.importBinding, {
-    onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
-    onSome: (binding) =>
-      Effect.gen(function* () {
-        yield* cbw.write(binding.localName);
-        yield* Effect.forEach(node.children, (child) =>
-          writeChildAddGroupAt(cbw, child, groupFactory),
-        );
-      }),
-  });
-
-const writeRootAddAt = Effect.fnUntraced(function* (
-  cbw: CodeBlockWriter,
-  node: SpecAssemblyNode,
-  groupFactory: string,
-): Effect.fn.Return<void> {
-  yield* cbw.write(".addAt(");
-  yield* cbw.quote(node.segment);
-  yield* cbw.write(", ");
-
-  yield* writeGroupAssembly(cbw, node, groupFactory);
-
-  yield* cbw.write(")");
-});
-
-const groupTypeExpr = (node: SpecAssemblyNode): string => {
-  const childUnion = Array.map(
-    node.children,
-    (child) => `GroupSpec.NamedAt<${groupTypeExpr(child)}, "${child.segment}">`,
-  ).join(" | ");
-
-  return Option.match(node.importBinding, {
-    onNone: () =>
-      `GroupSpec.GroupSpec<"Convex", "${node.segment}", never, ${childUnion}>`,
-    onSome: (binding) =>
-      node.children.length === 0
-        ? `typeof ${binding.localName}`
-        : `GroupSpec.AddGroups<typeof ${binding.localName}, ${childUnion}>`,
-  });
-};
-
-const rootGroupTypeMember = (node: SpecAssemblyNode): string =>
-  `GroupSpec.NamedAt<${groupTypeExpr(node)}, "${node.segment}">`;
-
 export const assembledSpec = ({
-  nodes,
-}: Parameters<typeof assembledSpecEffect>[0]) => assembledSpecEffect({ nodes });
-
-const assembledSpecEffect = Effect.fnUntraced(function* ({
   nodes,
 }: {
   nodes: ReadonlyArray<SpecAssemblyNode>;
-}) {
-  const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-  yield* cbw.writeLine(
-    nodes.length > 0
-      ? `import { GroupSpec, Spec } from "@confect/core";`
-      : `import { Spec } from "@confect/core";`,
-  );
-
-  yield* Effect.forEach(collectImportBindings(nodes), (binding) =>
-    cbw.writeLine(`import ${binding.localName} from "${binding.importPath}";`),
-  );
-
-  yield* cbw.blankLine();
-
-  yield* cbw.write(`const spec: `);
-  if (nodes.length === 0) {
-    yield* cbw.write(`Spec.Spec`);
-  } else {
-    yield* cbw.write(`Spec.Spec<{`);
-    yield* cbw.newLine();
-    yield* cbw.indent(
-      Effect.gen(function* () {
-        for (const node of nodes) {
-          yield* cbw.writeLine(
-            `readonly ${node.segment}: ${rootGroupTypeMember(node)};`,
-          );
-        }
-      }),
-    );
-    yield* cbw.write(`}>`);
-  }
-  // The assembled spec is runtime-agnostic: a Node group's `makeNode()` is
-  // already baked into its imported leaf spec, so the root is always
-  // `Spec.make()` and binding-less container groups always use
-  // `GroupSpec.makeAt` (containers register no functions and carry no runtime).
-  yield* cbw.write(` = Spec.make()`);
-  yield* Effect.forEach(nodes, (node) =>
-    writeRootAddAt(cbw, node, "GroupSpec.makeAt"),
-  );
-  yield* cbw.write(";");
-  yield* cbw.newLine();
-  yield* cbw.blankLine();
-  yield* cbw.writeLine(`export default spec;`);
-
-  return yield* cbw.toString();
-});
+}) => renderSpecAssembly(nodes);

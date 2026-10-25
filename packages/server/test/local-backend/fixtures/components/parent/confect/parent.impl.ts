@@ -8,13 +8,13 @@ import parent from "./parent.spec";
 
 const create = FunctionImpl.make(schema, parent, "create", (args) =>
   Effect.gen(function* () {
-    const runMutation = yield* MutationRunner;
+    const { runMutation } = yield* MutationRunner;
     return yield* runMutation(child.counter.create, args);
   }).pipe(Effect.orDie),
 );
 const list = FunctionImpl.make(schema, parent, "list", (args) =>
   Effect.gen(function* () {
-    const runQuery = yield* QueryRunner;
+    const { runQuery } = yield* QueryRunner;
     return yield* runQuery(child.counter.list, args);
   }).pipe(Effect.orDie),
 );

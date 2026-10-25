@@ -17,6 +17,7 @@ import {
 import type { Value } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Clock from "effect/Clock";
+import * as Data from "effect/Data";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -29,88 +30,110 @@ import * as DatabaseReader from "./DatabaseReader";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
+import * as ExecutionMetadata from "./ExecutionMetadata";
+import * as RequestMetadata from "./RequestMetadata";
+import * as TransactionMetadata from "./TransactionMetadata";
 import * as MutationCtx from "./MutationCtx";
 import * as MutationRunner from "./MutationRunner";
+import * as MutationTransactionContext from "./MutationTransactionContext";
 import * as QueryCtx from "./QueryCtx";
 import * as QueryRunner from "./QueryRunner";
+import * as QueryTransactionContext from "./QueryTransactionContext";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as FunctionRegistryItem from "./FunctionRegistryItem";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
-import { StorageReader } from "./StorageReader";
+import * as Storage from "./Storage";
 import { StorageWriter } from "./StorageWriter";
 import type * as Handler from "./Handler";
+
+export type Definition = Data.TaggedEnum<{
+  PublicQuery: ReturnType<typeof queryFunction>;
+  InternalQuery: ReturnType<typeof queryFunction>;
+  PublicMutation: ReturnType<typeof mutationFunction>;
+  InternalMutation: ReturnType<typeof mutationFunction>;
+  PublicAction: ReturnType<typeof convexActionFunction>;
+  InternalAction: ReturnType<typeof convexActionFunction>;
+  Registered: { readonly handler: RegisteredFunction.Any };
+}>;
+export const Definition = Data.taggedEnum<Definition>();
+
+export const prepare = (
+  databaseSchema: DatabaseSchema.AnyWithProps,
+  item: FunctionRegistryItem.ConfectFunctionRegistryItem,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
+) =>
+  Match.value(item.functionType).pipe(
+    Match.when("query", () => {
+      const definition = queryFunction({
+        databaseSchema,
+        name: item.name,
+        functionVisibility: item.functionVisibility,
+        args: item.args,
+        returns: item.returns,
+        error: item.error,
+        handler: item.handler,
+        resolvedMiddlewares,
+      });
+      return Match.value(item.functionVisibility).pipe(
+        Match.when("public", () => Definition.PublicQuery(definition)),
+        Match.when("internal", () => Definition.InternalQuery(definition)),
+        Match.exhaustive,
+      );
+    }),
+    Match.when("mutation", () => {
+      const definition = mutationFunction({
+        databaseSchema,
+        name: item.name,
+        functionVisibility: item.functionVisibility,
+        args: item.args,
+        returns: item.returns,
+        error: item.error,
+        handler: item.handler,
+        resolvedMiddlewares,
+      });
+      return Match.value(item.functionVisibility).pipe(
+        Match.when("public", () => Definition.PublicMutation(definition)),
+        Match.when("internal", () => Definition.InternalMutation(definition)),
+        Match.exhaustive,
+      );
+    }),
+    Match.when("action", () => {
+      const definition = convexActionFunction(databaseSchema, {
+        name: item.name,
+        functionVisibility: item.functionVisibility,
+        args: item.args,
+        returns: item.returns,
+        error: item.error,
+        handler: item.handler,
+        resolvedMiddlewares,
+      });
+      return Match.value(item.functionVisibility).pipe(
+        Match.when("public", () => Definition.PublicAction(definition)),
+        Match.when("internal", () => Definition.InternalAction(definition)),
+        Match.exhaustive,
+      );
+    }),
+    Match.exhaustive,
+  );
 
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
-): RegisteredFunction.Any => {
-  const { name, functionVisibility, handler } = item;
+): RegisteredFunction.Any =>
+  register(prepare(databaseSchema, item, resolvedMiddlewares));
 
-  return Match.value(item.functionType).pipe(
-    Match.when("query", () => {
-      const genericFunction = Match.value(functionVisibility).pipe(
-        Match.when("public", () => queryGeneric),
-        Match.when("internal", () => internalQueryGeneric),
-        Match.exhaustive,
-      );
-
-      return genericFunction(
-        queryFunction({
-          databaseSchema,
-          name,
-          functionVisibility,
-          args: item.args,
-          returns: item.returns,
-          error: item.error,
-          handler,
-          resolvedMiddlewares,
-        }),
-      );
-    }),
-    Match.when("mutation", () => {
-      const genericFunction = Match.value(functionVisibility).pipe(
-        Match.when("public", () => mutationGeneric),
-        Match.when("internal", () => internalMutationGeneric),
-        Match.exhaustive,
-      );
-
-      return genericFunction(
-        mutationFunction({
-          databaseSchema,
-          name,
-          functionVisibility,
-          args: item.args,
-          returns: item.returns,
-          error: item.error,
-          handler,
-          resolvedMiddlewares,
-        }),
-      );
-    }),
-    Match.when("action", () => {
-      const genericFunction = Match.value(functionVisibility).pipe(
-        Match.when("public", () => actionGeneric),
-        Match.when("internal", () => internalActionGeneric),
-        Match.exhaustive,
-      );
-
-      return genericFunction(
-        convexActionFunction(databaseSchema, {
-          name,
-          functionVisibility,
-          args: item.args,
-          returns: item.returns,
-          error: item.error,
-          handler,
-          resolvedMiddlewares,
-        }),
-      );
-    }),
-    Match.exhaustive,
-  );
-};
+export const register = (self: Definition): RegisteredFunction.Any =>
+  Definition.$match(self, {
+    PublicQuery: (definition) => queryGeneric(definition),
+    InternalQuery: (definition) => internalQueryGeneric(definition),
+    PublicMutation: (definition) => mutationGeneric(definition),
+    InternalMutation: (definition) => internalMutationGeneric(definition),
+    PublicAction: (definition) => actionGeneric(definition),
+    InternalAction: (definition) => internalActionGeneric(definition),
+    Registered: ({ handler }) => handler,
+  });
 
 /**
  * Convex evicts a query from its cache once the execution observes the current
@@ -190,7 +213,7 @@ const queryFunction = <
       const decodedArgs = yield* pipe(
         actualArgs,
         Schema.decodeUnknownEffect(args),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* RegisteredFunction.applyMiddleware(
@@ -210,10 +233,13 @@ const queryFunction = <
               databaseSchema.target,
               ctx.auth,
             ),
-            StorageReader.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
+            Storage.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
               ctx.storage,
               databaseSchema.target.scope,
             ),
+            ExecutionMetadata.layer(ctx.meta),
+            TransactionMetadata.layer(ctx.meta),
+            QueryTransactionContext.layer(ctx),
             QueryRunner.layer(ctx.runQuery),
             QueryCtx.layer<
               DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>,
@@ -226,7 +252,7 @@ const queryFunction = <
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
     }).pipe(
       Effect.provideService(Clock.Clock, queryClock),
@@ -251,7 +277,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
       ctx.scheduler,
       schema.target.scope,
     ),
-    StorageReader.layer<DatabaseSchema.Scope<Schema>>(
+    Storage.layer<DatabaseSchema.Scope<Schema>>(
       ctx.storage,
       schema.target.scope,
     ),
@@ -259,6 +285,11 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
       ctx.storage,
       schema.target.scope,
     ),
+    ExecutionMetadata.layer(ctx.meta),
+    RequestMetadata.layer(ctx.meta),
+    TransactionMetadata.layer(ctx.meta),
+    QueryTransactionContext.layer(ctx),
+    MutationTransactionContext.layer(ctx),
     QueryRunner.layer(ctx.runQuery),
     MutationRunner.layer(ctx.runMutation),
     MutationCtx.layer<
@@ -311,7 +342,7 @@ const mutationFunction = <
       const decodedArgs = yield* pipe(
         actualArgs,
         Schema.decodeUnknownEffect(args),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* RegisteredFunction.applyMiddleware(
@@ -327,7 +358,7 @@ const mutationFunction = <
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
     }).pipe(
       RegisteredFunction.runHandlerPromise(

@@ -1,7 +1,7 @@
 {
   "name": "@confect/cli",
   "description": "Developer tooling for codegen and sync",
-  "version": "10.0.0-next.22",
+  "version": "10.3.2",
   "author": "RJ Dellecese",
   "bin": {
     "confect": "./bin/confect.mjs"
@@ -10,26 +10,28 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@effect/platform-node": "^4.0.0-rc.115",
+    "@effect/platform-node": "^4.0.4",
     "bundle-require": "^5.1.0",
     "code-block-writer": "^13.0.3",
     "esbuild": "0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0",
-    "exsolve": "^1.1.1"
+    "exsolve": "^1.1.3",
+    "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
-    "@convex-dev/workpool": "0.4.11",
+    "@convex-dev/workpool": "0.4.14",
     "@effect/tsgo": "0.44.0",
-    "@effect/vitest": "4.0.0-rc.115",
-    "@types/node": "24.13.3",
-    "@vitest/coverage-v8": "5.0.0",
-    "convex": "1.45.0",
-    "effect": "4.0.0-rc.115",
-    "tsdown": "0.23.0",
+    "@effect/vitest": "4.0.4",
+    "@types/node": "26.6.5",
+    "@vitest/coverage-v8": "5.0.3",
+    "@yarnpkg/cli-dist": "4.18.1",
+    "convex": "1.46.0",
+    "effect": "4.0.4",
+    "tsdown": "0.23.1",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
-    "vite": "8.2.2",
+    "vite": "8.3.4",
     "vite-tsconfig-paths": "6.1.1",
-    "vitest": "5.0.0"
+    "vitest": "5.0.3"
   },
   "engines": {
     "node": ">=24"
@@ -55,7 +57,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/server": "workspace:^",
-    "effect": "^4.0.0-rc.115"
+    "effect": "^4.0.4"
   },
   "repository": {
     "type": "git",
@@ -67,7 +69,8 @@
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit --project tsconfig.json"
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "typecheck:inexact": "tsc --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
   },
   "type": "module"
 }

@@ -1,49 +1,43 @@
 import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as QueryStreamKey from "./QueryStreamKey";
+import * as SchemaIssue from "effect/SchemaIssue";
 import * as Match from "effect/Match";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
-import * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
-import * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+import * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 
 // Serialized labels are a cursor boundary representation. They include every
-// runtime position but do not preserve segment boundaries or implicitness.
+// runtime position but do not preserve implicitness.
 const RuntimeLabels = Schema.Array(Schema.String);
 const RuntimeLabelsEquivalence = Schema.toEquivalence(RuntimeLabels);
-const segmentRuntimeLabels = Match.type<QueryStreamKeyLayout.Segment>().pipe(
+const positionRuntimeLabel = Match.type<QueryStreamKeyLayout.Position>().pipe(
   Match.tagsExhaustive({
-    WithImplicitId: ({ labels }) =>
-      Array.append(QueryStreamKeyLabels.toArray(labels), "_id"),
-    Explicit: ({ labels }) => QueryStreamKeyLabels.toArray(labels),
+    Visible: ({ label }) => label,
+    ImplicitId: () => "_id",
   }),
 );
 
 /**
  * @experimental
  */
-export class QueryStreamCursor extends Schema.Class<QueryStreamCursor>(
-  "QueryStreamCursor",
-)(
-  Schema.Struct({
-    version: Schema.Literal(1),
-    keyFields: RuntimeLabels,
-    orderKey: QueryStreamOrderKey.QueryStreamOrderKey,
-  }).check(
-    Schema.makeFilter(
-      (cursor) => cursor.orderKey.length === cursor.keyFields.length,
-      {
-        message: "key and fields must have the same length",
-      },
-    ),
+export const QueryStreamCursor = Schema.Struct({
+  runtimeLabels: RuntimeLabels,
+  keyValues: QueryStreamKeyValues.QueryStreamKeyValues,
+}).check(
+  Schema.makeFilter(
+    (cursor) => cursor.keyValues.length === cursor.runtimeLabels.length,
+    { message: "key values and runtime labels must have the same length" },
   ),
-) {}
+);
 
 /**
  * @experimental
  */
-export const Json = Schema.fromJsonString(
-  Schema.toCodecJson(QueryStreamCursor),
-);
+export interface QueryStreamCursor extends Schema.Schema.Type<
+  typeof QueryStreamCursor
+> {}
 
 /**
  * @experimental
@@ -51,33 +45,55 @@ export const Json = Schema.fromJsonString(
 export const END_CURSOR = "[]";
 
 /**
- * Bind cursor encoding and decoding to a layout. Runtime labels are derived
- * here; the version-1 envelope retains its `keyFields` property.
+ * Bind cursor string encoding and decoding to a layout.
  *
  * @experimental
  */
-export const codecForLayout = (
-  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+export const fromKeyLayout = (
+  keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
 ) => {
-  const runtimeLabels = Array.flatMap(
-    QueryStreamKeyLayout.segments(layout),
-    segmentRuntimeLabels,
+  const runtimeLabels = Array.map(
+    QueryStreamKeyLayout.positions(keyLayout),
+    positionRuntimeLabel,
   );
-  return Json.check(
-    Schema.makeFilter(
-      (cursor) => RuntimeLabelsEquivalence(cursor.keyFields, runtimeLabels),
-      { message: "Cursor order-key fields do not match the stream" },
-    ),
-  ).pipe(
-    Schema.decodeTo(QueryStreamOrderKey.QueryStreamOrderKey, {
-      decode: SchemaGetter.transform((cursor) => cursor.orderKey),
-      encode: SchemaGetter.transformEffect((orderKey) =>
-        QueryStreamCursor.makeEffect({
-          version: 1,
-          keyFields: runtimeLabels,
-          orderKey,
-        }),
+  return Schema.fromJsonString(QueryStreamCursor)
+    .check(
+      Schema.makeFilter(
+        (cursor) =>
+          RuntimeLabelsEquivalence(cursor.runtimeLabels, runtimeLabels),
+        { message: "Cursor runtime labels do not match the stream" },
       ),
-    }),
-  );
+    )
+    .pipe(
+      Schema.decodeTo(
+        Schema.declare(QueryStreamKey.isComplete).check(
+          Schema.makeFilter(
+            (key) => QueryStreamKeyLayout.Equivalence(key.layout, keyLayout),
+            { message: "Cursor key does not belong to the stream layout" },
+          ),
+        ),
+        {
+          decode: SchemaGetter.transformEffect((cursor, options) =>
+            Effect.fromResult(
+              QueryStreamKey.complete(keyLayout, cursor.keyValues),
+            ).pipe(
+              Effect.mapError(
+                (error) =>
+                  new SchemaIssue.InvalidValue(
+                    { message: error.message },
+                    cursor.keyValues,
+                    options,
+                  ),
+              ),
+            ),
+          ),
+          encode: SchemaGetter.transformEffect((key) =>
+            QueryStreamCursor.makeEffect({
+              runtimeLabels,
+              keyValues: key.values,
+            }),
+          ),
+        },
+      ),
+    );
 };

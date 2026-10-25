@@ -195,10 +195,10 @@ export type ErrorSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     readonly functionProvenance: {
       readonly _tag: "Confect";
-      readonly error?: infer ErrorSchema_ extends Schema.Codec<any, any>;
+      readonly error?: infer ErrorSchema_;
     };
   }
-    ? ErrorSchema_
+    ? Extract<ErrorSchema_, Schema.Codec<any, any>>
     : never;
 
 export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {

@@ -1,4 +1,7 @@
 import type { BuildError, BundlerError } from "@confect/cli/BuildError";
+import type * as DevSupervisor from "@confect/cli/DevSupervisor";
+import type * as CompilationInputs from "@confect/cli/CompilationInputs";
+import type { ConfigError } from "effect/Config";
 import type * as CodegenError from "@confect/cli/CodegenError";
 import type {
   ConfectDirectory,
@@ -11,18 +14,17 @@ import type {
 } from "@confect/cli/ConvexDirectory";
 import type * as FunctionPaths from "@confect/cli/FunctionPaths";
 import type * as GroupPath from "@confect/cli/GroupPath";
-import type * as GroupPaths from "@confect/cli/GroupPaths";
 import type {
   ProjectRoot,
   ProjectRootNotFoundError,
 } from "@confect/cli/ProjectRoot";
+import type { EvaluationError } from "@confect/cli/Evaluation";
+import type * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import * as TableModule from "@confect/cli/TableModule";
 import { codegenHandler } from "@confect/cli/confect/codegen";
-import { dev } from "@confect/cli/confect/dev";
-import { generateFunctions, writeGroups } from "@confect/cli/utils";
-import type { Spec } from "@confect/core";
+import { dev, type SyncJobError } from "@confect/cli/confect/dev";
+import { generateFunctions, writeGroups } from "@confect/cli/FunctionModule";
 import { expect, expectTypeOf, it } from "@effect/vitest";
-import type { NoSuchElementError } from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
@@ -31,7 +33,7 @@ import type * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
-import type * as Command from "effect/unstable/cli/Command";
+import type * as Command from "effect/cli/Command";
 
 type FileServices = FileSystem.FileSystem | Path.Path;
 type GenerationServices = FileServices | ConfectDirectory | ConvexDirectory;
@@ -57,24 +59,18 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
     >
   >();
   expectTypeOf(writeGroups).parameters.toEqualTypeOf<
-    [spec: Spec.AnyWithProps, groupPaths: GroupPaths.GroupPaths]
+    [groups: ReadonlyArray<GenerationSnapshot.GroupSummary>]
   >();
   expectTypeOf(writeGroups).returns.toEqualTypeOf<
-    Effect.Effect<
-      Array<void>,
-      NoSuchElementError | PlatformError,
-      GenerationServices
-    >
+    Effect.Effect<Array<void>, PlatformError, GenerationServices | ProjectRoot>
   >();
   expectTypeOf(generateFunctions).parameters.toEqualTypeOf<
-    [spec: Spec.AnyWithProps]
+    [snapshot: GenerationSnapshot.GenerationSnapshot]
   >();
   expectTypeOf(generateFunctions).returns.toEqualTypeOf<
     Effect.Effect<
       FunctionPaths.FunctionPaths,
-      | GroupPath.GroupModulePathIsNotATypeScriptFileError
-      | NoSuchElementError
-      | PlatformError,
+      GroupPath.GroupModulePathIsNotATypeScriptFileError | PlatformError,
       GenerationServices | ProjectRoot
     >
   >();
@@ -82,12 +78,12 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
     Effect.Effect<
       {
         functionPaths: FunctionPaths.FunctionPaths;
-        anyWritesHappened: boolean;
       },
       | CodegenError.CodegenError
       | BundlerError
+      | CompilationInputs.RestartRequired
+      | EvaluationError
       | GroupPath.GroupModulePathIsNotATypeScriptFileError
-      | NoSuchElementError
       | PlatformError,
       GenerationServices | ProjectRoot
     >
@@ -100,12 +96,17 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
       | BundlerError
       | ConfectDirectoryNotFoundError
       | ConvexDirectoryNotFoundError
-      | GroupPath.GroupModulePathIsNotATypeScriptFileError
       | InvalidConvexJsonError
-      | NoSuchElementError
-      | PlatformError
       | ProjectRootNotFoundError
-      | Schema.SchemaError,
+      | Schema.SchemaError
+      | ConfigError
+      | EvaluationError
+      | PlatformError
+      | DevSupervisor.MissingSessionIpc
+      | DevSupervisor.RestartRequested
+      | DevSupervisor.SessionExited
+      | DevSupervisor.SupervisorError
+      | SyncJobError,
       FileServices
     >
   >();

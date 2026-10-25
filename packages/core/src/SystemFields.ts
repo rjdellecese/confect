@@ -70,20 +70,18 @@ const splitSystemFields = (input: { [key: PropertyKey]: unknown }) => {
 const wrapGetter = <R>(
   getter: SchemaGetter.Getter<any, any, R>,
 ): SchemaGetter.Getter<any, any, R> =>
-  new SchemaGetter.Getter((input, options) => {
+  SchemaGetter.transformOptionalEffect((input, options) => {
     if (Option.isNone(input) || !Predicate.isObject(input.value)) {
-      return getter.run(input, options);
+      return SchemaGetter.run(getter, input, options);
     }
     const { system, rest } = splitSystemFields(input.value);
-    return getter
-      .run(Option.some(rest), options)
-      .pipe(
-        Effect.map(
-          Option.map((output) =>
-            Predicate.isObject(output) ? Struct.assign(output, system) : output,
-          ),
+    return SchemaGetter.run(getter, Option.some(rest), options).pipe(
+      Effect.map(
+        Option.map((output) =>
+          Predicate.isObject(output) ? Struct.assign(output, system) : output,
         ),
-      );
+      ),
+    );
   });
 
 const wrapTransformation = (
@@ -163,15 +161,15 @@ const makeExtendAst = (
 /**
  * Extend a table schema with Convex system fields.
  *
- * A plain `Struct` gains the fields via `Schema.fieldsAssign` and a `Union` has
- * them distributed across its members, preserving the schema's `Struct`/`Union`
- * structure. Any other object-shaped schema—one built with
- * `Schema.decodeTo`/`Schema.encodeKeys`, a branded struct, a suspended
- * schema—is extended at the AST level: every object node in its encoding chain
- * gains the system fields, and each transformation is wrapped so the fields
- * bypass the user-defined getters. Schemas that do not resolve to an object
- * shape at every step (such as `Schema.Class`, whose decoded values are class
- * instances) are rejected with a descriptive error.
+ * A plain `Struct` gains the fields via `mapFields` and a `Union` has them
+ * distributed across its members via `mapMembers`, preserving the schema's
+ * checks and `Struct`/`Union` structure. Any other object-shaped schema—one
+ * built with `Schema.decodeTo`/`Schema.encodeKeys`, a branded struct, a
+ * suspended schema—is extended at the AST level: every object node in its
+ * encoding chain gains the system fields, and each transformation is wrapped so
+ * the fields bypass the user-defined getters. Schemas that do not resolve to an
+ * object shape at every step (such as `Schema.Class`, whose decoded values are
+ * class instances) are rejected with a descriptive error.
  *
  * Note that struct-level checks on an extended schema observe the value with
  * the system fields attached, and encoding an extended schema emits the system
@@ -204,11 +202,9 @@ export const extendWithSystemFields = <
       SchemaAST.isUnion(s.ast) &&
       Array.isArray((s as { readonly members?: unknown }).members)
     ) {
-      return Schema.Union(
-        Array.map(
-          (s as Schema.Union<ReadonlyArray<Schema.Top>>).members,
-          extend,
-        ),
+      return (s as Schema.Union<ReadonlyArray<Schema.Top>>).mapMembers(
+        Array.map(extend),
+        { unsafePreserveChecks: true },
       );
     }
     if (
@@ -216,8 +212,9 @@ export const extendWithSystemFields = <
       SchemaAST.isObjects(s.ast) &&
       typeof (s as { readonly mapFields?: unknown }).mapFields === "function"
     ) {
-      return Schema.fieldsAssign(system)(
-        s as Schema.Struct<Schema.Struct.Fields>,
+      return (s as Schema.Struct<Schema.Struct.Fields>).mapFields(
+        Struct.assign(system),
+        { unsafePreserveChecks: true },
       );
     }
     return Schema.make(extendAst(s.ast));

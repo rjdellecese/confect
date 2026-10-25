@@ -1,10 +1,14 @@
+import * as Table from "@confect/server/Table";
 import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
+import type * as QueryStreamKeyValues from "@confect/server/QueryStreamKeyValues";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
-import { describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, it } from "@effect/vitest";
 import * as QueryStream from "@confect/server/QueryStream";
 import { compareValues } from "convex/values";
 import * as Deferred from "effect/Deferred";
+import * as Cause from "effect/Cause";
+import * as Result from "effect/Result";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -12,7 +16,9 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
-const tableSchema = Schema.Struct({ group: Schema.String });
+const table = Table.make(() => Schema.Struct({ group: Schema.String }))(
+  "documents",
+);
 const distinctFields: ReadonlyArray<string> = ["group"];
 
 const documents = [
@@ -21,6 +27,12 @@ const documents = [
   { _id: "b1", _creationTime: 3, group: "b" },
   { _id: "b2", _creationTime: 4, group: "b" },
 ];
+
+interface RecordedConstraint {
+  readonly _tag: "eq" | "gt" | "gte" | "lt" | "lte";
+  readonly field: string;
+  readonly value: QueryStreamKeyValues.KeyValue;
+}
 
 type Document = (typeof documents)[number];
 
@@ -44,10 +56,10 @@ const makeReader = (pending?: PendingRead) => {
   const reader: QueryStream.ReflectionReader = {
     query: () => ({
       withIndex: (_indexName, indexRange) => {
-        const operations: Array<QueryStreamIndexRange.RangeOp> = [];
+        const operations: Array<RecordedConstraint> = [];
         const record =
-          (_tag: QueryStreamIndexRange.RangeOp["_tag"]) =>
-          (field: string, value: QueryStreamIndexRange.RangeOp["value"]) => {
+          (_tag: RecordedConstraint["_tag"]) =>
+          (field: string, value: RecordedConstraint["value"]) => {
             operations.push({ _tag, field, value });
             return builder;
           };
@@ -137,20 +149,130 @@ const makeReader = (pending?: PendingRead) => {
   };
   const stream = QueryStream.fromReflection<Document, "asc">({
     reader,
-    tableName: "documents",
-    tableSchema,
+    table,
     indexName: "by_group",
     indexFieldPaths: ["group", "_creationTime"],
-    spec: QueryStreamIndexRange.rangeBuilder<
+    indexRange: QueryStreamIndexRange.builder<
       Document,
       ["group", "_creationTime"]
     >(),
-    order: "asc",
+    orderDirection: "asc",
   });
   return { stream, runs, events };
 };
 
 describe("QueryStream iterator lifecycle", () => {
+  it.effect.each(["maximumRowsRead", "maximumBytesRead"] as const)(
+    "rejects invalid %s before starting a database read",
+    (field) =>
+      Effect.gen(function* () {
+        for (const value of [-1, 0.5, NaN, Infinity, -Infinity]) {
+          const reader = makeReader();
+          const exit = yield* QueryStream.paginate(reader.stream, {
+            cursor: null,
+            numItems: 10,
+            [field]: value,
+          }).pipe(Effect.exit);
+          assert(Exit.isFailure(exit));
+          const error = Result.getOrThrow(Cause.findDefect(exit.cause));
+          assert(error instanceof QueryStream.InvalidReadLimitError);
+          expect(Schema.isSchemaError(error.cause)).toBe(true);
+          expect(error.message).toContain(field);
+          expect(reader.runs).toEqual([]);
+          expect(reader.events).toEqual([]);
+        }
+      }),
+  );
+
+  it.effect(
+    "preserves the page budget during nested public stream consumption",
+    () =>
+      Effect.gen(function* () {
+        const outer = makeReader();
+        const inner = makeReader();
+        const stream = outer.stream.pipe(
+          QueryStream.mapEffect((document) =>
+            Stream.runCollect(inner.stream).pipe(
+              Effect.map((nested) => ({ document, nested })),
+            ),
+          ),
+        );
+
+        const page = yield* QueryStream.paginate(stream, {
+          cursor: null,
+          numItems: 10,
+          maximumRowsRead: 2,
+        });
+
+        expect(page.page).toEqual([
+          { document: documents[0], nested: [documents[0]] },
+        ]);
+        expect(page.pageStatus).toBe("SplitRequired");
+        expect(outer.runs).toEqual([
+          { order: "asc", next: 1, returned: 1, settled: 1 },
+        ]);
+        expect(inner.runs).toEqual([
+          { order: "asc", next: 1, returned: 1, settled: 1 },
+        ]);
+        expect(
+          Option.isNone(
+            yield* Effect.serviceOption(
+              QueryStreamReadBudget.QueryStreamReadBudget,
+            ),
+          ),
+        ).toBe(true);
+      }),
+  );
+
+  it.effect(
+    "restores the enclosing budget after successful and failed pagination",
+    () =>
+      Effect.gen(function* () {
+        const enclosing = yield* QueryStreamReadBudget.make(
+          yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)({
+            maximumRowsRead: 10,
+          }),
+        );
+        const reader = makeReader();
+
+        yield* Effect.gen(function* () {
+          const page = yield* QueryStream.paginate(reader.stream, {
+            cursor: null,
+            numItems: 10,
+            maximumRowsRead: 1,
+          });
+          expect(page.page).toEqual([documents[0]]);
+          expect(yield* QueryStreamReadBudget.QueryStreamReadBudget).toBe(
+            enclosing,
+          );
+
+          const error = yield* QueryStream.paginate(reader.stream, {
+            cursor: null,
+            numItems: 10,
+            maximumRowsRead: 0,
+          }).pipe(Effect.flip);
+          expect(error).toBeInstanceOf(QueryStream.ReadBudgetExceededError);
+          expect(yield* QueryStreamReadBudget.QueryStreamReadBudget).toBe(
+            enclosing,
+          );
+        }).pipe(
+          Effect.provideService(
+            QueryStreamReadBudget.QueryStreamReadBudget,
+            enclosing,
+          ),
+        );
+
+        expect((yield* enclosing.getReadCounts).rowsRead).toBe(0);
+        expect(
+          Option.isNone(
+            yield* Effect.serviceOption(
+              QueryStreamReadBudget.QueryStreamReadBudget,
+            ),
+          ),
+        ).toBe(true);
+      }),
+  );
+
   it.effect.each(["maximumRowsRead", "maximumBytesRead"] as const)(
     "reports zero reads when %s is zero",
     (limit) =>
@@ -161,13 +283,8 @@ describe("QueryStream iterator lifecycle", () => {
           numItems: 10,
           [limit]: 0,
         }).pipe(Effect.flip);
-        expect(error).toBeInstanceOf(
-          QueryStreamReadBudget.ReadBudgetExceededError,
-        );
-        expect(error).toMatchObject({ rowsRead: 0 });
-        if (limit === "maximumBytesRead") {
-          expect(error).toMatchObject({ bytesRead: 0 });
-        }
+        expect(error).toBeInstanceOf(QueryStream.ReadBudgetExceededError);
+        expect(error).toMatchObject({ rowsRead: 0, bytesRead: 0 });
         expect(reader.runs.every((run) => run.next === 0)).toBe(true);
       }),
   );
@@ -318,13 +435,21 @@ describe("QueryStream iterator lifecycle", () => {
           QueryStream.distinct(distinctFields),
           QueryStream.reverse,
         );
-        const head = yield* Stream.runHead(reversed.annotated);
+        const head = yield* Stream.runHead(reversed.annotated).pipe(
+          Effect.provideServiceEffect(
+            QueryStreamReadBudget.QueryStreamReadBudget,
+            QueryStreamReadBudget.make({
+              maximumRowsRead: Option.none(),
+              maximumBytesRead: Option.none(),
+            }),
+          ),
+        );
 
         expect(head).toEqual(
           Option.some(
             new QueryStream.Element({
               doc: Option.none(),
-              key: ["b", 3, "b1"],
+              keyValues: ["b", 3, "b1"],
             }),
           ),
         );
@@ -380,9 +505,7 @@ describe("QueryStream iterator lifecycle", () => {
           Effect.flip,
         );
 
-        expect(error).toBeInstanceOf(
-          QueryStreamReadBudget.ReadBudgetExceededError,
-        );
+        expect(error).toBeInstanceOf(QueryStream.ReadBudgetExceededError);
         expect(error).toMatchObject({ rowsRead: 1 });
         expect(reader.events).toEqual(["0:open:desc", "0:next", "0:return"]);
       }),
@@ -405,9 +528,7 @@ describe("QueryStream iterator lifecycle", () => {
           Effect.flip,
         );
 
-        expect(error).toBeInstanceOf(
-          QueryStreamReadBudget.ReadBudgetExceededError,
-        );
+        expect(error).toBeInstanceOf(QueryStream.ReadBudgetExceededError);
         expect(error).toMatchObject({ rowsRead: 2 });
         expect(reader.events).toEqual([
           "0:open:desc",
@@ -420,74 +541,72 @@ describe("QueryStream iterator lifecycle", () => {
       }),
   );
 
-  for (const stage of [
+  it.effect.each([
     "leaf",
     "reverse discovery",
     "representative probe",
-  ] as const) {
-    it.effect(
-      `releases ${stage} while next is pending and ignores its later resolution`,
-      () =>
-        Effect.gen(function* () {
-          const entered = yield* Deferred.make<void>();
-          const release = yield* Deferred.make<void>();
-          const settled = yield* Deferred.make<void>();
-          const iterator = stage === "representative probe" ? 1 : 0;
-          const reader = makeReader({ iterator, entered, release, settled });
-          const examined: Array<string> = [];
-          let processed = 0;
-          const observed = reader.stream.pipe(
-            QueryStream.filterEffect((document) =>
-              Effect.sync(() => {
-                examined.push(document._id);
-                return true;
-              }),
-            ),
-          );
-          const stream =
-            stage === "leaf"
-              ? observed
-              : observed.pipe(
-                  QueryStream.distinct(distinctFields),
-                  QueryStream.reverse,
-                );
-          const fiber = yield* stream.pipe(
-            QueryStream.mapEffect((document) =>
-              Effect.sync(() => {
-                processed++;
-                return document;
-              }),
-            ),
-            QueryStream.paginate({
-              cursor: null,
-              numItems: 10,
-              maximumRowsRead: 10,
+  ] as const)(
+    "releases %s while next is pending and ignores its later resolution",
+    (stage) =>
+      Effect.gen(function* () {
+        const entered = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        const settled = yield* Deferred.make<void>();
+        const iterator = stage === "representative probe" ? 1 : 0;
+        const reader = makeReader({ iterator, entered, release, settled });
+        const examined: Array<string> = [];
+        let processed = 0;
+        const observed = reader.stream.pipe(
+          QueryStream.filterEffect((document) =>
+            Effect.sync(() => {
+              examined.push(document._id);
+              return true;
             }),
-            Effect.forkScoped,
-          );
+          ),
+        );
+        const stream =
+          stage === "leaf"
+            ? observed
+            : observed.pipe(
+                QueryStream.distinct(distinctFields),
+                QueryStream.reverse,
+              );
+        const fiber = yield* stream.pipe(
+          QueryStream.mapEffect((document) =>
+            Effect.sync(() => {
+              processed++;
+              return document;
+            }),
+          ),
+          QueryStream.paginate({
+            cursor: null,
+            numItems: 10,
+            maximumRowsRead: 10,
+          }),
+          Effect.forkScoped,
+        );
 
-          yield* Deferred.await(entered);
-          expect(reader.runs[iterator]).toMatchObject({
-            next: 1,
-            returned: 0,
-            settled: 0,
-          });
-          yield* Fiber.interrupt(fiber);
-          expect(Exit.hasInterrupts(yield* Fiber.await(fiber))).toBe(true);
-          expect(reader.runs).toHaveLength(iterator + 1);
-          for (const run of reader.runs) expect(run.returned).toBe(1);
-          expect(reader.runs[iterator]?.settled).toBe(0);
-          expect(processed).toBe(0);
-          expect(examined).toEqual(iterator === 1 ? ["b2"] : []);
-          const eventsAfterInterruption = [...reader.events];
+        yield* Deferred.await(entered);
+        expect(reader.runs[iterator]).toMatchObject({
+          next: 1,
+          returned: 0,
+          settled: 0,
+        });
+        yield* Fiber.interrupt(fiber);
+        expect(Exit.hasInterrupts(yield* Fiber.await(fiber))).toBe(true);
+        expect(reader.runs).toHaveLength(iterator + 1);
+        for (const run of reader.runs) expect(run.returned).toBe(1);
+        expect(reader.runs[iterator]?.settled).toBe(0);
+        expect(processed).toBe(0);
+        expect(examined).toEqual(iterator === 1 ? ["b2"] : []);
+        const eventsAfterInterruption = [...reader.events];
 
-          yield* Deferred.succeed(release, undefined);
-          yield* Deferred.await(settled);
-          expect(reader.runs[iterator]?.settled).toBe(1);
-          expect(reader.events).toEqual(eventsAfterInterruption);
-          expect(processed).toBe(0);
-          expect(examined).toEqual(iterator === 1 ? ["b2"] : []);
-        }).pipe(Effect.scoped),
-    );
-  }
+        yield* Deferred.succeed(release, undefined);
+        yield* Deferred.await(settled);
+        expect(reader.runs[iterator]?.settled).toBe(1);
+        expect(reader.events).toEqual(eventsAfterInterruption);
+        expect(processed).toBe(0);
+        expect(examined).toEqual(iterator === 1 ? ["b2"] : []);
+      }).pipe(Effect.scoped),
+  );
 });

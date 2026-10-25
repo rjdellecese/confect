@@ -1,3 +1,4 @@
+import * as Project from "./integration/Project";
 import * as Bundler from "@confect/cli/Bundler";
 import * as CodegenError from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -36,6 +37,7 @@ const makeProject = Effect.fnUntraced(function* () {
     directory: import.meta.dirname,
     prefix: "tracing-",
   });
+  yield* Project.installPackages(root);
   const confect = path.join(root, "confect");
   const convex = path.join(root, "convex");
   yield* fs.makeDirectory(confect);
@@ -123,18 +125,18 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           );
 
           expect(spans).toEqual([]);
-          const first = yield* pass;
-          const second = yield* pass;
-          expect(first.anyWritesHappened).toBe(true);
-          expect(second.anyWritesHappened).toBe(false);
+          const first = yield* Project.writtenFiles(pass);
+          const second = yield* Project.writtenFiles(pass);
+          expect(first).not.toEqual([]);
+          expect(second).toEqual([]);
 
           const passes = spans.filter((span) => span.name === "Cli.codegen");
           expect(passes).toHaveLength(2);
           expect(passes[0]).not.toBe(passes[1]);
           for (const name of [
-            "LeafModule.validateSpec",
-            "LeafModule.validateImpl",
-            "ConvexConfig.discoverInstalledComponents",
+            "EvaluationSession.loadSpecs",
+            "EvaluationSession.validateImpls",
+            "EvaluationSession.components",
           ]) {
             const operations = spans.filter((span) => span.name === name);
             expect(operations).toHaveLength(2);
@@ -143,17 +145,17 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             }
           }
           const bundles = spans.filter(
-            (span) => span.name === "Bundler.bundle",
+            (span) => span.name === "Bundler.compile",
           );
           expect(bundles.length).toBeGreaterThan(0);
           for (const bundle of bundles) {
             const parent = Option.getOrUndefined(bundle.parent);
             assert(parent?._tag === "Span");
             expect([
-              "Cli.codegen",
-              "LeafModule.validateSpec",
-              "LeafModule.validateImpl",
-              "ConvexConfig.discoverInstalledComponents",
+              "EvaluationSession.compile",
+              "EvaluationSession.loadSpecs",
+              "EvaluationSession.validateImpls",
+              "EvaluationSession.components",
             ]).toContain(parent.name);
           }
           for (const span of spans) {
@@ -161,12 +163,18 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             expect(Exit.isSuccess(span.status.exit)).toBe(true);
           }
         }),
+      {
+        timeout:
+          process.platform === "win32" || process.platform === "linux"
+            ? 15000
+            : 5000,
+      },
     );
 
     it.effect.each([
-      { kind: "spec", name: "LeafModule.validateSpec" },
-      { kind: "impl", name: "LeafModule.validateImpl" },
-      { kind: "config", name: "ConvexConfig.discoverInstalledComponents" },
+      { kind: "spec", name: "EvaluationSession.loadSpecs" },
+      { kind: "impl", name: "EvaluationSession.validateImpls" },
+      { kind: "config", name: "EvaluationSession.components" },
     ] as const)(
       "retains a failed $kind operation when the caller recovers",
       ({ kind, name }) =>
@@ -215,11 +223,21 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
         expect((yield* bundle).module.default).toBe(42);
         yield* fs.remove(entry);
         expect(Exit.isFailure(yield* Effect.exit(bundle))).toBe(true);
-        expect(spans).toHaveLength(2);
-        assert(spans[0]?.status._tag === "Ended");
-        assert(spans[1]?.status._tag === "Ended");
-        expect(Exit.isSuccess(spans[0].status.exit)).toBe(true);
-        expect(Exit.isFailure(spans[1].status.exit)).toBe(true);
+        const bundles = spans.filter((span) => span.name === "Bundler.bundle");
+        const compilations = spans.filter(
+          (span) => span.name === "Bundler.compile",
+        );
+        expect(bundles).toHaveLength(2);
+        expect(compilations).toHaveLength(2);
+        for (const operations of [bundles, compilations]) {
+          assert(operations[0]?.status._tag === "Ended");
+          assert(operations[1]?.status._tag === "Ended");
+          expect(Exit.isSuccess(operations[0].status.exit)).toBe(true);
+          expect(Exit.isFailure(operations[1].status.exit)).toBe(true);
+        }
+        for (const compilation of compilations) {
+          expect(bundles).toContain(Option.getOrUndefined(compilation.parent));
+        }
       }),
     );
   },

@@ -17,12 +17,13 @@ export type QueryStreamOrderDirection = "asc" | "desc";
  *
  * @experimental
  */
-export type Flip<Direction extends QueryStreamOrderDirection> =
-  Direction extends "asc" ? "desc" : "asc";
+export type Flip<OrderDirection extends QueryStreamOrderDirection> =
+  OrderDirection extends "asc" ? "desc" : "asc";
 
 /**
  * @experimental
  */
-export const flip = <Direction extends QueryStreamOrderDirection>(
-  direction: Direction,
-): Flip<Direction> => (direction === "asc" ? "desc" : "asc") as Flip<Direction>;
+export const flip = <OrderDirection extends QueryStreamOrderDirection>(
+  orderDirection: OrderDirection,
+): Flip<OrderDirection> =>
+  (orderDirection === "asc" ? "desc" : "asc") as Flip<OrderDirection>;

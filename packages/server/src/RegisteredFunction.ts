@@ -18,6 +18,7 @@ import {
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import { pipe } from "effect/Function";
+import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
@@ -26,14 +27,17 @@ import type * as EffectScheduler from "effect/Scheduler";
 import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
 import * as Auth from "./Auth";
+import * as ConvexLogger from "./ConvexLogger";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
+import * as ExecutionMetadata from "./ExecutionMetadata";
+import * as RequestMetadata from "./RequestMetadata";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
+import * as Storage from "./Storage";
 import * as StorageActionWriter from "./StorageActionWriter";
-import * as StorageReader from "./StorageReader";
 import * as StorageWriter from "./StorageWriter";
 import * as VectorSearch from "./VectorSearch";
 import type * as Handler from "./Handler";
@@ -227,7 +231,7 @@ export const runHandlerPromise =
             Effect.catch((typedError) =>
               pipe(
                 Schema.encodeEffect(errorSchema)(typedError),
-                Effect.orDie,
+                Effect.catchTag("SchemaError", Effect.die),
                 Effect.andThen((encodedError) =>
                   Effect.fail(new ConvexError(encodedError)),
                 ),
@@ -235,7 +239,10 @@ export const runHandlerPromise =
             ),
           );
     return Effect.runPromise(
-      Effect.result(rethrowConvexErrorDefects(withConvexError)),
+      Effect.result(rethrowConvexErrorDefects(withConvexError)).pipe(
+        Effect.provide(ConvexLogger.layer),
+        Effect.provideService(Console.Console, globalThis.console),
+      ),
       runOptions,
     ).then(
       Result.match({
@@ -288,7 +295,7 @@ export const actionFunctionBase = <
       const decodedArgs = yield* pipe(
         actualArgs,
         Schema.decodeUnknownEffect(args),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* applyMiddleware(
@@ -304,7 +311,7 @@ export const actionFunctionBase = <
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
-        Effect.orDie,
+        Effect.catchTag("SchemaError", Effect.die),
       );
     }).pipe(runHandlerPromise(combineErrorSchemas(error, resolvedMiddlewares))),
 });
@@ -324,7 +331,9 @@ export const baseActionLayer = <ConvexDataModel extends GenericDataModel>(
   Layer.mergeAll(
     Scheduler.layer(ctx.scheduler),
     Auth.layer(ctx.auth),
-    StorageReader.StorageReader.layer(ctx.storage),
+    ExecutionMetadata.layer(ctx.meta),
+    RequestMetadata.layer(ctx.meta),
+    Storage.layer(ctx.storage),
     StorageWriter.StorageWriter.layer(ctx.storage),
     StorageActionWriter.StorageActionWriter.layer(ctx.storage),
     QueryRunner.layer(ctx.runQuery.bind(ctx)),
@@ -350,7 +359,9 @@ export const actionLayer = <
       databaseSchema.target,
       ctx.auth,
     ),
-    StorageReader.StorageReader.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
+    ExecutionMetadata.layer(ctx.meta),
+    RequestMetadata.layer(ctx.meta),
+    Storage.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
       ctx.storage,
       databaseSchema.target.scope,
     ),

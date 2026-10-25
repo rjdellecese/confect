@@ -5,13 +5,12 @@ import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 import type * as Schema from "effect/Schema";
 
-const run = Effect.fn("ActionRunner.run")(
+const run = Effect.fn("ActionRunner.runAction")(
   <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
 );
 
-const make =
-  (runAction: GenericActionCtx<any>["runAction"]) =>
-  <Action extends Ref.AnyAction>(
+const make = (runAction: GenericActionCtx<any>["runAction"]) => ({
+  runAction: <Action extends Ref.AnyAction>(
     action: Action,
     ...args: Ref.OptionalArgs<Action>
   ): Effect.Effect<
@@ -25,7 +24,8 @@ const make =
         (functionReference, encodedArgs) =>
           runAction(functionReference, encodedArgs),
       ),
-    );
+    ),
+});
 
 export const ActionRunner = Context.Service<ReturnType<typeof make>>(
   "@confect/server/ActionRunner",

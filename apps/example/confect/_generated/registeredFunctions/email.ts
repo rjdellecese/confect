@@ -1,6 +1,5 @@
-import { RegisteredFunctions } from "@confect/server";
 import { RegisteredNodeFunction } from "@confect/server/node";
 import databaseSchema from "../schema";
-import email from "../../email.impl";
+import groupLayer from "../../email.impl";
 
-export default RegisteredFunctions.buildForGroup<typeof import("../../email.spec")["default"]>(databaseSchema, email, RegisteredNodeFunction.make);
+export default RegisteredNodeFunction.buildForGroup<typeof import("../../email.spec")["default"]>(databaseSchema, groupLayer);

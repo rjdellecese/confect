@@ -31,10 +31,10 @@ import type * as DataModel from "./DataModel";
 import * as Document from "./Document";
 import * as OrderedQuery from "./OrderedQuery";
 import * as QueryStream from "./QueryStream";
+import type * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 import type * as Table from "./Table";
-import type * as TableInfo from "./TableInfo";
 
 type ConvexTableInfoFor<
   DataModel_ extends DataModel.AnyWithProps,
@@ -117,12 +117,12 @@ export interface QueryInitializer<
    * bound calls are the range predicates. The value is a reusable description
    * of a query: each run re-runs the index query. * The typed range builder
    * consumes `eq`-pinned fields from the index's field tuple at the type level,
-   * so the stream's order-key type is exactly the fields that still vary (the
-   * `ORDER BY` columns left after the equality predicates). The order direction
-   * is part of the type too: omitted, it is `"asc"`; a literal is tracked as
-   * that literal, and a value known only at runtime as the union. The order
-   * parameter is either absent or a direction—never `undefined`—so the type
-   * can't claim a literal the runtime default would contradict.
+   * so the stream's visible label type is exactly the fields that still vary
+   * (the `ORDER BY` columns left after the equality predicates). The order
+   * direction is part of the type too: omitted, it is `"asc"`; a literal is
+   * tracked as that literal, and a value known only at runtime as the union.
+   * The order parameter is either absent or a direction—never `undefined`—so
+   * the type can't claim a literal the runtime default would contradict.
    */
   readonly stream: {
     <
@@ -130,18 +130,20 @@ export interface QueryInitializer<
         ConvexTableInfoFor<DataModel_, TableName>
       > &
         string,
-      Spec extends QueryStreamIndexRange.AnyIndexRangeSpec,
+      Range extends QueryStreamIndexRange.QueryStreamIndexRange,
     >(
       indexName: IndexName,
       indexRange: (
-        q: QueryStreamIndexRange.RangeBuilder<
+        q: QueryStreamIndexRange.Builder<
           TableInfoFor<DataModel_, TableName>["convexDocument"],
           NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
         >,
-      ) => Spec,
+      ) => Range,
     ): QueryStream.QueryStream<
       Doc,
-      QueryStreamIndexRange.Remaining<Spec>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        QueryStreamIndexRange.Remaining<Range>
+      >,
       "asc",
       Document.DocumentDecodeError,
       never
@@ -151,20 +153,22 @@ export interface QueryInitializer<
         ConvexTableInfoFor<DataModel_, TableName>
       > &
         string,
-      Spec extends QueryStreamIndexRange.AnyIndexRangeSpec,
+      Range extends QueryStreamIndexRange.QueryStreamIndexRange,
       Direction extends OrderDirection,
     >(
       indexName: IndexName,
       indexRange: (
-        q: QueryStreamIndexRange.RangeBuilder<
+        q: QueryStreamIndexRange.Builder<
           TableInfoFor<DataModel_, TableName>["convexDocument"],
           NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
         >,
-      ) => Spec,
+      ) => Range,
       order: Direction,
     ): QueryStream.QueryStream<
       Doc,
-      QueryStreamIndexRange.Remaining<Spec>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        QueryStreamIndexRange.Remaining<Range>
+      >,
       Direction,
       Document.DocumentDecodeError,
       never
@@ -178,7 +182,9 @@ export interface QueryInitializer<
       indexName: IndexName,
     ): QueryStream.QueryStream<
       Doc,
-      NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
+      >,
       "asc",
       Document.DocumentDecodeError,
       never
@@ -194,7 +200,9 @@ export interface QueryInitializer<
       order: Direction,
     ): QueryStream.QueryStream<
       Doc,
-      NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
+      >,
       Direction,
       Document.DocumentDecodeError,
       never
@@ -206,12 +214,12 @@ export const make = <
   Tables extends Table.AnyWithProps,
   TableName extends Table.Name<Tables>,
 >(
-  tableName: TableName,
   convexDatabaseReader: BaseDatabaseReader<
     DataModel.ToConvex<DataModel.FromTables<Tables>>
   >,
   table: Table.WithName<Tables, TableName>,
 ): QueryInitializer<DataModel.FromTables<Tables>, TableName> => {
+  const tableName = table.tableName;
   type DataModel_ = DataModel.FromTables<Tables>;
   type ConvexDataModel_ = DataModel.ToConvex<DataModel_>;
   type ThisQueryInitializer = QueryInitializer<DataModel_, TableName>;
@@ -264,7 +272,7 @@ export const make = <
           ),
         ),
       ),
-      Effect.andThen(Document.decode(tableName, table.Fields)),
+      Effect.andThen(Document.decode(table)),
     );
   };
 
@@ -274,7 +282,7 @@ export const make = <
     if (args.length === 1) {
       const id = args[0] as GenericId<TableName>;
 
-      return getById(tableName, convexDatabaseReader, table)(id);
+      return getById<Tables, TableName>(convexDatabaseReader, table)(id);
     } else {
       const [indexName, ...indexFieldValues] = args;
 
@@ -350,36 +358,26 @@ export const make = <
       applyOrder,
     );
 
-    return OrderedQuery.make<
-      DataModel.TableInfoWithName_<DataModel_, TableName>,
-      TableName
-    >(
-      orderedQuery,
-      tableName,
-      table.Fields as TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >,
-    );
+    return OrderedQuery.make(orderedQuery, table);
   };
 
   const stream: QueryInitializerFunction<"stream"> = ((
     indexName: string,
     indexRangeOrOrder?:
       | ((
-          q: QueryStreamIndexRange.RangeBuilder<any, any>,
-        ) => QueryStreamIndexRange.AnyIndexRangeSpec)
+          q: QueryStreamIndexRange.Builder<any, any>,
+        ) => QueryStreamIndexRange.QueryStreamIndexRange)
       | OrderDirection,
     maybeOrder?: OrderDirection,
   ) => {
-    const order = Predicate.isString(indexRangeOrOrder)
+    const orderDirection = Predicate.isString(indexRangeOrOrder)
       ? indexRangeOrOrder
       : (maybeOrder ?? "asc");
 
-    // With no range callback, the leaf gets an empty spec (no ops, no
-    // pinned fields).
-    const spec = Predicate.isFunction(indexRangeOrOrder)
-      ? indexRangeOrOrder(QueryStreamIndexRange.rangeBuilder())
-      : QueryStreamIndexRange.rangeBuilder();
+    // Without a range callback, the leaf scans the entire index.
+    const indexRange = Predicate.isFunction(indexRangeOrOrder)
+      ? indexRangeOrOrder(QueryStreamIndexRange.builder())
+      : QueryStreamIndexRange.builder();
 
     // The type-level field tuple appends the `_creationTime` tiebreaker, but
     // the runtime `table.indexes` record stores only the declared fields—append it here.
@@ -408,12 +406,11 @@ export const make = <
 
     return QueryStream.fromReflection({
       reader: convexDatabaseReader as QueryStream.ReflectionReader,
-      tableName,
-      tableSchema: table.Fields,
+      table,
       indexName,
       indexFieldPaths,
-      spec,
-      order,
+      indexRange,
+      orderDirection,
     });
   }) as QueryInitializerFunction<"stream">;
 
@@ -421,17 +418,11 @@ export const make = <
     indexName,
     searchFilter,
   ) =>
-    OrderedQuery.make<
-      DataModel.TableInfoWithName_<DataModel_, TableName>,
-      TableName
-    >(
+    OrderedQuery.make(
       convexDatabaseReader
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),
-      tableName,
-      table.Fields as TableInfo.TableSchema<
-        DataModel.TableInfoWithName_<DataModel_, TableName>
-      >,
+      table,
     );
 
   return {
@@ -444,7 +435,6 @@ export const make = <
 
 export const getById =
   <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
-    tableName: TableName,
     convexDatabaseReader: BaseDatabaseReader<
       DataModel.ToConvex<DataModel.FromTables<Tables>>
     >,
@@ -457,11 +447,11 @@ export const getById =
         Effect.fromResult(
           Result.fromNullishOr(
             value,
-            () => new GetByIdFailure({ tableName, id }),
+            () => new GetByIdFailure({ tableName: table.tableName, id }),
           ),
         ),
       ),
-      Effect.andThen(Document.decode(tableName, table.Fields)),
+      Effect.andThen(Document.decode(table)),
     );
 
 export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>()(

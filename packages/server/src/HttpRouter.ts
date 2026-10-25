@@ -9,26 +9,32 @@ import {
 } from "convex/server";
 import * as Array from "effect/Array";
 import * as Config from "effect/Config";
+import * as Console from "effect/Console";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import type * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import type * as Etag from "effect/unstable/http/Etag";
-import type * as HttpPlatform from "effect/unstable/http/HttpPlatform";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpServer from "effect/unstable/http/HttpServer";
+import type * as Etag from "effect/http/Etag";
+import type * as HttpPlatform from "effect/http/HttpPlatform";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServer from "effect/http/HttpServer";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type * as Handler from "./Handler";
+import type { ExecutionMetadata } from "./ExecutionMetadata";
+import type { RequestMetadata } from "./RequestMetadata";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
+import * as ConvexLogger from "./ConvexLogger";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as Scheduler from "./Scheduler";
+import type { Storage } from "./Storage";
 import type { StorageActionWriter } from "./StorageActionWriter";
 import type { StorageReader } from "./StorageReader";
 import type { StorageWriter } from "./StorageWriter";
@@ -43,6 +49,9 @@ export type Services =
   | ActionRunner.ActionRunner
   | Scheduler.Scheduler
   | Auth.Auth
+  | ExecutionMetadata
+  | RequestMetadata
+  | Storage
   | StorageReader
   | StorageWriter
   | StorageActionWriter;
@@ -50,13 +59,12 @@ export type Services =
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
  *
- * Compose it from Effect's `effect/unstable/http` and `effect/unstable/httpapi`
- * modules: `HttpApiBuilder.layer(api)` registers an `HttpApi`'s endpoints
- * (provide its group handler layers with `Layer.provide`),
- * `HttpApiScalar.layer(api, ...)` serves interactive API docs, `HttpRouter.add`
- * registers a plain route, and `HttpRouter.middleware(fn, { global: true })`
- * applies middleware to every route. Merge any number of these with
- * `Layer.mergeAll`.
+ * Compose it from Effect's `effect/http` and `effect/http-api` modules:
+ * `HttpApiBuilder.layer(api)` registers an `HttpApi`'s endpoints (provide its
+ * group handler layers with `Layer.provide`), `HttpApiScalar.layer(api, ...)`
+ * serves interactive API docs, `HttpRouter.add` registers a plain route, and
+ * `HttpRouter.middleware(fn, { global: true })` applies middleware to every
+ * route. Merge any number of these with `Layer.mergeAll`.
  *
  * Route handlers and middleware may require any of the Confect {@link Services},
  * which surface as request-level `Requires` markers and are supplied per
@@ -148,6 +156,7 @@ const makeWithLayer = <Services_, DataModel_ extends GenericDataModel>(
   // Convex-aware provider; merged so that request fibers—endpoint handlers
   // and middleware—do too.
   const AppLayer = routes.pipe(
+    Layer.provideMerge(ConvexLogger.layer),
     Layer.provideMerge(ConvexConfigProvider.layer),
     Layer.provide(HttpServer.layerServices),
   );
@@ -169,7 +178,10 @@ const makeWithLayer = <Services_, DataModel_ extends GenericDataModel>(
         Layer.build(layer(ctx as unknown as GenericActionCtx<DataModel_>)),
       ),
     );
-    return handler(request, services);
+    return handler(
+      request,
+      Context.add(services, Console.Console, globalThis.console),
+    );
   });
 
   const convexHttpRouter = httpRouter();

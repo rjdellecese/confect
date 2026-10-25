@@ -6,7 +6,7 @@ import type * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 
 /**
  * A middleware spec paired with its implementation for one function's type—the
- * resolved form `buildForGroup` hands to `makeRegisteredFunction`.
+ * resolved form consumed by runtime-specific function preparation.
  */
 export interface ResolvedMiddleware {
   readonly middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec;

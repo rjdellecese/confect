@@ -1,9 +1,9 @@
 import { HttpRouter as ConfectHttpRouter } from "@confect/server";
 import { flow } from "effect/Function";
 import * as Layer from "effect/Layer";
-import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
+import * as HttpMiddleware from "effect/http/HttpMiddleware";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as NotesApi from "./http/NotesApi";
 import * as ScalarDocs from "./http/ScalarDocs";
 

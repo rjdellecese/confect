@@ -3,6 +3,9 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientError from "effect/http/HttpClientError";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
 
 /**
  * The current team is on the free plan or has the Convex AI gateway disabled.
@@ -18,15 +21,16 @@ export class AiGatewayDisabled extends Schema.TaggedError<AiGatewayDisabled>()(
 }
 
 /**
- * The current deployment is local or self-hosted and cannot use the Convex AI
- * gateway. Call the model provider directly with your own API key instead.
+ * The current deployment is anonymous, outdated, or self-hosted and cannot use
+ * the Convex AI gateway. Authenticated, project-linked local deployments are
+ * supported.
  */
 export class AiGatewayUnavailable extends Schema.TaggedError<AiGatewayUnavailable>()(
   "AiGatewayUnavailable",
   {},
 ) {
   override get message(): string {
-    return "The Convex AI gateway is unavailable. This action is running on a local or self-hosted deployment, which cannot use the gateway. Call the model provider directly with your own API key stored in a Convex environment variable.";
+    return "The Convex AI gateway is unavailable on this deployment. For local development, log in, link the deployment to a Convex project, and update the Convex CLI and local backend. Anonymous and self-hosted deployments cannot use the gateway; call the model provider directly with your own API key instead.";
   }
 }
 
@@ -46,7 +50,7 @@ export const AiGatewayError = Schema.Union([
 export type AiGatewayError = typeof AiGatewayError.Type;
 
 type GetServiceToken = typeof getConvexServiceToken;
-type AiGatewayErrorCode = "AiGatewayDisabled" | "AiGatewayUnavailable";
+type AiGatewayErrorCode = AiGatewayError["_tag"];
 
 const nodeRuntimeErrorCodeFragments: Record<AiGatewayErrorCode, string> = {
   AiGatewayDisabled: '"code":"AiGatewayDisabled"',
@@ -66,6 +70,11 @@ export interface Service {
     service: "ai-gateway",
   ) => Effect.Effect<string, AiGatewayError>;
 }
+
+export class AiGatewayServiceToken extends Context.Service<
+  AiGatewayServiceToken,
+  Service
+>()("@confect/server/internal/AiGatewayServiceToken") {}
 
 const matchesErrorCode = (
   rejection: unknown,
@@ -97,9 +106,24 @@ export const make = (getServiceToken: GetServiceToken): Service => ({
     }),
 });
 
-export class AiGatewayServiceToken extends Context.Service<
+export const layer = Layer.succeed(
   AiGatewayServiceToken,
-  Service
->()("@confect/server/internal/AiGatewayServiceToken") {
-  static readonly layer = Layer.succeed(this, make(getConvexServiceToken));
-}
+  make(getConvexServiceToken),
+);
+
+export const transformClientRequest = (serviceToken: Service) =>
+  HttpClient.mapRequestEffect((request) =>
+    serviceToken.get("ai-gateway").pipe(
+      Effect.map((token) => HttpClientRequest.bearerToken(request, token)),
+      Effect.mapError(
+        (cause) =>
+          new HttpClientError.HttpClientError({
+            reason: new HttpClientError.TransportError({
+              request,
+              cause,
+              description: cause.message,
+            }),
+          }),
+      ),
+    ),
+  );

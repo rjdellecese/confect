@@ -1,10 +1,14 @@
-export * as AiGatewayClient from "./AiGatewayClient";
+export * as AiGatewayDecisionClient from "./AiGatewayDecisionClient";
+export * as AiGatewayDecisionModel from "./AiGatewayDecisionModel";
+export * as AiGatewayLanguageClient from "./AiGatewayLanguageClient";
 export * as AiGatewayLanguageModel from "./AiGatewayLanguageModel";
 export * as ActionCtx from "./ActionCtx";
 export * as ActionRunner from "./ActionRunner";
 export * as Auth from "./Auth";
 export * as BlobNotFoundError from "./BlobNotFoundError";
 export * as ConvexConfigProvider from "./ConvexConfigProvider";
+export * as ConvexFunctionDefinitions from "./ConvexFunctionDefinitions";
+export * as ConvexLogger from "./ConvexLogger";
 export * as CronJob from "./CronJob";
 export * as CronJobs from "./CronJobs";
 export * as DatabaseReader from "./DatabaseReader";
@@ -12,6 +16,7 @@ export * as DatabaseSchema from "./DatabaseSchema";
 export * as DatabaseWriter from "./DatabaseWriter";
 export * as DataModel from "./DataModel";
 export * as Document from "./Document";
+export * as ExecutionMetadata from "./ExecutionMetadata";
 export * as FunctionImpl from "./FunctionImpl";
 export * as FunctionRegistryItem from "./FunctionRegistryItem";
 export * as GroupImpl from "./GroupImpl";
@@ -21,21 +26,47 @@ export * as MiddlewareImpl from "./MiddlewareImpl";
 export * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 export * as MutationCtx from "./MutationCtx";
 export * as MutationRunner from "./MutationRunner";
+export * as MutationTransactionContext from "./MutationTransactionContext";
 export * as OrderedQuery from "./OrderedQuery";
 export * as QueryCtx from "./QueryCtx";
 export * as QueryInitializer from "./QueryInitializer";
 export * as QueryRunner from "./QueryRunner";
+export * as QueryTransactionContext from "./QueryTransactionContext";
 /**
  * @experimental
  */
 export * as QueryStream from "./QueryStream";
+/**
+ * @experimental
+ */
 export * as QueryStreamCursor from "./QueryStreamCursor";
+/**
+ * @experimental
+ */
 export * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
+/**
+ * @experimental
+ */
 export * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
+/**
+ * @experimental
+ */
 export * as QueryStreamOrderDirection from "./QueryStreamOrderDirection";
-export * as QueryStreamOrderKey from "./QueryStreamOrderKey";
+/**
+ * @experimental
+ */
+export * as QueryStreamKeyValues from "./QueryStreamKeyValues";
+/**
+ * @experimental
+ */
 export * as QueryStreamKeyBounds from "./QueryStreamKeyBounds";
+/**
+ * @experimental
+ */
 export * as QueryStreamIndexRange from "./QueryStreamIndexRange";
+/**
+ * @experimental
+ */
 export * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 export * as RegisteredConvexFunction from "./RegisteredConvexFunction";
 export * as RegisteredFunction from "./RegisteredFunction";
@@ -43,10 +74,13 @@ export * as RegisteredFunctions from "./RegisteredFunctions";
 export * as Registry from "./Registry";
 export * as RegistryItems from "./RegistryItems";
 export * as ResolvedMiddleware from "./ResolvedMiddleware";
+export * as RequestMetadata from "./RequestMetadata";
 export * as Scheduler from "./Scheduler";
+export * as Storage from "./Storage";
 export * as StorageActionWriter from "./StorageActionWriter";
 export * as StorageReader from "./StorageReader";
 export * as StorageWriter from "./StorageWriter";
 export * as Table from "./Table";
 export * as TableInfo from "./TableInfo";
+export * as TransactionMetadata from "./TransactionMetadata";
 export * as VectorSearch from "./VectorSearch";

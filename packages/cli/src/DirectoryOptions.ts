@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import * as Flag from "effect/unstable/cli/Flag";
+import * as Flag from "effect/cli/Flag";
 import * as ConfectDirectory from "./ConfectDirectory";
 import * as ConvexDirectory from "./ConvexDirectory";
 import * as ProjectRoot from "./ProjectRoot";

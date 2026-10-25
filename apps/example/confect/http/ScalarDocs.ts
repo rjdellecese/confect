@@ -1,7 +1,7 @@
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
+import * as HttpApiScalar from "effect/http-api/HttpApiScalar";
 import { Api } from "./NotesApi";
 
 /**

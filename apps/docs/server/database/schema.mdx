@@ -6,7 +6,7 @@ description: "Define your database schema using Effect schemas."
 
 Your database schema lives in `confect/tables/`: one file per table, each default-exporting a `Table.make(...)` value, where the **filename is the table name** (`confect/tables/notes.ts` defines a table called `notes`). The Confect CLI's codegen combines these files into a single schema behind the scenes—and generates the per-table helpers your code imports—so you never assemble or edit a schema definition by hand. (For the full layout of what codegen emits, see [Project Structure](/concepts/project-structure).)
 
-Each table is defined with `Table.make`, which takes a callback returning the table's fields. The callback runs lazily—only the first time the table's `Fields` or `Doc` is accessed—so a function that never touches a table pays no schema-construction cost for it at cold start. Indexes are defined on tables the same way as in the base Convex APIs. Cross-table `Id` references are constructed with the codegen-emitted `Id` helper from `confect/_generated/id.ts`, whose argument is type-constrained to the set of declared table names.
+Each table is defined with `Table.make`, which takes a callback returning the table's fields. The callback runs lazily—only the first time the table's `Fields` or `Doc` is accessed—so a function that never touches a table pays no schema-construction cost for it at cold start. Indexes are defined on tables the same way as in the base Convex APIs. Cross-table `Id` references are constructed with the codegen-emitted `Id` helper from `confect/_generated/id.ts`, whose argument is type-constrained to your declared table names and Convex system table names.
 
 ```ts confect/tables/notes.ts
 import { Table } from "@confect/core";
@@ -52,6 +52,30 @@ export default Table.make(() =>
 ```
 
 Each `confect/tables/*.ts` file **must default-export a `Table`**—codegen reads `module.default` and applies the filename as the table name. Consumers (specs, impls, HTTP handlers, etc.) reach a table's derived `Schema`s through the generated wrapper at `confect/_generated/tables/<name>`, e.g. `import notes from "../_generated/tables/notes"` and then `notes.Doc`.
+
+## Document IDs
+
+Import `Id` from `confect/_generated/id` for both ID schemas and TypeScript types:
+
+```ts
+import * as Schema from "effect/Schema";
+import { Id } from "./confect/_generated/id";
+
+const noteArgs = Schema.Struct({ noteId: Id("notes") });
+type NoteProps = { noteId: Id<"notes"> };
+```
+
+Use `Id("notes")` when you need a schema and `Id<"notes">` when you need a type. Both accept only your declared table names and Convex's system table names, `"_storage"` and `"_scheduled_functions"`. For example, use `Id("_storage")` for a stored file reference and `Id<"_storage">` for its TypeScript type.
+
+When you only need the type, use a type-only import. It adds no runtime dependency and works in frontend code:
+
+```ts
+import type { Id } from "./confect/_generated/id";
+
+type NoteProps = { noteId: Id<"notes"> };
+```
+
+These types are compatible with Convex's generated `Id` types. IDs remain strings at runtime; a TypeScript annotation or cast does not validate an external string or check whether a document exists.
 
 ## Deriving table `Schema`s
 

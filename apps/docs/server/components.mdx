@@ -71,7 +71,7 @@ import { MutationRunner } from "./_generated/services";
 import { counter } from "./counter";
 
 const create = Effect.gen(function* () {
-  const runMutation = yield* MutationRunner;
+  const { runMutation } = yield* MutationRunner;
   return yield* runMutation(counter.counter.create, { count: 3 });
 });
 ```

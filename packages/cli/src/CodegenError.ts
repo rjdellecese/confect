@@ -6,6 +6,7 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { BuildError, isBuildError } from "./BuildError";
+import { SnapshotError } from "./SnapshotError";
 import * as Ansi from "./Ansi";
 import { formatPath, renderBuildError } from "./log";
 
@@ -156,6 +157,7 @@ export class InvalidConvexConfigError extends Schema.TaggedError<InvalidConvexCo
 ) {}
 
 export const CodegenError = Schema.Union([
+  SnapshotError,
   BuildError,
   MissingImplFileError,
   MissingSpecFileError,
@@ -371,6 +373,13 @@ const renderParentChildNameCollisionError = (
 export const renderCodegenError = (error: CodegenError): string => {
   if (isBuildError(error)) return renderBuildError(error);
   return Match.value(error).pipe(
+    Match.tag("SnapshotError", ({ reason, relativePath, pathSegments }) =>
+      singleLine(
+        `Invalid generation metadata (${reason})`,
+        relativePath === "" ? "" : ` for ${relativePath}`,
+        pathSegments.length === 0 ? "." : ` at ${pathSegments.join("/")}.`,
+      ),
+    ),
     Match.tag("MissingImplFileError", renderMissingImplFileError),
     Match.tag("MissingSpecFileError", renderMissingSpecFileError),
     Match.tag(

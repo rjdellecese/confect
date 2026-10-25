@@ -4,33 +4,88 @@ title: "Quickstart"
 description: "Install Confect and build a type-safe Convex app with Effect schemas in minutes."
 ---
 
+## Prerequisites
+
+Use Node.js 24 or later and an existing React + TypeScript app. The client examples
+below use [Vite](https://vite.dev/guide/) and its `VITE_CONVEX_URL` environment
+variable. Run all commands from your app's root directory.
+
 ## Installation
 
 <CodeGroup>
 
 ```bash pnpm
-pnpm add convex @confect/core @confect/server @confect/cli @confect/react
+pnpm add effect convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 ```bash npm
-npm install convex @confect/core @confect/server @confect/cli @confect/react
+npm install effect convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 ```bash yarn
-yarn add convex @confect/core @confect/server @confect/cli @confect/react
+yarn add effect convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 ```bash bun
-bun add convex @confect/core @confect/server @confect/cli @confect/react
+bun add effect convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 </CodeGroup>
+
+<Note>
+  If pnpm reports ignored build scripts for `esbuild`, run `pnpm approve-builds`
+  and approve only `esbuild`, then rerun `pnpm install`. Keep this approval
+  scoped to your project rather than enabling all dependency scripts.
+</Note>
+
+The commands below use `pnpm exec` to run the locally installed CLIs. With npm,
+use `npx` instead; with Yarn, use `yarn`; with Bun, use `bunx`.
+
+## TypeScript configuration
+
+Confect requires `strict: true` in the TypeScript configuration that covers your
+Confect files. `exactOptionalPropertyTypes: true` is optional but recommended:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "strict": true,
+    "exactOptionalPropertyTypes": true
+  }
+}
+```
+
+See [Effect Schema's explanation of `exactOptionalPropertyTypes`](https://effect.website/docs/v4/schema/introduction#the-exactoptionalpropertytypes-option)
+for how it affects optional properties and schema validation.
+
+Code generation uses the nearest `tsconfig.json` for each spec, implementation,
+table, or Convex component config. It applies inherited compiler options to that
+entry and its imported helpers; a config beside an imported helper does not
+override the entry's config. `confect dev` restarts automatically when a selected
+config or its inheritance chain changes. Ordinary source edits remain incremental.
+
+<Note>
+  In Yarn Plug'n'Play projects, run `yarn confect codegen` and `yarn confect
+  dev` so package-based `extends` uses the active Yarn runtime. A `.pnp.cjs`
+  file on disk alone does not activate Yarn resolution for configuration
+  inheritance.
+</Note>
 
 ## Usage
 
 <Steps>
   <Step title="Set up your Convex dev deployment">
-    Run `convex dev` to set up your Convex dev deployment.
+    Initialize your development deployment and the `convex/` directory, then exit
+    after the first successful sync:
+
+    ```bash
+    pnpm exec convex dev --once
+    ```
+
+    Follow the prompts to configure your deployment. See Convex's
+    [local deployment guide](https://docs.convex.dev/cli/local-deployments) if you
+    want to develop locally without an account.
+
   </Step>
 
   <Step title="Define your database schema">
@@ -54,6 +109,23 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     ```
 
     Codegen will assemble every `confect/tables/*.ts` into a `DatabaseSchema` (in `confect/_generated/schema.ts`) and a Convex deploy `SchemaDefinition` (in `confect/_generated/convexSchema.ts`) for you—you never write a `confect/schema.ts`. It also emits a `confect/_generated/id.ts` module exporting a type-safe `Id` constructor (`Id("notes")`) for cross-table references.
+
+  </Step>
+
+  <Step title="Generate your table bindings">
+    Before adding a function spec, generate the table schemas and services that
+    your specs and implementations will import:
+
+    ```bash
+    pnpm exec confect codegen
+    ```
+
+    This creates `confect/_generated/`, including `id.ts`, `tables/notes.ts`,
+    `schema.ts`, and `services.ts`.
+
+    This tutorial generates table bindings before you write the functions. If
+    your table, spec, and implementation files are already complete, one codegen
+    run can generate everything without this separate step.
 
   </Step>
 
@@ -85,17 +157,10 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
   </Step>
 
-  <Step title="Run the codegen command">
-    Generate your app's `confect/_generated/` files.
-
-    ```bash
-    confect codegen
-    ```
-
-  </Step>
-
   <Step title="Implement your Confect functions">
-    Create a `GroupImpl` and implement its functions.
+    Create a `GroupImpl` and implement its functions. Each spec needs a sibling
+    implementation before you run codegen again; otherwise codegen reports a
+    missing implementation.
 
     ```ts confect/notes.impl.ts
     import { FunctionImpl, GroupImpl } from "@confect/server";
@@ -134,28 +199,34 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
     `GroupImpl.finalize` only typechecks once every function declared by the spec has a corresponding `FunctionImpl`, so it acts as a per-group completeness check.
 
-    Run `confect codegen` again to pick up the new impl.
+    Generate the function refs and Convex functions now that both the spec and
+    implementation exist:
+
+    ```bash
+    pnpm exec confect codegen
+    ```
 
   </Step>
 
   <Step title="Start your Confect app">
-    Run the `confect dev` command to generate your app's Convex functions.
+    Keep Confect's generated files in sync as you edit:
 
     ```bash
-    confect dev
+    pnpm exec confect dev
     ```
 
-    In another terminal, run the `convex dev` command to start your Convex dev deployment.
+    In another terminal, start your Convex dev deployment:
 
     ```bash
-    convex dev
+    pnpm exec convex dev
     ```
 
   </Step>
 
   <Step title="Call your Confect functions from your React app">
 
-    Set up the Convex React client and provider.
+    Set `VITE_CONVEX_URL` in your Vite app's environment to the development
+    deployment URL printed by Convex. Set up the Convex React client and provider:
 
     ```tsx src/main.tsx
     import { ConvexProvider, ConvexReactClient } from "convex/react";
@@ -225,6 +296,10 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
     export default App;
     ```
+
+    Start your React app with its development command (for example, `pnpm dev`
+    in a Vite project). Enter a note and click **Create note**. The note should
+    appear in the list, confirming that the mutation and reactive query work.
 
   </Step>
 </Steps>

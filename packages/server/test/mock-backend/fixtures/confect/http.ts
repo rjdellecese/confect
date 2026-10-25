@@ -2,15 +2,16 @@ import { HttpRouter as ConfectHttpRouter } from "@confect/server";
 import { httpActionGeneric } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Schema from "effect/Schema";
-import type * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
-import * as HttpApi from "effect/unstable/httpapi/HttpApi";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
-import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
-import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
-import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
+import type * as HttpMiddleware from "effect/http/HttpMiddleware";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import * as HttpApi from "effect/http-api/HttpApi";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
+import * as HttpApiScalar from "effect/http-api/HttpApiScalar";
 import refs from "./_generated/refs";
 import { QueryRunner } from "./_generated/services";
 import notes from "./_generated/tables/notes";
@@ -28,9 +29,8 @@ export class NotesApi extends HttpApi.make("NotesApi")
 const NotesApiLive = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
   handlers.handle("listNotes", () =>
     Effect.gen(function* () {
-      const runQuery = yield* QueryRunner;
+      const { runQuery } = yield* QueryRunner;
 
-      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Generated runner constraints erase the ref's error; this ref declares no domain error, so its SchemaError is defected here.
       return yield* runQuery(refs.public.databaseReader.listNotes, {});
     }).pipe(Effect.orDie),
   ),
@@ -57,6 +57,21 @@ const http = ConfectHttpRouter.make(
     HttpApiBuilder.layer(MetaApi).pipe(Layer.provide(MetaApiLive)),
     HttpApiScalar.layer(NotesApi, { path: "/api/docs" }),
     HttpRouter.add("GET", "/health", HttpServerResponse.text("OK")),
+    HttpRouter.add(
+      "GET",
+      "/logging",
+      Effect.logWarning("HTTP request").pipe(
+        Effect.as(HttpServerResponse.text("logged")),
+      ),
+    ),
+    HttpRouter.add(
+      "GET",
+      "/logging/disabled",
+      Effect.logWarning("hidden").pipe(
+        Effect.provide(Logger.layer([])),
+        Effect.as(HttpServerResponse.text("silent")),
+      ),
+    ),
     HttpRouter.middleware(withTestHeader, { global: true }),
   ),
 );

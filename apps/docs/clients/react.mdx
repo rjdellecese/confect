@@ -193,7 +193,7 @@ Without an `error` schema, the `Failure` variant is excluded from the type entir
 
 ## `useStreamPaginatedQuery`
 
-Loads data reactively from a paginated query whose handler paginates a [query stream](/server/database/streams#paginating-a-stream) with `QueryStream.paginate`. Those pages are not tracked by Convex's query journal, which `usePaginatedQuery` relies on to keep pages consistent as data changes, so this hook maintains that guarantee itself: every loaded page is pinned to a fixed index range by echoing its `continueCursor` back as the next subscription's `endCursor`. Adjacent pages always meet exactly, a document is never shown twice or lost between pages, and a page that outgrows `initialNumItems` is split in two.
+Loads data reactively from a paginated query whose handler paginates a [query stream](/server/database/streams#paginating-a-stream) with `QueryStream.paginate`. Those pages are not tracked by Convex's query journal, which `usePaginatedQuery` relies on to keep pages consistent as data changes, so this hook maintains that guarantee itself: every loaded page is pinned to a fixed index range by echoing its `continueCursor` back as the next subscription's `endCursor`. Adjacent pages always meet exactly, a document is never shown twice or lost between pages, and a page that outgrows `initialNumItems` is split in two when the server supplies a `splitCursor`.
 
 The call shape and the result are the same as `usePaginatedQuery`: args are encoded with the spec's user-args schema, pages are decoded with its `item` schema, `"skip"` disables the query, and the result is a `PaginatedQueryResult<Item, E>` with a `Failure` variant when the spec declares an `error` schema.
 
@@ -226,7 +226,7 @@ const Feed = () => {
 };
 ```
 
-The options also accept `maximumRowsRead` and `maximumBytesRead`, per-page read budgets forwarded to the server. On a stream that filters out most of what it reads, a page that would otherwise scan past Convex's query limits returns truncated with `SplitRequired` instead, and the hook splits it.
+The options also accept `maximumRowsRead` and `maximumBytesRead`, per-page read budgets forwarded to the server. When a budget stops a stream at a safe boundary, the server returns a partial page with `SplitRequired`, and the hook splits it. If the budget prevents safe progress or an interior split of a pinned page, `QueryStream.paginate` fails with `ReadBudgetExceededError` instead; the hook cannot resolve that by splitting. Increase the budget or reduce the query's reads. These budgets do not cover arbitrary I/O inside callbacks or guarantee that a query stays within Convex's limits; see [Read budgets](/server/database/streams#read-budgets).
 
 When the server fails a page with `paginationError: "InvalidCursor"`, the hook restarts pagination from the first page rather than failing. Stream queries emit this signal for malformed cursors, unsupported cursor versions, or mismatched runtime key-field layouts—not every change to query semantics. See [Cursor handling](/server/database/streams#cursor-handling).
 

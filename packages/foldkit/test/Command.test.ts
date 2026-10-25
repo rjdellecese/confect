@@ -1,12 +1,13 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { describe, expect, expectTypeOf, it, test } from "@effect/vitest";
+import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as FoldkitCommand from "foldkit/command";
-import { m } from "foldkit/message";
+import { defineMessageUnion } from "foldkit/message";
 import * as Command from "@confect/foldkit/Command";
 import * as Client from "@confect/foldkit/Client";
 import * as TestClient from "./TestClient";
@@ -52,9 +53,12 @@ const deleteMutationRef = Ref.make(
   }),
 );
 
-const SucceededSaveNote = m("SucceededSaveNote", { note: Schema.Unknown });
-const FailedSaveNote = m("FailedSaveNote", { error: Schema.Unknown });
-type Message = typeof SucceededSaveNote.Type | typeof FailedSaveNote.Type;
+const Message = defineMessageUnion({
+  SucceededSaveNote: { note: Schema.Unknown },
+  FailedSaveNote: { error: Schema.Unknown },
+});
+const { SucceededSaveNote, FailedSaveNote } = Message;
+type Message = typeof Message.Type;
 
 const saveNoteHandlers = {
   onSuccess: (note: unknown) => SucceededSaveNote({ note }),
@@ -204,12 +208,16 @@ describe("Command", () => {
       Command.mutation("SaveNote", insertMutationRef, saveNoteHandlers);
     });
 
-    it("rejects an explicitly undefined interrupt option", () => {
-      // @ts-expect-error—absence and `interrupt: undefined` are distinct
-      Command.mutation("SaveNote", insertMutationRef, {
-        ...saveNoteConfig,
-        interrupt: undefined,
-      });
+    it("checks an explicitly undefined interrupt option against compiler optionality", () => {
+      type AcceptsUndefined = typeof Command.mutation extends (
+        name: "SaveNote",
+        ref: typeof insertMutationRef,
+        config: typeof saveNoteConfig & { interrupt: undefined },
+      ) => unknown
+        ? true
+        : false;
+
+      expectTypeOf<AcceptsUndefined>().toEqualTypeOf<CompilerOptions.AllowsExplicitUndefined>();
     });
 
     it("rejects a handler Message not declared in messages", () => {

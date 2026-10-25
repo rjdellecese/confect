@@ -78,8 +78,9 @@ it.effect(
           // oxlint-disable-next-line effecttsgo/run-effect-inside-effect -- Convex invokes this callback in its transaction context; the handler needs its own per-call services.
           Effect.runPromise(
             Effect.gen(function* () {
-              const mutation = yield* MutationRunner.MutationRunner;
-              const query = yield* QueryRunner.QueryRunner;
+              const { runMutation: mutation } =
+                yield* MutationRunner.MutationRunner;
+              const { runQuery: query } = yield* QueryRunner.QueryRunner;
               const id = yield* mutation(second.counter.create, { count: 7 });
               const failure = yield* Effect.result(
                 mutation(first.counter.reject),
