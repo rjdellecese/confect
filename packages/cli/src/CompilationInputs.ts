@@ -84,7 +84,7 @@ export const ancestors = (
 
 export const make = Effect.fn("CompilationInputs.make")(
   function* (
-    policy: CompilationPolicy.Policy = CompilationPolicy.Policy.Watch(),
+    policy: CompilationPolicy.CompilationPolicy = "Watch",
     conditions?: ReadonlyArray<string>,
   ) {
     const mode = CompilationPolicy.toMode(policy);
@@ -567,7 +567,7 @@ export const make = Effect.fn("CompilationInputs.make")(
   },
   (
     effect,
-    _policy?: CompilationPolicy.Policy,
+    _policy?: CompilationPolicy.CompilationPolicy,
     _conditions?: ReadonlyArray<string>,
   ) => Effect.provide(effect, NodeCrypto.layer),
 );

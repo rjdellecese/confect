@@ -6,7 +6,6 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type * as esbuild from "esbuild";
 import * as CompilationInputs from "@confect/cli/CompilationInputs";
-import * as CompilationPolicy from "@confect/cli/CompilationPolicy";
 import * as ResolutionScope from "@confect/cli/ResolutionScope";
 
 layer(NodeServices.layer, { excludeTestServices: true })(
@@ -28,9 +27,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const root = yield* fs.makeTempDirectoryScoped();
           yield* fs.writeFileString(path.join(root, "package.json"), "{}");
           const directories = [path.join(root, "a"), path.join(root, "b")];
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          );
+          const inputs = yield* CompilationInputs.make("OnceConcurrent");
           const scopes = yield* ResolutionScope.make(path, inputs);
           const lookups = yield* Effect.forEach(directories, (directory) =>
             Effect.gen(function* () {
