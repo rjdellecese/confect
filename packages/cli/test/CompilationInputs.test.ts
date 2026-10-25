@@ -33,9 +33,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const root = yield* fs.makeTempDirectoryScoped();
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          );
+          const inputs = yield* CompilationInputs.make("OnceConcurrent");
           yield* inputs.trackSource(path.join(root, "entry.ts"));
           expect(yield* inputs.resolutionBoundary(root)).toEqual({
             _tag: "Continue",
@@ -68,9 +66,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         const nested = path.join(root, "nested");
         yield* fs.makeDirectory(nested);
         yield* fs.writeFileString(path.join(root, name), "{}");
-        const inputs = yield* CompilationInputs.make(
-          CompilationPolicy.Policy.OnceConcurrent(),
-        );
+        const inputs = yield* CompilationInputs.make("OnceConcurrent");
         yield* inputs.trackSource(path.join(nested, "entry.ts"));
         expect(yield* inputs.canSharePackageLookups).toBe(false);
         expect(yield* inputs.resolutionBoundary(nested)).toEqual({
@@ -133,9 +129,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const read = yield* Deferred.make<void>();
           const release = yield* Deferred.make<void>();
           let block = false;
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          ).pipe(
+          const inputs = yield* CompilationInputs.make("OnceConcurrent").pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
               readFile: (file) =>
@@ -184,9 +178,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           );
           for (const file of files) yield* fs.writeFileString(file, "{}");
           const reads: string[] = [];
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          ).pipe(
+          const inputs = yield* CompilationInputs.make("OnceConcurrent").pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
               readFile: (file) => {
@@ -221,9 +213,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const read = yield* Deferred.make<void>();
           const release = yield* Deferred.make<void>();
           let block = false;
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          ).pipe(
+          const inputs = yield* CompilationInputs.make("OnceConcurrent").pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
               readFile: (candidate) =>
@@ -269,9 +259,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             method: "readFile",
             pathOrDescriptor: file,
           });
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          ).pipe(
+          const inputs = yield* CompilationInputs.make("OnceConcurrent").pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
               readFile: (candidate) =>
@@ -320,9 +308,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             other,
             '{"compilerOptions":{"jsxFactory":"other.h"}}',
           );
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          );
+          const inputs = yield* CompilationInputs.make("OnceConcurrent");
           const initial = yield* inputs.configuration(entry);
           expect(initial.tsconfigRaw.compilerOptions?.jsxFactory).toBe(
             "first.h",
@@ -344,9 +330,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(initial.tsconfigRaw.compilerOptions?.jsxFactory).toBe(
             "first.h",
           );
-          const fresh = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          );
+          const fresh = yield* CompilationInputs.make("OnceConcurrent");
           const selected = yield* fresh.configuration(entry);
           expect(selected.tsconfigRaw.compilerOptions?.jsxFactory).toBe(
             "other.h",
@@ -381,9 +365,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const file = target === "configuration" ? configuration : base;
           let inspections = 0;
           let directory = false;
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          ).pipe(
+          const inputs = yield* CompilationInputs.make("OnceConcurrent").pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
               realPath: (candidate) => {
@@ -436,9 +418,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const file = path.join(root, "tsconfig.json");
           yield* fs.writeFileString(file, "{}");
           let inspections = 0;
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          ).pipe(
+          const inputs = yield* CompilationInputs.make("OnceConcurrent").pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
               realPath: (candidate) => {
@@ -480,9 +460,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* fs.writeFileString(second, "{}");
           yield* fs.symlink(first, alias);
           let inspections = 0;
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          ).pipe(
+          const inputs = yield* CompilationInputs.make("OnceConcurrent").pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
               realPath: (file) =>
@@ -556,9 +534,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           );
           let reads = 0;
           const trigger = kind === "alias" ? 5 : 3;
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          ).pipe(
+          const inputs = yield* CompilationInputs.make("OnceConcurrent").pipe(
             Effect.provideService(FileSystem.FileSystem, {
               ...fs,
               readFile: (file) => {
@@ -589,9 +565,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const root = yield* fs.makeTempDirectoryScoped();
-          const inputs = yield* CompilationInputs.make(
-            CompilationPolicy.Policy.OnceConcurrent(),
-          );
+          const inputs = yield* CompilationInputs.make("OnceConcurrent");
           const entry = path.join(root, "entry.ts");
           expect(
             (yield* inputs.configuration(entry)).configuration,
@@ -723,9 +697,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           Effect.sync(() => discover.mockImplementation(implementation)),
           () => Effect.sync(() => discover.mockImplementation(original)),
         );
-        const inputs = yield* CompilationInputs.make(
-          CompilationPolicy.Policy.OnceConcurrent(),
-        );
+        const inputs = yield* CompilationInputs.make("OnceConcurrent");
         if (mode === "changed-before-registration") {
           expect(yield* Effect.flip(inputs.configuration(entry))).toMatchObject(
             {
