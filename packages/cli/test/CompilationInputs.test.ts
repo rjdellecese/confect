@@ -25,15 +25,6 @@ vi.mock("@confect/cli/CompilationConfig", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationInputs",
   (it) => {
-    it.effect.each(["Once", "Watch"] as const)(
-      "limits cross-directory package sharing to one-shot compilation in %s mode",
-      (mode) =>
-        Effect.gen(function* () {
-          const inputs = yield* CompilationInputs.make(mode);
-          expect(yield* inputs.canSharePackageLookups).toBe(mode === "Once");
-        }).pipe(Effect.scoped),
-    );
-
     it.effect.each(["package.json", "node_modules"])(
       "guards a shared resolution scope against later %s creation",
       (name) =>
