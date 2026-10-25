@@ -1,4 +1,4 @@
-import registeredFunctions from "../confect/_generated/registeredFunctions/webSocketClient";
+import registeredFunctions from "../confect/_generated/registeredFunctions/clients";
 
 export const echoAction = registeredFunctions.echoAction;
 export const echoMutation = registeredFunctions.echoMutation;

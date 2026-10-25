@@ -20,6 +20,33 @@ import type { GenericId as Id } from "convex/values";
  * ```
  */
 export declare const api: {
+  clients: {
+    echoAction: FunctionReference<
+      "action",
+      "public",
+      { failure?: "typed" | "unknown"; value?: string },
+      any
+    >;
+    echoMutation: FunctionReference<
+      "mutation",
+      "public",
+      { failure?: "typed" | "unknown"; value?: string },
+      any
+    >;
+    echoQuery: FunctionReference<
+      "query",
+      "public",
+      { failure?: "typed" | "unknown"; value?: string },
+      any
+    >;
+    read: FunctionReference<"query", "public", { caseId: string }, any>;
+    write: FunctionReference<
+      "mutation",
+      "public",
+      { caseId: string; value: string | null },
+      any
+    >;
+  };
   groups: {
     cacheControl: {
       control: FunctionReference<"query", "public", {}, any>;
@@ -186,33 +213,6 @@ export declare const api: {
         requestId: string;
         scheduledFunctionId: string | null;
       }
-    >;
-  };
-  webSocketClient: {
-    echoAction: FunctionReference<
-      "action",
-      "public",
-      { failure?: "typed" | "unknown"; value?: string },
-      any
-    >;
-    echoMutation: FunctionReference<
-      "mutation",
-      "public",
-      { failure?: "typed" | "unknown"; value?: string },
-      any
-    >;
-    echoQuery: FunctionReference<
-      "query",
-      "public",
-      { failure?: "typed" | "unknown"; value?: string },
-      any
-    >;
-    read: FunctionReference<"query", "public", { caseId: string }, any>;
-    write: FunctionReference<
-      "mutation",
-      "public",
-      { caseId: string; value: string | null },
-      any
     >;
   };
 };
