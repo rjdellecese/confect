@@ -28,19 +28,19 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   (it) => {
     it.effect.each([
       {
-        policy: CompilationPolicy.Policy.OnceStable(),
+        policy: "OnceStable",
         ignoresInstallMetadata: true,
       },
       {
-        policy: CompilationPolicy.Policy.OnceConcurrent(),
+        policy: "OnceConcurrent",
         ignoresInstallMetadata: false,
       },
       {
-        policy: CompilationPolicy.Policy.Watch(),
+        policy: "Watch",
         ignoresInstallMetadata: false,
       },
     ] as const)(
-      "selects source metadata for $policy._tag compilation",
+      "selects source metadata for $policy compilation",
       ({ policy, ignoresInstallMetadata }) =>
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem;

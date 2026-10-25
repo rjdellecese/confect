@@ -17,6 +17,7 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import { BundlerError } from "./BuildError";
 import * as CompilationPolicy from "./CompilationPolicy";
+import * as Match from "effect/Match";
 import * as CompilationConfig from "./CompilationConfig";
 import * as ResolutionScope from "./ResolutionScope";
 
@@ -108,11 +109,11 @@ export const make = Effect.fn("CompilationInputs.make")(
     const observationFailure = yield* Ref.make(Option.none<BundlerError>());
     const lock = yield* Semaphore.make(1);
     const sourceLock = yield* Semaphore.make(1);
-    const sourceMetadata = CompilationPolicy.Policy.$match(policy, {
-      Watch: () => names,
-      OnceConcurrent: () => names,
-      OnceStable: () => ["package.json", ...pnpNames],
-    });
+    const sourceMetadata = Match.value(policy).pipe(
+      Match.whenOr("Watch", "OnceConcurrent", () => names),
+      Match.when("OnceStable", () => ["package.json", ...pnpNames]),
+      Match.exhaustive,
+    );
     const fingerprint = Effect.fn("CompilationInputs.fingerprint")(
       function* (file: string) {
         yield* fs.stat(file);
@@ -360,11 +361,11 @@ export const make = Effect.fn("CompilationInputs.make")(
       events: Stream.fromQueue(events),
       pending: Ref.get(pending),
       check,
-      checkBeforeBuild: CompilationPolicy.Policy.$match(policy, {
-        Watch: () => check,
-        OnceConcurrent: () => check,
-        OnceStable: () => ensure,
-      }),
+      checkBeforeBuild: Match.value(policy).pipe(
+        Match.whenOr("Watch", "OnceConcurrent", () => check),
+        Match.when("OnceStable", () => ensure),
+        Match.exhaustive,
+      ),
       ensure,
       checkFiles,
       track,
