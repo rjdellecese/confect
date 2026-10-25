@@ -20,6 +20,7 @@ import * as CompilationContext from "./CompilationContext";
 import * as CompilationState from "./CompilationState";
 import * as CompiledModule from "./CompiledModule";
 import * as CompilationInputs from "./CompilationInputs";
+import * as CompilationPolicy from "./CompilationPolicy";
 import * as NodeConditions from "./NodeConditions";
 import type * as CompilationConfig from "./CompilationConfig";
 
@@ -107,10 +108,10 @@ export const layer = (options: {
       const conditions = yield* NodeConditions.current.pipe(
         Effect.mapError((cause) => new BundlerError({ cause })),
       );
+      const policy = CompilationPolicy.forCompilation(options.mode ?? "Watch");
       const resolutionInputs = yield* CompilationInputs.make(
-        options.mode,
+        policy,
         conditions,
-        options.mode === "Once" ? "Stable" : "Concurrent",
       );
       yield* resolutionInputs.track(options.restartInputs ?? []);
       const services = Context.make(
@@ -231,13 +232,7 @@ export const layer = (options: {
                 },
                 request.normalize,
                 (event) => Queue.offer(events, event).pipe(Effect.asVoid),
-                options.mode === "Once"
-                  ? {
-                      check: resolutionInputs.check,
-                      ensure: resolutionInputs.ensure,
-                      trackSource: resolutionInputs.trackSource,
-                    }
-                  : resolutionInputs,
+                CompilationPolicy.guards(policy, resolutionInputs),
                 options.mode,
                 (error) =>
                   Schema.is(CompilationInputs.RestartRequired)(error.cause)

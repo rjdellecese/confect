@@ -14,6 +14,7 @@ import * as HashMap from "effect/HashMap";
 import * as Semaphore from "effect/Semaphore";
 import type * as esbuild from "esbuild";
 import * as CompilationInputs from "./CompilationInputs";
+import * as ResolutionScope from "./ResolutionScope";
 import { BundlerError } from "./BuildError";
 
 export const namespace = "confect-generated";
@@ -143,51 +144,7 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
   );
   const discoveryLock = yield* Semaphore.make(1);
   const sharing = yield* Ref.make(false);
-  const resolutionScopes = yield* Ref.make(
-    HashMap.empty<
-      string,
-      {
-        readonly run: Effect.Effect<
-          string,
-          BundlerError | CompilationInputs.RestartRequired
-        >;
-      }
-    >(),
-  );
-  const resolutionScope = Effect.fn("CompilationPlugin.resolutionScope")(
-    function* (
-      directory: string,
-    ): Effect.fn.Return<
-      string,
-      BundlerError | CompilationInputs.RestartRequired
-    > {
-      const cached = yield* discoveryLock.withPermit(
-        Effect.gen(function* () {
-          const previous = HashMap.get(
-            yield* Ref.get(resolutionScopes),
-            directory,
-          );
-          if (Option.isSome(previous)) return previous.value;
-          const run = yield* Effect.cached(
-            Effect.gen(function* () {
-              const parent = path.dirname(directory);
-              if (
-                parent === directory ||
-                path.basename(directory).toLowerCase() === "node_modules" ||
-                !(yield* inputs.canShareResolution(directory))
-              )
-                return directory;
-              return yield* resolutionScope(parent);
-            }),
-          );
-          const next = { run };
-          yield* Ref.update(resolutionScopes, HashMap.set(directory, next));
-          return next;
-        }),
-      );
-      return yield* cached.run;
-    },
-  );
+  const scopes = yield* ResolutionScope.make(path, inputs);
   const probes = yield* Ref.make(
     HashMap.empty<
       string,
@@ -213,48 +170,48 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
     );
     if (args.kind === "entry-point" || Record.size(args.with) > 0)
       return yield* resolve;
-    const directory = path.dirname(args.importer);
-    const key = `${directory}\0${args.path}\0${args.resolveDir}\0${args.kind}\0${args.namespace}`;
-    let cached = Option.getOrUndefined(
+    const key = ResolutionScope.localKey(path, args);
+    const cached = yield* Option.match(
       HashMap.get(yield* Ref.get(probes), key),
+      {
+        onSome: Effect.succeed,
+        onNone: () =>
+          Effect.gen(function* () {
+            const lookup = yield* scopes.lookup(
+              args,
+              sharePackageLookups && (yield* Ref.get(sharing)),
+            );
+            const sharedKey = ResolutionScope.key(lookup);
+            return yield* discoveryLock.withPermit(
+              Effect.gen(function* () {
+                const current = yield* Ref.get(probes);
+                const discovered = yield* Option.match(
+                  HashMap.get(current, sharedKey),
+                  {
+                    onSome: Effect.succeed,
+                    onNone: () =>
+                      Effect.gen(function* () {
+                        return {
+                          importer: args.importer,
+                          run: yield* Effect.cached(resolve),
+                        };
+                      }),
+                  },
+                );
+                yield* Ref.set(
+                  probes,
+                  HashMap.set(
+                    HashMap.set(current, sharedKey, discovered),
+                    key,
+                    discovered,
+                  ),
+                );
+                return discovered;
+              }),
+            );
+          }),
+      },
     );
-    if (!cached) {
-      const share =
-        sharePackageLookups &&
-        (yield* Ref.get(sharing)) &&
-        (args.kind === "import-statement" ||
-          args.kind === "dynamic-import" ||
-          args.kind === "require-call" ||
-          args.kind === "require-resolve") &&
-        directory === args.resolveDir &&
-        !args.path.startsWith(".") &&
-        !args.path.startsWith("#") &&
-        !args.path.includes(":") &&
-        !path.isAbsolute(args.path);
-      const anchor = share ? yield* resolutionScope(directory) : directory;
-      const sharedKey = `${anchor}\0${args.path}\0${share ? anchor : args.resolveDir}\0${args.kind}\0${args.namespace}`;
-      cached = yield* discoveryLock.withPermit(
-        Effect.gen(function* () {
-          const current = yield* Ref.get(probes);
-          const previous = HashMap.get(current, sharedKey);
-          const discovered = Option.isSome(previous)
-            ? previous.value
-            : {
-                importer: args.importer,
-                run: yield* Effect.cached(resolve),
-              };
-          yield* Ref.set(
-            probes,
-            HashMap.set(
-              HashMap.set(current, sharedKey, discovered),
-              key,
-              discovered,
-            ),
-          );
-          return discovered;
-        }),
-      );
-    }
     const resolved = yield* cached.run;
     return cached.importer !== args.importer &&
       (resolved.errors.length > 0 || resolved.warnings.length > 0)
@@ -324,7 +281,7 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
             Effect.andThen(Ref.set(imports, HashMap.empty())),
             Effect.andThen(Ref.set(resolutions, HashMap.empty())),
             Effect.andThen(Ref.set(probes, HashMap.empty())),
-            Effect.andThen(Ref.set(resolutionScopes, HashMap.empty())),
+            Effect.andThen(scopes.clear),
             Effect.andThen(Ref.set(discoveries, HashMap.empty())),
             Effect.asVoid,
           ),

@@ -16,8 +16,9 @@ import * as Semaphore from "effect/Semaphore";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import { BundlerError } from "./BuildError";
-import type { Mode } from "./CompilationState";
+import * as CompilationPolicy from "./CompilationPolicy";
 import * as CompilationConfig from "./CompilationConfig";
+import * as ResolutionScope from "./ResolutionScope";
 
 export interface RestartNotification {
   readonly reason: "ResolutionInputsChanged";
@@ -83,10 +84,10 @@ export const ancestors = (
 
 export const make = Effect.fn("CompilationInputs.make")(
   function* (
-    mode: Mode = "Watch",
+    policy: CompilationPolicy.Policy = CompilationPolicy.Policy.Watch(),
     conditions?: ReadonlyArray<string>,
-    consistency: "Concurrent" | "Stable" = "Concurrent",
   ) {
+    const mode = CompilationPolicy.toMode(policy);
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const crypto = yield* Crypto.Crypto;
@@ -107,8 +108,11 @@ export const make = Effect.fn("CompilationInputs.make")(
     const observationFailure = yield* Ref.make(Option.none<BundlerError>());
     const lock = yield* Semaphore.make(1);
     const sourceLock = yield* Semaphore.make(1);
-    const stable = mode === "Once" && consistency === "Stable";
-    const sourceMetadata = stable ? ["package.json", ...pnpNames] : names;
+    const sourceMetadata = CompilationPolicy.Policy.$match(policy, {
+      Watch: () => names,
+      OnceConcurrent: () => names,
+      OnceStable: () => ["package.json", ...pnpNames],
+    });
     const fingerprint = Effect.fn("CompilationInputs.fingerprint")(
       function* (file: string) {
         yield* fs.stat(file);
@@ -356,7 +360,11 @@ export const make = Effect.fn("CompilationInputs.make")(
       events: Stream.fromQueue(events),
       pending: Ref.get(pending),
       check,
-      checkBeforeBuild: stable ? ensure : check,
+      checkBeforeBuild: CompilationPolicy.Policy.$match(policy, {
+        Watch: () => check,
+        OnceConcurrent: () => check,
+        OnceStable: () => ensure,
+      }),
       ensure,
       checkFiles,
       track,
@@ -371,18 +379,30 @@ export const make = Effect.fn("CompilationInputs.make")(
             ),
         ),
       ),
-      canShareResolution: Effect.fn("CompilationInputs.canShareResolution")(
-        function* (directory: string) {
+      resolutionBoundary: Effect.fn("CompilationInputs.resolutionBoundary")(
+        function* (
+          directory: string,
+        ): Effect.fn.Return<
+          ResolutionScope.Boundary,
+          BundlerError | RestartRequired
+        > {
           yield* ensure;
+          const parent = path.dirname(directory);
+          if (
+            parent === directory ||
+            path.basename(directory).toLowerCase() === "node_modules"
+          )
+            return ResolutionScope.Boundary.Stop({ directory });
           const current = yield* Ref.get(baseline);
           for (const ancestor of ancestors(path, directory)) {
             for (const name of pnpNames) {
               if (
-                Option.getOrUndefined(
+                !Option.contains(
                   HashMap.get(current, path.join(ancestor, name)),
-                ) !== "missing"
+                  "missing",
+                )
               )
-                return false;
+                return ResolutionScope.Boundary.Stop({ directory });
             }
           }
           const modules = path.join(directory, "node_modules");
@@ -391,10 +411,11 @@ export const make = Effect.fn("CompilationInputs.make")(
           yield* track(files);
           yield* checkFiles(files);
           const observed = yield* Ref.get(baseline);
-          return files.every(
-            (file) =>
-              Option.getOrUndefined(HashMap.get(observed, file)) === "missing",
-          );
+          return Array.every(files, (file) =>
+            Option.contains(HashMap.get(observed, file), "missing"),
+          )
+            ? ResolutionScope.Boundary.Continue({ parent })
+            : ResolutionScope.Boundary.Stop({ directory });
         },
       ),
       trackSource: Effect.fn("CompilationInputs.trackSource")(function* (
@@ -546,9 +567,8 @@ export const make = Effect.fn("CompilationInputs.make")(
   },
   (
     effect,
-    _mode?: Mode,
+    _policy?: CompilationPolicy.Policy,
     _conditions?: ReadonlyArray<string>,
-    _consistency?: "Concurrent" | "Stable",
   ) => Effect.provide(effect, NodeCrypto.layer),
 );
 
