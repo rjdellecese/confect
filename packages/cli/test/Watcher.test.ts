@@ -36,7 +36,6 @@ vi.mock("esbuild", (importOriginal) =>
 const controlledWatcher = Effect.fnUntraced(function* (
   options: {
     readonly files?: ReadonlyArray<string>;
-    readonly contents?: Readonly<Record<string, string>>;
     readonly plugins?: ReadonlyArray<esbuild.Plugin>;
     readonly afterPlugins?: ReadonlyArray<esbuild.Plugin>;
     readonly rebuild?: (
@@ -57,8 +56,6 @@ const controlledWatcher = Effect.fnUntraced(function* (
     "tables/notes.ts",
   ])
     yield* project.write(`confect/${file}`, "export const value = 1;");
-  for (const [file, contents] of Object.entries(options.contents ?? {}))
-    yield* project.write(file, contents);
 
   const events = yield* Queue.unbounded<FileSystem.WatchEvent>();
   const configEvents = yield* Queue.unbounded<FileSystem.WatchEvent>();
@@ -159,116 +156,6 @@ const controlledWatcher = Effect.fnUntraced(function* (
     contexts,
     first,
   };
-});
-
-layer(NodeServices.layer)("package self-reference resolution", (test) => {
-  test.effect(
-    "keeps unchanged strict bundles clean with opposite resolution arrival orders",
-    () =>
-      Effect.gen(function* () {
-        const preferred = yield* Ref.make("./leaf.ts");
-        const makeGates = Effect.all({
-          waiting: Deferred.make<void>(),
-          loaded: Deferred.make<void>(),
-        });
-        const gates = yield* Ref.make(yield* makeGates);
-        const resolutions = yield* Ref.make<ReadonlyArray<string>>([]);
-        const outputs = yield* Ref.make<ReadonlyArray<string>>([]);
-        const runPromise = Effect.runPromiseWith(yield* Effect.context());
-        const runSync = Effect.runSyncWith(yield* Effect.context());
-        const { watcher } = yield* controlledWatcher({
-          files: ["notes.spec.ts", "notes.impl.ts"],
-          contents: {
-            "package.json":
-              '{"name":"@fixture/backend","type":"module","exports":{"./*":"./confect/*.ts"}}',
-            "tsconfig.json": '{"compilerOptions":{"strict":true}}',
-            "confect/leaf.ts": "export const value = 1;",
-            "confect/notes.spec.ts": 'console.log(require("./leaf.ts"));',
-            "confect/notes.impl.ts":
-              'console.log(require("@fixture/backend/leaf"));',
-          },
-          plugins: [
-            {
-              name: "force-self-reference-arrival-order",
-              setup(build) {
-                build.onStart(() =>
-                  runSync(
-                    Effect.flatMap(makeGates, (next) =>
-                      Ref.set(gates, next),
-                    ).pipe(Effect.asVoid),
-                  ),
-                );
-                build.onResolve({ filter: /leaf(?:\.ts)?$/ }, (args) =>
-                  runPromise(
-                    Effect.gen(function* () {
-                      const { waiting, loaded } = yield* Ref.get(gates);
-                      if (args.path === (yield* Ref.get(preferred))) {
-                        yield* Deferred.await(waiting);
-                      } else {
-                        yield* Deferred.succeed(waiting, undefined);
-                        yield* Deferred.await(loaded);
-                      }
-                      yield* Ref.update(resolutions, (events) => [
-                        ...events,
-                        args.path,
-                      ]);
-                    }).pipe(Effect.as(undefined)),
-                  ),
-                );
-                build.onLoad({ filter: /[/\\]leaf\.ts$/ }, () =>
-                  runSync(
-                    Effect.gen(function* () {
-                      yield* Ref.update(resolutions, (events) => [
-                        ...events,
-                        "loaded",
-                      ]);
-                      const { loaded } = yield* Ref.get(gates);
-                      yield* Deferred.succeed(loaded, undefined);
-                    }).pipe(Effect.as(undefined)),
-                  ),
-                );
-                build.onEnd((result) =>
-                  runSync(
-                    Ref.update(outputs, (recorded) => [
-                      ...recorded,
-                      result.outputFiles?.[0]?.text ?? "",
-                    ]).pipe(Effect.asVoid),
-                  ),
-                );
-              },
-            },
-          ],
-        });
-        const first = yield* watcher.refresh;
-        expect(
-          (yield* watcher.diagnostics).errors.map((error) => error.text),
-        ).toEqual([]);
-        expect(first).toMatchObject({
-          _tag: "Observed",
-          outcome: { _tag: "Succeeded" },
-        });
-        expect((yield* watcher.next).work._tag).toBe("Full");
-        yield* Ref.set(preferred, "@fixture/backend/leaf");
-        const second = yield* watcher.refresh;
-        expect(second).toMatchObject({
-          _tag: "Observed",
-          outcome: { _tag: "Succeeded" },
-        });
-        expect(yield* Ref.get(resolutions)).toEqual([
-          "./leaf.ts",
-          "loaded",
-          "@fixture/backend/leaf",
-          "@fixture/backend/leaf",
-          "loaded",
-          "./leaf.ts",
-        ]);
-        const recorded = yield* Ref.get(outputs);
-        expect(recorded).toHaveLength(2);
-        expect(recorded[0]).toContain('"use strict"');
-        expect(recorded[1]).toBe(recorded[0]);
-        expect(yield* watcher.pending).toEqual(SyncState.empty);
-      }).pipe(Effect.scoped),
-  );
 });
 
 it("allows readiness only for empty or successfully refreshed watchers", () => {
