@@ -213,9 +213,13 @@ describe("DocumentIds", () => {
         const identified = yield* ids.identify("users:id");
         expectTypeOf(identified).toEqualTypeOf<
           Option.Option<
-            DocumentIds.IdentifiedId<
-              "notes" | "users" | "_storage" | "_scheduled_functions"
-            >
+            | { readonly table: "notes"; readonly id: GenericId<"notes"> }
+            | { readonly table: "users"; readonly id: GenericId<"users"> }
+            | { readonly table: "_storage"; readonly id: GenericId<"_storage"> }
+            | {
+                readonly table: "_scheduled_functions";
+                readonly id: GenericId<"_scheduled_functions">;
+              }
           >
         >();
         expect(Option.isSome(identified)).toBe(true);

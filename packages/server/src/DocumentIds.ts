@@ -4,11 +4,13 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Record from "effect/Record";
+import * as Struct from "effect/Struct";
 import type * as DataModel from "./DataModel";
 import * as DatabaseSchema from "./DatabaseSchema";
 import * as Table from "./Table";
 
-export type IdentifiedId<TableName extends string> = {
+type IdentifiedId<TableName extends string> = {
   readonly [Name in TableName]: {
     readonly table: Name;
     readonly id: GenericId<Name>;
@@ -45,7 +47,7 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
     table: Name,
     input: string,
   ): GenericId<Name> | null =>
-    (Object.hasOwn(Table.systemTables, table)
+    (Record.has<string, unknown>(Table.systemTables, table)
       ? reader.system.normalizeId(
           table as DatabaseSchema.SystemTableNames,
           input,
@@ -69,8 +71,8 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
     identify: Effect.fn("DocumentIds.identify")((input: string) =>
       Effect.sync(() => {
         const tables = [
-          ...Object.keys(DatabaseSchema.tables(schema)),
-          ...Object.keys(Table.systemTables),
+          ...Struct.keys(DatabaseSchema.tables(schema)),
+          ...Struct.keys(Table.systemTables),
         ] as ReadonlyArray<DatabaseSchema.AllTableNames<Schema>>;
         for (const table of tables) {
           const id = normalize(table, input);
