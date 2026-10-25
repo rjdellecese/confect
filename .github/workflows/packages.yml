@@ -144,6 +144,7 @@ jobs:
           restore-keys: |
             convex-local-backend-${{ runner.os }}-
       - run: pnpm --filter @confect/server test:local-backend
+      - run: pnpm test:js:local-backend
 
   codegen-fixtures:
     name: Codegen (server fixtures)

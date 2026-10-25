@@ -57,6 +57,7 @@
     "skills": "bun run scripts/manageSkills.ts",
     "skills:sync-ignore": "bun run scripts/syncSkillIgnore.ts",
     "test": "bun test ./scripts && vitest run",
+    "test:js:local-backend": "pnpm --filter @confect/js test:local-backend",
     "test:server:local-backend": "pnpm --filter @confect/server test:local-backend",
     "test:server:mock-backend": "pnpm --filter @confect/server test:mock-backend",
     "typecheck": "tsc -b tsconfig.packages.json tsconfig.json tools/oxlint-rules/tsconfig.json && pnpm --filter confect-test-types typecheck",

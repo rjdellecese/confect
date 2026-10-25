@@ -156,6 +156,33 @@ export declare const api: {
       }
     >;
   };
+  webSocketClient: {
+    echoAction: FunctionReference<
+      "action",
+      "public",
+      { failure?: "typed" | "unknown"; value?: string },
+      any
+    >;
+    echoMutation: FunctionReference<
+      "mutation",
+      "public",
+      { failure?: "typed" | "unknown"; value?: string },
+      any
+    >;
+    echoQuery: FunctionReference<
+      "query",
+      "public",
+      { failure?: "typed" | "unknown"; value?: string },
+      any
+    >;
+    read: FunctionReference<"query", "public", { caseId: string }, any>;
+    write: FunctionReference<
+      "mutation",
+      "public",
+      { caseId: string; value: string | null },
+      any
+    >;
+  };
 };
 
 /**

@@ -6,10 +6,12 @@ import groups_scheduling from "../groups/scheduling.spec";
 import groups_storage from "../groups/storage.spec";
 import groups_transactions from "../groups/transactions.spec";
 import metadataNode from "../metadataNode.spec";
+import webSocketClient from "../webSocketClient.spec";
 
 const spec: Spec.Spec<{
   readonly groups: GroupSpec.NamedAt<GroupSpec.GroupSpec<"Convex", "groups", never, GroupSpec.NamedAt<typeof groups_cacheControl, "cacheControl"> | GroupSpec.NamedAt<typeof groups_cacheStubbed, "cacheStubbed"> | GroupSpec.NamedAt<typeof groups_metadata, "metadata"> | GroupSpec.NamedAt<typeof groups_scheduling, "scheduling"> | GroupSpec.NamedAt<typeof groups_storage, "storage"> | GroupSpec.NamedAt<typeof groups_transactions, "transactions">>, "groups">;
   readonly metadataNode: GroupSpec.NamedAt<typeof metadataNode, "metadataNode">;
+  readonly webSocketClient: GroupSpec.NamedAt<typeof webSocketClient, "webSocketClient">;
 }> = Spec.fromGroups({
   ["groups"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
     ["cacheControl"]: groups_cacheControl,
@@ -20,6 +22,7 @@ const spec: Spec.Spec<{
     ["transactions"]: groups_transactions,
   }),
   ["metadataNode"]: metadataNode,
+  ["webSocketClient"]: webSocketClient,
 }) as typeof spec;
 
 export default spec;
