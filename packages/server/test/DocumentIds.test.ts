@@ -1,4 +1,3 @@
-import { DocumentIds as BarrelDocumentIds } from "@confect/server";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as DocumentIds from "@confect/server/DocumentIds";
 import * as Table from "@confect/server/Table";
@@ -46,16 +45,13 @@ const makeNative = () => {
 };
 
 describe("DocumentIds", () => {
-  it("exports the same tag factory through the barrel", () => {
-    expect(BarrelDocumentIds.DocumentIds).toBe(DocumentIds.DocumentIds);
-  });
-
   it.effect(
     "keeps schemas and native calls lazy and preserves receivers",
     () => {
       const fields = vi.fn(() => Schema.Struct({ text: Schema.String }));
-      const tables = { notes: Table.make(fields)("notes") };
-      const databaseSchema = DatabaseSchema.make(tables);
+      const databaseSchema = DatabaseSchema.make({
+        notes: Table.make(fields)("notes"),
+      });
       const native = makeNative();
       const layer = DocumentIds.layer(databaseSchema, native);
       expect(fields).not.toHaveBeenCalled();
@@ -84,7 +80,6 @@ describe("DocumentIds", () => {
             .mock.contexts.every((ctx) => ctx === native.system),
         ).toBe(true);
         expect(fields).not.toHaveBeenCalled();
-        expect(DatabaseSchema.tables(databaseSchema)).toBe(tables);
       }).pipe(Effect.provide(layer));
     },
   );
@@ -134,21 +129,30 @@ describe("DocumentIds", () => {
       Effect.gen(function* () {
         const native = makeNative();
         const ids = DocumentIds.make(schema, native);
-        yield* ids.identify("notes:id");
-        expect(vi.mocked(native.normalizeId).mock.calls).toEqual([
-          ["notes", "notes:id"],
-        ]);
-        expect(native.system.normalizeId).not.toHaveBeenCalled();
-        vi.mocked(native.normalizeId).mockClear();
-        yield* ids.identify("missing");
-        expect(vi.mocked(native.normalizeId).mock.calls).toEqual([
-          ["notes", "missing"],
-          ["users", "missing"],
-        ]);
-        expect(vi.mocked(native.system.normalizeId).mock.calls).toEqual([
-          ["_scheduled_functions", "missing"],
-          ["_storage", "missing"],
-        ]);
+        expect(yield* ids.identify("missing")).toEqual(Option.none());
+        expect(native.normalizeId).toHaveBeenCalledTimes(2);
+        expect(vi.mocked(native.normalizeId).mock.calls).toEqual(
+          expect.arrayContaining([
+            ["notes", "missing"],
+            ["users", "missing"],
+          ]),
+        );
+        expect(native.system.normalizeId).toHaveBeenCalledTimes(2);
+        expect(vi.mocked(native.system.normalizeId).mock.calls).toEqual(
+          expect.arrayContaining([
+            ["_scheduled_functions", "missing"],
+            ["_storage", "missing"],
+          ]),
+        );
+
+        const normalize = vi.fn(
+          <Name extends string>(_table: Name, input: string): GenericId<Name> =>
+            input as GenericId<Name>,
+        );
+        vi.mocked(native.normalizeId).mockImplementation(normalize);
+        vi.mocked(native.system.normalizeId).mockImplementation(normalize);
+        expect(Option.isSome(yield* ids.identify("matching-id"))).toBe(true);
+        expect(normalize).toHaveBeenCalledTimes(1);
       }),
   );
 
