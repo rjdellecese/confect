@@ -123,6 +123,14 @@ config or its inheritance chain changes. Ordinary source edits remain incrementa
     This creates `confect/_generated/`, including `id.ts`, `tables/notes.ts`,
     `schema.ts`, and `services.ts`.
 
+    <Note>
+      Run `confect codegen` after source edits, configuration changes, and
+      dependency installation have settled. If you change inputs while it runs,
+      rerun it. Codegen may fail or retry when it detects a change, but it does
+      not guarantee recovery from every concurrent change. Use `confect dev`
+      for continuous development.
+    </Note>
+
     This tutorial generates table bindings before you write the functions. If
     your table, spec, and implementation files are already complete, one codegen
     run can generate everything without this separate step.

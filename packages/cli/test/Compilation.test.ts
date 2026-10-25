@@ -72,6 +72,153 @@ const compileAndLoad = Effect.fn("Compilation.test.compileAndLoad")(function* (
 layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
+  it.effect.each(["Once", "Watch"] as const)(
+    "applies the late-discovery policy at the service boundary in %s mode",
+    (mode) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const nested = path.join(root, "nested");
+        yield* fs.makeDirectory(nested);
+        const entry = path.join(root, "entry.ts");
+        yield* fs.writeFileString(
+          entry,
+          'export { default } from "./nested/helper";',
+        );
+        yield* fs.writeFileString(
+          path.join(nested, "helper.ts"),
+          "export default 42;",
+        );
+        yield* fs.writeFileString(
+          path.join(nested, "package.json"),
+          '{"sideEffects":true}',
+        );
+        const makeContext = vi.mocked(CompilationContext.make);
+        const original = makeContext.getMockImplementation();
+        assert(original);
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => makeContext.mockImplementation(original)),
+        );
+        let builds = 0;
+        makeContext.mockImplementation(
+          (topology, options, normalize, publish, guards, ...rest) => {
+            expect(guards?.generation === undefined).toBe(mode === "Once");
+            return original(
+              topology,
+              {
+                ...options,
+                plugins: [
+                  ...(options.plugins ?? []),
+                  {
+                    name: "count-policy-builds",
+                    setup(build) {
+                      build.onStart(() => {
+                        builds++;
+                      });
+                    },
+                  },
+                ],
+              },
+              normalize,
+              publish,
+              guards,
+              ...rest,
+            );
+          },
+        );
+        const loaded = yield* Bundler.bundle(entry).pipe(
+          Effect.provide(Compilation.layer({ mode, ownedDirectories: [] })),
+        );
+        expect(loaded.module.default).toBe(42);
+        if (mode === "Once") expect(builds).toBe(1);
+        else expect(builds).toBeGreaterThanOrEqual(2);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "keeps generated-phase snapshots exact in one-shot compilation",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const generated = path.join(root, "generated");
+        yield* fs.makeDirectory(generated);
+        const entry = path.join(root, "entry.ts");
+        const value = path.join(generated, "value.ts");
+        yield* fs.writeFileString(
+          entry,
+          'export { default } from "./generated/value";',
+        );
+        yield* fs.writeFileString(value, "export default 1;");
+        yield* Effect.gen(function* () {
+          const first = yield* Bundler.compile(entry);
+          yield* fs.writeFileString(value, "export default 2;");
+          const second = yield* Bundler.compile(entry);
+          expect(second.origin?.context).toBe(first.origin?.context);
+          expect(second.origin?.revision).not.toBe(first.origin?.revision);
+          expect((yield* CompiledModule.load(first)).module.default).toBe(1);
+          expect((yield* CompiledModule.load(second)).module.default).toBe(2);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [generated] }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "still rejects detected metadata changes during a one-shot build",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const nested = path.join(root, "nested");
+        yield* fs.makeDirectory(nested);
+        const entry = path.join(root, "entry.ts");
+        const helper = path.join(nested, "helper.ts");
+        const manifest = path.join(root, "package.json");
+        yield* fs.writeFileString(manifest, '{"sideEffects":true}');
+        yield* fs.writeFileString(
+          entry,
+          'export { default } from "./nested/helper";',
+        );
+        yield* fs.writeFileString(helper, "export default 1;");
+        const realHelper = yield* fs.realPath(helper);
+        let changed = false;
+        yield* Effect.gen(function* () {
+          const restarts = yield* observeRestarts;
+          const result = yield* Compilation.runJob(Bundler.compile(entry));
+          expect(changed).toBe(true);
+          expect(Exit.isFailure(result.exit)).toBe(true);
+          expect(result.receipts).toEqual([]);
+          expect((yield* Queue.take(restarts)).paths).toContain(manifest);
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({ mode: "Once", ownedDirectories: [] }),
+          ),
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            realPath: (file) =>
+              fs.realPath(file).pipe(
+                Effect.tap((real) =>
+                  Effect.gen(function* () {
+                    if (real !== realHelper || changed) return;
+                    changed = true;
+                    yield* fs.writeFileString(
+                      manifest,
+                      '{"sideEffects":false}',
+                    );
+                  }),
+                ),
+              ),
+          }),
+        );
+      }).pipe(Effect.scoped),
+  );
+
   it.effect("retains and disposes live contexts by identity", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

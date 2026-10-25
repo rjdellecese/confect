@@ -230,7 +230,13 @@ export const layer = (options: {
                 },
                 request.normalize,
                 (event) => Queue.offer(events, event).pipe(Effect.asVoid),
-                resolutionInputs,
+                options.mode === "Once"
+                  ? {
+                      check: resolutionInputs.check,
+                      ensure: resolutionInputs.ensure,
+                      trackSource: resolutionInputs.trackSource,
+                    }
+                  : resolutionInputs,
                 options.mode,
                 (error) =>
                   Schema.is(CompilationInputs.RestartRequired)(error.cause)
