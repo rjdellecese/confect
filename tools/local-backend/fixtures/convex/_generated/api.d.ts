@@ -87,6 +87,47 @@ export declare const api: {
       storageUrl: FunctionReference<"query", "public", { id: string }, string>;
       uploadUrl: FunctionReference<"mutation", "public", {}, string>;
     };
+    documentIds: {
+      createAndDelete: FunctionReference<
+        "mutation",
+        "public",
+        {},
+        Id<"transactionNotes">
+      >;
+      inspect: FunctionReference<
+        "query",
+        "public",
+        {
+          input: string;
+          table: "transactionNotes" | "_storage" | "_scheduled_functions";
+        },
+        {
+          identified: { id: string; table: string } | null;
+          parsed: string | null;
+        }
+      >;
+      inspectFromMutation: FunctionReference<
+        "mutation",
+        "public",
+        {
+          input: string;
+          table: "transactionNotes" | "_storage" | "_scheduled_functions";
+        },
+        {
+          identified: { id: string; table: string } | null;
+          parsed: string | null;
+        }
+      >;
+      nativeSampleId: FunctionReference<
+        "query",
+        "public",
+        {
+          input: string;
+          table: "transactionNotes" | "_storage" | "_scheduled_functions";
+        },
+        string | null
+      >;
+    };
     metadata: {
       actionMetadata: FunctionReference<
         "action",

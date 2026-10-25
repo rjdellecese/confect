@@ -1,10 +1,15 @@
 import * as FunctionSpec from "@confect/core/FunctionSpec";
+import type { GenericId } from "@confect/core/GenericId";
+import * as IdScope from "@confect/core/IdScope";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
+import type * as DataModel from "@confect/server/DataModel";
+import * as DocumentIds from "@confect/server/DocumentIds";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Convex from "convex/server";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
 
@@ -21,6 +26,62 @@ vi.mock("convex/server", (importOriginal) =>
 );
 
 describe("make", () => {
+  it.effect.each([
+    {
+      name: "query",
+      spec: FunctionSpec.publicQuery({
+        name: "parse",
+        returns: () => Schema.String,
+      }),
+    },
+    {
+      name: "mutation",
+      spec: FunctionSpec.publicMutation({
+        name: "parse",
+        returns: () => Schema.String,
+      }),
+    },
+  ])("provides scoped DocumentIds to a component $name", ({ spec }) =>
+    Effect.gen(function* () {
+      const scope = IdScope.component("@example/files");
+      const database = DatabaseSchema.make({}, { kind: "component", scope });
+      const item = FunctionRegistryItem.make({
+        functionSpec: spec,
+        groupMiddlewareAttachments: [],
+        handler: () =>
+          Effect.gen(function* () {
+            const ids = yield* DocumentIds.DocumentIds<typeof database>();
+            const id = yield* ids.parse("_storage", "file-id");
+            expectTypeOf(id).toEqualTypeOf<
+              Option.Option<GenericId<"_storage", typeof scope>>
+            >();
+            return Option.getOrThrow(id);
+          }),
+      });
+      assert(item._tag === "Confect");
+      const definition = RegisteredConvexFunction.prepare(database, item);
+      assert(
+        definition._tag === "PublicQuery" ||
+          definition._tag === "PublicMutation",
+      );
+      const normalizeId = vi.fn((_table: string, input: string) => input);
+      const ctx = {
+        db: { system: { normalizeId } },
+        storage: {},
+        scheduler: {},
+      } as unknown as Convex.GenericMutationCtx<
+        DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema.AnyWithProps>>
+      >;
+      expect(yield* Effect.promise(() => definition.handler(ctx, {}))).toBe(
+        "file-id",
+      );
+      expect(normalizeId).toHaveBeenCalledExactlyOnceWith(
+        "_storage",
+        "file-id",
+      );
+    }),
+  );
+
   it("limits preparation to the six isolate registration kinds", () => {
     expectTypeOf<
       ReturnType<typeof RegisteredConvexFunction.prepare>["_tag"]

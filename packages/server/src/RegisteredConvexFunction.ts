@@ -27,6 +27,7 @@ import * as EffectScheduler from "effect/Scheduler";
 import * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as DatabaseReader from "./DatabaseReader";
+import * as DocumentIds from "./DocumentIds";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
@@ -229,6 +230,7 @@ const queryFunction = <
         Effect.provide(
           Layer.mergeAll(
             DatabaseReader.layer(databaseSchema, ctx.db),
+            DocumentIds.layer(databaseSchema, ctx.db),
             Auth.layerForTarget<DatabaseSchema_["target"]>(
               databaseSchema.target,
               ctx.auth,
@@ -271,6 +273,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
 ) =>
   Layer.mergeAll(
     DatabaseReader.layer(schema, ctx.db),
+    DocumentIds.layer(schema, ctx.db),
     DatabaseWriter.layer(schema, ctx.db),
     Auth.layerForTarget<Schema["target"]>(schema.target, ctx.auth),
     Scheduler.layer<DatabaseSchema.Scope<Schema>>(

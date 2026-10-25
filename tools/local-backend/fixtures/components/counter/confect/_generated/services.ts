@@ -4,6 +4,7 @@ import {
   type DataModel,
   DatabaseReader as DatabaseReader_,
   DatabaseWriter as DatabaseWriter_,
+  DocumentIds as DocumentIds_,
   ExecutionMetadata as ExecutionMetadata_,
   MutationCtx as MutationCtx_,
   MutationRunner as MutationRunner_,
@@ -53,6 +54,9 @@ export const VectorSearch: VectorSearch_.VectorSearchTag<
   DataModel.FromSchema<typeof schemaDefinition>
 > = VectorSearch_.VectorSearch<DataModel.FromSchema<typeof schemaDefinition>>();
 export type VectorSearch = typeof VectorSearch.Identifier;
+
+export const DocumentIds: DocumentIds_.DocumentIdsTag<typeof schemaDefinition> = DocumentIds_.DocumentIds<typeof schemaDefinition>();
+export type DocumentIds = typeof DocumentIds.Identifier;
 
 export const DatabaseReader: DatabaseReader_.DatabaseReaderTag<
   typeof schemaDefinition,

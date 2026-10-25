@@ -65,6 +65,12 @@ export type TableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
 > &
   string;
 
+export type SystemTableNames = Table.Name<Table.SystemTables>;
+
+export type AllTableNames<DatabaseSchema_ extends AnyWithProps> =
+  | TableNames<DatabaseSchema_>
+  | SystemTableNames;
+
 export type TableWithName<
   DatabaseSchema_ extends AnyWithProps,
   TableName extends TableNames<DatabaseSchema_>,
