@@ -104,7 +104,7 @@ export const codegen = Command.make("codegen", {}, () =>
   }),
 ).pipe(
   Command.withDescription(
-    "Generate `confect/_generated` files and the contents of the `convex` directory (except `convex.config.ts` and `tsconfig.json`). Run after edits and dependency installation have settled. If inputs change during generation, rerun codegen.",
+    "Generate `confect/_generated` files and the contents of the `convex` directory (except `convex.config.ts` and `tsconfig.json`).",
   ),
 );
 
