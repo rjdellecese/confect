@@ -11,7 +11,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as Tracer from "effect/Tracer";
 import { vi } from "vitest";
-import * as LocalBackend from "../../../server/test/local-backend/LocalBackend";
+import * as LocalBackend from "confect-local-backend/LocalBackend";
 
 class MissingValue extends Schema.TaggedError<MissingValue>()("MissingValue", {
   caseId: Schema.String,

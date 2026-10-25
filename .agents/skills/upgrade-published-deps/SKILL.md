@@ -42,7 +42,7 @@ bumping, confirm the new versions actually resolved (e.g. `pnpm why <dep>`).
   behavioral changes beyond mechanical fixes), drop it from the batch and
   document it the same way.
 - If the behavior of convex or the Confect CLI changed, re-run the server
-  codegen scripts (`pnpm codegen:server:mock-backend`/`codegen:server:local-backend`) and commit the complete fixture output—check `git status` for newly generated files, since CI's codegen check only
+  codegen scripts (`pnpm codegen:server:mock-backend`/`pnpm codegen:local-backend`) and commit the complete fixture output—check `git status` for newly generated files, since CI's codegen check only
   diffs tracked files.
 
 ## Dependency ranges and peer compatibility

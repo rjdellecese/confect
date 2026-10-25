@@ -9,6 +9,7 @@
   "devDependencies": {
     "@effect/vitest": "4.0.4",
     "@types/node": "26.6.5",
+    "confect-local-backend": "workspace:*",
     "effect": "4.0.4",
     "tsdown": "0.23.1",
     "typescript": "7.0.2",

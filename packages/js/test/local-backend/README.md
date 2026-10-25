@@ -10,10 +10,11 @@ pnpm test:js:local-backend
 ```
 
 The suite exercises the public `WebSocketClient.layer` against a real local
-Convex backend. It reuses the server suite's `LocalBackend` lifecycle and fixture
-project under `packages/server/test/local-backend`. The client-specific endpoints
-live in that project's `confect/webSocketClient.ts`; they use raw Convex functions
-so the tests can check client codecs independently of the server bindings.
+Convex backend. Both client and server suites use the private
+[`confect-local-backend` harness](../../../../tools/local-backend/README.md).
+The shared fixture project lives in `tools/local-backend/fixtures`. Its
+`confect/webSocketClient.ts` endpoints use raw Convex functions so the tests can
+check client codecs independently of the server bindings.
 
 The backend uses ports 3210 and 3211. Run this suite separately from the server
 local-backend suite and the example app. The first run may download a Convex
