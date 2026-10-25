@@ -34,8 +34,11 @@ const launcher = (
 ) => `import * as DevSupervisor from ${JSON.stringify(supervisorUrl)};
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeStream from "@effect/platform-node/NodeStream";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as PlatformError from "effect/PlatformError";
+import * as Stdio from "effect/Stdio";
 
 const program = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -68,7 +71,16 @@ const program = Effect.gen(function* () {
   return yield* run.pipe(Effect.raceFirst(disconnected));
 });
 
-NodeRuntime.runMain(program.pipe(Effect.provide(NodeServices.layer)));
+NodeRuntime.runMain(program.pipe(
+  Effect.updateService(Stdio.Stdio, (stdio) => Stdio.make({
+    ...stdio,
+    stdin: NodeStream.fromReadable({
+      evaluate: () => process.stdin,
+      onError: (cause) => PlatformError.systemError({ _tag: "Unknown", module: "Stdio", method: "stdin", cause }),
+    }),
+  })),
+  Effect.provide(NodeServices.layer),
+));
 `;
 
 const isAlive = (pid: number) => {
@@ -191,6 +203,35 @@ const start = Effect.fn("SupervisorIntegration.start")(function* (
 layer(NodeServices.layer, { excludeTestServices: true })(
   "real dev supervisor processes",
   (it) => {
+    it.effect(
+      "cleans up a running child when the supervisor is forcibly killed",
+      () =>
+        Effect.gen(function* () {
+          const fixture = yield* start("disconnect");
+          const session = yield* fixture.next;
+          expect(session.phase).toBe("Start");
+          expect(isAlive(session.pid)).toBe(true);
+          fixture.child.kill("SIGKILL");
+          expect(yield* fixture.next).toEqual({
+            phase: "Cleanup",
+            pid: session.pid,
+          });
+          expect(yield* fixture.exit).toEqual({
+            code: null,
+            signal: "SIGKILL",
+          });
+          expect(yield* fixture.journal).toEqual([
+            session,
+            { phase: "Cleanup", pid: session.pid },
+          ]);
+          expect(Array.map([fixture.pid, session.pid], isAlive)).toEqual([
+            false,
+            false,
+          ]);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "restarts once after cleanup and process exit, then stops on ordinary completion",
       () =>

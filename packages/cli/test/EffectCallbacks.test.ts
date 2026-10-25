@@ -1,4 +1,6 @@
 import type { BuildError, BundlerError } from "@confect/cli/BuildError";
+import type * as Stdio from "effect/Stdio";
+import type { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import type * as DevSupervisor from "@confect/cli/DevSupervisor";
 import type * as CompilationInputs from "@confect/cli/CompilationInputs";
 import type { ConfigError } from "effect/Config";
@@ -86,12 +88,12 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
       | ConfigError
       | EvaluationError
       | PlatformError
-      | DevSupervisor.MissingSessionIpc
+      | DevSupervisor.MissingEntrypoint
       | DevSupervisor.RestartRequested
       | DevSupervisor.SessionExited
-      | DevSupervisor.SupervisorError
+      | DevSupervisor.SessionRestart
       | SyncJobError,
-      GenerationServices | ProjectRoot
+      GenerationServices | ProjectRoot | Stdio.Stdio | ChildProcessSpawner
     >
   >();
 });

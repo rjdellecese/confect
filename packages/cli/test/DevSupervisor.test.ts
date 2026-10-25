@@ -1,28 +1,24 @@
-import { ChildProcess, fork } from "node:child_process";
-import type * as NodeChildProcess from "node:child_process";
 import * as DevSupervisor from "@confect/cli/DevSupervisor";
 import { assert, expect, it } from "@effect/vitest";
-import * as Array from "effect/Array";
 import * as Cause from "effect/Cause";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
+import * as PlatformError from "effect/PlatformError";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
+import * as Runtime from "effect/Runtime";
+import * as Sink from "effect/Sink";
+import * as Stdio from "effect/Stdio";
+import * as Stream from "effect/Stream";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as TestClock from "effect/testing/TestClock";
-import { vi } from "vitest";
 
-vi.mock("node:child_process", (importOriginal) =>
-  importOriginal<typeof NodeChildProcess>().then((original) => ({
-    ...original,
-    fork: vi.fn(),
-  })),
-);
-
-const restartSignal = { _tag: "ConfectDevSessionRestart" };
 const parentConfig = ConfigProvider.layer(ConfigProvider.fromUnknown({}));
 const childConfig = ConfigProvider.layer(
   ConfigProvider.fromUnknown({
@@ -31,445 +27,321 @@ const childConfig = ConfigProvider.layer(
 );
 
 const parentHarness = Effect.gen(function* () {
-  const runSync = Effect.runSyncWith(yield* Effect.context());
-  const started = yield* Queue.unbounded<ChildProcess>();
-  const stopping = yield* Queue.unbounded<ChildProcess>();
-  const signals = yield* Queue.unbounded<NodeJS.Signals | number>();
-  const spawn = yield* Effect.acquireRelease(
-    Effect.sync(() =>
-      vi.mocked(fork).mockImplementation(() => {
-        const child = new ChildProcess();
-        const connected = runSync(Ref.make(true));
-        Object.defineProperties(child, {
-          connected: {
-            configurable: true,
-            get: () => runSync(Ref.get(connected)),
-          },
-          disconnect: {
-            configurable: true,
-            writable: true,
-            value: () => {
-              runSync(Ref.set(connected, false));
-              runSync(Queue.offer(stopping, child));
-            },
-          },
-        });
-        vi.spyOn(child, "kill").mockImplementation((signal = "SIGTERM") => {
-          runSync(Queue.offer(signals, signal));
-          if (signal === "SIGKILL") child.emit("exit", null, "SIGKILL");
-          return true;
-        });
-        runSync(Queue.offer(started, child));
-        return child;
+  const started = yield* Queue.unbounded<{
+    command: ChildProcess.StandardCommand;
+    exited: Deferred.Deferred<
+      ChildProcessSpawner.ExitCode,
+      PlatformError.PlatformError
+    >;
+    stopping: Deferred.Deferred<void>;
+    released: Deferred.Deferred<void>;
+  }>();
+  const spawn = Effect.fnUntraced(function* (command: ChildProcess.Command) {
+    assert(ChildProcess.isStandardCommand(command));
+    const exited = yield* Deferred.make<
+      ChildProcessSpawner.ExitCode,
+      PlatformError.PlatformError
+    >();
+    const stopping = yield* Deferred.make<void>();
+    const released = yield* Deferred.make<void>();
+    yield* Effect.addFinalizer(() => Deferred.succeed(released, undefined));
+    const input = command.options.stdin;
+    assert(Stream.isStream(input));
+    yield* input.pipe(
+      Stream.runDrain,
+      Effect.andThen(Deferred.succeed(stopping, undefined)),
+      Effect.forkScoped,
+    );
+    yield* Queue.offer(started, { command, exited, stopping, released });
+    return ChildProcessSpawner.makeHandle({
+      pid: ChildProcessSpawner.ProcessId(1),
+      exitCode: Deferred.await(exited),
+      isRunning: Deferred.isDone(exited).pipe(Effect.map((done) => !done)),
+      kill: () => Effect.die("Termination belongs to the platform scope"),
+      stdin: Sink.drain,
+      stdout: Stream.empty,
+      stderr: Stream.empty,
+      all: Stream.empty,
+      getInputFd: () => Sink.drain,
+      getOutputFd: () => Stream.empty,
+      unref: Effect.succeed(Effect.void),
+    });
+  });
+  const layer = Layer.succeed(
+    ChildProcessSpawner.ChildProcessSpawner,
+    ChildProcessSpawner.make(spawn),
+  );
+  return {
+    started,
+    layer: Layer.mergeAll(
+      layer,
+      parentConfig,
+      Stdio.layerTest({
+        args: Effect.succeed(["dev", "--component-dir", "counter"]),
       }),
     ),
-    (mock) =>
-      Effect.sync(() => {
-        mock.mockReset();
-      }),
-  );
-  return { started, stopping, signals, spawn };
+  };
 });
 
-const childHarness = Effect.gen(function* () {
-  const runSync = Effect.runSyncWith(yield* Effect.context());
-  const sent = yield* Deferred.make<(error: Error | null) => void>();
-  const send = vi.fn(
-    (message: unknown, callback: (error: Error | null) => void) => {
-      expect(message).toEqual(restartSignal);
-      runSync(Deferred.succeed(sent, callback));
-      return true;
-    },
-  );
-  const connected = yield* Ref.make(true);
-  const disconnect = vi.fn(() => {
-    runSync(Ref.set(connected, false));
-    process.emit("disconnect");
-  });
-  yield* Effect.acquireRelease(
-    Effect.sync(() => {
-      const descriptors = Array.map(
-        ["send", "connected", "disconnect"] as const,
-        (name) =>
-          [name, Object.getOwnPropertyDescriptor(process, name)] as const,
-      );
-      Object.defineProperties(process, {
-        send: { configurable: true, value: send },
-        connected: {
-          configurable: true,
-          get: () => runSync(Ref.get(connected)),
-        },
-        disconnect: { configurable: true, value: disconnect },
-      });
-      return descriptors;
-    }),
-    (descriptors) =>
-      Effect.sync(() => {
-        for (const [name, descriptor] of descriptors) {
-          if (descriptor) Object.defineProperty(process, name, descriptor);
-          else Reflect.deleteProperty(process, name);
-        }
-      }),
-  );
-  return { sent, send, disconnect };
-});
-
-it.effect(
-  "waits for child exit before restarting without overlapping sessions",
-  () =>
-    Effect.gen(function* () {
-      const harness = yield* parentHarness;
-      const fiber = yield* DevSupervisor.run(
-        Effect.die("The parent must not evaluate the session"),
-      ).pipe(Effect.provide(parentConfig), Effect.forkScoped);
-      const first = yield* Queue.take(harness.started);
-      const unrelated = vi.fn();
-      first.on("message", unrelated);
-      const invocation = harness.spawn.mock.calls[0];
-      assert(invocation);
-      expect(invocation[0]).toBe(process.argv[1]);
-      expect(invocation[1]).toEqual(process.argv.slice(2));
-      const options = invocation[2];
-      assert(options);
-      expect(options.execArgv).toEqual(process.execArgv);
-      expect(options.stdio).toEqual(["inherit", "inherit", "inherit", "ipc"]);
-      expect(options.env?.CONFECT_INTERNAL_DEV_SESSION).toBe("1");
-      expect(
-        Array.every(
-          Object.entries(process.env),
-          ([key, value]) =>
-            key === "CONFECT_INTERNAL_DEV_SESSION" ||
-            options.env?.[key] === value,
-        ),
-      ).toBe(true);
-      first.emit("message", restartSignal);
-      first.emit("message", restartSignal);
-      yield* Effect.yieldNow;
-      expect(harness.spawn).toHaveBeenCalledTimes(1);
-      first.emit("exit", 0, null);
-      const second = yield* Queue.take(harness.started);
-      expect(first.listeners("message")).toEqual([unrelated]);
-      expect(harness.spawn).toHaveBeenCalledTimes(2);
-      expect(yield* Queue.size(harness.signals)).toBe(0);
-      second.emit("exit", 0, null);
-      yield* Fiber.join(fiber);
-      expect(yield* Queue.size(harness.signals)).toBe(0);
-      expect(harness.spawn).toHaveBeenCalledTimes(2);
-    }).pipe(Effect.scoped),
+it.effect("restarts only after child exit and platform scope release", () =>
+  Effect.gen(function* () {
+    const harness = yield* parentHarness;
+    const fiber = yield* DevSupervisor.run(
+      Effect.die("The parent must not evaluate the session"),
+    ).pipe(Effect.provide(harness.layer), Effect.forkScoped);
+    const first = yield* Queue.take(harness.started);
+    expect(first.command.command).toBe(process.execPath);
+    expect(first.command.args).toEqual([
+      ...process.execArgv,
+      process.argv[1],
+      "dev",
+      "--component-dir",
+      "counter",
+    ]);
+    expect(first.command.options).toMatchObject({
+      env: { CONFECT_INTERNAL_DEV_SESSION: "1" },
+      extendEnv: true,
+      stdout: "inherit",
+      stderr: "inherit",
+      forceKillAfter: "5 seconds",
+    });
+    expect(yield* Queue.size(harness.started)).toBe(0);
+    yield* Deferred.succeed(first.exited, ChildProcessSpawner.ExitCode(75));
+    const second = yield* Queue.take(harness.started);
+    expect(yield* Deferred.isDone(first.released)).toBe(true);
+    yield* Deferred.succeed(second.exited, ChildProcessSpawner.ExitCode(0));
+    yield* Fiber.join(fiber);
+    expect(yield* Deferred.isDone(second.released)).toBe(true);
+    expect(yield* Queue.size(harness.started)).toBe(0);
+  }).pipe(Effect.scoped),
 );
 
-it.effect.each([undefined, "ConfectDevSessionRestart", { _tag: "Other" }])(
-  "does not restart an ordinary exit or interpret unrelated message %j",
-  (message) =>
+it.effect.each([1, 23, 130])(
+  "propagates exit code %i without retrying",
+  (code) =>
     Effect.gen(function* () {
       const harness = yield* parentHarness;
       const fiber = yield* DevSupervisor.run(Effect.void).pipe(
-        Effect.provide(parentConfig),
-        Effect.forkScoped,
-      );
-      const child = yield* Queue.take(harness.started);
-      child.emit("message", message);
-      child.emit("exit", 0, null);
-      yield* Fiber.join(fiber);
-      expect(harness.spawn).toHaveBeenCalledTimes(1);
-    }).pipe(Effect.scoped),
-);
-
-it.effect(
-  "records restart before acknowledging a child that exits immediately",
-  () =>
-    Effect.gen(function* () {
-      const harness = yield* parentHarness;
-      const fiber = yield* DevSupervisor.run(Effect.void).pipe(
-        Effect.provide(parentConfig),
-        Effect.forkScoped,
-      );
-      const first = yield* Queue.take(harness.started);
-      vi.spyOn(first, "disconnect").mockImplementation(() => {
-        first.emit("exit", 0, null);
-      });
-      first.emit("message", restartSignal);
-      const second = yield* Queue.take(harness.started);
-      expect(harness.spawn).toHaveBeenCalledTimes(2);
-      second.emit("exit", 0, null);
-      yield* Fiber.join(fiber);
-    }).pipe(Effect.scoped),
-);
-
-it.effect.each([
-  { code: 23, signal: null, restart: false },
-  { code: 23, signal: null, restart: true },
-  { code: null, signal: "SIGTERM", restart: true },
-])(
-  "propagates child exit $code/$signal without retrying failures",
-  ({ code, signal, restart }) =>
-    Effect.gen(function* () {
-      const harness = yield* parentHarness;
-      const fiber = yield* DevSupervisor.run(Effect.void).pipe(
-        Effect.provide(parentConfig),
+        Effect.provide(harness.layer),
         Effect.result,
         Effect.forkScoped,
       );
       const child = yield* Queue.take(harness.started);
-      if (restart) child.emit("message", restartSignal);
-      child.emit("exit", code, signal);
+      yield* Deferred.succeed(child.exited, ChildProcessSpawner.ExitCode(code));
       expect(yield* Fiber.join(fiber)).toEqual(
-        Result.fail(new DevSupervisor.SessionExited({ code, signal })),
+        Result.fail(new DevSupervisor.SessionExited({ code })),
       );
-      expect(harness.spawn).toHaveBeenCalledTimes(1);
+      expect(yield* Deferred.isDone(child.released)).toBe(true);
+      expect(yield* Queue.size(harness.started)).toBe(0);
     }).pipe(Effect.scoped),
 );
 
-it.effect("propagates a spawn failure without retrying", () =>
+it.effect("propagates a platform spawn failure without retrying", () =>
   Effect.gen(function* () {
-    const harness = yield* parentHarness;
-    const failure = new Error("spawn failed");
-    harness.spawn.mockImplementationOnce(() => {
-      throw failure;
+    const attempts = yield* Ref.make(0);
+    const failure = PlatformError.systemError({
+      _tag: "Unknown",
+      module: "ChildProcess",
+      method: "spawn",
+      cause: "spawn failed",
     });
+    const spawner = Layer.succeed(
+      ChildProcessSpawner.ChildProcessSpawner,
+      ChildProcessSpawner.make(() =>
+        Ref.update(attempts, (n) => n + 1).pipe(
+          Effect.andThen(Effect.fail(failure)),
+        ),
+      ),
+    );
     expect(
       yield* DevSupervisor.run(Effect.void).pipe(
-        Effect.provide(parentConfig),
+        Effect.provide([spawner, parentConfig, Stdio.layerTest({})]),
         Effect.result,
       ),
-    ).toEqual(
-      Result.fail(
-        new DevSupervisor.SupervisorError({
-          operation: "Spawn",
-          cause: failure,
-        }),
-      ),
+    ).toEqual(Result.fail(failure));
+    expect(yield* Ref.get(attempts)).toBe(1);
+  }),
+);
+
+it.effect("preserves platform exit failures and releases the child", () =>
+  Effect.gen(function* () {
+    const harness = yield* parentHarness;
+    const failure = PlatformError.systemError({
+      _tag: "Unknown",
+      module: "ChildProcess",
+      method: "exitCode",
+      cause: "child terminated by signal",
+    });
+    const fiber = yield* DevSupervisor.run(Effect.void).pipe(
+      Effect.provide(harness.layer),
+      Effect.result,
+      Effect.forkScoped,
     );
-    expect(harness.spawn).toHaveBeenCalledTimes(1);
+    const child = yield* Queue.take(harness.started);
+    yield* Deferred.fail(child.exited, failure);
+    expect(yield* Fiber.join(fiber)).toEqual(Result.fail(failure));
+    expect(yield* Deferred.isDone(child.released)).toBe(true);
+    expect(yield* Queue.size(harness.started)).toBe(0);
   }).pipe(Effect.scoped),
 );
 
 it.effect(
-  "waits for termination on interruption instead of leaving an orphan child",
+  "closes the shutdown pipe and waits for graceful exit before releasing the platform scope",
   () =>
     Effect.gen(function* () {
       const harness = yield* parentHarness;
-      const finished = yield* Deferred.make<void>();
       const fiber = yield* DevSupervisor.run(Effect.void).pipe(
-        Effect.provide(parentConfig),
+        Effect.provide(harness.layer),
         Effect.forkScoped,
       );
       const child = yield* Queue.take(harness.started);
-      child.emit("message", restartSignal);
-      expect(yield* Queue.take(harness.stopping)).toBe(child);
-      const interrupt = yield* Fiber.interrupt(fiber).pipe(
-        Effect.tap(() => Deferred.succeed(finished, undefined)),
-        Effect.forkScoped,
-      );
-      yield* Effect.yieldNow;
-      expect(yield* Deferred.isDone(finished)).toBe(false);
-      child.emit("exit", null, "SIGTERM");
+      const interrupt = yield* Fiber.interrupt(fiber).pipe(Effect.forkScoped);
+      yield* Deferred.await(child.stopping);
+      expect(yield* Deferred.isDone(child.released)).toBe(false);
+      yield* Deferred.succeed(child.exited, ChildProcessSpawner.ExitCode(130));
       yield* Fiber.join(interrupt);
-      const exit = yield* Effect.exit(Fiber.join(fiber));
+      expect(yield* Deferred.isDone(child.released)).toBe(true);
+      const exit = yield* Fiber.await(fiber);
       assert(Exit.isFailure(exit));
       expect(Cause.hasInterruptsOnly(exit.cause)).toBe(true);
-      expect(harness.spawn).toHaveBeenCalledTimes(1);
     }).pipe(Effect.scoped),
 );
 
-it.effect("waits for process cleanup after an asynchronous spawn error", () =>
-  Effect.gen(function* () {
-    const harness = yield* parentHarness;
-    const finished = yield* Deferred.make<void>();
-    const failure = new Error("child process error");
-    const fiber = yield* DevSupervisor.run(Effect.void).pipe(
-      Effect.provide(parentConfig),
-      Effect.result,
-      Effect.tap(() => Deferred.succeed(finished, undefined)),
-      Effect.forkScoped,
-    );
-    const child = yield* Queue.take(harness.started);
-    child.emit("error", failure);
-    expect(yield* Queue.take(harness.stopping)).toBe(child);
-    expect(yield* Deferred.isDone(finished)).toBe(false);
-    child.emit("close", 1, null);
-    expect(yield* Fiber.join(fiber)).toEqual(
-      Result.fail(
-        new DevSupervisor.SupervisorError({
-          operation: "Spawn",
-          cause: failure,
-        }),
-      ),
-    );
-    expect(harness.spawn).toHaveBeenCalledTimes(1);
-  }).pipe(Effect.scoped),
-);
-
-it.effect("still reaps the child if disconnect fails during interruption", () =>
-  Effect.gen(function* () {
-    const harness = yield* parentHarness;
-    const fiber = yield* DevSupervisor.run(Effect.void).pipe(
-      Effect.provide(parentConfig),
-      Effect.forkScoped,
-    );
-    const child = yield* Queue.take(harness.started);
-    vi.spyOn(child, "disconnect").mockImplementation(() => {
-      throw new Error("disconnect failed");
-    });
-    yield* Fiber.interrupt(fiber);
-    expect(yield* Queue.take(harness.signals)).toBe("SIGKILL");
-    const exit = yield* Effect.exit(Fiber.join(fiber));
-    assert(Exit.isFailure(exit));
-    expect(Cause.hasInterrupts(exit.cause)).toBe(true);
-    expect(Cause.hasDies(exit.cause)).toBe(true);
-    expect(harness.spawn).toHaveBeenCalledTimes(1);
-  }).pipe(Effect.scoped),
-);
-
-it.effect("force-terminates a child that ignores graceful shutdown", () =>
-  Effect.gen(function* () {
-    const harness = yield* parentHarness;
-    const fiber = yield* DevSupervisor.run(Effect.void).pipe(
-      Effect.provide(parentConfig),
-      Effect.forkScoped,
-    );
-    const child = yield* Queue.take(harness.started);
-    const interrupt = yield* Fiber.interrupt(fiber).pipe(Effect.forkScoped);
-    expect(yield* Queue.take(harness.stopping)).toBe(child);
-    yield* TestClock.adjust("5 seconds");
-    expect(yield* Queue.take(harness.signals)).toBe("SIGKILL");
-    yield* Fiber.join(interrupt);
-    expect(harness.spawn).toHaveBeenCalledTimes(1);
-  }).pipe(Effect.scoped),
-);
-
-it.effect.each([
-  { mode: "throw", reason: "SignalFailed" },
-  { mode: "reject", reason: "SignalRejected" },
-  { mode: "accept", reason: "ExitTimeout" },
-] as const)(
-  "reports $reason if forced termination cannot confirm child exit",
-  ({ mode, reason }) =>
+it.effect(
+  "hands an unresponsive child back to platform termination after the grace period",
+  () =>
     Effect.gen(function* () {
       const harness = yield* parentHarness;
-      const runSync = Effect.runSyncWith(yield* Effect.context());
-      const attempted = yield* Deferred.make<void>();
-      const finished = yield* Deferred.make<void>();
       const fiber = yield* DevSupervisor.run(Effect.void).pipe(
-        Effect.provide(parentConfig),
+        Effect.provide(harness.layer),
         Effect.forkScoped,
       );
       const child = yield* Queue.take(harness.started);
-      vi.spyOn(child, "kill").mockImplementation(() => {
-        runSync(Deferred.succeed(attempted, undefined));
-        if (mode === "throw") throw new Error("kill failed");
-        return mode === "accept";
-      });
-      const interrupt = yield* Fiber.interrupt(fiber).pipe(
-        Effect.tap(() => Deferred.succeed(finished, undefined)),
-        Effect.forkScoped,
-      );
-      yield* Queue.take(harness.stopping);
-      yield* TestClock.adjust("5 seconds");
-      yield* Deferred.await(attempted);
-      expect(yield* Deferred.isDone(finished)).toBe(false);
+      const interrupt = yield* Fiber.interrupt(fiber).pipe(Effect.forkScoped);
+      yield* Deferred.await(child.stopping);
+      expect(yield* Deferred.isDone(child.released)).toBe(false);
       yield* TestClock.adjust("5 seconds");
       yield* Fiber.join(interrupt);
-      const exit = yield* Effect.exit(Fiber.join(fiber));
-      assert(Exit.isFailure(exit));
-      expect(Cause.hasInterrupts(exit.cause)).toBe(true);
-      const defect = Cause.findDefect(exit.cause);
-      assert(Result.isSuccess(defect));
-      expect(defect.success).toMatchObject({
-        _tag: "DevSessionTerminationError",
-        reason,
-        pid: null,
-      });
-      expect(harness.spawn).toHaveBeenCalledTimes(1);
+      expect(yield* Deferred.isDone(child.released)).toBe(true);
     }).pipe(Effect.scoped),
 );
 
-it.effect("rejects a private session marker without an IPC send function", () =>
+const childHarness = Effect.gen(function* () {
+  const disconnected = yield* Deferred.make<
+    void,
+    PlatformError.PlatformError
+  >();
+  const events = yield* Queue.unbounded<string>();
+  const layer = Layer.mergeAll(
+    childConfig,
+    Stdio.layerTest({
+      stdin: Stream.fromEffect(Deferred.await(disconnected)).pipe(Stream.drain),
+    }),
+    Layer.mock(ChildProcessSpawner.ChildProcessSpawner, {}),
+  );
+  return { disconnected, events, layer };
+});
+
+it.effect("keeps worker IPC intact when the fake child disconnects", () =>
+  Effect.gen(function* () {
+    const worker = globalThis.process;
+    const connected = worker.connected;
+    const send = worker.send?.bind(worker);
+    const descriptors = ["send", "connected", "disconnect"].map(
+      (name) => [name, Object.getOwnPropertyDescriptor(worker, name)] as const,
+    );
+    const listeners = worker.listeners("disconnect");
+    const harness = yield* childHarness;
+    const started = yield* Deferred.make<void>();
+    const fiber = yield* DevSupervisor.run(
+      Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)),
+    ).pipe(Effect.provide(harness.layer), Effect.forkScoped);
+    yield* Deferred.await(started);
+    yield* Deferred.succeed(harness.disconnected, undefined);
+    const exit = yield* Fiber.await(fiber);
+    assert(Exit.isFailure(exit));
+    expect(Cause.hasInterruptsOnly(exit.cause)).toBe(true);
+    expect(worker.connected).toBe(connected);
+    expect(worker.listeners("disconnect")).toEqual(listeners);
+    for (const [name, descriptor] of descriptors) {
+      expect(Object.getOwnPropertyDescriptor(worker, name)).toEqual(descriptor);
+    }
+    if (send)
+      yield* Effect.callback<void>((resume) => {
+        send({ cmd: "NODE_CONFECT_TEST" }, (error) =>
+          resume(error ? Effect.die(error) : Effect.void),
+        );
+      });
+  }).pipe(Effect.scoped),
+);
+
+it.effect("requests a restart exit only after successful session cleanup", () =>
   Effect.gen(function* () {
     const harness = yield* childHarness;
-    Object.defineProperty(process, "send", {
-      configurable: true,
-      value: undefined,
+    const allowCleanup = yield* Deferred.make<void>();
+    const session = Effect.gen(function* () {
+      yield* Effect.addFinalizer(() =>
+        Queue.offer(harness.events, "cleanup").pipe(
+          Effect.andThen(Deferred.await(allowCleanup)),
+        ),
+      );
+      return yield* DevSupervisor.requestRestart;
     });
-    const executed = yield* Ref.make(false);
-    const result = yield* DevSupervisor.run(Ref.set(executed, true)).pipe(
-      Effect.provide(childConfig),
-      Effect.result,
+    const fiber = yield* DevSupervisor.run(session).pipe(
+      Effect.provide(harness.layer),
+      Effect.forkScoped,
     );
-    expect(result).toEqual(Result.fail(new DevSupervisor.MissingSessionIpc()));
-    expect(yield* Ref.get(executed)).toBe(false);
-    expect(harness.disconnect).not.toHaveBeenCalled();
+    expect(yield* Queue.take(harness.events)).toBe("cleanup");
+    expect(fiber.pollUnsafe()).toBeUndefined();
+    yield* Deferred.succeed(allowCleanup, undefined);
+    const exit = yield* Fiber.await(fiber);
+    assert(Exit.isFailure(exit));
+    expect(exit.cause.reasons).toHaveLength(1);
+    expect(Cause.findError(exit.cause)).toEqual(
+      Result.succeed(new DevSupervisor.SessionRestart()),
+    );
+    const codes: Array<number> = [];
+    Runtime.defaultTeardown(exit, (code) => codes.push(code));
+    expect(codes).toEqual([75]);
+    expect(Runtime.getErrorReported(new DevSupervisor.SessionRestart())).toBe(
+      false,
+    );
   }).pipe(Effect.scoped),
 );
 
-it.effect(
-  "interrupts an already disconnected real child without starting a session",
-  () =>
+it.effect.each(["complete", "fail", "defect"] as const)(
+  "does not restart on %s",
+  (mode) =>
     Effect.gen(function* () {
       const harness = yield* childHarness;
-      harness.disconnect();
-      const executed = yield* Ref.make(false);
-      const exit = yield* DevSupervisor.run(Ref.set(executed, true)).pipe(
-        Effect.provide(childConfig),
+      const failure = new DevSupervisor.SessionExited({ code: 7 });
+      const session =
+        mode === "complete"
+          ? Effect.void
+          : mode === "fail"
+            ? Effect.fail(failure)
+            : Effect.die(failure);
+      const exit = yield* DevSupervisor.run(session).pipe(
+        Effect.provide(harness.layer),
         Effect.exit,
       );
-      assert(Exit.isFailure(exit));
-      expect(Cause.hasInterruptsOnly(exit.cause)).toBe(true);
-      expect(yield* Ref.get(executed)).toBe(false);
-      expect(harness.send).not.toHaveBeenCalled();
-    }).pipe(Effect.scoped),
-);
-
-it.effect.each(["send-first", "disconnect-first"] as const)(
-  "sends restart after cleanup and awaits the parent's acknowledgement with %s",
-  (order) =>
-    Effect.gen(function* () {
-      const harness = yield* childHarness;
-      const cleaning = yield* Deferred.make<void>();
-      const allowCleanup = yield* Deferred.make<void>();
-      const cleaned = yield* Ref.make(false);
-      const finished = yield* Deferred.make<void>();
-      const session = Effect.gen(function* () {
-        yield* Effect.addFinalizer(() =>
-          Deferred.succeed(cleaning, undefined).pipe(
-            Effect.andThen(Deferred.await(allowCleanup)),
-            Effect.andThen(Ref.set(cleaned, true)),
-          ),
-        );
-        return yield* DevSupervisor.requestRestart;
-      });
-      const fiber = yield* DevSupervisor.run(session).pipe(
-        Effect.provide(childConfig),
-        Effect.tap(() => Deferred.succeed(finished, undefined)),
-        Effect.forkScoped,
-      );
-      yield* Deferred.await(cleaning);
-      expect(harness.send).not.toHaveBeenCalled();
-      expect(harness.disconnect).not.toHaveBeenCalled();
-      yield* Deferred.succeed(allowCleanup, undefined);
-      const sent = yield* Deferred.await(harness.sent);
-      expect(yield* Ref.get(cleaned)).toBe(true);
-      expect(yield* Deferred.isDone(finished)).toBe(false);
-      expect(harness.disconnect).not.toHaveBeenCalled();
-      if (order === "send-first") {
-        sent(null);
-        yield* Effect.yieldNow;
-        expect(yield* Deferred.isDone(finished)).toBe(false);
-        expect(harness.disconnect).not.toHaveBeenCalled();
-        harness.disconnect();
-      } else {
-        harness.disconnect();
-        yield* Effect.yieldNow;
-        expect(yield* Deferred.isDone(finished)).toBe(false);
-        sent(null);
+      if (mode === "complete") expect(exit).toEqual(Exit.void);
+      else {
+        assert(Exit.isFailure(exit));
+        expect(exit.cause.reasons).toHaveLength(1);
+        expect(
+          mode === "fail"
+            ? Cause.findError(exit.cause)
+            : Cause.findDefect(exit.cause),
+        ).toEqual(Result.succeed(failure));
       }
-      yield* Fiber.join(fiber);
-      expect(harness.send).toHaveBeenCalledTimes(1);
-      expect(harness.disconnect).toHaveBeenCalledTimes(1);
-    }).pipe(Effect.scoped),
+      const codes: Array<number> = [];
+      Runtime.defaultTeardown(exit, (code) => codes.push(code));
+      expect(codes).toEqual([mode === "complete" ? 0 : 1]);
+    }),
 );
 
-it.effect("does not request restart when scope cleanup defects", () =>
+it.effect("preserves a cleanup defect alongside a restart request", () =>
   Effect.gen(function* () {
     const harness = yield* childHarness;
     const session = Effect.gen(function* () {
@@ -477,141 +349,100 @@ it.effect("does not request restart when scope cleanup defects", () =>
       return yield* DevSupervisor.requestRestart;
     });
     const exit = yield* DevSupervisor.run(session).pipe(
-      Effect.provide(childConfig),
+      Effect.provide(harness.layer),
       Effect.exit,
     );
     assert(Exit.isFailure(exit));
     expect(Cause.hasDies(exit.cause)).toBe(true);
     expect(Cause.hasFails(exit.cause)).toBe(true);
-    expect(harness.send).not.toHaveBeenCalled();
-    expect(harness.disconnect).toHaveBeenCalledTimes(1);
-  }).pipe(Effect.scoped),
+    const codes: Array<number> = [];
+    Runtime.defaultTeardown(exit, (code) => codes.push(code));
+    expect(codes).toEqual([1]);
+  }),
 );
 
-it.effect("preserves interruption while awaiting restart acknowledgement", () =>
+it.effect.each(["interrupt", "disconnect"] as const)(
+  "cleans up the child session on %s",
+  (reason) =>
+    Effect.gen(function* () {
+      const harness = yield* childHarness;
+      const session = Effect.gen(function* () {
+        yield* Effect.addFinalizer(() =>
+          Queue.offer(harness.events, "cleanup"),
+        );
+        yield* Queue.offer(harness.events, "start");
+        return yield* Effect.never;
+      });
+      const fiber = yield* DevSupervisor.run(session).pipe(
+        Effect.provide(harness.layer),
+        Effect.forkScoped,
+      );
+      expect(yield* Queue.take(harness.events)).toBe("start");
+      if (reason === "interrupt") yield* Fiber.interrupt(fiber);
+      else yield* Deferred.succeed(harness.disconnected, undefined);
+      const exit = yield* Fiber.await(fiber);
+      assert(Exit.isFailure(exit));
+      expect(Cause.hasInterruptsOnly(exit.cause)).toBe(true);
+      expect(yield* Queue.take(harness.events)).toBe("cleanup");
+    }).pipe(Effect.scoped),
+);
+
+it.effect("preserves interruption during restart cleanup", () =>
   Effect.gen(function* () {
     const harness = yield* childHarness;
-    const listeners = process.listenerCount("disconnect");
-    const fiber = yield* DevSupervisor.run(DevSupervisor.requestRestart).pipe(
-      Effect.provide(childConfig),
+    const allowCleanup = yield* Deferred.make<void>();
+    const session = Effect.gen(function* () {
+      yield* Effect.addFinalizer(() =>
+        Queue.offer(harness.events, "cleanup").pipe(
+          Effect.andThen(Deferred.await(allowCleanup)),
+        ),
+      );
+      return yield* DevSupervisor.requestRestart;
+    });
+    const fiber = yield* DevSupervisor.run(session).pipe(
+      Effect.provide(harness.layer),
       Effect.forkScoped,
     );
-    const sent = yield* Deferred.await(harness.sent);
-    sent(null);
+    yield* Queue.take(harness.events);
+    const interrupted = yield* Fiber.interrupt(fiber).pipe(Effect.forkScoped);
     yield* Effect.yieldNow;
-    yield* Fiber.interrupt(fiber);
-    const exit = yield* Effect.exit(Fiber.join(fiber));
+    yield* Deferred.succeed(allowCleanup, undefined);
+    yield* Fiber.join(interrupted);
+    const exit = yield* Fiber.await(fiber);
     assert(Exit.isFailure(exit));
-    expect(Cause.hasInterruptsOnly(exit.cause)).toBe(true);
-    expect(harness.disconnect).toHaveBeenCalledTimes(1);
-    expect(process.listenerCount("disconnect")).toBe(listeners);
+    expect(Cause.hasInterrupts(exit.cause)).toBe(true);
+    const codes: Array<number> = [];
+    Runtime.defaultTeardown(exit, (code) => codes.push(code));
+    expect(codes).not.toContain(75);
   }).pipe(Effect.scoped),
 );
 
 it.effect(
-  "does not convert interruption during restart cleanup into another restart",
+  "propagates a shutdown-pipe failure and cleans up without restarting",
   () =>
     Effect.gen(function* () {
       const harness = yield* childHarness;
-      const cleaning = yield* Deferred.make<void>();
-      const allowCleanup = yield* Deferred.make<void>();
+      const failure = PlatformError.systemError({
+        _tag: "Unknown",
+        module: "Stdio",
+        method: "stdin",
+        cause: "read failed",
+      });
       const session = Effect.gen(function* () {
         yield* Effect.addFinalizer(() =>
-          Deferred.succeed(cleaning, undefined).pipe(
-            Effect.andThen(Deferred.await(allowCleanup)),
-          ),
+          Queue.offer(harness.events, "cleanup"),
         );
-        return yield* DevSupervisor.requestRestart;
-      });
-      const fiber = yield* DevSupervisor.run(session).pipe(
-        Effect.provide(childConfig),
-        Effect.forkScoped,
-      );
-      yield* Deferred.await(cleaning);
-      const interrupt = yield* Fiber.interrupt(fiber).pipe(Effect.forkScoped);
-      yield* Effect.yieldNow;
-      yield* Deferred.succeed(allowCleanup, undefined);
-      yield* Fiber.join(interrupt);
-      const exit = yield* Effect.exit(Fiber.join(fiber));
-      assert(Exit.isFailure(exit));
-      expect(Cause.hasInterrupts(exit.cause)).toBe(true);
-      expect(harness.send).not.toHaveBeenCalled();
-      expect(harness.disconnect).toHaveBeenCalledTimes(1);
-    }).pipe(Effect.scoped),
-);
-it.effect("propagates session failures without requesting restart", () =>
-  Effect.gen(function* () {
-    const harness = yield* childHarness;
-    const failure = new DevSupervisor.SessionExited({ code: 7, signal: null });
-    expect(
-      yield* DevSupervisor.run(Effect.fail(failure)).pipe(
-        Effect.provide(childConfig),
-        Effect.result,
-      ),
-    ).toEqual(Result.fail(failure));
-    expect(harness.send).not.toHaveBeenCalled();
-    expect(harness.disconnect).toHaveBeenCalledTimes(1);
-  }).pipe(Effect.scoped),
-);
-
-it.effect("disconnects normally without sending a restart", () =>
-  Effect.gen(function* () {
-    const harness = yield* childHarness;
-    yield* DevSupervisor.run(Effect.void).pipe(Effect.provide(childConfig));
-    expect(harness.send).not.toHaveBeenCalled();
-    expect(harness.disconnect).toHaveBeenCalledTimes(1);
-  }).pipe(Effect.scoped),
-);
-
-it.effect("propagates IPC send failures instead of silently restarting", () =>
-  Effect.gen(function* () {
-    const harness = yield* childHarness;
-    const fiber = yield* DevSupervisor.run(DevSupervisor.requestRestart).pipe(
-      Effect.provide(childConfig),
-      Effect.result,
-      Effect.forkScoped,
-    );
-    const acknowledge = yield* Deferred.await(harness.sent);
-    const failure = new Error("IPC send failed");
-    acknowledge(failure);
-    expect(yield* Fiber.join(fiber)).toEqual(
-      Result.fail(
-        new DevSupervisor.SupervisorError({
-          operation: "Restart",
-          cause: failure,
-        }),
-      ),
-    );
-    expect(harness.disconnect).toHaveBeenCalledTimes(1);
-  }).pipe(Effect.scoped),
-);
-
-it.effect.each(["interrupt", "disconnect"] as const)(
-  "preserves child interruption on %s and closes its scope",
-  (reason) =>
-    Effect.gen(function* () {
-      const harness = yield* childHarness;
-      const started = yield* Deferred.make<void>();
-      const cleaned = yield* Ref.make(false);
-      const listeners = process.listenerCount("disconnect");
-      const session = Effect.gen(function* () {
-        yield* Effect.addFinalizer(() => Ref.set(cleaned, true));
-        yield* Deferred.succeed(started, undefined);
+        yield* Queue.offer(harness.events, "start");
         return yield* Effect.never;
       });
       const fiber = yield* DevSupervisor.run(session).pipe(
-        Effect.provide(childConfig),
+        Effect.provide(harness.layer),
+        Effect.result,
         Effect.forkScoped,
       );
-      yield* Deferred.await(started);
-      if (reason === "interrupt") yield* Fiber.interrupt(fiber);
-      else harness.disconnect();
-      const exit = yield* Effect.exit(Fiber.join(fiber));
-      assert(Exit.isFailure(exit));
-      expect(Cause.hasInterruptsOnly(exit.cause)).toBe(true);
-      expect(yield* Ref.get(cleaned)).toBe(true);
-      expect(harness.send).not.toHaveBeenCalled();
-      expect(harness.disconnect).toHaveBeenCalledTimes(1);
-      expect(process.listenerCount("disconnect")).toBe(listeners);
+      yield* Queue.take(harness.events);
+      yield* Deferred.fail(harness.disconnected, failure);
+      expect(yield* Fiber.join(fiber)).toEqual(Result.fail(failure));
+      expect(yield* Queue.take(harness.events)).toBe("cleanup");
     }).pipe(Effect.scoped),
 );
