@@ -7,7 +7,7 @@ import type * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Semaphore from "effect/Semaphore";
 import type * as esbuild from "esbuild";
-import type { BundlerError } from "./BuildError";
+import type * as BuildError from "./BuildError";
 import type * as CompilationInputs from "./CompilationInputs";
 
 export type ResolutionScope = string & Brand.Brand<"ResolutionScope">;
@@ -52,7 +52,7 @@ export const make = Effect.fn("ResolutionScope.make")(function* (
       {
         readonly run: Effect.Effect<
           ResolutionScope,
-          BundlerError | CompilationInputs.RestartRequired
+          BuildError.BundlerError | CompilationInputs.RestartRequired
         >;
       }
     >(),
@@ -62,7 +62,7 @@ export const make = Effect.fn("ResolutionScope.make")(function* (
     directory: string,
   ): Effect.fn.Return<
     ResolutionScope,
-    BundlerError | CompilationInputs.RestartRequired
+    BuildError.BundlerError | CompilationInputs.RestartRequired
   > {
     const cached = yield* lock.withPermit(
       Effect.gen(function* () {
@@ -93,7 +93,7 @@ export const make = Effect.fn("ResolutionScope.make")(function* (
       enabled: boolean,
     ): Effect.fn.Return<
       Lookup,
-      BundlerError | CompilationInputs.RestartRequired
+      BuildError.BundlerError | CompilationInputs.RestartRequired
     > {
       const directory = path.dirname(args.importer);
       if (
