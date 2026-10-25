@@ -143,7 +143,7 @@ jobs:
           key: convex-local-backend-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             convex-local-backend-${{ runner.os }}-
-      - run: pnpm --filter @confect/server test:local-backend
+      - run: pnpm test:server:local-backend
       - run: pnpm test:js:local-backend
 
   codegen-fixtures:
