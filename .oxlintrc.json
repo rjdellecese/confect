@@ -85,8 +85,8 @@
       "files": [
         "packages/cli/src/EvaluationSession.ts",
         "packages/cli/test/Evaluation.test.ts",
-        "packages/cli/src/DevSupervisor.ts",
-        "packages/cli/test/DevSupervisor.test.ts",
+        "packages/cli/src/NodeDevSessionProcess.ts",
+        "packages/cli/test/NodeDevSessionProcess.test.ts",
         "packages/cli/test/integration/DevSupervisor.test.ts"
       ],
       "rules": {

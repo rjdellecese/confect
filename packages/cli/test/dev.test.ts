@@ -1,4 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as DevSessionProcess from "@confect/cli/DevSessionProcess";
+import * as Layer from "effect/Layer";
 import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as Command from "effect/cli/Command";
@@ -39,7 +41,12 @@ vi.mock("effect/Console", (importOriginal) =>
   })),
 );
 
-layer(NodeServices.layer, { excludeTestServices: true })(
+const services = Layer.merge(
+  NodeServices.layer,
+  Layer.mock(DevSessionProcess.Service, {}),
+);
+
+layer(services, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
     it.effect.each([
