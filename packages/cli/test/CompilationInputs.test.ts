@@ -34,7 +34,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const root = yield* fs.makeTempDirectoryScoped();
           const inputs = yield* CompilationInputs.make("Once");
           yield* inputs.trackSource(path.join(root, "entry.ts"));
-          expect(yield* inputs.canShareResolution(root)).toBe(true);
+          expect(yield* inputs.resolutionBoundary(root)).toEqual({
+            _tag: "Continue",
+            parent: path.dirname(root),
+          });
           const added = path.join(root, name);
           if (name === "node_modules") yield* fs.makeDirectory(added);
           else yield* fs.writeFileString(added, "{}");
@@ -44,7 +47,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           });
           yield* fs.remove(added, { recursive: true });
           expect(
-            yield* Effect.flip(inputs.canShareResolution(root)),
+            yield* Effect.flip(inputs.resolutionBoundary(root)),
           ).toMatchObject({ _tag: "CompilationRestartRequired" });
         }).pipe(Effect.scoped),
     );
@@ -65,7 +68,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         const inputs = yield* CompilationInputs.make("Once");
         yield* inputs.trackSource(path.join(nested, "entry.ts"));
         expect(yield* inputs.canSharePackageLookups).toBe(false);
-        expect(yield* inputs.canShareResolution(nested)).toBe(false);
+        expect(yield* inputs.resolutionBoundary(nested)).toEqual({
+          _tag: "Stop",
+          directory: nested,
+        });
       }).pipe(Effect.scoped),
     );
 
