@@ -1,4 +1,5 @@
 import type { BuildError, BundlerError } from "@confect/cli/BuildError";
+import type * as DevSessionProcess from "@confect/cli/DevSessionProcess";
 import type * as DevSupervisor from "@confect/cli/DevSupervisor";
 import type * as CompilationInputs from "@confect/cli/CompilationInputs";
 import type { ConfigError } from "effect/Config";
@@ -102,12 +103,12 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
       | ConfigError
       | EvaluationError
       | PlatformError
-      | DevSupervisor.MissingSessionIpc
+      | DevSessionProcess.MissingSessionIpc
       | DevSupervisor.RestartRequested
-      | DevSupervisor.SessionExited
-      | DevSupervisor.SupervisorError
+      | DevSessionProcess.SessionExited
+      | DevSessionProcess.SupervisorError
       | SyncJobError,
-      FileServices
+      FileServices | DevSessionProcess.Service
     >
   >();
 });

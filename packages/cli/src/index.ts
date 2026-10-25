@@ -4,6 +4,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as Effect from "effect/Effect";
 import { cliApp } from "./cliApp";
+import * as NodeDevSessionProcess from "./NodeDevSessionProcess";
 
 // Track if we received SIGINT so we can re-raise it after cleanup.
 // This ensures proper terminal state restoration when run via e.g. `pnpm`.
@@ -19,4 +20,7 @@ process.on("exit", () => {
   }
 });
 
-cliApp.pipe(Effect.provide(NodeServices.layer), NodeRuntime.runMain);
+cliApp.pipe(
+  Effect.provide([NodeDevSessionProcess.layer, NodeServices.layer]),
+  NodeRuntime.runMain,
+);

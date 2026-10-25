@@ -37,6 +37,8 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 
+import * as NodeDevSessionProcess from ${JSON.stringify(new URL("NodeDevSessionProcess.ts", supervisorUrl).href)};
+
 const program = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const mode = process.argv[2];
@@ -68,7 +70,7 @@ const program = Effect.gen(function* () {
   return yield* run.pipe(Effect.raceFirst(disconnected));
 });
 
-NodeRuntime.runMain(program.pipe(Effect.provide(NodeServices.layer)));
+NodeRuntime.runMain(program.pipe(Effect.provide([NodeDevSessionProcess.layer, NodeServices.layer])));
 `;
 
 const isAlive = (pid: number) => {
@@ -109,7 +111,7 @@ const start = Effect.fn("SupervisorIntegration.start")(function* (
   const child = yield* Effect.acquireRelease(
     Effect.sync(() => {
       const supervisor = fork(entrypoint, [mode, journal], {
-        execArgv: [],
+        execArgv: ["--import", "tsx"],
         env: { ...process.env, CONFECT_INTERNAL_DEV_SESSION: "0" },
         stdio: ["ignore", "pipe", "pipe", "ipc"],
       });
