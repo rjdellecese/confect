@@ -18,6 +18,7 @@ import * as Stream from "effect/Stream";
 import { BundlerError } from "./BuildError";
 import type { Mode } from "./CompilationState";
 import * as CompilationConfig from "./CompilationConfig";
+import * as ResolutionScope from "./ResolutionScope";
 
 export interface RestartNotification {
   readonly reason: "ResolutionInputsChanged";
@@ -364,18 +365,30 @@ export const make = Effect.fn("CompilationInputs.make")(
             ),
         ),
       ),
-      canShareResolution: Effect.fn("CompilationInputs.canShareResolution")(
-        function* (directory: string) {
+      resolutionBoundary: Effect.fn("CompilationInputs.resolutionBoundary")(
+        function* (
+          directory: string,
+        ): Effect.fn.Return<
+          ResolutionScope.Boundary,
+          BundlerError | RestartRequired
+        > {
           yield* ensure;
+          const parent = path.dirname(directory);
+          if (
+            parent === directory ||
+            path.basename(directory).toLowerCase() === "node_modules"
+          )
+            return ResolutionScope.Boundary.Stop({ directory });
           const current = yield* Ref.get(baseline);
           for (const ancestor of ancestors(path, directory)) {
             for (const name of pnpNames) {
               if (
-                Option.getOrUndefined(
+                !Option.contains(
                   HashMap.get(current, path.join(ancestor, name)),
-                ) !== "missing"
+                  "missing",
+                )
               )
-                return false;
+                return ResolutionScope.Boundary.Stop({ directory });
             }
           }
           const modules = path.join(directory, "node_modules");
@@ -384,10 +397,11 @@ export const make = Effect.fn("CompilationInputs.make")(
           yield* track(files);
           yield* checkFiles(files);
           const observed = yield* Ref.get(baseline);
-          return files.every(
-            (file) =>
-              Option.getOrUndefined(HashMap.get(observed, file)) === "missing",
-          );
+          return Array.every(files, (file) =>
+            Option.contains(HashMap.get(observed, file), "missing"),
+          )
+            ? ResolutionScope.Boundary.Continue({ parent })
+            : ResolutionScope.Boundary.Stop({ directory });
         },
       ),
       trackSource: Effect.fn("CompilationInputs.trackSource")(function* (
