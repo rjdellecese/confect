@@ -38,7 +38,7 @@ export const tables = <Schema extends AnyWithProps>(
   self: Schema,
 ): Schema[TypeId] => self[TypeId];
 
-export type UserTableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
+export type TableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
   Tables<DatabaseSchema_>
 > &
   string;
@@ -46,12 +46,12 @@ export type UserTableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
 export type SystemTableNames = Table.Name<Table.SystemTables>;
 
 export type AllTableNames<DatabaseSchema_ extends AnyWithProps> =
-  | UserTableNames<DatabaseSchema_>
+  | TableNames<DatabaseSchema_>
   | SystemTableNames;
 
 export type TableWithName<
   DatabaseSchema_ extends AnyWithProps,
-  TableName extends UserTableNames<DatabaseSchema_>,
+  TableName extends TableNames<DatabaseSchema_>,
 > = Extract<Tables<DatabaseSchema_>, { readonly tableName: TableName }>;
 
 /**

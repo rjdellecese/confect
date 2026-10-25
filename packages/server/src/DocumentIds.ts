@@ -53,7 +53,7 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
           input,
         )
       : reader.normalizeId(
-          table as DatabaseSchema.UserTableNames<Schema>,
+          table as DatabaseSchema.TableNames<Schema>,
           input,
         )) as GenericId<Name> | null;
 
