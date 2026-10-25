@@ -17,6 +17,7 @@ import * as PlatformError from "effect/PlatformError";
 import * as CompilationState from "@confect/cli/CompilationState";
 import * as CompilationContext from "@confect/cli/CompilationContext";
 import * as CompilationInputs from "@confect/cli/CompilationInputs";
+import * as CompilationPolicy from "@confect/cli/CompilationPolicy";
 import * as esbuild from "esbuild";
 
 vi.mock("esbuild", (importOriginal) =>
@@ -388,9 +389,9 @@ describe("CompilationContext", () => {
               ),
             ),
         };
-        const guards = yield* CompilationInputs.make("Once").pipe(
-          Effect.provideService(FileSystem.FileSystem, filesystem),
-        );
+        const guards = yield* CompilationInputs.make(
+          CompilationPolicy.Policy.OnceConcurrent(),
+        ).pipe(Effect.provideService(FileSystem.FileSystem, filesystem));
         yield* guards.trackSource(fixture.entry);
         const outputs: string[] = [];
         const context = yield* fixture.make(

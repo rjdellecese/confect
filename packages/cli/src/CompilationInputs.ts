@@ -16,7 +16,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import { BundlerError } from "./BuildError";
-import type { Mode } from "./CompilationState";
+import * as CompilationPolicy from "./CompilationPolicy";
 import * as CompilationConfig from "./CompilationConfig";
 import * as ResolutionScope from "./ResolutionScope";
 
@@ -83,7 +83,11 @@ export const ancestors = (
   );
 
 export const make = Effect.fn("CompilationInputs.make")(
-  function* (mode: Mode = "Watch", conditions?: ReadonlyArray<string>) {
+  function* (
+    policy: CompilationPolicy.Policy = CompilationPolicy.Policy.Watch(),
+    conditions?: ReadonlyArray<string>,
+  ) {
+    const mode = CompilationPolicy.toMode(policy);
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const crypto = yield* Crypto.Crypto;
@@ -551,8 +555,11 @@ export const make = Effect.fn("CompilationInputs.make")(
       }),
     };
   },
-  (effect, _mode?: Mode, _conditions?: ReadonlyArray<string>) =>
-    Effect.provide(effect, NodeCrypto.layer),
+  (
+    effect,
+    _policy?: CompilationPolicy.Policy,
+    _conditions?: ReadonlyArray<string>,
+  ) => Effect.provide(effect, NodeCrypto.layer),
 );
 
 export type Inputs = Effect.Success<ReturnType<typeof make>>;

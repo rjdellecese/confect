@@ -12,6 +12,7 @@ import * as Result from "effect/Result";
 import * as esbuild from "esbuild";
 import { resolveModulePath } from "exsolve";
 import * as CompilationInputs from "@confect/cli/CompilationInputs";
+import * as CompilationPolicy from "@confect/cli/CompilationPolicy";
 import * as CompilationPlugin from "@confect/cli/CompilationPlugin";
 import { BundlerError } from "@confect/cli/BuildError";
 
@@ -82,7 +83,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           }
           const compile = (share: boolean) =>
             Effect.gen(function* () {
-              const inputs = yield* CompilationInputs.make("Once");
+              const inputs = yield* CompilationInputs.make(
+                CompilationPolicy.Policy.OnceConcurrent(),
+              );
               yield* Effect.forEach(entries, inputs.trackSource);
               const resolver = yield* CompilationPlugin.make(
                 path,
@@ -174,7 +177,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               return fs.realPath(file);
             },
           };
-          const inputs = yield* CompilationInputs.make("Once");
+          const inputs = yield* CompilationInputs.make(
+            CompilationPolicy.Policy.OnceConcurrent(),
+          );
           const resolver = yield* CompilationPlugin.make(
             path,
             observedFs,
@@ -297,7 +302,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         }
         const compile = (selected: ReadonlyArray<string>) =>
           Effect.gen(function* () {
-            const inputs = yield* CompilationInputs.make("Once");
+            const inputs = yield* CompilationInputs.make(
+              CompilationPolicy.Policy.OnceConcurrent(),
+            );
             const resolver = yield* CompilationPlugin.make(
               path,
               testCase.kind === "stat-error"
@@ -388,7 +395,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         const target = path.join(generated, "target.ts");
         yield* fs.writeFileString(entry, "export default 1;");
         yield* fs.writeFileString(target, "export default 2;");
-        const inputs = yield* CompilationInputs.make("Once");
+        const inputs = yield* CompilationInputs.make(
+          CompilationPolicy.Policy.OnceConcurrent(),
+        );
         const resolver = yield* CompilationPlugin.make(
           path,
           fs,
