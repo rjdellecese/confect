@@ -60,9 +60,6 @@ export declare const api: {
       storageUrl: FunctionReference<"query", "public", { id: string }, string>;
       uploadUrl: FunctionReference<"mutation", "public", {}, string>;
     };
-    nativeComponents: {
-      roundTrip: FunctionReference<"mutation", "public", { run: string }, any>;
-    };
     metadata: {
       actionMetadata: FunctionReference<
         "action",
@@ -102,6 +99,9 @@ export declare const api: {
           remainingReads: number;
         }
       >;
+    };
+    nativeComponents: {
+      roundTrip: FunctionReference<"mutation", "public", { run: string }, any>;
     };
     scheduling: {
       manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;

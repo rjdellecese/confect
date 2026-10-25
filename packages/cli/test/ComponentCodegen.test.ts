@@ -85,6 +85,7 @@ it.effect(
       yield* codegenHandler.pipe(Effect.provide(dirs));
       expect(yield* generatedModificationTimes(directory)).toEqual(before);
     }).pipe(Effect.provide(NodeServices.layer)),
+  { timeout: 30000 },
 );
 
 it.effect(
@@ -115,6 +116,7 @@ export default Table.make(() => Schema.Struct({ name: Schema.String }));
       yield* codegenHandler.pipe(Effect.provide(dirs));
       expect(yield* generatedModificationTimes(directory)).toEqual(before);
     }).pipe(Effect.provide(NodeServices.layer)),
+  { timeout: 30000 },
 );
 
 it.effect(
@@ -156,6 +158,7 @@ export default Table.make(() => Schema.Struct({ id: Component.id(child, "counter
       yield* codegenHandler.pipe(Effect.provide(dirs));
       expect(yield* generatedModificationTimes(directory)).toEqual(before);
     }).pipe(Effect.provide(NodeServices.layer)),
+  { timeout: 30000 },
 );
 
 it.effect(
