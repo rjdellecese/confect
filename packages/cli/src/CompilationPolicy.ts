@@ -2,6 +2,7 @@ import * as Schema from "effect/Schema";
 import * as Match from "effect/Match";
 import type * as CompilationInputs from "./CompilationInputs";
 import type * as CompilationState from "./CompilationState";
+import type * as CompilationContext from "./CompilationContext";
 
 export const CompilationPolicy = Schema.Literals([
   "Watch",
@@ -36,7 +37,7 @@ export const toMode = (policy: CompilationPolicy): CompilationState.Mode =>
 export const guards = (
   policy: CompilationPolicy,
   inputs: CompilationInputs.Inputs,
-) =>
+): CompilationContext.Guards =>
   Match.value(policy).pipe(
     Match.whenOr("Watch", "OnceConcurrent", () => inputs),
     Match.when("OnceStable", () => ({

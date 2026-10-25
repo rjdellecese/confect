@@ -17,7 +17,7 @@ import * as Array from "effect/Array";
 import * as Record from "effect/Record";
 import * as Option from "effect/Option";
 import * as esbuild from "esbuild";
-import { BundlerError } from "./BuildError";
+import * as BuildError from "./BuildError";
 import * as CompilationState from "./CompilationState";
 import type * as CompilationInputs from "./CompilationInputs";
 import * as CompilationSources from "./CompilationSources";
@@ -28,6 +28,19 @@ export interface Snapshot {
   readonly cwd: string;
   readonly metafile: esbuild.Metafile;
   readonly warnings: ReadonlyArray<esbuild.Message>;
+}
+
+export interface Guards {
+  readonly check: Effect.Effect<
+    void,
+    BuildError.BundlerError | CompilationInputs.RestartRequired
+  >;
+  readonly ensure: Effect.Effect<
+    void,
+    BuildError.BundlerError | CompilationInputs.RestartRequired
+  >;
+  readonly trackSource?: CompilationInputs.Inputs["trackSource"];
+  readonly generation?: Effect.Effect<number>;
 }
 
 interface Captured {
@@ -120,21 +133,14 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   },
   normalize: (metafile: esbuild.Metafile) => esbuild.Metafile,
   publish: (revision: CompilationState.Revision) => Effect.Effect<void>,
-  guards: Readonly<
-    Record<
-      "check" | "ensure",
-      Effect.Effect<void, BundlerError | CompilationInputs.RestartRequired>
-    >
-  > & {
-    readonly trackSource?: CompilationInputs.Inputs["trackSource"];
-    readonly generation?: Effect.Effect<number>;
-  } = {
+  guards: Guards = {
     check: Effect.void,
     ensure: Effect.void,
   },
   mode: CompilationState.Mode = "Watch",
-  publishFailure: (error: BundlerError) => Effect.Effect<void> = () =>
-    Effect.void,
+  publishFailure: (
+    error: BuildError.BundlerError,
+  ) => Effect.Effect<void> = () => Effect.void,
   configurationWarnings: ReadonlyArray<esbuild.PartialMessage> = [],
 ) {
   const fs = yield* FileSystem.FileSystem;
@@ -149,7 +155,9 @@ export const make = Effect.fn("CompilationContext.make")(function* (
   const rebuildLock = yield* Semaphore.make(1);
   const stabilization = yield* Queue.sliding<void>(1);
   const needsStabilization = yield* Ref.make(false);
-  const terminalFailure = yield* Ref.make(Option.none<BundlerError>());
+  const terminalFailure = yield* Ref.make(
+    Option.none<BuildError.BundlerError>(),
+  );
   const ensureActive = Effect.gen(function* () {
     const failure = yield* Ref.get(terminalFailure);
     if (Option.isSome(failure)) return yield* failure.value;
@@ -434,9 +442,11 @@ export const make = Effect.fn("CompilationContext.make")(function* (
                     capture(result).pipe(
                       Effect.tapError((cause) =>
                         Effect.gen(function* () {
-                          const failure = Schema.is(BundlerError)(cause)
+                          const failure = Schema.is(BuildError.BundlerError)(
+                            cause,
+                          )
                             ? cause
-                            : new BundlerError({ cause });
+                            : new BuildError.BundlerError({ cause });
                           yield* Ref.set(terminalFailure, Option.some(failure));
                           yield* publishFailure(failure);
                         }),
@@ -448,7 +458,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
             },
           ],
         }),
-      catch: (cause) => new BundlerError({ cause }),
+      catch: (cause) => new BuildError.BundlerError({ cause }),
     }),
     (context) => Effect.promise(() => context.dispose()),
   );
@@ -457,16 +467,16 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       yield* ensureActive;
       yield* guards.ensure;
       yield* sources.ensure.pipe(
-        Effect.mapError((cause) => new BundlerError({ cause })),
+        Effect.mapError((cause) => new BuildError.BundlerError({ cause })),
       );
       const outcome = yield* Effect.tryPromise({
         try: () => native.rebuild(),
-        catch: (cause) => new BundlerError({ cause }),
+        catch: (cause) => new BuildError.BundlerError({ cause }),
       }).pipe(Effect.result);
       yield* ensureActive;
       yield* guards.ensure;
       yield* sources.ensure.pipe(
-        Effect.mapError((cause) => new BundlerError({ cause })),
+        Effect.mapError((cause) => new BuildError.BundlerError({ cause })),
       );
       if (Result.isFailure(outcome)) {
         const cause = outcome.failure.cause;
@@ -532,7 +542,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       }
       return outcome.success;
     }
-    return yield* new BundlerError({
+    return yield* new BuildError.BundlerError({
       cause: new UnstableInputs({ context: topology.id, attempts: 8 }),
     });
   });
@@ -551,9 +561,9 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       ),
       Effect.catch((cause) =>
         Effect.gen(function* () {
-          const failure = Schema.is(BundlerError)(cause)
+          const failure = Schema.is(BuildError.BundlerError)(cause)
             ? cause
-            : new BundlerError({ cause });
+            : new BuildError.BundlerError({ cause });
           yield* Ref.set(terminalFailure, Option.some(failure));
           yield* Ref.set(prepared, Option.none());
           yield* publishFailure(failure);
@@ -563,7 +573,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
     );
     yield* Effect.tryPromise({
       try: () => native.watch(),
-      catch: (cause) => new BundlerError({ cause }),
+      catch: (cause) => new BuildError.BundlerError({ cause }),
     });
   }
   return {
@@ -591,7 +601,7 @@ export const make = Effect.fn("CompilationContext.make")(function* (
             ? available.value
             : identities.get(yield* rebuild());
         if (!captured?.metafile || !captured.outputFiles) {
-          return yield* new BundlerError({
+          return yield* new BuildError.BundlerError({
             cause: new IncompleteCompilation({
               reason: "MissingRevision",
               context: topology.id,
@@ -664,10 +674,10 @@ export const make = Effect.fn("CompilationContext.make")(function* (
       },
       (effect, _expected?: CompilationState.Receipt) =>
         Effect.mapError(effect, (cause) =>
-          Schema.is(BundlerError)(cause) ||
+          Schema.is(BuildError.BundlerError)(cause) ||
           Schema.is(CompilationState.Failed)(cause)
             ? cause
-            : new BundlerError({ cause }),
+            : new BuildError.BundlerError({ cause }),
         ),
     ),
   };
