@@ -27,6 +27,7 @@ import * as EffectScheduler from "effect/Scheduler";
 import * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as DatabaseReader from "./DatabaseReader";
+import * as DocumentIds from "./DocumentIds";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
@@ -202,6 +203,7 @@ const queryFunction = <
     Returns,
     E,
     | DatabaseReader.DatabaseReader<DatabaseSchema_>
+    | DocumentIds.DocumentIds<DatabaseSchema_>
     | Auth.Auth
     | ExecutionMetadata.ExecutionMetadata
     | TransactionMetadata.TransactionMetadata
@@ -243,6 +245,7 @@ const queryFunction = <
         Effect.provide(
           Layer.mergeAll(
             DatabaseReader.layer(databaseSchema, ctx.db),
+            DocumentIds.layer(databaseSchema, ctx.db),
             Auth.layer(ctx.auth),
             ExecutionMetadata.layer(ctx.meta),
             TransactionMetadata.layer(ctx.meta),
@@ -281,6 +284,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
 ) =>
   Layer.mergeAll(
     DatabaseReader.layer(schema, ctx.db),
+    DocumentIds.layer(schema, ctx.db),
     DatabaseWriter.layer(schema, ctx.db),
     Auth.layer(ctx.auth),
     ExecutionMetadata.layer(ctx.meta),
@@ -304,6 +308,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
 
 export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
   | DatabaseReader.DatabaseReader<Schema>
+  | DocumentIds.DocumentIds<Schema>
   | DatabaseWriter.DatabaseWriter<Schema>
   | Auth.Auth
   | ExecutionMetadata.ExecutionMetadata
