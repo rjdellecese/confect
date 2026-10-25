@@ -14,9 +14,9 @@ import type {
   second,
   left,
   right,
-} from "./fixtures/confect/componentBindings";
-import { api } from "./fixtures/convex/_generated/api";
-import * as LocalBackend from "./LocalBackend";
+} from "confect-local-backend/componentBindings";
+import { api } from "confect-local-backend/api";
+import * as LocalBackend from "confect-local-backend/LocalBackend";
 
 // These identities come from Convex's generated ComponentApi<MountName>,
 // including the nested child's scope carried by the parent's contract.

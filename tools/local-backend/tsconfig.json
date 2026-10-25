@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "target": "ESNext"
+  },
+  "include": ["src", "fixtures"],
+  "exclude": ["fixtures/components/*/convex/_generated"]
+}

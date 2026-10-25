@@ -11,7 +11,6 @@ import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
 import { vi } from "vitest";
 import * as HttpClient from "../src/internal/HttpClient";
-import * as WebSocketClient from "../src/internal/WebSocketClient";
 
 class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
   id: Schema.String,
@@ -28,9 +27,7 @@ const queryRef = Ref.make("notes", FunctionSpec.publicQuery(definition));
 const mutationRef = Ref.make("notes", FunctionSpec.publicMutation(definition));
 const actionRef = Ref.make("notes", FunctionSpec.publicAction(definition));
 
-type Client =
-  | ReturnType<typeof HttpClient.make>
-  | ReturnType<typeof WebSocketClient.make>;
+type Client = ReturnType<typeof HttpClient.make>;
 
 const operations: ReadonlyArray<{
   readonly name: string;
@@ -38,10 +35,7 @@ const operations: ReadonlyArray<{
     client: Client,
   ) => Effect.Effect<
     string,
-    | NotFound
-    | Schema.SchemaError
-    | HttpClient.HttpClientError
-    | WebSocketClient.WebSocketClientError
+    NotFound | Schema.SchemaError | HttpClient.HttpClientError
   >;
 }> = [
   {
@@ -69,18 +63,6 @@ const clients = [
         query: (_, args) => invoke(args),
         mutation: (_, args) => invoke(args),
         action: (_, args) => invoke(args),
-      }),
-  },
-  {
-    name: "WebSocketClient",
-    make: (invoke: (args: unknown) => Promise<unknown>) =>
-      WebSocketClient.make("https://test.convex.cloud", {
-        setAuth: () => {},
-        close: () => Promise.resolve(),
-        query: (_, args) => invoke(args),
-        mutation: (_, args) => invoke(args),
-        action: (_, args) => invoke(args),
-        onUpdate: () => () => {},
       }),
   },
 ];
@@ -165,7 +147,7 @@ describe.each(clients)("$name operation boundaries", ({ name, make }) => {
         const ref = Ref.make(
           "notes",
           FunctionSpec.convexPublicQuery<
-            RegisteredQuery<"public", Record<string, never>, string>
+            RegisteredQuery<"public", Record<never, never>, string>
           >()("list"),
         );
         const invoke = vi.fn((_args: unknown) => Promise.resolve("found"));

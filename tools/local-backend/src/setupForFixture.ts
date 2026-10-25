@@ -24,21 +24,11 @@ const runCommand = (
     }
   }).pipe(Effect.orDie);
 
-// Absolute path to the `confect` bin shim, resolved from this file's
-// location rather than via a `confect` bin in `node_modules/.bin/`. The shim
-// owns the "build output is missing, run `pnpm build`" pre-flight, so this
-// file doesn't need its own existence check on the CLI's `dist/`.
-//
-// Note: `@confect/cli` is intentionally NOT declared as a (dev)dependency of
-// `@confect/server`. The CLI peer-depends on `@confect/server` (its codegen
-// emits and type-checks against `@confect/server` imports), so a reciprocal
-// dep here would create a cyclic workspace-dependency warning from pnpm. The
-// fixture sub-packages under `test/{mock,local}-backend/fixtures` declare
-// `@confect/cli` themselves for the `pnpm confect codegen` calls in this
-// package's `codegen:*` scripts; this `globalSetup` resolves the binary by
-// filesystem path instead, so it does not require the dep graph either.
+// Resolve the CLI by repository location so the harness does not depend on
+// @confect/cli, which would create a workspace cycle through @confect/server.
+// The CLI shim checks that its build output exists before running codegen.
 const confectCliEntryUrl = new URL(
-  "../../cli/bin/confect.mjs",
+  "../../../packages/cli/bin/confect.mjs",
   import.meta.url,
 );
 

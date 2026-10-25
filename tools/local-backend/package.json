@@ -1,0 +1,30 @@
+{
+  "name": "confect-local-backend",
+  "description": "Shared local Convex backend harness for integration tests.",
+  "version": "0.0.0",
+  "devDependencies": {
+    "@effect/platform-node": "4.0.4",
+    "@types/node": "26.6.5",
+    "convex": "1.46.0",
+    "cross-env": "10.1.0",
+    "effect": "4.0.4",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  },
+  "exports": {
+    "./api": "./fixtures/convex/_generated/api.js",
+    "./componentBindings": "./fixtures/confect/componentBindings.ts",
+    "./LocalBackend": "./src/LocalBackend.ts",
+    "./refs": "./fixtures/confect/_generated/refs.ts",
+    "./setupForFixture": "./src/setupForFixture.ts",
+    "./vitest": "./src/vitest.ts"
+  },
+  "private": true,
+  "scripts": {
+    "clean": "shx rm -rf node_modules",
+    "codegen": "cd fixtures && pnpm confect codegen --component-dir components/counter/convex && pnpm confect codegen --component-dir components/parent/convex && pnpm confect codegen && cross-env CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
+    "typecheck": "tsc --project tsconfig.json",
+    "typecheck:inexact": "tsc --project tsconfig.json --exactOptionalPropertyTypes false"
+  },
+  "type": "module"
+}
