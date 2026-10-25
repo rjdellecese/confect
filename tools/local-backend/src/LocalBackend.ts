@@ -26,7 +26,7 @@ class BackendVersionLookupError extends Schema.TaggedError<BackendVersionLookupE
 export class LocalBackend extends Context.Service<
   LocalBackend,
   { readonly client: ConvexHttpClient }
->()("@confect/server/test/local-backend/LocalBackend") {}
+>()("confect-local-backend/LocalBackend") {}
 
 const READY_LINE = "Convex functions ready!";
 const URL = "http://127.0.0.1:3210";
@@ -48,7 +48,7 @@ export const maxCacheAge = Duration.seconds(
 );
 
 /**
- * Spawn `convex dev` from `test/local-backend/fixtures/` with reduced UDF
+ * Spawn `convex dev` from the shared `fixtures/` project with reduced UDF
  * timeouts. The CLI keeps the local backend alive for the lifetime of the scope
  * and is signalled on scope close; the `ConvexHttpClient` is shared by every
  * test case.
@@ -61,7 +61,7 @@ const make = Effect.gen(function* () {
   const path = yield* Path.Path;
   const spawner = yield* ChildProcessSpawner;
   const parentScope = yield* Effect.scope;
-  const fixturesDir = path.resolve(import.meta.dirname, "./fixtures");
+  const fixturesDir = path.resolve(import.meta.dirname, "../fixtures");
 
   const command = ChildProcess.make(
     "pnpm",

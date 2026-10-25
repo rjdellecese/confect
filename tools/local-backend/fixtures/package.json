@@ -1,6 +1,6 @@
 {
-  "name": "@confect/server-local-backend-fixtures",
-  "description": "Internal fixture project for @confect/server's local-backend test suite.",
+  "name": "confect-local-backend-fixtures",
+  "description": "Shared Convex fixture project for local-backend integration tests.",
   "version": "0.0.0",
   "dependencies": {
     "@confect/core": "workspace:*",
