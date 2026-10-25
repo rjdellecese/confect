@@ -21,6 +21,7 @@
   "scripts": {
     "clean": "shx rm -rf node_modules",
     "codegen": "cd fixtures && pnpm confect codegen && cross-env CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
+    "typecheck": "tsc --project tsconfig.json",
     "typecheck:inexact": "tsc --project tsconfig.json --exactOptionalPropertyTypes false"
   },
   "type": "module"

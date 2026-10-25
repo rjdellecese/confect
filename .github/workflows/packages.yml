@@ -128,7 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter @confect/server test:mock-backend
+      - run: pnpm test:server:mock-backend
 
   test-local-backend:
     name: Test (local-backend)
@@ -163,7 +163,7 @@ jobs:
       - run: pnpm codegen:local-backend
       - uses: ./.github/actions/verify-codegen-committed
         with:
-          path: packages/server/test
+          path: packages/server/test/mock-backend/fixtures
       - uses: ./.github/actions/verify-codegen-committed
         with:
           path: tools/local-backend/fixtures
