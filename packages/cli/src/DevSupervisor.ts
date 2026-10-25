@@ -1,4 +1,5 @@
 import { fork } from "node:child_process";
+import process from "node:process";
 import * as Array from "effect/Array";
 import * as Cause from "effect/Cause";
 import * as Config from "effect/Config";

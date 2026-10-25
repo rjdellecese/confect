@@ -1,5 +1,6 @@
 import { ChildProcess, fork } from "node:child_process";
 import type * as NodeChildProcess from "node:child_process";
+import process from "node:process";
 import * as DevSupervisor from "@confect/cli/DevSupervisor";
 import { assert, expect, it } from "@effect/vitest";
 import * as Array from "effect/Array";
@@ -19,6 +20,16 @@ vi.mock("node:child_process", (importOriginal) =>
   importOriginal<typeof NodeChildProcess>().then((original) => ({
     ...original,
     fork: vi.fn(),
+  })),
+);
+
+vi.mock("node:process", () =>
+  import("node:events").then(({ EventEmitter }) => ({
+    default: Object.assign(new EventEmitter(), {
+      argv: globalThis.process.argv,
+      execArgv: globalThis.process.execArgv,
+      env: globalThis.process.env,
+    }),
   })),
 );
 
@@ -113,6 +124,46 @@ const childHarness = Effect.gen(function* () {
   );
   return { sent, send, disconnect };
 });
+
+it.effect("keeps worker IPC intact when the fake child disconnects", () =>
+  Effect.gen(function* () {
+    const worker = globalThis.process;
+    const connected = worker.connected;
+    const send = worker.send?.bind(worker);
+    const descriptors = Array.map(
+      ["connected", "send", "disconnect"] as const,
+      (name) => [name, Object.getOwnPropertyDescriptor(worker, name)] as const,
+    );
+    const listeners = worker.listeners("disconnect");
+    const disconnected = vi.fn();
+    yield* Effect.acquireRelease(
+      Effect.sync(() => worker.on("disconnect", disconnected)),
+      () => Effect.sync(() => worker.off("disconnect", disconnected)),
+    );
+    const harness = yield* childHarness;
+    expect(process).not.toBe(worker);
+    expect(worker.connected).toBe(connected);
+    harness.disconnect();
+    expect(process.connected).toBe(false);
+    expect(worker.connected).toBe(connected);
+    expect(disconnected).not.toHaveBeenCalled();
+    expect(worker.listeners("disconnect")).toEqual([
+      ...listeners,
+      disconnected,
+    ]);
+    for (const [name, descriptor] of descriptors) {
+      expect(Object.getOwnPropertyDescriptor(worker, name)).toEqual(descriptor);
+    }
+    if (send) {
+      yield* Effect.callback<void>((resume) => {
+        send({ cmd: "NODE_CONFECT_TEST" }, (error) => {
+          resume(error ? Effect.die(error) : Effect.void);
+        });
+      });
+    }
+    expect(harness.send).not.toHaveBeenCalled();
+  }).pipe(Effect.scoped),
+);
 
 it.effect(
   "waits for child exit before restarting without overlapping sessions",
