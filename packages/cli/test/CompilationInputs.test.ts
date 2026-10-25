@@ -25,6 +25,96 @@ vi.mock("@confect/cli/CompilationConfig", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "CompilationInputs",
   (it) => {
+    it.effect.each([
+      { mode: "Once", consistency: "Stable" },
+      { mode: "Once", consistency: "Concurrent" },
+      { mode: "Watch", consistency: "Stable" },
+    ] as const)(
+      "selects source metadata for $mode compilation with $consistency inputs",
+      ({ mode, consistency }) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          for (const name of [
+            "pnpm-lock.yaml",
+            ".npmrc",
+            "package.json",
+            ".pnp.cjs",
+          ]) {
+            const root = yield* fs.makeTempDirectoryScoped();
+            const inputs = yield* CompilationInputs.make(
+              mode,
+              undefined,
+              consistency,
+            ).pipe(
+              Effect.provideService(FileSystem.FileSystem, {
+                ...fs,
+                watch: () => Stream.never,
+              }),
+            );
+            yield* inputs.trackSource(path.join(root, "entry.ts"));
+            const file = path.join(root, name);
+            yield* fs.writeFileString(file, "{}");
+            const result = yield* Effect.result(inputs.check);
+            const ignored =
+              mode === "Once" &&
+              consistency === "Stable" &&
+              (name === "pnpm-lock.yaml" || name === ".npmrc");
+            expect(Result.isSuccess(result)).toBe(ignored);
+            if (!ignored) {
+              assert(Result.isFailure(result));
+              expect(result.failure).toMatchObject({
+                _tag: "CompilationRestartRequired",
+                paths: [file],
+              });
+            }
+          }
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect.each(["Once", "Watch"] as const)(
+      "retains boundary validation and sticky failures with stable inputs in %s mode",
+      (mode) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fs.makeTempDirectoryScoped();
+          const manifest = path.join(root, "package.json");
+          yield* fs.writeFileString(manifest, "{}");
+          let reads = 0;
+          const inputs = yield* CompilationInputs.make(
+            mode,
+            undefined,
+            "Stable",
+          ).pipe(
+            Effect.provideService(FileSystem.FileSystem, {
+              ...fs,
+              watch: () => Stream.never,
+              readFile: (file) => {
+                reads++;
+                return fs.readFile(file);
+              },
+            }),
+          );
+          yield* inputs.track([manifest]);
+          reads = 0;
+          yield* inputs.checkBeforeBuild;
+          expect(reads).toBe(mode === "Once" ? 0 : 1);
+          yield* fs.writeFileString(manifest, '{"changed":true}');
+          expect(
+            Result.isSuccess(yield* Effect.result(inputs.checkBeforeBuild)),
+          ).toBe(mode === "Once");
+          expect(yield* Effect.flip(inputs.check)).toMatchObject({
+            _tag: "CompilationRestartRequired",
+            paths: [manifest],
+          });
+          yield* fs.writeFileString(manifest, "{}");
+          expect(yield* Effect.flip(inputs.checkBeforeBuild)).toMatchObject({
+            _tag: "CompilationRestartRequired",
+          });
+        }).pipe(Effect.scoped),
+    );
+
     it.effect.each(["Once", "Watch"] as const)(
       "limits cross-directory package sharing to one-shot compilation in %s mode",
       (mode) =>

@@ -315,7 +315,7 @@ export const make = Effect.fn("CompilationPlugin.make")(function* (
     setup(build) {
       build.onStart(() =>
         Effect.runPromiseWith(Context.empty())(
-          inputs.check.pipe(
+          inputs.checkBeforeBuild.pipe(
             Effect.andThen(
               inputs.canSharePackageLookups.pipe(
                 Effect.flatMap((enabled) => Ref.set(sharing, enabled)),

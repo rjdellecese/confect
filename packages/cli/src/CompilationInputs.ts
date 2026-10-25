@@ -82,7 +82,11 @@ export const ancestors = (
   );
 
 export const make = Effect.fn("CompilationInputs.make")(
-  function* (mode: Mode = "Watch", conditions?: ReadonlyArray<string>) {
+  function* (
+    mode: Mode = "Watch",
+    conditions?: ReadonlyArray<string>,
+    consistency: "Concurrent" | "Stable" = "Concurrent",
+  ) {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const crypto = yield* Crypto.Crypto;
@@ -103,6 +107,8 @@ export const make = Effect.fn("CompilationInputs.make")(
     const observationFailure = yield* Ref.make(Option.none<BundlerError>());
     const lock = yield* Semaphore.make(1);
     const sourceLock = yield* Semaphore.make(1);
+    const stable = mode === "Once" && consistency === "Stable";
+    const sourceMetadata = stable ? ["package.json", ...pnpNames] : names;
     const fingerprint = Effect.fn("CompilationInputs.fingerprint")(
       function* (file: string) {
         yield* fs.stat(file);
@@ -350,6 +356,7 @@ export const make = Effect.fn("CompilationInputs.make")(
       events: Stream.fromQueue(events),
       pending: Ref.get(pending),
       check,
+      checkBeforeBuild: stable ? ensure : check,
       ensure,
       checkFiles,
       track,
@@ -402,7 +409,7 @@ export const make = Effect.fn("CompilationInputs.make")(
               return yield* ensure;
             yield* track(
               Array.flatMap(ancestors(path, path.dirname(file)), (ancestor) =>
-                Array.map(names, (name) => path.join(ancestor, name)),
+                Array.map(sourceMetadata, (name) => path.join(ancestor, name)),
               ),
             );
             yield* Ref.update(sources, HashSet.add(directory));
@@ -537,8 +544,12 @@ export const make = Effect.fn("CompilationInputs.make")(
       }),
     };
   },
-  (effect, _mode?: Mode, _conditions?: ReadonlyArray<string>) =>
-    Effect.provide(effect, NodeCrypto.layer),
+  (
+    effect,
+    _mode?: Mode,
+    _conditions?: ReadonlyArray<string>,
+    _consistency?: "Concurrent" | "Stable",
+  ) => Effect.provide(effect, NodeCrypto.layer),
 );
 
 export type Inputs = Effect.Success<ReturnType<typeof make>>;

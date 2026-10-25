@@ -72,6 +72,50 @@ const compileAndLoad = Effect.fn("Compilation.test.compileAndLoad")(function* (
 layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer), {
   excludeTestServices: true,
 })("Compilation", (it) => {
+  it.effect(
+    "validates explicit restart inputs after one-shot artifact copying",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped();
+        const entry = path.join(root, "entry.ts");
+        const marker = path.join(root, "compiler.json");
+        yield* fs.writeFileString(entry, "export default 1;");
+        yield* fs.writeFileString(marker, "{}");
+        yield* Effect.gen(function* () {
+          const job = yield* Compilation.runJob(Bundler.compile(entry));
+          expect(Exit.isFailure(job.exit)).toBe(true);
+          expect(job.receipts).toEqual([]);
+          expect(
+            yield* (yield* Compilation.Service).restartRequired,
+          ).toMatchObject({
+            _tag: "Some",
+            value: { paths: [marker] },
+          });
+        }).pipe(
+          Effect.provide(
+            Compilation.layer({
+              mode: "Once",
+              ownedDirectories: [],
+              restartInputs: [marker],
+            }),
+          ),
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            writeFile: (...args) =>
+              fs
+                .writeFile(...args)
+                .pipe(
+                  Effect.andThen(
+                    fs.writeFileString(marker, '{"changed":true}'),
+                  ),
+                ),
+          }),
+        );
+      }).pipe(Effect.scoped),
+  );
+
   it.effect.each(["Once", "Watch"] as const)(
     "applies the late-discovery policy at the service boundary in %s mode",
     (mode) =>

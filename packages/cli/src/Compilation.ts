@@ -110,6 +110,7 @@ export const layer = (options: {
       const resolutionInputs = yield* CompilationInputs.make(
         options.mode,
         conditions,
+        options.mode === "Once" ? "Stable" : "Concurrent",
       );
       yield* resolutionInputs.track(options.restartInputs ?? []);
       const services = Context.make(
