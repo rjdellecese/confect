@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 import * as Match from "effect/Match";
 import type * as CompilationInputs from "./CompilationInputs";
-import type { Mode } from "./CompilationState";
+import type * as CompilationState from "./CompilationState";
 
 export const CompilationPolicy = Schema.Literals([
   "Watch",
@@ -10,21 +10,23 @@ export const CompilationPolicy = Schema.Literals([
 ]);
 export type CompilationPolicy = typeof CompilationPolicy.Type;
 
-export const concurrent = (mode: Mode): CompilationPolicy =>
+export const concurrent = (mode: CompilationState.Mode): CompilationPolicy =>
   Match.value(mode).pipe(
     Match.when("Watch", () => "Watch" as const),
     Match.when("Once", () => "OnceConcurrent" as const),
     Match.exhaustive,
   );
 
-export const forCompilation = (mode: Mode): CompilationPolicy =>
+export const forCompilation = (
+  mode: CompilationState.Mode,
+): CompilationPolicy =>
   Match.value(mode).pipe(
     Match.when("Watch", () => "Watch" as const),
     Match.when("Once", () => "OnceStable" as const),
     Match.exhaustive,
   );
 
-export const toMode = (policy: CompilationPolicy): Mode =>
+export const toMode = (policy: CompilationPolicy): CompilationState.Mode =>
   Match.value(policy).pipe(
     Match.when("Watch", () => "Watch" as const),
     Match.whenOr("OnceConcurrent", "OnceStable", () => "Once" as const),
