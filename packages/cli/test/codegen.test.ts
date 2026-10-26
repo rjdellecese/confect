@@ -601,13 +601,32 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
-const CodegenLayer = Layer.mergeAll(
-  NodePath.layer,
-  NodeFileSystem.layer,
-  Layer.succeed(
-    ConfectDirectory,
-    ConfectDirectory.of({ get: Effect.succeed(fixtureConfect) }),
-  ),
+const CodegenLayer = Layer.effect(
+  ConfectDirectory,
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* fs.makeTempDirectoryScoped({
+      directory: import.meta.dirname,
+      prefix: "table-fixture-",
+    });
+    yield* fs.makeDirectory(path.join(directory, "tables"));
+    yield* fs.makeDirectory(path.join(directory, "_generated"));
+    for (const file of [
+      "tables/events.ts",
+      "tables/notes.ts",
+      "tables/tags.ts",
+      "tables/users.ts",
+      "_generated/id.ts",
+    ])
+      yield* fs.copyFile(
+        path.join(fixtureConfect, file),
+        path.join(directory, file),
+      );
+    return ConfectDirectory.of({ get: Effect.succeed(directory) });
+  }),
+).pipe(
+  Layer.provideMerge(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer)),
 );
 
 layer(CodegenLayer)("TableModule.validate", (it) => {
@@ -677,7 +696,11 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const stowedPath = path.join(fixtureConfect, "tables", "stowed.ts");
+        const stowedPath = path.join(
+          yield* ConfectDirectory.get,
+          "tables",
+          "stowed.ts",
+        );
 
         yield* Effect.gen(function* () {
           yield* fs.writeFileString(stowedPath, "export default {};\n");
@@ -703,7 +726,11 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const invalidPath = path.join(fixtureConfect, "tables", filename);
+        const invalidPath = path.join(
+          yield* ConfectDirectory.get,
+          "tables",
+          filename,
+        );
 
         yield* Effect.gen(function* () {
           yield* fs.writeFileString(invalidPath, "export default {};\n");
