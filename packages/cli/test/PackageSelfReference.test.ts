@@ -5,6 +5,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PackageSelfReference from "@confect/cli/PackageSelfReference";
+import * as BundleRequire from "bundle-require";
 
 layer(NodeServices.layer)("PackageSelfReference", (it) => {
   it.effect(
@@ -28,11 +29,19 @@ layer(NodeServices.layer)("PackageSelfReference", (it) => {
           path.join(root, "nested"),
         );
         assert(Option.isSome(found));
-        const pattern = PackageSelfReference.toRegExp(found.value);
-        expect(pattern.test("@fixture/backend.v1")).toBe(true);
-        expect(pattern.test("@fixture/backend.v1/leaf")).toBe(true);
-        expect(pattern.test("@fixture/backendXv1")).toBe(false);
-        expect(pattern.test("@fixture/backend.v1-extra")).toBe(false);
+        expect(found.value).toBe("@fixture/backend.v1");
+        expect(BundleRequire.match("@fixture/backend.v1", [found.value])).toBe(
+          true,
+        );
+        expect(
+          BundleRequire.match("@fixture/backend.v1/leaf", [found.value]),
+        ).toBe(true);
+        expect(BundleRequire.match("@fixture/backendXv1", [found.value])).toBe(
+          false,
+        );
+        expect(
+          BundleRequire.match("@fixture/backend.v1-extra", [found.value]),
+        ).toBe(false);
         expect(
           yield* PackageSelfReference.discover(path.join(root, "boundary")),
         ).toEqual(Option.none());
