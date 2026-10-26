@@ -54,6 +54,69 @@ export type Outcome = Data.TaggedEnum<{
 }>;
 export const Outcome = Data.taggedEnum<Outcome>();
 
+export const combine = (
+  outcomes: Array.NonEmptyReadonlyArray<Outcome>,
+): Outcome => {
+  if (outcomes.length === 1) return Array.headNonEmpty(outcomes);
+  const combined = Array.reduce(
+    outcomes,
+    {
+      fingerprints: HashMap.empty<string, string>(),
+      graph: HashMap.empty<string, HashSet.HashSet<string>>(),
+      hashes: [] as ReadonlyArray<string>,
+      failures: [] as ReadonlyArray<Failure>,
+      warnings: [] as ReadonlyArray<esbuild.Message>,
+    },
+    (state, outcome) =>
+      Outcome.$match(outcome, {
+        Failed: ({ fingerprints, failures, warnings }) => ({
+          ...state,
+          fingerprints: HashMap.union(state.fingerprints, fingerprints),
+          failures: [...state.failures, ...failures],
+          warnings: [...state.warnings, ...warnings],
+        }),
+        Succeeded: ({ snapshot, warnings }) => ({
+          ...state,
+          fingerprints: HashMap.union(
+            state.fingerprints,
+            snapshot.fingerprints,
+          ),
+          graph: Array.reduce(
+            snapshot.graph,
+            state.graph,
+            (graph, [file, importers]) =>
+              HashMap.set(
+                graph,
+                file,
+                HashSet.union(
+                  Option.getOrElse(HashMap.get(graph, file), () =>
+                    HashSet.empty<string>(),
+                  ),
+                  importers,
+                ),
+              ),
+          ),
+          hashes: [...state.hashes, snapshot.outputHash],
+          warnings: [...state.warnings, ...warnings],
+        }),
+      }),
+  );
+  return Array.isReadonlyArrayNonEmpty(combined.failures)
+    ? Outcome.Failed({
+        fingerprints: combined.fingerprints,
+        failures: combined.failures,
+        warnings: combined.warnings,
+      })
+    : Outcome.Succeeded({
+        snapshot: {
+          fingerprints: combined.fingerprints,
+          graph: combined.graph,
+          outputHash: Array.join(combined.hashes, ":"),
+        },
+        warnings: combined.warnings,
+      });
+};
+
 export type Generation = number & Brand.Brand<"WatchBuild.Generation">;
 const Generation = Brand.nominal<Generation>();
 
