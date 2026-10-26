@@ -7,6 +7,7 @@ import * as Option from "effect/Option";
 import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Record from "effect/Record";
 import * as Result from "effect/Result";
 import * as SyncState from "@confect/cli/SyncState";
 import * as EntryPoint from "@confect/cli/EntryPoint";
@@ -36,7 +37,7 @@ vi.mock("esbuild", (importOriginal) =>
 const controlledWatcher = Effect.fnUntraced(function* (
   options: {
     readonly files?: ReadonlyArray<string>;
-    readonly contents?: Readonly<Record<string, string>>;
+    readonly contents?: Record.ReadonlyRecord<string, string>;
     readonly plugins?: ReadonlyArray<esbuild.Plugin>;
     readonly afterPlugins?: ReadonlyArray<esbuild.Plugin>;
     readonly rebuild?: (
@@ -57,7 +58,7 @@ const controlledWatcher = Effect.fnUntraced(function* (
     "tables/notes.ts",
   ])
     yield* project.write(`confect/${file}`, "export const value = 1;");
-  for (const [file, contents] of Object.entries(options.contents ?? {}))
+  for (const [file, contents] of Record.toEntries(options.contents ?? {}))
     yield* project.write(file, contents);
 
   const events = yield* Queue.unbounded<FileSystem.WatchEvent>();
