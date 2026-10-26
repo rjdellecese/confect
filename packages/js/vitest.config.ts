@@ -16,7 +16,7 @@ export default mergeConfig(
     },
     test: {
       root: import.meta.dirname,
-      include: ["test/**/*.test.ts"],
+      include: ["test/*.test.ts"],
     },
   }),
 );

@@ -1,14 +1,7 @@
 import { createRequire, isBuiltin } from "node:module";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import {
-  bundleRequire,
-  dynamicImport,
-  injectFileScopePlugin,
-  JS_EXT_RE,
-  loadTsConfig,
-  tsconfigPathsToRegExp,
-} from "bundle-require";
+import * as BundleRequire from "bundle-require";
 import { resolveModulePath } from "exsolve";
 import { identity, pipe } from "effect/Function";
 import * as Array from "effect/Array";
@@ -31,6 +24,7 @@ import * as String from "effect/String";
 import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 import { logCoalescedBuildWarnings } from "./log";
+import * as PackageSelfReference from "./PackageSelfReference";
 
 export interface Bundled {
   readonly module: any;
@@ -116,20 +110,21 @@ export const resolveModule = (
  * outside `node_modules`—mirroring Vite's "linked dependencies are not
  * externalized" heuristic. Registered ahead of `externalPlugin`, so deferring
  * (returning `undefined`) leaves third-party externalization untouched.
- * `skipPatterns` are the tsconfig `paths` regexes, which keep deferring to
- * esbuild's own `paths` resolution.
+ * `skipPatterns` leave tsconfig `paths` aliases and package self-references to
+ * esbuild's native resolution.
  */
 export const bundleWorkspacePlugin = (
   path: Path.Path,
   fs: FileSystem.FileSystem,
-  skipPatterns: ReadonlyArray<RegExp>,
+  skipPatterns: ReadonlyArray<string | RegExp>,
 ): esbuild.Plugin => ({
   name: "confect:bundle-workspace",
   setup(build) {
+    const patterns = [...skipPatterns];
     build.onResolve({ filter: /^[^./]/ }, (args) => {
       if (args.namespace !== "file" && args.namespace !== "") return undefined;
       if (isBuiltin(args.path) || path.isAbsolute(args.path)) return undefined;
-      if (Array.some(skipPatterns, (pattern) => pattern.test(args.path))) {
+      if (BundleRequire.match(args.path, patterns)) {
         return undefined;
       }
 
@@ -223,7 +218,7 @@ interface ExternalImport {
 const batchResolutionPlugin = (
   path: Path.Path,
   fs: FileSystem.FileSystem,
-  skipPatterns: ReadonlyArray<RegExp>,
+  skipPatterns: ReadonlyArray<string | RegExp>,
   conditions: string[],
   externalImports: Ref.Ref<
     HashMap.HashMap<string, ReadonlyArray<ExternalImport>>
@@ -231,6 +226,7 @@ const batchResolutionPlugin = (
 ): esbuild.Plugin => ({
   name: "confect:batch-resolution",
   setup(build) {
+    const patterns = [...skipPatterns];
     const external = (args: esbuild.OnResolveArgs, resolved: string) => {
       const importer = path.resolve(args.importer);
       Effect.runSync(
@@ -251,8 +247,7 @@ const batchResolutionPlugin = (
     build.onResolve({ filter: /.*/ }, (args) => {
       if (args.kind === "entry-point") return undefined;
       if (isBuiltin(args.path)) return { path: args.path, external: true };
-      if (Array.some(skipPatterns, (pattern) => pattern.test(args.path)))
-        return undefined;
+      if (BundleRequire.match(args.path, patterns)) return undefined;
       if (/[\\/]node_modules[\\/]/.test(args.path)) {
         return external(
           args,
@@ -338,7 +333,9 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   if (
     first === undefined ||
     entries.some(
-      (entry) => !JS_EXT_RE.test(entry) || /[\\/]node_modules[\\/]/.test(entry),
+      (entry) =>
+        !BundleRequire.JS_EXT_RE.test(entry) ||
+        /[\\/]node_modules[\\/]/.test(entry),
     )
   ) {
     return yield* new BatchIncompatible({
@@ -348,7 +345,8 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
     });
   }
   const configs = yield* Effect.try({
-    try: () => entries.map((entry) => loadTsConfig(path.dirname(entry))),
+    try: () =>
+      entries.map((entry) => BundleRequire.loadTsConfig(path.dirname(entry))),
     catch: (cause) => new BundlerError({ cause }),
   });
   const config = configs[0];
@@ -374,6 +372,12 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   );
   const externalImports = yield* Ref.make(
     HashMap.empty<string, ReadonlyArray<ExternalImport>>(),
+  );
+  const selfReferences = Array.getSomes(
+    yield* Effect.forEach(
+      Array.dedupe(Array.map(entries, path.dirname)),
+      PackageSelfReference.discover,
+    ),
   );
   const result = yield* Effect.tryPromise({
     try: () =>
@@ -401,11 +405,16 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
           batchResolutionPlugin(
             path,
             fs,
-            tsconfigPathsToRegExp(config?.data.compilerOptions?.paths ?? {}),
+            [
+              ...BundleRequire.tsconfigPathsToRegExp(
+                config?.data.compilerOptions?.paths ?? {},
+              ),
+              ...selfReferences,
+            ],
             conditions,
             externalImports,
           ),
-          injectFileScopePlugin(),
+          BundleRequire.injectFileScopePlugin(),
         ],
       }),
     catch: (cause) => new BundlerError({ cause }),
@@ -589,12 +598,13 @@ const entryMetafile = (
 });
 
 /**
- * Bundle a TypeScript entry point with esbuild via {@link bundleRequire} and
- * import the result. `bundle-require` writes a temp `.mjs` next to the source,
- * `import()`s it, and deletes it—so third-party `node_modules` externals
- * resolve through the user's normal `node_modules` walk, while first-party
- * workspace deps are bundled by {@link bundleWorkspacePlugin} and tsconfig
- * `paths` aliases stay inside the bundle.
+ * Bundle a TypeScript entry point with esbuild via
+ * {@link BundleRequire.bundleRequire} and import the result. `bundle-require`
+ * writes a temp `.mjs` next to the source, `import()`s it, and deletes it—so
+ * third-party `node_modules` externals resolve through the user's normal
+ * `node_modules` walk, while first-party workspace deps are bundled by
+ * {@link bundleWorkspacePlugin} and tsconfig `paths` aliases stay inside the
+ * bundle.
  *
  * `cwd` is set to the entry's directory so `bundle-require`'s `tsconfig.json`
  * discovery (which walks upward from `cwd`) lands on the project's tsconfig
@@ -641,9 +651,12 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
         );
         const module = yield* Effect.tryPromise({
           try: () =>
-            dynamicImport(pathToFileURL(entry.value.output).href, {
-              format: "esm",
-            }),
+            BundleRequire.dynamicImport(
+              pathToFileURL(entry.value.output).href,
+              {
+                format: "esm",
+              },
+            ),
           catch: (cause) => new BundlerError({ cause }),
         }).pipe(
           Effect.ensuring(
@@ -669,19 +682,25 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
   });
 
   const cwd = path.dirname(entryPoint);
+  const selfReferences = Option.toArray(
+    yield* PackageSelfReference.discover(cwd),
+  );
   const skipPatterns = yield* Effect.try({
-    try: () =>
-      tsconfigPathsToRegExp(
-        loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
+    try: () => [
+      ...BundleRequire.tsconfigPathsToRegExp(
+        BundleRequire.loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
       ),
+      ...selfReferences,
+    ],
     catch: (cause) => new BundlerError({ cause }),
   });
   const result = yield* Effect.tryPromise({
     try: () =>
-      bundleRequire({
+      BundleRequire.bundleRequire({
         filepath: entryPoint,
         cwd,
         format: "esm",
+        notExternal: selfReferences,
         esbuildOptions: {
           plugins: [
             ...(options?.plugins ?? []),

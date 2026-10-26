@@ -482,6 +482,9 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
+      confect-local-backend:
+        specifier: workspace:*
+        version: link:../../tools/local-backend
       effect:
         specifier: 4.0.4
         version: 4.0.4
@@ -583,6 +586,9 @@ importers:
       confect-bench-harness:
         specifier: workspace:*
         version: link:../../tools/bench-harness
+      confect-local-backend:
+        specifier: workspace:*
+        version: link:../../tools/local-backend
       confect-test-types:
         specifier: workspace:*
         version: link:../../tools/test-types
@@ -616,25 +622,6 @@ importers:
       vitest:
         specifier: 5.0.3
         version: 5.0.3(@types/node@26.6.5)(@vitest/browser-preview@4.1.11)(@vitest/coverage-v8@5.0.3)(happy-dom@20.12.0)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.15)(yaml@2.9.0))
-
-  packages/server/test/local-backend/fixtures:
-    dependencies:
-      '@confect/core':
-        specifier: workspace:*
-        version: link:../../../../core
-      '@confect/server':
-        specifier: workspace:*
-        version: link:../../..
-      convex:
-        specifier: 1.46.0
-        version: 1.46.0(react@19.3.0)
-      effect:
-        specifier: 4.0.4
-        version: 4.0.4
-    devDependencies:
-      '@confect/cli':
-        specifier: workspace:*
-        version: link:../../../../cli
 
   packages/server/test/mock-backend/fixtures:
     dependencies:
@@ -700,6 +687,49 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+
+  tools/local-backend:
+    devDependencies:
+      '@effect/platform-node':
+        specifier: 4.0.4
+        version: 4.0.4(effect@4.0.4)(redis@6.2.1)
+      '@types/node':
+        specifier: 26.6.5
+        version: 26.6.5
+      convex:
+        specifier: 1.46.0
+        version: 1.46.0(react@19.3.0)
+      cross-env:
+        specifier: 10.1.0
+        version: 10.1.0
+      effect:
+        specifier: 4.0.4
+        version: 4.0.4
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@types/node@26.6.5)(@vitest/browser-preview@4.1.11)(@vitest/coverage-v8@5.0.3)(happy-dom@20.12.0)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.15)(yaml@2.9.0))
+
+  tools/local-backend/fixtures:
+    dependencies:
+      '@confect/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@confect/server':
+        specifier: workspace:*
+        version: link:../../../packages/server
+      convex:
+        specifier: 1.46.0
+        version: 1.46.0(react@19.3.0)
+      effect:
+        specifier: 4.0.4
+        version: 4.0.4
+    devDependencies:
+      '@confect/cli':
+        specifier: workspace:*
+        version: link:../../../packages/cli
 
   tools/oxlint-rules:
     devDependencies:

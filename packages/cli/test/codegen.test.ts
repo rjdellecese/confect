@@ -46,6 +46,54 @@ vi.mock("esbuild", (importOriginal) =>
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
+    it.effect(
+      "matches fresh output with workspace-linked dependencies",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const installed = yield* Project.make;
+          yield* installed.provide(codegenHandler);
+          const expected = yield* installed.generatedFiles;
+          const installedBundle = yield* installed.provide(
+            Bundler.bundle(
+              path.join(installed.root, "confect/tables/notes.ts"),
+            ),
+          );
+          expect(
+            Array.dedupe(
+              Object.values(installedBundle.metafile.inputs)
+                .flatMap((input) => input.imports)
+                .filter((imported) => imported.original === "@confect/core")
+                .map((imported) => Boolean(imported.external)),
+            ),
+          ).toEqual([true]);
+          const workspace = yield* Project.make;
+          yield* fs.remove(path.join(workspace.root, "node_modules"), {
+            recursive: true,
+          });
+          yield* workspace.provide(codegenHandler);
+          expect(yield* workspace.generatedFiles).toEqual(expected);
+          const workspaceBundle = yield* workspace.provide(
+            Bundler.bundle(
+              path.join(workspace.root, "confect/tables/notes.ts"),
+            ),
+          );
+          expect(
+            Array.dedupe(
+              Object.values(workspaceBundle.metafile.inputs)
+                .flatMap((input) => input.imports)
+                .filter((imported) => imported.original === "@confect/core")
+                .map((imported) => Boolean(imported.external)),
+            ),
+          ).toEqual([false]);
+          expect(
+            Object.keys(installedBundle.metafile.inputs).length,
+          ).toBeLessThan(Object.keys(workspaceBundle.metafile.inputs).length);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect.each([
       "schema.spec.ts",
       "http.spec.ts",
@@ -553,13 +601,32 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
-const CodegenLayer = Layer.mergeAll(
-  NodePath.layer,
-  NodeFileSystem.layer,
-  Layer.succeed(
-    ConfectDirectory,
-    ConfectDirectory.of({ get: Effect.succeed(fixtureConfect) }),
-  ),
+const CodegenLayer = Layer.effect(
+  ConfectDirectory,
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* fs.makeTempDirectoryScoped({
+      directory: import.meta.dirname,
+      prefix: "table-fixture-",
+    });
+    yield* fs.makeDirectory(path.join(directory, "tables"));
+    yield* fs.makeDirectory(path.join(directory, "_generated"));
+    for (const file of [
+      "tables/events.ts",
+      "tables/notes.ts",
+      "tables/tags.ts",
+      "tables/users.ts",
+      "_generated/id.ts",
+    ])
+      yield* fs.copyFile(
+        path.join(fixtureConfect, file),
+        path.join(directory, file),
+      );
+    return ConfectDirectory.of({ get: Effect.succeed(directory) });
+  }),
+).pipe(
+  Layer.provideMerge(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer)),
 );
 
 layer(CodegenLayer)("TableModule.validate", (it) => {
@@ -629,7 +696,11 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const stowedPath = path.join(fixtureConfect, "tables", "stowed.ts");
+        const stowedPath = path.join(
+          yield* ConfectDirectory.get,
+          "tables",
+          "stowed.ts",
+        );
 
         yield* Effect.gen(function* () {
           yield* fs.writeFileString(stowedPath, "export default {};\n");
@@ -655,7 +726,11 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const invalidPath = path.join(fixtureConfect, "tables", filename);
+        const invalidPath = path.join(
+          yield* ConfectDirectory.get,
+          "tables",
+          filename,
+        );
 
         yield* Effect.gen(function* () {
           yield* fs.writeFileString(invalidPath, "export default {};\n");

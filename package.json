@@ -42,7 +42,7 @@
     "check:pack-contents": "bun run scripts/checkPackContents.ts",
     "circular": "dpdm --no-warning --no-tree --exit-code circular:1 -T \"packages/*/src/**/*.ts\"",
     "clean": "pnpm -r run clean && bun run scripts/clean.ts node_modules",
-    "codegen:server:local-backend": "pnpm --filter @confect/server codegen:local-backend",
+    "codegen:local-backend": "pnpm --filter confect-local-backend codegen",
     "codegen:server:mock-backend": "pnpm --filter @confect/server codegen:mock-backend",
     "dev": "concurrently --prefix-colors \"white.bold.bgBlue,white.bold.bgMagenta\" --names \"JS,DTS\" \"vp run --filter '@confect/*' --parallel dev\" \"tsc -b tsconfig.packages.json --watch --preserveWatchOutput\"",
     "dev:docs": "pnpm --filter docs dev",
@@ -57,10 +57,11 @@
     "skills": "bun run scripts/manageSkills.ts",
     "skills:sync-ignore": "bun run scripts/syncSkillIgnore.ts",
     "test": "bun test ./scripts && vitest run",
+    "test:js:local-backend": "pnpm --filter @confect/js test:local-backend",
     "test:server:local-backend": "pnpm --filter @confect/server test:local-backend",
     "test:server:mock-backend": "pnpm --filter @confect/server test:mock-backend",
     "typecheck": "tsc -b tsconfig.packages.json tsconfig.json tools/oxlint-rules/tsconfig.json && pnpm --filter confect-test-types typecheck",
-    "typecheck:inexact": "tsc -b tsconfig.packages.json && vp run --filter \"@confect/*\" --filter confect-test-types typecheck:inexact",
+    "typecheck:inexact": "tsc -b tsconfig.packages.json && vp run --filter \"@confect/*\" --filter confect-test-types --filter confect-local-backend typecheck:inexact",
     "version-packages": "changeset version && pnpm format"
   }
 }

@@ -24,13 +24,10 @@ import * as Scope from "effect/Scope";
 import * as Schema from "effect/Schema";
 import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
-import {
-  externalPlugin,
-  loadTsConfig,
-  tsconfigPathsToRegExp,
-} from "bundle-require";
+import * as BundleRequire from "bundle-require";
 import * as esbuild from "esbuild";
 import * as Bundler from "./Bundler";
+import * as PackageSelfReference from "./PackageSelfReference";
 import * as WatchBuild from "./WatchBuild";
 import * as WatchTopology from "./WatchTopology";
 import * as SyncState from "./SyncState";
@@ -188,7 +185,7 @@ const esbuildOptions = (
   projectRoot: string,
   generatedDirectory: string,
   entries: ReadonlyArray<Entry>,
-  notExternal: ReadonlyArray<RegExp>,
+  notExternal: ReadonlyArray<string | RegExp>,
   stateRef: Ref.Ref<WatchBuild.State>,
   captureRef: Ref.Ref<WatchBuild.Capture>,
   progressRef: Ref.Ref<WatchBuild.Progress>,
@@ -215,7 +212,7 @@ const esbuildOptions = (
     logLevel: "silent",
     plugins: [
       Bundler.bundleWorkspacePlugin(path, fs, notExternal),
-      externalPlugin({ notExternal: [...notExternal] }),
+      BundleRequire.externalPlugin({ notExternal: [...notExternal] }),
       {
         name: "notify-rebuild",
         setup(build) {
@@ -392,10 +389,19 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     const captureRef = yield* Ref.make(WatchBuild.emptyCapture);
     const progress = yield* Ref.make(WatchBuild.initialProgress);
     const initial = yield* Deferred.make<void>();
-    const tsconfig = loadTsConfig(projectRoot);
-    const notExternal = tsconfigPathsToRegExp(
-      tsconfig?.data.compilerOptions?.paths ?? {},
-    );
+    const tsconfig = BundleRequire.loadTsConfig(projectRoot);
+    const notExternal = [
+      ...BundleRequire.tsconfigPathsToRegExp(
+        tsconfig?.data.compilerOptions?.paths ?? {},
+      ),
+      ...Option.toArray(
+        yield* PackageSelfReference.discover(projectRoot).pipe(
+          Effect.mapError(
+            (cause) => new OperationError({ operation: "create", cause }),
+          ),
+        ),
+      ),
+    ];
     const context = yield* Effect.acquireRelease(
       Effect.tryPromise({
         try: () =>
