@@ -353,10 +353,10 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   const configPath = (
     selected: Option.Option<TypeScriptConfig.TypeScriptConfig>,
   ) => Option.getOrUndefined(Option.map(selected, (value) => value.path));
-  if (configs.some((other) => configPath(other) !== configPath(config)))
+  if (Array.some(configs, (other) => configPath(other) !== configPath(config)))
     return yield* new BatchIncompatible({
       reason: "MixedTsconfigs",
-      message: `Entries use different tsconfigs: ${Array.dedupe(configs.map((item) => configPath(item) ?? "(no tsconfig)")).join(", ")}`,
+      message: `Entries use different tsconfigs: ${Array.join(Array.dedupe(Array.map(configs, (item) => configPath(item) ?? "(no tsconfig)")), ", ")}`,
     });
 
   const cwd = yield* fs.realPath(path.dirname(first));

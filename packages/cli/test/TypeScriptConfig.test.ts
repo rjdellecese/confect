@@ -1,10 +1,12 @@
 import * as TypeScriptConfig from "@confect/cli/TypeScriptConfig";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { expect, layer } from "@effect/vitest";
+import { assert, expect, layer } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as PlatformError from "effect/PlatformError";
 import * as Record from "effect/Record";
 import * as Result from "effect/Result";
 
@@ -23,6 +25,77 @@ const fixture = Effect.fnUntraced(function* (
 });
 
 layer(NodeServices.layer)("TypeScriptConfig", (it) => {
+  it.effect.each([
+    { reason: "NotFound", cause: undefined },
+    { reason: "BadResource", cause: { code: "ENOTDIR" } },
+  ] as const)(
+    "keeps local aliases when an inherited candidate reports $reason",
+    ({ reason, cause }) =>
+      Effect.gen(function* () {
+        const { root, fs, path } = yield* fixture({
+          "tsconfig.json":
+            '{"extends":"./base.json","compilerOptions":{"paths":{"local":["./value.ts"]}}}',
+        });
+        const base = path.join(root, "base.json");
+        const error = PlatformError.systemError({
+          _tag: reason,
+          module: "FileSystem",
+          method: "stat",
+          pathOrDescriptor: base,
+          cause,
+        });
+        const selected = yield* TypeScriptConfig.discover(root).pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            stat: (file) =>
+              file === base ? Effect.fail(error) : fs.stat(file),
+          }),
+        );
+        expect(Option.map(selected, (config) => config.aliases)).toEqual(
+          Option.some(["local"]),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect.each([
+    { name: "absent cause", reason: "BadResource", cause: undefined },
+    { name: "null cause", reason: "BadResource", cause: null },
+    { name: "primitive cause", reason: "BadResource", cause: "ENOTDIR" },
+    { name: "another code", reason: "BadResource", cause: { code: "EACCES" } },
+    { name: "non-string code", reason: "BadResource", cause: { code: 42 } },
+    {
+      name: "another platform reason",
+      reason: "PermissionDenied",
+      cause: { code: "ENOTDIR" },
+    },
+  ] as const)(
+    "preserves the original platform failure for $name",
+    ({ reason, cause }) =>
+      Effect.gen(function* () {
+        const { root, fs, path } = yield* fixture({
+          "tsconfig.json": '{"extends":"./base.json"}',
+        });
+        const base = path.join(root, "base.json");
+        const error = PlatformError.systemError({
+          _tag: reason,
+          module: "FileSystem",
+          method: "stat",
+          pathOrDescriptor: base,
+          cause,
+        });
+        const result = yield* TypeScriptConfig.discover(root).pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            stat: (file) =>
+              file === base ? Effect.fail(error) : fs.stat(file),
+          }),
+          Effect.result,
+        );
+        assert(Result.isFailure(result));
+        expect(result.failure.cause).toBe(error);
+      }).pipe(Effect.scoped),
+  );
+
   it.effect(
     "merges repeated inheritance branches in order without dropping shared aliases",
     () =>
@@ -101,16 +174,20 @@ layer(NodeServices.layer)("TypeScriptConfig", (it) => {
       const selected = yield* TypeScriptConfig.discover(root);
       const patterns = TypeScriptConfig.aliasPatterns(selected);
       expect(
-        patterns.some((pattern) => pattern.test("@app.v1/nested/value")),
+        Array.some(patterns, (pattern) => pattern.test("@app.v1/nested/value")),
       ).toBe(true);
       expect(
-        patterns.some((pattern) => pattern.test("@appXv1/nested/value")),
+        Array.some(patterns, (pattern) => pattern.test("@appXv1/nested/value")),
       ).toBe(false);
-      expect(patterns.some((pattern) => pattern.test("exact.name"))).toBe(true);
-      expect(patterns.some((pattern) => pattern.test("exactXname"))).toBe(
+      expect(
+        Array.some(patterns, (pattern) => pattern.test("exact.name")),
+      ).toBe(true);
+      expect(
+        Array.some(patterns, (pattern) => pattern.test("exactXname")),
+      ).toBe(false);
+      expect(Array.some(patterns, (pattern) => pattern.test("unused"))).toBe(
         false,
       );
-      expect(patterns.some((pattern) => pattern.test("unused"))).toBe(false);
     }).pipe(Effect.scoped),
   );
 

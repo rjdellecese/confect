@@ -111,7 +111,7 @@ export const combine = (
         snapshot: {
           fingerprints: combined.fingerprints,
           graph: combined.graph,
-          outputHash: combined.hashes.join(":"),
+          outputHash: Array.join(combined.hashes, ":"),
         },
         warnings: combined.warnings,
       });
