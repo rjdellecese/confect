@@ -25,6 +25,7 @@ import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 import { logCoalescedBuildWarnings } from "./log";
 import * as PackageSelfReference from "./PackageSelfReference";
+import * as TypeScriptConfig from "./TypeScriptConfig";
 
 export interface Bundled {
   readonly module: any;
@@ -329,9 +330,8 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
     ),
   ];
   const entries = Array.dedupe(entryPoints.map((entry) => path.resolve(entry)));
-  const first = entries[0];
   if (
-    first === undefined ||
+    !Array.isReadonlyArrayNonEmpty(entries) ||
     entries.some(
       (entry) =>
         !BundleRequire.JS_EXT_RE.test(entry) ||
@@ -344,16 +344,19 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
         "Shared builds require JavaScript or TypeScript entries outside node_modules.",
     });
   }
-  const configs = yield* Effect.try({
-    try: () =>
-      entries.map((entry) => BundleRequire.loadTsConfig(path.dirname(entry))),
-    catch: (cause) => new BundlerError({ cause }),
-  });
-  const config = configs[0];
-  if (configs.some((other) => other?.path !== config?.path))
+  const first = Array.headNonEmpty(entries);
+  const configs = yield* Effect.forEach(
+    Array.dedupe(Array.map(entries, path.dirname)),
+    TypeScriptConfig.discover,
+  );
+  const config = Array.headNonEmpty(configs);
+  const configPath = (
+    selected: Option.Option<TypeScriptConfig.TypeScriptConfig>,
+  ) => Option.getOrUndefined(Option.map(selected, (value) => value.path));
+  if (Array.some(configs, (other) => configPath(other) !== configPath(config)))
     return yield* new BatchIncompatible({
       reason: "MixedTsconfigs",
-      message: `Entries use different tsconfigs: ${Array.dedupe(configs.map((item) => item?.path ?? "(no tsconfig)")).join(", ")}`,
+      message: `Entries use different tsconfigs: ${Array.join(Array.dedupe(Array.map(configs, (item) => configPath(item) ?? "(no tsconfig)")), ", ")}`,
     });
 
   const cwd = yield* fs.realPath(path.dirname(first));
@@ -398,19 +401,12 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
         metafile: true,
         write: false,
         logLevel: "silent",
-        ...(config?.path
-          ? { tsconfig: config.path }
-          : { tsconfigRaw: config?.data ?? {} }),
+        ...TypeScriptConfig.buildOptions(config),
         plugins: [
           batchResolutionPlugin(
             path,
             fs,
-            [
-              ...BundleRequire.tsconfigPathsToRegExp(
-                config?.data.compilerOptions?.paths ?? {},
-              ),
-              ...selfReferences,
-            ],
+            [...TypeScriptConfig.aliasPatterns(config), ...selfReferences],
             conditions,
             externalImports,
           ),
@@ -606,11 +602,6 @@ const entryMetafile = (
  * {@link bundleWorkspacePlugin} and tsconfig `paths` aliases stay inside the
  * bundle.
  *
- * `cwd` is set to the entry's directory so `bundle-require`'s `tsconfig.json`
- * discovery (which walks upward from `cwd`) lands on the project's tsconfig
- * regardless of where `confect codegen` was invoked from, and so esbuild
- * resolves relative imports against the entry's location.
- *
  * The returned pair carries both the imported module and the esbuild metafile
  * so callers can inspect the import graph (see {@link directlyImports}); the
  * metafile is captured via a small `onEnd` plugin because `bundle-require`
@@ -685,24 +676,31 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
   const selfReferences = Option.toArray(
     yield* PackageSelfReference.discover(cwd),
   );
-  const skipPatterns = yield* Effect.try({
-    try: () => [
-      ...BundleRequire.tsconfigPathsToRegExp(
-        BundleRequire.loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
-      ),
-      ...selfReferences,
-    ],
-    catch: (cause) => new BundlerError({ cause }),
-  });
+  const config = yield* TypeScriptConfig.discover(cwd);
+  const skipPatterns = [
+    ...TypeScriptConfig.aliasPatterns(config),
+    ...selfReferences,
+  ];
   const result = yield* Effect.tryPromise({
     try: () =>
       BundleRequire.bundleRequire({
         filepath: entryPoint,
         cwd,
         format: "esm",
-        notExternal: selfReferences,
+        tsconfig: false,
+        notExternal: skipPatterns,
         esbuildOptions: {
           plugins: [
+            {
+              name: "confect:typescript-config",
+              setup(build) {
+                delete build.initialOptions.tsconfigRaw;
+                Object.assign(
+                  build.initialOptions,
+                  TypeScriptConfig.buildOptions(config),
+                );
+              },
+            },
             ...(options?.plugins ?? []),
             bundleWorkspacePlugin(path, fs, skipPatterns),
             captureBuildResultPlugin(buildResultRef),
