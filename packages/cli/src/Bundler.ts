@@ -31,6 +31,7 @@ import * as String from "effect/String";
 import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 import { logCoalescedBuildWarnings } from "./log";
+import * as PackageSelfReference from "./PackageSelfReference";
 
 export interface Bundled {
   readonly module: any;
@@ -116,8 +117,8 @@ export const resolveModule = (
  * outside `node_modules`—mirroring Vite's "linked dependencies are not
  * externalized" heuristic. Registered ahead of `externalPlugin`, so deferring
  * (returning `undefined`) leaves third-party externalization untouched.
- * `skipPatterns` are the tsconfig `paths` regexes, which keep deferring to
- * esbuild's own `paths` resolution.
+ * `skipPatterns` leave tsconfig `paths` aliases and package self-references to
+ * esbuild's native resolution.
  */
 export const bundleWorkspacePlugin = (
   path: Path.Path,
@@ -375,6 +376,15 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   const externalImports = yield* Ref.make(
     HashMap.empty<string, ReadonlyArray<ExternalImport>>(),
   );
+  const selfReferences = Array.map(
+    Array.getSomes(
+      yield* Effect.forEach(
+        Array.dedupe(Array.map(entries, path.dirname)),
+        PackageSelfReference.discover,
+      ),
+    ),
+    PackageSelfReference.toRegExp,
+  );
   const result = yield* Effect.tryPromise({
     try: () =>
       esbuild.build({
@@ -401,7 +411,12 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
           batchResolutionPlugin(
             path,
             fs,
-            tsconfigPathsToRegExp(config?.data.compilerOptions?.paths ?? {}),
+            [
+              ...tsconfigPathsToRegExp(
+                config?.data.compilerOptions?.paths ?? {},
+              ),
+              ...selfReferences,
+            ],
             conditions,
             externalImports,
           ),
@@ -669,11 +684,17 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
   });
 
   const cwd = path.dirname(entryPoint);
+  const selfReferences = Array.map(
+    Option.toArray(yield* PackageSelfReference.discover(cwd)),
+    PackageSelfReference.toRegExp,
+  );
   const skipPatterns = yield* Effect.try({
-    try: () =>
-      tsconfigPathsToRegExp(
+    try: () => [
+      ...tsconfigPathsToRegExp(
         loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
       ),
+      ...selfReferences,
+    ],
     catch: (cause) => new BundlerError({ cause }),
   });
   const result = yield* Effect.tryPromise({
@@ -682,6 +703,7 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
         filepath: entryPoint,
         cwd,
         format: "esm",
+        notExternal: selfReferences,
         esbuildOptions: {
           plugins: [
             ...(options?.plugins ?? []),

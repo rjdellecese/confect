@@ -31,6 +31,7 @@ import {
 } from "bundle-require";
 import * as esbuild from "esbuild";
 import * as Bundler from "./Bundler";
+import * as PackageSelfReference from "./PackageSelfReference";
 import * as WatchBuild from "./WatchBuild";
 import * as WatchTopology from "./WatchTopology";
 import * as SyncState from "./SyncState";
@@ -393,9 +394,19 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     const progress = yield* Ref.make(WatchBuild.initialProgress);
     const initial = yield* Deferred.make<void>();
     const tsconfig = loadTsConfig(projectRoot);
-    const notExternal = tsconfigPathsToRegExp(
-      tsconfig?.data.compilerOptions?.paths ?? {},
-    );
+    const notExternal = [
+      ...tsconfigPathsToRegExp(tsconfig?.data.compilerOptions?.paths ?? {}),
+      ...Array.map(
+        Option.toArray(
+          yield* PackageSelfReference.discover(projectRoot).pipe(
+            Effect.mapError(
+              (cause) => new OperationError({ operation: "create", cause }),
+            ),
+          ),
+        ),
+        PackageSelfReference.toRegExp,
+      ),
+    ];
     const context = yield* Effect.acquireRelease(
       Effect.tryPromise({
         try: () =>
