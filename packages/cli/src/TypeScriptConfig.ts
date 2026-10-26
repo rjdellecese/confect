@@ -46,11 +46,13 @@ const property = (
 ): Jsonc.Node | undefined =>
   Match.value(node).pipe(
     Match.when({ type: "object" }, (object) =>
-      Array.findFirst(
-        object.children ?? [],
-        (entry) => entry.children?.[0]?.value === key,
+      Array.findFirst(object.children ?? [], (entry) =>
+        Option.exists(
+          Array.head(entry.children ?? []),
+          (name) => name.value === key,
+        ),
       ).pipe(
-        Option.flatMap((entry) => Option.fromUndefinedOr(entry.children?.[1])),
+        Option.flatMap((entry) => Array.get(entry.children ?? [], 1)),
         Option.getOrUndefined,
       ),
     ),
@@ -171,7 +173,7 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
           Option.some(
             Array.getSomes(
               Array.map(object.children ?? [], (entry) =>
-                string(entry.children?.[0]),
+                Option.flatMap(Array.head(entry.children ?? []), string),
               ),
             ),
           ),
@@ -222,11 +224,7 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
         );
         const manifestPath = path.join(packageDirectory, "package.json");
         const manifest = yield* read(manifestPath);
-        let base = path.join(current, "node_modules", value);
         if (Option.isSome(manifest)) {
-          const config = string(property(manifest.value.tree, "tsconfig"));
-          if (Option.isSome(config) && String.isNonEmpty(config.value))
-            base = path.resolve(packageDirectory, config.value);
           const exports = property(manifest.value.tree, "exports");
           const target = Match.value(exports).pipe(
             Match.whenOr(
@@ -249,6 +247,15 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
             if (Option.isSome(found)) return found;
           }
         }
+        const base = Option.flatMap(manifest, ({ tree }) =>
+          string(property(tree, "tsconfig")),
+        ).pipe(
+          Option.filter(String.isNonEmpty),
+          Option.match({
+            onNone: () => path.join(current, "node_modules", value),
+            onSome: (configPath) => path.resolve(packageDirectory, configPath),
+          }),
+        );
         for (const file of [
           path.join(base, "tsconfig.json"),
           base,

@@ -344,12 +344,12 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
         "Shared builds require JavaScript or TypeScript entries outside node_modules.",
     });
   }
-  const first = entries[0];
+  const first = Array.headNonEmpty(entries);
   const configs = yield* Effect.forEach(
     Array.dedupe(Array.map(entries, path.dirname)),
     TypeScriptConfig.discover,
   );
-  const config = configs[0];
+  const config = Array.headNonEmpty(configs);
   const configPath = (
     selected: Option.Option<TypeScriptConfig.TypeScriptConfig>,
   ) => Option.getOrUndefined(Option.map(selected, (value) => value.path));

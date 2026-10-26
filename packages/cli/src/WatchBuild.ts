@@ -57,7 +57,7 @@ export const Outcome = Data.taggedEnum<Outcome>();
 export const combine = (
   outcomes: Array.NonEmptyReadonlyArray<Outcome>,
 ): Outcome => {
-  if (outcomes.length === 1) return outcomes[0];
+  if (outcomes.length === 1) return Array.headNonEmpty(outcomes);
   const combined = Array.reduce(
     outcomes,
     {

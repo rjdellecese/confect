@@ -456,7 +456,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     );
     const groups = yield* Effect.forEach(partitions, (partition) =>
       Effect.gen(function* () {
-        const config = partition[0].config;
+        const config = Array.headNonEmpty(partition).config;
         const groupEntries = Array.map(partition, (selected) => selected.entry);
         const captureRef = yield* Ref.make(WatchBuild.emptyCapture);
         const progress = yield* Ref.make(WatchBuild.initialProgress);
