@@ -3,7 +3,6 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
-import * as RegExp from "effect/RegExp";
 import * as Schema from "effect/Schema";
 import * as BuildError from "./BuildError";
 
@@ -53,6 +52,3 @@ export const discover = Effect.fnUntraced(
   },
   Effect.mapError((cause) => new BuildError.BundlerError({ cause })),
 );
-
-export const toRegExp = (self: PackageSelfReference): globalThis.RegExp =>
-  new globalThis.RegExp(`^${RegExp.escape(self)}(?:/|$)`);

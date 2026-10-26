@@ -25,7 +25,7 @@ import * as Scope from "effect/Scope";
 import * as Schema from "effect/Schema";
 import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
-import { externalPlugin } from "bundle-require";
+import * as BundleRequire from "bundle-require";
 import * as esbuild from "esbuild";
 import * as Bundler from "./Bundler";
 import * as PackageSelfReference from "./PackageSelfReference";
@@ -213,7 +213,7 @@ const esbuildOptions = (
   projectRoot: string,
   generatedDirectory: string,
   entries: ReadonlyArray<Entry>,
-  notExternal: ReadonlyArray<RegExp>,
+  notExternal: ReadonlyArray<string | RegExp>,
   config: Option.Option<TypeScriptConfig.TypeScriptConfig>,
   stateRef: Ref.Ref<HashMap.HashMap<string, WatchBuild.State>>,
   captureRef: Ref.Ref<WatchBuild.Capture>,
@@ -246,7 +246,7 @@ const esbuildOptions = (
     logLevel: "silent",
     plugins: [
       Bundler.bundleWorkspacePlugin(path, fs, notExternal),
-      externalPlugin({ notExternal: [...notExternal] }),
+      BundleRequire.externalPlugin({ notExternal: [...notExternal] }),
       {
         name: "notify-rebuild",
         setup(build) {
@@ -463,22 +463,19 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
         const initial = yield* Deferred.make<void>();
         const notExternal = [
           ...TypeScriptConfig.aliasPatterns(config),
-          ...Array.map(
-            Array.getSomes(
-              yield* Effect.forEach(
-                Array.dedupe(
-                  Array.map(groupEntries, (entry) =>
-                    path.dirname(entry.absolutePath),
-                  ),
-                ),
-                PackageSelfReference.discover,
-              ).pipe(
-                Effect.mapError(
-                  (cause) => new OperationError({ operation: "create", cause }),
+          ...Array.getSomes(
+            yield* Effect.forEach(
+              Array.dedupe(
+                Array.map(groupEntries, (entry) =>
+                  path.dirname(entry.absolutePath),
                 ),
               ),
+              PackageSelfReference.discover,
+            ).pipe(
+              Effect.mapError(
+                (cause) => new OperationError({ operation: "create", cause }),
+              ),
             ),
-            PackageSelfReference.toRegExp,
           ),
         ];
         const context = yield* Effect.acquireRelease(
