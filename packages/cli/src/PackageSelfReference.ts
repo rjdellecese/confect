@@ -40,9 +40,11 @@ export const discover = Effect.fnUntraced(
     const metadata = yield* Schema.decodeEffect(PackageMetadata)(
       yield* fs.readFileString(path.join(nearest.value, "package.json")),
     );
-    return metadata.name && metadata.exports != null
-      ? Option.some(metadata.name)
-      : Option.none<PackageSelfReference>();
+    if (metadata.name === undefined || metadata.name.length === 0)
+      return Option.none<PackageSelfReference>();
+    if (metadata.exports === undefined || metadata.exports === null)
+      return Option.none<PackageSelfReference>();
+    return Option.some(metadata.name);
   },
   Effect.mapError((cause) => new BuildError.BundlerError({ cause })),
 );
