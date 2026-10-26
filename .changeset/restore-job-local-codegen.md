@@ -2,6 +2,8 @@
 "@confect/cli": patch
 ---
 
-Address the code-generation performance regression in `confect codegen` and `confect dev` while retaining the package self-reference fixes from 10.3.2: avoid repeated regeneration when relative imports and package self-references reach the same file, and preserve distinct `import` and `require` export conditions.
+Address the code-generation performance regression in `confect codegen` and `confect dev` while preserving package self-reference handling and consistent entry-specific and inherited `tsconfig.json` settings, including path aliases and compiler options from shared configuration packages.
 
-The configuration-resolution changes introduced in 10.3.2 are not retained. Restart `confect dev` manually after configuration, package metadata, or dependency installation changes.
+Relative imports and package self-references to the same file do not cause repeated regeneration, and code generation preserves distinct `import` and `require` export conditions.
+
+Restart `confect dev` manually after configuration, package metadata, or dependency installation changes.
