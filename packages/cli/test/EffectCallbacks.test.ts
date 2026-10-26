@@ -1,8 +1,4 @@
-import type { BuildError, BundlerError } from "@confect/cli/BuildError";
-import type * as DevSessionProcess from "@confect/cli/DevSessionProcess";
-import type * as DevSupervisor from "@confect/cli/DevSupervisor";
-import type * as CompilationInputs from "@confect/cli/CompilationInputs";
-import type { ConfigError } from "effect/Config";
+import type { BuildError } from "@confect/cli/BuildError";
 import type * as CodegenError from "@confect/cli/CodegenError";
 import type {
   ConfectDirectory,
@@ -23,7 +19,8 @@ import type { EvaluationError } from "@confect/cli/Evaluation";
 import type * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import * as TableModule from "@confect/cli/TableModule";
 import { codegenHandler } from "@confect/cli/confect/codegen";
-import { dev, type SyncJobError } from "@confect/cli/confect/dev";
+import { dev } from "@confect/cli/confect/dev";
+import type { OperationError } from "@confect/cli/Watcher";
 import { generateFunctions, writeGroups } from "@confect/cli/FunctionModule";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import * as Context from "effect/Context";
@@ -81,9 +78,6 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
         functionPaths: FunctionPaths.FunctionPaths;
       },
       | CodegenError.CodegenError
-      | BundlerError
-      | CompilationInputs.RestartRequired
-      | EvaluationError
       | GroupPath.GroupModulePathIsNotATypeScriptFileError
       | PlatformError,
       GenerationServices | ProjectRoot
@@ -94,21 +88,15 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
       "dev",
       { componentDir: Option.Option<string> },
       {},
-      | BundlerError
+      | OperationError
+      | EvaluationError
+      | PlatformError
       | ConfectDirectoryNotFoundError
       | ConvexDirectoryNotFoundError
       | InvalidConvexJsonError
       | ProjectRootNotFoundError
-      | Schema.SchemaError
-      | ConfigError
-      | EvaluationError
-      | PlatformError
-      | DevSessionProcess.MissingSessionIpc
-      | DevSupervisor.RestartRequested
-      | DevSessionProcess.SessionExited
-      | DevSessionProcess.SupervisorError
-      | SyncJobError,
-      FileServices | DevSessionProcess.Service
+      | Schema.SchemaError,
+      FileServices
     >
   >();
 });

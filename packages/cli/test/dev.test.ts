@@ -1,19 +1,16 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as DevSessionProcess from "@confect/cli/DevSessionProcess";
 import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as Command from "effect/cli/Command";
 import * as Deferred from "effect/Deferred";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
-import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import type * as DirectoryOptions from "@confect/cli/DirectoryOptions";
+import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
-import * as Ref from "effect/Ref";
 import * as esbuild from "esbuild";
-import type * as DevSupervisor from "@confect/cli/DevSupervisor";
-import type * as DirectoryOptions from "@confect/cli/DirectoryOptions";
 import { dev } from "@confect/cli/confect/dev";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
@@ -24,13 +21,6 @@ vi.mock("@confect/cli/DirectoryOptions", (importOriginal) =>
   importOriginal<typeof DirectoryOptions>().then((original) => ({
     ...original,
     layer: () => Layer.empty,
-  })),
-);
-
-vi.mock("@confect/cli/DevSupervisor", (importOriginal) =>
-  importOriginal<typeof DevSupervisor>().then((original) => ({
-    ...original,
-    run: Effect.scoped,
   })),
 );
 
@@ -49,12 +39,7 @@ vi.mock("effect/Console", (importOriginal) =>
   })),
 );
 
-const services = Layer.merge(
-  NodeServices.layer,
-  Layer.mock(DevSessionProcess.Service, {}),
-);
-
-layer(services, { excludeTestServices: true })(
+layer(NodeServices.layer, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
     it.effect.each([
@@ -158,75 +143,6 @@ layer(services, { excludeTestServices: true })(
           yield* fs.rename(replacement, helper);
           yield* Queue.take(ready);
           expect(readyCount).toBe(2);
-        }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
-      { timeout: 25000 },
-    );
-
-    it.effect.each([
-      { kind: "impl", source: Project.impl },
-      { kind: "spec", source: Project.spec },
-    ])(
-      "uses the observed $kind revision without another consumption build",
-      ({ kind, source }) =>
-        Effect.gen(function* () {
-          const path = yield* Path.Path;
-          const project = yield* Project.make;
-          const ready = yield* Queue.unbounded<void>();
-          const rebuilds = yield* Ref.make(0);
-          const context = vi.mocked(esbuild.context);
-          const original = context.getMockImplementation();
-          assert(original);
-          const runPromise = Effect.runPromiseWith(yield* Effect.context());
-          context.mockImplementation((options) =>
-            original(options).then((actual) => ({
-              ...actual,
-              rebuild: () =>
-                runPromise(
-                  Ref.update(rebuilds, (count) => count + 1).pipe(
-                    Effect.andThen(Effect.promise(() => actual.rebuild())),
-                  ),
-                ),
-            })),
-          );
-          yield* Effect.addFinalizer(() =>
-            Effect.sync(() => context.mockImplementation(original)),
-          );
-          yield* Effect.acquireRelease(
-            Effect.sync(() =>
-              vi
-                .spyOn(Console, "log")
-                .mockImplementation((...args) =>
-                  args.some(
-                    (arg) =>
-                      typeof arg === "string" &&
-                      arg.includes("Generated files are up-to-date"),
-                  )
-                    ? Queue.offer(ready, undefined).pipe(Effect.asVoid)
-                    : Effect.void,
-                ),
-            ),
-            (spy) => Effect.sync(() => spy.mockRestore()),
-          );
-          yield* Command.runWith(dev, { version: "test" })([]).pipe(
-            Effect.provideService(ProjectRoot, {
-              get: Effect.succeed(project.root),
-            }),
-            Effect.provideService(ConfectDirectory, {
-              get: Effect.succeed(path.join(project.root, "confect")),
-            }),
-            Effect.provideService(ConvexDirectory, {
-              get: Effect.succeed(path.join(project.root, "convex")),
-            }),
-            Effect.forkScoped,
-          );
-          yield* Queue.take(ready);
-          yield* Ref.set(rebuilds, 0);
-          yield* project.write(
-            `confect/notes.${kind}.ts`,
-            `${source}\n// authored edit\n`,
-          );
-          yield* Queue.take(ready);
-          expect(yield* Ref.get(rebuilds)).toBe(2);
         }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
       { timeout: 25000 },
     );

@@ -58,19 +58,6 @@ Confect files. `exactOptionalPropertyTypes: true` is optional but recommended:
 See [Effect Schema's explanation of `exactOptionalPropertyTypes`](https://effect.website/docs/v4/schema/introduction#the-exactoptionalpropertytypes-option)
 for how it affects optional properties and schema validation.
 
-Code generation uses the nearest `tsconfig.json` for each spec, implementation,
-table, or Convex component config. It applies inherited compiler options to that
-entry and its imported helpers; a config beside an imported helper does not
-override the entry's config. `confect dev` restarts automatically when a selected
-config or its inheritance chain changes. Ordinary source edits remain incremental.
-
-<Note>
-  In Yarn Plug'n'Play projects, run `yarn confect codegen` and `yarn confect
-  dev` so package-based `extends` uses the active Yarn runtime. A `.pnp.cjs`
-  file on disk alone does not activate Yarn resolution for configuration
-  inheritance.
-</Note>
-
 ## Usage
 
 <Steps>
