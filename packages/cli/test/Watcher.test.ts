@@ -253,6 +253,7 @@ layer(NodeServices.layer)("entry configuration", (test) => {
 
   test.effect("applies each entry configuration to its shared helpers", () =>
     Effect.gen(function* () {
+      const path = yield* Path.Path;
       const outputs = yield* Ref.make<ReadonlyArray<string>>([]);
       const runSync = Effect.runSyncWith(yield* Effect.context());
       const { watcher, project } = yield* controlledWatcher({
@@ -296,7 +297,9 @@ layer(NodeServices.layer)("entry configuration", (test) => {
       expect(SyncState.isDirty(changed)).toBe(true);
       expect(changed.work).toMatchObject({
         _tag: "Declarations",
-        entries: [{ _tag: "Table", relativePath: "tables/notes.ts" }],
+        entries: [
+          { _tag: "Table", relativePath: path.join("tables", "notes.ts") },
+        ],
       });
     }).pipe(Effect.scoped),
   );
