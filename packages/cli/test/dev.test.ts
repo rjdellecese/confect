@@ -8,21 +8,12 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
-import * as Ref from "effect/Ref";
 import * as esbuild from "esbuild";
-import type * as DevSupervisor from "@confect/cli/DevSupervisor";
 import { dev } from "@confect/cli/confect/dev";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as Project from "./integration/Project";
-
-vi.mock("@confect/cli/DevSupervisor", (importOriginal) =>
-  importOriginal<typeof DevSupervisor>().then((original) => ({
-    ...original,
-    run: Effect.scoped,
-  })),
-);
 
 vi.mock("esbuild", (importOriginal) =>
   importOriginal<typeof esbuild>().then((original) => ({
@@ -43,33 +34,52 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
     it.effect.each([
-      { kind: "impl", source: Project.impl },
-      { kind: "spec", source: Project.spec },
+      { kind: "syntax", message: "Unexpected" },
+      { kind: "unlocated", message: "unlocated watcher failure" },
     ])(
-      "uses the observed $kind revision without another consumption build",
-      ({ kind, source }) =>
+      "reports $kind build errors before recovering from a helper edit",
+      ({ kind, message }) =>
         Effect.gen(function* () {
-          const path = yield* Path.Path;
           const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const helper = path.join(project.root, "confect/name.ts");
+          const replacement = path.join(project.root, "name.next.ts");
           const ready = yield* Queue.unbounded<void>();
-          const rebuilds = yield* Ref.make(0);
-          const context = vi.mocked(esbuild.context);
-          const original = context.getMockImplementation();
-          assert(original);
-          const runPromise = Effect.runPromiseWith(yield* Effect.context());
-          context.mockImplementation((options) =>
-            original(options).then((actual) => ({
-              ...actual,
-              rebuild: () =>
-                runPromise(
-                  Ref.update(rebuilds, (count) => count + 1).pipe(
-                    Effect.andThen(Effect.promise(() => actual.rebuild())),
-                  ),
-                ),
-            })),
+          const errors = yield* Queue.unbounded<string>();
+          let readyCount = 0;
+          let broken = false;
+          if (kind === "unlocated") {
+            const context = vi.mocked(esbuild.context);
+            const original = context.getMockImplementation();
+            assert(original);
+            context.mockImplementation((options) =>
+              original({
+                ...options,
+                plugins: [
+                  ...(options.plugins ?? []),
+                  {
+                    name: "unlocated-watcher-error",
+                    setup(build) {
+                      build.onStart(() =>
+                        broken ? { errors: [{ text: message }] } : undefined,
+                      );
+                    },
+                  },
+                ],
+              }),
+            );
+            yield* Effect.addFinalizer(() =>
+              Effect.sync(() => context.mockImplementation(original)),
+            );
+          }
+          yield* project.write(
+            "confect/name.ts",
+            'export const name = "list";',
           );
-          yield* Effect.addFinalizer(() =>
-            Effect.sync(() => context.mockImplementation(original)),
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { name } from "./name";\n${Project.spec.replace('name: "list"', "name")}`,
           );
           yield* Effect.acquireRelease(
             Effect.sync(() =>
@@ -81,32 +91,49 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                       typeof arg === "string" &&
                       arg.includes("Generated files are up-to-date"),
                   )
-                    ? Queue.offer(ready, undefined).pipe(Effect.asVoid)
+                    ? Effect.sync(() => readyCount++).pipe(
+                        Effect.andThen(Queue.offer(ready, undefined)),
+                        Effect.asVoid,
+                      )
                     : Effect.void,
                 ),
             ),
             (spy) => Effect.sync(() => spy.mockRestore()),
           );
-          yield* Command.runWith(dev, { version: "test" })([]).pipe(
-            Effect.provideService(ProjectRoot, {
-              get: Effect.succeed(project.root),
-            }),
-            Effect.provideService(ConfectDirectory, {
-              get: Effect.succeed(path.join(project.root, "confect")),
-            }),
-            Effect.provideService(ConvexDirectory, {
-              get: Effect.succeed(path.join(project.root, "convex")),
-            }),
-            Effect.forkScoped,
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi.spyOn(Console, "error").mockImplementation((...args) =>
+                Effect.forEach(
+                  args.filter(
+                    (arg): arg is string =>
+                      typeof arg === "string" && arg.includes("Build errors"),
+                  ),
+                  (text) => Queue.offer(errors, text),
+                  { discard: true },
+                ),
+              ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
           );
+          yield* project
+            .provide(Command.runWith(dev, { version: "test" })([]))
+            .pipe(Effect.forkScoped);
           yield* Queue.take(ready);
-          yield* Ref.set(rebuilds, 0);
-          yield* project.write(
-            `confect/notes.${kind}.ts`,
-            `${source}\n// authored edit\n`,
+          broken = true;
+          yield* fs.writeFileString(
+            replacement,
+            kind === "syntax"
+              ? "export const name = ;"
+              : 'export const name = "pending";',
           );
+          yield* fs.rename(replacement, helper);
+          expect(yield* Queue.take(errors)).toContain(message);
+          expect(readyCount).toBe(1);
+          broken = false;
+          yield* fs.writeFileString(replacement, 'export const name = "list";');
+          yield* fs.rename(replacement, helper);
           yield* Queue.take(ready);
-          expect(yield* Ref.get(rebuilds)).toBe(2);
+          expect(readyCount).toBe(2);
         }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
       { timeout: 25000 },
     );

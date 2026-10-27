@@ -1,5 +1,15 @@
 # @confect/core
 
+## 10.4.1
+
+### Patch Changes
+
+- cacac19: Fix ID schemas returned by `Id` so they can be used as record keys, checked, annotated, and constructed while preserving table-specific decoded and encoded types.
+
+## 10.4.0
+
+No changes in this release.
+
 ## 10.3.2
 
 No changes in this release.

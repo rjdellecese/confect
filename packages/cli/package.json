@@ -1,7 +1,7 @@
 {
   "name": "@confect/cli",
   "description": "Developer tooling for codegen and sync",
-  "version": "10.3.2",
+  "version": "10.4.1",
   "author": "RJ Dellecese",
   "bin": {
     "confect": "./bin/confect.mjs"
@@ -23,7 +23,6 @@
     "@effect/vitest": "4.0.4",
     "@types/node": "26.6.5",
     "@vitest/coverage-v8": "5.0.3",
-    "@yarnpkg/cli-dist": "4.18.1",
     "convex": "1.46.0",
     "effect": "4.0.4",
     "tsdown": "0.23.1",
