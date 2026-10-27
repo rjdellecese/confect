@@ -3,7 +3,7 @@ packages:
   - tools/*
   - apps/*
   - packages/server/test/mock-backend/fixtures
-  - packages/server/test/local-backend/fixtures
+  - tools/local-backend/fixtures
 
 allowBuilds:
   "@parcel/watcher": false

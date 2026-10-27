@@ -13,6 +13,7 @@ import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as References from "effect/References";
 import * as Result from "effect/Result";
+import * as Match from "effect/Match";
 import * as Bundler from "@confect/cli/Bundler";
 
 const BundlerLayer = Layer.mergeAll(NodePath.layer, NodeFileSystem.layer);
@@ -326,7 +327,233 @@ const fixture = Effect.fn("Bundler.test.fixture")(function* (
   };
 });
 
+layer(BundlerLayer)("check", (it) => {
+  it.effect.each(["individual", "shared", "fallback"] as const)(
+    "checks aliases and dependencies without executing them in %s builds",
+    (mode) =>
+      Effect.gen(function* () {
+        const { file, fs, directory } = yield* fixture({
+          "tsconfig.json": '{"compilerOptions":{"paths":{"~/*":["./src/*"]}}}',
+          "entry.ts":
+            'import "~/dependency"; throw new Error("Entry must not execute"); export default {};',
+          "src/dependency.ts":
+            'throw new Error("Dependency must not execute"); export {};',
+          "broken.ts": "export default ;",
+        });
+        const entry = file("entry.ts");
+        const checked = Match.value(mode).pipe(
+          Match.when("individual", () => Bundler.check(entry)),
+          Match.when("shared", () =>
+            Bundler.withBatch([entry], Bundler.check(entry)),
+          ),
+          Match.when("fallback", () =>
+            Bundler.withBatch([entry, file("broken.ts")], Bundler.check(entry)),
+          ),
+          Match.exhaustive,
+        );
+        yield* checked;
+        expect(yield* fs.readDirectory(directory)).toHaveLength(4);
+        yield* fs.writeFileString(
+          file("src/dependency.ts"),
+          "export default ;",
+        );
+        const failed = yield* Effect.result(checked);
+        expect(failed).toMatchObject({
+          _tag: "Failure",
+          failure: {
+            _tag: "BundlerError",
+            cause: { errors: expect.any(Array) },
+          },
+        });
+        expect(yield* fs.readDirectory(directory)).toHaveLength(4);
+      }).pipe(Effect.scoped),
+  );
+});
+
 layer(BundlerLayer)("withBatch", (it) => {
+  it.effect("uses native node conditions for inherited package aliases", () =>
+    Effect.gen(function* () {
+      const { file } = yield* fixture({
+        "tsconfig.json": '{"extends":"fixture"}',
+        "entry.ts": 'export { value } from "node-alias";',
+        "node_modules/fixture/package.json":
+          '{"exports":{"types":"./types.json","node":"./node.json","require":"./require.json"}}',
+        "node_modules/fixture/types.json":
+          '{"compilerOptions":{"paths":{"types-alias":["./value.ts"]}}}',
+        "node_modules/fixture/node.json":
+          '{"compilerOptions":{"paths":{"node-alias":["./value.ts"]}}}',
+        "node_modules/fixture/require.json":
+          '{"compilerOptions":{"paths":{"require-alias":["./value.ts"]}}}',
+        "node_modules/fixture/value.ts": 'export const value = "native-node";',
+      });
+      const entry = file("entry.ts");
+      expect((yield* Bundler.bundle(entry)).module.value).toBe("native-node");
+      expect(
+        (yield* Bundler.withBatch([entry], Bundler.bundle(entry))).module.value,
+      ).toBe("native-node");
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "preserves local aliases when a missing relative base only produces a warning",
+    () =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "tsconfig.json":
+            '{"extends":"./missing.json","compilerOptions":{"paths":{"alias":["./value.ts"]}}}',
+          "value.ts": 'export const value = "local";',
+          "entry.ts": 'export { value } from "alias";',
+        });
+        const entry = file("entry.ts");
+        expect((yield* Bundler.bundle(entry)).module.value).toBe("local");
+        expect(
+          (yield* Bundler.withBatch([entry], Bundler.bundle(entry))).module
+            .value,
+        ).toBe("local");
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "keeps entry-specific inherited transforms for a shared source",
+    () =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "base.json": '{"compilerOptions":{"useDefineForClassFields":false}}',
+          "tsconfig.json": '{"extends":"./base.json"}',
+          "nested/tsconfig.json":
+            '{"extends":"../base.json","compilerOptions":{"useDefineForClassFields":true}}',
+          "first.ts": 'export { value } from "./shared";',
+          "nested/second.ts": 'export { value } from "../shared";',
+          "shared.ts":
+            'class Base { set field(value) { this.received = value; } } class Derived extends Base { field = "assigned"; } export const value = new Derived().received ?? "defined";',
+        });
+        const first = file("first.ts");
+        const second = file("nested/second.ts");
+        const bundled = yield* Bundler.withBatch(
+          [first, second],
+          Effect.all([Bundler.bundle(first), Bundler.bundle(second)]),
+        );
+        expect(bundled.map((result) => result.module.value)).toEqual([
+          "assigned",
+          "defined",
+        ]);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "does not discover imported nested configuration when the entry has none",
+    () =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "entry.ts": 'export { value } from "./nested/shared";',
+          "nested/tsconfig.json": '{"extends":',
+          "nested/shared.ts": "export const value = 1;",
+        });
+        expect((yield* Bundler.bundle(file("entry.ts"))).module.value).toBe(1);
+        expect(
+          (yield* Bundler.withBatch(
+            [file("entry.ts")],
+            Bundler.bundle(file("entry.ts")),
+          )).module.value,
+        ).toBe(1);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect.each([
+    { name: "absent exports", manifest: '{"tsconfig":"base.json"}' },
+    {
+      name: "null exports",
+      manifest: '{"exports":null,"main":"index.js","tsconfig":"base.json"}',
+    },
+  ])(
+    "uses inherited package configuration with $name for individual and shared bundles",
+    ({ manifest }) =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "tsconfig.json": '{"extends":"@fixture/config"}',
+          "node_modules/@fixture/config/package.json": manifest,
+          "node_modules/@fixture/config/index.js":
+            'export const value = "not-a-config";',
+          "node_modules/@fixture/config/base.json":
+            '{"compilerOptions":{"paths":{"alias":["./value.ts"]},"useDefineForClassFields":false}}',
+          "node_modules/@fixture/config/value.ts":
+            'export const value = "inherited";',
+          "entry.ts":
+            'import { value } from "alias"; class Base { set field(value) { this.received = value; } } class Derived extends Base { field = value; } export default new Derived().received;',
+        });
+        const entry = file("entry.ts");
+        expect((yield* Bundler.bundle(entry)).module.default).toBe("inherited");
+        expect(
+          (yield* Bundler.withBatch([entry], Bundler.bundle(entry))).module
+            .default,
+        ).toBe("inherited");
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "preserves native self-reference conditions in individual, batch and fallback builds",
+    () =>
+      Effect.gen(function* () {
+        const { file } = yield* fixture({
+          "package.json":
+            '{"name":"@fixture/backend.v1","type":"module","exports":{".":{"import":"./import.ts","require":"./require.ts"},"./*":"./*.ts"}}',
+          "tsconfig.json": tsconfigContents,
+          "import.ts": 'export const value = "import";',
+          "require.ts": 'export const value = "require";',
+          "leaf.ts": "export const shared = {};",
+          "shared.ts":
+            'import { value } from "@fixture/backend.v1"; import other from "@fixture/backend.v1-extra"; export { shared } from "@fixture/backend.v1/leaf"; export const values = [value, require("@fixture/backend.v1").value, other];',
+          "first.ts": 'export { shared, values } from "~/shared";',
+          "nested/second.ts": 'export { shared, values } from "~/shared";',
+          "node_modules/@fixture/backend.v1-extra/package.json":
+            '{"type":"module","exports":"./index.js"}',
+          "node_modules/@fixture/backend.v1-extra/index.js":
+            'export default "external";',
+        });
+        const individual = yield* Bundler.bundle(file("first.ts"));
+        const [first, second] = yield* Bundler.withBatch(
+          [file("first.ts"), file("nested/second.ts")],
+          Effect.all([
+            Bundler.bundle(file("first.ts")),
+            Bundler.bundle(file("nested/second.ts")),
+          ]),
+        );
+        const fallback = yield* Bundler.withBatch(
+          [file("first.ts"), file("nested/second.ts")],
+          Bundler.bundle(file("nested/second.ts")),
+        ).pipe(
+          Effect.provide(
+            ConfigProvider.layer(
+              ConfigProvider.fromUnknown({
+                NODE_OPTIONS: "--conditions=custom",
+              }),
+            ),
+          ),
+        );
+        for (const bundled of [individual, first, second, fallback]) {
+          expect(bundled.module.values).toEqual([
+            "import",
+            "require",
+            "external",
+          ]);
+          expect(
+            Bundler.importersOfPackage(
+              bundled,
+              "@fixture/backend.v1",
+              () => true,
+            ),
+          ).toEqual([file("shared.ts")]);
+          expect(bundled.metafile.inputs[file("leaf.ts")]).toBeDefined();
+          expect(
+            Object.keys(bundled.metafile.inputs).some((input) =>
+              input.includes("node_modules"),
+            ),
+          ).toBe(false);
+        }
+        expect(first.module.shared).toBe(second.module.shared);
+      }).pipe(Effect.scoped),
+  );
+
   const incompatibilities: ReadonlyArray<{
     readonly reason: string;
     readonly nodeOptions: string;

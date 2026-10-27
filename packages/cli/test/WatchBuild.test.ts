@@ -2,6 +2,7 @@ import { assert, expect, it } from "@effect/vitest";
 import * as WatchBuild from "@confect/cli/WatchBuild";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
+import * as Equal from "effect/Equal";
 import * as FileSystem from "effect/FileSystem";
 import * as HashMap from "effect/HashMap";
 import * as HashSet from "effect/HashSet";
@@ -51,6 +52,54 @@ const successfulOutcome = WatchBuild.Outcome.Succeeded({
 
 const request = (progress: WatchBuild.Progress) =>
   WatchBuild.request(progress, WatchBuild.makeRequestId());
+
+it("combines configuration snapshots without losing shared-helper dependents", () => {
+  const first = WatchBuild.Outcome.Succeeded({
+    snapshot: {
+      fingerprints: HashMap.make(
+        ["shared.ts", "shared"],
+        ["first.ts", "first"],
+      ),
+      graph: HashMap.make(["shared.ts", HashSet.make("first.ts")]),
+      outputHash: "first",
+    },
+    warnings: [],
+  });
+  const second = WatchBuild.Outcome.Succeeded({
+    snapshot: {
+      fingerprints: HashMap.make(
+        ["shared.ts", "shared"],
+        ["second.ts", "second"],
+      ),
+      graph: HashMap.make(["shared.ts", HashSet.make("second.ts")]),
+      outputHash: "second",
+    },
+    warnings: [],
+  });
+  const combined = WatchBuild.combine([first, second]);
+  assert(combined._tag === "Succeeded");
+  expect(
+    Equal.equals(
+      HashMap.get(combined.snapshot.graph, "shared.ts"),
+      Option.some(HashSet.make("first.ts", "second.ts")),
+    ),
+  ).toBe(true);
+  expect(HashMap.size(combined.snapshot.fingerprints)).toBe(3);
+  expect(combined.snapshot.outputHash).toBe("first:second");
+  expect(HashMap.get(first.snapshot.graph, "shared.ts")).toEqual(
+    Option.some(HashSet.make("first.ts")),
+  );
+});
+
+it("retains failed configuration groups beside successful groups", () => {
+  const failed = WatchBuild.Outcome.Failed({
+    fingerprints: HashMap.make(["broken.ts", "broken"]),
+    failures: [WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" })],
+    warnings: [],
+  });
+  expect(WatchBuild.combine([failed, successfulOutcome])).toEqual(failed);
+  expect(WatchBuild.combine([successfulOutcome, failed])).toEqual(failed);
+});
 
 it.effect(
   "checks captured inputs against current files without changing the snapshot",
