@@ -612,8 +612,20 @@ const entryMetafile = (
  * resolutions (e.g. `convex.config` imports) before the workspace and
  * externalization heuristics see them.
  */
-export const bundle = Effect.fn("Bundler.bundle")(function* (
+export const bundle = Effect.fn("Bundler.bundle")(
+  (
+    entryPoint: string,
+    options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
+  ) => bundleWith(entryPoint, BundleRequire.dynamicImport, options),
+);
+
+export const check = Effect.fn("Bundler.check")((entryPoint: string) =>
+  bundleWith(entryPoint, () => Promise.resolve(undefined)).pipe(Effect.asVoid),
+);
+
+const bundleWith = Effect.fnUntraced(function* (
   entryPoint: string,
+  load: typeof BundleRequire.dynamicImport,
   options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
 ): Effect.fn.Return<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> {
   const path = yield* Path.Path;
@@ -642,12 +654,9 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
         );
         const module = yield* Effect.tryPromise({
           try: () =>
-            BundleRequire.dynamicImport(
-              pathToFileURL(entry.value.output).href,
-              {
-                format: "esm",
-              },
-            ),
+            load(pathToFileURL(entry.value.output).href, {
+              format: "esm",
+            }),
           catch: (cause) => new BundlerError({ cause }),
         }).pipe(
           Effect.ensuring(
@@ -685,6 +694,7 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
     try: () =>
       BundleRequire.bundleRequire({
         filepath: entryPoint,
+        require: load,
         cwd,
         format: "esm",
         tsconfig: false,

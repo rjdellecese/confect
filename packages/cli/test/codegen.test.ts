@@ -145,6 +145,48 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
       { timeout: 30000 },
     );
 
+    it.effect.each(["http.ts", "crons.ts", "auth.ts"])(
+      "checks optional module %s and recovers after compile errors",
+      (file) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          for (const contents of [
+            "export default ;",
+            'export { default } from "./missing-optional-dependency";',
+          ]) {
+            yield* project.write(`confect/${file}`, contents);
+            const result = yield* project
+              .provide(codegenHandler)
+              .pipe(Effect.result);
+            assert(Result.isFailure(result));
+            expect(result.failure).toMatchObject({
+              _tag: "BundleFailedError",
+              file,
+            });
+          }
+          yield* project.write(
+            `confect/${file}`,
+            'throw new Error("Optional runtime must not execute"); export default {};',
+          );
+          yield* project.provide(codegenHandler);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect.each(["http.ts", "crons.ts", "auth.ts"])(
+      "checks %s after its generated dependencies exist without evaluating it",
+      (file) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write(
+            `confect/${file}`,
+            'import "./_generated/registeredFunctions/notes"; import "../convex/notes"; throw new Error("Optional runtime must not execute"); export default {};',
+          );
+          yield* project.provide(codegenHandler);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "notifies Convex after explicit codegen even when generated contents are unchanged",
       () =>
