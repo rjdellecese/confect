@@ -1,10 +1,11 @@
 import {
+  compileSchema,
   compileAst,
   type UndefinedOrValueToValidator,
   type ValueToValidator,
 } from "@confect/core/SchemaToValidator";
+import * as GenericId from "@confect/core/GenericId";
 import type { TypeError } from "@confect/core/Types";
-import type * as GenericId from "@confect/core/GenericId";
 import type * as IdScope from "@confect/core/IdScope";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import {
@@ -320,6 +321,33 @@ describe("UndefinedOrValueToValidator", () => {
     expectTypeOf<
       UndefinedOrValueToValidator<UnionValue | undefined>
     >().toEqualTypeOf<VOptional<ValueToValidator<UnionValue>>>();
+  });
+});
+
+describe("ID schemas", () => {
+  it("compiles an ID to a table-specific validator", () => {
+    const expected = v.id("users");
+    const compiled = compileSchema(GenericId.GenericId("users"));
+
+    expect(compiled).toEqual(expected);
+    expectTypeOf(compiled).toEqualTypeOf<typeof expected>();
+  });
+
+  it("compiles an ID-keyed record field with checks and annotations", () => {
+    const schema = Schema.Struct({
+      counts: Schema.Record(
+        GenericId.GenericId("shipmentLineItems")
+          .check(Schema.isMinLength(1))
+          .annotate({ title: "Line item ID" }),
+        Schema.Finite,
+      ).check(Schema.isMinProperties(1)),
+    });
+
+    expect(compileSchema(schema)).toEqual(
+      v.object({
+        counts: v.record(v.id("shipmentLineItems"), v.float64()),
+      }),
+    );
   });
 });
 

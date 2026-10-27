@@ -33,14 +33,19 @@ export const GenericId = <
 >(
   tableName: TableName,
   scope?: Scope,
-): Schema.Codec<GenericId<TableName, Scope>> =>
+): Schema.toType<Schema.refine<GenericId<TableName, Scope>, Schema.String>> =>
   Schema.String.annotate({
     [ConvexId]: tableName,
     [ConvexIdScope]: scope ?? IdScope.app,
-  }) as unknown as Schema.Codec<GenericId<TableName, Scope>>;
+  }).pipe(
+    Schema.refine((_value): _value is GenericId<TableName, Scope> => true),
+    Schema.toType,
+  );
 
 export const scope = (ast: SchemaAST.AST): IdScope.IdScope =>
-  SchemaAST.resolveAt<IdScope.IdScope>(ConvexIdScope)(ast) ?? IdScope.app;
+  (ast.annotations?.[ConvexIdScope] as IdScope.IdScope | undefined) ??
+  SchemaAST.resolveAt<IdScope.IdScope>(ConvexIdScope)(ast) ??
+  IdScope.app;
 
 /**
  * Rebind only IDs owned by `From`; IDs belonging to other scopes survive.
@@ -208,9 +213,18 @@ export const rebase = <
     const scoped =
       Option.isSome(tableName(ast)) &&
       (ownScope === from || ownScope.startsWith(`${from}/instance:`))
-        ? Schema.make<Schema.Codec<unknown>>(next).annotate({
-            [ConvexIdScope]: to + ownScope.slice(from.length),
-          }).ast
+        ? (Object.create(Object.getPrototypeOf(next), {
+            ...Object.getOwnPropertyDescriptors(next),
+            annotations: {
+              value: {
+                ...next.annotations,
+                [ConvexIdScope]: to + ownScope.slice(from.length),
+              },
+              enumerable: true,
+              configurable: true,
+              writable: true,
+            },
+          }) as SchemaAST.AST)
         : next;
     if (ast.encoding === undefined) return scoped;
     // Effect's replaceEncoding helper is internal and omitted from its published
@@ -235,4 +249,7 @@ export const rebase = <
 export const tableName = <TableName extends string>(
   ast: SchemaAST.AST,
 ): Option.Option<TableName> =>
-  Option.fromNullishOr(SchemaAST.resolveAt<TableName>(ConvexId)(ast));
+  Option.fromNullishOr(
+    (ast.annotations?.[ConvexId] as TableName | undefined) ??
+      SchemaAST.resolveAt<TableName>(ConvexId)(ast),
+  );
