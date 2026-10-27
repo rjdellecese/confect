@@ -2,8 +2,8 @@
 "@confect/cli": patch
 ---
 
-Address the code-generation performance regression in `confect codegen` and `confect dev` while preserving package self-reference handling and consistent entry-specific and inherited `tsconfig.json` settings, including path aliases and compiler options from shared configuration packages.
+Fix the 10.3.2 code-generation performance regression affecting `confect codegen` and `confect dev`.
 
-Relative imports and package self-references to the same file do not cause repeated regeneration, and code generation preserves distinct `import` and `require` export conditions.
+Restart `confect dev` manually after changing TypeScript configuration, package metadata, or installed dependencies. Ordinary source edits continue to update automatically.
 
-Restart `confect dev` manually after configuration, package metadata, or dependency installation changes.
+Resolve `${configDir}` path aliases consistently with TypeScript when `..` follows a wildcard. For example, with `"@/*": ["${configDir}/fixtures/*/../value.ts"]`, an import of `@/a/b` resolves to `fixtures/value.ts`, not `fixtures/a/value.ts`.
