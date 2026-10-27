@@ -47,6 +47,7 @@ import * as Scheduler from "./Scheduler";
 import * as Storage from "./Storage";
 import type { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
+import { toConvexDefinition } from "./internal/convexDefinition";
 
 export type Definition = Data.TaggedEnum<{
   PublicQuery: ReturnType<typeof queryFunction>;
@@ -127,12 +128,16 @@ export const make = (
 
 export const register = (self: Definition): RegisteredFunction.Any =>
   Definition.$match(self, {
-    PublicQuery: (definition) => queryGeneric(definition),
-    InternalQuery: (definition) => internalQueryGeneric(definition),
-    PublicMutation: (definition) => mutationGeneric(definition),
-    InternalMutation: (definition) => internalMutationGeneric(definition),
-    PublicAction: (definition) => actionGeneric(definition),
-    InternalAction: (definition) => internalActionGeneric(definition),
+    PublicQuery: (definition) => queryGeneric(toConvexDefinition(definition)),
+    InternalQuery: (definition) =>
+      internalQueryGeneric(toConvexDefinition(definition)),
+    PublicMutation: (definition) =>
+      mutationGeneric(toConvexDefinition(definition)),
+    InternalMutation: (definition) =>
+      internalMutationGeneric(toConvexDefinition(definition)),
+    PublicAction: (definition) => actionGeneric(toConvexDefinition(definition)),
+    InternalAction: (definition) =>
+      internalActionGeneric(toConvexDefinition(definition)),
     Registered: ({ handler }) => handler,
   });
 
@@ -217,8 +222,8 @@ const queryFunction = <
   >;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
-  args: compileArgsSchema(args),
-  returns: compileReturnsSchema(returns),
+  args: () => compileArgsSchema(args),
+  returns: () => compileReturnsSchema(returns),
   handler: (
     ctx: GenericQueryCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
@@ -352,8 +357,8 @@ const mutationFunction = <
   ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
-  args: compileArgsSchema(args),
-  returns: compileReturnsSchema(returns),
+  args: () => compileArgsSchema(args),
+  returns: () => compileReturnsSchema(returns),
   handler: (
     ctx: GenericMutationCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>

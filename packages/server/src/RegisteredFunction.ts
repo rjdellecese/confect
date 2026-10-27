@@ -282,8 +282,8 @@ export const actionFunctionBase = <
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
   ) => Layer.Layer<R>;
 }) => ({
-  args: compileArgsSchema(args),
-  returns: compileReturnsSchema(returns),
+  args: () => compileArgsSchema(args),
+  returns: () => compileReturnsSchema(returns),
   handler: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexArgs,

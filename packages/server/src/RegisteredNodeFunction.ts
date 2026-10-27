@@ -18,6 +18,7 @@ import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as GroupImpl from "./GroupImpl";
 import type * as RegisteredFunctions from "./RegisteredFunctions";
 import { mapLeaves } from "./internal/utils";
+import { toConvexDefinition } from "./internal/convexDefinition";
 
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   databaseSchema: DatabaseSchema.AnyWithProps,
@@ -57,15 +58,17 @@ export const make = (
   );
 
   return genericFunction(
-    nodeActionFunction(databaseSchema, {
-      name: item.name,
-      functionVisibility: item.functionVisibility,
-      args: item.args,
-      returns: item.returns,
-      error: item.error,
-      handler: item.handler,
-      resolvedMiddlewares,
-    }),
+    toConvexDefinition(
+      nodeActionFunction(databaseSchema, {
+        name: item.name,
+        functionVisibility: item.functionVisibility,
+        args: item.args,
+        returns: item.returns,
+        error: item.error,
+        handler: item.handler,
+        resolvedMiddlewares,
+      }),
+    ),
   );
 };
 
