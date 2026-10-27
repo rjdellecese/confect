@@ -26,6 +26,7 @@ minimumReleaseAgeExclude:
   - "@effect/platform-node@4.0.4"
   - "@effect/vitest@4.0.4"
   - effect@4.0.4
+  - exsolve@1.2.0
 
 overrides:
   convex: 1.46.0
