@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import * as BundleRequire from "bundle-require";
 import { resolveModulePath } from "exsolve";
-import { identity, pipe } from "effect/Function";
+import { constUndefined, identity, pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Chunk from "effect/Chunk";
 import * as Cause from "effect/Cause";
@@ -612,8 +612,20 @@ const entryMetafile = (
  * resolutions (e.g. `convex.config` imports) before the workspace and
  * externalization heuristics see them.
  */
-export const bundle = Effect.fn("Bundler.bundle")(function* (
+export const bundle = Effect.fn("Bundler.bundle")(
+  (
+    entryPoint: string,
+    options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
+  ) => bundleWith(entryPoint, BundleRequire.dynamicImport, options),
+);
+
+export const check = Effect.fn("Bundler.check")((entryPoint: string) =>
+  bundleWith(entryPoint).pipe(Effect.asVoid),
+);
+
+const bundleWith = Effect.fnUntraced(function* (
   entryPoint: string,
+  load?: typeof BundleRequire.dynamicImport,
   options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
 ): Effect.fn.Return<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> {
   const path = yield* Path.Path;
@@ -640,15 +652,16 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
           entry.value.source,
           entry.value.output,
         );
-        const module = yield* Effect.tryPromise({
-          try: () =>
-            BundleRequire.dynamicImport(
-              pathToFileURL(entry.value.output).href,
-              {
-                format: "esm",
-              },
-            ),
-          catch: (cause) => new BundlerError({ cause }),
+        const module = yield* Option.match(Option.fromUndefinedOr(load), {
+          onNone: () => Effect.void,
+          onSome: (loadModule) =>
+            Effect.tryPromise({
+              try: () =>
+                loadModule(pathToFileURL(entry.value.output).href, {
+                  format: "esm",
+                }),
+              catch: (cause) => new BundlerError({ cause }),
+            }),
         }).pipe(
           Effect.ensuring(
             logCoalescedBuildWarnings(
@@ -685,6 +698,7 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
     try: () =>
       BundleRequire.bundleRequire({
         filepath: entryPoint,
+        require: load ?? constUndefined,
         cwd,
         format: "esm",
         tsconfig: false,

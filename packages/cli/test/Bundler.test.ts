@@ -13,6 +13,7 @@ import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as References from "effect/References";
 import * as Result from "effect/Result";
+import * as Match from "effect/Match";
 import * as Bundler from "@confect/cli/Bundler";
 
 const BundlerLayer = Layer.mergeAll(NodePath.layer, NodeFileSystem.layer);
@@ -324,6 +325,49 @@ const fixture = Effect.fn("Bundler.test.fixture")(function* (
     path,
     file: (name: string) => path.join(directory, name),
   };
+});
+
+layer(BundlerLayer)("check", (it) => {
+  it.effect.each(["individual", "shared", "fallback"] as const)(
+    "checks aliases and dependencies without executing them in %s builds",
+    (mode) =>
+      Effect.gen(function* () {
+        const { file, fs, directory } = yield* fixture({
+          "tsconfig.json": '{"compilerOptions":{"paths":{"~/*":["./src/*"]}}}',
+          "entry.ts":
+            'import "~/dependency"; throw new Error("Entry must not execute"); export default {};',
+          "src/dependency.ts":
+            'throw new Error("Dependency must not execute"); export {};',
+          "broken.ts": "export default ;",
+        });
+        const entry = file("entry.ts");
+        const checked = Match.value(mode).pipe(
+          Match.when("individual", () => Bundler.check(entry)),
+          Match.when("shared", () =>
+            Bundler.withBatch([entry], Bundler.check(entry)),
+          ),
+          Match.when("fallback", () =>
+            Bundler.withBatch([entry, file("broken.ts")], Bundler.check(entry)),
+          ),
+          Match.exhaustive,
+        );
+        yield* checked;
+        expect(yield* fs.readDirectory(directory)).toHaveLength(4);
+        yield* fs.writeFileString(
+          file("src/dependency.ts"),
+          "export default ;",
+        );
+        const failed = yield* Effect.result(checked);
+        expect(failed).toMatchObject({
+          _tag: "Failure",
+          failure: {
+            _tag: "BundlerError",
+            cause: { errors: expect.any(Array) },
+          },
+        });
+        expect(yield* fs.readDirectory(directory)).toHaveLength(4);
+      }).pipe(Effect.scoped),
+  );
 });
 
 layer(BundlerLayer)("withBatch", (it) => {
