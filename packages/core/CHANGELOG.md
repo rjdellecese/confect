@@ -1,5 +1,9 @@
 # @confect/core
 
+## 10.4.0
+
+No changes in this release.
+
 ## 10.3.2
 
 No changes in this release.
