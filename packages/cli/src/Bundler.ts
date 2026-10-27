@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import * as BundleRequire from "bundle-require";
 import { resolveModulePath } from "exsolve";
-import { identity, pipe } from "effect/Function";
+import { constUndefined, identity, pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Chunk from "effect/Chunk";
 import * as Cause from "effect/Cause";
@@ -620,12 +620,12 @@ export const bundle = Effect.fn("Bundler.bundle")(
 );
 
 export const check = Effect.fn("Bundler.check")((entryPoint: string) =>
-  bundleWith(entryPoint, () => Promise.resolve(undefined)).pipe(Effect.asVoid),
+  bundleWith(entryPoint).pipe(Effect.asVoid),
 );
 
 const bundleWith = Effect.fnUntraced(function* (
   entryPoint: string,
-  load: typeof BundleRequire.dynamicImport,
+  load?: typeof BundleRequire.dynamicImport,
   options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
 ): Effect.fn.Return<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> {
   const path = yield* Path.Path;
@@ -652,12 +652,16 @@ const bundleWith = Effect.fnUntraced(function* (
           entry.value.source,
           entry.value.output,
         );
-        const module = yield* Effect.tryPromise({
-          try: () =>
-            load(pathToFileURL(entry.value.output).href, {
-              format: "esm",
+        const module = yield* Option.match(Option.fromUndefinedOr(load), {
+          onNone: () => Effect.void,
+          onSome: (loadModule) =>
+            Effect.tryPromise({
+              try: () =>
+                loadModule(pathToFileURL(entry.value.output).href, {
+                  format: "esm",
+                }),
+              catch: (cause) => new BundlerError({ cause }),
             }),
-          catch: (cause) => new BundlerError({ cause }),
         }).pipe(
           Effect.ensuring(
             logCoalescedBuildWarnings(
@@ -694,7 +698,7 @@ const bundleWith = Effect.fnUntraced(function* (
     try: () =>
       BundleRequire.bundleRequire({
         filepath: entryPoint,
-        require: load,
+        require: load ?? constUndefined,
         cwd,
         format: "esm",
         tsconfig: false,
