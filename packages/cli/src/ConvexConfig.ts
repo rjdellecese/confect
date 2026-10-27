@@ -1,7 +1,6 @@
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Context from "effect/Context";
 import type * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
@@ -12,7 +11,6 @@ import * as String from "effect/String";
 import type * as esbuild from "esbuild";
 import { fromBundlerError, type BuildError } from "./BuildError";
 import * as Bundler from "./Bundler";
-import * as CompilationPlugin from "./CompilationPlugin";
 import { InvalidConvexConfigError } from "./CodegenError";
 import { toPosixPath } from "./utils";
 
@@ -65,12 +63,16 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
     build.onResolve({ filter: /convex\.config/ }, (args) => {
       // The app's own `convex.config.ts` is the entry point; only imports of
       // *component* definitions get wrapped.
-      if (
-        args.kind === "entry-point" ||
-        args.pluginData === CompilationPlugin.nativeProbe
-      )
-        return undefined;
-      if (args.namespace === COMPONENT_CONFIG_NAMESPACE) return undefined;
+      if (args.kind === "entry-point") return undefined;
+
+      // Claim a wrapper's import of the real definition into the file
+      // namespace: bundled, the definition's own nested `convex.config`
+      // imports re-enter this plugin and get stamped; externalized, an npm
+      // definition would be evaluated natively by Node, where its top-level
+      // `component.use(...)` of unstamped nested definitions throws.
+      if (args.namespace === COMPONENT_CONFIG_NAMESPACE) {
+        return { path: args.path };
+      }
       if (args.namespace !== "file" && args.namespace !== "") return undefined;
 
       const importer =
@@ -90,74 +92,25 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
           : []),
       ];
 
-      return Effect.runPromiseWith(Context.empty())(
-        Effect.forEach(candidates, (candidate) =>
-          Effect.promise(() =>
-            build.resolve(candidate, {
-              kind: args.kind,
-              importer,
-              resolveDir: args.resolveDir,
-              namespace: "file",
-              pluginData: CompilationPlugin.nativeProbe,
-            }),
-          ).pipe(Effect.map((result) => ({ candidate, result }))),
-        ).pipe(
-          Effect.map((results) =>
-            Option.match(
-              Array.findFirst(
-                results,
-                ({ result }) => result.errors.length === 0 && !result.external,
-              ),
-              {
-                onNone: () => undefined,
-                onSome: ({ candidate: sourceSpecifier, result: resolved }) => {
-                  const manifest = Option.flatMap(
-                    CompilationPlugin.packageManifest(args.path, importer),
-                    Option.fromUndefinedOr,
-                  );
-                  const watchFiles = Array.dedupe([
-                    resolved.path,
-                    ...Option.toArray(manifest),
-                    ...Array.getSomes(
-                      Array.map(candidates, (candidate) =>
-                        String.startsWith(".")(candidate) ||
-                        path.isAbsolute(candidate)
-                          ? Option.some(
-                              path.resolve(args.resolveDir, candidate),
-                            )
-                          : Option.none(),
-                      ),
-                    ),
-                  ]);
-                  return {
-                    path: resolved.path,
-                    namespace: COMPONENT_CONFIG_NAMESPACE,
-                    pluginData: {
-                      specifier: args.path,
-                      sourceSpecifier,
-                      resolveDir: args.resolveDir,
-                    },
-                    watchFiles,
-                    watchDirs: Array.dedupe(
-                      Array.map(watchFiles, path.dirname),
-                    ),
-                  };
-                },
-              },
-            ),
-          ),
-        ),
+      return pipe(
+        candidates,
+        Array.map((candidate) => Bundler.resolveModule(candidate, importer)),
+        Option.firstSomeOf,
+        Option.match({
+          onNone: () => undefined,
+          onSome: (resolved) => ({
+            path: resolved,
+            namespace: COMPONENT_CONFIG_NAMESPACE,
+            pluginData: { specifier: args.path },
+          }),
+        }),
       );
     });
 
     build.onLoad(
       { filter: /.*/, namespace: COMPONENT_CONFIG_NAMESPACE },
       (args) => {
-        const { specifier, sourceSpecifier, resolveDir } = args.pluginData as {
-          readonly specifier: string;
-          readonly sourceSpecifier: string;
-          readonly resolveDir: string;
-        };
+        const specifier = (args.pluginData as { specifier: string }).specifier;
         // The injected path is the definition's *directory*, matching the
         // Convex runtime's convention—so even if a future convex version
         // stops reading `defaultName`, `app.use`'s last-resort fallback
@@ -181,10 +134,10 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
         // resolution identical to the Convex runtime's.
         return {
           loader: "js",
-          resolveDir,
+          resolveDir: path.dirname(args.path),
           contents: Array.join(
             [
-              `import real from ${JSON.stringify(sourceSpecifier)};`,
+              `import real from ${JSON.stringify(args.path)};`,
               `export default { ...real, componentDefinitionPath: ${JSON.stringify(componentDefinitionPath)}, defaultName: real._name };`,
             ],
             "\n",
@@ -242,17 +195,10 @@ export const discoverInstalledComponents = Effect.fn(
   const path = yield* Path.Path;
 
   const { module } = yield* Bundler.bundle(convexConfigPath, {
-    profile: "component-config",
     plugins: [componentConfigPlugin(path)],
   }).pipe(Effect.mapError((error) => fromBundlerError(displayPath, error)));
 
-  return yield* parseInstalledComponents(module.default, displayPath);
-});
-
-export const parseInstalledComponents = Effect.fn(
-  "ConvexConfig.parseInstalledComponents",
-)(function* (value: unknown, displayPath: string) {
-  const app = value as
+  const app = module.default as
     | { _isRoot?: unknown; export?: unknown }
     | null
     | undefined;

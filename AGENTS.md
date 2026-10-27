@@ -44,6 +44,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 ## Tools
 
 - `tools/bench-harness` - Private package that hands `@ark/attest` the TypeScript version the type benchmarks need; see its README
+- `tools/local-backend` - Private shared Convex backend harness, fixtures, and Vitest configuration for client and server integration tests; see its README
 
 ## TypeScript
 
@@ -73,7 +74,7 @@ Build, lint, and format run through Vite+ (`vp`), which orders packages by their
 
 ## Testing
 
-Tests use Vitest with a root-level `vitest.config.ts` (which uses `projects: ["packages/*"]` to discover per-package test projects) and shared config in `vitest.shared.ts`. The core, foldkit, js, react, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
+Tests use Vitest with a root-level `vitest.config.ts` (which discovers `packages/*/vitest.config.ts` plus the oxlint-rules test config) and shared config in `vitest.shared.ts`. Coverage settings are shared with the root through `vitest.coverage.ts`; root runs keep coverage opt-in (`--coverage`), while package runs and CI test lanes collect it. Discover only explicit Vitest configs so packages without tests do not load their Vite+ build plugins into the test runner. The core, foldkit, js, react, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
 
 Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.shared.ts` aliases those to each package's `src/` so suites run against source rather than built `dist/`.
 
@@ -86,7 +87,7 @@ Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.s
 
 ### Running tests
 
-Run `pnpm test` to run all suites at once, or target a single package with `vitest run --project @confect/<pkg>` (e.g. `vitest run --project @confect/core`). Run tests with `vitest run`, not `vp test`—the Vite+ test runner mishandles type-only test files. The server's Convex integration suites have dedicated scripts: `pnpm test:server:mock-backend` and `pnpm test:server:local-backend`.
+Run `pnpm test` to run all suites at once, or target a single package with `vitest run --project @confect/<pkg>` (e.g. `vitest run --project @confect/core`). Run tests with `vitest run`, not `vp test`—the Vite+ test runner mishandles type-only test files. Convex integration suites have dedicated scripts: `pnpm test:server:mock-backend`, `pnpm test:server:local-backend`, and `pnpm test:js:local-backend`. The two local-backend suites share `tools/local-backend` and must run sequentially because they use the same ports. Regenerate their shared fixture project with `pnpm codegen:local-backend`.
 
 ## Versioning and Publishing
 

@@ -1,0 +1,276 @@
+/* eslint-disable */
+/**
+ * Generated `api` utility.
+ *
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
+ */
+
+import type { FunctionReference } from "convex/server";
+import type { GenericId as Id } from "convex/values";
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
+export declare const api: {
+  clients: {
+    echoAction: FunctionReference<
+      "action",
+      "public",
+      { failure?: "typed" | "unknown"; value?: string },
+      any
+    >;
+    echoMutation: FunctionReference<
+      "mutation",
+      "public",
+      { failure?: "typed" | "unknown"; value?: string },
+      any
+    >;
+    echoQuery: FunctionReference<
+      "query",
+      "public",
+      { failure?: "typed" | "unknown"; value?: string },
+      any
+    >;
+    read: FunctionReference<"query", "public", { caseId: string }, any>;
+    write: FunctionReference<
+      "mutation",
+      "public",
+      { caseId: string; value: string | null },
+      any
+    >;
+  };
+  groups: {
+    cacheControl: {
+      control: FunctionReference<"query", "public", {}, any>;
+    };
+    cacheStubbed: {
+      confectNoTime: FunctionReference<"query", "public", {}, number>;
+      confectWithClock: FunctionReference<"query", "public", {}, number>;
+      confectWithLog: FunctionReference<"query", "public", {}, number>;
+      confectWithRawDateNow: FunctionReference<"query", "public", {}, number>;
+      confectWithSpan: FunctionReference<"query", "public", {}, number>;
+    };
+    documentIds: {
+      createAndDelete: FunctionReference<
+        "mutation",
+        "public",
+        {},
+        Id<"transactionNotes">
+      >;
+      inspect: FunctionReference<
+        "query",
+        "public",
+        {
+          input: string;
+          table: "transactionNotes" | "_storage" | "_scheduled_functions";
+        },
+        {
+          identified: { id: string; table: string } | null;
+          parsed: string | null;
+        }
+      >;
+      inspectFromMutation: FunctionReference<
+        "mutation",
+        "public",
+        {
+          input: string;
+          table: "transactionNotes" | "_storage" | "_scheduled_functions";
+        },
+        {
+          identified: { id: string; table: string } | null;
+          parsed: string | null;
+        }
+      >;
+      nativeSampleId: FunctionReference<
+        "query",
+        "public",
+        {
+          input: string;
+          table: "transactionNotes" | "_storage" | "_scheduled_functions";
+        },
+        string | null
+      >;
+    };
+    metadata: {
+      actionMetadata: FunctionReference<
+        "action",
+        "public",
+        {},
+        {
+          deploymentName: string;
+          functionName: string;
+          functionType: string;
+          ip: string | null;
+          requestId: string;
+          scheduledFunctionId: string | null;
+        }
+      >;
+      mutationMetadata: FunctionReference<
+        "mutation",
+        "public",
+        {},
+        {
+          deploymentName: string;
+          functionName: string;
+          functionType: string;
+          ip: string | null;
+          remainingWrites: number;
+          requestId: string;
+          scheduledFunctionId: string | null;
+        }
+      >;
+      queryMetadata: FunctionReference<
+        "query",
+        "public",
+        {},
+        {
+          deploymentName: string;
+          functionName: string;
+          functionType: string;
+          remainingReads: number;
+        }
+      >;
+    };
+    orderedQuery: {
+      first: FunctionReference<
+        "query",
+        "public",
+        { caseId: string },
+        number | null
+      >;
+      seed: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; count: number },
+        null
+      >;
+      take: FunctionReference<
+        "query",
+        "public",
+        { caseId: string; n: number },
+        Array<number>
+      >;
+    };
+    scheduling: {
+      manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;
+      manyOpsQuery: FunctionReference<"query", "public", {}, number>;
+    };
+    storage: {
+      deleteBlob: FunctionReference<
+        "mutation",
+        "public",
+        { storageId: Id<"_storage"> },
+        null
+      >;
+      generateUploadUrl: FunctionReference<"mutation", "public", {}, string>;
+      get: FunctionReference<
+        "action",
+        "public",
+        { storageId: Id<"_storage"> },
+        string
+      >;
+      getUrl: FunctionReference<
+        "query",
+        "public",
+        { storageId: Id<"_storage"> },
+        string
+      >;
+      store: FunctionReference<
+        "action",
+        "public",
+        { text: string },
+        Id<"_storage">
+      >;
+    };
+    transactions: {
+      limitedRead: FunctionReference<
+        "query",
+        "public",
+        { caseId: string; limit: number },
+        Array<string>
+      >;
+      limitedReadFromMutation: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; limit: number },
+        Array<string>
+      >;
+      limitedWrite: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; limit: number },
+        null
+      >;
+      rollback: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string },
+        boolean
+      >;
+      seed: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; count: number },
+        null
+      >;
+      staleRead: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; stale: boolean },
+        Array<string>
+      >;
+    };
+  };
+  metadataNode: {
+    metadata: FunctionReference<
+      "action",
+      "public",
+      {},
+      {
+        deploymentName: string;
+        functionName: string;
+        functionType: string;
+        ip: string | null;
+        requestId: string;
+        scheduledFunctionId: string | null;
+      }
+    >;
+  };
+};
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
+export declare const internal: {
+  groups: {
+    transactions: {
+      read: FunctionReference<
+        "query",
+        "internal",
+        { caseId: string },
+        Array<string>
+      >;
+      write: FunctionReference<
+        "mutation",
+        "internal",
+        { caseId: string; fail: boolean; value: string },
+        null
+      >;
+    };
+  };
+};
+
+export declare const components: {};

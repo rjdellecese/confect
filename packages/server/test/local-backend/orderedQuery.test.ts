@@ -12,8 +12,8 @@ import * as Schedule from "effect/Schedule";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
-import refs from "./fixtures/confect/_generated/refs";
-import * as LocalBackend from "./LocalBackend";
+import refs from "confect-local-backend/refs";
+import * as LocalBackend from "confect-local-backend/LocalBackend";
 
 const functions = refs.public.groups.orderedQuery;
 

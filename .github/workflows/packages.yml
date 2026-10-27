@@ -49,17 +49,66 @@ jobs:
       - run: pnpm circular
 
   test:
-    name: Test (${{ matrix.package }}, ${{ matrix.os }})
+    name: Test (unit, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        package: [cli, core, foldkit, js, server]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      - run: cd packages/${{ matrix.package }} && pnpm test
+      - run: pnpm exec vitest run --project @confect/core --project @confect/foldkit --project @confect/js --project @confect/react --project @confect/server --coverage
+
+  test-cli:
+    name: Test (cli, ${{ matrix.os }}, ${{ matrix.shard }}/4)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter @confect/cli test --shard=${{ matrix.shard }}/4 --reporter=default --reporter=blob --reporter=json --outputFile.blob=coverage/blobs/shard-${{ matrix.shard }}.json --outputFile.json=coverage/timings/shard-${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cli-results-${{ matrix.os }}-${{ matrix.shard }}
+          path: |
+            packages/cli/coverage/blobs
+            packages/cli/coverage/timings
+          if-no-files-found: error
+
+  test-cli-report:
+    name: Test (cli reports)
+    needs: test-cli
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/confect-setup
+        with:
+          build: "false"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cli-results-ubuntu-latest-*
+          path: packages/cli/coverage/shards/linux
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cli-results-windows-latest-*
+          path: packages/cli/coverage/shards/windows
+          merge-multiple: true
+      - name: Merge Linux results and coverage
+        run: pnpm --filter @confect/cli exec vitest run --mergeReports coverage/shards/linux/blobs --coverage.reportsDirectory=coverage/merged/linux --reporter=default --reporter=json --outputFile.json=coverage/merged/linux/results.json
+      - name: Merge Windows results and coverage
+        run: pnpm --filter @confect/cli exec vitest run --mergeReports coverage/shards/windows/blobs --coverage.reportsDirectory=coverage/merged/windows --coverage.reporter=json --reporter=default --reporter=json --outputFile.json=coverage/merged/windows/results.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cli-coverage
+          path: packages/cli/coverage/merged
+          if-no-files-found: error
 
   test-oxlint-rules:
     name: Test (oxlint-rules)
@@ -79,7 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter @confect/server test:mock-backend
+      - run: pnpm test:server:mock-backend
 
   test-local-backend:
     name: Test (local-backend)
@@ -94,10 +143,11 @@ jobs:
           key: convex-local-backend-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             convex-local-backend-${{ runner.os }}-
-      - run: pnpm --filter @confect/server test:local-backend
+      - run: pnpm test:server:local-backend
+      - run: pnpm test:js:local-backend
 
   codegen-fixtures:
-    name: Codegen (server fixtures)
+    name: Codegen (fixtures)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -110,10 +160,13 @@ jobs:
           restore-keys: |
             convex-local-backend-${{ runner.os }}-
       - run: pnpm codegen:server:mock-backend
-      - run: pnpm codegen:server:local-backend
+      - run: pnpm codegen:local-backend
       - uses: ./.github/actions/verify-codegen-committed
         with:
-          path: packages/server/test
+          path: packages/server/test/mock-backend/fixtures
+      - uses: ./.github/actions/verify-codegen-committed
+        with:
+          path: tools/local-backend/fixtures
 
   bench:
     name: Bench
@@ -156,23 +209,12 @@ jobs:
           if-no-files-found: error
 
   build:
-    name: Build (${{ matrix.package }}, ${{ matrix.os }})
+    name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        package:
-          [
-            "@confect/cli",
-            "@confect/core",
-            "@confect/foldkit",
-            "@confect/js",
-            "@confect/server",
-            "@confect/react",
-            "@confect/test",
-          ]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      - run: pnpm exec vp run --filter ${{ matrix.package }} build

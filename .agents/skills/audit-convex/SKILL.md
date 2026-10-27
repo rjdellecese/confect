@@ -100,9 +100,12 @@ Treat `0.x` minor releases as potentially breaking. Defer ecosystem majors and
 non-mechanical migrations with a concrete assessment.
 
 For applied changes, run `pnpm check`, `pnpm test`, `pnpm build`,
-`pnpm test:server:mock-backend`, and `pnpm test:server:local-backend`. Regenerate
-both server codegen fixtures when Convex or CLI behavior changes, including new
-untracked output. Verify affected features explicitly; green existing tests
+`pnpm test:server:mock-backend`, `pnpm test:server:local-backend`, and
+`pnpm test:js:local-backend`. Run the two local-backend suites sequentially
+because they share ports. When Convex or CLI behavior changes, regenerate the
+server's mock-backend fixtures and the shared local-backend fixtures with
+`pnpm codegen:server:mock-backend` and `pnpm codegen:local-backend`, including
+new untracked output. Verify affected features explicitly; green existing tests
 alone are not feature-parity evidence. Follow through on the PR's CI, including
 packed-consumer checks. Never claim unrun checks passed. If an upgrade fails
 verification, remove it from the deliverable and retain the blocker in the

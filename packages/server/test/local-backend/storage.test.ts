@@ -15,8 +15,8 @@ import * as Schema from "effect/Schema";
 import * as HttpBody from "effect/http/HttpBody";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
-import refs from "./fixtures/confect/_generated/refs";
-import * as LocalBackend from "./LocalBackend";
+import refs from "confect-local-backend/refs";
+import * as LocalBackend from "confect-local-backend/LocalBackend";
 
 const UploadResponse = Schema.fromJsonString(
   Schema.Struct({ storageId: Schema.String }),
