@@ -47,7 +47,6 @@ import * as Scheduler from "./Scheduler";
 import * as Storage from "./Storage";
 import type { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
-import { toConvexDefinition } from "./internal/convexDefinition";
 
 export type Definition = Data.TaggedEnum<{
   PublicQuery: ReturnType<typeof queryFunction>;
@@ -128,16 +127,20 @@ export const make = (
 
 export const register = (self: Definition): RegisteredFunction.Any =>
   Definition.$match(self, {
-    PublicQuery: (definition) => queryGeneric(toConvexDefinition(definition)),
+    PublicQuery: (definition) =>
+      queryGeneric(RegisteredFunction.toConvexDefinition(definition)),
     InternalQuery: (definition) =>
-      internalQueryGeneric(toConvexDefinition(definition)),
+      internalQueryGeneric(RegisteredFunction.toConvexDefinition(definition)),
     PublicMutation: (definition) =>
-      mutationGeneric(toConvexDefinition(definition)),
+      mutationGeneric(RegisteredFunction.toConvexDefinition(definition)),
     InternalMutation: (definition) =>
-      internalMutationGeneric(toConvexDefinition(definition)),
-    PublicAction: (definition) => actionGeneric(toConvexDefinition(definition)),
+      internalMutationGeneric(
+        RegisteredFunction.toConvexDefinition(definition),
+      ),
+    PublicAction: (definition) =>
+      actionGeneric(RegisteredFunction.toConvexDefinition(definition)),
     InternalAction: (definition) =>
-      internalActionGeneric(toConvexDefinition(definition)),
+      internalActionGeneric(RegisteredFunction.toConvexDefinition(definition)),
     Registered: ({ handler }) => handler,
   });
 
