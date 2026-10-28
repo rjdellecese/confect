@@ -1,4 +1,4 @@
-import { Table } from "@confect/core";
+import { GenericId as ConfectGenericId, Table } from "@confect/core";
 import type * as DataModel from "@confect/server/DataModel";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as DatabaseWriter from "@confect/server/DatabaseWriter";
@@ -89,6 +89,8 @@ const notes = Table.make(() =>
       ]),
     ),
     outline: Schema.optionalKey(Tree),
+    // An Id is a string refined by a check that passes every value.
+    parent: Schema.optionalKey(ConfectGenericId.GenericId("notes")),
   }),
 )("notes");
 
@@ -269,6 +271,7 @@ describe("DatabaseWriter.patch", () => {
         outline: { name: "root", children: [{ name: "leaf", children: [] }] },
       },
     },
+    { fields: "an Id", patch: { parent: noteId } },
     {
       fields: "several",
       patch: { text: "Final", tag: undefined, status: "draft" },
