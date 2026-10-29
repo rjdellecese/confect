@@ -127,12 +127,20 @@ export const make = (
 
 export const register = (self: Definition): RegisteredFunction.Any =>
   Definition.$match(self, {
-    PublicQuery: (definition) => queryGeneric(definition),
-    InternalQuery: (definition) => internalQueryGeneric(definition),
-    PublicMutation: (definition) => mutationGeneric(definition),
-    InternalMutation: (definition) => internalMutationGeneric(definition),
-    PublicAction: (definition) => actionGeneric(definition),
-    InternalAction: (definition) => internalActionGeneric(definition),
+    PublicQuery: (definition) =>
+      queryGeneric(RegisteredFunction.toConvexDefinition(definition)),
+    InternalQuery: (definition) =>
+      internalQueryGeneric(RegisteredFunction.toConvexDefinition(definition)),
+    PublicMutation: (definition) =>
+      mutationGeneric(RegisteredFunction.toConvexDefinition(definition)),
+    InternalMutation: (definition) =>
+      internalMutationGeneric(
+        RegisteredFunction.toConvexDefinition(definition),
+      ),
+    PublicAction: (definition) =>
+      actionGeneric(RegisteredFunction.toConvexDefinition(definition)),
+    InternalAction: (definition) =>
+      internalActionGeneric(RegisteredFunction.toConvexDefinition(definition)),
     Registered: ({ handler }) => handler,
   });
 
@@ -202,8 +210,8 @@ const queryFunction = <
   ) => Effect.Effect<Returns, E, Handler.QueryServices<DatabaseSchema_>>;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
-  args: compileArgsSchema(args, databaseSchema.target.scope),
-  returns: compileReturnsSchema(returns, databaseSchema.target.scope),
+  args: () => compileArgsSchema(args, databaseSchema.target.scope),
+  returns: () => compileReturnsSchema(returns, databaseSchema.target.scope),
   handler: (
     ctx: GenericQueryCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
@@ -333,8 +341,8 @@ const mutationFunction = <
   ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
-  args: compileArgsSchema(args, databaseSchema.target.scope),
-  returns: compileReturnsSchema(returns, databaseSchema.target.scope),
+  args: () => compileArgsSchema(args, databaseSchema.target.scope),
+  returns: () => compileReturnsSchema(returns, databaseSchema.target.scope),
   handler: (
     ctx: GenericMutationCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>

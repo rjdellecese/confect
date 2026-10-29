@@ -1,6 +1,7 @@
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { FunctionSpec } from "@confect/core";
+import * as SchemaToValidator from "@confect/core/SchemaToValidator";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
 import { RegisteredNodeFunction } from "@confect/server/node";
@@ -46,6 +47,47 @@ import {
 } from "./fixtures/confect/groups/typedErrors.spec";
 import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
+
+describe("Generated function registration", () => {
+  it.effect("defers validators across generated handler forwarding", () =>
+    Effect.gen(function* () {
+      const compileArgs = vi.spyOn(SchemaToValidator, "compileArgsSchema");
+      const compileReturns = vi.spyOn(
+        SchemaToValidator,
+        "compileReturnsSchema",
+      );
+      try {
+        yield* Effect.promise(() => import("./fixtures/convex/groups/notes"));
+        expect(compileArgs).not.toHaveBeenCalled();
+        expect(compileReturns).not.toHaveBeenCalled();
+
+        const backend = convexTest(
+          convexSchema,
+          import.meta.glob([
+            "./fixtures/convex/**/*.ts",
+            "./fixtures/convex/**/*.js",
+            "!./fixtures/convex/**/*.*.*",
+          ]),
+        );
+        const list = makeFunctionReference<"query">("groups/notes:list");
+        expect(yield* Effect.promise(() => backend.query(list, {}))).toEqual(
+          [],
+        );
+        expect(compileArgs).toHaveBeenCalledOnce();
+        expect(compileReturns).toHaveBeenCalledOnce();
+
+        expect(yield* Effect.promise(() => backend.query(list, {}))).toEqual(
+          [],
+        );
+        expect(compileArgs).toHaveBeenCalledOnce();
+        expect(compileReturns).toHaveBeenCalledOnce();
+      } finally {
+        compileArgs.mockRestore();
+        compileReturns.mockRestore();
+      }
+    }),
+  );
+});
 
 describe("DocumentIds", () => {
   const cases = [
