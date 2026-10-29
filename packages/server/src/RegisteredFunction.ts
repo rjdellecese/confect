@@ -1,5 +1,6 @@
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
+import * as Lazy from "@confect/core/Lazy";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import {
   compileArgsSchema,
@@ -14,7 +15,7 @@ import {
   type RegisteredMutation,
   type RegisteredQuery,
 } from "convex/server";
-import type { Value } from "convex/values";
+import type { PropertyValidators, Validator, Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Console from "effect/Console";
@@ -127,6 +128,21 @@ export type RegisteredFunction<
         >
       ? ConfectRegisteredFunction<FunctionSpec_>
       : never;
+
+export const toConvexDefinition = <
+  Args extends PropertyValidators,
+  Returns extends Validator<any, any, any>,
+  Handler,
+>(prepared: {
+  readonly args: () => Args;
+  readonly returns: () => Returns;
+  readonly handler: Handler;
+}): { args: Args; returns: Returns; handler: Handler } => {
+  const definition = { handler: prepared.handler };
+  Lazy.defineProperty(definition, "args", prepared.args);
+  Lazy.defineProperty(definition, "returns", prepared.returns);
+  return definition as { args: Args; returns: Returns; handler: Handler };
+};
 
 /**
  * Wrap a function's handler effect in its resolved middleware chain, per
@@ -282,8 +298,8 @@ export const actionFunctionBase = <
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
   ) => Layer.Layer<R>;
 }) => ({
-  args: compileArgsSchema(args),
-  returns: compileReturnsSchema(returns),
+  args: () => compileArgsSchema(args),
+  returns: () => compileReturnsSchema(returns),
   handler: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexArgs,
