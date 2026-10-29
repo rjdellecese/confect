@@ -10,8 +10,8 @@
     "convex": "1.46.0",
     "convex-helpers": "0.1.128",
     "effect": "4.0.4",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "vite": "8.3.4"
   },
   "devDependencies": {
