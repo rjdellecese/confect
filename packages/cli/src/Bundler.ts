@@ -51,15 +51,18 @@ const absolutizeMetafile = (
   path: Path.Path,
   metafile: esbuild.Metafile,
   cwd: string,
+  inputPaths: ReadonlyMap<string, string>,
 ): esbuild.Metafile => {
   const absolutize = (p: string) => path.resolve(cwd, p);
+  const inputPath = (p: string) =>
+    inputPaths.get(absolutize(p)) ?? absolutize(p);
   const inputs = Record.mapEntries(metafile.inputs, (value, key) => [
-    absolutize(key),
+    inputPath(key),
     {
       ...value,
       imports: Array.map(value.imports, (i) => ({
         ...i,
-        path: absolutize(i.path),
+        path: inputPath(i.path),
         original: i.original ?? i.path,
       })),
     },
@@ -68,8 +71,8 @@ const absolutizeMetafile = (
     absolutize(key),
     {
       ...value,
-      ...(value.entryPoint ? { entryPoint: absolutize(value.entryPoint) } : {}),
-      inputs: Record.mapKeys(value.inputs, absolutize),
+      ...(value.entryPoint ? { entryPoint: inputPath(value.entryPoint) } : {}),
+      inputs: Record.mapKeys(value.inputs, inputPath),
       imports: Array.map(value.imports, (imported) =>
         imported.external
           ? imported
@@ -79,6 +82,23 @@ const absolutizeMetafile = (
   ]);
   return { inputs, outputs };
 };
+
+const canonicalInputPaths = Effect.fnUntraced(function* (
+  path: Path.Path,
+  fs: FileSystem.FileSystem,
+  metafile: esbuild.Metafile,
+  cwd: string,
+) {
+  return new Map(
+    yield* Effect.forEach(Object.keys(metafile.inputs), (input) => {
+      const absolute = path.resolve(cwd, input);
+      return fs.realPath(absolute).pipe(
+        Effect.orElseSucceed(() => absolute),
+        Effect.map((real) => [absolute, real] as const),
+      );
+    }),
+  );
+});
 
 const resolveEsm = Option.liftThrowable((specifier: string, importer: string) =>
   resolveModulePath(specifier, {
@@ -182,6 +202,7 @@ interface BatchCompilation {
     { readonly source: string; readonly output: string }
   >;
   readonly metafile: esbuild.Metafile;
+  readonly inputPaths: ReadonlyMap<string, string>;
   readonly warnings: ReadonlyArray<esbuild.Message>;
   readonly cwd: string;
 }
@@ -434,6 +455,12 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
     fs.writeFile(output.path, output.contents),
   );
   const capturedExternalImports = yield* Ref.get(externalImports);
+  const canonicalPaths = yield* canonicalInputPaths(
+    path,
+    fs,
+    result.metafile,
+    cwd,
+  );
   const inputs = Object.fromEntries(
     Object.entries(result.metafile.inputs).map(([input, metadata]) => {
       const originals = Option.getOrElse(
@@ -462,7 +489,13 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   );
   return {
     entries: HashMap.fromIterable(artifacts),
-    metafile: absolutizeMetafile(path, { ...result.metafile, inputs }, cwd),
+    metafile: absolutizeMetafile(
+      path,
+      { ...result.metafile, inputs },
+      cwd,
+      canonicalPaths,
+    ),
+    inputPaths: canonicalPaths,
     warnings: result.warnings,
     cwd,
   } satisfies BatchCompilation;
@@ -669,7 +702,13 @@ const bundleWith = Effect.fnUntraced(function* (
                 (warning) =>
                   warning.location &&
                   metafile.inputs[
-                    path.resolve(compilation.value.cwd, warning.location.file)
+                    compilation.value.inputPaths.get(
+                      path.resolve(
+                        compilation.value.cwd,
+                        warning.location.file,
+                      ),
+                    ) ??
+                      path.resolve(compilation.value.cwd, warning.location.file)
                   ],
               ),
             ),
@@ -738,7 +777,12 @@ const bundleWith = Effect.fnUntraced(function* (
 
   return {
     module: result.mod,
-    metafile: absolutizeMetafile(path, metafile, cwd),
+    metafile: absolutizeMetafile(
+      path,
+      metafile,
+      cwd,
+      yield* canonicalInputPaths(path, fs, metafile, cwd),
+    ),
   };
 });
 
