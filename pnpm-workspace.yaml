@@ -19,7 +19,7 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - effect-oxlint@0.3.4
   - eslint-plugin-jsdoc@64.3.10
-  - foldkit@0.165.0
+  - foldkit@0.170.0
   - "@effect/ai-openai-compat@4.1.0"
   - "@effect/ai-openrouter@4.1.0"
   - "@effect/platform-node-shared@4.1.0"
