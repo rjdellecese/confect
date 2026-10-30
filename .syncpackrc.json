@@ -67,6 +67,13 @@
       "dependencyTypes": ["dev"]
     },
     {
+      "label": "CLI and server unstable Effect APIs are supported within one minor release",
+      "packages": ["@confect/cli", "@confect/server"],
+      "dependencies": ["effect", "@effect/platform-node"],
+      "dependencyTypes": ["prod", "peer"],
+      "pinVersion": "~4.1.0"
+    },
+    {
       "label": "External dependencies shared across @confect/* packages must use the same range in prod/peer",
       "packages": ["@confect/*"],
       "dependencies": [

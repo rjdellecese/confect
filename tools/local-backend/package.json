@@ -3,11 +3,11 @@
   "description": "Shared local Convex backend harness for integration tests.",
   "version": "0.0.0",
   "devDependencies": {
-    "@effect/platform-node": "4.0.4",
+    "@effect/platform-node": "4.1.0",
     "@types/node": "26.6.5",
     "convex": "1.46.0",
     "cross-env": "10.1.0",
-    "effect": "4.0.4",
+    "effect": "4.1.0",
     "typescript": "7.0.2",
     "vitest": "5.0.3"
   },

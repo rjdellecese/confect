@@ -90,17 +90,30 @@ test("both advertised profiles include the whole backend and CLI graph", () => {
 
 test("the coherent baseline selects both moving Node companions; fresh resolution does not", () => {
   expect(consumerDependencies("react", "baseline")).toMatchObject({
-    effect: "4.0.4",
-    "@effect/platform-node": "4.0.4",
-    "@effect/platform-node-shared": "4.0.4",
+    effect: "4.1.0",
+    "@effect/platform-node": "4.1.0",
+    "@effect/platform-node-shared": "4.1.0",
   });
   expect(consumerDependencies("react", "fresh")).toMatchObject({
-    effect: "^4.0.4",
-    "@effect/platform-node": "^4.0.4",
+    effect: "~4.1.0",
+    "@effect/platform-node": "~4.1.0",
   });
   expect(consumerDependencies("react", "fresh")).not.toHaveProperty(
     "@effect/platform-node-shared",
   );
+});
+
+test.each([
+  ["4.0.7", false],
+  ["4.1.0", true],
+  ["4.1.1", true],
+  ["4.2.0", false],
+] as const)("fresh Effect ranges admit %s: %s", (version, supported) => {
+  const dependencies = consumerDependencies("react", "fresh");
+  expect(Bun.semver.satisfies(version, dependencies.effect)).toBe(supported);
+  expect(
+    Bun.semver.satisfies(version, dependencies["@effect/platform-node"]),
+  ).toBe(supported);
 });
 
 test.each(["4.0.0", "4.0.1", "4.0.3"])(

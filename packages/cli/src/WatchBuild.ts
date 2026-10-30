@@ -1,6 +1,6 @@
 import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
-import type * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
@@ -11,7 +11,6 @@ import * as Match from "effect/Match";
 import * as Hex from "effect/encoding/Hex";
 import * as Option from "effect/Option";
 import type { PlatformError } from "effect/PlatformError";
-import * as Result from "effect/Result";
 import type * as esbuild from "esbuild";
 import * as WatchGraph from "./WatchGraph";
 
@@ -20,7 +19,6 @@ export type Failure = Data.TaggedEnum<{
     readonly errors: Array.NonEmptyReadonlyArray<esbuild.Message>;
   };
   InputCaptureFailed: { readonly file: string; readonly cause: PlatformError };
-  OutputCaptureFailed: { readonly file: string; readonly cause: PlatformError };
   InvalidBuildResult: { readonly missing: "metafile" | "outputFiles" };
 }>;
 export const Failure = Data.taggedEnum<Failure>();
@@ -205,14 +203,14 @@ export const isFresh = (barrier: Barrier, completion: Completion): boolean =>
 export const verifyInputs = Effect.fn("WatchBuild.verifyInputs")(function* (
   snapshot: Snapshot,
   fs: FileSystem.FileSystem,
-  crypto: Crypto.Crypto,
+  digest: Digest.Digest["Service"],
 ) {
   const matches = yield* Effect.forEach(
     snapshot.fingerprints,
     ([file, expected]) =>
       fs.readFile(file).pipe(
-        Effect.flatMap((contents) => crypto.digest("SHA-256", contents)),
-        Effect.map((digest) => Hex.encode(digest) === expected),
+        Effect.flatMap((contents) => digest.digest(Digest.sha256, contents)),
+        Effect.map((hash) => Hex.encode(hash) === expected),
         Effect.mapError((cause) => Failure.InputCaptureFailed({ file, cause })),
       ),
     { concurrency: 8 },
@@ -355,7 +353,7 @@ export const parse = Effect.fn("WatchBuild.parse")(function* (
   result: esbuild.BuildResult,
   capture: Capture,
   resolve: (file: string) => string,
-  crypto: Crypto.Crypto,
+  digest: Digest.Digest["Service"],
 ) {
   const failures = Array.fromIterable(HashMap.values(capture.failures));
   if (Array.isReadonlyArrayNonEmpty(result.errors))
@@ -379,24 +377,13 @@ export const parse = Effect.fn("WatchBuild.parse")(function* (
       warnings: result.warnings,
     });
   const hashes = yield* Effect.forEach(result.outputFiles, (file) =>
-    crypto.digest("SHA-256", file.contents).pipe(
-      Effect.map(Hex.encode),
-      Effect.mapError((cause) =>
-        Failure.OutputCaptureFailed({ file: file.path, cause }),
-      ),
-    ),
-  ).pipe(Effect.result);
-  if (Result.isFailure(hashes))
-    return Outcome.Failed({
-      fingerprints: capture.fingerprints,
-      failures: [hashes.failure],
-      warnings: result.warnings,
-    });
+    digest.digest(Digest.sha256, file.contents).pipe(Effect.map(Hex.encode)),
+  );
   return Outcome.Succeeded({
     snapshot: {
       fingerprints: capture.fingerprints,
       graph: WatchGraph.make(result.metafile, resolve),
-      outputHash: hashes.success.join(":"),
+      outputHash: hashes.join(":"),
     },
     warnings: result.warnings,
   });
@@ -407,8 +394,6 @@ export const failureMessage = (failure: Failure): string =>
     BuildFailed: ({ errors }) => errors.map((error) => error.text).join("\n"),
     InputCaptureFailed: ({ file, cause }) =>
       `Could not fingerprint input ${file}: ${cause.message}`,
-    OutputCaptureFailed: ({ file, cause }) =>
-      `Could not fingerprint output ${file}: ${cause.message}`,
     InvalidBuildResult: ({ missing }) => `esbuild completed without ${missing}`,
   });
 
@@ -421,7 +406,6 @@ export const messages = (outcome: Outcome): ReadonlyArray<esbuild.Message> =>
           Match.tag("BuildFailed", ({ errors }) => errors),
           Match.tag(
             "InputCaptureFailed",
-            "OutputCaptureFailed",
             "InvalidBuildResult",
             (captureFailure) => [
               {

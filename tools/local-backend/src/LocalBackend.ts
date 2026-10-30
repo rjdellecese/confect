@@ -64,14 +64,7 @@ const make = Effect.gen(function* () {
   const fixturesDir = path.resolve(import.meta.dirname, "../fixtures");
 
   const command = ChildProcess.make(
-    "pnpm",
-    [
-      "convex",
-      "dev",
-      "--typecheck=disable",
-      "--codegen=disable",
-      "--tail-logs=disable",
-    ],
+    "pnpm convex dev --typecheck=disable --codegen=disable --tail-logs=disable",
     {
       cwd: fixturesDir,
       // `pnpm` is a `.cmd` shim on Windows, which `spawn` cannot execute
