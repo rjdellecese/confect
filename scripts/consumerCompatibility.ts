@@ -24,14 +24,11 @@ export const profiles = {
     packages: ["core", "server", "cli", "react"],
     hosts: { react: "^19.0.0" },
     baseline: { react: "19.3.0" },
-    blocker: null,
   },
   foldkit: {
     packages: ["core", "server", "cli", "js", "foldkit"],
-    hosts: { foldkit: "^0.165.0", "@effect/platform-browser": "4.0.0" },
-    baseline: { foldkit: "0.165.0", "@effect/platform-browser": "4.0.0" },
-    blocker:
-      "The advertised full app requires both Foldkit's Effect 4.0.0 and server/CLI's Effect ~4.1.0. Restore compatibility or explicitly revise the support claim before release acceptance.",
+    hosts: { foldkit: "^0.170.0", "@effect/platform-browser": "~4.1.0" },
+    baseline: { foldkit: "0.170.0", "@effect/platform-browser": "4.1.0" },
   },
 } as const;
 export type Profile = keyof typeof profiles;

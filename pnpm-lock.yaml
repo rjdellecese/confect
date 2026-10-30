@@ -439,6 +439,9 @@ importers:
         specifier: workspace:^
         version: link:../js
     devDependencies:
+      '@effect/platform-browser':
+        specifier: 4.1.0
+        version: 4.1.0(effect@4.1.0)
       '@effect/vitest':
         specifier: 4.1.0
         version: 4.1.0(effect@4.1.0)(vitest@5.0.3)
@@ -455,8 +458,8 @@ importers:
         specifier: 4.1.0
         version: 4.1.0
       foldkit:
-        specifier: 0.165.0
-        version: 0.165.0(@effect/platform-browser@4.0.0(effect@4.1.0))(effect@4.1.0)
+        specifier: 0.170.0
+        version: 0.170.0(@effect/platform-browser@4.1.0(effect@4.1.0))(effect@4.1.0)
       tsdown:
         specifier: 0.23.1
         version: 0.23.1(tsx@4.23.15)(typescript@7.0.2)(unrun@0.3.1)
@@ -1027,8 +1030,8 @@ packages:
     peerDependencies:
       effect: 4.1.0
 
-  '@effect/platform-browser@4.0.0':
-    resolution: {integrity: sha512-OHo7EPpF3RVPiI+mjoU9yd05LdCdKPjzDXqs5wRgF9CsdVvwN76B0zgt54DxPUcvMYri1tVJOtLCVnK0tRkNQQ==}
+  '@effect/platform-browser@4.1.0':
+    resolution: {integrity: sha512-IEyaPzejKozHDupOUSjQIgQYGv2C0I828up8z7/nvQTHzmQHUS2/tGMEwXX/FwAvnrWZ0H9MhlhTl18ZgCHQiQ==}
     peerDependencies:
       effect: 4.1.0
 
@@ -4918,11 +4921,11 @@ packages:
   flatted@3.4.4:
     resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
 
-  foldkit@0.165.0:
-    resolution: {integrity: sha512-ue0DVJvRtb6PnF4SbW/qWJIEuseXxaPHEiQX1iiG1Nk2n5BUMD0KYjsm741HsboAJlJPojzSvyG9HXwzpVUQmw==}
+  foldkit@0.170.0:
+    resolution: {integrity: sha512-H/MRQe/IZ/LqpgPi+Zy1S1OXQ8o12e2S/6U+phQu3WmoHSm7Vase/dEnOvrq9YZfqxK44/oVq6wE9oqXzEIaig==}
     engines: {node: '>=20.19.0'}
     peerDependencies:
-      '@effect/platform-browser': 4.0.0
+      '@effect/platform-browser': ~4.1.0
       effect: 4.1.0
 
   follow-redirects@1.16.0:
@@ -8351,7 +8354,7 @@ snapshots:
     dependencies:
       effect: 4.1.0
 
-  '@effect/platform-browser@4.0.0(effect@4.1.0)':
+  '@effect/platform-browser@4.1.0(effect@4.1.0)':
     dependencies:
       effect: 4.1.0
 
@@ -12053,9 +12056,9 @@ snapshots:
 
   flatted@3.4.4: {}
 
-  foldkit@0.165.0(@effect/platform-browser@4.0.0(effect@4.1.0))(effect@4.1.0):
+  foldkit@0.170.0(@effect/platform-browser@4.1.0(effect@4.1.0))(effect@4.1.0):
     dependencies:
-      '@effect/platform-browser': 4.0.0(effect@4.1.0)
+      '@effect/platform-browser': 4.1.0(effect@4.1.0)
       effect: 4.1.0
       parse5: 8.0.1
 
