@@ -1,5 +1,11 @@
 # @confect/foldkit
 
+## 10.5.0
+
+### Minor Changes
+
+- 546aa71: Support Foldkit 0.170.x with Effect 4.1.x. Upgrade `foldkit` to `^0.170.0`, and both `effect` and `@effect/platform-browser` to `~4.1.0`; patch releases are accepted, while new minor releases require a verified adapter upgrade.
+
 ## 10.4.1
 
 No changes in this release.
