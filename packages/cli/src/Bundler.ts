@@ -90,7 +90,7 @@ const canonicalInputPaths = Effect.fnUntraced(function* (
   cwd: string,
 ) {
   return new Map(
-    yield* Effect.forEach(Object.keys(metafile.inputs), (input) => {
+    yield* Effect.forEach(Record.keys(metafile.inputs), (input) => {
       const absolute = path.resolve(cwd, input);
       return fs.realPath(absolute).pipe(
         Effect.orElseSucceed(() => absolute),
