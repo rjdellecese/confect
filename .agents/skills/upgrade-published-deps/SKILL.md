@@ -58,6 +58,12 @@ bumping, confirm the new versions actually resolved (e.g. `pnpm why <dep>`).
   Keep existing exact runtime pins, such as the server's AI dependencies, and keep
   `devDependencies` exactly pinned. Do not normalize these different roles
   into one version policy during a routine upgrade.
+- Keep the Foldkit adapter's peers on a verified pair: a pre-1.0 Foldkit minor
+  (`^0.170.0` admits only 0.170.x) and an Effect minor (`~4.1.0`). Align the
+  browser platform with Foldkit's published peer requirement. Update the
+  adapter's Syncpack rules, exact development pins, documentation, and both
+  packed-consumer lanes together; do not use workspace overrides to claim
+  compatibility with a new Foldkit or Effect minor.
 - Read the **published metadata for each selected dependency version**,
   including its `peerDependencies` (for example,
   `pnpm view @effect/platform-node@4.0.1 peerDependencies --json`). Account for
