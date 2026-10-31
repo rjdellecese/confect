@@ -1,5 +1,15 @@
 # @confect/server
 
+## 10.5.0
+
+### Minor Changes
+
+- 3ff40bb: Update the AI gateway integrations for Effect 4.1. Upgrade `effect` to `~4.1.0` alongside `@confect/server`, and use `@effect/platform-node` `~4.1.0` for Node actions. Both peer ranges now admit only 4.1.x releases because the integrations use APIs that may break between minor versions.
+
+### Patch Changes
+
+- 86c88fb: Reduce function startup work by compiling Convex argument and return validators only when they are requested for deployment analysis or backend tests.
+
 ## 10.4.1
 
 No changes in this release.
