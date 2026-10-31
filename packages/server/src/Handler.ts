@@ -21,10 +21,10 @@ import type * as QueryRunner from "./QueryRunner";
 import type { QueryTransactionContext } from "./QueryTransactionContext";
 import type * as RegisteredFunction from "./RegisteredFunction";
 import type * as Scheduler from "./Scheduler";
-import type { Storage } from "./Storage";
-import type { StorageActionWriter } from "./StorageActionWriter";
-import type { StorageReader } from "./StorageReader";
-import type { StorageWriter } from "./StorageWriter";
+import type * as Storage from "./Storage";
+import type * as StorageActionWriter from "./StorageActionWriter";
+import type * as StorageReader from "./StorageReader";
+import type * as StorageWriter from "./StorageWriter";
 import type * as VectorSearch from "./VectorSearch";
 
 export type Handler<
@@ -79,15 +79,16 @@ export type QueryServices<
 > =
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | DocumentIds.DocumentIds<DatabaseSchema_>
-  | Auth.Auth
+  | (DatabaseSchema_["target"]["kind"] extends "component" ? never : Auth.Auth)
   | ExecutionMetadata
-  | TransactionMetadata
-  | Storage
-  | StorageReader
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | QueryRunner.QueryRunner
   | QueryTransactionContext
+  | TransactionMetadata
   | QueryCtx.QueryCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>,
+      DatabaseSchema.Scope<DatabaseSchema_>
     >;
 
 export type MutationServices<
@@ -96,20 +97,21 @@ export type MutationServices<
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | DatabaseWriter.DatabaseWriter<DatabaseSchema_>
   | DocumentIds.DocumentIds<DatabaseSchema_>
-  | Auth.Auth
+  | (DatabaseSchema_["target"]["kind"] extends "component" ? never : Auth.Auth)
+  | Scheduler.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | ExecutionMetadata
-  | RequestMetadata
-  | TransactionMetadata
-  | Scheduler.Scheduler
-  | Storage
-  | StorageReader
-  | StorageWriter
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | QueryTransactionContext
   | MutationTransactionContext
+  | RequestMetadata
+  | TransactionMetadata
   | MutationCtx.MutationCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>,
+      DatabaseSchema.Scope<DatabaseSchema_>
     >;
 
 /**
@@ -118,20 +120,21 @@ export type MutationServices<
 export type ActionServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
-  | Scheduler.Scheduler
-  | Auth.Auth
+  | Scheduler.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | (DatabaseSchema_["target"]["kind"] extends "component" ? never : Auth.Auth)
   | ExecutionMetadata
-  | RequestMetadata
-  | Storage
-  | StorageReader
-  | StorageWriter
-  | StorageActionWriter
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageActionWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
+  | RequestMetadata
   | VectorSearch.VectorSearch<DataModel.FromSchema<DatabaseSchema_>>
   | ActionCtx.ActionCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>,
+      DatabaseSchema.Scope<DatabaseSchema_>
     >;
 
 export type ConfectProvenanceQuery<

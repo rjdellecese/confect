@@ -18,6 +18,7 @@ import * as Ansi from "../Ansi";
 import * as SyncState from "../SyncState";
 import type { OptionalFile } from "../EntryPoint";
 import * as Watcher from "../Watcher";
+import * as DirectoryOptions from "../DirectoryOptions";
 import * as Evaluation from "../Evaluation";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
@@ -119,7 +120,7 @@ const logFunctionPathDiff = Effect.fnUntraced(function* (
   );
 });
 
-export const dev = Command.make("dev", {}, () =>
+export const dev = Command.make("dev", DirectoryOptions.flags, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
     const previousFunctionPaths = yield* Evaluation.loadPreviousFunctionPaths;
@@ -130,7 +131,10 @@ export const dev = Command.make("dev", {}, () =>
       concurrency: "unbounded",
     });
   }),
-).pipe(Command.withDescription("Start the Confect development server"));
+).pipe(
+  Command.provide(DirectoryOptions.layer),
+  Command.withDescription("Start the Confect development server"),
+);
 
 const esbuildMessageKey = (m: esbuild.Message): string =>
   `${m.location?.file ?? ""}:${m.location?.line ?? ""}:${m.location?.column ?? ""}:${m.text}`;
@@ -180,6 +184,7 @@ const syncLoop = Effect.fnUntraced(function* (
   initialFunctionPaths: FunctionPaths.FunctionPaths,
   watcher: Watcher.Watcher,
 ) {
+  const target = yield* ConvexDirectory.target;
   const functionPathsRef = yield* Ref.make(initialFunctionPaths);
   const lastLoggedErrorsRef = yield* Ref.make<string>("");
   const lastLoggedWarningsRef = yield* Ref.make<string>("");
@@ -204,7 +209,11 @@ const syncLoop = Effect.fnUntraced(function* (
   return yield* Effect.forever(
     Effect.gen(function* () {
       yield* Effect.logDebug("Running sync loop…");
-      const pending = yield* watcher.next;
+      const queued = yield* watcher.next;
+      const pending =
+        target.kind === "component" && HashSet.has(queued.optional, "Auth")
+          ? SyncState.full(queued)
+          : queued;
 
       const phase = yield* Ref.get(phaseRef);
       const firstSync = SyncState.Phase.$is("Bootstrapping")(phase);

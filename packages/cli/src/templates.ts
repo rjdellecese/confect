@@ -1,3 +1,5 @@
+import type * as IdScope from "@confect/core/IdScope";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import { CodeBlockWriter } from "./CodeBlockWriter";
@@ -56,13 +58,16 @@ interface TableModuleBinding {
  */
 export const runtimeSchema = ({
   tableModules,
+  component = false,
 }: Parameters<typeof runtimeSchemaEffect>[0]) =>
-  runtimeSchemaEffect({ tableModules });
+  runtimeSchemaEffect({ tableModules, component });
 
 const runtimeSchemaEffect = Effect.fnUntraced(function* ({
   tableModules,
+  component = false,
 }: {
   tableModules: ReadonlyArray<TableModuleBinding>;
+  component?: boolean;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
@@ -79,9 +84,13 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
 
   yield* cbw.blankLine();
 
+  if (component) {
+    yield* cbw.writeLine(`import { target as $target } from "./id";`);
+  }
+
   if (tableModules.length === 0) {
     yield* cbw.writeLine(
-      `const databaseSchema: $DatabaseSchema.DatabaseSchema = $DatabaseSchema.make({});`,
+      `const databaseSchema: $DatabaseSchema.DatabaseSchema${component ? "<{}, typeof $target>" : ""} = $DatabaseSchema.make({}${component ? ", $target" : ""});`,
     );
   } else {
     yield* cbw.writeLine(
@@ -95,7 +104,9 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
         { discard: true },
       ),
     );
-    yield* cbw.writeLine(`}> = $DatabaseSchema.make({`);
+    yield* cbw.writeLine(
+      `}${component ? ", typeof $target" : ""}> = $DatabaseSchema.make({`,
+    );
     yield* cbw.indent(
       Effect.gen(function* () {
         for (const { tableName } of tableModules) {
@@ -103,7 +114,7 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
         }
       }),
     );
-    yield* cbw.writeLine(`});`);
+    yield* cbw.writeLine(`}${component ? ", $target" : ""});`);
   }
 
   yield* cbw.blankLine();
@@ -182,21 +193,34 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
  * When the table directory is empty the `TableNames` union resolves to `never`,
  * which still lets the file typecheck against an empty workspace.
  */
-export const id = ({ tableNames }: Parameters<typeof idEffect>[0]) =>
-  idEffect({ tableNames });
+export const id = ({ tableNames, scope }: Parameters<typeof idEffect>[0]) =>
+  idEffect({ tableNames, scope });
 
 const idEffect = Effect.fnUntraced(function* ({
   tableNames,
+  scope,
 }: {
   tableNames: ReadonlyArray<string>;
+  scope?: IdScope.Component<string> | undefined;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-  yield* cbw.writeLine(`import { GenericId } from "@confect/core";`);
+  yield* cbw.writeLine(
+    `import { GenericId${scope === undefined ? "" : ", IdScope"} } from "@confect/core";`,
+  );
   yield* cbw.writeLine(
     `import type { SystemTableNames } from "convex/server";`,
   );
   yield* cbw.blankLine();
+  if (scope !== undefined) {
+    yield* cbw.writeLine(
+      // oxlint-disable-next-line effecttsgo/prefer-schema-over-json -- Emit an escaped TypeScript string literal, not a JSON payload.
+      `export const scope = IdScope.component(${JSON.stringify(scope.slice("component:".length))});`,
+    );
+    yield* cbw.writeLine(
+      `export const target = { kind: "component", scope } as const;`,
+    );
+  }
 
   const union =
     tableNames.length === 0
@@ -206,7 +230,7 @@ const idEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(
-    `export type Id<TableName extends TableNames | SystemTableNames> = GenericId.GenericId<TableName>;`,
+    `export type Id<TableName extends TableNames | SystemTableNames> = GenericId.GenericId<TableName${scope === undefined ? "" : ", typeof scope"}>;`,
   );
   yield* cbw.blankLine();
 
@@ -214,7 +238,9 @@ const idEffect = Effect.fnUntraced(function* ({
     `export const Id = <const TableName extends TableNames | SystemTableNames>(`,
   );
   yield* cbw.indent(cbw.writeLine(`tableName: TableName,`));
-  yield* cbw.writeLine(`) => GenericId.GenericId(tableName);`);
+  yield* cbw.writeLine(
+    `) => GenericId.GenericId(tableName${scope === undefined ? "" : ", scope"});`,
+  );
 
   return yield* cbw.toString();
 });
@@ -228,21 +254,27 @@ const idEffect = Effect.fnUntraced(function* ({
 export const tableWrapper = ({
   tableName,
   unnamedImportPath,
+  component = false,
 }: Parameters<typeof tableWrapperEffect>[0]) =>
-  tableWrapperEffect({ tableName, unnamedImportPath });
+  tableWrapperEffect({ tableName, unnamedImportPath, component });
 
 const tableWrapperEffect = Effect.fnUntraced(function* ({
   tableName,
   unnamedImportPath,
+  component = false,
 }: {
   tableName: string;
   unnamedImportPath: string;
+  component?: boolean;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
   yield* cbw.writeLine(`import unnamed from "${unnamedImportPath}";`);
+  if (component) yield* cbw.writeLine(`import { scope } from "../id";`);
   yield* cbw.blankLine();
-  yield* cbw.writeLine(`export default unnamed("${tableName}");`);
+  yield* cbw.writeLine(
+    `export default unnamed("${tableName}"${component ? ", scope" : ""});`,
+  );
 
   return yield* cbw.toString();
 });
@@ -374,6 +406,27 @@ const refsEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
   yield* cbw.writeLine(`export default refs;`);
 
+  return yield* cbw.toString();
+});
+
+export const componentContract = Effect.fnUntraced(function* ({
+  tableNames,
+}: {
+  tableNames: ReadonlyArray<string>;
+}) {
+  const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+  yield* cbw.writeLine('import { Component } from "@confect/core";');
+  yield* cbw.writeLine('import spec from "./spec";');
+  yield* cbw.writeLine('import { scope } from "./id";');
+  yield* cbw.blankLine();
+  const names = Array.map(
+    [...tableNames, "_storage", "_scheduled_functions"],
+    (name) => `"${name}"`,
+  );
+  yield* cbw.writeLine(
+    `const component: Component.Component<typeof spec, typeof scope, ${names.join(" | ")}> = Component.make(spec, scope, [${names.join(", ")}]);`,
+  );
+  yield* cbw.writeLine("export default component;");
   return yield* cbw.toString();
 });
 
@@ -532,13 +585,16 @@ export default ${bindings(spec, "definitions")} as RegisteredFunctions.Registere
 
 export const services = ({
   schemaImportPath,
+  component = false,
 }: Parameters<typeof servicesEffect>[0]) =>
-  servicesEffect({ schemaImportPath });
+  servicesEffect({ schemaImportPath, component });
 
 const servicesEffect = Effect.fnUntraced(function* ({
   schemaImportPath,
+  component = false,
 }: {
   schemaImportPath: string;
+  component?: boolean;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
@@ -548,7 +604,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
     Effect.gen(function* () {
       yield* cbw.writeLine("ActionCtx as ActionCtx_,");
       yield* cbw.writeLine("ActionRunner as ActionRunner_,");
-      yield* cbw.writeLine("Auth as Auth_,");
+      if (!component) yield* cbw.writeLine("Auth as Auth_,");
       yield* cbw.writeLine("type DataModel,");
       yield* cbw.writeLine("DatabaseReader as DatabaseReader_,");
       yield* cbw.writeLine("DatabaseWriter as DatabaseWriter_,");
@@ -579,11 +635,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
     `import type schemaDefinition from "${schemaImportPath}";`,
   );
   yield* cbw.writeLine(`import type { Docs } from "./docs";`);
+  if (component) yield* cbw.writeLine(`import type { scope } from "./id";`);
   yield* cbw.blankLine();
 
   // Auth
-  yield* cbw.writeLine("export const Auth = Auth_.Auth;");
-  yield* cbw.writeLine("export type Auth = typeof Auth.Identifier;");
+  if (!component) {
+    yield* cbw.writeLine("export const Auth = Auth_.Auth;");
+    yield* cbw.writeLine("export type Auth = typeof Auth.Identifier;");
+  }
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(
@@ -611,17 +670,23 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   // Scheduler
-  yield* cbw.writeLine("export const Scheduler = Scheduler_.Scheduler;");
+  yield* cbw.writeLine(
+    component
+      ? "export const Scheduler = Scheduler_.forScope<typeof scope>();"
+      : "export const Scheduler = Scheduler_.Scheduler;",
+  );
   yield* cbw.writeLine("export type Scheduler = typeof Scheduler.Identifier;");
   yield* cbw.blankLine();
 
-  yield* cbw.writeLine("export const Storage = Storage_.Storage;");
+  yield* cbw.writeLine(
+    `export const Storage = Storage_.Storage${component ? ".forScope<typeof scope>()" : ""};`,
+  );
   yield* cbw.writeLine("export type Storage = typeof Storage.Identifier;");
   yield* cbw.blankLine();
 
   // StorageReader
   yield* cbw.writeLine(
-    "export const StorageReader = StorageReader_.StorageReader;",
+    `export const StorageReader = StorageReader_.StorageReader${component ? ".forScope<typeof scope>()" : ""};`,
   );
   yield* cbw.writeLine(
     "export type StorageReader = typeof StorageReader.Identifier;",
@@ -630,7 +695,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
 
   // StorageWriter
   yield* cbw.writeLine(
-    "export const StorageWriter = StorageWriter_.StorageWriter;",
+    `export const StorageWriter = StorageWriter_.StorageWriter${component ? ".forScope<typeof scope>()" : ""};`,
   );
   yield* cbw.writeLine(
     "export type StorageWriter = typeof StorageWriter.Identifier;",
@@ -639,7 +704,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
 
   // StorageActionWriter
   yield* cbw.writeLine(
-    "export const StorageActionWriter = StorageActionWriter_.StorageActionWriter;",
+    `export const StorageActionWriter = StorageActionWriter_.StorageActionWriter${component ? ".forScope<typeof scope>()" : ""};`,
   );
   yield* cbw.writeLine(
     "export type StorageActionWriter = typeof StorageActionWriter.Identifier;",
@@ -749,13 +814,13 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine("export const QueryCtx: QueryCtx_.QueryCtxTag<");
   yield* cbw.indent(
     cbw.writeLine(
-      "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine("> = QueryCtx_.QueryCtx<");
   yield* cbw.indent(
     cbw.writeLine(
-      "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine(">();");
@@ -768,13 +833,13 @@ const servicesEffect = Effect.fnUntraced(function* ({
   );
   yield* cbw.indent(
     cbw.writeLine(
-      "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine("> = MutationCtx_.MutationCtx<");
   yield* cbw.indent(
     cbw.writeLine(
-      "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine(">();");
@@ -787,13 +852,13 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine("export const ActionCtx: ActionCtx_.ActionCtxTag<");
   yield* cbw.indent(
     cbw.writeLine(
-      "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine("> = ActionCtx_.ActionCtx<");
   yield* cbw.indent(
     cbw.writeLine(
-      "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine(">();");

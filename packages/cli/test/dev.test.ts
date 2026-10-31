@@ -5,6 +5,8 @@ import * as Command from "effect/cli/Command";
 import * as Deferred from "effect/Deferred";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import type * as DirectoryOptions from "@confect/cli/DirectoryOptions";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
@@ -14,6 +16,13 @@ import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
 import * as Project from "./integration/Project";
+
+vi.mock("@confect/cli/DirectoryOptions", (importOriginal) =>
+  importOriginal<typeof DirectoryOptions>().then((original) => ({
+    ...original,
+    layer: () => Layer.empty,
+  })),
+);
 
 vi.mock("esbuild", (importOriginal) =>
   importOriginal<typeof esbuild>().then((original) => ({

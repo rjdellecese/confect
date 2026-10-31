@@ -1,5 +1,6 @@
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as Table from "@confect/server/Table";
+import * as IdScope from "@confect/core/IdScope";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 
@@ -48,5 +49,31 @@ describe("DatabaseSchema", () => {
     expectTypeOf<DatabaseSchema.AllTableNames<typeof schema>>().toEqualTypeOf<
       "_storage" | "_scheduled_functions"
     >();
+  });
+
+  it("retains component scope alongside the precise lazy table record", () => {
+    const scope = IdScope.component("counter");
+    const target = { kind: "component", scope } as const;
+    let evaluated = 0;
+    const counters = Table.make(() => {
+      evaluated++;
+      return Schema.Struct({ count: Schema.Finite });
+    })("counters", scope);
+    const input = { counters };
+    const schema = DatabaseSchema.make(input, target);
+
+    expect(DatabaseSchema.tables(schema)).toBe(input);
+    expect(schema.target).toBe(target);
+    expect(evaluated).toBe(0);
+    expectTypeOf(DatabaseSchema.tables(schema).counters).toEqualTypeOf<
+      typeof counters
+    >();
+    expectTypeOf<DatabaseSchema.Scope<typeof schema>>().toEqualTypeOf<
+      typeof scope
+    >();
+    expectTypeOf<DatabaseSchema.Tables<typeof schema>>().toEqualTypeOf<
+      typeof counters
+    >();
+    expectTypeOf<"~Tables">().not.toExtend<keyof typeof schema>();
   });
 });

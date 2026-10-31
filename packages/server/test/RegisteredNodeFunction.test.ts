@@ -1,6 +1,8 @@
 import { RegisteredNodeFunction } from "@confect/server/node";
 import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
 import { FunctionSpec, GroupSpec } from "@confect/core";
+import { GenericId } from "@confect/core/GenericId";
+import * as IdScope from "@confect/core/IdScope";
 import * as SchemaToValidator from "@confect/core/SchemaToValidator";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import { afterEach, assert, expect, expectTypeOf, it } from "@effect/vitest";
@@ -11,6 +13,44 @@ import * as Schema from "effect/Schema";
 import { vi } from "vitest";
 
 afterEach(() => vi.restoreAllMocks());
+
+it("preserves component scope in lazy Node validators", () => {
+  const scope = IdScope.component("counter");
+  const own = GenericId("items", scope);
+  const item = FunctionRegistryItem.make({
+    functionSpec: FunctionSpec.publicNodeAction({
+      name: "scoped",
+      args: () => ({ own, foreign: GenericId("items") }),
+      returns: () => own,
+    }),
+    groupMiddlewareAttachments: [],
+    handler: (args) => Effect.succeed(args.own),
+  });
+  assert(item._tag === "Confect");
+  const compileArgs = vi.spyOn(SchemaToValidator, "compileArgsSchema");
+  const compileReturns = vi.spyOn(SchemaToValidator, "compileReturnsSchema");
+  const registered = RegisteredNodeFunction.make(
+    DatabaseSchema.make({}, { kind: "component", scope }),
+    item,
+  ) as unknown as { exportArgs: () => string; exportReturns: () => string };
+  expect(compileArgs).not.toHaveBeenCalled();
+  expect(compileReturns).not.toHaveBeenCalled();
+  expect(JSON.parse(registered.exportArgs())).toEqual({
+    type: "object",
+    value: {
+      own: { fieldType: { type: "id", tableName: "items" }, optional: false },
+      foreign: { fieldType: { type: "string" }, optional: false },
+    },
+  });
+  expect(JSON.parse(registered.exportReturns())).toEqual({
+    type: "id",
+    tableName: "items",
+  });
+  registered.exportArgs();
+  registered.exportReturns();
+  expect(compileArgs).toHaveBeenCalledExactlyOnceWith(item.args, scope);
+  expect(compileReturns).toHaveBeenCalledExactlyOnceWith(item.returns, scope);
+});
 
 it("registers a Node group without a factory parameter", () => {
   const group = GroupSpec.makeNode().addFunction(

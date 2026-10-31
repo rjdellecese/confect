@@ -46,6 +46,62 @@ const makeNative = () => {
 
 describe("DocumentIds", () => {
   it.effect(
+    "returns component-scoped user and system IDs without forcing schemas",
+    () => {
+      const scope = IdScope.component("@example/notes");
+      const fields = vi.fn(() => Schema.Struct({ text: Schema.String }));
+      const componentSchema = DatabaseSchema.make(
+        { notes: Table.make(fields)("notes", scope) },
+        { kind: "component", scope },
+      );
+      const native = makeNative();
+      return Effect.gen(function* () {
+        const ids = yield* DocumentIds.DocumentIds<typeof componentSchema>();
+        const note = yield* ids.parse("notes", "notes:id");
+        const storage = yield* ids.parse("_storage", "_storage:id");
+        const scheduled = yield* ids.parse(
+          "_scheduled_functions",
+          "_scheduled_functions:id",
+        );
+        expectTypeOf(note).toEqualTypeOf<
+          Option.Option<ScopedId<"notes", typeof scope>>
+        >();
+        expectTypeOf(storage).toEqualTypeOf<
+          Option.Option<ScopedId<"_storage", typeof scope>>
+        >();
+        expectTypeOf(scheduled).toEqualTypeOf<
+          Option.Option<ScopedId<"_scheduled_functions", typeof scope>>
+        >();
+        expectTypeOf<ScopedId<"notes", typeof scope>>().not.toExtend<
+          GenericId<"notes">
+        >();
+        expect(note).toEqual(Option.some("notes:id"));
+        expect(storage).toEqual(Option.some("_storage:id"));
+        expect(scheduled).toEqual(Option.some("_scheduled_functions:id"));
+        const identified = yield* ids.identify("notes:id");
+        expect(identified).toEqual(
+          Option.some({ table: "notes", id: "notes:id" }),
+        );
+        if (Option.isSome(identified) && identified.value.table === "notes") {
+          expectTypeOf(identified.value.id).toEqualTypeOf<
+            ScopedId<"notes", typeof scope>
+          >();
+        }
+        const system = yield* ids.identify("_storage:id");
+        expect(system).toEqual(
+          Option.some({ table: "_storage", id: "_storage:id" }),
+        );
+        if (Option.isSome(system) && system.value.table === "_storage") {
+          expectTypeOf(system.value.id).toEqualTypeOf<
+            ScopedId<"_storage", typeof scope>
+          >();
+        }
+        expect(fields).not.toHaveBeenCalled();
+      }).pipe(Effect.provide(DocumentIds.layer(componentSchema, native)));
+    },
+  );
+
+  it.effect(
     "keeps schemas and native calls lazy and preserves receivers",
     () => {
       const fields = vi.fn(() => Schema.Struct({ text: Schema.String }));
@@ -233,3 +289,5 @@ describe("DocumentIds", () => {
       }).pipe(Effect.provide(DocumentIds.layer(schema, makeNative()))),
   );
 });
+import type { GenericId as ScopedId } from "@confect/core/GenericId";
+import * as IdScope from "@confect/core/IdScope";

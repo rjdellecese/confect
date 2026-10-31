@@ -27,6 +27,18 @@ export const RequestContext = Schema.Struct({
   projectRoot: Schema.String,
   confectDirectory: Schema.String,
   convexDirectory: Schema.String,
+  target: Schema.Union([
+    Schema.Struct({
+      kind: Schema.Literal("app"),
+      scope: Schema.Literal("").pipe(Schema.brand("@confect/core/IdScope")),
+    }),
+    Schema.Struct({
+      kind: Schema.Literal("component"),
+      scope: Schema.TemplateLiteral(["component:", Schema.String]).pipe(
+        Schema.brand("@confect/core/IdScope"),
+      ),
+    }),
+  ]),
   minimumLogLevel: Schema.Literals(LogLevel.values),
 });
 export type RequestContext = typeof RequestContext.Type;
@@ -77,6 +89,7 @@ const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
     projectRoot: yield* ProjectRoot.get,
     confectDirectory: yield* ConfectDirectory.get,
     convexDirectory: yield* ConvexDirectory.get,
+    target: yield* ConvexDirectory.target,
     minimumLogLevel: yield* References.MinimumLogLevel,
   };
   return yield* Effect.scoped(

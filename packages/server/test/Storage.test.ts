@@ -1,4 +1,8 @@
 import * as Storage from "@confect/server/Storage";
+import type { GenericId as ScopedId } from "@confect/core/GenericId";
+import * as IdScope from "@confect/core/IdScope";
+import type { ForScope as ScopedStorageWriter } from "@confect/server/StorageWriter";
+import type { ForScope as ScopedStorageActionWriter } from "@confect/server/StorageActionWriter";
 import { BlobNotFoundError } from "@confect/server/BlobNotFoundError";
 import { StorageActionWriter } from "@confect/server/StorageActionWriter";
 import { StorageReader } from "@confect/server/StorageReader";
@@ -31,6 +35,50 @@ const makeNativeStorage = () =>
   }) satisfies ConvexStorageActionWriter;
 
 describe("Storage", () => {
+  it.effect("preserves component IDs and deferred writer capabilities", () => {
+    const scope = IdScope.component("@example/storage");
+    const native = makeNativeStorage();
+
+    return Effect.gen(function* () {
+      const storage = yield* Storage.Storage.forScope<typeof scope>();
+      const store = storage.store(new Blob(["component"]));
+      expectTypeOf(store).toEqualTypeOf<
+        Effect.Effect<
+          ScopedId<"_storage", typeof scope>,
+          never,
+          ScopedStorageActionWriter<typeof scope>
+        >
+      >();
+      expectTypeOf(storage.getUrl)
+        .parameter(0)
+        .toEqualTypeOf<ScopedId<"_storage", typeof scope>>();
+      expectTypeOf<GenericId<"_storage">>().not.toExtend<
+        Parameters<typeof storage.delete>[0]
+      >();
+      const id = yield* store;
+      expect(id).toBe(storageId);
+      expect((yield* storage.getUrl(id)).href).toBe(blobUrl);
+      const remove = storage.delete(id);
+      expectTypeOf(remove).toEqualTypeOf<
+        Effect.Effect<
+          void,
+          BlobNotFoundError,
+          ScopedStorageWriter<typeof scope>
+        >
+      >();
+      yield* remove;
+      expect(native.delete).toHaveBeenCalledExactlyOnceWith(storageId);
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          Storage.layer(native, scope),
+          StorageWriter.layer(native, scope),
+          StorageActionWriter.layer(native, scope),
+        ),
+      ),
+    );
+  });
+
   it.effect(
     "reads URLs with only the reader layer and retains the legacy reader",
     () => {

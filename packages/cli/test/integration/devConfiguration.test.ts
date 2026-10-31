@@ -12,6 +12,54 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
     it.effect(
+      "preserves component targets across edits and rejects application authentication",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* project.write(
+            "package.json",
+            '{"type":"module","name":"counter"}',
+          );
+          yield* project.write(
+            "convex/convex.config.ts",
+            'import { defineComponent } from "convex/server"; export default defineComponent("counter");',
+          );
+          const watching = yield* project.start("dev", [
+            "--component-dir",
+            "convex",
+          ]);
+          yield* watching.waitFor(success);
+          expect(
+            yield* fs.readFileString(
+              path.join(project.root, "confect/_generated/id.ts"),
+            ),
+          ).toContain('IdScope.component("counter:convex")');
+          yield* project.write(
+            "confect/auth.ts",
+            "export default { providers: [] };",
+          );
+          yield* watching.waitFor(
+            "Components cannot configure application authentication",
+          );
+          expect(
+            yield* fs.exists(path.join(project.root, "convex/auth.config.ts")),
+          ).toBe(false);
+          yield* fs.remove(path.join(project.root, "confect/auth.ts"));
+          yield* watching.waitFor(success);
+          yield* project.write("confect/notes.spec.ts", `${Project.spec}\n`);
+          yield* watching.waitFor(success);
+          expect(
+            yield* fs.readFileString(
+              path.join(project.root, "confect/_generated/services.ts"),
+            ),
+          ).toContain("Storage_.Storage.forScope<typeof scope>()");
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "generates once when startup bindings reveal additional library dependencies",
       () =>
         Effect.gen(function* () {

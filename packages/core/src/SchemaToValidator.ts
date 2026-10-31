@@ -1,4 +1,6 @@
+import * as IdScope from "./IdScope";
 import type {
+  GenericId as ConvexGenericId,
   PropertyValidators,
   Validator,
   VAny,
@@ -43,6 +45,7 @@ import type {
 
 export const compileArgsSchema = <ConfectValue, ConvexValue>(
   argsSchema: Schema.Codec<ConfectValue, ConvexValue>,
+  scope: IdScope.IdScope = IdScope.app,
 ): PropertyValidators => {
   const ast = Schema.toEncoded(argsSchema).ast;
 
@@ -51,7 +54,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
     Match.value,
     Match.tag("Objects", (objectsAst) =>
       Array.isReadonlyArrayEmpty(objectsAst.indexSignatures)
-        ? handlePropertySignatures(objectsAst)
+        ? handlePropertySignatures(objectsAst, scope)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
@@ -63,8 +66,9 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
   schema: Schema.Codec<ConfectValue, ConvexValue>,
+  scope: IdScope.IdScope = IdScope.app,
 ): Validator<any, any, any> =>
-  Effect.runSync(compileAst(Schema.toEncoded(schema).ast));
+  Effect.runSync(compileAst(Schema.toEncoded(schema).ast, false, scope));
 
 // Table
 
@@ -82,6 +86,7 @@ export type TableSchemaToTableValidator<
 
 export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
   schema: TableSchema,
+  scope: IdScope.IdScope = IdScope.app,
 ): TableSchemaToTableValidator<TableSchema> => {
   const ast = Schema.toEncoded(schema).ast;
 
@@ -91,10 +96,10 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
     Match.tag("Objects", ({ indexSignatures }) =>
       Array.isReadonlyArrayEmpty(indexSignatures)
         ? // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- The return type is derived from the input schema and cannot be recovered from the runtime AST.
-          (compileAst(ast) as Effect.Effect<any>)
+          (compileAst(ast, false, scope) as Effect.Effect<any>)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
-    Match.tag("Union", (unionAst) => compileAst(unionAst)),
+    Match.tag("Union", (unionAst) => compileAst(unionAst, false, scope)),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
     Effect.runSync,
   );
@@ -180,14 +185,12 @@ type ConvertValueToValidator<
                         ? ObjectValueToValidator<Vl, Optionality>
                         : never;
 
-type StringValueToValidator<
-  Vl,
-  Optionality extends "required" | "optional",
-> = Vl extends { __tableName: infer TableName extends string }
-  ? VId<OptionalValue<GenericId.GenericId<TableName>, Optionality>, Optionality>
-  : [string] extends [Vl]
-    ? VString<OptionalValue<string, Optionality>, Optionality>
-    : VLiteral<OptionalValue<Vl, Optionality>, Optionality>;
+type StringValueToValidator<Vl, Optionality extends "required" | "optional"> =
+  Vl extends ConvexGenericId<string>
+    ? VId<OptionalValue<Vl, Optionality>, Optionality>
+    : [string] extends [Vl]
+      ? VString<OptionalValue<string, Optionality>, Optionality>
+      : VLiteral<OptionalValue<Vl, Optionality>, Optionality>;
 
 type ObjectValueToValidator<Vl, Optionality extends "required" | "optional"> =
   IsRecord<MutableValue<Vl>> extends true
@@ -307,6 +310,7 @@ export const isRecursive = (ast: SchemaAST.AST): boolean =>
 export const compileAst = (
   ast: SchemaAST.AST,
   isOptionalPropertyOfTypeLiteral = false,
+  scope: IdScope.IdScope = IdScope.app,
 ): Effect.Effect<
   Validator<any, any, any>,
   | UnsupportedSchemaTypeError
@@ -343,17 +347,22 @@ export const compileAst = (
           GenericId.tableName(stringAst).pipe(
             Option.match({
               onNone: () => Effect.succeed(v.string()),
-              onSome: (tableName) => Effect.succeed(v.id(tableName)),
+              onSome: (tableName) =>
+                Effect.succeed(
+                  GenericId.scope(stringAst) === scope
+                    ? v.id(tableName)
+                    : v.string(),
+                ),
             }),
           ),
         ),
         Match.tag("Number", () => Effect.succeed(v.float64())),
         Match.tag("BigInt", () => Effect.succeed(v.int64())),
         Match.tag("Union", (unionAst) =>
-          handleUnion(unionAst, isOptionalPropertyOfTypeLiteral),
+          handleUnion(unionAst, isOptionalPropertyOfTypeLiteral, scope),
         ),
-        Match.tag("Objects", (objectsAst) => handleObjects(objectsAst)),
-        Match.tag("Arrays", (arraysAst) => handleArrays(arraysAst)),
+        Match.tag("Objects", (objectsAst) => handleObjects(objectsAst, scope)),
+        Match.tag("Arrays", (arraysAst) => handleArrays(arraysAst, scope)),
         Match.tag("Unknown", "Any", () => Effect.succeed(v.any())),
         Match.tag("Declaration", (declaration) =>
           Effect.mapBoth(
@@ -395,18 +404,22 @@ export const compileAst = (
 const handleUnion = (
   { types }: SchemaAST.Union,
   isOptionalPropertyOfTypeLiteral: boolean,
-) => handleUnionTypes(types, isOptionalPropertyOfTypeLiteral);
+  scope: IdScope.IdScope,
+) => handleUnionTypes(types, isOptionalPropertyOfTypeLiteral, scope);
 
 const handleUnionTypes = Effect.fnUntraced(function* (
   types: SchemaAST.Union["types"],
   isOptionalPropertyOfTypeLiteral: boolean,
+  scope: IdScope.IdScope,
 ) {
   const members = isOptionalPropertyOfTypeLiteral
     ? Array.filter(types, Predicate.not(SchemaAST.isUndefined))
     : types;
 
   const [firstValidator, secondValidator, ...restValidators] =
-    yield* Effect.all(Array.map(members, (type) => compileAst(type)));
+    yield* Effect.all(
+      Array.map(members, (type) => compileAst(type, false, scope)),
+    );
 
   if (firstValidator === undefined) {
     return yield* new EmptyUnionIsNotSupportedError();
@@ -417,12 +430,13 @@ const handleUnionTypes = Effect.fnUntraced(function* (
   }
 });
 
-const handleObjects = (objectsAst: SchemaAST.Objects) =>
+const handleObjects = (objectsAst: SchemaAST.Objects, scope: IdScope.IdScope) =>
   pipe(
     objectsAst.indexSignatures,
     Array.head,
     Option.match({
-      onNone: () => Effect.map(handlePropertySignatures(objectsAst), v.object),
+      onNone: () =>
+        Effect.map(handlePropertySignatures(objectsAst, scope), v.object),
       onSome: ({ parameter, type }) =>
         pipe(
           objectsAst.propertySignatures,
@@ -431,8 +445,8 @@ const handleObjects = (objectsAst: SchemaAST.Objects) =>
             onNone: () =>
               Effect.map(
                 Effect.all({
-                  parameter_: compileAst(parameter),
-                  type_: compileAst(type),
+                  parameter_: compileAst(parameter, false, scope),
+                  type_: compileAst(type, false, scope),
                 }),
                 ({ parameter_, type_ }) => v.record(parameter_, type_),
               ),
@@ -445,19 +459,22 @@ const handleObjects = (objectsAst: SchemaAST.Objects) =>
     }),
   );
 
-const handleArrays = ({ elements, rest }: SchemaAST.Arrays) =>
-  handleArrayElements(elements, rest);
+const handleArrays = (
+  { elements, rest }: SchemaAST.Arrays,
+  scope: IdScope.IdScope,
+) => handleArrayElements(elements, rest, scope);
 
 const handleArrayElements = Effect.fnUntraced(function* (
   elements: SchemaAST.Arrays["elements"],
   rest: SchemaAST.Arrays["rest"],
+  scope: IdScope.IdScope,
 ) {
   const [f, s, ...r] = elements;
 
   const elementToValidator = (element: SchemaAST.AST) =>
     SchemaAST.isOptional(element)
       ? Effect.fail(new OptionalTupleElementsAreNotSupportedError())
-      : compileAst(element);
+      : compileAst(element, false, scope);
 
   const arrayItemsValidator = yield* f === undefined
     ? pipe(
@@ -465,7 +482,7 @@ const handleArrayElements = Effect.fnUntraced(function* (
         Array.head,
         Option.match({
           onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
-          onSome: (type) => compileAst(type),
+          onSome: (type) => compileAst(type, false, scope),
         }),
       )
     : s === undefined
@@ -481,7 +498,10 @@ const handleArrayElements = Effect.fnUntraced(function* (
   return v.array(arrayItemsValidator);
 });
 
-const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
+const handlePropertySignatures = (
+  objectsAst: SchemaAST.Objects,
+  scope: IdScope.IdScope,
+) =>
   pipe(
     objectsAst.propertySignatures,
     Effect.forEach(({ type, name }) => {
@@ -491,7 +511,7 @@ const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
         return Option.match(Number.parse(name), {
           onNone: () =>
             Effect.gen(function* () {
-              const validator = yield* compileAst(type, isOptional);
+              const validator = yield* compileAst(type, isOptional, scope);
 
               return {
                 propertyName: name,

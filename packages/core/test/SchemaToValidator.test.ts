@@ -4,8 +4,9 @@ import {
   type UndefinedOrValueToValidator,
   type ValueToValidator,
 } from "@confect/core/SchemaToValidator";
-import { GenericId } from "@confect/core/GenericId";
+import * as GenericId from "@confect/core/GenericId";
 import type { TypeError } from "@confect/core/Types";
+import type * as IdScope from "@confect/core/IdScope";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import {
   v,
@@ -19,6 +20,18 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 describe("ValueToValidator", () => {
+  it("preserves scoped ID brands in required and optional fields", () => {
+    type Id = GenericId.GenericId<"items", IdScope.Component<"counter">>;
+    type Converted = ValueToValidator<{ id: Id; optional?: Id }>;
+    expectTypeOf<Converted["fields"]["id"]["type"]>().toEqualTypeOf<Id>();
+    expectTypeOf<Converted["fields"]["optional"]["type"]>().toEqualTypeOf<
+      Id | undefined
+    >();
+    expectTypeOf<
+      Converted["fields"]["optional"]["isOptional"]
+    >().toEqualTypeOf<"optional">();
+  });
+
   it("preserves wide literal unions in required, optional, and nested validators", () => {
     type Hex =
       | "0"
@@ -314,7 +327,7 @@ describe("UndefinedOrValueToValidator", () => {
 describe("ID schemas", () => {
   it("compiles an ID to a table-specific validator", () => {
     const expected = v.id("users");
-    const compiled = compileSchema(GenericId("users"));
+    const compiled = compileSchema(GenericId.GenericId("users"));
 
     expect(compiled).toEqual(expected);
     expectTypeOf(compiled).toEqualTypeOf<typeof expected>();
@@ -323,7 +336,7 @@ describe("ID schemas", () => {
   it("compiles an ID-keyed record field with checks and annotations", () => {
     const schema = Schema.Struct({
       counts: Schema.Record(
-        GenericId("shipmentLineItems")
+        GenericId.GenericId("shipmentLineItems")
           .check(Schema.isMinLength(1))
           .annotate({ title: "Line item ID" }),
         Schema.Finite,

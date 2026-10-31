@@ -104,12 +104,19 @@ export const make = Effect.gen(function* () {
   yield* write("confect/notes.spec.ts", spec);
   yield* write("confect/notes.impl.ts", impl);
 
-  const start = Effect.fnUntraced(function* (command: "dev" | "codegen") {
+  const start = Effect.fnUntraced(function* (
+    command: "dev" | "codegen",
+    args: ReadonlyArray<string> = [],
+  ) {
     const spawner = yield* ChildProcessSpawner;
     const handle = yield* spawner.spawn(
       ChildProcess.make(
         process.execPath,
-        [path.resolve(import.meta.dirname, "../../bin/confect.mjs"), command],
+        [
+          path.resolve(import.meta.dirname, "../../bin/confect.mjs"),
+          command,
+          ...args,
+        ],
         { cwd: root, extendEnv: true, env: { NO_COLOR: "1" } },
       ),
     );
