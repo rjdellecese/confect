@@ -1,5 +1,9 @@
 # @confect/core
 
+## 10.5.0
+
+No changes in this release.
+
 ## 10.4.1
 
 ### Patch Changes
