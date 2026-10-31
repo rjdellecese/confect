@@ -59,18 +59,13 @@ export const make = <Table_ extends Table.AnyWithProps>(
   const collect: OrderedQueryFunction<"collect"> = () =>
     pipe(stream(), Stream.runCollect);
 
-  const take: OrderedQueryFunction<"take"> = (n: number) => {
-    // As in `Stream.take`: floored, 0 or less reads nothing, unbounded reads all.
-    const count = n > 0 ? Math.floor(n) : 0;
-    if (count === 0) return Effect.succeed([]);
-    if (!Number.isSafeInteger(count)) return collect();
-    return pipe(
-      Effect.promise(() => query.take(count)),
+  const take: OrderedQueryFunction<"take"> = (n: number) =>
+    pipe(
+      Effect.promise(() => query.take(n)),
       Effect.flatMap((encoded) =>
         Effect.forEach(encoded, Document.decode(table)),
       ),
     );
-  };
 
   const first: OrderedQueryFunction<"first"> = () =>
     Effect.map(take(1), Array.head);

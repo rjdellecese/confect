@@ -72,29 +72,40 @@ describe("OrderedQuery", () => {
     }),
   );
 
-  it.effect("take counts n as Stream.take does", () =>
+  it.effect("take passes the count unchanged to Convex", () =>
     Effect.gen(function* () {
-      const fractional = makeQuery(documents);
-      expect(
-        yield* OrderedQuery.make(fractional.query, notes).take(2.5),
-      ).toHaveLength(2);
-      expect(fractional.take.mock.calls).toEqual([[2]]);
-
-      for (const n of [0, -1, Number.NaN]) {
+      for (const n of [
+        0,
+        -0,
+        2.5,
+        -1,
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+        Number.NEGATIVE_INFINITY,
+        Number.MAX_SAFE_INTEGER + 1,
+      ]) {
         const { query, take, iterate } = makeQuery(documents);
+        take.mockResolvedValueOnce([]);
         expect(yield* OrderedQuery.make(query, notes).take(n)).toEqual([]);
-        expect(take).not.toHaveBeenCalled();
+        expect(take.mock.calls).toEqual([[n]]);
         expect(iterate).not.toHaveBeenCalled();
       }
+    }),
+  );
 
-      const unbounded = makeQuery(documents);
-      expect(
-        yield* OrderedQuery.make(unbounded.query, notes).take(
-          Number.POSITIVE_INFINITY,
-        ),
-      ).toHaveLength(3);
-      expect(unbounded.take).not.toHaveBeenCalled();
-      expect(unbounded.iterate).toHaveBeenCalledOnce();
+  it.effect("take preserves Convex rejections as defects", () =>
+    Effect.gen(function* () {
+      const { query, take, iterate } = makeQuery(documents);
+      const error = new TypeError("n must be a non-negative integer");
+      take.mockRejectedValueOnce(error);
+
+      const result = yield* OrderedQuery.make(query, notes)
+        .take(2.5)
+        .pipe(Effect.catchDefect(Effect.succeed));
+
+      expect(result).toBe(error);
+      expect(take.mock.calls).toEqual([[2.5]]);
+      expect(iterate).not.toHaveBeenCalled();
     }),
   );
 

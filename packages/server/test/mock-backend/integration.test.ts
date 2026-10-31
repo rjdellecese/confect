@@ -504,7 +504,7 @@ describe("DatabaseReader", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
-  it.effect("first and take accept any n, as Stream.take does", () =>
+  it.effect("first and take use Convex count validation", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -531,14 +531,29 @@ describe("DatabaseReader", () => {
             Option.some("a"),
           );
           expect(yield* texts(2)).toEqual(["a", "b"]);
-          expect(yield* texts(2.5)).toEqual(["a", "b"]);
           expect(yield* texts(0)).toEqual([]);
-          expect(yield* texts(-1)).toEqual([]);
-          expect(yield* texts(Number.POSITIVE_INFINITY)).toEqual([
+          expect(yield* texts(-0)).toEqual([]);
+          expect(yield* texts(Number.MAX_SAFE_INTEGER + 1)).toEqual([
             "a",
             "b",
             "c",
           ]);
+
+          for (const n of [
+            2.5,
+            -1,
+            Number.NaN,
+            Number.POSITIVE_INFINITY,
+            Number.NEGATIVE_INFINITY,
+          ]) {
+            const error = yield* texts(n).pipe(
+              Effect.catchDefect(Effect.succeed),
+            );
+            assert.instanceOf(error, TypeError);
+            expect(error.message).toBe(
+              "Arg 1 `n` to `take` must be a non-negative integer",
+            );
+          }
         }).pipe(Effect.orDie),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
