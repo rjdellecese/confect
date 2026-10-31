@@ -545,6 +545,38 @@ describe("DatabaseReader", () => {
       assertEquals(notes[9]?.text, "1");
     }).pipe(Effect.provide(TestConfect.layer)),
   );
+
+  it.effect("take uses Convex count validation", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const reader = yield* DatabaseReader;
+          const take = (n: number) =>
+            reader.table("notes").index("by_text").take(n);
+
+          expect(yield* take(0)).toEqual([]);
+
+          for (const n of [
+            2.5,
+            -1,
+            Number.NaN,
+            Number.POSITIVE_INFINITY,
+            Number.NEGATIVE_INFINITY,
+          ]) {
+            const error = yield* take(n).pipe(
+              Effect.catchDefect(Effect.succeed),
+            );
+            assert.instanceOf(error, TypeError);
+            expect(error.message).toBe(
+              "Arg 1 `n` to `take` must be a non-negative integer",
+            );
+          }
+        }).pipe(Effect.orDie),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
 });
 
 describe("DatabaseWriter", () => {
