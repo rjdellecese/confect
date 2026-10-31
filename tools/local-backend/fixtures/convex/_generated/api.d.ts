@@ -139,26 +139,6 @@ export declare const api: {
         }
       >;
     };
-    orderedQuery: {
-      first: FunctionReference<
-        "query",
-        "public",
-        { caseId: string },
-        number | null
-      >;
-      seed: FunctionReference<
-        "mutation",
-        "public",
-        { caseId: string; count: number },
-        null
-      >;
-      take: FunctionReference<
-        "query",
-        "public",
-        { caseId: string; n: number },
-        Array<number>
-      >;
-    };
     scheduling: {
       manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;
       manyOpsQuery: FunctionReference<"query", "public", {}, number>;

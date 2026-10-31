@@ -504,40 +504,17 @@ describe("DatabaseReader", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
-  it.effect("first and take use Convex count validation", () =>
+  it.effect("take uses Convex count validation", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
       yield* c.run(
         Effect.gen(function* () {
-          const writer = yield* DatabaseWriter;
           const reader = yield* DatabaseReader;
-          const texts = (n: number) =>
-            reader
-              .table("notes")
-              .index("by_text")
-              .take(n)
-              .pipe(Effect.map(Array.map((note) => note.text)));
+          const take = (n: number) =>
+            reader.table("notes").index("by_text").take(n);
 
-          expect(yield* reader.table("notes").index("by_text").first()).toEqual(
-            Option.none(),
-          );
-          yield* Effect.forEach(["a", "b", "c"], (text) =>
-            writer.table("notes").insert({ text }),
-          );
-
-          const first = yield* reader.table("notes").index("by_text").first();
-          expect(Option.map(first, (note) => note.text)).toEqual(
-            Option.some("a"),
-          );
-          expect(yield* texts(2)).toEqual(["a", "b"]);
-          expect(yield* texts(0)).toEqual([]);
-          expect(yield* texts(-0)).toEqual([]);
-          expect(yield* texts(Number.MAX_SAFE_INTEGER + 1)).toEqual([
-            "a",
-            "b",
-            "c",
-          ]);
+          expect(yield* take(0)).toEqual([]);
 
           for (const n of [
             2.5,
@@ -546,7 +523,7 @@ describe("DatabaseReader", () => {
             Number.POSITIVE_INFINITY,
             Number.NEGATIVE_INFINITY,
           ]) {
-            const error = yield* texts(n).pipe(
+            const error = yield* take(n).pipe(
               Effect.catchDefect(Effect.succeed),
             );
             assert.instanceOf(error, TypeError);

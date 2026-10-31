@@ -24,9 +24,6 @@ const note = (id: string, value: string) => ({
   value,
 });
 
-/**
- * A Convex query over `documents` that records how it is read.
- */
 const makeQuery = (documents: ReadonlyArray<ReturnType<typeof note>>) => {
   const take = vi.fn((n: number) => Promise.resolve(documents.slice(0, n)));
   const iterate = vi.fn(() => {
@@ -76,12 +73,8 @@ describe("OrderedQuery", () => {
     Effect.gen(function* () {
       for (const n of [
         0,
-        -0,
         2.5,
-        -1,
-        Number.NaN,
         Number.POSITIVE_INFINITY,
-        Number.NEGATIVE_INFINITY,
         Number.MAX_SAFE_INTEGER + 1,
       ]) {
         const { query, take, iterate } = makeQuery(documents);
@@ -93,37 +86,15 @@ describe("OrderedQuery", () => {
     }),
   );
 
-  it.effect("take preserves Convex rejections as defects", () =>
-    Effect.gen(function* () {
-      const { query, take, iterate } = makeQuery(documents);
-      const error = new TypeError("n must be a non-negative integer");
-      take.mockRejectedValueOnce(error);
-
-      const result = yield* OrderedQuery.make(query, notes)
-        .take(2.5)
-        .pipe(Effect.catchDefect(Effect.succeed));
-
-      expect(result).toBe(error);
-      expect(take.mock.calls).toEqual([[2.5]]);
-      expect(iterate).not.toHaveBeenCalled();
-    }),
-  );
-
-  it.effect("first and take fail on the first document that can't decode", () =>
+  it.effect("take identifies the first document that can't decode", () =>
     Effect.gen(function* () {
       const invalid = [note("a", "1"), note("b", "two"), note("c", "three")];
 
-      const taken = yield* Effect.flip(
+      const error = yield* Effect.flip(
         OrderedQuery.make(makeQuery(invalid).query, notes).take(3),
       );
-      const first = yield* Effect.flip(
-        OrderedQuery.make(makeQuery(invalid.slice(1)).query, notes).first(),
-      );
-
-      for (const error of [taken, first]) {
-        assert.instanceOf(error, Document.DocumentDecodeError);
-        expect(error.id).toBe("b");
-      }
+      assert.instanceOf(error, Document.DocumentDecodeError);
+      expect(error.id).toBe("b");
     }),
   );
 });

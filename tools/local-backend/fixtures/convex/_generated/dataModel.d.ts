@@ -27,22 +27,6 @@ import type { GenericId } from "convex/values";
  */
 
 export type DataModel = {
-  orderedRows: {
-    document: {
-      caseId: string;
-      position: number;
-      _id: Id<"orderedRows">;
-      _creationTime: number;
-    };
-    fieldPaths: "_creationTime" | "_id" | "caseId" | "position";
-    indexes: {
-      by_id: ["_id"];
-      by_creation_time: ["_creationTime"];
-      by_caseId_position: ["caseId", "position", "_creationTime"];
-    };
-    searchIndexes: {};
-    vectorIndexes: {};
-  };
   transactionNotes: {
     document: {
       caseId: string;
