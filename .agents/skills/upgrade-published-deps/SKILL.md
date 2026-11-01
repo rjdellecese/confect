@@ -50,11 +50,20 @@ bumping, confirm the new versions actually resolved (e.g. `pnpm why <dep>`).
 ## Dependency ranges and peer compatibility
 
 - Preserve existing dependency range styles. Keep caret ranges for stable
-  dependencies such as the CLI's `@effect/platform-node`; do not replace them
-  with exact pins merely because they belong to the Effect ecosystem. Keep
-  existing exact runtime pins, such as the server's AI dependencies, and keep
+  APIs; do not replace them with exact pins merely because they belong to
+  the Effect ecosystem. Effect APIs marked unstable may break in minor
+  releases. The CLI and server use these APIs, so keep their `effect` peers
+  and `@effect/platform-node` requirements within the verified minor using
+  tilde ranges. Update their Syncpack rule when migrating to a new minor.
+  Keep existing exact runtime pins, such as the server's AI dependencies, and keep
   `devDependencies` exactly pinned. Do not normalize these different roles
   into one version policy during a routine upgrade.
+- Keep the Foldkit adapter's peers on a verified pair: a pre-1.0 Foldkit minor
+  (`^0.170.0` admits only 0.170.x) and an Effect minor (`~4.1.0`). Align the
+  browser platform with Foldkit's published peer requirement. Update the
+  adapter's Syncpack rules, exact development pins, documentation, and both
+  packed-consumer lanes together; do not use workspace overrides to claim
+  compatibility with a new Foldkit or Effect minor.
 - Read the **published metadata for each selected dependency version**,
   including its `peerDependencies` (for example,
   `pnpm view @effect/platform-node@4.0.1 peerDependencies --json`). Account for

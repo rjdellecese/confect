@@ -15,7 +15,9 @@ const fixture = Effect.fnUntraced(function* (
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const root = yield* fs.makeTempDirectoryScoped();
+  const root = yield* fs
+    .makeTempDirectoryScoped()
+    .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
   for (const [name, contents] of Record.toEntries(files)) {
     const file = path.join(root, name);
     yield* fs.makeDirectory(path.dirname(file), { recursive: true });

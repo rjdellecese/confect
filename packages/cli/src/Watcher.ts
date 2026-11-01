@@ -2,7 +2,7 @@ import * as Clock from "effect/Clock";
 import * as Cache from "effect/Cache";
 import * as Duration from "effect/Duration";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
 import * as Hex from "effect/encoding/Hex";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -209,7 +209,7 @@ const drainUntilQuiescent = Effect.fnUntraced(function* (
 const esbuildOptions = (
   path: Path.Path,
   fs: FileSystem.FileSystem,
-  crypto: Crypto.Crypto,
+  digest: Digest.Digest["Service"],
   projectRoot: string,
   generatedDirectory: string,
   entries: ReadonlyArray<Entry>,
@@ -263,7 +263,7 @@ const esbuildOptions = (
               Effect.gen(function* () {
                 const fingerprint = yield* fs.readFile(args.path).pipe(
                   Effect.flatMap((contents) =>
-                    crypto.digest("SHA-256", contents),
+                    digest.digest(Digest.sha256, contents),
                   ),
                   Effect.map(Hex.encode),
                   Effect.result,
@@ -305,7 +305,7 @@ const esbuildOptions = (
                   result,
                   yield* Ref.get(captureRef),
                   (file) => path.resolve(projectRoot, file),
-                  crypto,
+                  digest,
                 );
                 const current = WatchBuild.observe(previous, outcome);
                 yield* Ref.update(stateRef, HashMap.set(groupKey, current));
@@ -364,7 +364,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     yield* fs.realPath(confectDirectory),
     "_generated",
   );
-  const crypto = yield* Crypto.Crypto;
+  const digest = yield* Digest.Digest;
   const completedInitial = Deferred.make<void>().pipe(
     Effect.tap((initial) => Deferred.succeed(initial, undefined)),
   );
@@ -485,7 +485,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
                 esbuildOptions(
                   path,
                   fs,
-                  crypto,
+                  digest,
                   projectRoot,
                   generatedDirectory,
                   groupEntries,
@@ -525,7 +525,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
           },
           progress,
           verifyInputs: (snapshot) =>
-            WatchBuild.verifyInputs(snapshot, fs, crypto),
+            WatchBuild.verifyInputs(snapshot, fs, digest),
         } satisfies WatchGroup;
       }),
     );
@@ -553,7 +553,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
   return yield* Effect.forever(
     Queue.take(restartQueue).pipe(Effect.andThen(sync)),
   );
-}, Effect.provide(NodeCrypto.layer));
+}, Effect.provide(NodeCrypto.layerDigest));
 
 const refresh = Effect.fnUntraced(function* (watcher: State) {
   return yield* watcher.lock.withPermit(

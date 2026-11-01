@@ -178,7 +178,9 @@ layer(BundlerLayer)("bundle", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const tempDir = yield* fs.makeTempDirectoryScoped();
+        const tempDir = yield* fs
+          .makeTempDirectoryScoped()
+          .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
 
         const entry = path.join(tempDir, "entry.ts");
         yield* fs.writeFileString(entry, `export default import.meta.url;\n`);
@@ -313,7 +315,9 @@ const fixture = Effect.fn("Bundler.test.fixture")(function* (
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const directory = yield* fs.makeTempDirectoryScoped();
+  const directory = yield* fs
+    .makeTempDirectoryScoped()
+    .pipe(Effect.flatMap((temporary) => fs.realPath(temporary)));
   for (const [name, contents] of Object.entries(files)) {
     const file = path.join(directory, name);
     yield* fs.makeDirectory(path.dirname(file), { recursive: true });
@@ -1305,6 +1309,59 @@ layer(BundlerLayer)("withBatch", (it) => {
       );
       expect((yield* load()).module.value).toBe("after");
     }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "keeps batch metadata and warnings when real paths differ from esbuild paths",
+    () =>
+      Effect.gen(function* () {
+        const { file, fs, path } = yield* fixture({
+          "short/first.ts": 'export { value } from "./shared";',
+          "short/second.ts": 'export { value } from "./shared";',
+          "short/shared.ts":
+            "export const value = { duplicate: 1, duplicate: 2 };",
+        });
+        yield* fs.copy(file("short"), file("canonical"));
+        const messages: unknown[] = [];
+        const console = yield* Console.Console;
+        const bundled = yield* Bundler.withBatch(
+          [file("short/first.ts"), file("short/second.ts")],
+          Bundler.bundle(file("short/first.ts")),
+        ).pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            realPath: (source) =>
+              fs
+                .realPath(source)
+                .pipe(
+                  Effect.map((real) =>
+                    real === file("short") ||
+                    real.startsWith(file("short") + path.sep)
+                      ? file("canonical") + real.slice(file("short").length)
+                      : real,
+                  ),
+                ),
+          }),
+          Effect.provideService(
+            Console.Console,
+            Object.assign(Object.create(console), {
+              error: (...args: ReadonlyArray<unknown>) => {
+                messages.push(...args);
+              },
+            }),
+          ),
+        );
+        expect(Object.keys(bundled.metafile.inputs).sort()).toEqual(
+          [file("canonical/first.ts"), file("canonical/shared.ts")].sort(),
+        );
+        expect(
+          bundled.metafile.inputs[file("canonical/first.ts")]?.imports,
+        ).toContainEqual(
+          expect.objectContaining({ path: file("canonical/shared.ts") }),
+        );
+        expect(messages).toHaveLength(1);
+        expect(messages.join("\n")).toContain("Duplicate key");
+      }).pipe(Effect.scoped),
   );
 
   it.effect(

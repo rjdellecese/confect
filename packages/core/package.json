@@ -1,16 +1,16 @@
 {
   "name": "@confect/core",
   "description": "Shared specs and schemas used by all Confect packages",
-  "version": "10.4.0",
+  "version": "10.5.0",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.4",
+    "@effect/vitest": "4.1.0",
     "@types/node": "26.6.5",
     "confect-bench-harness": "workspace:*",
-    "effect": "4.0.4",
+    "effect": "4.1.0",
     "tsdown": "0.23.1",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
