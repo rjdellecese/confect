@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
-import * as LocalBackend from "./LocalBackend";
+import * as LocalBackend from "confect-local-backend/LocalBackend";
 
 layer(LocalBackend.layer, { timeout: "120 seconds" })("HttpRouter", (it) => {
   it.effect("streams a 100 MiB response through the Effect router", () =>

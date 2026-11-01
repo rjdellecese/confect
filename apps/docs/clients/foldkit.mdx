@@ -25,12 +25,14 @@ accepted.
 ## Installation
 
 ```bash
-pnpm add @confect/foldkit @confect/js @confect/core foldkit@^0.165.0 effect@4.0.0 @effect/platform-browser@4.0.0
+pnpm add @confect/foldkit @confect/js @confect/core foldkit@^0.170.0 effect@~4.1.0 @effect/platform-browser@~4.1.0
 ```
 
 <Note>
-  Foldkit 0.165 requires `effect` and `@effect/platform-browser` 4.0.0. Install
-  those matching versions; no peer-dependency override is needed.
+  Use Foldkit 0.170.x with Effect and `@effect/platform-browser` 4.1.x. These
+  ranges accept patch updates but exclude new minor versions until the adapter
+  has verified them. The same Effect version also satisfies Confect's server and
+  CLI; no peer-dependency override is needed.
 </Note>
 
 ## Setup

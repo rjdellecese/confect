@@ -445,7 +445,9 @@ export const tapAndLog = <A, E, R>(
 export const catchAndLog = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<Option.Option<A>, Exclude<E, CodegenError>, R> =>
-  Effect.catchIf(Effect.map(effect, Option.some<A>), isCodegenError, (error) =>
-    logCodegenError(error).pipe(Effect.as(Option.none<A>())),
+  Effect.catchIf(
+    Effect.map(effect, Option.some<A>),
+    (error: E): error is E & CodegenError => isCodegenError(error),
+    (error: E & CodegenError) =>
+      logCodegenError(error).pipe(Effect.as(Option.none<A>())),
   ) as Effect.Effect<Option.Option<A>, Exclude<E, CodegenError>, R>;
-// oxlint-enable effecttsgo/unsafe-effect-type-assertion

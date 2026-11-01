@@ -40,7 +40,8 @@
     "packages/cli/src/**/*",
     "tools/*/*.ts",
     "tools/*/src/**/*",
-    "tools/*/test/**/*"
+    "tools/*/test/**/*",
+    "tools/local-backend/fixtures/**/*"
   ],
   "exclude": ["tools/oxlint-rules", "tools/test-types"]
 }

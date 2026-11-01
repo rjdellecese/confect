@@ -7,6 +7,7 @@ import * as Option from "effect/Option";
 import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Record from "effect/Record";
 import * as Result from "effect/Result";
 import * as SyncState from "@confect/cli/SyncState";
 import * as EntryPoint from "@confect/cli/EntryPoint";
@@ -36,6 +37,7 @@ vi.mock("esbuild", (importOriginal) =>
 const controlledWatcher = Effect.fnUntraced(function* (
   options: {
     readonly files?: ReadonlyArray<string>;
+    readonly contents?: Record.ReadonlyRecord<string, string>;
     readonly plugins?: ReadonlyArray<esbuild.Plugin>;
     readonly afterPlugins?: ReadonlyArray<esbuild.Plugin>;
     readonly rebuild?: (
@@ -56,6 +58,8 @@ const controlledWatcher = Effect.fnUntraced(function* (
     "tables/notes.ts",
   ])
     yield* project.write(`confect/${file}`, "export const value = 1;");
+  for (const [file, contents] of Record.toEntries(options.contents ?? {}))
+    yield* project.write(file, contents);
 
   const events = yield* Queue.unbounded<FileSystem.WatchEvent>();
   const configEvents = yield* Queue.unbounded<FileSystem.WatchEvent>();
@@ -156,6 +160,259 @@ const controlledWatcher = Effect.fnUntraced(function* (
     contexts,
     first,
   };
+});
+
+layer(NodeServices.layer)("entry configuration", (test) => {
+  test.effect(
+    "rechecks earlier groups after later groups finish building",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const edited = yield* Ref.make(false);
+        const earlierOutput = yield* Ref.make("");
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
+        const { watcher } = yield* controlledWatcher({
+          files: ["notes.spec.ts", "tables/notes.ts"],
+          contents: {
+            "confect/tsconfig.json": "{}",
+            "confect/tables/tsconfig.json": "{}",
+            "confect/notes.spec.ts": 'import "../shared";',
+            "confect/tables/notes.ts": 'import "../../shared";',
+            "shared.ts": 'console.log("before-edit");',
+          },
+          afterPlugins: [
+            {
+              name: "edit-after-later-configuration-build",
+              setup(build) {
+                const table =
+                  path.basename(
+                    path.dirname(build.initialOptions.tsconfig ?? ""),
+                  ) === "tables";
+                build.onEnd((result) =>
+                  runPromise(
+                    Effect.gen(function* () {
+                      if (table) {
+                        yield* Ref.set(
+                          earlierOutput,
+                          (result.outputFiles ?? [])
+                            .map((output) => output.text)
+                            .join("\n"),
+                        );
+                      } else if (!(yield* Ref.getAndSet(edited, true))) {
+                        yield* fs.writeFileString(
+                          path.join(
+                            build.initialOptions.absWorkingDir ?? "",
+                            "shared.ts",
+                          ),
+                          'console.log("after-edit");',
+                        );
+                      }
+                    }),
+                  ),
+                );
+              },
+            },
+          ],
+        });
+        expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(true);
+        expect(yield* Ref.get(earlierOutput)).toContain("after-edit");
+        expect(yield* Ref.get(earlierOutput)).not.toContain("before-edit");
+      }).pipe(Effect.scoped),
+  );
+
+  test.effect(
+    "keeps other configuration failures visible during recovery",
+    () =>
+      Effect.gen(function* () {
+        const { watcher, project } = yield* controlledWatcher({
+          files: ["notes.spec.ts", "tables/notes.ts"],
+          contents: {
+            "confect/tsconfig.json": "{}",
+            "confect/tables/tsconfig.json": "{}",
+            "confect/notes.spec.ts": "export const broken = ;",
+            "confect/tables/notes.ts": "export const alsoBroken = ;",
+          },
+        });
+        expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(false);
+        expect((yield* watcher.diagnostics).errors).toHaveLength(2);
+        yield* project.write(
+          "confect/notes.spec.ts",
+          "export const value = 1;",
+        );
+        expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(false);
+        expect((yield* watcher.diagnostics).errors).toHaveLength(1);
+        yield* project.write(
+          "confect/tables/notes.ts",
+          "export const value = 2;",
+        );
+        expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(true);
+        expect((yield* watcher.diagnostics).errors).toEqual([]);
+      }).pipe(Effect.scoped),
+  );
+
+  test.effect("applies each entry configuration to its shared helpers", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const outputs = yield* Ref.make<ReadonlyArray<string>>([]);
+      const runSync = Effect.runSyncWith(yield* Effect.context());
+      const { watcher, project } = yield* controlledWatcher({
+        files: ["notes.spec.ts", "tables/notes.ts"],
+        contents: {
+          "confect/tsconfig.json":
+            '{"compilerOptions":{"paths":{"alias":["../spec-value.ts"]}}}',
+          "confect/tables/tsconfig.json":
+            '{"compilerOptions":{"paths":{"alias":["../../table-value.ts"]}}}',
+          "confect/notes.spec.ts": 'import "./shared";',
+          "confect/tables/notes.ts": 'import "../shared";',
+          "confect/shared.ts":
+            'import { value } from "alias"; console.log(value);',
+          "spec-value.ts": 'export const value = "chosen-spec";',
+          "table-value.ts": 'export const value = "chosen-table";',
+        },
+        afterPlugins: [
+          {
+            name: "capture-configured-output",
+            setup(build) {
+              build.onEnd((result) =>
+                runSync(
+                  Ref.update(outputs, (current) => [
+                    ...current,
+                    ...(result.outputFiles ?? []).map((file) => file.text),
+                  ]),
+                ),
+              );
+            },
+          },
+        ],
+      });
+      expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(true);
+      expect((yield* watcher.diagnostics).errors).toEqual([]);
+      expect((yield* Ref.get(outputs)).join("\n")).toContain("chosen-spec");
+      expect((yield* Ref.get(outputs)).join("\n")).toContain("chosen-table");
+      yield* watcher.next;
+      yield* project.write("table-value.ts", 'export const value = "changed";');
+      expect(Watcher.isRefreshSuccessful(yield* watcher.refresh)).toBe(true);
+      const changed = yield* watcher.next;
+      expect(SyncState.isDirty(changed)).toBe(true);
+      expect(changed.work).toMatchObject({
+        _tag: "Declarations",
+        entries: [
+          { _tag: "Table", relativePath: path.join("tables", "notes.ts") },
+        ],
+      });
+    }).pipe(Effect.scoped),
+  );
+});
+
+layer(NodeServices.layer)("package self-reference resolution", (test) => {
+  test.effect(
+    "keeps unchanged strict bundles clean with opposite resolution arrival orders",
+    () =>
+      Effect.gen(function* () {
+        const preferred = yield* Ref.make("./leaf.ts");
+        const makeGates = Effect.all({
+          waiting: Deferred.make<void>(),
+          loaded: Deferred.make<void>(),
+        });
+        const gates = yield* Ref.make(yield* makeGates);
+        const resolutions = yield* Ref.make<ReadonlyArray<string>>([]);
+        const outputs = yield* Ref.make<ReadonlyArray<string>>([]);
+        const runPromise = Effect.runPromiseWith(yield* Effect.context());
+        const runSync = Effect.runSyncWith(yield* Effect.context());
+        const { watcher } = yield* controlledWatcher({
+          files: ["notes.spec.ts", "notes.impl.ts"],
+          contents: {
+            "package.json":
+              '{"name":"@fixture/backend","type":"module","exports":{"./*":"./confect/*.ts"}}',
+            "tsconfig.json": '{"compilerOptions":{"strict":true}}',
+            "confect/leaf.ts": "export const value = 1;",
+            "confect/notes.spec.ts": 'console.log(require("./leaf.ts"));',
+            "confect/notes.impl.ts":
+              'console.log(require("@fixture/backend/leaf"));',
+          },
+          plugins: [
+            {
+              name: "force-self-reference-arrival-order",
+              setup(build) {
+                build.onStart(() =>
+                  runSync(
+                    Effect.flatMap(makeGates, (next) =>
+                      Ref.set(gates, next),
+                    ).pipe(Effect.asVoid),
+                  ),
+                );
+                build.onResolve({ filter: /leaf(?:\.ts)?$/ }, (args) =>
+                  runPromise(
+                    Effect.gen(function* () {
+                      const { waiting, loaded } = yield* Ref.get(gates);
+                      if (args.path === (yield* Ref.get(preferred))) {
+                        yield* Deferred.await(waiting);
+                      } else {
+                        yield* Deferred.succeed(waiting, undefined);
+                        yield* Deferred.await(loaded);
+                      }
+                      yield* Ref.update(resolutions, (events) => [
+                        ...events,
+                        args.path,
+                      ]);
+                    }).pipe(Effect.as(undefined)),
+                  ),
+                );
+                build.onLoad({ filter: /[/\\]leaf\.ts$/ }, () =>
+                  runSync(
+                    Effect.gen(function* () {
+                      yield* Ref.update(resolutions, (events) => [
+                        ...events,
+                        "loaded",
+                      ]);
+                      const { loaded } = yield* Ref.get(gates);
+                      yield* Deferred.succeed(loaded, undefined);
+                    }).pipe(Effect.as(undefined)),
+                  ),
+                );
+                build.onEnd((result) =>
+                  runSync(
+                    Ref.update(outputs, (recorded) => [
+                      ...recorded,
+                      result.outputFiles?.[0]?.text ?? "",
+                    ]).pipe(Effect.asVoid),
+                  ),
+                );
+              },
+            },
+          ],
+        });
+        const first = yield* watcher.refresh;
+        expect(
+          (yield* watcher.diagnostics).errors.map((error) => error.text),
+        ).toEqual([]);
+        expect(first).toMatchObject({
+          _tag: "Observed",
+          outcome: { _tag: "Succeeded" },
+        });
+        expect((yield* watcher.next).work._tag).toBe("Full");
+        yield* Ref.set(preferred, "@fixture/backend/leaf");
+        const second = yield* watcher.refresh;
+        expect(second).toMatchObject({
+          _tag: "Observed",
+          outcome: { _tag: "Succeeded" },
+        });
+        expect(yield* Ref.get(resolutions)).toEqual([
+          "./leaf.ts",
+          "loaded",
+          "@fixture/backend/leaf",
+          "@fixture/backend/leaf",
+          "loaded",
+          "./leaf.ts",
+        ]);
+        const recorded = yield* Ref.get(outputs);
+        expect(recorded).toHaveLength(2);
+        expect(recorded[0]).toContain('"use strict"');
+        expect(recorded[1]).toBe(recorded[0]);
+        expect(yield* watcher.pending).toEqual(SyncState.empty);
+      }).pipe(Effect.scoped),
+  );
 });
 
 it("allows readiness only for empty or successfully refreshed watchers", () => {

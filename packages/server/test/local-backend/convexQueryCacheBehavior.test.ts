@@ -13,8 +13,8 @@ import type { ConvexHttpClient } from "convex/browser";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import refs from "./fixtures/confect/_generated/refs";
-import * as LocalBackend from "./LocalBackend";
+import refs from "confect-local-backend/refs";
+import * as LocalBackend from "confect-local-backend/LocalBackend";
 
 class ConvexQueryError extends Schema.TaggedError<ConvexQueryError>()(
   "ConvexQueryError",

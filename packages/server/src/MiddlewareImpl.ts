@@ -9,6 +9,7 @@ import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import type * as Auth from "./Auth";
 import type * as DatabaseReader from "./DatabaseReader";
+import type * as DocumentIds from "./DocumentIds";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 import type { ExecutionMetadata } from "./ExecutionMetadata";
@@ -93,6 +94,7 @@ type QueryMutationCommonServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
+  | DocumentIds.DocumentIds<DatabaseSchema_>
   | Auth.Auth
   | ExecutionMetadata
   | TransactionMetadata

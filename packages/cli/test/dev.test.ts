@@ -7,6 +7,7 @@ import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Queue from "effect/Queue";
 import * as esbuild from "esbuild";
 import { dev } from "@confect/cli/confect/dev";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -32,6 +33,111 @@ vi.mock("effect/Console", (importOriginal) =>
 layer(NodeServices.layer, { excludeTestServices: true })(
   "dev dependency watcher resources",
   (it) => {
+    it.effect.each([
+      { kind: "syntax", message: "Unexpected" },
+      { kind: "unlocated", message: "unlocated watcher failure" },
+    ])(
+      "reports $kind build errors before recovering from a helper edit",
+      ({ kind, message }) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const helper = path.join(project.root, "confect/name.ts");
+          const replacement = path.join(project.root, "name.next.ts");
+          const ready = yield* Queue.unbounded<void>();
+          const errors = yield* Queue.unbounded<string>();
+          let readyCount = 0;
+          let broken = false;
+          if (kind === "unlocated") {
+            const context = vi.mocked(esbuild.context);
+            const original = context.getMockImplementation();
+            assert(original);
+            context.mockImplementation((options) =>
+              original({
+                ...options,
+                plugins: [
+                  ...(options.plugins ?? []),
+                  {
+                    name: "unlocated-watcher-error",
+                    setup(build) {
+                      build.onStart(() =>
+                        broken ? { errors: [{ text: message }] } : undefined,
+                      );
+                    },
+                  },
+                ],
+              }),
+            );
+            yield* Effect.addFinalizer(() =>
+              Effect.sync(() => context.mockImplementation(original)),
+            );
+          }
+          yield* project.write(
+            "confect/name.ts",
+            'export const name = "list";',
+          );
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { name } from "./name";\n${Project.spec.replace('name: "list"', "name")}`,
+          );
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi
+                .spyOn(Console, "log")
+                .mockImplementation((...args) =>
+                  args.some(
+                    (arg) =>
+                      typeof arg === "string" &&
+                      arg.includes("Generated files are up-to-date"),
+                  )
+                    ? Effect.sync(() => readyCount++).pipe(
+                        Effect.andThen(Queue.offer(ready, undefined)),
+                        Effect.asVoid,
+                      )
+                    : Effect.void,
+                ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              vi.spyOn(Console, "error").mockImplementation((...args) =>
+                Effect.forEach(
+                  args.filter(
+                    (arg): arg is string =>
+                      typeof arg === "string" && arg.includes("Build errors"),
+                  ),
+                  (text) => Queue.offer(errors, text),
+                  { discard: true },
+                ),
+              ),
+            ),
+            (spy) => Effect.sync(() => spy.mockRestore()),
+          );
+          yield* project
+            .provide(Command.runWith(dev, { version: "test" })([]))
+            .pipe(Effect.forkScoped);
+          yield* Queue.take(ready);
+          broken = true;
+          yield* fs.writeFileString(
+            replacement,
+            kind === "syntax"
+              ? "export const name = ;"
+              : 'export const name = "pending";',
+          );
+          yield* fs.rename(replacement, helper);
+          expect(yield* Queue.take(errors)).toContain(message);
+          expect(readyCount).toBe(1);
+          broken = false;
+          yield* fs.writeFileString(replacement, 'export const name = "list";');
+          yield* fs.rename(replacement, helper);
+          yield* Queue.take(ready);
+          expect(readyCount).toBe(2);
+        }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
+      { timeout: 25000 },
+    );
+
     it.effect.each(["operation", "metadata"] as const)(
       "does not report readiness after a watcher %s failure and recovers on edit",
       (failureKind) =>
