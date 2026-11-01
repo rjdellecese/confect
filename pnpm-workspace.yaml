@@ -26,12 +26,13 @@ minimumReleaseAgeExclude:
   - "@effect/platform-node@4.1.0"
   - "@effect/vitest@4.1.0"
   - effect@4.1.0
+  - exsolve@1.2.0
 
 overrides:
   convex: 1.46.0
   effect: 4.1.0
-  react: 19.3.0
-  react-dom: 19.3.0
+  react: 19.3.1
+  react-dom: 19.3.1
 
 packageExtensions:
   "@mintlify/mdx":
