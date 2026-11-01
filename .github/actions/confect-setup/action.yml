@@ -2,6 +2,11 @@ name: "Confect Packages Setup"
 description: "Sets up Node.js and pnpm for the confect packages"
 author: "Confect"
 
+inputs:
+  build:
+    description: "Build package distributions after installing dependencies"
+    default: "true"
+
 runs:
   using: "composite"
   steps:
@@ -21,5 +26,6 @@ runs:
       shell: bash
 
     - name: Build Confect packages
+      if: inputs.build == 'true'
       run: pnpm build
       shell: bash

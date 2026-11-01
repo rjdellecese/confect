@@ -27,6 +27,7 @@ import * as EffectScheduler from "effect/Scheduler";
 import * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as DatabaseReader from "./DatabaseReader";
+import * as DocumentIds from "./DocumentIds";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
@@ -126,12 +127,20 @@ export const make = (
 
 export const register = (self: Definition): RegisteredFunction.Any =>
   Definition.$match(self, {
-    PublicQuery: (definition) => queryGeneric(definition),
-    InternalQuery: (definition) => internalQueryGeneric(definition),
-    PublicMutation: (definition) => mutationGeneric(definition),
-    InternalMutation: (definition) => internalMutationGeneric(definition),
-    PublicAction: (definition) => actionGeneric(definition),
-    InternalAction: (definition) => internalActionGeneric(definition),
+    PublicQuery: (definition) =>
+      queryGeneric(RegisteredFunction.toConvexDefinition(definition)),
+    InternalQuery: (definition) =>
+      internalQueryGeneric(RegisteredFunction.toConvexDefinition(definition)),
+    PublicMutation: (definition) =>
+      mutationGeneric(RegisteredFunction.toConvexDefinition(definition)),
+    InternalMutation: (definition) =>
+      internalMutationGeneric(
+        RegisteredFunction.toConvexDefinition(definition),
+      ),
+    PublicAction: (definition) =>
+      actionGeneric(RegisteredFunction.toConvexDefinition(definition)),
+    InternalAction: (definition) =>
+      internalActionGeneric(RegisteredFunction.toConvexDefinition(definition)),
     Registered: ({ handler }) => handler,
   });
 
@@ -202,6 +211,7 @@ const queryFunction = <
     Returns,
     E,
     | DatabaseReader.DatabaseReader<DatabaseSchema_>
+    | DocumentIds.DocumentIds<DatabaseSchema_>
     | Auth.Auth
     | ExecutionMetadata.ExecutionMetadata
     | TransactionMetadata.TransactionMetadata
@@ -215,8 +225,8 @@ const queryFunction = <
   >;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
-  args: compileArgsSchema(args),
-  returns: compileReturnsSchema(returns),
+  args: () => compileArgsSchema(args),
+  returns: () => compileReturnsSchema(returns),
   handler: (
     ctx: GenericQueryCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
@@ -243,6 +253,7 @@ const queryFunction = <
         Effect.provide(
           Layer.mergeAll(
             DatabaseReader.layer(databaseSchema, ctx.db),
+            DocumentIds.layer(databaseSchema, ctx.db),
             Auth.layer(ctx.auth),
             ExecutionMetadata.layer(ctx.meta),
             TransactionMetadata.layer(ctx.meta),
@@ -281,6 +292,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
 ) =>
   Layer.mergeAll(
     DatabaseReader.layer(schema, ctx.db),
+    DocumentIds.layer(schema, ctx.db),
     DatabaseWriter.layer(schema, ctx.db),
     Auth.layer(ctx.auth),
     ExecutionMetadata.layer(ctx.meta),
@@ -304,6 +316,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
 
 export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
   | DatabaseReader.DatabaseReader<Schema>
+  | DocumentIds.DocumentIds<Schema>
   | DatabaseWriter.DatabaseWriter<Schema>
   | Auth.Auth
   | ExecutionMetadata.ExecutionMetadata
@@ -347,8 +360,8 @@ const mutationFunction = <
   ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
-  args: compileArgsSchema(args),
-  returns: compileReturnsSchema(returns),
+  args: () => compileArgsSchema(args),
+  returns: () => compileReturnsSchema(returns),
   handler: (
     ctx: GenericMutationCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>

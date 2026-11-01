@@ -149,6 +149,24 @@ assert.equal(await Effect.runPromise(Ref.runWithCodec(refs.public.notes.count, {
   assert.deepEqual(args, { count: "41" });
   return Promise.resolve("42");
 })), 42);
+${
+  profile === "foldkit"
+    ? `
+const { Client } = await import("@confect/foldkit");
+const { command, Message } = await import("./client");
+const message = await Effect.runPromise(command.pipe(
+  Effect.provide(Layer.mock(Client.Client, {
+    url: "https://consumer.invalid",
+    query: (ref, ...args) => {
+      assert.deepEqual(args, [{ count: 41 }]);
+      return Ref.decodeReturns(ref, "42");
+    },
+  })),
+));
+assert.deepEqual(message, Message.SucceededCount({ count: 42 }));
+`
+    : ""
+}
 console.log("Installed consumer smoke passed");
 `,
   ...(profile === "react"

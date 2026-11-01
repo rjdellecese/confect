@@ -13,6 +13,7 @@ pnpm build
 pnpm check:consumers --profile react --lane baseline --manager npm
 pnpm check:consumers --profile react --lane fresh --manager pnpm
 pnpm check:consumers --profile foldkit --lane baseline --manager npm
+pnpm check:consumers --profile foldkit --lane fresh --manager pnpm
 ```
 
 Each invocation creates an isolated temporary directory, runs real `pnpm pack`
@@ -46,9 +47,10 @@ include core, server, and CLI; React adds `@confect/react`, while Foldkit adds
 `@confect/js`, `@confect/foldkit`, and Foldkit's browser platform peer. These are
 whole applications, not independently installable client and backend snippets.
 
-- **Baseline** selects Effect 4.0.1, platform-node 4.0.1 **and node-shared 4.0.1**,
+- **Baseline** selects Effect 4.1.0, platform-node 4.1.0 **and node-shared 4.1.0**,
   plus Convex 1.45.0. It is a coherent minimum-Effect baseline with a selected
-  React 19.3.0 host, not a claim that every package is at its absolute minimum.
+  React 19.3.0 host or Foldkit 0.170.0 and platform-browser 4.1.0, not a claim
+  that every package is at its absolute minimum.
   Unrelated transitive dependencies still resolve normally; this is not a frozen
   lockfile or a proof of every allowed version.
 - **Fresh** uses the declared host ranges and normal fresh resolution, with no
@@ -57,24 +59,18 @@ whole applications, not independently installable client and backend snippets.
   delay is disabled for this isolated compatibility probe so new upstream
   releases are visible.
 
-### Foldkit remains a release-acceptance blocker
+### Supported Foldkit graph
 
-On 2026-10-12, source and published Confect 10.2.0 require Effect `^4.0.1` through
-server/CLI. Foldkit 0.165.0, the stable version admitted by `^0.165.0`, requires
-exactly `4.0.0`. Latest Foldkit 0.168.0 also requires 4.0.0 and is outside that
-range. Workspace overrides hide this incompatibility; the isolated runner must
-fail it.
+The Foldkit profile selects `foldkit: ^0.170.0` and
+`@effect/platform-browser: ~4.1.0` in the fresh lane, alongside Effect `~4.1.0`.
+These ranges admit patch releases within the verified minor versions. The
+adapter, Foldkit, server, and CLI can share one Effect installation without
+overrides.
 
-The Foldkit row is **not** an expected-failure acceptance test or an unsupported
-profile. Reproducing the conflict in regression tests does not make it pass.
-An explicit support decision is required: restore a compatible supported graph,
-or revise the advertised support claim through the normal release/documentation
-process. This tooling does neither. Passing React rows do not establish complete
-release readiness.
-
-The Packages workflow runs only the four React rows (two managers × two lanes).
-It has no `continue-on-error` or expected-failure Foldkit job. The missing passing
-Foldkit row is the explicit blocker above, not evidence of full release coverage.
+The Packages workflow requires all eight rows: two profiles × two managers ×
+two lanes. Neither profile is an expected failure, and neither uses
+`continue-on-error`. The daily compatibility automation also checks both
+profiles with fresh npm and pnpm resolution, even when main has not changed.
 
 ## Reports and final candidate artifacts
 
@@ -91,10 +87,10 @@ rewriting against that checkout, and installs those exact tarballs. This is the
 same runner intended for the final versioned release candidates after Changesets,
 not a second source-manifest-only check.
 
-Production-required release wiring is deliberately pending the Foldkit support
-decision. Before enabling it, run both managers and both lanes for every claimed
-profile against final versioned artifacts and require successful acceptance
-before publication. This PR does not change `release` or publish anything.
+The release workflow does not yet run this gate against final versioned
+artifacts before publication. That is separate from the PR and daily checks:
+release acceptance should run both managers and both lanes for every claimed
+profile against those exact artifacts.
 
 The fast regression tests live in `consumerCompatibility.test.ts` and
 `checkConsumers.test.ts`; `bun test ./scripts` discovers them. They cover the

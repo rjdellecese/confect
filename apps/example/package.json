@@ -8,10 +8,10 @@
     "@confect/server": "workspace:*",
     "@convex-dev/workpool": "0.4.14",
     "convex": "1.47.0",
-    "convex-helpers": "0.1.128",
-    "effect": "4.0.4",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "convex-helpers": "0.1.129",
+    "effect": "4.1.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "vite": "8.3.4"
   },
   "devDependencies": {

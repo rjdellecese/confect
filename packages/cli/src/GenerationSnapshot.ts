@@ -28,23 +28,15 @@ export const GroupSummary = Schema.Struct({
 });
 export interface GroupSummary extends Schema.Schema.Type<typeof GroupSummary> {}
 
-export const FunctionSummary = Schema.Struct({
-  name: Schema.NonEmptyString,
-  provenance: Schema.Literals(["Confect", "Convex"]),
-});
-export interface FunctionSummary extends Schema.Schema.Type<
-  typeof FunctionSummary
-> {}
-
 export interface GroupTree {
   readonly runtime: "Convex" | "Node";
-  readonly functions: ReadonlyArray<FunctionSummary>;
+  readonly functionNames: ReadonlyArray<string>;
   readonly groups: { readonly [name: string]: GroupTree };
 }
 
 export const GroupTree: Schema.Codec<GroupTree> = Schema.Struct({
   runtime: GroupSummary.fields.runtime,
-  functions: Schema.Array(FunctionSummary),
+  functionNames: GroupSummary.fields.functionNames,
   groups: Schema.Record(
     Schema.String,
     Schema.suspend(() => GroupTree),
@@ -91,7 +83,7 @@ const parseTree = (
   Result.gen(function* () {
     yield* Result.try({
       try: () => {
-        for (const { name } of tree.functions)
+        for (const name of tree.functionNames)
           Identifier.validateConfectFunctionIdentifier(name);
       },
       catch: () =>
@@ -102,9 +94,8 @@ const parseTree = (
         }),
     });
     if (
-      HashSet.size(
-        HashSet.fromIterable(Array.map(tree.functions, ({ name }) => name)),
-      ) !== tree.functions.length
+      HashSet.size(HashSet.fromIterable(tree.functionNames)) !==
+      tree.functionNames.length
     ) {
       return yield* Result.fail(
         new SnapshotError({
@@ -129,39 +120,6 @@ const parseTree = (
     return tree;
   });
 
-export const parseRootPath = (
-  key: string,
-): Result.Result<SpecModulePath.SpecModulePath, SnapshotError> =>
-  Result.gen(function* () {
-    const relativePath = yield* Schema.decodeResult(CanonicalSpecPath)(
-      key,
-    ).pipe(
-      Result.mapError(
-        (cause) =>
-          new SnapshotError({
-            reason: "NoncanonicalPath",
-            relativePath: key,
-            pathSegments: [],
-            cause,
-          }),
-      ),
-    );
-    const path = rootPath(relativePath);
-    yield* Result.try({
-      try: () => {
-        for (const segment of path.pathSegments)
-          Identifier.validateConfectFunctionIdentifier(segment);
-      },
-      catch: () =>
-        new SnapshotError({
-          reason: "NoncanonicalPath",
-          relativePath,
-          pathSegments: path.pathSegments,
-        }),
-    });
-    return relativePath;
-  });
-
 const fromEntries = (
   entries: ReadonlyArray<readonly [string, GroupTree]>,
 ): Result.Result<
@@ -171,8 +129,32 @@ const fromEntries = (
   Result.gen(function* () {
     let leaves = HashMap.empty<SpecModulePath.SpecModulePath, GroupTree>();
     for (const [key, tree] of entries) {
-      const relativePath = yield* parseRootPath(key);
+      const relativePath = yield* Schema.decodeResult(CanonicalSpecPath)(
+        key,
+      ).pipe(
+        Result.mapError(
+          (cause) =>
+            new SnapshotError({
+              reason: "NoncanonicalPath",
+              relativePath: key,
+              pathSegments: [],
+              cause,
+            }),
+        ),
+      );
       const path = rootPath(relativePath);
+      yield* Result.try({
+        try: () => {
+          for (const segment of path.pathSegments)
+            Identifier.validateConfectFunctionIdentifier(segment);
+        },
+        catch: () =>
+          new SnapshotError({
+            reason: "NoncanonicalPath",
+            relativePath,
+            pathSegments: path.pathSegments,
+          }),
+      });
       if (HashMap.has(leaves, relativePath)) {
         return yield* Result.fail(
           new SnapshotError({
@@ -240,10 +222,7 @@ export const GenerationSnapshot = Entries.pipe(
 
 const summarize = (group: GroupSpec.AnyWithProps): GroupTree => ({
   runtime: group.runtime,
-  functions: Array.map(Record.toEntries(group.functions), ([name, spec]) => ({
-    name,
-    provenance: spec.functionProvenance._tag,
-  })),
+  functionNames: Record.keys(group.functions),
   groups: Record.map(group.groups, summarize),
 });
 
@@ -286,10 +265,7 @@ const groups = (snapshot: GenerationSnapshot): ReadonlyArray<GroupSummary> => {
     {
       path,
       runtime: tree.runtime,
-      functionNames: Array.sort(
-        Array.map(tree.functions, ({ name }) => name),
-        String.Order,
-      ),
+      functionNames: Array.sort(tree.functionNames, String.Order),
     },
     ...Array.flatMap(
       Array.sort(Object.keys(tree.groups), String.Order),
@@ -376,10 +352,7 @@ const parseNoParentChildNameCollisions = (
       const parent = HashMap.get(leaves, parentPath);
       if (Option.isNone(parent)) continue;
       const collisionName = segments[depth]!;
-      const collisionKind = Array.some(
-        parent.value.functions,
-        ({ name }) => name === collisionName,
-      )
+      const collisionKind = parent.value.functionNames.includes(collisionName)
         ? "function"
         : Object.hasOwn(parent.value.groups, collisionName)
           ? "group"

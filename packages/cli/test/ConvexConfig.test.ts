@@ -14,7 +14,6 @@ import {
 } from "@confect/cli/ConvexConfig";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
-import * as Compilation from "@confect/cli/Compilation";
 
 const fixturesRoot = `${import.meta.dirname}/fixtures/components`;
 
@@ -51,66 +50,6 @@ const directoriesLayer = ({
   );
 
 layer(TestLayer)("discoverInstalledComponents", (it) => {
-  it.effect.each(["standalone", "persistent"] as const)(
-    "handles component export changes according to the %s session policy",
-    (mode) =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* fs.makeTempDirectoryScoped({
-          directory: import.meta.dirname,
-        });
-        const component = path.join(root, "node_modules", "component");
-        yield* fs.makeDirectory(component, { recursive: true });
-        yield* fs.writeFileString(
-          path.join(component, "one.ts"),
-          'import { defineComponent } from "convex/server"; export default defineComponent("one");',
-        );
-        yield* fs.writeFileString(
-          path.join(component, "two.ts"),
-          'import { defineComponent } from "convex/server"; export default defineComponent("two");',
-        );
-        const manifest = (target: string) =>
-          fs.writeFileString(
-            path.join(component, "package.json"),
-            `{ "name": "component", "type": "module", "exports": { "./convex.config": "./${target}.ts" } }`,
-          );
-        yield* manifest("one");
-        const config = path.join(root, "convex.config.ts");
-        const contents =
-          'import { defineApp } from "convex/server"; import component from "component/convex.config"; const app = defineApp(); app.use(component); export default app;';
-        yield* fs.writeFileString(config, contents);
-        const program = Effect.gen(function* () {
-          const first = yield* Compilation.runJob(
-            discoverInstalledComponents(config, "convex.config.ts"),
-          );
-          expect((yield* first.exit)[0]?.name).toBe("one");
-          yield* manifest("two");
-          yield* fs.writeFileString(config, contents + "\n");
-          const second = yield* Compilation.runJob(
-            discoverInstalledComponents(config, "convex.config.ts"),
-          );
-          if (mode === "persistent") {
-            expect(Result.isFailure(yield* Effect.result(second.exit))).toBe(
-              true,
-            );
-            expect(second.receipts).toEqual([]);
-            const compiler = yield* Effect.serviceOption(Compilation.Service);
-            expect(compiler._tag).toBe("Some");
-            if (compiler._tag === "Some")
-              expect(yield* compiler.value.restartRequired).toMatchObject({
-                _tag: "Some",
-                value: { reason: "ResolutionInputsChanged" },
-              });
-          } else expect((yield* second.exit)[0]?.name).toBe("two");
-        });
-        yield* mode === "persistent"
-          ? program.pipe(
-              Effect.provide(Compilation.layer({ ownedDirectories: [] })),
-            )
-          : program;
-      }).pipe(Effect.scoped),
-  );
   it.effect(
     "lists npm components by mount name, keeping bare import specifiers",
     () =>

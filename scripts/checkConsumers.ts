@@ -362,7 +362,6 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
     lane,
     manager,
     directory,
-    blocker: profiles[profile].blocker,
     acceptance: "failed",
   };
   yield* Effect.gen(function* () {

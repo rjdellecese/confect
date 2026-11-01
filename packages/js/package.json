@@ -1,15 +1,16 @@
 {
   "name": "@confect/js",
   "description": "JavaScript client bindings for any JS runtime",
-  "version": "10.3.2",
+  "version": "10.5.0",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.4",
+    "@effect/vitest": "4.1.0",
     "@types/node": "26.6.5",
-    "effect": "4.0.4",
+    "confect-local-backend": "workspace:*",
+    "effect": "4.1.0",
     "tsdown": "0.23.1",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
@@ -61,6 +62,7 @@
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",
+    "test:local-backend": "vitest run --config vitest.local-backend.config.ts",
     "typecheck": "tsc -b tsconfig.src.json",
     "typecheck:inexact": "tsc --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
   },

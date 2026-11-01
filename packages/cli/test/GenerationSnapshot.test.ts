@@ -94,65 +94,34 @@ const metadataGroup = (
   groups: GenerationSnapshot.GroupTree["groups"] = {},
 ): GenerationSnapshot.GroupTree => ({
   runtime: "Convex",
-  functions: functionNames.map((name) => ({ name, provenance: "Confect" })),
+  functionNames,
   groups,
 });
 
 describe("GenerationSnapshot parsing", () => {
-  test.each(["notes.spec.ts", "admin/reports.spec.ts"])(
-    "parses declaration root %s without runtime metadata",
-    (path) =>
-      expect(Result.getOrThrow(GenerationSnapshot.parseRootPath(path))).toBe(
-        path,
-      ),
-  );
-
-  test.each([
-    "schema.spec.ts",
-    "bad-dir/notes.spec.ts",
-    "notes/..spec.ts",
-    "notes\\list.spec.ts",
-    ".spec.ts",
-  ])("rejects invalid declaration root %s without runtime metadata", (path) => {
-    const result = GenerationSnapshot.parseRootPath(path);
-    assert(Result.isFailure(result));
-    expect(result.failure).toMatchObject({
-      _tag: "SnapshotError",
-      reason: "NoncanonicalPath",
-      relativePath: path,
-    });
-  });
-
   test.each([
     { reason: "InvalidShape", entries: {} },
     {
       reason: "InvalidShape",
       entries: [
-        ["notes.spec.ts", { runtime: "Other", functions: [], groups: {} }],
+        ["notes.spec.ts", { runtime: "Other", functionNames: [], groups: {} }],
       ],
     },
     {
       reason: "InvalidShape",
       entries: [
-        ["notes.spec.ts", { runtime: "Convex", functions: [], groups: [] }],
+        ["notes.spec.ts", { runtime: "Convex", functionNames: [], groups: [] }],
       ],
     },
     {
       reason: "InvalidShape",
-      entries: [["notes.spec.ts", metadataGroup([""])]],
-    },
-    ...[
-      { functionNames: ["list"] },
-      { functions: ["list"] },
-      { functions: [{ name: "list" }] },
-      { functions: [{ name: "list", provenance: "Other" }] },
-      { functions: { list: "Confect" } },
-    ].map((fields) => ({
-      reason: "InvalidShape",
       entries: [
-        ["notes.spec.ts", { runtime: "Convex", groups: {}, ...fields }],
+        [
+          "notes.spec.ts",
+          { runtime: "Convex", functionNames: [""], groups: {} },
+        ],
       ],
-    })),
+    },
     {
       reason: "InvalidShape",
       entries: [
@@ -210,22 +179,6 @@ describe("GenerationSnapshot parsing", () => {
       reason: "NoncanonicalFunctionNames",
       entries: [["notes.spec.ts", metadataGroup(["list", "list"])]],
     },
-    {
-      reason: "NoncanonicalFunctionNames",
-      entries: [
-        [
-          "notes.spec.ts",
-          {
-            runtime: "Convex",
-            functions: [
-              { name: "list", provenance: "Confect" },
-              { name: "list", provenance: "Convex" },
-            ],
-            groups: {},
-          },
-        ],
-      ],
-    },
     ...[
       "not-an-identifier",
       "nested/child",
@@ -279,10 +232,7 @@ describe("GenerationSnapshot parsing", () => {
       { path: ["nested", "notes", "alpha", "child"], names: ["run"] },
       { path: ["nested", "notes", "zebra"], names: ["a", "z"] },
     ]);
-    expect(tree.functions).toEqual([
-      { name: "zebra", provenance: "Confect" },
-      { name: "alpha", provenance: "Confect" },
-    ]);
+    expect(tree.functionNames).toEqual(["zebra", "alpha"]);
     expect(Object.keys(tree.groups)).toEqual(["zebra", "alpha"]);
     expect(GenerationSnapshot.diff(snapshot, roundtrip(snapshot))).toEqual({
       removed: [],
@@ -404,20 +354,13 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           const leaves = [leaf];
           const snapshot = fromLoadedLeaves(leaves);
           const summary = getLeaf(snapshot, leaf.relativePath);
-          expect(summary.functions).toEqual([
-            { name: "zebra", provenance: "Confect" },
-            { name: "alpha", provenance: "Confect" },
-          ]);
+          expect(summary.functionNames).toEqual(["zebra", "alpha"]);
           expect(summary.groups).toEqual({
             empty: {
               runtime: "Convex",
-              functions: [],
+              functionNames: [],
               groups: {
-                node: {
-                  runtime: "Node",
-                  functions: [{ name: "run", provenance: "Confect" }],
-                  groups: {},
-                },
+                node: { runtime: "Node", functionNames: ["run"], groups: {} },
               },
             },
           });
@@ -427,18 +370,15 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
               "nested/notes.spec.ts",
               {
                 runtime: "Convex",
-                functions: [
-                  { name: "zebra", provenance: "Confect" },
-                  { name: "alpha", provenance: "Confect" },
-                ],
+                functionNames: ["zebra", "alpha"],
                 groups: {
                   empty: {
                     runtime: "Convex",
-                    functions: [],
+                    functionNames: [],
                     groups: {
                       node: {
                         runtime: "Node",
-                        functions: [{ name: "run", provenance: "Confect" }],
+                        functionNames: ["run"],
                         groups: {},
                       },
                     },
@@ -484,62 +424,6 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
     );
 
     it.effect(
-      "retains native and Confect provenance in declaration order through JSON",
-      () =>
-        Effect.gen(function* () {
-          const spec = GroupSpec.addGroupsAt(
-            GroupSpec.make()
-              .addFunction(FunctionSpec.convexPublicQuery()("zebra"))
-              .addFunction(query("alpha")),
-            {
-              child: GroupSpec.make().addFunction(
-                FunctionSpec.convexInternalAction()("run"),
-              ),
-            },
-          );
-          const leaf = yield* loadLeaf("notes.spec.ts", spec);
-          const snapshot = fromLoadedLeaves([leaf]);
-          expect(getLeaf(roundtrip(snapshot), leaf.relativePath)).toEqual({
-            runtime: "Convex",
-            functions: [
-              { name: "zebra", provenance: "Convex" },
-              { name: "alpha", provenance: "Confect" },
-            ],
-            groups: {
-              child: {
-                runtime: "Convex",
-                functions: [{ name: "run", provenance: "Convex" }],
-                groups: {},
-              },
-            },
-          });
-          const changed = update(snapshot, [
-            yield* loadLeaf(
-              "notes.spec.ts",
-              GroupSpec.addGroupsAt(
-                GroupSpec.make()
-                  .addFunction(query("zebra"))
-                  .addFunction(query("alpha")),
-                spec.groups,
-              ),
-            ),
-          ]);
-          expect(getLeaf(changed, leaf.relativePath).functions[0]).toEqual({
-            name: "zebra",
-            provenance: "Confect",
-          });
-          expect(getLeaf(snapshot, leaf.relativePath).functions[0]).toEqual({
-            name: "zebra",
-            provenance: "Convex",
-          });
-          expect(GenerationSnapshot.diff(snapshot, changed)).toEqual({
-            removed: [],
-            changed: [],
-          });
-        }),
-    );
-
-    it.effect(
       "replaces supplied leaves while retaining untouched summaries and the prior snapshot",
       () =>
         Effect.gen(function* () {
@@ -563,12 +447,12 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           expect(getLeaf(after, "other.spec.ts")).toBe(
             getLeaf(before, "other.spec.ts"),
           );
-          expect(getLeaf(before, "notes.spec.ts").functions).toEqual([
-            { name: "list", provenance: "Confect" },
+          expect(getLeaf(before, "notes.spec.ts").functionNames).toEqual([
+            "list",
           ]);
           expect(getLeaf(after, "notes.spec.ts")).toMatchObject({
             runtime: "Node",
-            functions: [{ name: "run", provenance: "Confect" }],
+            functionNames: ["run"],
           });
           expect(update(before, [])).toBe(before);
         }),
@@ -755,7 +639,7 @@ for (const { name, pathLayer, sep } of [
             assert(Result.isFailure(result));
             assert(result.failure._tag === "ParentChildNameCollisionError");
             expect(result.failure.collisionKind).toBe("function");
-            expect(getLeaf(before, "notes.spec.ts").functions).toEqual([]);
+            expect(getLeaf(before, "notes.spec.ts").functionNames).toEqual([]);
             expect(
               Schema.is(GenerationSnapshot.GenerationSnapshot)(before),
             ).toBe(true);

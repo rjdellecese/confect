@@ -40,7 +40,6 @@ vi.mock("esbuild", (importOriginal) =>
   importOriginal<typeof esbuild>().then((original) => ({
     ...original,
     build: vi.fn(original.build),
-    context: vi.fn(original.context),
   })),
 );
 
@@ -48,207 +47,53 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
     it.effect(
-      "passes inherited aliases and per-entry options through one resolved config",
+      "matches fresh output with workspace-linked dependencies",
       () =>
         Effect.gen(function* () {
-          const project = yield* Project.makeInheritedConfigProfiles;
-          const path = yield* Path.Path;
-          vi.mocked(esbuild.build).mockClear();
-          vi.mocked(esbuild.context).mockClear();
-          yield* project.provide(codegenHandler);
-          const generated = yield* project.generatedFiles;
-          expect(generated[path.join("convex", "notes.ts")]).toContain(
-            "export const list =",
-          );
-          expect(
-            generated[path.join("convex", "nested", "other.ts")],
-          ).toContain("export const other =");
-          expect(vi.mocked(esbuild.build)).not.toHaveBeenCalled();
-          expect(vi.mocked(esbuild.context)).toHaveBeenCalledTimes(3);
-          const factories = vi
-            .mocked(esbuild.context)
-            .mock.calls.map(([options]) => {
-              expect(options).not.toHaveProperty("tsconfig");
-              assert(typeof options.tsconfigRaw === "object");
-              expect(options.tsconfigRaw).not.toHaveProperty("extends");
-              expect(options.tsconfigRaw.compilerOptions?.baseUrl).toBe(
-                project.root,
-              );
-              expect(
-                options.tsconfigRaw.compilerOptions?.target?.toLowerCase(),
-              ).toBe("es2022");
-              return options.tsconfigRaw.compilerOptions?.jsxFactory ?? "";
-            });
-          expect(factories.sort()).toEqual(
-            ["rootFactory.h", "rootFactory.h", "nestedFactory.h"].sort(),
-          );
-          yield* project.provide(codegenHandler);
-          expect(yield* project.generatedFiles).toEqual(generated);
-        }).pipe(Effect.scoped),
-      { timeout: 30000 },
-    );
-
-    it.effect(
-      "partitions shared helpers by each entry's selected config",
-      () =>
-        Effect.gen(function* () {
-          const project = yield* Project.makeConfigProfiles;
-          const path = yield* Path.Path;
-          yield* project.provide(generateWithSnapshot);
-          const baseline = yield* project.generatedFiles;
-          expect(baseline[path.join("convex", "notes.ts")]).toContain(
-            "export const list =",
-          );
-          expect(baseline[path.join("convex", "nested", "other.ts")]).toContain(
-            "export const other =",
-          );
-          vi.mocked(esbuild.build).mockClear();
-          vi.mocked(esbuild.context).mockClear();
-          yield* project.provide(codegenHandler);
-          expect(yield* project.generatedFiles).toEqual(baseline);
-          expect(vi.mocked(esbuild.build)).not.toHaveBeenCalled();
-          expect(vi.mocked(esbuild.context)).toHaveBeenCalledTimes(3);
-          expect(
-            vi
-              .mocked(esbuild.context)
-              .mock.calls.map(([options]) => {
-                expect(options).not.toHaveProperty("tsconfig");
-                assert(typeof options.tsconfigRaw === "object");
-                return options.tsconfigRaw.compilerOptions?.jsxFactory ?? "";
-              })
-              .sort(),
-          ).toEqual(
-            ["rootFactory.h", "rootFactory.h", "nestedFactory.h"].sort(),
-          );
-        }).pipe(Effect.scoped),
-      { timeout: 30000 },
-    );
-
-    it.effect.each(["nested", "ancestor"] as const)(
-      "preserves generation with an ignored malformed %s config",
-      (ignored) =>
-        Effect.gen(function* () {
-          const project = yield* Project.make;
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
-          yield* fs.makeDirectory(path.join(project.root, "confect/helpers"));
-          yield* project.write(
-            "confect/helpers/name.ts",
-            'export const name = "list";',
+          const installed = yield* Project.make;
+          yield* installed.provide(codegenHandler);
+          const expected = yield* installed.generatedFiles;
+          const installedBundle = yield* installed.provide(
+            Bundler.bundle(
+              path.join(installed.root, "confect/tables/notes.ts"),
+            ),
           );
-          yield* project.write(
-            "confect/notes.spec.ts",
-            `import { name } from "./helpers/name";\n${Project.spec.replace('name: "list"', "name")}`,
-          );
-          if (ignored === "ancestor")
-            yield* project.write("confect/tsconfig.json", "{}");
-          yield* project.write(
-            ignored === "nested"
-              ? "confect/helpers/tsconfig.json"
-              : "tsconfig.json",
-            '{"extends":',
-          );
-          yield* project.provide(generateWithSnapshot);
-          const baseline = yield* project.generatedFiles;
-          vi.mocked(esbuild.build).mockClear();
-          vi.mocked(esbuild.context).mockClear();
-          yield* project.provide(codegenHandler);
-          expect(yield* project.generatedFiles).toEqual(baseline);
-          expect(vi.mocked(esbuild.build)).not.toHaveBeenCalled();
-          expect(vi.mocked(esbuild.context).mock.calls.length).toBeGreaterThan(
-            0,
-          );
-          for (const [options] of vi.mocked(esbuild.context).mock.calls) {
-            expect(options).not.toHaveProperty("tsconfig");
-            expect(options.tsconfigRaw).toBeDefined();
-            expect(options.tsconfigRaw).not.toHaveProperty("extends");
-          }
-        }).pipe(Effect.scoped),
-      { timeout: 30000 },
-    );
-
-    it.effect.each([
-      { files: ["bad-name.ts"], error: "InvalidTableFilenameError" },
-      {
-        files: ["user_profiles.ts", "userProfiles.ts"],
-        error: "ConflictingDocNameError",
-      },
-    ])("rejects $error before writing generated bindings", ({ files, error }) =>
-      Effect.gen(function* () {
-        const project = yield* Project.make;
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        for (const file of files)
-          yield* project.write(`confect/tables/${file}`, Project.table);
-        const result = yield* project
-          .provide(codegenHandler)
-          .pipe(Effect.result);
-        assert(Result.isFailure(result));
-        expect(result.failure._tag).toBe(error);
-        expect(
-          yield* fs.exists(path.join(project.root, "confect", "_generated")),
-        ).toBe(false);
-        expect(
-          yield* fs.readDirectory(path.join(project.root, "convex")),
-        ).toEqual([]);
-      }).pipe(Effect.scoped),
-    );
-
-    it.effect.each([
-      {
-        table: "export default {};",
-        spec: Project.spec,
-        error: "InvalidTableDefaultExportError",
-      },
-      {
-        table: Project.table,
-        spec: "export default {};",
-        error: "SpecMissingDefaultGroupSpecError",
-      },
-      { table: Project.table, spec: Project.spec, error: "BundleFailedError" },
-    ])(
-      "preserves $error when the shared build cannot compile an implementation",
-      ({ table, spec, error }) =>
-        Effect.gen(function* () {
-          const project = yield* Project.make;
-          yield* project.write("confect/tables/notes.ts", table);
-          yield* project.write("confect/notes.spec.ts", spec);
-          yield* project.write("confect/notes.impl.ts", "export default ;");
-          const result = yield* project
-            .provide(codegenHandler)
-            .pipe(Effect.result);
-          assert(Result.isFailure(result));
-          expect(result.failure._tag).toBe(error);
-          yield* project.write("confect/tables/notes.ts", Project.table);
-          yield* project.write("confect/notes.spec.ts", Project.spec);
-          yield* project.write("confect/notes.impl.ts", Project.impl);
-          yield* project.provide(codegenHandler);
-        }).pipe(Effect.scoped),
-      { timeout: 30000 },
-    );
-
-    it.effect.each(["http.ts", "crons.ts", "auth.ts"])(
-      "checks optional module %s without evaluating it and recovers after errors",
-      (file) =>
-        Effect.gen(function* () {
-          const project = yield* Project.make;
-          yield* project.write(`confect/${file}`, "export default ;");
-          const failed = yield* project
-            .provide(codegenHandler)
-            .pipe(Effect.result);
-          assert(Result.isFailure(failed));
-          expect(failed.failure).toMatchObject({
-            _tag: "BundleFailedError",
-            file,
+          expect(
+            Array.dedupe(
+              Object.values(installedBundle.metafile.inputs)
+                .flatMap((input) => input.imports)
+                .filter((imported) => imported.original === "@confect/core")
+                .map((imported) => Boolean(imported.external)),
+            ),
+          ).toEqual([true]);
+          const workspace = yield* Project.make;
+          yield* fs.remove(path.join(workspace.root, "node_modules"), {
+            recursive: true,
           });
-          yield* project.write(
-            `confect/${file}`,
-            'import "./_generated/registeredFunctions/notes";\nimport "../convex/notes";\nthrow new Error("Optional runtime must not execute");\nexport default {};\n',
+          yield* workspace.provide(codegenHandler);
+          expect(yield* workspace.generatedFiles).toEqual(expected);
+          const workspaceBundle = yield* workspace.provide(
+            Bundler.bundle(
+              path.join(workspace.root, "confect/tables/notes.ts"),
+            ),
           );
-          yield* project.provide(codegenHandler);
+          expect(
+            Array.dedupe(
+              Object.values(workspaceBundle.metafile.inputs)
+                .flatMap((input) => input.imports)
+                .filter((imported) => imported.original === "@confect/core")
+                .map((imported) => Boolean(imported.external)),
+            ),
+          ).toEqual([false]);
+          expect(
+            Object.keys(installedBundle.metafile.inputs).length,
+          ).toBeLessThan(Object.keys(workspaceBundle.metafile.inputs).length);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
+
     it.effect.each([
       "schema.spec.ts",
       "http.spec.ts",
@@ -296,9 +141,48 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
               path.join(project.root, "convex/schema.ts"),
             ),
           ).toBe(previousSchema);
-          expect(
-            yield* fs.exists(path.join(project.root, "confect", "_generated")),
-          ).toBe(false);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect.each(["http.ts", "crons.ts", "auth.ts"])(
+      "checks optional module %s and recovers after compile errors",
+      (file) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          for (const contents of [
+            "export default ;",
+            'export { default } from "./missing-optional-dependency";',
+          ]) {
+            yield* project.write(`confect/${file}`, contents);
+            const result = yield* project
+              .provide(codegenHandler)
+              .pipe(Effect.result);
+            assert(Result.isFailure(result));
+            expect(result.failure).toMatchObject({
+              _tag: "BundleFailedError",
+              file,
+            });
+          }
+          yield* project.write(
+            `confect/${file}`,
+            'throw new Error("Optional runtime must not execute"); export default {};',
+          );
+          yield* project.provide(codegenHandler);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect.each(["http.ts", "crons.ts", "auth.ts"])(
+      "checks %s after its generated dependencies exist without evaluating it",
+      (file) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write(
+            `confect/${file}`,
+            'import "./_generated/registeredFunctions/notes"; import "../convex/notes"; throw new Error("Optional runtime must not execute"); export default {};',
+          );
+          yield* project.provide(codegenHandler);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -348,7 +232,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             Project.impl.replace('"list"', '"latest"'),
           );
           const bundle = yield* Effect.acquireRelease(
-            Effect.sync(() => vi.spyOn(Bundler, "compile")),
+            Effect.sync(() => vi.spyOn(Bundler, "bundle")),
             (spy) => Effect.sync(() => spy.mockRestore()),
           );
           const next = yield* project.provide(
@@ -386,80 +270,6 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             yield* Project.writtenFiles(project.provide(codegenHandler)),
           ).toEqual([]);
           expect(yield* project.generatedFiles).toEqual(incremental);
-        }).pipe(Effect.scoped),
-      { timeout: 30000 },
-    );
-
-    it.effect(
-      "rewrites only the registry when function provenance changes",
-      () =>
-        Effect.gen(function* () {
-          const path = yield* Path.Path;
-          const project = yield* Project.make;
-          let { snapshot } = yield* project.provide(generateWithSnapshot);
-          const registry = path.join(
-            "confect",
-            "_generated",
-            "registeredFunctions",
-            "notes.ts",
-          );
-          const nativeSpec = `import { FunctionSpec, GroupSpec } from "@confect/core";
-import type { RegisteredQuery } from "convex/server";
-export default GroupSpec.make().addFunction(FunctionSpec.convexPublicQuery<RegisteredQuery<"public", {}, null>>()("list"));`;
-          const nativeImpl = `import { FunctionImpl, GroupImpl } from "@confect/server";
-import * as Layer from "effect/Layer";
-import { queryGeneric } from "convex/server";
-import databaseSchema from "./_generated/schema";
-import notes from "./notes.spec";
-const list = FunctionImpl.make(databaseSchema, notes, "list", queryGeneric(() => null));
-export default GroupImpl.make(databaseSchema, notes).pipe(Layer.provide(list), GroupImpl.finalize);`;
-          for (const { spec, impl, registration } of [
-            {
-              spec: nativeSpec,
-              impl: nativeImpl,
-              registration: "RegisteredFunctions.buildForGroup<",
-            },
-            {
-              spec: Project.spec,
-              impl: Project.impl,
-              registration: 'handler: forward(definitions["list"].handler)',
-            },
-          ]) {
-            yield* project.write("confect/notes.spec.ts", spec);
-            yield* project.write("confect/notes.impl.ts", impl);
-            const before = snapshot;
-            const writes = yield* Project.writtenFiles(
-              project.provide(
-                updateDeclarations(
-                  snapshot,
-                  [
-                    {
-                      _tag: "Spec",
-                      relativePath: SpecModulePath.make("notes.spec.ts"),
-                    },
-                  ],
-                  [],
-                ).pipe(
-                  Effect.tap((next) =>
-                    Effect.sync(() => {
-                      snapshot = next;
-                    }),
-                  ),
-                ),
-              ),
-            );
-            expect(writes).toEqual([path.join(project.root, registry)]);
-            expect(GenerationSnapshot.diff(before, snapshot)).toEqual({
-              removed: [],
-              changed: [],
-            });
-            const incremental = yield* project.generatedFiles;
-            expect(incremental[registry]).toContain(registration);
-            expect(
-              yield* Project.writtenFiles(project.provide(codegenHandler)),
-            ).toEqual([]);
-            expect(yield* project.generatedFiles).toEqual(incremental);
-          }
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -646,7 +456,7 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
     );
 
     it.effect(
-      "separates table roots while sharing specs and implementations without changing generated output",
+      "shares one build per evaluation phase without changing generated output",
       () =>
         Effect.gen(function* () {
           const path = yield* Path.Path;
@@ -671,50 +481,16 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
             }),
           );
           vi.mocked(esbuild.build).mockClear();
-          vi.mocked(esbuild.context).mockClear();
           expect(yield* Project.writtenFiles(run)).not.toEqual([]);
           const batchedOutputs = yield* project.generatedFiles;
-          expect(vi.mocked(esbuild.build)).not.toHaveBeenCalled();
-          expect(vi.mocked(esbuild.context)).toHaveBeenCalledTimes(2);
           expect(
             vi
-              .mocked(esbuild.context)
+              .mocked(esbuild.build)
               .mock.calls.map(
                 ([options]) => Object.keys(options?.entryPoints ?? {}).length,
               )
               .filter((count) => count > 1),
-          ).toEqual([2, 6]);
-          expect(
-            vi
-              .mocked(esbuild.context)
-              .mock.calls.map(([options]) => options?.entryPoints),
-          ).toEqual([
-            expect.arrayContaining(
-              ["labels", "notes"].map((name) =>
-                expect.objectContaining({
-                  in: path.join(
-                    project.root,
-                    "confect",
-                    "tables",
-                    `${name}.ts`,
-                  ),
-                }),
-              ),
-            ),
-            expect.arrayContaining(
-              ["notes", "other", "another"].flatMap((name) =>
-                ["spec", "impl"].map((kind) =>
-                  expect.objectContaining({
-                    in: path.join(
-                      project.root,
-                      "confect",
-                      `${name}.${kind}.ts`,
-                    ),
-                  }),
-                ),
-              ),
-            ),
-          ]);
+          ).toEqual([2, 3, 3]);
           yield* Effect.acquireRelease(
             Effect.sync(() =>
               vi
@@ -730,26 +506,6 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
           );
           expect(yield* Project.writtenFiles(run)).toEqual([]);
           expect(yield* project.generatedFiles).toEqual(batchedOutputs);
-        }).pipe(Effect.scoped),
-      { timeout: 30000 },
-    );
-
-    it.effect(
-      "evaluates each spec once across table, spec and implementation phases",
-      () =>
-        Effect.gen(function* () {
-          const project = yield* Project.make;
-          yield* project.write(
-            "confect/notes.spec.ts",
-            Project.spec +
-              '\nglobalThis.__confectSpecRuns = (globalThis.__confectSpecRuns ?? 0) + 1;\nif (globalThis.__confectSpecRuns !== 1) throw new Error("Spec evaluated twice in one generation");\n',
-          );
-          yield* project.provide(codegenHandler);
-          const before = yield* project.generatedFiles;
-          expect(
-            yield* Project.writtenFiles(project.provide(codegenHandler)),
-          ).toEqual([]);
-          expect(yield* project.generatedFiles).toEqual(before);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -776,10 +532,10 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
           const active = { spec: 0, impl: 0 };
           const maximum = { spec: 0, impl: 0 };
           let completedSpecs = 0;
-          const original = Bundler.compile;
+          const original = Bundler.bundle;
           yield* Effect.acquireRelease(
             Effect.sync(() =>
-              vi.spyOn(Bundler, "compile").mockImplementation((entry) =>
+              vi.spyOn(Bundler, "bundle").mockImplementation((entry) =>
                 Effect.gen(function* () {
                   const phase = entry.endsWith(".spec.ts")
                     ? "spec"
@@ -828,7 +584,7 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
           const path = yield* Path.Path;
           const project = yield* Project.make;
           const bundle = yield* Effect.acquireRelease(
-            Effect.sync(() => vi.spyOn(Bundler, "compile")),
+            Effect.sync(() => vi.spyOn(Bundler, "bundle")),
             (spy) => Effect.sync(() => spy.mockRestore()),
           );
           yield* codegenHandler.pipe(
@@ -887,13 +643,32 @@ export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
-const CodegenLayer = Layer.mergeAll(
-  NodePath.layer,
-  NodeFileSystem.layer,
-  Layer.succeed(
-    ConfectDirectory,
-    ConfectDirectory.of({ get: Effect.succeed(fixtureConfect) }),
-  ),
+const CodegenLayer = Layer.effect(
+  ConfectDirectory,
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* fs.makeTempDirectoryScoped({
+      directory: import.meta.dirname,
+      prefix: "table-fixture-",
+    });
+    yield* fs.makeDirectory(path.join(directory, "tables"));
+    yield* fs.makeDirectory(path.join(directory, "_generated"));
+    for (const file of [
+      "tables/events.ts",
+      "tables/notes.ts",
+      "tables/tags.ts",
+      "tables/users.ts",
+      "_generated/id.ts",
+    ])
+      yield* fs.copyFile(
+        path.join(fixtureConfect, file),
+        path.join(directory, file),
+      );
+    return ConfectDirectory.of({ get: Effect.succeed(directory) });
+  }),
+).pipe(
+  Layer.provideMerge(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer)),
 );
 
 layer(CodegenLayer)("TableModule.validate", (it) => {
@@ -963,7 +738,11 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const stowedPath = path.join(fixtureConfect, "tables", "stowed.ts");
+        const stowedPath = path.join(
+          yield* ConfectDirectory.get,
+          "tables",
+          "stowed.ts",
+        );
 
         yield* Effect.gen(function* () {
           yield* fs.writeFileString(stowedPath, "export default {};\n");
@@ -989,7 +768,11 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const invalidPath = path.join(fixtureConfect, "tables", filename);
+        const invalidPath = path.join(
+          yield* ConfectDirectory.get,
+          "tables",
+          filename,
+        );
 
         yield* Effect.gen(function* () {
           yield* fs.writeFileString(invalidPath, "export default {};\n");

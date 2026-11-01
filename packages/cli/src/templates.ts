@@ -1,7 +1,5 @@
 import * as Effect from "effect/Effect";
-import * as Array from "effect/Array";
-import * as Record from "effect/Record";
-import type { GroupTree } from "./GenerationSnapshot";
+import type * as GroupSpec from "@confect/core/GroupSpec";
 import { CodeBlockWriter } from "./CodeBlockWriter";
 import {
   render as renderSpecAssembly,
@@ -440,36 +438,37 @@ const docsEffect = Effect.fnUntraced(function* ({
 });
 
 export const registeredFunctionsForGroup = ({
-  group,
+  spec,
   schemaImportPath,
   specImportPath,
   implImportPath,
 }: Parameters<typeof registeredFunctionsForGroupEffect>[0]) =>
   registeredFunctionsForGroupEffect({
-    group,
+    spec,
     schemaImportPath,
     specImportPath,
     implImportPath,
   });
 
 const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
-  group,
+  spec,
   schemaImportPath,
   specImportPath,
   implImportPath,
 }: {
-  group: GroupTree;
+  spec: GroupSpec.AnyWithProps;
   schemaImportPath: string;
   specImportPath: string;
   implImportPath: string;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-  const useNode = group.runtime === "Node";
+  const useNode = spec.runtime === "Node";
 
-  const hasConfectFunctions = (tree: GroupTree): boolean =>
-    Array.some(tree.functions, ({ provenance }) => provenance === "Confect") ||
-    Record.some(tree.groups, hasConfectFunctions);
-  const forwarding = !useNode && hasConfectFunctions(group);
+  const hasConfectFunctions = (group: GroupSpec.AnyWithProps): boolean =>
+    Object.values(group.functions).some(
+      (functionSpec) => functionSpec.functionProvenance._tag === "Confect",
+    ) || Object.values(group.groups).some(hasConfectFunctions);
+  const forwarding = !useNode && hasConfectFunctions(spec);
 
   if (useNode) {
     yield* cbw.writeLine(
@@ -503,19 +502,19 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
       `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
     );
   } else {
-    const bindings = (tree: GroupTree, path: string): string =>
+    const bindings = (group: GroupSpec.AnyWithProps, path: string): string =>
       `{
 ${[
-  ...Array.map(tree.functions, ({ name, provenance }) => {
+  ...Object.entries(group.functions).map(([name, functionSpec]) => {
     const key = JSON.stringify(name);
     const definition = `${path}[${key}]`;
     return `[${key}]: ${
-      provenance === "Convex"
+      functionSpec.functionProvenance._tag === "Convex"
         ? `${definition}.handler`
         : `RegisteredConvexFunction.register({ ...${definition}, handler: forward(${definition}.handler) })`
     },`;
   }),
-  ...Array.map(Record.toEntries(tree.groups), ([name, child]) => {
+  ...Object.entries(group.groups).map(([name, child]) => {
     const key = JSON.stringify(name);
     return `[${key}]: ${bindings(child, `${path}[${key}]`)},`;
   }),
@@ -525,7 +524,7 @@ ${[
 
 const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(databaseSchema, groupLayer);
 
-export default ${bindings(group, "definitions")} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
+export default ${bindings(spec, "definitions")} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
   }
 
   return yield* cbw.toString();
@@ -553,6 +552,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
       yield* cbw.writeLine("type DataModel,");
       yield* cbw.writeLine("DatabaseReader as DatabaseReader_,");
       yield* cbw.writeLine("DatabaseWriter as DatabaseWriter_,");
+      yield* cbw.writeLine("DocumentIds as DocumentIds_,");
       yield* cbw.writeLine("ExecutionMetadata as ExecutionMetadata_,");
       yield* cbw.writeLine("MutationCtx as MutationCtx_,");
       yield* cbw.writeLine("MutationRunner as MutationRunner_,");
@@ -658,6 +658,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
   );
   yield* cbw.writeLine(
     "export type VectorSearch = typeof VectorSearch.Identifier;",
+  );
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine(
+    "export const DocumentIds: DocumentIds_.DocumentIdsTag<typeof schemaDefinition> = DocumentIds_.DocumentIds<typeof schemaDefinition>();",
+  );
+  yield* cbw.writeLine(
+    "export type DocumentIds = typeof DocumentIds.Identifier;",
   );
   yield* cbw.blankLine();
 

@@ -41,18 +41,29 @@ bumping, confirm the new versions actually resolved (e.g. `pnpm why <dep>`).
 - If a non-major upgrade snowballs into a real migration (API rewrites,
   behavioral changes beyond mechanical fixes), drop it from the batch and
   document it the same way.
-- If the behavior of convex or the Confect CLI changed, re-run the server
-  codegen scripts (`pnpm codegen:server:mock-backend`/`codegen:server:local-backend`) and commit the complete fixture output—check `git status` for newly generated files, since CI's codegen check only
-  diffs tracked files.
+- If the behavior of Convex or the Confect CLI changed, regenerate the server's
+  mock-backend fixtures and the shared local-backend fixtures with
+  `pnpm codegen:server:mock-backend` and `pnpm codegen:local-backend`.
+  Commit the complete output, including newly generated files: CI checks both
+  tracked changes and untracked output in each fixture directory.
 
 ## Dependency ranges and peer compatibility
 
 - Preserve existing dependency range styles. Keep caret ranges for stable
-  dependencies such as the CLI's `@effect/platform-node`; do not replace them
-  with exact pins merely because they belong to the Effect ecosystem. Keep
-  existing exact runtime pins, such as the server's AI dependencies, and keep
+  APIs; do not replace them with exact pins merely because they belong to
+  the Effect ecosystem. Effect APIs marked unstable may break in minor
+  releases. The CLI and server use these APIs, so keep their `effect` peers
+  and `@effect/platform-node` requirements within the verified minor using
+  tilde ranges. Update their Syncpack rule when migrating to a new minor.
+  Keep existing exact runtime pins, such as the server's AI dependencies, and keep
   `devDependencies` exactly pinned. Do not normalize these different roles
   into one version policy during a routine upgrade.
+- Keep the Foldkit adapter's peers on a verified pair: a pre-1.0 Foldkit minor
+  (`^0.170.0` admits only 0.170.x) and an Effect minor (`~4.1.0`). Align the
+  browser platform with Foldkit's published peer requirement. Update the
+  adapter's Syncpack rules, exact development pins, documentation, and both
+  packed-consumer lanes together; do not use workspace overrides to claim
+  compatibility with a new Foldkit or Effect minor.
 - Read the **published metadata for each selected dependency version**,
   including its `peerDependencies` (for example,
   `pnpm view @effect/platform-node@4.0.1 peerDependencies --json`). Account for
@@ -79,8 +90,9 @@ bumping, confirm the new versions actually resolved (e.g. `pnpm why <dep>`).
    deferred upgrades (e.g. a peer-ecosystem major) were spotted; the next
    scheduled run will surface them again.
 2. Verify with the full repo checks (`pnpm check`, `pnpm test`, `pnpm build`)
-   plus the server backend suites (`pnpm test:server:mock-backend` and
-   `pnpm test:server:local-backend`). Anything the local environment genuinely
+   plus `pnpm test:server:mock-backend`, `pnpm test:server:local-backend`, and
+   `pnpm test:js:local-backend`. Run the two local-backend suites sequentially
+   because they share ports. Anything the local environment genuinely
    can't run, leave to the PR's CI—and get it green. Drop upgrades that fail
    here before moving on.
 3. Add a changeset iff the applied upgrade changes something consumers can
