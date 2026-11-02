@@ -11,6 +11,7 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import * as Bundler from "../Bundler";
+import * as BuildError from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import { LegacySchemaFileError } from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
@@ -164,6 +165,24 @@ const runCodegen = Effect.gen(function* () {
       logGenerated(generateAuthConfig),
     ],
     { concurrency: "unbounded" },
+  );
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const optionalFiles = yield* Effect.filter(
+    ["http.ts", "crons.ts", "auth.ts"],
+    (file) => fs.exists(path.join(confectDirectory, file)),
+  );
+  yield* Bundler.withBatch(
+    Array.map(optionalFiles, (file) => path.join(confectDirectory, file)),
+    Effect.forEach(
+      optionalFiles,
+      (file) =>
+        Bundler.check(path.join(confectDirectory, file)).pipe(
+          Effect.mapError((error) => BuildError.fromBundlerError(file, error)),
+        ),
+      { discard: true },
+    ),
   );
   return {
     functionPaths,
@@ -447,9 +466,7 @@ const rejectLegacySchemaFile = Effect.gen(function* () {
  * legal—but the warning catches the much more common case of a typoed directory
  * or files placed under the wrong root.
  */
-const warnIfNoTables = (
-  tableModules: ReadonlyArray<TableModule.TableModule>,
-) =>
+const warnIfNoTables = (tableModules: ReadonlyArray<TableModule.TableModule>) =>
   tableModules.length === 0
     ? logWarn(
         `No tables discovered in \`confect/${TableModule.TABLES_DIRNAME}/\`. ` +

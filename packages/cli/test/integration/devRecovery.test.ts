@@ -11,6 +11,33 @@ const success = "Generated files are up-to-date";
 layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
+    it.effect.each(["http.ts", "crons.ts", "auth.ts"])(
+      "rejects invalid %s during codegen and recovers in dev without executing it",
+      (file) =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write(`confect/${file}`, "export default ;");
+          yield* Effect.gen(function* () {
+            const once = yield* project.start("codegen");
+            yield* once.waitFor('Unexpected ";"');
+            expect(yield* once.handle.exitCode).not.toBe(0);
+            expect(yield* Ref.get(once.output)).not.toContain(success);
+          }).pipe(Effect.scoped);
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor('Unexpected ";"');
+          expect(yield* Ref.get(watching.output)).not.toContain(success);
+          yield* project.write(
+            `confect/${file}`,
+            'import "./_generated/registeredFunctions/notes"; import "../convex/notes"; throw new Error("Optional runtime must not execute"); export default {};',
+          );
+          yield* watching.waitFor(success);
+          expect(yield* Ref.get(watching.output)).not.toContain(
+            "Optional runtime must not execute",
+          );
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
     it.effect(
       "does not hide a failing impl when an unrelated impl is edited",
       () =>

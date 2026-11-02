@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import * as BundleRequire from "bundle-require";
 import { resolveModulePath } from "exsolve";
-import { identity, pipe } from "effect/Function";
+import { constUndefined, identity, pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Chunk from "effect/Chunk";
 import * as Cause from "effect/Cause";
@@ -25,6 +25,7 @@ import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 import { logCoalescedBuildWarnings } from "./log";
 import * as PackageSelfReference from "./PackageSelfReference";
+import * as TypeScriptConfig from "./TypeScriptConfig";
 
 export interface Bundled {
   readonly module: any;
@@ -50,15 +51,18 @@ const absolutizeMetafile = (
   path: Path.Path,
   metafile: esbuild.Metafile,
   cwd: string,
+  inputPaths: ReadonlyMap<string, string>,
 ): esbuild.Metafile => {
   const absolutize = (p: string) => path.resolve(cwd, p);
+  const inputPath = (p: string) =>
+    inputPaths.get(absolutize(p)) ?? absolutize(p);
   const inputs = Record.mapEntries(metafile.inputs, (value, key) => [
-    absolutize(key),
+    inputPath(key),
     {
       ...value,
       imports: Array.map(value.imports, (i) => ({
         ...i,
-        path: absolutize(i.path),
+        path: inputPath(i.path),
         original: i.original ?? i.path,
       })),
     },
@@ -67,8 +71,8 @@ const absolutizeMetafile = (
     absolutize(key),
     {
       ...value,
-      ...(value.entryPoint ? { entryPoint: absolutize(value.entryPoint) } : {}),
-      inputs: Record.mapKeys(value.inputs, absolutize),
+      ...(value.entryPoint ? { entryPoint: inputPath(value.entryPoint) } : {}),
+      inputs: Record.mapKeys(value.inputs, inputPath),
       imports: Array.map(value.imports, (imported) =>
         imported.external
           ? imported
@@ -78,6 +82,23 @@ const absolutizeMetafile = (
   ]);
   return { inputs, outputs };
 };
+
+const canonicalInputPaths = Effect.fnUntraced(function* (
+  path: Path.Path,
+  fs: FileSystem.FileSystem,
+  metafile: esbuild.Metafile,
+  cwd: string,
+) {
+  return new Map(
+    yield* Effect.forEach(Record.keys(metafile.inputs), (input) => {
+      const absolute = path.resolve(cwd, input);
+      return fs.realPath(absolute).pipe(
+        Effect.orElseSucceed(() => absolute),
+        Effect.map((real) => [absolute, real] as const),
+      );
+    }),
+  );
+});
 
 const resolveEsm = Option.liftThrowable((specifier: string, importer: string) =>
   resolveModulePath(specifier, {
@@ -181,6 +202,7 @@ interface BatchCompilation {
     { readonly source: string; readonly output: string }
   >;
   readonly metafile: esbuild.Metafile;
+  readonly inputPaths: ReadonlyMap<string, string>;
   readonly warnings: ReadonlyArray<esbuild.Message>;
   readonly cwd: string;
 }
@@ -329,9 +351,8 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
     ),
   ];
   const entries = Array.dedupe(entryPoints.map((entry) => path.resolve(entry)));
-  const first = entries[0];
   if (
-    first === undefined ||
+    !Array.isReadonlyArrayNonEmpty(entries) ||
     entries.some(
       (entry) =>
         !BundleRequire.JS_EXT_RE.test(entry) ||
@@ -344,16 +365,19 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
         "Shared builds require JavaScript or TypeScript entries outside node_modules.",
     });
   }
-  const configs = yield* Effect.try({
-    try: () =>
-      entries.map((entry) => BundleRequire.loadTsConfig(path.dirname(entry))),
-    catch: (cause) => new BundlerError({ cause }),
-  });
-  const config = configs[0];
-  if (configs.some((other) => other?.path !== config?.path))
+  const first = Array.headNonEmpty(entries);
+  const configs = yield* Effect.forEach(
+    Array.dedupe(Array.map(entries, path.dirname)),
+    TypeScriptConfig.discover,
+  );
+  const config = Array.headNonEmpty(configs);
+  const configPath = (
+    selected: Option.Option<TypeScriptConfig.TypeScriptConfig>,
+  ) => Option.getOrUndefined(Option.map(selected, (value) => value.path));
+  if (Array.some(configs, (other) => configPath(other) !== configPath(config)))
     return yield* new BatchIncompatible({
       reason: "MixedTsconfigs",
-      message: `Entries use different tsconfigs: ${Array.dedupe(configs.map((item) => item?.path ?? "(no tsconfig)")).join(", ")}`,
+      message: `Entries use different tsconfigs: ${Array.join(Array.dedupe(Array.map(configs, (item) => configPath(item) ?? "(no tsconfig)")), ", ")}`,
     });
 
   const cwd = yield* fs.realPath(path.dirname(first));
@@ -398,19 +422,12 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
         metafile: true,
         write: false,
         logLevel: "silent",
-        ...(config?.path
-          ? { tsconfig: config.path }
-          : { tsconfigRaw: config?.data ?? {} }),
+        ...TypeScriptConfig.buildOptions(config),
         plugins: [
           batchResolutionPlugin(
             path,
             fs,
-            [
-              ...BundleRequire.tsconfigPathsToRegExp(
-                config?.data.compilerOptions?.paths ?? {},
-              ),
-              ...selfReferences,
-            ],
+            [...TypeScriptConfig.aliasPatterns(config), ...selfReferences],
             conditions,
             externalImports,
           ),
@@ -438,6 +455,12 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
     fs.writeFile(output.path, output.contents),
   );
   const capturedExternalImports = yield* Ref.get(externalImports);
+  const canonicalPaths = yield* canonicalInputPaths(
+    path,
+    fs,
+    result.metafile,
+    cwd,
+  );
   const inputs = Object.fromEntries(
     Object.entries(result.metafile.inputs).map(([input, metadata]) => {
       const originals = Option.getOrElse(
@@ -466,7 +489,13 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   );
   return {
     entries: HashMap.fromIterable(artifacts),
-    metafile: absolutizeMetafile(path, { ...result.metafile, inputs }, cwd),
+    metafile: absolutizeMetafile(
+      path,
+      { ...result.metafile, inputs },
+      cwd,
+      canonicalPaths,
+    ),
+    inputPaths: canonicalPaths,
     warnings: result.warnings,
     cwd,
   } satisfies BatchCompilation;
@@ -606,11 +635,6 @@ const entryMetafile = (
  * {@link bundleWorkspacePlugin} and tsconfig `paths` aliases stay inside the
  * bundle.
  *
- * `cwd` is set to the entry's directory so `bundle-require`'s `tsconfig.json`
- * discovery (which walks upward from `cwd`) lands on the project's tsconfig
- * regardless of where `confect codegen` was invoked from, and so esbuild
- * resolves relative imports against the entry's location.
- *
  * The returned pair carries both the imported module and the esbuild metafile
  * so callers can inspect the import graph (see {@link directlyImports}); the
  * metafile is captured via a small `onEnd` plugin because `bundle-require`
@@ -621,8 +645,20 @@ const entryMetafile = (
  * resolutions (e.g. `convex.config` imports) before the workspace and
  * externalization heuristics see them.
  */
-export const bundle = Effect.fn("Bundler.bundle")(function* (
+export const bundle = Effect.fn("Bundler.bundle")(
+  (
+    entryPoint: string,
+    options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
+  ) => bundleWith(entryPoint, BundleRequire.dynamicImport, options),
+);
+
+export const check = Effect.fn("Bundler.check")((entryPoint: string) =>
+  bundleWith(entryPoint).pipe(Effect.asVoid),
+);
+
+const bundleWith = Effect.fnUntraced(function* (
   entryPoint: string,
+  load?: typeof BundleRequire.dynamicImport,
   options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
 ): Effect.fn.Return<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> {
   const path = yield* Path.Path;
@@ -649,15 +685,16 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
           entry.value.source,
           entry.value.output,
         );
-        const module = yield* Effect.tryPromise({
-          try: () =>
-            BundleRequire.dynamicImport(
-              pathToFileURL(entry.value.output).href,
-              {
-                format: "esm",
-              },
-            ),
-          catch: (cause) => new BundlerError({ cause }),
+        const module = yield* Option.match(Option.fromUndefinedOr(load), {
+          onNone: () => Effect.void,
+          onSome: (loadModule) =>
+            Effect.tryPromise({
+              try: () =>
+                loadModule(pathToFileURL(entry.value.output).href, {
+                  format: "esm",
+                }),
+              catch: (cause) => new BundlerError({ cause }),
+            }),
         }).pipe(
           Effect.ensuring(
             logCoalescedBuildWarnings(
@@ -665,7 +702,13 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
                 (warning) =>
                   warning.location &&
                   metafile.inputs[
-                    path.resolve(compilation.value.cwd, warning.location.file)
+                    compilation.value.inputPaths.get(
+                      path.resolve(
+                        compilation.value.cwd,
+                        warning.location.file,
+                      ),
+                    ) ??
+                      path.resolve(compilation.value.cwd, warning.location.file)
                   ],
               ),
             ),
@@ -685,24 +728,32 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
   const selfReferences = Option.toArray(
     yield* PackageSelfReference.discover(cwd),
   );
-  const skipPatterns = yield* Effect.try({
-    try: () => [
-      ...BundleRequire.tsconfigPathsToRegExp(
-        BundleRequire.loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
-      ),
-      ...selfReferences,
-    ],
-    catch: (cause) => new BundlerError({ cause }),
-  });
+  const config = yield* TypeScriptConfig.discover(cwd);
+  const skipPatterns = [
+    ...TypeScriptConfig.aliasPatterns(config),
+    ...selfReferences,
+  ];
   const result = yield* Effect.tryPromise({
     try: () =>
       BundleRequire.bundleRequire({
         filepath: entryPoint,
+        require: load ?? constUndefined,
         cwd,
         format: "esm",
-        notExternal: selfReferences,
+        tsconfig: false,
+        notExternal: skipPatterns,
         esbuildOptions: {
           plugins: [
+            {
+              name: "confect:typescript-config",
+              setup(build) {
+                delete build.initialOptions.tsconfigRaw;
+                Object.assign(
+                  build.initialOptions,
+                  TypeScriptConfig.buildOptions(config),
+                );
+              },
+            },
             ...(options?.plugins ?? []),
             bundleWorkspacePlugin(path, fs, skipPatterns),
             captureBuildResultPlugin(buildResultRef),
@@ -726,7 +777,12 @@ export const bundle = Effect.fn("Bundler.bundle")(function* (
 
   return {
     module: result.mod,
-    metafile: absolutizeMetafile(path, metafile, cwd),
+    metafile: absolutizeMetafile(
+      path,
+      metafile,
+      cwd,
+      yield* canonicalInputPaths(path, fs, metafile, cwd),
+    ),
   };
 });
 

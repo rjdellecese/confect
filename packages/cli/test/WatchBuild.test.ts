@@ -1,19 +1,21 @@
 import { assert, expect, it } from "@effect/vitest";
 import * as WatchBuild from "@confect/cli/WatchBuild";
-import * as Crypto from "effect/Crypto";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import * as Digest from "effect/crypto/Digest";
+import * as Exit from "effect/Exit";
 import * as Effect from "effect/Effect";
+import * as Equal from "effect/Equal";
 import * as FileSystem from "effect/FileSystem";
 import * as HashMap from "effect/HashMap";
 import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
 import * as PlatformError from "effect/PlatformError";
-import * as Result from "effect/Result";
 import type * as esbuild from "esbuild";
 import type * as WatchGraph from "@confect/cli/WatchGraph";
 
-const crypto = Crypto.make({
-  randomBytes: (size) => new Uint8Array(size),
+const crypto = Digest.Digest.of({
   digest: () => Effect.succeed(new Uint8Array([1, 2])),
+  digestHex: () => Effect.succeed("0102"),
 });
 const result = (): esbuild.BuildResult => ({
   errors: [],
@@ -52,6 +54,87 @@ const successfulOutcome = WatchBuild.Outcome.Succeeded({
 const request = (progress: WatchBuild.Progress) =>
   WatchBuild.request(progress, WatchBuild.makeRequestId());
 
+it.effect("fingerprints inputs and outputs with the Node SHA-256 service", () =>
+  Effect.gen(function* () {
+    const digest = yield* Digest.Digest;
+    const contents = new TextEncoder().encode("abc");
+    const expected =
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+    const input = {
+      ...result(),
+      outputFiles: [{ path: "out.js", contents, hash: "hash", text: "abc" }],
+    };
+    const capture = {
+      ...WatchBuild.emptyCapture,
+      fingerprints: HashMap.make(["input.ts", expected]),
+    };
+    const outcome = yield* WatchBuild.parse(
+      input,
+      capture,
+      (file) => file,
+      digest,
+    );
+    assert(outcome._tag === "Succeeded");
+    expect(outcome.snapshot.outputHash).toBe(expected);
+    expect(
+      yield* WatchBuild.verifyInputs(
+        outcome.snapshot,
+        FileSystem.makeNoop({ readFile: () => Effect.succeed(contents) }),
+        digest,
+      ),
+    ).toBe(true);
+    expect(contents).toEqual(new TextEncoder().encode("abc"));
+  }).pipe(Effect.provide(NodeCrypto.layerDigest)),
+);
+
+it("combines configuration snapshots without losing shared-helper dependents", () => {
+  const first = WatchBuild.Outcome.Succeeded({
+    snapshot: {
+      fingerprints: HashMap.make(
+        ["shared.ts", "shared"],
+        ["first.ts", "first"],
+      ),
+      graph: HashMap.make(["shared.ts", HashSet.make("first.ts")]),
+      outputHash: "first",
+    },
+    warnings: [],
+  });
+  const second = WatchBuild.Outcome.Succeeded({
+    snapshot: {
+      fingerprints: HashMap.make(
+        ["shared.ts", "shared"],
+        ["second.ts", "second"],
+      ),
+      graph: HashMap.make(["shared.ts", HashSet.make("second.ts")]),
+      outputHash: "second",
+    },
+    warnings: [],
+  });
+  const combined = WatchBuild.combine([first, second]);
+  assert(combined._tag === "Succeeded");
+  expect(
+    Equal.equals(
+      HashMap.get(combined.snapshot.graph, "shared.ts"),
+      Option.some(HashSet.make("first.ts", "second.ts")),
+    ),
+  ).toBe(true);
+  expect(HashMap.size(combined.snapshot.fingerprints)).toBe(3);
+  expect(combined.snapshot.outputHash).toBe("first:second");
+  expect(HashMap.get(first.snapshot.graph, "shared.ts")).toEqual(
+    Option.some(HashSet.make("first.ts")),
+  );
+});
+
+it("retains failed configuration groups beside successful groups", () => {
+  const failed = WatchBuild.Outcome.Failed({
+    fingerprints: HashMap.make(["broken.ts", "broken"]),
+    failures: [WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" })],
+    warnings: [],
+  });
+  expect(WatchBuild.combine([failed, successfulOutcome])).toEqual(failed);
+  expect(WatchBuild.combine([successfulOutcome, failed])).toEqual(failed);
+});
+
 it.effect(
   "checks captured inputs against current files without changing the snapshot",
   () =>
@@ -64,8 +147,8 @@ it.effect(
       const fs = FileSystem.makeNoop({
         readFile: () => Effect.succeed(new Uint8Array([1, 2])),
       });
-      const hashing = Crypto.make({
-        randomBytes: (size) => new Uint8Array(size),
+      const hashing = Digest.Digest.of({
+        ...crypto,
         digest: (_algorithm, contents) => Effect.succeed(contents),
       });
       expect(yield* WatchBuild.verifyInputs(captured, fs, hashing)).toBe(true);
@@ -103,15 +186,23 @@ it.effect.each(["read", "digest"] as const)(
               ? Effect.fail(cause)
               : Effect.succeed(new Uint8Array([1, 2])),
         }),
-        Crypto.make({
-          randomBytes: (size) => new Uint8Array(size),
-          digest: () => Effect.fail(cause),
+        Digest.Digest.of({
+          ...crypto,
+          digest: () => Effect.die(cause),
         }),
-      ).pipe(Effect.result);
-      assert(Result.isFailure(verified));
-      expect(verified.failure).toEqual(
-        WatchBuild.Failure.InputCaptureFailed({ file: "input.ts", cause }),
-      );
+      ).pipe(Effect.exit);
+      assert(Exit.isFailure(verified));
+      expect(verified.cause.reasons).toMatchObject([
+        operation === "read"
+          ? {
+              _tag: "Fail",
+              error: WatchBuild.Failure.InputCaptureFailed({
+                file: "input.ts",
+                cause,
+              }),
+            }
+          : { _tag: "Die", defect: cause },
+      ]);
     }),
 );
 
@@ -562,14 +653,14 @@ it.effect(
         result(),
         WatchBuild.emptyCapture,
         (file) => file,
-        Crypto.make({
-          randomBytes: (size) => new Uint8Array(size),
-          digest: () => Effect.fail(cause),
+        Digest.Digest.of({
+          ...crypto,
+          digest: () => Effect.die(cause),
         }),
-      );
-      assert(outputFailure._tag === "Failed");
-      expect(outputFailure.failures).toEqual([
-        WatchBuild.Failure.OutputCaptureFailed({ file: "out.js", cause }),
+      ).pipe(Effect.exit);
+      assert(Exit.isFailure(outputFailure));
+      expect(outputFailure.cause.reasons).toMatchObject([
+        { _tag: "Die", defect: cause },
       ]);
     }),
 );
