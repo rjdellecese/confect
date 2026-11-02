@@ -1,5 +1,5 @@
 import * as Ref from "@confect/core/Ref";
-import { ConvexHttpClient } from "convex/browser";
+import { ConvexHttpClient, type HttpMutationOptions } from "convex/browser";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -61,18 +61,21 @@ const make = (
 
   const mutation = <Mutation extends Ref.AnyPublicMutation>(
     ref: Mutation,
-    ...rest: Ref.OptionalArgs<Mutation>
+    ...rest: [...Ref.OptionalArgs<Mutation>, options?: HttpMutationOptions]
   ): Effect.Effect<
     Ref.Returns<Mutation>,
     Ref.Error<Mutation> | HttpClientError | Schema.SchemaError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
+    const mutationOptions: HttpMutationOptions = rest[1] ?? {
+      skipQueue: false,
+    };
     return runMutation(
       Ref.runWithCodec(
         ref,
         args,
         (functionReference, encodedArgs) =>
-          client.mutation(functionReference, encodedArgs),
+          client.mutation(functionReference, encodedArgs, mutationOptions),
         mapUnknownError,
       ),
     );

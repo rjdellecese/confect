@@ -44,6 +44,29 @@ const program = Effect.gen(function* () {
 
 Each method returns an `Effect` that can fail with `HttpClientError` (wrapping transport-level errors) or `ParseResult.ParseError` (if schema encoding or decoding fails).
 
+### Running independent mutations concurrently
+
+HTTP mutations are queued on each client by default, even when their Effects run concurrently. Pass `{ skipQueue: true }` as the third argument to send an independent mutation without waiting for that client's queued mutations:
+
+```ts
+import { HttpClient } from "@confect/js";
+import * as Effect from "effect/Effect";
+
+import refs from "./confect/_generated/refs";
+
+const insertIndependentNote = Effect.gen(function* () {
+  const client = yield* HttpClient.HttpClient;
+
+  return yield* client.mutation(
+    refs.public.notes.insert,
+    { text: "An independent note" },
+    { skipQueue: true },
+  );
+});
+```
+
+For a mutation with no arguments, pass `undefined` or `{}` in the second position. Omit the options or use `{ skipQueue: false }` to keep the default queue. Bypassing the queue removes the client's execution-order guarantee; don't use it for mutations that depend on earlier mutations. It doesn't change Convex's transaction guarantees, argument encoding, result decoding, or typed errors.
+
 ## Typed errors
 
 When a ref's spec declares an `error` schema, the decoded error is added to the returned `Effect`'s error channel alongside `HttpClientError` and `ParseError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
