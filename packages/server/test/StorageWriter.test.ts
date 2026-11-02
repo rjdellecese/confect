@@ -9,8 +9,10 @@ const uploadUrl =
 const fakeConvexStorageWriter = {
   delete: () => Promise.resolve(),
   generateUploadUrl: () => Promise.resolve(uploadUrl),
+  get: () => Promise.resolve(null),
   getMetadata: () => Promise.resolve(null),
   getUrl: () => Promise.resolve(null),
+  store: () => Promise.reject(new Error("Unexpected store call")),
 } satisfies ConvexStorageWriter;
 
 describe("StorageWriter", () => {

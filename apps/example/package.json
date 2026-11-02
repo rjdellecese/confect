@@ -7,7 +7,7 @@
     "@confect/react": "workspace:*",
     "@confect/server": "workspace:*",
     "@convex-dev/workpool": "0.4.14",
-    "convex": "1.47.0",
+    "convex": "1.49.0",
     "convex-helpers": "0.1.129",
     "effect": "4.1.0",
     "react": "19.3.1",

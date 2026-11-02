@@ -22,6 +22,10 @@ describe("TransactionMetadata", () => {
         databaseQueries: { used: 0, remaining: 100 },
         documentsRead: { used: 0, remaining: 100 },
         documentsWritten: { used: 0, remaining: 100 },
+        filesWritten: { used: 0, remaining: 100 },
+        fileWriteBytes: { used: 0, remaining: 1000 },
+        filesRead: { used: 0, remaining: 100 },
+        fileReadBytes: { used: 0, remaining: 1000 },
         functionsScheduled: { used: 0, remaining: 100 },
         scheduledFunctionArgsBytes: { used: 0, remaining: 1000 },
       };
@@ -30,6 +34,10 @@ describe("TransactionMetadata", () => {
         bytesRead: { used: 150, remaining: 850 },
         databaseQueries: { used: 1, remaining: 99 },
         documentsRead: { used: 2, remaining: 98 },
+        filesWritten: { used: 1, remaining: 99 },
+        fileWriteBytes: { used: 200, remaining: 800 },
+        filesRead: { used: 1, remaining: 99 },
+        fileReadBytes: { used: 150, remaining: 850 },
       };
       let current = before;
       const getTransactionMetrics = vi.fn(() => Promise.resolve(current));
