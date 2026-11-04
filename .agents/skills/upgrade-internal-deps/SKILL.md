@@ -29,14 +29,14 @@ since their pins move with their ranges.
   changes to get green, drop it from the batch and explain what it would take
   in the PR description (or in your final report, if the run ends up applying
   nothing and opens no PR).
-- Bumping `@effect/tsgo` also means updating
-  `lsp.effect-tsgo.settings.package_version` in `.zed/settings.json` to the same
-  version. That pins the copy of the binary Zed's `effect-tsgo` extension
-  downloads, and it lives outside any dependency map, so `pnpm outdated` will
-  never surface the drift. Also verify that the pinned `oxlint` and
-  `oxlint-tsgolint` versions appear in that `@effect/tsgo` release's supported
-  component table; the patch command rejects incompatible integrations. Left
-  stale, the editor and CLI use different Effect language-service versions.
+- Upgrade `@effect/tsgo`, `tsrs`, and `oxlint` as a compatible set from the
+  Effect release's supported-component table. Lint and Zed launch through the
+  workspace's `effect-tsgo` proxy, so no separate editor version pin is needed.
+  The `prepare` script patches only `tsrs`, for compiler scripts, Vitest, and
+  the native benchmark harness. Preserve the explicit lint severities
+  when upstream presets change; a compiler upgrade must not silently remove
+  existing checks. Verify the native type-benchmark harness too; its patched
+  dependency and baselines are documented in `tools/bench-harness/README.md`.
 - These upgrades are not user-facing: **no changeset**.
 
 ## Delivering

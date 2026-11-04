@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@effect/platform-node": "4.1.0",
+    "@effect/tsgo": "0.67.1",
     "@effect/vitest": "4.1.0",
     "@swc/jest": "0.2.39",
     "@types/node": "26.6.6",
@@ -23,8 +24,8 @@
     "dotenv": "18.0.9",
     "effect": "4.1.0",
     "tsdown": "0.23.4",
+    "tsrs": "0.21.0-ts7.1.0-beta",
     "tsx": "4.23.15",
-    "typescript": "7.0.2",
     "unrun": "0.3.1",
     "vite": "8.3.5",
     "vite-tsconfig-paths": "6.1.1",
@@ -82,7 +83,7 @@
     "url": "git+https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
-    "bench": "tsx test/SchemaToValidator.bench.ts && tsx test/Document.bench.ts && tsx test/QueryStream.bench.ts",
+    "bench": "tsx test/SchemaToValidator.bench.ts --checker tsrs && tsx test/Document.bench.ts --checker tsrs && tsx test/QueryStream.bench.ts --checker tsrs",
     "clean": "shx rm -rf dist coverage node_modules",
     "codegen:mock-backend": "cd test/mock-backend/fixtures && pnpm confect codegen && cross-env CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
     "dev": "tsdown --watch --no-clean --config-loader unrun",
@@ -91,8 +92,8 @@
     "test": "vitest run",
     "test:local-backend": "vitest run --config vitest.local-backend.config.ts",
     "test:mock-backend": "vitest run --config vitest.mock-backend.config.ts",
-    "typecheck": "tsc -b tsconfig.src.json",
-    "typecheck:inexact": "tsc --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
+    "typecheck": "tsrs -b tsconfig.src.json",
+    "typecheck:inexact": "tsrs --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
   },
   "sideEffects": false,
   "type": "module",

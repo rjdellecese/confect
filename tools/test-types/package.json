@@ -5,7 +5,7 @@
   "devDependencies": {
     "@effect/vitest": "4.1.0",
     "effect": "4.1.0",
-    "typescript": "7.0.2",
+    "tsrs": "0.21.0-ts7.1.0-beta",
     "vitest": "5.0.5"
   },
   "exports": {
@@ -14,8 +14,8 @@
   "private": true,
   "scripts": {
     "clean": "shx rm -rf node_modules",
-    "typecheck": "tsc --project tsconfig.json",
-    "typecheck:inexact": "tsc --project test/inexact/tsconfig.json"
+    "typecheck": "tsrs --project tsconfig.json",
+    "typecheck:inexact": "tsrs --project test/inexact/tsconfig.json"
   },
   "type": "module"
 }

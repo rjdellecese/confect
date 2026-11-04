@@ -5,13 +5,13 @@ void ({} as IsRecursive<any>);
 
 bench("IsRecursive<string>", () => {
   return {} as IsRecursive<string>;
-}).types([25, "instantiations"]);
+}).types([19, "instantiations"]);
 
 type DeepObject = { a: { b: { c: { d: { e: { value: string } } } } } };
 
 bench("IsRecursive (deep object)", () => {
   return {} as IsRecursive<DeepObject>;
-}).types([394, "instantiations"]);
+}).types([375, "instantiations"]);
 
 type OptionalObject = {
   status?: string;
@@ -21,7 +21,7 @@ type OptionalObject = {
 
 bench("IsRecursive (assignable optional structures)", () => {
   return {} as IsRecursive<OptionalObject>;
-}).types([431, "instantiations"]);
+}).types([321, "instantiations"]);
 
 type SharedChild = { value: string; items: readonly number[] };
 type SharedObject = {
@@ -33,7 +33,7 @@ type SharedObject = {
 
 bench("IsRecursive (shared subtrees)", () => {
   return {} as IsRecursive<SharedObject>;
-}).types([300, "instantiations"]);
+}).types([280, "instantiations"]);
 
 type ObjectUnion =
   | { kind: "text"; text: string }
@@ -45,7 +45,7 @@ type ObjectUnion =
 
 bench("IsRecursive (object union)", () => {
   return {} as IsRecursive<ObjectUnion>;
-}).types([1347, "instantiations"]);
+}).types([1236, "instantiations"]);
 
 type RecursiveObject = { next?: RecursiveObject };
 type RecursiveArray = RecursiveArray[];
@@ -53,12 +53,12 @@ type RecursiveUnion = string | { children: readonly RecursiveUnion[] };
 
 bench("IsRecursive (recursive object)", () => {
   return {} as IsRecursive<RecursiveObject>;
-}).types([230, "instantiations"]);
+}).types([132, "instantiations"]);
 
 bench("IsRecursive (recursive array)", () => {
   return {} as IsRecursive<RecursiveArray>;
-}).types([186, "instantiations"]);
+}).types([89, "instantiations"]);
 
 bench("IsRecursive (recursive union)", () => {
   return {} as IsRecursive<RecursiveUnion>;
-}).types([433, "instantiations"]);
+}).types([334, "instantiations"]);

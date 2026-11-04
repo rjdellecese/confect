@@ -78,9 +78,38 @@
     "typescript/no-unnecessary-type-parameters": "off",
     "effecttsgo/any-unknown-in-error-context": "error",
     "effecttsgo/deterministic-keys": "error",
-    "effecttsgo/strict-effect-provide": "off"
+    "effecttsgo/strict-effect-provide": "off",
+    "effecttsgo/async-function": "warn",
+    "effecttsgo/crypto-random-uuid": "warn",
+    "effecttsgo/crypto-random-uuid-in-effect": "warn",
+    "effecttsgo/extends-native-error": "warn",
+    "effecttsgo/global-console": "warn",
+    "effecttsgo/global-console-in-effect": "warn",
+    "effecttsgo/global-date": "warn",
+    "effecttsgo/global-date-in-effect": "warn",
+    "effecttsgo/global-fetch": "warn",
+    "effecttsgo/global-fetch-in-effect": "warn",
+    "effecttsgo/global-random": "warn",
+    "effecttsgo/global-random-in-effect": "warn",
+    "effecttsgo/global-timers": "warn",
+    "effecttsgo/global-timers-in-effect": "warn",
+    "effecttsgo/instance-of-schema": "warn",
+    "effecttsgo/new-promise": "warn",
+    "effecttsgo/node-builtin-import": "warn",
+    "effecttsgo/process-env": "warn",
+    "effecttsgo/process-env-in-effect": "warn",
+    "effecttsgo/schema-class-missing-brand": "off",
+    "effecttsgo/unstable-api-usage": "off",
+    "effecttsgo/effect-try-without-catch": "off",
+    "typescript/no-generated-empty-object-type": "off",
+    "effecttsgo/global-json-in-effect": "warn",
+    "effecttsgo/match-to-result-or-option": "off"
   },
   "overrides": [
+    {
+      "files": ["packages/js/test/HttpClient.test.ts"],
+      "rules": { "effecttsgo/run-effect-inside-effect": "off" }
+    },
     {
       "files": [
         "packages/cli/src/Evaluation.ts",
