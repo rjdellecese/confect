@@ -14,21 +14,21 @@
     "@effect/platform-node": "4.1.0",
     "@effect/vitest": "4.1.0",
     "@swc/jest": "0.2.39",
-    "@types/node": "26.6.5",
-    "@vitest/coverage-v8": "5.0.3",
+    "@types/node": "26.6.6",
+    "@vitest/coverage-v8": "5.0.5",
     "confect-bench-harness": "workspace:*",
     "confect-local-backend": "workspace:*",
     "confect-test-types": "workspace:*",
     "convex-test": "0.0.60",
-    "dotenv": "18.0.7",
+    "dotenv": "18.0.9",
     "effect": "4.1.0",
-    "tsdown": "0.23.1",
+    "tsdown": "0.23.4",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
-    "vite": "8.3.4",
+    "vite": "8.3.5",
     "vite-tsconfig-paths": "6.1.1",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   },
   "engines": {
     "node": ">=24"

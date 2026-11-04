@@ -203,9 +203,7 @@ const renderCoalescedBuildErrors = (
   return `${header}\n${formatEsbuildMessages(messages, formatted)}`;
 };
 
-export const logCoalescedBuildErrors = (
-  messages: readonly esbuild.Message[],
-) =>
+export const logCoalescedBuildErrors = (messages: readonly esbuild.Message[]) =>
   messages.length === 0
     ? Effect.void
     : Console.error(renderCoalescedBuildErrors(messages));
