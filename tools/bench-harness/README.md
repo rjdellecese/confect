@@ -4,9 +4,6 @@ Re-exports [`@ark/attest`](https://github.com/arktypeio/arktype/tree/main/ark/at
 `bench` to `packages/*/test/*.bench.ts`. The package pins the native compiler API
 used to inspect benchmark syntax and count type instantiations.
 
-See [the toolchain benchmark](TOOLCHAIN.md) for migration timings, memory
-measurements, raw samples, and reproduction commands.
-
 Run the suites after `pnpm install` and `pnpm build`:
 
 ```sh
