@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "devDependencies": {
     "@effect/platform-node": "4.1.0",
-    "@types/node": "26.6.5",
+    "@types/node": "26.6.6",
     "convex": "1.49.0",
     "cross-env": "10.1.0",
     "effect": "4.1.0",
     "typescript": "7.0.2",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   },
   "exports": {
     "./LocalBackend": "./src/LocalBackend.ts",
