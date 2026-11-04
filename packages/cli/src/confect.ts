@@ -6,6 +6,9 @@ import * as ConfectDirectory from "./ConfectDirectory";
 import * as ConvexDirectory from "./ConvexDirectory";
 import * as ProjectRoot from "./ProjectRoot";
 
+/**
+ * @internal
+ */
 export const confect = Command.make("confect").pipe(
   Command.withDescription("Generate and sync Confect files with Convex"),
   Command.withSubcommands([codegen, dev]),

@@ -23,22 +23,20 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             parsed: id,
             identified: { table: "transactionNotes", id },
           };
-          expect(
-            yield* Effect.promise(() =>
-              client.query(Ref.getFunctionReference(functions.inspect), {
-                table: "transactionNotes",
-                input: id,
-              }),
+          const promiseResult = yield* Effect.promise(() =>
+            client.query(Ref.getFunctionReference(functions.inspect), {
+              table: "transactionNotes",
+              input: id,
+            }),
+          );
+          expect(promiseResult).toEqual(expected);
+          const promiseResult2 = yield* Effect.promise(() =>
+            client.mutation(
+              Ref.getFunctionReference(functions.inspectFromMutation),
+              { table: "transactionNotes", input: id },
             ),
-          ).toEqual(expected);
-          expect(
-            yield* Effect.promise(() =>
-              client.mutation(
-                Ref.getFunctionReference(functions.inspectFromMutation),
-                { table: "transactionNotes", input: id },
-              ),
-            ),
-          ).toEqual(expected);
+          );
+          expect(promiseResult2).toEqual(expected);
         }),
     );
 
@@ -66,19 +64,19 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
           ),
         );
         assert(input !== null);
-        expect(
-          yield* Effect.promise(() => client.query(inspect, { table, input })),
-        ).toEqual({
+        const promiseResult3 = yield* Effect.promise(() =>
+          client.query(inspect, { table, input }),
+        );
+        expect(promiseResult3).toEqual({
           parsed: input,
           identified: { table, id: input },
         });
         const wrongTable =
           table === "_storage" ? "transactionNotes" : "_storage";
-        expect(
-          yield* Effect.promise(() =>
-            client.query(inspect, { table: wrongTable, input }),
-          ),
-        ).toEqual({
+        const promiseResult4 = yield* Effect.promise(() =>
+          client.query(inspect, { table: wrongTable, input }),
+        );
+        expect(promiseResult4).toEqual({
           parsed: null,
           identified: { table, id: input },
         });
@@ -90,16 +88,13 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
       (input) =>
         Effect.gen(function* () {
           const { client } = yield* LocalBackend.LocalBackend;
-          expect(
-            yield* Effect.promise(() =>
-              client.query(
-                Ref.getFunctionReference(
-                  refs.public.groups.documentIds.inspect,
-                ),
-                { table: "transactionNotes", input },
-              ),
+          const promiseResult5 = yield* Effect.promise(() =>
+            client.query(
+              Ref.getFunctionReference(refs.public.groups.documentIds.inspect),
+              { table: "transactionNotes", input },
             ),
-          ).toEqual({
+          );
+          expect(promiseResult5).toEqual({
             parsed: null,
             identified: null,
           });

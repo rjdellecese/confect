@@ -1,10 +1,10 @@
 import { MiddlewareSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-export class FunctionGateClosed extends Schema.TaggedError<FunctionGateClosed>()(
-  "FunctionGateClosed",
-  {},
-) {}
+export class FunctionGateClosed extends Schema.TaggedError<
+  FunctionGateClosed,
+  {}
+>()("FunctionGateClosed", {}) {}
 
 /**
  * Attached to a single function rather than a group: runs inside the

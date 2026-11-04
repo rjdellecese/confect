@@ -26,13 +26,12 @@ export const make = Effect.fn("WatchTopology.make")(function* (
   pending: Ref.Ref<SyncState.Pending>,
 ) {
   const state = yield* Ref.make<State>(State.Reconciling({ revision: 0 }));
-  const changed = yield* Ref.make(yield* Deferred.make<void>());
+  const initialChange = yield* Deferred.make<void>();
+  const changed = yield* Ref.make(initialChange);
   const lock = yield* Semaphore.make(1);
   const notify = Effect.gen(function* () {
-    const previous = yield* Ref.getAndSet(
-      changed,
-      yield* Deferred.make<void>(),
-    );
+    const nextChange = yield* Deferred.make<void>();
+    const previous = yield* Ref.getAndSet(changed, nextChange);
     yield* Deferred.succeed(previous, undefined);
   });
 

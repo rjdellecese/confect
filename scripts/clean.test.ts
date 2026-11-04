@@ -22,10 +22,14 @@ test("removes files and nested directories and tolerates missing targets", () =>
       const targets = [nested, file, missing];
       yield* clean(targets);
       expect(targets).toEqual([nested, file, missing]);
-      expect(yield* fs.exists(nested)).toBe(false);
-      expect(yield* fs.exists(file)).toBe(false);
-      expect(yield* fs.exists(missing)).toBe(false);
-      expect(yield* fs.readFileString(kept)).toBe("kept");
+      const nestedExists = yield* fs.exists(nested);
+      expect(nestedExists).toBe(false);
+      const fileExists = yield* fs.exists(file);
+      expect(fileExists).toBe(false);
+      const missingExists = yield* fs.exists(missing);
+      expect(missingExists).toBe(false);
+      const keptText = yield* fs.readFileString(kept);
+      expect(keptText).toBe("kept");
       yield* clean([]);
     }).pipe(Effect.scoped, Effect.provide(BunServices.layer)),
   ));

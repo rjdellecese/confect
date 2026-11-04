@@ -39,8 +39,13 @@ describe("ConvexLogger", () => {
     ({ log, level, method }) =>
       Effect.gen(function* () {
         const console = yield* makeConsole;
-        yield* log("message").pipe(
-          Effect.provide(Logger.layer([ConvexLogger.logger])),
+        yield* Effect.gen(function* () {
+          const services = yield* Layer.build(
+            Logger.layer([ConvexLogger.logger]),
+          );
+          return yield* log("message").pipe(Effect.provideContext(services));
+        }).pipe(
+          Effect.scoped,
           Effect.provideService(Console.Console, console),
           Effect.provideService(References.MinimumLogLevel, "Trace"),
         );
@@ -63,12 +68,20 @@ describe("ConvexLogger", () => {
     Effect.gen(function* () {
       const console = yield* makeConsole;
       const details = { attempt: 2 };
-      yield* Effect.logError("failed", details, Cause.fail("unavailable")).pipe(
-        Effect.annotateLogs("operation", "read"),
-        Effect.withLogSpan("request"),
-        Effect.provide(Logger.layer([ConvexLogger.logger])),
-        Effect.provideService(Console.Console, console),
-      );
+      yield* Effect.gen(function* () {
+        const services = yield* Layer.build(
+          Logger.layer([ConvexLogger.logger]),
+        );
+        return yield* Effect.logError(
+          "failed",
+          details,
+          Cause.fail("unavailable"),
+        ).pipe(
+          Effect.annotateLogs("operation", "read"),
+          Effect.withLogSpan("request"),
+          Effect.provideContext(services),
+        );
+      }).pipe(Effect.scoped, Effect.provideService(Console.Console, console));
 
       expect(console.error).toHaveBeenCalledExactlyOnceWith({
         level: "ERROR",

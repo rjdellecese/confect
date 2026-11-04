@@ -1,3 +1,6 @@
+import * as Schema from "effect/Schema";
+import { dual } from "effect/Function";
+import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
 
 /**
@@ -28,6 +31,15 @@ export type Concat<
       : never
     : never;
 
+/**
+ * @experimental
+ */
+export const QueryStreamKeyLabels = Schema.declare<QueryStreamKeyLabels>(
+  (value): value is QueryStreamKeyLabels =>
+    Array.isArray(value) &&
+    Array.every(value, (label) => typeof label === "string"),
+);
+
 const LabelsBrand = Brand.nominal<QueryStreamKeyLabels>();
 
 /**
@@ -48,9 +60,17 @@ export function make(names: ReadonlyArray<string>): QueryStreamKeyLabels {
  *
  * @experimental
  */
-export const hasPrefix = (
-  self: QueryStreamKeyLabels,
-  prefixKeyLabels: QueryStreamKeyLabels,
-): boolean =>
-  prefixKeyLabels.length <= self.length &&
-  prefixKeyLabels.every((label, index) => label === self[index]);
+export const hasPrefix: {
+  (
+    prefixKeyLabels: QueryStreamKeyLabels,
+  ): (self: QueryStreamKeyLabels) => boolean;
+  (self: QueryStreamKeyLabels, prefixKeyLabels: QueryStreamKeyLabels): boolean;
+} = dual(
+  2,
+  (
+    self: QueryStreamKeyLabels,
+    prefixKeyLabels: QueryStreamKeyLabels,
+  ): boolean =>
+    prefixKeyLabels.length <= self.length &&
+    Array.every(prefixKeyLabels, (label, index) => label === self[index]),
+);

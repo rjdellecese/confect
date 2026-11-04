@@ -1,3 +1,4 @@
+import * as Record from "effect/Record";
 import { compileTableSchema } from "@confect/core/SchemaToValidator";
 import * as Table_ from "@confect/core/Table";
 import * as Schema from "effect/Schema";
@@ -58,20 +59,21 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
     >;
   }
 
-  let definition: TableDefinition<any, any, any, any> = defineTable(
-    compileTableSchema(table.Fields),
+  let definition: TableDefinition<any, any, any, any> = table.Fields.pipe(
+    compileTableSchema,
+    defineTable,
   );
-  for (const [name, indexFields] of Object.entries(
+  for (const [name, indexFields] of Record.toEntries(
     table.indexes as Record<string, any>,
   )) {
     definition = definition.index(name, indexFields);
   }
-  for (const [name, config] of Object.entries(
+  for (const [name, config] of Record.toEntries(
     table.searchIndexes as Record<string, any>,
   )) {
     definition = definition.searchIndex(name, config);
   }
-  for (const [name, config] of Object.entries(
+  for (const [name, config] of Record.toEntries(
     table.vectorIndexes as Record<string, any>,
   )) {
     definition = definition.vectorIndex(name, config);

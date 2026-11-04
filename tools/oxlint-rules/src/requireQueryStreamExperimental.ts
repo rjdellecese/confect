@@ -1,3 +1,5 @@
+import * as Arr from "effect/Array";
+import * as Str from "effect/String";
 import { Diagnostic, Rule, RuleContext, Visitor } from "effect-oxlint";
 import type { ESTree } from "effect-oxlint";
 import * as Effect from "effect/Effect";
@@ -11,7 +13,7 @@ export const requireQueryStreamExperimental = Rule.define({
   }),
   create: function* () {
     const ctx = yield* RuleContext;
-    const filename = ctx.filename.replaceAll("\\", "/");
+    const filename = Str.replaceAll("\\", "/")(ctx.filename);
     const isModule = /\/packages\/[^/]+\/src\/QueryStream[^/]*\.ts$/.test(
       filename,
     );
@@ -30,7 +32,7 @@ export const requireQueryStreamExperimental = Rule.define({
         !(
           isBarrel &&
           "source" in node &&
-          node.source &&
+          node.source != null &&
           /^\.\/QueryStream[^/]*$/.test(node.source.value)
         )
       )
@@ -40,8 +42,9 @@ export const requireQueryStreamExperimental = Rule.define({
         node.type === "ExportAllDeclaration" ? undefined : node.declaration;
       if (
         declaration?.type === "FunctionDeclaration" &&
-        declaration.body &&
-        ctx.sourceCode.ast.body.some(
+        declaration.body != null &&
+        Arr.some(
+          ctx.sourceCode.ast.body,
           (statement) =>
             (statement.type === "ExportNamedDeclaration" ||
               statement.type === "ExportDefaultDeclaration") &&
@@ -55,14 +58,15 @@ export const requireQueryStreamExperimental = Rule.define({
       const comment = ctx.sourceCode.getCommentsBefore(node).at(-1);
       if (
         comment?.type === "Block" &&
-        comment.value.startsWith("*") &&
-        ctx.sourceCode.text.slice(comment.range[1], node.range[0]).trim() ===
-          "" &&
-        comment.value
-          .split("\n")
-          .some(
-            (line) => line.replace(/^\s*\*\s?/, "").trim() === "@experimental",
-          )
+        Str.startsWith("*")(comment.value) &&
+        Str.trim(
+          Str.slice(comment.range[1], node.range[0])(ctx.sourceCode.text),
+        ) === "" &&
+        Arr.some(
+          Str.split("\n")(comment.value),
+          (line) =>
+            Str.trim(Str.replace(/^\s*\*\s?/, "")(line)) === "@experimental",
+        )
       )
         return Effect.void;
 

@@ -17,9 +17,7 @@ export interface Call {
 }
 
 export interface Service extends Client.Client {
-  // Keep inspection operations function-valued, like the fake's controls.
-  // @effect-diagnostics-next-line lazyEffect:off
-  readonly calls: () => Effect.Effect<ReadonlyArray<Call>>;
+  readonly calls: Effect.Effect<ReadonlyArray<Call>>;
   readonly setNextResult: (
     result: Result.Result<unknown, unknown>,
   ) => Effect.Effect<void>;
@@ -31,11 +29,9 @@ export interface Service extends Client.Client {
   ) => Effect.Effect<void>;
 }
 
-export const TestClient = Context.Service<Service>(
+export class TestClient extends Context.Service<TestClient, Service>()(
   "@confect/foldkit/test/TestClient",
-);
-
-export type TestClient = typeof TestClient.Identifier;
+) {}
 
 const failRejection = <Ref_ extends CoreRef.Any>(
   ref: Ref_,
@@ -60,9 +56,10 @@ const failRejection = <Ref_ extends CoreRef.Any>(
 export const layer = Layer.effectContext(
   Effect.gen(function* () {
     const recordedCalls = yield* Ref.make<ReadonlyArray<Call>>([]);
-    const nextResult = yield* Ref.make<
-      Effect.Effect<Result.Result<unknown, unknown>>
-    >(Effect.succeed(Result.succeed({})));
+    const nextResult = yield* Result.succeed({}).pipe(
+      Effect.succeed,
+      Ref.make<Effect.Effect<Result.Result<unknown, unknown>>>,
+    );
     const nextReactiveQueryResults = yield* Ref.make<
       Stream.Stream<Result.Result<unknown, unknown>, never, never>
     >(Stream.empty);
@@ -116,19 +113,11 @@ export const layer = Layer.effectContext(
             result: Result.Result<unknown, unknown>,
           ): Effect.Effect<QueryResult> => {
             if (Result.isFailure(result)) {
-              return failRejection(ref, result.failure).pipe(
-                Effect.match({
-                  onFailure: (failure): QueryResult => Result.fail(failure),
-                  onSuccess: (success): QueryResult => Result.succeed(success),
-                }),
-              );
+              return failRejection(ref, result.failure).pipe(Effect.result);
             }
 
             return CoreRef.decodeReturns(ref, result.success).pipe(
-              Effect.match({
-                onFailure: (failure): QueryResult => Result.fail(failure),
-                onSuccess: (success): QueryResult => Result.succeed(success),
-              }),
+              Effect.result,
             );
           };
 
@@ -157,9 +146,7 @@ export const layer = Layer.effectContext(
     const client = yield* Client.make(webSocketClient);
     const service: Service = {
       ...client,
-      calls: Effect.fn("TestClient.calls")(function* () {
-        return yield* Ref.get(recordedCalls);
-      }),
+      calls: Ref.get(recordedCalls),
       setNextResult: Effect.fn("TestClient.setNextResult")(function* (result) {
         yield* Ref.set(nextResult, Effect.succeed(result));
       }),

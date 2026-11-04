@@ -1,3 +1,4 @@
+import * as Result from "effect/Result";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -26,10 +27,16 @@ describe("GenericId", () => {
       const constructed = id.make(value);
       expectTypeOf(constructed).toEqualTypeOf<GenericId.GenericId<"users">>();
       expect(constructed).toBe(value);
-      expect(Schema.decodeUnknownSync(id)(value)).toBe(value);
-      expect(Schema.encodeSync(id)(constructed)).toBe(value);
+      expect(Result.getOrThrow(Schema.decodeUnknownResult(id)(value))).toBe(
+        value,
+      );
+      expect(Result.getOrThrow(Schema.encodeResult(id)(constructed))).toBe(
+        value,
+      );
     }
-    expect(() => Schema.decodeUnknownSync(id)(42)).toThrow();
+    expect(() =>
+      Result.getOrThrow(Schema.decodeUnknownResult(id)(42)),
+    ).toThrow();
   });
 
   it("supports checks, annotations, and piping without losing the ID type", () => {
@@ -48,7 +55,9 @@ describe("GenericId", () => {
     expect(GenericId.tableName(id.ast)).toEqual(Option.some("users"));
     expect(id.make("candidate-id")).toBe("candidate-id");
     expect(() => id.make("")).toThrow();
-    expect(() => Schema.decodeUnknownSync(id)("")).toThrow();
+    expect(() =>
+      Result.getOrThrow(Schema.decodeUnknownResult(id)("")),
+    ).toThrow();
     expect(base.make("")).toBe("");
   });
 
@@ -63,12 +72,16 @@ describe("GenericId", () => {
     }>();
     expectTypeOf<typeof counts.Encoded>().toEqualTypeOf<typeof counts.Type>();
     const value = { "candidate-id": 2 };
-    const decoded = Schema.decodeSync(counts)(value);
+    const decoded = Result.getOrThrow(Schema.decodeResult(counts)(value));
     expect(decoded).toEqual(value);
-    expect(Schema.encodeSync(counts)(decoded)).toEqual(value);
-    expect(() => Schema.decodeSync(counts)({})).toThrow();
+    expect(Result.getOrThrow(Schema.encodeResult(counts)(decoded))).toEqual(
+      value,
+    );
+    expect(() => Result.getOrThrow(Schema.decodeResult(counts)({}))).toThrow();
     expect(() =>
-      Schema.decodeUnknownSync(counts)({ "candidate-id": "2" }),
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(counts)({ "candidate-id": "2" }),
+      ),
     ).toThrow();
   });
 });

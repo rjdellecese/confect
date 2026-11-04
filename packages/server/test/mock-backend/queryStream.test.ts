@@ -1,3 +1,4 @@
+import * as Str from "effect/String";
 import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamKey from "@confect/server/QueryStreamKey";
 import { identity } from "effect/Function";
@@ -12,6 +13,7 @@ import * as Array from "effect/Array";
 import * as Context from "effect/Context";
 import { getDocumentSize, type Value } from "convex/values";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
@@ -28,7 +30,7 @@ const collectTexts = <E, R>(
   stream: Stream.Stream<{ text: string }, E, R>,
 ): Effect.Effect<ReadonlyArray<string>, E, R> =>
   Stream.runCollect(stream).pipe(
-    Effect.map((docs) => docs.map((doc) => doc.text)),
+    Effect.map((docs) => Array.map(docs, (doc) => doc.text)),
   );
 
 /**
@@ -81,8 +83,8 @@ const insertNotes = Effect.fnUntraced(function* (texts: ReadonlyArray<string>) {
   );
 });
 
-describe("QueryStream", () => {
-  it.effect("emits documents in index order", () =>
+it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
+  test.effect("emits documents in index order", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -103,10 +105,10 @@ describe("QueryStream", () => {
           expect(descending).toEqual(["cherry", "banana", "apple"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("is a reusable description backed by leaf reflection", () =>
+  test.effect("is a reusable description backed by leaf reflection", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -136,10 +138,10 @@ describe("QueryStream", () => {
           expect(second).toEqual(first);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("supports plain Stream combinators", () =>
+  test.effect("supports plain Stream combinators", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -160,10 +162,10 @@ describe("QueryStream", () => {
           expect(QueryStream.isQueryStream(texts)).toBe(false);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("applies typed index range bounds", () =>
+  test.effect("applies typed index range bounds", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -193,10 +195,10 @@ describe("QueryStream", () => {
           expect(exactly).toEqual(["apple"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("empty merges with, and paginates like, streams of its key", () =>
+  test.effect("empty merges with, and paginates like, streams of its key", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -214,9 +216,10 @@ describe("QueryStream", () => {
             ),
           );
 
-          expect(
-            yield* collectTexts(QueryStream.merge([nothing, notes])),
-          ).toEqual(["a", "b"]);
+          const collectTextsResult = yield* collectTexts(
+            QueryStream.merge([nothing, notes]),
+          );
+          expect(collectTextsResult).toEqual(["a", "b"]);
           const page = yield* QueryStream.paginate(nothing, {
             numItems: 5,
             cursor: null,
@@ -239,14 +242,16 @@ describe("QueryStream", () => {
                   ),
                 ),
             });
-          expect(yield* collectTexts(only([]))).toEqual([]);
-          expect(yield* collectTexts(only(["b", "a"]))).toEqual(["a", "b"]);
+          const collectTextsResult2 = yield* collectTexts(only([]));
+          expect(collectTextsResult2).toEqual([]);
+          const collectTextsResult3 = yield* collectTexts(only(["b", "a"]));
+          expect(collectTextsResult3).toEqual(["a", "b"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("merge rejects differing directions when combined", () =>
+  test.effect("merge rejects differing directions when combined", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -268,10 +273,10 @@ describe("QueryStream", () => {
           ).toThrow(/must share an order/);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("merge interleaves streams in key order", () =>
+  test.effect("merge interleaves streams in key order", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -302,7 +307,7 @@ describe("QueryStream", () => {
             streamFor("b", "asc"),
           ]);
           const tags = yield* Stream.runCollect(merged).pipe(
-            Effect.map((docs) => docs.map((doc) => doc.tag)),
+            Effect.map((docs) => Array.map(docs, (doc) => doc.tag)),
           );
           expect(tags).toEqual(["1", "2", "3", "4"]);
 
@@ -311,15 +316,15 @@ describe("QueryStream", () => {
             streamFor("b", "desc"),
           ]);
           const tagsDesc = yield* Stream.runCollect(mergedDesc).pipe(
-            Effect.map((docs) => docs.map((doc) => doc.tag)),
+            Effect.map((docs) => Array.map(docs, (doc) => doc.tag)),
           );
           expect(tagsDesc).toEqual(["4", "3", "2", "1"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("filterEffect filters with an effectful predicate", () =>
+  test.effect("filterEffect filters with an effectful predicate", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -342,10 +347,10 @@ describe("QueryStream", () => {
           expect(filtered).toEqual(["apple", "cherry"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("paginates a merged, filtered stream with cursors", () =>
+  test.effect("paginates a merged, filtered stream with cursors", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -378,7 +383,7 @@ describe("QueryStream", () => {
           );
 
           const tagsOf = (page: ReadonlyArray<{ tag?: string }>) =>
-            page.map((doc) => doc.tag);
+            Array.map(page, (doc) => doc.tag);
 
           const page1 = yield* QueryStream.paginate(composed, {
             numItems: 2,
@@ -405,10 +410,10 @@ describe("QueryStream", () => {
           assertEquals(page3.continueCursor, QueryStreamCursor.END_CURSOR);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("paginate honors endCursor for gap-free adjacent pages", () =>
+  test.effect("paginate honors endCursor for gap-free adjacent pages", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -423,7 +428,7 @@ describe("QueryStream", () => {
             numItems: 2,
             cursor: null,
           });
-          expect(page1.page.map((doc) => doc.text)).toEqual(["a", "b"]);
+          expect(Array.map(page1.page, (doc) => doc.text)).toEqual(["a", "b"]);
 
           // Re-request the same page pinned to its end cursor: `numItems`
           // is ignored and the page runs exactly to the pinned endpoint—the range-defined page the reactive pagination articles call
@@ -433,42 +438,44 @@ describe("QueryStream", () => {
             cursor: null,
             endCursor: page1.continueCursor,
           });
-          expect(pinned.page.map((doc) => doc.text)).toEqual(["a", "b"]);
+          expect(Array.map(pinned.page, (doc) => doc.text)).toEqual(["a", "b"]);
           assertEquals(pinned.isDone, false);
           assertEquals(pinned.continueCursor, page1.continueCursor);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("paginate reports SplitRequired when maximumRowsRead is hit", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
+  test.effect(
+    "paginate reports SplitRequired when maximumRowsRead is hit",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
 
-      yield* c.run(
-        Effect.gen(function* () {
-          yield* insertNotes(["a", "b", "c", "d"]);
+        yield* c.run(
+          Effect.gen(function* () {
+            yield* insertNotes(["a", "b", "c", "d"]);
 
-          const reader = yield* DatabaseReader;
+            const reader = yield* DatabaseReader;
 
-          const result = yield* QueryStream.paginate(
-            reader
-              .table("notes")
-              .stream("by_text")
-              .pipe(QueryStream.filterEffect(() => Effect.succeed(false))),
-            { numItems: 3, cursor: null, maximumRowsRead: 2 },
-          );
+            const result = yield* QueryStream.paginate(
+              reader
+                .table("notes")
+                .stream("by_text")
+                .pipe(QueryStream.filterEffect(() => Effect.succeed(false))),
+              { numItems: 3, cursor: null, maximumRowsRead: 2 },
+            );
 
-          assertEquals(result.page.length, 0);
-          assertEquals(result.isDone, false);
-          assertEquals(result.pageStatus, "SplitRequired");
-          expect(result.splitCursor).toBeDefined();
-        }),
-      );
-    }).pipe(Effect.provide(TestConfect.layer)),
+            assertEquals(result.page.length, 0);
+            assertEquals(result.isDone, false);
+            assertEquals(result.pageStatus, "SplitRequired");
+            expect(result.splitCursor).toBeDefined();
+          }),
+        );
+      }),
   );
 
-  it.effect(
+  test.effect(
     "rejects a non-interior split even when the end cursor is reformatted",
     () =>
       Effect.gen(function* () {
@@ -490,97 +497,104 @@ describe("QueryStream", () => {
               maximumRowsRead: 1,
             }).pipe(Effect.result);
 
-            assert(Result.isFailure(result));
+            const isFailure2 = Result.isFailure(result);
+            assert(isFailure2);
             expect(result.failure).toBeInstanceOf(
               QueryStream.ReadBudgetExceededError,
             );
           }),
         );
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
   );
 
-  it.effect("paginate reports SplitRequired when maximumBytesRead is hit", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
+  test.effect(
+    "paginate reports SplitRequired when maximumBytesRead is hit",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
 
-      yield* c.run(
-        Effect.gen(function* () {
-          // Equal-sized documents, and a budget of two and a half of them,
-          // so a page admits exactly three.
-          yield* insertNotes(
-            ["a", "b", "c", "d", "e"].map((text) => text.padEnd(100, ".")),
-          );
-
-          const reader = yield* DatabaseReader;
-          const notes = reader.table("notes").stream("by_text");
-          const initials = (page: ReadonlyArray<{ text: string }>) =>
-            page.map((note) => note.text[0]);
-          const [first] = yield* Stream.runCollect(notes);
-          const maximumBytesRead =
-            2.5 * getDocumentSize(first as unknown as Record<string, Value>);
-
-          const page = yield* QueryStream.paginate(notes, {
-            numItems: 10,
-            cursor: null,
-            maximumBytesRead,
-          });
-          expect(initials(page.page)).toEqual(["a", "b", "c"]);
-          expect(page.pageStatus).toEqual("SplitRequired");
-          assertEquals(page.isDone, false);
-
-          // The budget is per call: resuming reads the rest.
-          const rest = yield* QueryStream.paginate(notes, {
-            numItems: 10,
-            cursor: page.continueCursor,
-            maximumBytesRead,
-          });
-          expect(initials(rest.page)).toEqual(["d", "e"]);
-          assertEquals(rest.isDone, true);
-
-          // Without a budget nothing is measured.
-          const whole = yield* QueryStream.paginate(notes, {
-            numItems: 10,
-            cursor: null,
-          });
-          expect(whole.page).toHaveLength(5);
-
-          // The budget reaches the leaves through combinators: a merge of
-          // two ranges (which pre-fetches from both) still stops early and
-          // covers every document across its pages.
-          const merged = QueryStream.merge([
-            reader.table("notes").stream("by_text", (q) => q.lt("text", "c")),
-            reader.table("notes").stream("by_text", (q) => q.gte("text", "c")),
-          ]);
-          const budgeted = (
-            cursor: string | null,
-            pages: ReadonlyArray<ReadonlyArray<string>>,
-          ): Effect.Effect<
-            ReadonlyArray<ReadonlyArray<string>>,
-            Document.DocumentDecodeError | QueryStream.ReadBudgetExceededError
-          > =>
-            QueryStream.paginate(merged, {
-              numItems: 10,
-              cursor,
-              maximumBytesRead,
-            }).pipe(
-              Effect.flatMap((result) =>
-                result.isDone
-                  ? Effect.succeed([...pages, initials(result.page)])
-                  : budgeted(result.continueCursor, [
-                      ...pages,
-                      initials(result.page),
-                    ]),
+        yield* c.run(
+          Effect.gen(function* () {
+            // Equal-sized documents, and a budget of two and a half of them,
+            // so a page admits exactly three.
+            yield* insertNotes(
+              Array.map(["a", "b", "c", "d", "e"], (text) =>
+                Str.padEnd(100, ".")(text),
               ),
             );
-          const pages = yield* budgeted(null, []);
-          expect(pages.length).toBeGreaterThan(1);
-          expect(pages.flat()).toEqual(["a", "b", "c", "d", "e"]);
-        }),
-      );
-    }).pipe(Effect.provide(TestConfect.layer)),
+
+            const reader = yield* DatabaseReader;
+            const notes = reader.table("notes").stream("by_text");
+            const initials = (page: ReadonlyArray<{ text: string }>) =>
+              Array.map(page, (note) => note.text[0]);
+            const [first] = yield* Stream.runCollect(notes);
+            const maximumBytesRead =
+              2.5 * getDocumentSize(first as unknown as Record<string, Value>);
+
+            const page = yield* QueryStream.paginate(notes, {
+              numItems: 10,
+              cursor: null,
+              maximumBytesRead,
+            });
+            expect(initials(page.page)).toEqual(["a", "b", "c"]);
+            expect(page.pageStatus).toEqual("SplitRequired");
+            assertEquals(page.isDone, false);
+
+            // The budget is per call: resuming reads the rest.
+            const rest = yield* QueryStream.paginate(notes, {
+              numItems: 10,
+              cursor: page.continueCursor,
+              maximumBytesRead,
+            });
+            expect(initials(rest.page)).toEqual(["d", "e"]);
+            assertEquals(rest.isDone, true);
+
+            // Without a budget nothing is measured.
+            const whole = yield* QueryStream.paginate(notes, {
+              numItems: 10,
+              cursor: null,
+            });
+            expect(whole.page).toHaveLength(5);
+
+            // The budget reaches the leaves through combinators: a merge of
+            // two ranges (which pre-fetches from both) still stops early and
+            // covers every document across its pages.
+            const merged = QueryStream.merge([
+              reader.table("notes").stream("by_text", (q) => q.lt("text", "c")),
+              reader
+                .table("notes")
+                .stream("by_text", (q) => q.gte("text", "c")),
+            ]);
+            const budgeted = (
+              cursor: string | null,
+              pages: ReadonlyArray<ReadonlyArray<string>>,
+            ): Effect.Effect<
+              ReadonlyArray<ReadonlyArray<string>>,
+              Document.DocumentDecodeError | QueryStream.ReadBudgetExceededError
+            > =>
+              QueryStream.paginate(merged, {
+                numItems: 10,
+                cursor,
+                maximumBytesRead,
+              }).pipe(
+                Effect.flatMap((result) =>
+                  result.isDone
+                    ? Effect.succeed([...pages, initials(result.page)])
+                    : budgeted(result.continueCursor, [
+                        ...pages,
+                        initials(result.page),
+                      ]),
+                ),
+              );
+            const pages = yield* budgeted(null, []);
+            expect(pages.length).toBeGreaterThan(1);
+            expect(pages.flat()).toEqual(["a", "b", "c", "d", "e"]);
+          }),
+        );
+      }),
   );
 
-  it.effect("narrow pushes cursor bounds into the leaf query", () =>
+  test.effect("narrow pushes cursor bounds into the leaf query", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -621,10 +635,10 @@ describe("QueryStream", () => {
           expect(rest).toEqual(["b"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("narrow pushes bounds through filter and map", () =>
+  test.effect("narrow pushes bounds through filter and map", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -638,7 +652,7 @@ describe("QueryStream", () => {
             .stream("by_text")
             .pipe(
               QueryStream.filter((note) => note.text !== "c"),
-              QueryStream.map((note) => ({ text: note.text.toUpperCase() })),
+              QueryStream.map((note) => ({ text: Str.toUpperCase(note.text) })),
             );
 
           const page1 = yield* QueryStream.paginate(derived, {
@@ -657,10 +671,11 @@ describe("QueryStream", () => {
             start: { keyValues: afterKeyValues, inclusive: false },
           });
 
-          expect(yield* collectTexts(narrowed)).toEqual(["B", "D"]);
+          const collectTextsResult4 = yield* collectTexts(narrowed);
+          expect(collectTextsResult4).toEqual(["B", "D"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
   describe.each(["asc", "desc"] as const)("narrow (%s)", (order) => {
@@ -671,7 +686,7 @@ describe("QueryStream", () => {
       { startInclusive: false, endInclusive: false },
     ];
 
-    it.effect.each(cases)(
+    test.effect.each(cases)(
       "includes start=$startInclusive and end=$endInclusive for keys and prefixes",
       ({ startInclusive, endInclusive }) =>
         Effect.gen(function* () {
@@ -740,65 +755,72 @@ describe("QueryStream", () => {
                 QueryStream.map((note) => ({ ...note })),
               );
               for (const stream of [leaf, fallback, composed]) {
-                expect(
-                  yield* collectTexts(stream.pipe(QueryStream.narrow(bounds))),
-                ).toEqual(expected);
-                expect(
-                  yield* collectTexts(QueryStream.narrow(stream, prefixBounds)),
-                ).toEqual(expectedPrefixes);
-                expect(
-                  yield* collectTexts(
-                    QueryStream.narrow(stream, {
-                      start,
-                      end: {
-                        keyValues: start.keyValues,
-                        inclusive: endInclusive,
-                      },
-                    }),
-                  ),
-                ).toEqual(startInclusive && endInclusive ? [texts[1]] : []);
-                expect(
-                  yield* collectTexts(
-                    QueryStream.narrow(stream, {
-                      start: prefixBounds.start,
-                      end: { ...prefixBounds.start, inclusive: endInclusive },
-                    }),
-                  ),
-                ).toEqual(
+                const collectTextsResult5 = yield* collectTexts(
+                  stream.pipe(QueryStream.narrow(bounds)),
+                );
+                expect(collectTextsResult5).toEqual(expected);
+                const collectTextsResult6 = yield* collectTexts(
+                  QueryStream.narrow(stream, prefixBounds),
+                );
+                expect(collectTextsResult6).toEqual(expectedPrefixes);
+                const collectTextsResult7 = yield* collectTexts(
+                  QueryStream.narrow(stream, {
+                    start,
+                    end: {
+                      keyValues: start.keyValues,
+                      inclusive: endInclusive,
+                    },
+                  }),
+                );
+                expect(collectTextsResult7).toEqual(
+                  startInclusive && endInclusive ? [texts[1]] : [],
+                );
+                const collectTextsResult8 = yield* collectTexts(
+                  QueryStream.narrow(stream, {
+                    start: prefixBounds.start,
+                    end: { ...prefixBounds.start, inclusive: endInclusive },
+                  }),
+                );
+                expect(collectTextsResult8).toEqual(
                   startInclusive && endInclusive ? texts.slice(1, 3) : [],
                 );
               }
 
               const distinct = leaf.pipe(QueryStream.distinct(["text"]));
-              expect(
-                yield* collectTexts(QueryStream.narrow(distinct, bounds)),
-              ).toEqual(
-                texts.filter(
+              const collectTextsResult9 = yield* collectTexts(
+                QueryStream.narrow(distinct, bounds),
+              );
+              expect(collectTextsResult9).toEqual(
+                Array.filter(
+                  texts,
                   (text, index) =>
                     texts.indexOf(text) === index &&
                     index >= (startInclusive ? 1 : 2) &&
                     index <= (endInclusive ? 5 : 4),
                 ),
               );
-              expect(
-                yield* collectTexts(QueryStream.narrow(distinct, prefixBounds)),
-              ).toEqual([...new Set(expectedPrefixes)]);
-              expect(
-                yield* collectTexts(QueryStream.reverse(narrowed)),
-              ).toEqual(
-                yield* collectTexts(
-                  QueryStream.narrow(QueryStream.reverse(leaf), {
-                    start: end,
-                    end: start,
-                  }),
-                ),
+              const collectTextsResult10 = yield* collectTexts(
+                QueryStream.narrow(distinct, prefixBounds),
               );
+              expect(collectTextsResult10).toEqual([
+                ...new Set(expectedPrefixes),
+              ]);
+              const collectTextsResult12 = yield* collectTexts(
+                QueryStream.narrow(QueryStream.reverse(leaf), {
+                  start: end,
+                  end: start,
+                }),
+              );
+              const collectTextsResult11 = yield* collectTexts(
+                QueryStream.reverse(narrowed),
+              );
+              expect(collectTextsResult11).toEqual(collectTextsResult12);
             }),
           );
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
 
-    it.effect(
+    test.effect(
       "keeps omitted sides unbounded and intersects repeated bounds",
       () =>
         Effect.gen(function* () {
@@ -817,52 +839,52 @@ describe("QueryStream", () => {
                 keyValues: [Array.getUnsafe(texts, 3)],
                 inclusive: false,
               };
-              expect(
-                yield* collectTexts(QueryStream.narrow(leaf, { start })),
-              ).toEqual(texts.slice(1));
-              expect(
-                yield* collectTexts(QueryStream.narrow(leaf, { end })),
-              ).toEqual(texts.slice(0, 3));
+              const collectTextsResult13 = yield* collectTexts(
+                QueryStream.narrow(leaf, { start }),
+              );
+              expect(collectTextsResult13).toEqual(texts.slice(1));
+              const collectTextsResult14 = yield* collectTexts(
+                QueryStream.narrow(leaf, { end }),
+              );
+              expect(collectTextsResult14).toEqual(texts.slice(0, 3));
               const bounded = leaf.pipe(
                 QueryStream.narrow({ start }),
                 QueryStream.narrow({ end }),
               );
-              expect(yield* collectTexts(bounded)).toEqual(texts.slice(1, 3));
-              expect(
-                yield* collectTexts(
-                  QueryStream.narrow(bounded, {
-                    start: {
-                      keyValues: [Array.getUnsafe(texts, 0)],
-                      inclusive: true,
-                    },
-                    end: {
-                      keyValues: [Array.getUnsafe(texts, 4)],
-                      inclusive: true,
-                    },
-                  }),
-                ),
-              ).toEqual(texts.slice(1, 3));
-              expect(
-                yield* collectTexts(
-                  QueryStream.narrow(bounded, {
-                    start: { ...start, inclusive: false },
-                  }),
-                ),
-              ).toEqual(texts.slice(2, 3));
-              expect(
-                yield* collectTexts(
-                  QueryStream.narrow(leaf, {
-                    start: end,
-                    end: start,
-                  }),
-                ),
-              ).toEqual([]);
+              const collectTextsResult15 = yield* collectTexts(bounded);
+              expect(collectTextsResult15).toEqual(texts.slice(1, 3));
+              const collectTextsResult16 = yield* collectTexts(
+                QueryStream.narrow(bounded, {
+                  start: {
+                    keyValues: [Array.getUnsafe(texts, 0)],
+                    inclusive: true,
+                  },
+                  end: {
+                    keyValues: [Array.getUnsafe(texts, 4)],
+                    inclusive: true,
+                  },
+                }),
+              );
+              expect(collectTextsResult16).toEqual(texts.slice(1, 3));
+              const collectTextsResult17 = yield* collectTexts(
+                QueryStream.narrow(bounded, {
+                  start: { ...start, inclusive: false },
+                }),
+              );
+              expect(collectTextsResult17).toEqual(texts.slice(2, 3));
+              const collectTextsResult18 = yield* collectTexts(
+                QueryStream.narrow(leaf, {
+                  start: end,
+                  end: start,
+                }),
+              );
+              expect(collectTextsResult18).toEqual([]);
             }),
           );
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
 
-    it.effect.each(cases)(
+    test.effect.each(cases)(
       "narrows joined boundary rows with start=$startInclusive and end=$endInclusive",
       ({ startInclusive, endInclusive }) =>
         Effect.gen(function* () {
@@ -942,11 +964,11 @@ describe("QueryStream", () => {
               }
             }),
           );
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
   });
 
-  it.effect("paginates through duplicate index values", () =>
+  test.effect("paginates through duplicate index values", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -962,17 +984,15 @@ describe("QueryStream", () => {
           const stream = reader.table("notes").stream("by_text");
 
           const pages = yield* paginateAll(stream, 1);
-          expect(pages.map((page) => page.map((doc) => doc.text))).toEqual([
-            ["apple"],
-            ["banana"],
-            ["banana"],
-          ]);
+          expect(
+            Array.map(pages, (page) => Array.map(page, (doc) => doc.text)),
+          ).toEqual([["apple"], ["banana"], ["banana"]]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("paginates descending streams with pushed-down cursors", () =>
+  test.effect("paginates descending streams with pushed-down cursors", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -984,17 +1004,15 @@ describe("QueryStream", () => {
           const stream = reader.table("notes").stream("by_text", "desc");
 
           const pages = yield* paginateAll(stream, 1);
-          expect(pages.map((page) => page.map((doc) => doc.text))).toEqual([
-            ["c"],
-            ["b"],
-            ["a"],
-          ]);
+          expect(
+            Array.map(pages, (page) => Array.map(page, (doc) => doc.text)),
+          ).toEqual([["c"], ["b"], ["a"]]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("cursors compose with range bounds from the query spec", () =>
+  test.effect("cursors compose with range bounds from the query spec", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1008,16 +1026,15 @@ describe("QueryStream", () => {
             .stream("by_text", (q) => q.gte("text", "b"));
 
           const pages = yield* paginateAll(stream, 1);
-          expect(pages.map((page) => page.map((doc) => doc.text))).toEqual([
-            ["banana"],
-            ["cherry"],
-          ]);
+          expect(
+            Array.map(pages, (page) => Array.map(page, (doc) => doc.text)),
+          ).toEqual([["banana"], ["cherry"]]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("flatMap joins each outer document to an inner stream", () =>
+  test.effect("flatMap joins each outer document to an inner stream", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1057,7 +1074,7 @@ describe("QueryStream", () => {
           );
 
           const tags = yield* Stream.runCollect(joined).pipe(
-            Effect.map((docs) => docs.map((doc) => doc.tag)),
+            Effect.map((docs) => Array.map(docs, (doc) => doc.tag)),
           );
           // x1 → the "a" rows in creation order, x2 → the "b" row, and
           // x3's empty inner stream contributes nothing visible.
@@ -1082,15 +1099,15 @@ describe("QueryStream", () => {
             ),
           );
           const filteredTags = yield* Stream.runCollect(filteredJoin).pipe(
-            Effect.map((docs) => docs.map((doc) => doc.tag)),
+            Effect.map((docs) => Array.map(docs, (doc) => doc.tag)),
           );
           expect(filteredTags).toEqual(["a1", "a2"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("flatMap paginates across inner-stream boundaries", () =>
+  test.effect("flatMap paginates across inner-stream boundaries", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1133,17 +1150,15 @@ describe("QueryStream", () => {
             );
 
           const pages = yield* paginateAll(joined, 1);
-          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
-            ["a1"],
-            ["a2"],
-            ["b1"],
-          ]);
+          expect(
+            Array.map(pages, (page) => Array.map(page, (doc) => doc.tag)),
+          ).toEqual([["a1"], ["a2"], ["b1"]]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect(
+  test.effect(
     "flatMap with onEmpty keeps outer documents that have no inner rows",
     () =>
       Effect.gen(function* () {
@@ -1187,12 +1202,9 @@ describe("QueryStream", () => {
               }),
             );
             const pages = yield* paginateAll(joined, 1);
-            expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
-              ["none for x0"],
-              ["a1"],
-              ["a2"],
-              ["b1"],
-            ]);
+            expect(
+              Array.map(pages, (page) => Array.map(page, (doc) => doc.tag)),
+            ).toEqual([["none for x0"], ["a1"], ["a2"], ["b1"]]);
 
             // An outer document filtered out upstream contributes no
             // placeholder.
@@ -1206,17 +1218,16 @@ describe("QueryStream", () => {
                 onEmpty: (note) => ({ tag: `none for ${note.text}` }),
               }),
             );
-            expect(
-              yield* Stream.runCollect(withoutX0).pipe(
-                Effect.map((docs) => docs.map((doc) => doc.tag)),
-              ),
-            ).toEqual(["a1", "a2", "b1"]);
+            const pipeResult2 = yield* Stream.runCollect(withoutX0).pipe(
+              Effect.map((docs) => Array.map(docs, (doc) => doc.tag)),
+            );
+            expect(pipeResult2).toEqual(["a1", "a2", "b1"]);
           }),
         );
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
   );
 
-  it.effect("effectful transforms keep stream order at any concurrency", () =>
+  test.effect("effectful transforms keep stream order at any concurrency", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1226,38 +1237,70 @@ describe("QueryStream", () => {
 
           const reader = yield* DatabaseReader;
           const notes = reader.table("notes").stream("by_text");
+          const makeTransform = Effect.fnUntraced(function* (
+            predecessors: number,
+          ) {
+            const releaseA = yield* Deferred.make<void>();
+            const completionOrder: Array<string> = [];
+            const transform = Effect.fnUntraced(function* (text: string) {
+              if (text === "a") yield* Deferred.await(releaseA);
+              completionOrder.push(text);
+              if (text !== "a" && completionOrder.length === predecessors) {
+                yield* Deferred.succeed(releaseA, undefined);
+              }
+              return Str.toUpperCase(text);
+            });
+            return { transform, completionOrder };
+          });
+
           // The first element's effect finishes last.
-          const slowForA = (text: string) =>
-            Effect.succeed(text.toUpperCase()).pipe(
-              Effect.delay(text === "a" ? "30 millis" : "1 millis"),
-            );
+          const mapped = yield* makeTransform(2);
 
           const shouted = notes.pipe(
-            QueryStream.mapEffect((note) => slowForA(note.text), {
+            QueryStream.mapEffect((note) => mapped.transform(note.text), {
               concurrency: "unbounded",
             }),
           );
-          expect(yield* Stream.runCollect(shouted)).toEqual(["A", "B", "C"]);
+          const runCollectResult = yield* Stream.runCollect(shouted);
+          expect(runCollectResult).toEqual(["A", "B", "C"]);
+          expect(Array.takeRight(mapped.completionOrder, 1)).toEqual(["a"]);
 
+          const filtered = yield* makeTransform(1);
           const withoutB = QueryStream.filterEffect(
             notes,
-            (note) => Effect.map(slowForA(note.text), (text) => text !== "B"),
+            (note) =>
+              Effect.map(filtered.transform(note.text), (text) => text !== "B"),
             { concurrency: 2 },
           );
-          expect(yield* collectTexts(withoutB)).toEqual(["a", "c"]);
+          const collectTextsResult19 = yield* collectTexts(withoutB);
+          expect(collectTextsResult19).toEqual(["a", "c"]);
+          expect(
+            Array.filter(filtered.completionOrder, (text) => text !== "c"),
+          ).toEqual(["b", "a"]);
 
           // Still a query stream: it paginates.
-          const page = yield* QueryStream.paginate(shouted, {
-            numItems: 2,
-            cursor: null,
-          });
+          const paginated = yield* makeTransform(1);
+          const page = yield* QueryStream.paginate(
+            notes.pipe(
+              QueryStream.mapEffect((note) => paginated.transform(note.text), {
+                concurrency: "unbounded",
+              }),
+            ),
+            {
+              numItems: 2,
+              cursor: null,
+            },
+          );
           expect(page.page).toEqual(["A", "B"]);
+          expect(
+            Array.filter(paginated.completionOrder, (text) => text !== "c"),
+          ).toEqual(["b", "a"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("reverse runs a composition in the opposite direction", () =>
+  test.effect("reverse runs a composition in the opposite direction", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1278,7 +1321,10 @@ describe("QueryStream", () => {
           }
 
           const notes = reader.table("notes").stream("by_text");
-          expect(yield* collectTexts(QueryStream.reverse(notes))).toEqual([
+          const collectTextsResult20 = yield* collectTexts(
+            QueryStream.reverse(notes),
+          );
+          expect(collectTextsResult20).toEqual([
             "x2",
             "x1",
             "x0",
@@ -1287,11 +1333,17 @@ describe("QueryStream", () => {
             "a",
           ]);
           // Reversing twice is the original direction.
-          expect(
-            yield* collectTexts(
-              QueryStream.reverse(QueryStream.reverse(notes)),
-            ),
-          ).toEqual(["a", "a", "b", "x0", "x1", "x2"]);
+          const collectTextsResult21 = yield* collectTexts(
+            QueryStream.reverse(QueryStream.reverse(notes)),
+          );
+          expect(collectTextsResult21).toEqual([
+            "a",
+            "a",
+            "b",
+            "x0",
+            "x1",
+            "x2",
+          ]);
 
           // Through a merge and the transforms.
           const feed = QueryStream.merge([
@@ -1301,13 +1353,10 @@ describe("QueryStream", () => {
             QueryStream.filter((note) => note.text !== "x1"),
             QueryStream.map((note) => note.text),
           );
-          expect(yield* Stream.runCollect(QueryStream.reverse(feed))).toEqual([
-            "x2",
-            "x0",
-            "b",
-            "a",
-            "a",
-          ]);
+          const runCollectResult2 = yield* Stream.runCollect(
+            QueryStream.reverse(feed),
+          );
+          expect(runCollectResult2).toEqual(["x2", "x0", "b", "a", "a"]);
 
           // Through a join—the inner streams reverse with the outer—and
           // on to pagination, with cursors still pushed down.
@@ -1329,22 +1378,22 @@ describe("QueryStream", () => {
               ),
             );
           const pages = yield* paginateAll(QueryStream.reverse(joined), 1);
-          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
-            ["b1"],
-            ["a2"],
-            ["a1"],
-          ]);
+          expect(
+            Array.map(pages, (page) => Array.map(page, (doc) => doc.tag)),
+          ).toEqual([["b1"], ["a2"], ["a1"]]);
 
           const firstPerText = notes.pipe(QueryStream.distinct(["text"]));
-          expect(
-            yield* Stream.runCollect(QueryStream.reverse(firstPerText)),
-          ).toEqual(Array.reverse(yield* Stream.runCollect(firstPerText)));
+          const runCollectResult4 = yield* Stream.runCollect(firstPerText);
+          const runCollectResult3 = yield* Stream.runCollect(
+            QueryStream.reverse(firstPerText),
+          );
+          expect(runCollectResult3).toEqual(Array.reverse(runCollectResult4));
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("distinct keeps the first document per group", () =>
+  test.effect("distinct keeps the first document per group", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1367,7 +1416,7 @@ describe("QueryStream", () => {
             stream: Stream.Stream<{ tag?: string }, E, R>,
           ): Effect.Effect<ReadonlyArray<string | undefined>, E, R> =>
             Stream.runCollect(stream).pipe(
-              Effect.map((docs) => docs.map((doc) => doc.tag)),
+              Effect.map((docs) => Array.map(docs, (doc) => doc.tag)),
             );
 
           const firstPerText = yield* tagsOf(
@@ -1389,10 +1438,10 @@ describe("QueryStream", () => {
           expect(firstPerTextDesc).toEqual(["c1", "b2", "a2"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("distinct paginates group by group", () =>
+  test.effect("distinct paginates group by group", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1417,11 +1466,9 @@ describe("QueryStream", () => {
             .pipe(QueryStream.distinct(["text"]));
 
           const pages = yield* paginateAll(distinctTexts, 1);
-          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
-            ["a1"],
-            ["b1"],
-            ["c1"],
-          ]);
+          expect(
+            Array.map(pages, (page) => Array.map(page, (doc) => doc.tag)),
+          ).toEqual([["a1"], ["b1"], ["c1"]]);
 
           // Filtering *after* distinct filters the kept documents.
           const filtered = distinctTexts.pipe(
@@ -1431,14 +1478,16 @@ describe("QueryStream", () => {
           );
           const filteredPages = yield* paginateAll(filtered, 1);
           expect(
-            filteredPages.map((page) => page.map((doc) => doc.tag)),
+            Array.map(filteredPages, (page) =>
+              Array.map(page, (doc) => doc.tag),
+            ),
           ).toEqual([["a1"], ["c1"]]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect(
+  test.effect(
     "renameKey relabels ordering positions so foreign streams merge",
     () =>
       Effect.gen(function* () {
@@ -1480,7 +1529,7 @@ describe("QueryStream", () => {
             ]);
 
             const tags = yield* Stream.runCollect(merged).pipe(
-              Effect.map((docs) => docs.map((doc) => doc.tag)),
+              Effect.map((docs) => Array.map(docs, (doc) => doc.tag)),
             );
             expect(tags).toEqual(["ta1", "tr1", "ta2", "tr2"]);
 
@@ -1488,18 +1537,15 @@ describe("QueryStream", () => {
             // bounds are positional values, so the relabeled branch's leaf
             // receives them against its own fields.
             const pages = yield* paginateAll(merged, 1);
-            expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
-              ["ta1"],
-              ["tr1"],
-              ["ta2"],
-              ["tr2"],
-            ]);
+            expect(
+              Array.map(pages, (page) => Array.map(page, (doc) => doc.tag)),
+            ).toEqual([["ta1"], ["tr1"], ["ta2"], ["tr2"]]);
           }),
         );
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
   );
 
-  it.effect("renameKey and distinct see through flatMap tiebreakers", () =>
+  test.effect("renameKey and distinct see through flatMap tiebreakers", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1523,7 +1569,7 @@ describe("QueryStream", () => {
             stream: Stream.Stream<{ tag?: string }, E, R>,
           ): Effect.Effect<ReadonlyArray<string | undefined>, E, R> =>
             Stream.runCollect(stream).pipe(
-              Effect.map((docs) => docs.map((doc) => doc.tag)),
+              Effect.map((docs) => Array.map(docs, (doc) => doc.tag)),
             );
 
           // Type-level key ["text", "_creationTime", "_creationTime"]; the
@@ -1569,36 +1615,30 @@ describe("QueryStream", () => {
             { _tag: "ImplicitId" },
           ]);
           const pages = yield* paginateAll(relabeled, 1);
-          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
-            ["a1"],
-            ["a2"],
-            ["b1"],
-          ]);
+          expect(
+            Array.map(pages, (page) => Array.map(page, (doc) => doc.tag)),
+          ).toEqual([["a1"], ["a2"], ["b1"]]);
 
           // Distinct over the outer key keeps each outer row's first inner
           // document; the "x0" row has none.
-          expect(
-            yield* tagsOf(joined.pipe(QueryStream.distinct(["text"]))),
-          ).toEqual(["a1", "b1"]);
+          const tagsOfResult = yield* tagsOf(
+            joined.pipe(QueryStream.distinct(["text"])),
+          );
+          expect(tagsOfResult).toEqual(["a1", "b1"]);
 
           // A prefix reaching into the inner key spans the outer `_id`.
-          expect(
-            yield* tagsOf(
-              joined.pipe(
-                QueryStream.distinct([
-                  "text",
-                  "_creationTime",
-                  "_creationTime",
-                ]),
-              ),
+          const tagsOfResult2 = yield* tagsOf(
+            joined.pipe(
+              QueryStream.distinct(["text", "_creationTime", "_creationTime"]),
             ),
-          ).toEqual(["a1", "a2", "b1"]);
+          );
+          expect(tagsOfResult2).toEqual(["a1", "a2", "b1"]);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("paginates nested inner joins with their complete layouts", () =>
+  test.effect("paginates nested inner joins with their complete layouts", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
       yield* c.run(
@@ -1642,17 +1682,21 @@ describe("QueryStream", () => {
           const expected = ["l1", "l2", "l1", "l2", "l1", "l2", "l1", "l2"];
           const tags = (
             pages: ReadonlyArray<ReadonlyArray<{ tag?: string }>>,
-          ) => pages.flatMap((page) => page.map((doc) => doc.tag));
-          expect(tags(yield* paginateAll(merged, 1))).toEqual(expected);
-          expect(
-            tags(yield* paginateAll(QueryStream.reverse(merged), 2)),
-          ).toEqual(expected.toReversed());
+          ) =>
+            Array.flatMap(pages, (page) => Array.map(page, (doc) => doc.tag));
+          const paginateAllResult = yield* paginateAll(merged, 1);
+          expect(tags(paginateAllResult)).toEqual(expected);
+          const paginateAllResult2 = yield* paginateAll(
+            QueryStream.reverse(merged),
+            2,
+          );
+          expect(tags(paginateAllResult2)).toEqual(Array.reverse(expected));
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect(
+  test.effect(
     "joins zero-width by_id keys and pads composite empty layouts",
     () =>
       Effect.gen(function* () {
@@ -1673,7 +1717,10 @@ describe("QueryStream", () => {
               QueryStreamKeyLayout.positions(outer.keyLayout),
             );
             expect(
-              (yield* paginateAll(joined, 1)).flat().map((doc) => doc.text),
+              Array.map(
+                (yield* paginateAll(joined, 1)).flat(),
+                (doc) => doc.text,
+              ),
             ).toEqual(["only"]);
             const zeroEmpty = QueryStream.empty<
               Stream.Success<typeof pinned>
@@ -1712,16 +1759,17 @@ describe("QueryStream", () => {
               null,
             ]);
             expect(
-              (yield* paginateAll(placeholders, 1))
-                .flat()
-                .map((doc) => doc.text),
+              Array.map(
+                (yield* paginateAll(placeholders, 1)).flat(),
+                (doc) => doc.text,
+              ),
             ).toEqual(["only"]);
           }),
         );
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
   );
 
-  it.effect("resumes a fully eq-pinned by_id stream from its cursor", () =>
+  test.effect("resumes a fully eq-pinned by_id stream from its cursor", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1743,7 +1791,7 @@ describe("QueryStream", () => {
             numItems: 1,
             cursor: null,
           });
-          expect(page1.page.map((doc) => doc.text)).toEqual(["only"]);
+          expect(Array.map(page1.page, (doc) => doc.text)).toEqual(["only"]);
 
           const page2 = yield* QueryStream.paginate(pinned, {
             numItems: 1,
@@ -1753,10 +1801,10 @@ describe("QueryStream", () => {
           assertEquals(page2.isDone, true);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect(
+  test.effect(
     "treats an exclusive-inclusive bound at the same key as empty",
     () =>
       Effect.gen(function* () {
@@ -1783,10 +1831,10 @@ describe("QueryStream", () => {
             expect(emptyPinned.page).toEqual([]);
           }),
         );
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
   );
 
-  it.effect("fails with the InvalidCursor signal on a malformed cursor", () =>
+  test.effect("fails with the InvalidCursor signal on a malformed cursor", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1814,10 +1862,10 @@ describe("QueryStream", () => {
           }
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect(
+  test.effect(
     "binds continuation and split cursors to the composed key layout",
     () =>
       Effect.gen(function* () {
@@ -1871,13 +1919,15 @@ describe("QueryStream", () => {
                 numItems: 10,
               },
             );
-            expect(previous.page.map((note) => note.text)).toEqual(["a"]);
+            expect(Array.map(previous.page, (note) => note.text)).toEqual([
+              "a",
+            ]);
           }),
         );
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
   );
 
-  it.effect("filter and map keep the stream paginable", () =>
+  test.effect("filter and map keep the stream paginable", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1892,7 +1942,7 @@ describe("QueryStream", () => {
             .stream("by_text")
             .pipe(
               QueryStream.filter((note) => note.text !== "b"),
-              QueryStream.map((note) => note.text.toUpperCase()),
+              QueryStream.map((note) => Str.toUpperCase(note.text)),
             );
 
           const page1 = yield* QueryStream.paginate(shouted, {
@@ -1910,10 +1960,10 @@ describe("QueryStream", () => {
           assertEquals(page2.isDone, true);
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("unique succeeds on zero or one and fails on two", () =>
+  test.effect("unique succeeds on zero or one and fails on two", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1946,7 +1996,7 @@ describe("QueryStream", () => {
           );
         }),
       );
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 });
 

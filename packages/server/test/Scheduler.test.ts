@@ -1,3 +1,4 @@
+import * as Layer from "effect/Layer";
 import * as Scheduler from "@confect/server/Scheduler";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { Scheduler as ConvexScheduler } from "convex/server";
@@ -19,19 +20,23 @@ describe("Scheduler", () => {
     } satisfies ConvexScheduler;
 
     return Effect.gen(function* () {
-      const scheduler = yield* Scheduler.Scheduler;
-      const cancellation = scheduler.cancel(scheduledFunctionId);
+      const services = yield* Layer.build(Scheduler.layer(convexScheduler));
+      return yield* Effect.gen(function* () {
+        const scheduler = yield* Scheduler.Scheduler;
+        const cancellation = scheduler.cancel(scheduledFunctionId);
 
-      expectTypeOf(scheduler.cancel)
-        .parameter(0)
-        .toEqualTypeOf<GenericId<"_scheduled_functions">>();
-      expectTypeOf(cancellation).toEqualTypeOf<Effect.Effect<void>>();
-      expect(cancel).not.toHaveBeenCalled();
+        expectTypeOf(scheduler.cancel)
+          .parameter(0)
+          .toEqualTypeOf<GenericId<"_scheduled_functions">>();
+        expectTypeOf(cancellation).toEqualTypeOf<Effect.Effect<void>>();
+        expect(cancel).not.toHaveBeenCalled();
 
-      expect(yield* cancellation).toBeUndefined();
-      expect(cancel).toHaveBeenCalledExactlyOnceWith(scheduledFunctionId);
-      expect(cancel.mock.contexts[0]).toBe(convexScheduler);
-    }).pipe(Effect.provide(Scheduler.layer(convexScheduler)));
+        const cancellationResult = yield* cancellation;
+        expect(cancellationResult).toBeUndefined();
+        expect(cancel).toHaveBeenCalledExactlyOnceWith(scheduledFunctionId);
+        expect(cancel.mock.contexts[0]).toBe(convexScheduler);
+      }).pipe(Effect.provideContext(services));
+    }).pipe(Effect.scoped);
   });
 
   it.effect("cancel preserves unexpected Convex failures as defects", () => {
@@ -43,10 +48,13 @@ describe("Scheduler", () => {
     } satisfies ConvexScheduler;
 
     return Effect.gen(function* () {
-      const scheduler = yield* Scheduler.Scheduler;
-      const exit = yield* Effect.exit(scheduler.cancel(scheduledFunctionId));
+      const services = yield* Layer.build(Scheduler.layer(convexScheduler));
+      return yield* Effect.gen(function* () {
+        const scheduler = yield* Scheduler.Scheduler;
+        const exit = yield* Effect.exit(scheduler.cancel(scheduledFunctionId));
 
-      expect(exit).toEqual(Exit.die(failure));
-    }).pipe(Effect.provide(Scheduler.layer(convexScheduler)));
+        expect(exit).toEqual(Exit.die(failure));
+      }).pipe(Effect.provideContext(services));
+    }).pipe(Effect.scoped);
   });
 });

@@ -1,3 +1,4 @@
+import { dual } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import * as HashSet from "effect/HashSet";
@@ -37,77 +38,94 @@ export const reconcile = (pending: Pending): Pending => ({
   work: Work.$is("None")(pending.work) ? Work.Reconcile() : pending.work,
 });
 
-export const add = (
-  pending: Pending,
-  entries: ReadonlyArray<Kind>,
-  forceFull = false,
-): Pending => {
-  const next = Array.reduce(
-    entries,
-    {
-      needsFull: forceFull || Work.$is("Full")(pending.work),
-      paths: Work.$match(pending.work, {
-        None: () => HashSet.empty<ImplModulePath>(),
-        Reconcile: () => HashSet.empty<ImplModulePath>(),
-        Full: () => HashSet.empty<ImplModulePath>(),
-        Impls: ({ paths }) => HashSet.fromIterable(paths),
-        Declarations: ({ paths }) => HashSet.fromIterable(paths),
-      }),
-      declarations: Work.$match(pending.work, {
-        None: () => HashMap.empty<string, Declaration>(),
-        Reconcile: () => HashMap.empty<string, Declaration>(),
-        Full: () => HashMap.empty<string, Declaration>(),
-        Impls: () => HashMap.empty<string, Declaration>(),
-        Declarations: ({ entries: declarations }) =>
-          HashMap.fromIterable(
-            declarations.map(
-              (entry) =>
-                [`${entry._tag}:${entry.relativePath}`, entry] as const,
+export const add: {
+  (
+    entries: ReadonlyArray<Kind>,
+    forceFull?: boolean,
+  ): (pending: Pending) => Pending;
+  (
+    pending: Pending,
+    entries: ReadonlyArray<Kind>,
+    forceFull?: boolean,
+  ): Pending;
+} = dual(
+  (args) => !Array.isArray(args[0]),
+  (
+    pending: Pending,
+    entries: ReadonlyArray<Kind>,
+    forceFull: boolean = false,
+  ): Pending => {
+    const next = Array.reduce(
+      entries,
+      {
+        needsFull: forceFull || Work.$is("Full")(pending.work),
+        paths: Work.$match(pending.work, {
+          None: () => HashSet.empty<ImplModulePath>(),
+          Reconcile: () => HashSet.empty<ImplModulePath>(),
+          Full: () => HashSet.empty<ImplModulePath>(),
+          Impls: ({ paths }) => HashSet.fromIterable(paths),
+          Declarations: ({ paths }) => HashSet.fromIterable(paths),
+        }),
+        declarations: Work.$match(pending.work, {
+          None: () => HashMap.empty<string, Declaration>(),
+          Reconcile: () => HashMap.empty<string, Declaration>(),
+          Full: () => HashMap.empty<string, Declaration>(),
+          Impls: () => HashMap.empty<string, Declaration>(),
+          Declarations: ({ entries: declarations }) =>
+            HashMap.fromIterable(
+              Array.map(
+                declarations,
+                (entry) =>
+                  [`${entry._tag}:${entry.relativePath}`, entry] as const,
+              ),
             ),
-          ),
-      }),
-      optional: pending.optional,
-    },
-    (state, entry) =>
-      Match.value(entry).pipe(
-        Match.tag("Impl", ({ relativePath }) => ({
-          ...state,
-          paths: HashSet.add(state.paths, relativePath),
-        })),
-        Match.tag("Http", "Crons", "Auth", ({ _tag }) => ({
-          ...state,
-          optional: HashSet.add(state.optional, _tag),
-        })),
-        Match.tag("Spec", "Table", (declaration) => ({
-          ...state,
-          declarations: HashMap.set(
-            state.declarations,
-            `${declaration._tag}:${declaration.relativePath}`,
-            declaration,
-          ),
-        })),
-        Match.tag("Config", () => ({
-          ...state,
-          needsFull: true,
-        })),
-        Match.exhaustive,
-      ),
-  );
-  const impls = Array.fromIterable(next.paths);
-  const declarations = Array.fromIterable(HashMap.values(next.declarations));
-  return {
-    work: next.needsFull
-      ? Work.Full()
-      : Array.isReadonlyArrayNonEmpty(declarations)
-        ? Work.Declarations({ entries: declarations, paths: impls })
-        : Array.isReadonlyArrayNonEmpty(impls)
-          ? Work.Impls({ paths: impls })
-          : Work.$is("Reconcile")(pending.work)
-            ? Work.Reconcile()
-            : Work.None(),
-    optional: next.optional,
-  };
-};
+        }),
+        optional: pending.optional,
+      },
+      (state, entry) =>
+        Match.value(entry).pipe(
+          Match.tag("Impl", ({ relativePath }) => ({
+            ...state,
+            paths: HashSet.add(state.paths, relativePath),
+          })),
+          Match.tag("Http", "Crons", "Auth", ({ _tag }) => ({
+            ...state,
+            optional: HashSet.add(state.optional, _tag),
+          })),
+          Match.tag("Spec", "Table", (declaration) => ({
+            ...state,
+            declarations: HashMap.set(
+              state.declarations,
+              `${declaration._tag}:${declaration.relativePath}`,
+              declaration,
+            ),
+          })),
+          Match.tag("Config", () => ({
+            ...state,
+            needsFull: true,
+          })),
+          Match.exhaustive,
+        ),
+    );
+    const impls = Array.fromIterable(next.paths);
+    const declarations = next.declarations.pipe(
+      HashMap.values,
+      Array.fromIterable,
+    );
+    return {
+      work: next.needsFull
+        ? Work.Full()
+        : Array.isReadonlyArrayNonEmpty(declarations)
+          ? Work.Declarations({ entries: declarations, paths: impls })
+          : Array.isReadonlyArrayNonEmpty(impls)
+            ? Work.Impls({ paths: impls })
+            : Work.$is("Reconcile")(pending.work)
+              ? Work.Reconcile()
+              : Work.None(),
+      optional: next.optional,
+    };
+  },
+);
 
 export type Phase = Data.TaggedEnum<{
   Bootstrapping: {};
@@ -146,8 +164,15 @@ export const transition = (outcome: Outcome): Phase =>
       }),
   });
 
-export const shouldRetry = (phase: Phase, outcome: Outcome): boolean =>
-  Phase.$is("Bootstrapping")(phase) && Outcome.$is("GenerationFailed")(outcome);
+export const shouldRetry: {
+  (outcome: Outcome): (phase: Phase) => boolean;
+  (phase: Phase, outcome: Outcome): boolean;
+} = dual(
+  2,
+  (phase: Phase, outcome: Outcome): boolean =>
+    Phase.$is("Bootstrapping")(phase) &&
+    Outcome.$is("GenerationFailed")(outcome),
+);
 
 export const needsDeploymentNotification = (phase: Phase): boolean =>
   Phase.$match(phase, {
@@ -156,10 +181,10 @@ export const needsDeploymentNotification = (phase: Phase): boolean =>
     Incremental: ({ failedImpls }) => !HashSet.isEmpty(failedImpls),
   });
 
-export const implsToValidate = (
-  phase: Phase,
-  pending: Pending,
-): ReadonlyArray<ImplModulePath> =>
+export const implsToValidate: {
+  (pending: Pending): (phase: Phase) => ReadonlyArray<ImplModulePath>;
+  (phase: Phase, pending: Pending): ReadonlyArray<ImplModulePath>;
+} = dual(2, (phase: Phase, pending: Pending): ReadonlyArray<ImplModulePath> =>
   Array.fromIterable(
     HashSet.union(
       Phase.$match(phase, {
@@ -175,7 +200,8 @@ export const implsToValidate = (
         Declarations: ({ paths }) => HashSet.fromIterable(paths),
       }),
     ),
-  );
+  ),
+);
 
 export type Operation = Data.TaggedEnum<{
   Generate: {};
@@ -191,7 +217,10 @@ export type Operation = Data.TaggedEnum<{
 }>;
 export const Operation = Data.taggedEnum<Operation>();
 
-export const plan = (phase: Phase, pending: Pending): Operation =>
+export const plan: {
+  (pending: Pending): (phase: Phase) => Operation;
+  (phase: Phase, pending: Pending): Operation;
+} = dual(2, (phase: Phase, pending: Pending): Operation =>
   Phase.$match(phase, {
     Bootstrapping: () => Operation.Generate(),
     NeedsFullSync: () => Operation.Generate(),
@@ -213,4 +242,5 @@ export const plan = (phase: Phase, pending: Pending): Operation =>
         ),
         Match.exhaustive,
       ),
-  });
+  }),
+);

@@ -1,3 +1,4 @@
+import * as RecordEffect from "effect/Record";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { FunctionSpec } from "@confect/core";
@@ -70,15 +71,17 @@ describe("Generated function registration", () => {
           ]),
         );
         const list = makeFunctionReference<"query">("groups/notes:list");
-        expect(yield* Effect.promise(() => backend.query(list, {}))).toEqual(
-          [],
+        const promiseResult = yield* Effect.promise(() =>
+          backend.query(list, {}),
         );
+        expect(promiseResult).toEqual([]);
         expect(compileArgs).toHaveBeenCalledOnce();
         expect(compileReturns).toHaveBeenCalledOnce();
 
-        expect(yield* Effect.promise(() => backend.query(list, {}))).toEqual(
-          [],
+        const promiseResult2 = yield* Effect.promise(() =>
+          backend.query(list, {}),
         );
+        expect(promiseResult2).toEqual([]);
         expect(compileArgs).toHaveBeenCalledOnce();
         expect(compileReturns).toHaveBeenCalledOnce();
       } finally {
@@ -149,13 +152,14 @@ describe("DocumentIds", () => {
                 yield* DocumentIds.DocumentIds<typeof confectSchema>();
               const parsed = yield* ids.parse("notes", input);
               const identified = yield* ids.identify(input);
+              const parseResult = yield* ids.parse("users", input);
               return (
                 Option.isSome(parsed) &&
                 parsed.value === input &&
                 Option.isSome(identified) &&
                 identified.value.table === "notes" &&
                 identified.value.id === input &&
-                Option.isNone(yield* ids.parse("users", input))
+                Option.isNone(parseResult)
               );
             }),
         });
@@ -175,7 +179,8 @@ describe("DocumentIds", () => {
               ),
           ),
         );
-        expect(yield* Effect.promise(() => invoke(t, id))).toBe(true);
+        const promiseResult3 = yield* Effect.promise(() => invoke(t, id));
+        expect(promiseResult3).toBe(true);
       }),
   );
 });
@@ -195,7 +200,8 @@ describe("Storage", () => {
   const roundtrip = Effect.gen(function* () {
     const storage = yield* Storage.Storage;
     const id = yield* storage.store(new Blob(["storage roundtrip"]));
-    expect(yield* storage.getUrl(id)).toBeInstanceOf(URL);
+    const getUrlResult = yield* storage.getUrl(id);
+    expect(getUrlResult).toBeInstanceOf(URL);
     const blob = yield* storage.get(id);
     const text = yield* Effect.promise(() => blob.text());
     yield* storage.delete(id);
@@ -270,7 +276,8 @@ describe("Storage", () => {
           "./fixtures/convex/storage.ts": () =>
             Promise.resolve({ run: registered }),
         });
-        expect(yield* Effect.promise(() => invoke(t))).toBe(expected);
+        const promiseResult4 = yield* Effect.promise(() => invoke(t));
+        expect(promiseResult4).toBe(expected);
       }),
   );
 });
@@ -344,7 +351,8 @@ describe("function logging", () => {
           "./fixtures/convex/logging.ts": () =>
             Promise.resolve({ run: registered }),
         });
-        expect(yield* Effect.promise(() => invoke(t))).toBeNull();
+        const promiseResult5 = yield* Effect.promise(() => invoke(t));
+        expect(promiseResult5).toBeNull();
         expect(console.warn).toHaveBeenCalledExactlyOnceWith(
           expect.objectContaining({ level: "WARN", message: name }),
         );
@@ -353,36 +361,39 @@ describe("function logging", () => {
   );
 });
 
-describe("TransactionMetadata", () => {
-  it.effect("reads updated metrics after database operations", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
-      yield* c.run(
-        Effect.gen(function* () {
-          const transaction = yield* TransactionMetadata;
-          const writer = yield* DatabaseWriter;
-          const reader = yield* DatabaseReader;
-          const getMetrics = transaction.getMetrics();
-          const before = yield* getMetrics;
+it.layer(TestConfect.layer, { buildPerTest: true })(
+  "TransactionMetadata",
+  (test) => {
+    test.effect("reads updated metrics after database operations", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+        yield* c.run(
+          Effect.gen(function* () {
+            const transaction = yield* TransactionMetadata;
+            const writer = yield* DatabaseWriter;
+            const reader = yield* DatabaseReader;
+            const getMetrics = transaction.getMetrics();
+            const before = yield* getMetrics;
 
-          const id = yield* writer.table("notes").insert({ text: "metrics" });
-          yield* reader.table("notes").get(id);
-          const after = yield* getMetrics;
+            const id = yield* writer.table("notes").insert({ text: "metrics" });
+            yield* reader.table("notes").get(id);
+            const after = yield* getMetrics;
 
-          expect(after.documentsWritten.used).toBeGreaterThan(
-            before.documentsWritten.used,
-          );
-          expect(after.documentsRead.used).toBeGreaterThan(
-            before.documentsRead.used,
-          );
-        }),
-      );
-    }).pipe(Effect.provide(TestConfect.layer)),
-  );
-});
+            expect(after.documentsWritten.used).toBeGreaterThan(
+              before.documentsWritten.used,
+            );
+            expect(after.documentsRead.used).toBeGreaterThan(
+              before.documentsRead.used,
+            );
+          }),
+        );
+      }),
+    );
+  },
+);
 
-describe("Scheduler", () => {
-  it.effect("cancels a pending function without executing it", () =>
+it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
+  test.effect("cancels a pending function without executing it", () =>
     Effect.gen(function* () {
       vi.useFakeTimers();
       const c = yield* TestConfect.TestConfect;
@@ -406,246 +417,266 @@ describe("Scheduler", () => {
 
       yield* c.finishAllScheduledFunctions(() => vi.runAllTimers());
 
-      expect(yield* c.query(refs.public.groups.notes.list)).toEqual([]);
-    }).pipe(
-      Effect.ensuring(Effect.sync(() => vi.useRealTimers())),
-      Effect.provide(TestConfect.layer),
-    ),
+      const queryResult2 = yield* c.query(refs.public.groups.notes.list);
+      expect(queryResult2).toEqual([]);
+    }).pipe(Effect.ensuring(Effect.sync(() => vi.useRealTimers()))),
   );
 });
 
-describe("DatabaseReader", () => {
-  it.effect("uses the canonical Doc decoder across database read paths", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
-
-      yield* c.run(
+it.layer(TestConfect.layer, { buildPerTest: true })(
+  "DatabaseReader",
+  (test) => {
+    test.effect(
+      "uses the canonical Doc decoder across database read paths",
+      () =>
         Effect.gen(function* () {
-          const ctx = yield* MutationCtx;
-          const id = yield* Effect.promise(() =>
-            ctx.db.insert("notes", { text: "hello" }),
-          );
-          let evaluations = 0;
-          const table = Table.make(() => {
-            evaluations++;
-            return Schema.Struct({ text: Schema.String });
-          })
-            .index("by_text", ["text"])
-            .searchIndex("text", { searchField: "text" })("notes");
-          const schema = DatabaseSchema.make({ notes: table });
-          const reader = DatabaseReader_.make<typeof schema>(
-            schema,
-            ctx.db,
-          ).table("notes");
-          const writer = DatabaseWriter_.make<typeof schema>(
-            schema,
-            ctx.db,
-          ).table("notes");
-          const get = reader.get(id);
-          const getByIndex = reader.get("by_text", "hello");
-          const first = reader.index("by_text").first();
-          const take = reader.index("by_text").take(1);
-          const collect = reader.index("by_text").collect();
-          const orderedStream = reader.index("by_text").stream();
-          const paginate = reader
-            .index("by_text")
-            .paginate({ numItems: 1, cursor: null });
-          const search = reader.search("text", (q) =>
-            q.search("text", "hello"),
-          );
-          const stream = reader.stream("by_text");
+          const c = yield* TestConfect.TestConfect;
 
-          expect(evaluations).toBe(0);
+          yield* c.run(
+            Effect.gen(function* () {
+              const ctx = yield* MutationCtx;
+              const id = yield* Effect.promise(() =>
+                ctx.db.insert("notes", { text: "hello" }),
+              );
+              let evaluations = 0;
+              const table = Table.make(() => {
+                evaluations++;
+                return Schema.Struct({ text: Schema.String });
+              })
+                .index("by_text", ["text"])
+                .searchIndex("text", { searchField: "text" })("notes");
+              const schema = DatabaseSchema.make({ notes: table });
+              const reader = DatabaseReader_.make<typeof schema>(
+                schema,
+                ctx.db,
+              ).table("notes");
+              const writer = DatabaseWriter_.make<typeof schema>(
+                schema,
+                ctx.db,
+              ).table("notes");
+              const get = reader.get(id);
+              const getByIndex = reader.get("by_text", "hello");
+              const first = reader.index("by_text").first();
+              const take = reader.index("by_text").take(1);
+              const collect = reader.index("by_text").collect();
+              const orderedStream = reader.index("by_text").stream();
+              const paginate = reader
+                .index("by_text")
+                .paginate({ numItems: 1, cursor: null });
+              const search = reader.search("text", (q) =>
+                q.search("text", "hello"),
+              );
+              const stream = reader.stream("by_text");
 
-          const encoded = yield* Effect.promise(() => ctx.db.get(id));
-          const doc = table.Doc;
-          const interpreted = SchemaParser.decodeUnknownEffect(doc);
-          yield* interpreted(encoded);
-          let calls = 0;
-          SchemaCompiler.set(doc.ast, {
-            decodeEffect: (input, options) => {
-              calls++;
-              return interpreted(input, options);
-            },
-          });
+              expect(evaluations).toBe(0);
 
-          expect(yield* get).toEqual(encoded);
-          expect(yield* getByIndex).toEqual(encoded);
-          expect(yield* first).toEqual(Option.some(encoded));
-          expect(yield* take).toEqual([encoded]);
-          expect(yield* collect).toEqual([encoded]);
-          expect(yield* Stream.runCollect(orderedStream)).toEqual([encoded]);
-          expect((yield* paginate).page).toEqual([encoded]);
-          expect(yield* search.collect()).toEqual([encoded]);
-          expect(yield* Stream.runCollect(stream)).toEqual([encoded]);
-          expect(
-            (yield* QueryStream.paginate(stream, { numItems: 1, cursor: null }))
-              .page,
-          ).toEqual([encoded]);
-          expect(calls).toBe(10);
+              const encoded = yield* Effect.promise(() => ctx.db.get(id));
+              const doc = table.Doc;
+              const interpreted = SchemaParser.decodeUnknownEffect(doc);
+              yield* interpreted(encoded);
+              let calls = 0;
+              SchemaCompiler.set(doc.ast, {
+                decodeEffect: (input, options) => {
+                  calls++;
+                  return interpreted(input, options);
+                },
+              });
 
-          yield* writer.patch(id, { text: "patched" });
-          expect(calls).toBe(11);
-          expect(evaluations).toBe(1);
-          expect(table.Doc).toBe(doc);
-          expect(encoded?.text).toBe("hello");
-          expect((yield* Effect.promise(() => ctx.db.get(id)))?.text).toBe(
-            "patched",
-          );
-        }),
-      );
-    }).pipe(Effect.provide(TestConfect.layer)),
-  );
+              const getResult = yield* get;
+              expect(getResult).toEqual(encoded);
+              const getByIndexResult = yield* getByIndex;
+              expect(getByIndexResult).toEqual(encoded);
+              const firstResult = yield* first;
+              expect(firstResult).toEqual(Option.some(encoded));
+              const takeResult = yield* take;
+              expect(takeResult).toEqual([encoded]);
+              const collectResult = yield* collect;
+              expect(collectResult).toEqual([encoded]);
+              const runCollectResult = yield* Stream.runCollect(orderedStream);
+              expect(runCollectResult).toEqual([encoded]);
+              expect((yield* paginate).page).toEqual([encoded]);
+              const collectResult2 = yield* search.collect();
+              expect(collectResult2).toEqual([encoded]);
+              const runCollectResult2 = yield* Stream.runCollect(stream);
+              expect(runCollectResult2).toEqual([encoded]);
+              expect(
+                (yield* QueryStream.paginate(stream, {
+                  numItems: 1,
+                  cursor: null,
+                })).page,
+              ).toEqual([encoded]);
+              expect(calls).toBe(10);
 
-  it.effect("get", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
-
-      const text = "Hello, world!";
-
-      const noteId = yield* c.run(
-        Effect.gen(function* () {
-          const writer = yield* DatabaseWriter;
-
-          return yield* writer.table("notes").insert({
-            text,
-          });
-        }),
-        Id("notes"),
-      );
-
-      const retrievedText = yield* c
-        .query(refs.public.databaseReader.getNote, { noteId: noteId })
-        .pipe(Effect.map((note) => note.text));
-
-      assertEquals(retrievedText, text);
-    }).pipe(Effect.provide(TestConfect.layer)),
-  );
-
-  it.effect("collect", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
-
-      yield* c.run(
-        Effect.gen(function* () {
-          const writer = yield* DatabaseWriter;
-
-          yield* Effect.forEach(Array.range(1, 10), (i) =>
-            writer.table("notes").insert({
-              text: `${i}`,
+              yield* writer.patch(id, { text: "patched" });
+              expect(calls).toBe(11);
+              expect(evaluations).toBe(1);
+              expect(table.Doc).toBe(doc);
+              expect(encoded?.text).toBe("hello");
+              expect((yield* Effect.promise(() => ctx.db.get(id)))?.text).toBe(
+                "patched",
+              );
             }),
           );
         }),
-      );
+    );
 
-      const notes = yield* c.query(refs.public.databaseReader.listNotes);
+    test.effect("get", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
 
-      assertEquals(notes.length, 10);
-      assertEquals(notes[0]?.text, "10");
-      assertEquals(notes[9]?.text, "1");
-    }).pipe(Effect.provide(TestConfect.layer)),
-  );
+        const text = "Hello, world!";
 
-  it.effect("take uses Convex count validation", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
+        const noteId = yield* c.run(
+          Effect.gen(function* () {
+            const writer = yield* DatabaseWriter;
 
-      yield* c.run(
-        Effect.gen(function* () {
-          const reader = yield* DatabaseReader;
-          const take = (n: number) =>
-            reader.table("notes").index("by_text").take(n);
+            return yield* writer.table("notes").insert({
+              text,
+            });
+          }),
+          Id("notes"),
+        );
 
-          expect(yield* take(0)).toEqual([]);
+        const retrievedText = yield* c
+          .query(refs.public.databaseReader.getNote, { noteId: noteId })
+          .pipe(Effect.map((note) => note.text));
 
-          for (const n of [
-            2.5,
-            -1,
-            Number.NaN,
-            Number.POSITIVE_INFINITY,
-            Number.NEGATIVE_INFINITY,
-          ]) {
-            const error = yield* take(n).pipe(
-              Effect.catchDefect(Effect.succeed),
+        assertEquals(retrievedText, text);
+      }),
+    );
+
+    test.effect("collect", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+
+        yield* c.run(
+          Effect.gen(function* () {
+            const writer = yield* DatabaseWriter;
+
+            yield* Effect.forEach(Array.range(1, 10), (i) =>
+              writer.table("notes").insert({
+                text: `${i}`,
+              }),
             );
-            assert.instanceOf(error, TypeError);
-            expect(error.message).toBe(
-              "Arg 1 `n` to `take` must be a non-negative integer",
-            );
-          }
-        }).pipe(Effect.orDie),
-      );
-    }).pipe(Effect.provide(TestConfect.layer)),
-  );
-});
+          }),
+        );
 
-describe("DatabaseWriter", () => {
-  it.effect("patch unsets optional fields set to undefined", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
+        const notes = yield* c.query(refs.public.databaseReader.listNotes);
 
-      const noteId = yield* c.run(
-        Effect.gen(function* () {
-          const writer = yield* DatabaseWriter;
+        assertEquals(notes.length, 10);
+        assertEquals(notes[0]?.text, "10");
+        assertEquals(notes[9]?.text, "1");
+      }),
+    );
 
-          const id = yield* writer
-            .table("notes")
-            .insert({ text: "original", tag: "draft" });
+    test.effect("take uses Convex count validation", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
 
-          yield* writer
-            .table("notes")
-            .patch(id, { text: "patched", tag: undefined });
+        yield* c.run(
+          Effect.gen(function* () {
+            const reader = yield* DatabaseReader;
+            const take = (n: number) =>
+              reader.table("notes").index("by_text").take(n);
 
-          return id;
-        }),
-        Id("notes"),
-      );
+            const takeResult2 = yield* take(0);
+            expect(takeResult2).toEqual([]);
 
-      const note = yield* c.query(refs.public.databaseReader.getNote, {
-        noteId,
-      });
+            for (const n of [
+              2.5,
+              -1,
+              Number.NaN,
+              Number.POSITIVE_INFINITY,
+              Number.NEGATIVE_INFINITY,
+            ]) {
+              const error = yield* take(n).pipe(
+                Effect.catchDefect(Effect.succeed),
+              );
+              assert.instanceOf(error, TypeError);
+              expect(error.message).toBe(
+                "Arg 1 `n` to `take` must be a non-negative integer",
+              );
+            }
+          }).pipe(Effect.orDie),
+        );
+      }),
+    );
+  },
+);
 
-      assertEquals(note.text, "patched");
-      assert.isFalse(Object.hasOwn(note, "tag"));
-    }).pipe(Effect.provide(TestConfect.layer)),
-  );
+it.layer(TestConfect.layer, { buildPerTest: true })(
+  "DatabaseWriter",
+  (test) => {
+    test.effect("patch unsets optional fields set to undefined", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
 
-  it("patch accepts undefined according to field types and compiler optionality", () => {
-    const patchNote = (writer: DatabaseWriter) => writer.table("notes").patch;
-    type Patch = Parameters<ReturnType<typeof patchNote>>[1];
+        const noteId = yield* c.run(
+          Effect.gen(function* () {
+            const writer = yield* DatabaseWriter;
 
-    expectTypeOf<{ tag: undefined }>().toExtend<Patch>();
-    expectTypeOf<{ author: undefined }>().toExtend<Patch>();
-    expectTypeOf<
-      { text: undefined } extends Patch ? true : false
-    >().toEqualTypeOf<CompilerOptions.AllowsExplicitUndefined>();
-    expectTypeOf<{ text: string }>().toExtend<Patch>();
-  });
-});
+            const id = yield* writer
+              .table("notes")
+              .insert({ text: "original", tag: "draft" });
 
-describe("MutationRunner", () => {
-  it.effect("insertNoteViaRunner", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
+            yield* writer
+              .table("notes")
+              .patch(id, { text: "patched", tag: undefined });
 
-      const text = "via runner";
+            return id;
+          }),
+          Id("notes"),
+        );
 
-      const noteId = yield* c.action(
-        refs.public.groups.runners.insertNoteViaRunner,
-        { text },
-      );
+        const note = yield* c.query(refs.public.databaseReader.getNote, {
+          noteId,
+        });
 
-      const note = yield* c.query(refs.public.databaseReader.getNote, {
-        noteId,
-      });
-      expectTypeOf(note).toEqualTypeOf<(typeof notes.Doc)["Type"]>();
-      assertEquals(note.text, text);
-    }).pipe(Effect.provide(TestConfect.layer)),
-  );
-});
+        assertEquals(note.text, "patched");
+        assert.isFalse(RecordEffect.has<string, unknown>(note, "tag"));
+      }),
+    );
 
-describe("ActionRunner", () => {
-  it.effect("getNumberViaRunner", () =>
+    test("patch accepts undefined according to field types and compiler optionality", () => {
+      const patchNote = (writer: DatabaseWriter) => writer.table("notes").patch;
+      type Patch = Parameters<ReturnType<typeof patchNote>>[1];
+
+      expectTypeOf<{ tag: undefined }>().toExtend<Patch>();
+      expectTypeOf<{ author: undefined }>().toExtend<Patch>();
+      expectTypeOf<
+        { text: undefined } extends Patch ? true : false
+      >().toEqualTypeOf<CompilerOptions.AllowsExplicitUndefined>();
+      expectTypeOf<{ text: string }>().toExtend<Patch>();
+    });
+  },
+);
+
+it.layer(TestConfect.layer, { buildPerTest: true })(
+  "MutationRunner",
+  (test) => {
+    test.effect("insertNoteViaRunner", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+
+        const text = "via runner";
+
+        const noteId = yield* c.action(
+          refs.public.groups.runners.insertNoteViaRunner,
+          { text },
+        );
+
+        const note = yield* c.query(refs.public.databaseReader.getNote, {
+          noteId,
+        });
+        expectTypeOf(note).toEqualTypeOf<(typeof notes.Doc)["Type"]>();
+        assertEquals(note.text, text);
+      }),
+    );
+  },
+);
+
+it.layer(TestConfect.layer, { buildPerTest: true })("ActionRunner", (test) => {
+  test.effect("getNumberViaRunner", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -655,12 +686,12 @@ describe("ActionRunner", () => {
 
       expectTypeOf(result).toEqualTypeOf<number>();
       assertEquals(typeof result, "number");
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 });
 
-describe("QueryRunner", () => {
-  it.effect("countNotesViaRunner", () =>
+it.layer(TestConfect.layer, { buildPerTest: true })("QueryRunner", (test) => {
+  test.effect("countNotesViaRunner", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -673,12 +704,12 @@ describe("QueryRunner", () => {
 
       expectTypeOf(count).toEqualTypeOf<number>();
       assertEquals(count, 2);
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 });
 
-describe("paginate", () => {
-  it.effect("paginate without filter", () =>
+it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
+  test.effect("paginate without filter", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -705,10 +736,10 @@ describe("paginate", () => {
 
       assertEquals(result2.page.length, 2);
       assertEquals(result2.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("accepts the protocol fields Convex's client sends", () =>
+  test.effect("accepts the protocol fields Convex's client sends", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -731,10 +762,10 @@ describe("paginate", () => {
 
       assertEquals(result.page.length, 3);
       assertEquals(result.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("paginate with filter", () =>
+  test.effect("paginate with filter", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -758,14 +789,14 @@ describe("paginate", () => {
       assertEquals(result.page.length, 3);
       assertEquals(result.isDone, true);
 
-      const texts = new Set(result.page.map((n) => n.text));
+      const texts = new Set(Array.map(result.page, (n) => n.text));
       assertEquals(texts.has("a"), true);
       assertEquals(texts.has("c"), true);
       assertEquals(texts.has("e"), true);
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("paginate with filter returns empty when no matches", () =>
+  test.effect("paginate with filter returns empty when no matches", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -785,10 +816,10 @@ describe("paginate", () => {
 
       assertEquals(result.page.length, 0);
       assertEquals(result.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("paginate with filter paginates correctly", () =>
+  test.effect("paginate with filter paginates correctly", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -814,10 +845,10 @@ describe("paginate", () => {
       for (const note of page1.page) {
         assertEquals(note.tag, "even");
       }
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("surfaces the declared typed error", () =>
+  test.effect("surfaces the declared typed error", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -828,7 +859,8 @@ describe("paginate", () => {
         })
         .pipe(Effect.result, Effect.map(expectFailure));
 
-      assert(Schema.is(PaginationDenied)(failure));
+      const matchesSchema = Schema.is(PaginationDenied)(failure);
+      assert(matchesSchema);
       assertEquals(failure.reason, "denied");
 
       const result = yield* c.query(
@@ -841,12 +873,13 @@ describe("paginate", () => {
 
       assertEquals(result.page.length, 0);
       assertEquals(result.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 });
 
 const expectFailure = <A, E>(result: Result.Result<A, E>): E => {
-  assert(Result.isFailure(result));
+  const isFailure2 = Result.isFailure(result);
+  assert(isFailure2);
   return result.failure;
 };
 
@@ -866,9 +899,9 @@ const insertAndDeleteNote = Effect.gen(function* () {
   );
 }).pipe(Effect.orDie);
 
-describe("typed errors", () => {
+it.layer(TestConfect.layer, { buildPerTest: true })("typed errors", (test) => {
   describe("server-side encoding", () => {
-    it.effect("query handler typed error surfaces as the typed error", () =>
+    test.effect("query handler typed error surfaces as the typed error", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
         const missingId = yield* insertAndDeleteNote;
@@ -880,12 +913,13 @@ describe("typed errors", () => {
         );
 
         const error = expectFailure(result);
-        assert(Schema.is(NotFound)(error));
+        const matchesSchema2 = Schema.is(NotFound)(error);
+        assert(matchesSchema2);
         expect(error.id).toBe(missingId);
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
 
-    it.effect(
+    test.effect(
       "mutation handler typed error (NotFound) surfaces as the typed error",
       () =>
         Effect.gen(function* () {
@@ -900,12 +934,13 @@ describe("typed errors", () => {
           );
 
           const error = expectFailure(result);
-          assert(Schema.is(NotFound)(error));
+          const matchesSchema3 = Schema.is(NotFound)(error);
+          assert(matchesSchema3);
           expect(error.id).toBe(missingId);
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
 
-    it.effect(
+    test.effect(
       "mutation handler typed error (Forbidden) surfaces as the typed error",
       () =>
         Effect.gen(function* () {
@@ -920,12 +955,13 @@ describe("typed errors", () => {
           );
 
           const error = expectFailure(result);
-          assert(Schema.is(Forbidden)(error));
+          const matchesSchema4 = Schema.is(Forbidden)(error);
+          assert(matchesSchema4);
           expect(error.reason).toBe("admin required");
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
 
-    it.effect("action handler typed error surfaces as the typed error", () =>
+    test.effect("action handler typed error surfaces as the typed error", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
 
@@ -936,14 +972,15 @@ describe("typed errors", () => {
         );
 
         const error = expectFailure(result);
-        assert(Schema.is(Forbidden)(error));
+        const matchesSchema5 = Schema.is(Forbidden)(error);
+        assert(matchesSchema5);
         expect(error.reason).toBe("no access");
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
   });
 
   describe("runner decoding", () => {
-    it.effect("QueryRunner decodes nested typed error to tagged result", () =>
+    test.effect("QueryRunner decodes nested typed error to tagged result", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
         const missingId = yield* insertAndDeleteNote;
@@ -954,10 +991,10 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
 
-    it.effect("QueryRunner Ok path: returns the decoded note text", () =>
+    test.effect("QueryRunner Ok path: returns the decoded note text", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
 
@@ -975,10 +1012,10 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "Ok", text: "hello" });
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
 
-    it.effect("MutationRunner decodes NotFound to tagged result", () =>
+    test.effect("MutationRunner decodes NotFound to tagged result", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
         const missingId = yield* insertAndDeleteNote;
@@ -989,10 +1026,10 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
 
-    it.effect("MutationRunner decodes Forbidden to tagged result", () =>
+    test.effect("MutationRunner decodes Forbidden to tagged result", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
         const missingId = yield* insertAndDeleteNote;
@@ -1006,10 +1043,10 @@ describe("typed errors", () => {
           _tag: "Forbidden",
           reason: "admin required",
         });
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
 
-    it.effect("MutationRunner Ok path: deletes the existing note", () =>
+    test.effect("MutationRunner Ok path: deletes the existing note", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
 
@@ -1030,10 +1067,10 @@ describe("typed errors", () => {
 
         const remaining = yield* c.query(refs.public.databaseReader.listNotes);
         assertEquals(remaining.length, 0);
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
 
-    it.effect("ActionRunner decodes NotFound to tagged result", () =>
+    test.effect("ActionRunner decodes NotFound to tagged result", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
 
@@ -1043,10 +1080,10 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "NotFound", id: "missing" });
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
 
-    it.effect("ActionRunner decodes Forbidden to tagged result", () =>
+    test.effect("ActionRunner decodes Forbidden to tagged result", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
 
@@ -1059,12 +1096,12 @@ describe("typed errors", () => {
           _tag: "Forbidden",
           reason: "no access",
         });
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
   });
 
   describe("round-trip identity", () => {
-    it.effect(
+    test.effect(
       "decoded error data round-trips into the original TaggedError class",
       () =>
         Effect.gen(function* () {
@@ -1077,7 +1114,8 @@ describe("typed errors", () => {
             }),
           );
           const notFound = expectFailure(queryResult);
-          assert(Schema.is(NotFound)(notFound));
+          const matchesSchema6 = Schema.is(NotFound)(notFound);
+          assert(matchesSchema6);
           expect(notFound.id).toBe(missingId);
 
           const mutationResult = yield* Effect.result(
@@ -1087,14 +1125,15 @@ describe("typed errors", () => {
             }),
           );
           const forbidden = expectFailure(mutationResult);
-          assert(Schema.is(Forbidden)(forbidden));
+          const matchesSchema7 = Schema.is(Forbidden)(forbidden);
+          assert(matchesSchema7);
           expect(forbidden.reason).toBe("admin required");
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
   });
 
   describe("mutation rollback", () => {
-    it.effect(
+    test.effect(
       "throwing typed error from a mutation rolls back inserted rows",
       () =>
         Effect.gen(function* () {
@@ -1107,17 +1146,18 @@ describe("typed errors", () => {
           );
 
           const error = expectFailure(result);
-          assert(Schema.is(NotFound)(error));
+          const matchesSchema8 = Schema.is(NotFound)(error);
+          assert(matchesSchema8);
           expect(error.id).toBe("rolled-back");
 
           const notes = yield* c.query(refs.public.databaseReader.listNotes);
           assertEquals(notes.length, 0);
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
   });
 
   describe("internal visibility", () => {
-    it.effect(
+    test.effect(
       "QueryRunner decodes a typed error from an internal query into the typed E channel",
       () =>
         Effect.gen(function* () {
@@ -1130,12 +1170,12 @@ describe("typed errors", () => {
           );
 
           expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
   });
 
   describe("node action", () => {
-    it.effect(
+    test.effect(
       "typed error from a publicNodeAction surfaces as the typed error",
       () =>
         Effect.gen(function* () {
@@ -1148,9 +1188,10 @@ describe("typed errors", () => {
           );
 
           const error = expectFailure(result);
-          assert(Schema.is(NodeNotFound)(error));
+          const matchesSchema9 = Schema.is(NodeNotFound)(error);
+          assert(matchesSchema9);
           expect(error.id).toBe("abc");
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
   });
 });

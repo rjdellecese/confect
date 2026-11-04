@@ -1,3 +1,4 @@
+import { dual } from "effect/Function";
 import * as WebSocketClient from "@confect/js/WebSocketClient";
 import type { ConvexClient } from "convex/browser";
 import * as Context from "effect/Context";
@@ -41,13 +42,20 @@ export type Client = typeof Client.Identifier;
 /**
  * Constructs one scoped client for a Foldkit application's `resources`.
  */
-export const layer = (
-  address: string,
-  options?: ConstructorParameters<typeof ConvexClient>[1],
-) =>
-  Layer.effect(
-    Client,
-    Effect.flatMap(WebSocketClient.WebSocketClient, make),
-  ).pipe(Layer.provide(WebSocketClient.layer(address, options)));
-
+export const layer: {
+  (
+    options?: ConstructorParameters<typeof ConvexClient>[1],
+  ): (address: string) => Layer.Layer<Effect.Success<ReturnType<typeof make>>>;
+  (
+    address: string,
+    options?: ConstructorParameters<typeof ConvexClient>[1],
+  ): Layer.Layer<Effect.Success<ReturnType<typeof make>>>;
+} = dual(
+  (args) => typeof args[0] === "string",
+  (address: string, options?: ConstructorParameters<typeof ConvexClient>[1]) =>
+    Layer.effect(
+      Client,
+      Effect.flatMap(WebSocketClient.WebSocketClient, make),
+    ).pipe(Layer.provide(WebSocketClient.layer(address, options))),
+);
 export { WebSocketClientError } from "@confect/js/WebSocketClient";

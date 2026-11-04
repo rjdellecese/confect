@@ -1,3 +1,5 @@
+import * as Result from "effect/Result";
+import * as Str from "effect/String";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as SchemaToValidator from "@confect/core/SchemaToValidator";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
@@ -102,7 +104,7 @@ describe("make", () => {
       registration.mockClear();
       const prepared = RegisteredConvexFunction.prepare(database, item);
       expect(registration).not.toHaveBeenCalled();
-      expect(prepared._tag.toLowerCase()).toBe(
+      expect(Str.toLowerCase(prepared._tag)).toBe(
         `${spec.functionVisibility}${spec.runtimeAndFunctionType.functionType}`,
       );
       const forwardedHandler = () => Promise.resolve("forwarded");
@@ -140,11 +142,19 @@ describe("make", () => {
       expect(exported.exportReturns()).toBe(returnsJson);
       expect(compileArgs).toHaveBeenCalledOnce();
       expect(compileReturns).toHaveBeenCalledOnce();
-      expect(JSON.parse(argsJson)).toEqual({
+      expect(
+        Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+          argsJson,
+        ).pipe(Result.getOrThrow),
+      ).toEqual({
         type: "object",
         value: { value: { fieldType: { type: "string" }, optional: false } },
       });
-      expect(JSON.parse(returnsJson)).toEqual({ type: "string" });
+      expect(
+        Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+          returnsJson,
+        ).pipe(Result.getOrThrow),
+      ).toEqual({ type: "string" });
       registration.mockClear();
       RegisteredConvexFunction.make(database, item);
       expect(registration).toHaveBeenCalledOnce();

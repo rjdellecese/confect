@@ -32,10 +32,13 @@ describe("QueryStreamReadBudget", () => {
         maximumRowsRead: Option.none(),
         maximumBytesRead: Option.none(),
       };
-      expect(yield* decode({})).toEqual(unlimited);
-      expect(
-        yield* decode({ maximumRowsRead: 0, maximumBytesRead: 0 }),
-      ).toEqual({
+      const decodeResult = yield* decode({});
+      expect(decodeResult).toEqual(unlimited);
+      const decodeResult2 = yield* decode({
+        maximumRowsRead: 0,
+        maximumBytesRead: 0,
+      });
+      expect(decodeResult2).toEqual({
         maximumRowsRead: Option.some(0),
         maximumBytesRead: Option.some(0),
       });
@@ -66,30 +69,31 @@ describe("QueryStreamReadBudget", () => {
     (firstLimit) =>
       Effect.gen(function* () {
         const doc = { _id: "n1", _creationTime: 1, text: "hello" };
-        const budget = yield* QueryStreamReadBudget.make(
-          yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)(
-            Match.value(firstLimit).pipe(
-              Match.when("rows", () => ({
-                maximumRowsRead: 1,
-                maximumBytesRead: 10000,
-              })),
-              Match.when("bytes", () => ({
-                maximumRowsRead: 10,
-                maximumBytesRead: 1,
-              })),
-              Match.exhaustive,
-            ),
+        const value2 = yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)(
+          Match.value(firstLimit).pipe(
+            Match.when("rows", () => ({
+              maximumRowsRead: 1,
+              maximumBytesRead: 10000,
+            })),
+            Match.when("bytes", () => ({
+              maximumRowsRead: 10,
+              maximumBytesRead: 1,
+            })),
+            Match.exhaustive,
           ),
         );
+        const budget = yield* QueryStreamReadBudget.make(value2);
         const result = yield* budget
           .accountFor(Stream.fromIterable([doc, doc]).pipe(Stream.rechunk(1)))
           .pipe(Stream.runCollect);
         expect(result).toEqual([doc]);
-        expect(yield* budget.getReadCounts).toMatchObject({
+        const getReadCountsResult = yield* budget.getReadCounts;
+        expect(getReadCountsResult).toMatchObject({
           rowsRead: 1,
           bytesRead: getDocumentSize(doc),
         });
-        expect(yield* budget.isStopped).toBe(true);
+        const isStoppedResult = yield* budget.isStopped;
+        expect(isStoppedResult).toBe(true);
       }),
   );
 
@@ -128,13 +132,16 @@ describe("QueryStreamReadBudget", () => {
         );
 
         expect(collected).toEqual([[first], [second]]);
-        expect(yield* budget.getReadCounts).toEqual({
+        const getReadCountsResult2 = yield* budget.getReadCounts;
+        expect(getReadCountsResult2).toEqual({
           rowsRead: 2,
           bytesRead: getDocumentSize(first) + getDocumentSize(second),
         });
         expect(initialCounts).toEqual({ rowsRead: 0, bytesRead: 0 });
-        expect(yield* budget.isExhausted).toBe(false);
-        expect(yield* budget.isStopped).toBe(false);
+        const isExhaustedResult = yield* budget.isExhausted;
+        expect(isExhaustedResult).toBe(false);
+        const isStoppedResult2 = yield* budget.isStopped;
+        expect(isStoppedResult2).toBe(false);
       }),
   );
 
@@ -146,12 +153,12 @@ describe("QueryStreamReadBudget", () => {
           maximumRowsRead: Option.none(),
           maximumBytesRead: Option.none(),
         });
-        expect(yield* budget.isStopped).toBe(false);
-        expect(
-          yield* Stream.runCollect(
-            budget.accountFor(Stream.make({ value: 1 }, { value: 2 })),
-          ),
-        ).toEqual([{ value: 1 }, { value: 2 }]);
+        const isStoppedResult3 = yield* budget.isStopped;
+        expect(isStoppedResult3).toBe(false);
+        const runCollectResult = yield* Stream.runCollect(
+          budget.accountFor(Stream.make({ value: 1 }, { value: 2 })),
+        );
+        expect(runCollectResult).toEqual([{ value: 1 }, { value: 2 }]);
       }),
   );
 
@@ -160,24 +167,26 @@ describe("QueryStreamReadBudget", () => {
     (kind) =>
       Effect.gen(function* () {
         const doc = { _id: "n1", _creationTime: 1, text: "hello" };
-        const budget = yield* QueryStreamReadBudget.make(
-          yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)(
-            Match.value(kind).pipe(
-              Match.when("rows", () => ({ maximumRowsRead: 2 })),
-              Match.when("bytes", () => ({
-                maximumBytesRead: 2 * getDocumentSize(doc),
-              })),
-              Match.exhaustive,
-            ),
+        const value3 = yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)(
+          Match.value(kind).pipe(
+            Match.when("rows", () => ({ maximumRowsRead: 2 })),
+            Match.when("bytes", () => ({
+              maximumBytesRead: 2 * getDocumentSize(doc),
+            })),
+            Match.exhaustive,
           ),
         );
-        expect(yield* budget.isExhausted).toBe(false);
+        const budget = yield* QueryStreamReadBudget.make(value3);
+        const isExhaustedResult2 = yield* budget.isExhausted;
+        expect(isExhaustedResult2).toBe(false);
         for (const exhausted of [false, true]) {
           yield* budget
             .accountFor(Stream.make(doc))
             .pipe(Stream.take(1), Stream.runDrain);
-          expect(yield* budget.isExhausted).toBe(exhausted);
-          expect(yield* budget.isStopped).toBe(false);
+          const isExhaustedResult3 = yield* budget.isExhausted;
+          expect(isExhaustedResult3).toBe(exhausted);
+          const isStoppedResult4 = yield* budget.isStopped;
+          expect(isStoppedResult4).toBe(false);
         }
       }),
   );
@@ -188,14 +197,16 @@ describe("QueryStreamReadBudget", () => {
         maximumRowsRead: Option.none(),
         maximumBytesRead: Option.none(),
       });
-      expect(yield* budget.isUnlimited).toBe(true);
-      expect(
-        yield* budget
-          .accountFor(Stream.make({ value: 1 }, { value: 2 }))
-          .pipe(Stream.runCollect),
-      ).toEqual([{ value: 1 }, { value: 2 }]);
-      expect(yield* budget.isExhausted).toBe(false);
-      expect(yield* budget.isStopped).toBe(false);
+      const isUnlimitedResult = yield* budget.isUnlimited;
+      expect(isUnlimitedResult).toBe(true);
+      const pipeResult = yield* budget
+        .accountFor(Stream.make({ value: 1 }, { value: 2 }))
+        .pipe(Stream.runCollect);
+      expect(pipeResult).toEqual([{ value: 1 }, { value: 2 }]);
+      const isExhaustedResult4 = yield* budget.isExhausted;
+      expect(isExhaustedResult4).toBe(false);
+      const isStoppedResult5 = yield* budget.isStopped;
+      expect(isStoppedResult5).toBe(false);
       const counts = yield* budget.getReadCounts;
       expect(counts).toEqual({
         rowsRead: 2,
@@ -211,15 +222,14 @@ describe("QueryStreamReadBudget", () => {
       Effect.gen(function* () {
         let reads = 0;
         let finalized = 0;
-        const budget = yield* QueryStreamReadBudget.make(
-          yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)(
-            Match.value(kind).pipe(
-              Match.when("rows", () => ({ maximumRowsRead: 0 })),
-              Match.when("bytes", () => ({ maximumBytesRead: 0 })),
-              Match.exhaustive,
-            ),
+        const value4 = yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)(
+          Match.value(kind).pipe(
+            Match.when("rows", () => ({ maximumRowsRead: 0 })),
+            Match.when("bytes", () => ({ maximumBytesRead: 0 })),
+            Match.exhaustive,
           ),
         );
+        const budget = yield* QueryStreamReadBudget.make(value4);
         const documents = Stream.fromAsyncIterable(
           {
             [Symbol.asyncIterator]: () => ({
@@ -235,13 +245,16 @@ describe("QueryStreamReadBudget", () => {
           },
           (error) => error,
         ).pipe(Stream.orDie);
-        expect(yield* budget.isExhausted).toBe(true);
-        expect(
-          yield* budget.accountFor(documents).pipe(Stream.runCollect),
-        ).toEqual([]);
+        const isExhaustedResult5 = yield* budget.isExhausted;
+        expect(isExhaustedResult5).toBe(true);
+        const pipeResult2 = yield* budget
+          .accountFor(documents)
+          .pipe(Stream.runCollect);
+        expect(pipeResult2).toEqual([]);
         expect(reads).toBe(0);
         expect(finalized).toBe(1);
-        expect(yield* budget.isStopped).toBe(true);
+        const isStoppedResult6 = yield* budget.isStopped;
+        expect(isStoppedResult6).toBe(true);
         const counts = yield* budget.getReadCounts;
         expect(counts.rowsRead).toBe(0);
         expect(counts.bytesRead).toBe(0);
@@ -265,15 +278,14 @@ describe("QueryStreamReadBudget", () => {
             }),
           ),
         );
-        const budget = yield* QueryStreamReadBudget.make(
-          yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)(
-            Match.value(kind).pipe(
-              Match.when("rows", () => ({ maximumRowsRead: 1 })),
-              Match.when("bytes", () => ({ maximumBytesRead: 1 })),
-              Match.exhaustive,
-            ),
+        const value5 = yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)(
+          Match.value(kind).pipe(
+            Match.when("rows", () => ({ maximumRowsRead: 1 })),
+            Match.when("bytes", () => ({ maximumBytesRead: 1 })),
+            Match.exhaustive,
           ),
         );
+        const budget = yield* QueryStreamReadBudget.make(value5);
         const collected = yield* Stream.runCollect(
           budget.accountFor(documents),
         );
@@ -282,13 +294,16 @@ describe("QueryStreamReadBudget", () => {
         const counts = yield* budget.getReadCounts;
         expect(counts.rowsRead).toBe(1);
         expect(counts.bytesRead).toBe(getDocumentSize(doc));
-        expect(yield* budget.isStopped).toBe(true);
+        const isStoppedResult7 = yield* budget.isStopped;
+        expect(isStoppedResult7).toBe(true);
         for (let attempt = 0; attempt < 2; attempt++) {
-          expect(
-            yield* budget.accountFor(documents).pipe(Stream.runCollect),
-          ).toEqual([]);
+          const pipeResult3 = yield* budget
+            .accountFor(documents)
+            .pipe(Stream.runCollect);
+          expect(pipeResult3).toEqual([]);
           expect(reads).toBe(1);
-          expect(yield* budget.isStopped).toBe(true);
+          const isStoppedResult8 = yield* budget.isStopped;
+          expect(isStoppedResult8).toBe(true);
           const repeatedCounts = yield* budget.getReadCounts;
           expect(repeatedCounts).toEqual(counts);
         }
@@ -297,11 +312,10 @@ describe("QueryStreamReadBudget", () => {
 
   it.effect("serializes accounting across concurrent leaf streams", () =>
     Effect.gen(function* () {
-      const budget = yield* QueryStreamReadBudget.make(
-        yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)({
-          maximumRowsRead: 1,
-        }),
-      );
+      const value6 = yield* Schema.decodeEffect(QueryStreamReadBudget.Limits)({
+        maximumRowsRead: 1,
+      });
+      const budget = yield* QueryStreamReadBudget.make(value6);
       const collected = yield* Effect.forEach(
         [1, 2],
         (value) =>
@@ -313,7 +327,8 @@ describe("QueryStreamReadBudget", () => {
         { concurrency: "unbounded" },
       );
       expect(collected.flat()).toHaveLength(1);
-      expect(yield* budget.isStopped).toBe(true);
+      const isStoppedResult9 = yield* budget.isStopped;
+      expect(isStoppedResult9).toBe(true);
       expect((yield* budget.getReadCounts).rowsRead).toBe(1);
     }),
   );

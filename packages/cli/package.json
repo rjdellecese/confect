@@ -42,7 +42,7 @@
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
-    "bin",
+    "bin/confect.mjs",
     "dist",
     "package.json"
   ],

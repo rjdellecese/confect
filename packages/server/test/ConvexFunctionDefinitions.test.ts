@@ -1,3 +1,4 @@
+import * as RecordEffect from "effect/Record";
 import * as ConvexFunctionDefinitions from "@confect/server/ConvexFunctionDefinitions";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
 import type * as DataModel from "@confect/server/DataModel";
@@ -37,7 +38,7 @@ it("prepares only its own functions and preserves native registrations", () => {
   expectTypeOf(definitions.native._tag).toEqualTypeOf<"Registered">();
   expectTypeOf(definitions).not.toHaveProperty("missing");
   expectTypeOf(definitions.native).not.toHaveProperty("args");
-  expect(Object.keys(definitions).sort()).toEqual(["get", "native"]);
+  expect(RecordEffect.keys(definitions).sort()).toEqual(["get", "native"]);
   const prepared = definitions.get;
   assert(prepared && ConvexFunctionDefinitions.isDefinition(prepared));
   expect(prepared._tag).toBe("PublicQuery");

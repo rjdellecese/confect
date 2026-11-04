@@ -87,11 +87,10 @@ const emitDeclarations = Effect.gen(function* () {
 
   yield* fs.writeFileString(configPath, config);
 
-  const effectTsgo = path.dirname(
-    yield* path.fromFileUrl(
-      new URL(import.meta.resolve("@effect/tsgo/package.json")),
-    ),
+  const fromFileUrlResult = yield* path.fromFileUrl(
+    new URL(import.meta.resolve("@effect/tsgo/package.json")),
   );
+  const effectTsgo = path.dirname(fromFileUrlResult);
 
   const diagnostics = yield* spawner.string(
     ChildProcess.make(process.execPath, [

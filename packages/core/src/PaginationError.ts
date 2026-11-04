@@ -1,3 +1,4 @@
+import * as String from "effect/String";
 import { ConvexError } from "convex/values";
 import type { Value } from "convex/values";
 import * as Match from "effect/Match";
@@ -7,7 +8,7 @@ import * as Schema from "effect/Schema";
 /**
  * A Convex pagination cursor that no longer describes the current query.
  */
-export class InvalidCursor extends Schema.TaggedError<InvalidCursor>()(
+export class InvalidCursor extends Schema.TaggedError<InvalidCursor, {}>()(
   "InvalidCursor",
   {
     cause: Schema.Defect(),
@@ -38,8 +39,8 @@ const isInvalidCursorData = (value: unknown): value is InvalidCursorData =>
 const fromErrorMessage = (
   error: globalThis.Error,
 ): Option.Option<InvalidCursor> =>
-  error.message.includes("InvalidCursor")
-    ? Option.some(new InvalidCursor({ cause: error }))
+  String.includes("InvalidCursor")(error.message)
+    ? Option.some(InvalidCursor.make({ cause: error }))
     : Option.none();
 
 /**
@@ -52,7 +53,7 @@ export const fromConvexQueryError = (
     Match.when(isConvexError, (convexError) =>
       Match.value(isInvalidCursorData(convexError.data)).pipe(
         Match.when(true, () =>
-          Option.some(new InvalidCursor({ cause: error })),
+          Option.some(InvalidCursor.make({ cause: error })),
         ),
         Match.when(false, () => fromErrorMessage(convexError)),
         Match.exhaustive,
@@ -71,7 +72,7 @@ export const fromConvexErrorData = (
 ): Option.Option<InvalidCursor> =>
   Match.value(errorData).pipe(
     Match.when(isInvalidCursorData, (cause) =>
-      Option.some(new InvalidCursor({ cause })),
+      Option.some(InvalidCursor.make({ cause })),
     ),
     Match.when(Match.any, () => Option.none<InvalidCursor>()),
     Match.exhaustive,

@@ -1,3 +1,5 @@
+import { pipe } from "effect/Function";
+import * as Str from "effect/String";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -37,9 +39,12 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             ],
             [
               "confect/tables/notes.ts",
-              Project.table.replace(
-                "text: Schema.String",
-                "text: Schema.String, archived: Schema.Boolean",
+              pipe(
+                Project.table,
+                Str.replace(
+                  "text: Schema.String",
+                  "text: Schema.String, archived: Schema.Boolean",
+                ),
               ),
             ],
             ["convex/convex.config.ts", `${config}\n// configuration edit\n`],
@@ -88,7 +93,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           ).toBe(1000);
           yield* project.write(file, repaired);
           yield* watching.waitFor(success);
-          expect(yield* project.generatedFiles).toEqual(before);
+          const actual = yield* project.generatedFiles;
+          expect(actual).toEqual(before);
           expect(
             Option.getOrThrow((yield* fs.stat(schema)).mtime).getTime(),
           ).toBeGreaterThan(1000);
@@ -120,11 +126,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
           for (const output of outputs) {
-            expect(
-              yield* fs.readFileString(
-                path.join(project.root, "convex", output),
-              ),
-            ).toBe(contents);
+            const contents2 = yield* fs.readFileString(
+              path.join(project.root, "convex", output),
+            );
+            expect(contents2).toBe(contents);
           }
         }).pipe(Effect.scoped),
       { timeout: 30000 },
@@ -159,14 +164,16 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
           const generated = path.join(project.root, "convex", output);
-          expect(yield* fs.exists(generated)).toBe(true);
+          const actual2 = yield* fs.exists(generated);
+          expect(actual2).toBe(true);
           yield* project.write("confect/notes.impl.ts", Project.emptyImpl);
           yield* watching.waitFor("does not implement every function");
           yield* fs.remove(path.join(project.root, "confect", source));
           yield* watching.waitFor("does not implement every function");
           yield* project.write("confect/notes.impl.ts", Project.impl);
           yield* watching.waitFor(success);
-          expect(yield* fs.exists(generated)).toBe(false);
+          const actual3 = yield* fs.exists(generated);
+          expect(actual3).toBe(false);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -184,23 +191,26 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           );
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
-          expect(
-            yield* fs.exists(path.join(project.root, "convex/auth.config.ts")),
-          ).toBe(true);
+          const actual4 = yield* fs.exists(
+            path.join(project.root, "convex/auth.config.ts"),
+          );
+          expect(actual4).toBe(true);
           yield* fs.remove(path.join(project.root, "confect/auth.ts"));
           yield* watching.waitFor(success);
-          expect(
-            yield* fs.exists(path.join(project.root, "convex/auth.config.ts")),
-          ).toBe(false);
+          const actual5 = yield* fs.exists(
+            path.join(project.root, "convex/auth.config.ts"),
+          );
+          expect(actual5).toBe(false);
           yield* fs.remove(path.join(project.root, "confect/notes.impl.ts"));
           yield* fs.remove(path.join(project.root, "confect/notes.spec.ts"));
           yield* fs.remove(path.join(project.root, "confect/tables"), {
             recursive: true,
           });
           yield* watching.waitFor(success);
-          expect(
-            yield* fs.exists(path.join(project.root, "convex/notes.ts")),
-          ).toBe(false);
+          const actual6 = yield* fs.exists(
+            path.join(project.root, "convex/notes.ts"),
+          );
+          expect(actual6).toBe(false);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );

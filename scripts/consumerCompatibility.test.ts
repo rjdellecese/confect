@@ -1,3 +1,4 @@
+import * as Arr from "effect/Array";
 import { expect, test } from "bun:test";
 import {
   consumerDependencies,
@@ -162,7 +163,7 @@ test.each(["4.0.0", "4.0.1", "4.0.3"])(
     ];
     const problems = graphProblems(graph, [], roots, "/app");
     expect(
-      problems.filter((problem) => problem._tag === "InvalidPeer"),
+      Arr.filter(problems, (problem) => problem._tag === "InvalidPeer"),
     ).toHaveLength(1);
   },
 );
@@ -257,12 +258,15 @@ test("rejects registry siblings, missing candidates, linked source, and split Ef
     { ...effect("4.0.1"), path: "/workspace/effect" },
   ];
   expect(
-    graphProblems(
-      graph,
-      [candidate],
-      { ...roots, "@confect/core": "/app/core" },
-      "/app",
-    ).map((problem) => problem._tag),
+    Arr.map(
+      graphProblems(
+        graph,
+        [candidate],
+        { ...roots, "@confect/core": "/app/core" },
+        "/app",
+      ),
+      (problem) => problem._tag,
+    ),
   ).toEqual([
     "WrongCandidate",
     "ExternalPath",

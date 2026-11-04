@@ -1,9 +1,24 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { expectTypeOf, it } from "@effect/vitest";
-import type * as WebSocketClient from "@confect/js/WebSocketClient";
+import { expect, expectTypeOf, it } from "@effect/vitest";
+import * as WebSocketClient from "@confect/js/WebSocketClient";
+import * as Layer from "effect/Layer";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+
+it("supports pipeable layer construction with optional options", () => {
+  const defaultLayer = WebSocketClient.layer()(
+    "https://example-123.convex.cloud",
+  );
+  const configuredLayer = WebSocketClient.layer({ logger: false })(
+    "https://example-123.convex.cloud",
+  );
+  expect(Layer.isLayer(defaultLayer)).toBe(true);
+  expect(Layer.isLayer(configuredLayer)).toBe(true);
+  expectTypeOf(configuredLayer).toEqualTypeOf<
+    ReturnType<typeof WebSocketClient.layer>
+  >();
+});
 
 class TokenProvider extends Context.Service<
   TokenProvider,
@@ -72,7 +87,10 @@ const argsActionRef = Ref.make(
   }),
 );
 
-class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedError<
+  NotFound,
+  { readonly brand: unique symbol }
+>()("NotFound", {
   id: Schema.String,
 }) {}
 

@@ -64,7 +64,7 @@ export default GroupImpl.make(databaseSchema, databaseReader).pipe(
         ({ paginationOpts, shouldFail }) =>
           Effect.gen(function* () {
             if (shouldFail) {
-              return yield* new PaginationDenied({ reason: "denied" });
+              return yield* PaginationDenied.make({ reason: "denied" });
             }
 
             const reader = yield* DatabaseReader;

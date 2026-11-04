@@ -3,10 +3,10 @@ import * as Schema from "effect/Schema";
 import { Id } from "./_generated/id";
 import notes from "./_generated/tables/notes";
 
-export class PaginationDenied extends Schema.TaggedError<PaginationDenied>()(
-  "PaginationDenied",
-  { reason: Schema.String },
-) {}
+export class PaginationDenied extends Schema.TaggedError<
+  PaginationDenied,
+  {}
+>()("PaginationDenied", { reason: Schema.String }) {}
 
 export default GroupSpec.make()
   .addFunction(

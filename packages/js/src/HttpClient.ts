@@ -1,3 +1,4 @@
+import { dual } from "effect/Function";
 import * as Ref from "@confect/core/Ref";
 import { ConvexHttpClient, type HttpMutationOptions } from "convex/browser";
 import * as Context from "effect/Context";
@@ -5,7 +6,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
+export class HttpClientError extends Schema.TaggedError<HttpClientError, {}>()(
   "HttpClientError",
   {
     cause: Schema.Unknown,
@@ -38,7 +39,7 @@ const make = (
     client.clearAuth();
   });
 
-  const mapUnknownError = (cause: unknown) => new HttpClientError({ cause });
+  const mapUnknownError = (cause: unknown) => HttpClientError.make({ cause });
 
   const query = <Query extends Ref.AnyPublicQuery>(
     ref: Query,
@@ -121,7 +122,18 @@ export const HttpClient = Context.Service<ReturnType<typeof make>>(
 
 export type HttpClient = typeof HttpClient.Identifier;
 
-export const layer = (
-  address: string,
-  options?: ConstructorParameters<typeof ConvexHttpClient>[1],
-) => Layer.sync(HttpClient, () => make(address, options));
+export const layer: {
+  (
+    options?: ConstructorParameters<typeof ConvexHttpClient>[1],
+  ): (address: string) => Layer.Layer<ReturnType<typeof make>>;
+  (
+    address: string,
+    options?: ConstructorParameters<typeof ConvexHttpClient>[1],
+  ): Layer.Layer<ReturnType<typeof make>>;
+} = dual(
+  (args) => typeof args[0] === "string",
+  (
+    address: string,
+    options?: ConstructorParameters<typeof ConvexHttpClient>[1],
+  ) => Layer.sync(HttpClient, () => make(address, options)),
+);

@@ -1,11 +1,5 @@
 {
   "compilerOptions": {
-    "plugins": [
-      {
-        "name": "@effect/language-service",
-        "diagnostics": false
-      }
-    ],
     "declaration": true,
     "declarationMap": true,
     "isolatedDeclarations": false,

@@ -1,3 +1,4 @@
+import { dual } from "effect/Function";
 import type { Predicate } from "effect";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -7,25 +8,38 @@ type NestedObject<T> = {
   [key: string]: T | NestedObject<T>;
 };
 
-export const mapLeaves = <T, U>(
-  obj: NestedObject<T>,
-  leafRefinement: Predicate.Refinement<unknown, T>,
-  f: (value: T) => U,
-): NestedObject<U> => {
-  const result: any = {};
+export const mapLeaves = dual<
+  <T, U>(
+    leafRefinement: Predicate.Refinement<unknown, T>,
+    f: (value: T) => U,
+  ) => (obj: NestedObject<T>) => NestedObject<U>,
+  <T, U>(
+    obj: NestedObject<T>,
+    leafRefinement: Predicate.Refinement<unknown, T>,
+    f: (value: T) => U,
+  ) => NestedObject<U>
+>(
+  3,
+  <T, U>(
+    obj: NestedObject<T>,
+    leafRefinement: Predicate.Refinement<unknown, T>,
+    f: (value: T) => U,
+  ): NestedObject<U> => {
+    const result: any = {};
 
-  for (const key in obj) {
-    const value = obj[key];
+    for (const key in obj) {
+      const value = obj[key];
 
-    if (leafRefinement(value)) {
-      result[key] = f(value as T);
-    } else {
-      result[key] = mapLeaves(value as NestedObject<T>, leafRefinement, f);
+      if (leafRefinement(value)) {
+        result[key] = f(value as T);
+      } else {
+        result[key] = mapLeaves(value as NestedObject<T>, leafRefinement, f);
+      }
     }
-  }
 
-  return result;
-};
+    return result;
+  },
+);
 
 const collectBranchLeaves = <T>(
   obj: NestedObject<T>,
@@ -52,25 +66,43 @@ const collectBranchLeaves = <T>(
   return [...currentBranch, ...nestedBranches];
 };
 
-export const forEachBranchLeaves = <T, A, E, R>(
-  obj: NestedObject<T>,
-  leafRefinement: Predicate.Refinement<unknown, T>,
-  f: (branchLeaves: {
-    path: string[];
-    values: Record<string, T>;
-  }) => Effect.Effect<A, E, R>,
-): Effect.Effect<void, E, R> => {
-  const branchLeaves = collectBranchLeaves(obj, leafRefinement);
-  return Effect.forEach(branchLeaves, f, {
-    discard: true,
-  });
-};
+export const forEachBranchLeaves = dual<
+  <T, A, E, R>(
+    leafRefinement: Predicate.Refinement<unknown, T>,
+    f: (branchLeaves: {
+      path: string[];
+      values: Record<string, T>;
+    }) => Effect.Effect<A, E, R>,
+  ) => (obj: NestedObject<T>) => Effect.Effect<void, E, R>,
+  <T, A, E, R>(
+    obj: NestedObject<T>,
+    leafRefinement: Predicate.Refinement<unknown, T>,
+    f: (branchLeaves: {
+      path: string[];
+      values: Record<string, T>;
+    }) => Effect.Effect<A, E, R>,
+  ) => Effect.Effect<void, E, R>
+>(
+  3,
+  <T, A, E, R>(
+    obj: NestedObject<T>,
+    leafRefinement: Predicate.Refinement<unknown, T>,
+    f: (branchLeaves: {
+      path: string[];
+      values: Record<string, T>;
+    }) => Effect.Effect<A, E, R>,
+  ): Effect.Effect<void, E, R> => {
+    const branchLeaves = collectBranchLeaves(obj, leafRefinement);
+    return Effect.forEach(branchLeaves, f, {
+      discard: true,
+    });
+  },
+);
 
-export const setNestedProperty = <T extends object>(
-  obj: T,
-  path: PropertyKey[],
-  value: any,
-): T => {
+export const setNestedProperty = dual<
+  (path: PropertyKey[], value: any) => <T extends object>(obj: T) => T,
+  <T extends object>(obj: T, path: PropertyKey[], value: any) => T
+>(3, <T extends object>(obj: T, path: PropertyKey[], value: any): T => {
   if (path.length === 0) {
     return obj;
   }
@@ -86,4 +118,4 @@ export const setNestedProperty = <T extends object>(
     ...obj,
     [key]: setNestedProperty((obj as any)[key] ?? {}, tail, value),
   };
-};
+});

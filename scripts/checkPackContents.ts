@@ -1,3 +1,6 @@
+import * as Str from "effect/String";
+import * as Option from "effect/Option";
+import * as Arr from "effect/Array";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Console from "effect/Console";
@@ -26,43 +29,51 @@ const PackProblem = Schema.Struct({
   reason: Schema.String,
 });
 
-export class InvalidPackContents extends Schema.TaggedError<InvalidPackContents>()(
-  "InvalidPackContents",
-  {
-    packages: Schema.Array(
-      Schema.Struct({
-        directory: Schema.String,
-        problems: Schema.Array(PackProblem),
-      }),
-    ),
-  },
-) {
+export class InvalidPackContents extends Schema.TaggedError<
+  InvalidPackContents,
+  {}
+>()("InvalidPackContents", {
+  packages: Schema.Array(
+    Schema.Struct({
+      directory: Schema.String,
+      problems: Schema.Array(PackProblem),
+    }),
+  ),
+}) {
   override get message() {
     return (
-      this.packages
-        .map(
+      Arr.join(
+        Arr.map(
+          this.packages,
           ({ directory, problems }) =>
-            `FAIL ${directory}\n${problems.map(({ path, reason }) => `       ${path}—${reason}`).join("\n")}`,
-        )
-        .join("\n") +
+            `FAIL ${directory}\n${Arr.join(
+              Arr.map(
+                problems,
+                ({ path, reason }) => `       ${path}—${reason}`,
+              ),
+              "\n",
+            )}`,
+        ),
+        "\n",
+      ) +
       "\n\nThese files would be published to npm. Keep build artifacts out of the packed directories,\nor narrow the `files` field in the offending package.json."
     );
   }
 }
 
-export class NpmPackError extends Schema.TaggedError<NpmPackError>()(
+export class NpmPackError extends Schema.TaggedError<NpmPackError, {}>()(
   "NpmPackError",
   { directory: Schema.String, exitCode: Schema.Finite, stderr: Schema.String },
 ) {
   override get message() {
-    return `npm pack failed for ${this.directory} (exit ${this.exitCode}): ${this.stderr.trim()}`;
+    return `npm pack failed for ${this.directory} (exit ${this.exitCode}): ${Str.trim(this.stderr)}`;
   }
 }
 
-export class InvalidPackOutput extends Schema.TaggedError<InvalidPackOutput>()(
-  "InvalidPackOutput",
-  { directory: Schema.String, cause: Schema.Unknown },
-) {
+export class InvalidPackOutput extends Schema.TaggedError<
+  InvalidPackOutput,
+  {}
+>()("InvalidPackOutput", { directory: Schema.String, cause: Schema.Unknown }) {
   override get message() {
     return `Invalid npm pack JSON for ${this.directory}`;
   }
@@ -72,18 +83,23 @@ export const packProblems = (
   files: ReadonlyArray<string>,
 ): ReadonlyArray<typeof PackProblem.Type> => {
   const problems: Array<typeof PackProblem.Type> = [];
-  if (!files.some((path) => path.startsWith("dist/")))
+  if (!Arr.some(files, (path) => Str.startsWith("dist/")(path)))
     problems.push({
       path: "dist/",
       reason: "no build output packed—did this run before `pnpm build`?",
     });
   for (const path of files) {
-    const denial = DENIED.find(([pattern]) => pattern.test(path));
-    if (denial) problems.push({ path, reason: denial[1] });
+    const denial = Option.getOrUndefined(
+      Arr.findFirst(DENIED, ([pattern]) => pattern.test(path)),
+    );
+    if (denial !== undefined) problems.push({ path, reason: denial[1] });
   }
   return problems;
 };
 
+/**
+ * @internal
+ */
 export const publishedPackages = Effect.fn("PackContents.publishedPackages")(
   function* (packagesDirectory = "packages") {
     const fs = yield* FileSystem.FileSystem;
@@ -122,12 +138,15 @@ export const decodePackedFiles = Effect.fn("PackContents.decodePackedFiles")(
         ]),
       ),
     )(stdout).pipe(
-      Effect.mapError((cause) => new InvalidPackOutput({ directory, cause })),
+      Effect.mapError((cause) => InvalidPackOutput.make({ directory, cause })),
     );
-    return output[0].files.map((file) => file.path);
+    return Arr.map(output[0].files, (file) => file.path);
   },
 );
 
+/**
+ * @internal
+ */
 export const packedFiles = Effect.fn("PackContents.packedFiles")(function* (
   directory: string,
 ) {
@@ -147,7 +166,7 @@ export const packedFiles = Effect.fn("PackContents.packedFiles")(function* (
     { concurrency: "unbounded" },
   );
   if (result.exitCode !== 0)
-    return yield* new NpmPackError({
+    return yield* NpmPackError.make({
       directory,
       exitCode: result.exitCode,
       stderr: result.stderr,
@@ -155,6 +174,9 @@ export const packedFiles = Effect.fn("PackContents.packedFiles")(function* (
   return yield* decodePackedFiles(directory, result.stdout);
 }, Effect.scoped);
 
+/**
+ * @internal
+ */
 export const checkPackContents = Effect.fn("PackContents.check")(function* (
   packagesDirectory = "packages",
 ) {
@@ -171,7 +193,7 @@ export const checkPackContents = Effect.fn("PackContents.check")(function* (
     }
   }
   if (failures.length > 0)
-    return yield* new InvalidPackContents({ packages: failures });
+    return yield* InvalidPackContents.make({ packages: failures });
 });
 
 if (import.meta.main) {

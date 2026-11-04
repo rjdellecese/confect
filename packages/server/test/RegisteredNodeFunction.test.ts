@@ -1,3 +1,4 @@
+import * as Result from "effect/Result";
 import { RegisteredNodeFunction } from "@confect/server/node";
 import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
 import { FunctionSpec, GroupSpec } from "@confect/core";
@@ -65,10 +66,18 @@ it.each([
     exportArgs: () => string;
     exportReturns: () => string;
   };
-  expect(JSON.parse(exported.exportReturns())).toEqual({ type: "boolean" });
+  expect(
+    Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+      exported.exportReturns(),
+    ).pipe(Result.getOrThrow),
+  ).toEqual({ type: "boolean" });
   expect(compileReturns).toHaveBeenCalledOnce();
   expect(compileArgs).not.toHaveBeenCalled();
-  expect(JSON.parse(exported.exportArgs())).toEqual({
+  expect(
+    Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+      exported.exportArgs(),
+    ).pipe(Result.getOrThrow),
+  ).toEqual({
     type: "object",
     value: {
       flags: {

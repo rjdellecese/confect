@@ -16,10 +16,10 @@ export class ConvexDirectory extends Context.Service<
   static readonly get = ConvexDirectory.use((service) => service.get);
 }
 
-export class ConvexDirectoryNotFoundError extends Schema.TaggedError<ConvexDirectoryNotFoundError>()(
-  "ConvexDirectoryNotFoundError",
-  {},
-) {
+export class ConvexDirectoryNotFoundError extends Schema.TaggedError<
+  ConvexDirectoryNotFoundError,
+  { readonly brand: unique symbol }
+>()("ConvexDirectoryNotFoundError", {}) {
   override get message(): string {
     return "Could not find Convex directory";
   }
@@ -36,12 +36,12 @@ const ConvexJsonConfig = Schema.fromJsonString(
   }),
 );
 
-export class InvalidConvexJsonError extends Schema.TaggedError<InvalidConvexJsonError>()(
-  "InvalidConvexJsonError",
-  {
-    cause: Schema.Unknown,
-  },
-) {
+export class InvalidConvexJsonError extends Schema.TaggedError<
+  InvalidConvexJsonError,
+  { readonly brand: unique symbol }
+>()("InvalidConvexJsonError", {
+  cause: Schema.Unknown,
+}) {
   override get message(): string {
     const detail = Predicate.isError(this.cause)
       ? `: ${this.cause.message}`
@@ -64,7 +64,7 @@ const findConvexDirectory = Effect.gen(function* () {
     ? yield* fs.readFileString(convexJsonPath).pipe(
         Effect.flatMap((json) =>
           Schema.decodeEffect(ConvexJsonConfig)(json).pipe(
-            Effect.mapError((cause) => new InvalidConvexJsonError({ cause })),
+            Effect.mapError((cause) => InvalidConvexJsonError.make({ cause })),
           ),
         ),
         Effect.map((config) =>
@@ -79,10 +79,13 @@ const findConvexDirectory = Effect.gen(function* () {
   if (yield* fs.exists(convexDirectory)) {
     return convexDirectory;
   } else {
-    return yield* new ConvexDirectoryNotFoundError();
+    return yield* ConvexDirectoryNotFoundError.make();
   }
 });
 
+/**
+ * @internal
+ */
 export const layer = Layer.effect(
   ConvexDirectory,
   Effect.gen(function* () {

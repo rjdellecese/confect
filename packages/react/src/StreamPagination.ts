@@ -1,3 +1,4 @@
+import { dual } from "effect/Function";
 /**
  * EXPERIMENTAL—the pure state machine behind {@link useStreamPaginatedQuery}
  * (see `notes/stream-based-querying.md` in the repo root).
@@ -101,15 +102,18 @@ export const empty: State = {
 /**
  * One growing (unpinned) page from the start of the stream.
  */
-export const initial = (
-  initialNumItems: number,
-  budget: ReadBudget = {},
-): State => ({
-  nextPageKey: 1,
-  pageKeys: ["0"],
-  pages: Record.singleton("0", growingRequest(initialNumItems, null, budget)),
-  ongoingSplits: Record.empty(),
-});
+export const initial: {
+  (budget?: ReadBudget): (initialNumItems: number) => State;
+  (initialNumItems: number, budget?: ReadBudget): State;
+} = dual(
+  (args) => typeof args[0] === "number",
+  (initialNumItems: number, budget: ReadBudget = {}): State => ({
+    nextPageKey: 1,
+    pageKeys: ["0"],
+    pages: Record.singleton("0", growingRequest(initialNumItems, null, budget)),
+    ongoingSplits: Record.empty(),
+  }),
+);
 
 /**
  * Pin a freshly loaded growing page at its `continueCursor` (or, once
@@ -118,85 +122,105 @@ export const initial = (
  * sheds items past its edges. Modeled as a one-replacement split so the
  * original keeps rendering until the pinned twin has a result.
  */
-export const pin =
+export const pin: {
+  (endCursor: string): (key: string) => (state: State) => State;
+  (key: string, endCursor: string): (state: State) => State;
+} = dual(
+  2,
   (key: string, endCursor: string): ((state: State) => State) =>
-  (state) =>
-    Option.match(Record.get(state.pages, key), {
-      onNone: () => state,
-      onSome: (page) => {
-        if (
-          page.endCursor !== undefined ||
-          Record.has(state.ongoingSplits, key)
-        ) {
-          return state;
-        }
-        const pinnedKey = String(state.nextPageKey);
-        return {
-          nextPageKey: state.nextPageKey + 1,
-          pageKeys: state.pageKeys,
-          pages: Record.set(state.pages, pinnedKey, { ...page, endCursor }),
-          ongoingSplits: Record.set(state.ongoingSplits, key, [pinnedKey]),
-        };
-      },
-    });
+    (state) =>
+      Option.match(Record.get(state.pages, key), {
+        onNone: () => state,
+        onSome: (page) => {
+          if (
+            page.endCursor !== undefined ||
+            Record.has(state.ongoingSplits, key)
+          ) {
+            return state;
+          }
+          const pinnedKey = String(state.nextPageKey);
+          return {
+            nextPageKey: state.nextPageKey + 1,
+            pageKeys: state.pageKeys,
+            pages: Record.set(state.pages, pinnedKey, { ...page, endCursor }),
+            ongoingSplits: Record.set(state.ongoingSplits, key, [pinnedKey]),
+          };
+        },
+      }),
+);
 
 /**
  * Pin the growing last page at `continueCursor` and start a new growing page
  * from there. Modeled as a split of the last page into its pinned replacement
  * and the new page, so the swap waits for both.
  */
-export const loadMore =
+export const loadMore: {
+  (
+    numItems: number,
+    budget?: ReadBudget,
+  ): (continueCursor: string) => (state: State) => State;
+  (
+    continueCursor: string,
+    numItems: number,
+    budget?: ReadBudget,
+  ): (state: State) => State;
+} = dual(
+  (args) => typeof args[0] === "string",
   (
     continueCursor: string,
     numItems: number,
     budget: ReadBudget = {},
   ): ((state: State) => State) =>
-  (state) =>
-    pipe(
-      Option.Do,
-      Option.bind("lastKey", () => Array.last(state.pageKeys)),
-      Option.bind("lastPage", ({ lastKey }) =>
-        Record.get(state.pages, lastKey),
-      ),
-      Option.match({
-        onNone: () => state,
-        onSome: ({ lastKey, lastPage }) => {
-          if (lastPage.endCursor !== undefined) {
-            // The last page is already pinned (the usual case, since pages
-            // pin themselves on first load): just append a new growing page.
-            const nextKey = String(state.nextPageKey);
+    (state) =>
+      pipe(
+        Option.Do,
+        Option.bind("lastKey", () => Array.last(state.pageKeys)),
+        Option.bind("lastPage", ({ lastKey }) =>
+          Record.get(state.pages, lastKey),
+        ),
+        Option.match({
+          onNone: () => state,
+          onSome: ({ lastKey, lastPage }) => {
+            if (lastPage.endCursor !== undefined) {
+              // The last page is already pinned (the usual case, since pages
+              // pin themselves on first load): just append a new growing page.
+              const nextKey = String(state.nextPageKey);
+              return {
+                nextPageKey: state.nextPageKey + 1,
+                pageKeys: Array.append(state.pageKeys, nextKey),
+                pages: Record.set(
+                  state.pages,
+                  nextKey,
+                  growingRequest(numItems, continueCursor, budget),
+                ),
+                ongoingSplits: state.ongoingSplits,
+              };
+            }
+            const pinnedKey = String(state.nextPageKey);
+            const nextKey = String(state.nextPageKey + 1);
             return {
-              nextPageKey: state.nextPageKey + 1,
-              pageKeys: Array.append(state.pageKeys, nextKey),
-              pages: Record.set(
+              nextPageKey: state.nextPageKey + 2,
+              pageKeys: state.pageKeys,
+              pages: pipe(
                 state.pages,
-                nextKey,
-                growingRequest(numItems, continueCursor, budget),
+                Record.set(pinnedKey, {
+                  ...lastPage,
+                  endCursor: continueCursor,
+                }),
+                Record.set(
+                  nextKey,
+                  growingRequest(numItems, continueCursor, budget),
+                ),
               ),
-              ongoingSplits: state.ongoingSplits,
+              ongoingSplits: Record.set(state.ongoingSplits, lastKey, [
+                pinnedKey,
+                nextKey,
+              ]),
             };
-          }
-          const pinnedKey = String(state.nextPageKey);
-          const nextKey = String(state.nextPageKey + 1);
-          return {
-            nextPageKey: state.nextPageKey + 2,
-            pageKeys: state.pageKeys,
-            pages: pipe(
-              state.pages,
-              Record.set(pinnedKey, { ...lastPage, endCursor: continueCursor }),
-              Record.set(
-                nextKey,
-                growingRequest(numItems, continueCursor, budget),
-              ),
-            ),
-            ongoingSplits: Record.set(state.ongoingSplits, lastKey, [
-              pinnedKey,
-              nextKey,
-            ]),
-          };
-        },
-      }),
-    );
+          },
+        }),
+      ),
+);
 
 /**
  * Split the page at `key` in two at `splitCursor`. The first replacement pins
@@ -204,29 +228,34 @@ export const loadMore =
  * page its original end (so a truncated `SplitRequired` page loses none of its
  * range), and for a growing page no end at all (it keeps growing).
  */
-export const split =
+export const split: {
+  (splitCursor: string): (key: string) => (state: State) => State;
+  (key: string, splitCursor: string): (state: State) => State;
+} = dual(
+  2,
   (key: string, splitCursor: string): ((state: State) => State) =>
-  (state) =>
-    Option.match(Record.get(state.pages, key), {
-      onNone: () => state,
-      onSome: (page) => {
-        const firstKey = String(state.nextPageKey);
-        const secondKey = String(state.nextPageKey + 1);
-        return {
-          nextPageKey: state.nextPageKey + 2,
-          pageKeys: state.pageKeys,
-          pages: pipe(
-            state.pages,
-            Record.set(firstKey, { ...page, endCursor: splitCursor }),
-            Record.set(secondKey, { ...page, cursor: splitCursor }),
-          ),
-          ongoingSplits: Record.set(state.ongoingSplits, key, [
-            firstKey,
-            secondKey,
-          ]),
-        };
-      },
-    });
+    (state) =>
+      Option.match(Record.get(state.pages, key), {
+        onNone: () => state,
+        onSome: (page) => {
+          const firstKey = String(state.nextPageKey);
+          const secondKey = String(state.nextPageKey + 1);
+          return {
+            nextPageKey: state.nextPageKey + 2,
+            pageKeys: state.pageKeys,
+            pages: pipe(
+              state.pages,
+              Record.set(firstKey, { ...page, endCursor: splitCursor }),
+              Record.set(secondKey, { ...page, cursor: splitCursor }),
+            ),
+            ongoingSplits: Record.set(state.ongoingSplits, key, [
+              firstKey,
+              secondKey,
+            ]),
+          };
+        },
+      }),
+);
 
 /**
  * Swap a completed split's replacements in for the original page.
@@ -257,10 +286,21 @@ export const isLastPageSplitting = (state: State): boolean =>
 /**
  * Build one subscription request per subscribed page.
  */
-export const pageRequests = <A>(
-  state: State,
-  f: (page: PageRequest) => A,
-): Record.ReadonlyRecord<string, A> => Record.map(state.pages, f);
+export const pageRequests: {
+  <A>(
+    f: (page: PageRequest) => A,
+  ): (state: State) => Record.ReadonlyRecord<string, A>;
+  <A>(
+    state: State,
+    f: (page: PageRequest) => A,
+  ): Record.ReadonlyRecord<string, A>;
+} = dual(
+  2,
+  <A>(
+    state: State,
+    f: (page: PageRequest) => A,
+  ): Record.ReadonlyRecord<string, A> => Record.map(state.pages, f),
+);
 
 /**
  * The per-page results a render observes, keyed like {@link pageRequests}.
@@ -326,78 +366,100 @@ const interpreted = (
  * `isInvalidCursorError` marks errors that call for a full pagination reset
  * rather than a failure (the cursor no longer matches the query).
  */
-export const interpret = (
-  state: State,
-  results: Record.ReadonlyRecord<string, PageResult | Error | undefined>,
-  options: {
-    readonly initialNumItems: number;
-    readonly isInvalidCursorError: (error: Error) => boolean;
-  },
-): Interpretation => {
-  const go = (
-    remaining: ReadonlyArray<string>,
-    items: ReadonlyArray<unknown>,
-    transitions: ReadonlyArray<(s: State) => State>,
-    lastResult: Option.Option<PageResult>,
-  ): Interpretation =>
-    Option.match(Array.head(remaining), {
-      onNone: () => interpreted(items, lastResult, transitions),
-      onSome: (pageKey) => {
-        const result = Record.get(results, pageKey).pipe(
-          Option.flatMap(Option.fromNullishOr),
-          Option.getOrUndefined,
-        );
-        if (result === undefined) {
-          // The trailing pages are still loading.
-          return interpreted(items, Option.none(), transitions);
-        }
-        if (result instanceof Error) {
-          return options.isInvalidCursorError(result)
-            ? { _tag: "ResetRequired" }
-            : { _tag: "Failed", error: result, items };
-        }
-
-        const hasResult = (key: string) =>
-          Record.get(results, key).pipe(
+export const interpret: {
+  (
+    results: Results,
+    options: {
+      readonly initialNumItems: number;
+      readonly isInvalidCursorError: (error: Error) => boolean;
+    },
+  ): (state: State) => Interpretation;
+  (
+    state: State,
+    results: Results,
+    options: {
+      readonly initialNumItems: number;
+      readonly isInvalidCursorError: (error: Error) => boolean;
+    },
+  ): Interpretation;
+} = dual(
+  3,
+  (
+    state: State,
+    results: Record.ReadonlyRecord<string, PageResult | Error | undefined>,
+    options: {
+      readonly initialNumItems: number;
+      readonly isInvalidCursorError: (error: Error) => boolean;
+    },
+  ): Interpretation => {
+    const go = (
+      remaining: ReadonlyArray<string>,
+      items: ReadonlyArray<unknown>,
+      transitions: ReadonlyArray<(s: State) => State>,
+      lastResult: Option.Option<PageResult>,
+    ): Interpretation =>
+      Option.match(Array.head(remaining), {
+        onNone: () => interpreted(items, lastResult, transitions),
+        onSome: (pageKey) => {
+          const result = Record.get(results, pageKey).pipe(
             Option.flatMap(Option.fromNullishOr),
-            Option.isSome,
+            Option.getOrUndefined,
           );
-        const ongoingSplit = Record.get(state.ongoingSplits, pageKey);
-        const nextTransitions = Option.match(ongoingSplit, {
-          onSome: (replacements) =>
-            // Swap the replacements in once all of them have results.
-            Array.every(replacements, hasResult)
-              ? Array.append(transitions, completeSplit(pageKey))
-              : transitions,
-          onNone: () =>
-            typeof result.splitCursor === "string" &&
-            (result.pageStatus === "SplitRecommended" ||
-              result.pageStatus === "SplitRequired" ||
-              result.page.length > options.initialNumItems)
-              ? Array.append(transitions, split(pageKey, result.splitCursor))
-              : // A loaded growing page pins itself to the range it just
-                // served (`END_CURSOR` once exhausted), so it stops being a
-                // sliding window that sheds items as new documents arrive.
-                Option.exists(
-                    Record.get(state.pages, pageKey),
-                    (request) => request.endCursor === undefined,
-                  ) && result.pageStatus !== "SplitRequired"
-                ? Array.append(transitions, pin(pageKey, result.continueCursor))
-                : transitions,
-        });
+          if (result === undefined) {
+            // The trailing pages are still loading.
+            return interpreted(items, Option.none(), transitions);
+          }
+          if (result instanceof Error) {
+            return options.isInvalidCursorError(result)
+              ? { _tag: "ResetRequired" }
+              : { _tag: "Failed", error: result, items };
+          }
 
-        // A force-split page couldn't be fetched in full: show the items
-        // before it and report the tail as still loading.
-        return result.pageStatus === "SplitRequired"
-          ? interpreted(items, Option.none(), nextTransitions)
-          : go(
-              Array.drop(remaining, 1),
-              Array.appendAll(items, result.page),
-              nextTransitions,
-              Option.some(result),
+          const hasResult = (key: string) =>
+            Record.get(results, key).pipe(
+              Option.flatMap(Option.fromNullishOr),
+              Option.isSome,
             );
-      },
-    });
+          const ongoingSplit = Record.get(state.ongoingSplits, pageKey);
+          const nextTransitions = Option.match(ongoingSplit, {
+            onSome: (replacements) =>
+              // Swap the replacements in once all of them have results.
+              Array.every(replacements, hasResult)
+                ? Array.append(transitions, completeSplit(pageKey))
+                : transitions,
+            onNone: () =>
+              typeof result.splitCursor === "string" &&
+              (result.pageStatus === "SplitRecommended" ||
+                result.pageStatus === "SplitRequired" ||
+                result.page.length > options.initialNumItems)
+                ? Array.append(transitions, split(pageKey, result.splitCursor))
+                : // A loaded growing page pins itself to the range it just
+                  // served (`END_CURSOR` once exhausted), so it stops being a
+                  // sliding window that sheds items as new documents arrive.
+                  Option.exists(
+                      Record.get(state.pages, pageKey),
+                      (request) => request.endCursor === undefined,
+                    ) && result.pageStatus !== "SplitRequired"
+                  ? Array.append(
+                      transitions,
+                      pin(pageKey, result.continueCursor),
+                    )
+                  : transitions,
+          });
 
-  return go(state.pageKeys, [], [], Option.none());
-};
+          // A force-split page couldn't be fetched in full: show the items
+          // before it and report the tail as still loading.
+          return result.pageStatus === "SplitRequired"
+            ? interpreted(items, Option.none(), nextTransitions)
+            : go(
+                Array.drop(remaining, 1),
+                Array.appendAll(items, result.page),
+                nextTransitions,
+                Option.some(result),
+              );
+        },
+      });
+
+    return go(state.pageKeys, [], [], Option.none());
+  },
+);

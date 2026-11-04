@@ -1,3 +1,4 @@
+import * as RecordEffect from "effect/Record";
 import { UnsupportedSchemaTypeError } from "@confect/core/SchemaToValidator";
 import { v } from "convex/values";
 import * as RegisteredFunction from "@confect/server/RegisteredFunction";
@@ -21,8 +22,10 @@ describe("runHandlerPromise", () => {
       const run = RegisteredFunction.runHandlerPromise(undefined);
       yield* Effect.promise(() => {
         globalThis.console = first;
-        const firstResult = run(
-          Deferred.await(release).pipe(Effect.andThen(Effect.log("first"))),
+        const firstResult = release.pipe(
+          Deferred.await,
+          Effect.andThen(Effect.log("first")),
+          run,
         );
         globalThis.console = second;
         const secondResult = run(Effect.log("second")).finally(() =>
@@ -88,7 +91,8 @@ describe("runHandlerPromise", () => {
               yield* Effect.logTrace("hidden trace");
               yield* Effect.logDebug("hidden debug");
               yield* Effect.logInfo("visible");
-              expect(yield* References.MinimumLogLevel).toBe("Info");
+              const MinimumLogLevelResult = yield* References.MinimumLogLevel;
+              expect(MinimumLogLevelResult).toBe("Info");
               return yield* Logger.CurrentLoggers;
             }).pipe(Effect.provideService(Console.Console, console)),
           ),
@@ -129,7 +133,11 @@ describe("toConvexDefinition", () => {
     const definition = RegisteredFunction.toConvexDefinition(prepared);
 
     expect(definition.handler).toBe(prepared.handler);
-    expect(Object.keys(definition)).toEqual(["handler", "args", "returns"]);
+    expect(RecordEffect.keys(definition)).toEqual([
+      "handler",
+      "args",
+      "returns",
+    ]);
     expect(prepared.args).not.toHaveBeenCalled();
     expect(prepared.returns).not.toHaveBeenCalled();
 
@@ -153,13 +161,13 @@ describe("toConvexDefinition", () => {
       enumerable: true,
       configurable: false,
     });
-    expect(Object.keys(prepared)).toEqual(["args", "returns", "handler"]);
+    expect(RecordEffect.keys(prepared)).toEqual(["args", "returns", "handler"]);
     expect(prepared.args).toBeTypeOf("function");
     expect(prepared.returns).toBeTypeOf("function");
   });
 
   it("propagates a compiler failure only when its validator is requested", () => {
-    const failure = new UnsupportedSchemaTypeError({ schemaType: "Symbol" });
+    const failure = UnsupportedSchemaTypeError.make({ schemaType: "Symbol" });
     const prepared = {
       args: vi.fn(() => {
         throw failure;

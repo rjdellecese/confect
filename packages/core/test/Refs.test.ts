@@ -1,3 +1,5 @@
+import * as Record from "effect/Record";
+import * as String from "effect/String";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { RegisteredMutation, RegisteredQuery } from "convex/server";
 import * as Schema from "effect/Schema";
@@ -57,7 +59,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
     const expectedRef = Ref.make("groups/notes", list);
 
-    expect(Object.keys(refs.public).sort()).toEqual([
+    expect(Record.keys(refs.public).sort(String.Order)).toEqual([
       "databaseReader",
       "email",
       "groups",
@@ -363,7 +365,7 @@ describe("make", () => {
 
 describe("middleware error unions", () => {
   it("adds them to Confect refs and keeps them off plain Convex refs", () => {
-    class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
+    class Blocked extends Schema.TaggedError<Blocked, {}>()("Blocked", {}) {}
 
     class GateMutations extends MiddlewareSpec.MiddlewareSpec<GateMutations>()(
       "GateMutations",
@@ -399,7 +401,7 @@ describe("middleware error unions", () => {
 });
 
 describe("make with middleware options", () => {
-  class AccessDenied extends Schema.TaggedError<AccessDenied>()(
+  class AccessDenied extends Schema.TaggedError<AccessDenied, {}>()(
     "AccessDenied",
     {},
   ) {}

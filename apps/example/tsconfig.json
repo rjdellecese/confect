@@ -1,11 +1,5 @@
 {
   "compilerOptions": {
-    "plugins": [
-      {
-        "name": "@effect/language-service",
-        "diagnostics": false
-      }
-    ],
     "composite": true,
     "lib": ["ESNext", "DOM"],
     "types": ["node"],

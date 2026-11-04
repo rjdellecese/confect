@@ -1,3 +1,4 @@
+import * as Arr from "effect/Array";
 import * as QueryStreamIndexPrefix from "@confect/server/QueryStreamIndexPrefix";
 import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
 import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
@@ -191,12 +192,20 @@ describe("QueryStreamIndexRange.apply", () => {
           ["text"]
         >()[tag]("text", value);
         const result = QueryStreamIndexRange.apply(range, receiver);
+        const applyToReceiver = QueryStreamIndexRange.apply(receiver);
+        const curriedResult = applyToReceiver(range);
         expectTypeOf(result).toEqualTypeOf<ConvexIndexRange>();
-        expectTypeOf(QueryStreamIndexRange.apply)
-          .parameter(1)
-          .toEqualTypeOf<ConvexIndexRangeBuilder<GenericDocument, string[]>>();
+        expectTypeOf(curriedResult).toEqualTypeOf<ConvexIndexRange>();
+        expectTypeOf(applyToReceiver)
+          .parameter(0)
+          .toEqualTypeOf<QueryStreamIndexRange.QueryStreamIndexRange>();
+        expectTypeOf<{}>().not.toExtend<
+          Parameters<typeof applyToReceiver>[0]
+        >();
         expect(result).toHaveProperty("calls", [[tag, "text", value]]);
         expect(result).not.toBe(receiver);
+        expect(curriedResult).toHaveProperty("calls", [[tag, "text", value]]);
+        expect(curriedResult).not.toBe(receiver);
         expect(receiver.calls).toEqual([]);
       }
     },
@@ -282,7 +291,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
       });
       expect(split).toEqual(
         Result.fail(
-          new QueryStreamIndexPrefix.IndexPrefixWidthMismatchError({
+          QueryStreamIndexPrefix.IndexPrefixWidthMismatchError.make({
             width: 1,
             actual: 2,
           }),
@@ -316,12 +325,12 @@ describe("QueryStreamIndexRange.fromBounds", () => {
       expectTypeOf(ranges).toEqualTypeOf<
         ReadonlyArray<QueryStreamIndexRange.QueryStreamIndexRange>
       >();
-      expect(ranges.map(QueryStreamIndexRange.toBounds)).toEqual(
-        order === "asc" ? expected : expected.toReversed(),
+      expect(Arr.map(ranges, QueryStreamIndexRange.toBounds)).toEqual(
+        order === "asc" ? expected : Arr.reverse(expected),
       );
-      expect(ranges.map(QueryStreamIndexRange.equalityPrefixLength)).toEqual([
-        2, 1, 2,
-      ]);
+      expect(
+        Arr.map(ranges, QueryStreamIndexRange.equalityPrefixLength),
+      ).toEqual([2, 1, 2]);
     },
   );
 
@@ -337,10 +346,10 @@ describe("QueryStreamIndexRange.fromBounds", () => {
     ]) {
       const bounds = QueryStreamIndexRange.toBounds(range);
       const ranges = fromBounds(["category", "score", "_id"], "asc", bounds);
-      expect(ranges.map(QueryStreamIndexRange.toBounds)).toEqual([bounds]);
-      expect(ranges.map(QueryStreamIndexRange.equalityPrefixLength)).toEqual([
-        QueryStreamIndexRange.equalityPrefixLength(range),
-      ]);
+      expect(Arr.map(ranges, QueryStreamIndexRange.toBounds)).toEqual([bounds]);
+      expect(
+        Arr.map(ranges, QueryStreamIndexRange.equalityPrefixLength),
+      ).toEqual([QueryStreamIndexRange.equalityPrefixLength(range)]);
     }
   });
 
@@ -353,9 +362,9 @@ describe("QueryStreamIndexRange.fromBounds", () => {
         [1, 0],
         [1, 1],
       ];
-      const ordered = order === "asc" ? keys : keys.toReversed();
-      const endpoints = [[], [0], [1], ...keys].flatMap((keyValues) =>
-        [true, false].map((inclusive) => ({ keyValues, inclusive })),
+      const ordered = order === "asc" ? keys : Arr.reverse(keys);
+      const endpoints = Arr.flatMap([[], [0], [1], ...keys], (keyValues) =>
+        Arr.map([true, false], (inclusive) => ({ keyValues, inclusive })),
       );
       const layout = Result.getOrThrow(Layout.fromIndex(["a", "_id"]));
       const admits = (bounds: QueryStreamKeyBounds.IndexBounds) => {
@@ -380,10 +389,13 @@ describe("QueryStreamIndexRange.fromBounds", () => {
           const bounds = { lower, upper };
           const ranges = fromBounds(["a", "b"], order, bounds);
           expect(
-            ranges.flatMap((range) =>
-              ordered.filter(admits(QueryStreamIndexRange.toBounds(range))),
+            Arr.flatMap(ranges, (range) =>
+              Arr.filter(
+                ordered,
+                admits(QueryStreamIndexRange.toBounds(range)),
+              ),
             ),
-          ).toEqual(ordered.filter(admits(bounds)));
+          ).toEqual(Arr.filter(ordered, admits(bounds)));
         }
     },
   );

@@ -6,7 +6,7 @@ import type {
 } from "convex/server";
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
-import { identity, pipe } from "effect/Function";
+import { identity, pipe, dual } from "effect/Function";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
@@ -246,41 +246,52 @@ interface ConvexRangeBuilder extends ConvexUpperBoundBuilder {
  *
  * @experimental
  */
-export const apply = (
-  self: QueryStreamIndexRange,
-  q: ConvexIndexRangeBuilder<GenericDocument, string[]>,
-): ConvexIndexRange => {
-  const { equalities, bounded } = self[TypeId];
-  // Convex tracks equality progress through a static field tuple. These paths
-  // are runtime data; the range model owns their ordering. Its runtime builder
-  // supports further equality calls, even when the SDK type has lost the tuple.
-  const prefix = Array.reduce(
-    equalities,
-    q as ConvexRangeBuilder,
-    (target, { fieldPath, value }) => target.eq(fieldPath, value),
-  );
-  return Option.match(bounded, {
-    onNone: () => prefix,
-    onSome: ({ fieldPath, interval }) => {
-      const lower = (
-        target: ConvexRangeBuilder,
-        endpoint: Endpoint,
-      ): ConvexUpperBoundBuilder =>
-        target[endpoint.inclusive ? "gte" : "gt"](fieldPath, endpoint.value);
-      const upper = (
-        target: ConvexUpperBoundBuilder,
-        endpoint: Endpoint,
-      ): ConvexIndexRange =>
-        target[endpoint.inclusive ? "lte" : "lt"](fieldPath, endpoint.value);
-      return Interval.$match(interval, {
-        Lower: ({ lower: endpoint }) => lower(prefix, endpoint),
-        Upper: ({ upper: endpoint }) => upper(prefix, endpoint),
-        Between: (endpoints) =>
-          upper(lower(prefix, endpoints.lower), endpoints.upper),
-      });
-    },
-  });
-};
+export const apply: {
+  (
+    q: ConvexIndexRangeBuilder<GenericDocument, string[]>,
+  ): (self: QueryStreamIndexRange) => ConvexIndexRange;
+  (
+    self: QueryStreamIndexRange,
+    q: ConvexIndexRangeBuilder<GenericDocument, string[]>,
+  ): ConvexIndexRange;
+} = dual(
+  2,
+  (
+    self: QueryStreamIndexRange,
+    q: ConvexIndexRangeBuilder<GenericDocument, string[]>,
+  ): ConvexIndexRange => {
+    const { equalities, bounded } = self[TypeId];
+    // Convex tracks equality progress through a static field tuple. These paths
+    // are runtime data; the range model owns their ordering. Its runtime builder
+    // supports further equality calls, even when the SDK type has lost the tuple.
+    const prefix = Array.reduce(
+      equalities,
+      q as ConvexRangeBuilder,
+      (target, { fieldPath, value }) => target.eq(fieldPath, value),
+    );
+    return Option.match(bounded, {
+      onNone: () => prefix,
+      onSome: ({ fieldPath, interval }) => {
+        const lower = (
+          target: ConvexRangeBuilder,
+          endpoint: Endpoint,
+        ): ConvexUpperBoundBuilder =>
+          target[endpoint.inclusive ? "gte" : "gt"](fieldPath, endpoint.value);
+        const upper = (
+          target: ConvexUpperBoundBuilder,
+          endpoint: Endpoint,
+        ): ConvexIndexRange =>
+          target[endpoint.inclusive ? "lte" : "lt"](fieldPath, endpoint.value);
+        return Interval.$match(interval, {
+          Lower: ({ lower: endpoint }) => lower(prefix, endpoint),
+          Upper: ({ upper: endpoint }) => upper(prefix, endpoint),
+          Between: (endpoints) =>
+            upper(lower(prefix, endpoints.lower), endpoints.upper),
+        });
+      },
+    });
+  },
+);
 
 // Convex index ranges have the shape `eq(f1) … eq(fn), gt/gte(fm)?,
 // lt/lte(fm)?`—every field path pinned except the last, which may carry two
@@ -366,98 +377,122 @@ const rangeFor = (
  *
  * @experimental
  */
-export const fromBounds = (
-  fieldPaths: ReadonlyArray<string>,
-  orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
-  indexBounds: QueryStreamKeyBounds.IndexBounds,
-): Result.Result<
-  ReadonlyArray<QueryStreamIndexRange>,
-  QueryStreamIndexPrefix.IndexPrefixWidthMismatchError
-> =>
-  Result.gen(function* () {
-    const lowerIndexEntries = QueryStreamIndexPrefix.entries(
-      yield* QueryStreamIndexPrefix.make(
-        fieldPaths,
-        indexBounds.lower.keyValues,
-      ),
-    );
-    const upperIndexEntries = QueryStreamIndexPrefix.entries(
-      yield* QueryStreamIndexPrefix.make(
-        fieldPaths,
-        indexBounds.upper.keyValues,
-      ),
-    );
-    // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
-    // upper inclusive at `k`—the half-open (k, k]—both cut at
-    // successor(k).
-    if (QueryStreamKeyBounds.isEmpty(indexBounds)) {
-      return [];
-    }
+export const fromBounds: {
+  (
+    orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
+    indexBounds: QueryStreamKeyBounds.IndexBounds,
+  ): (
+    fieldPaths: ReadonlyArray<string>,
+  ) => Result.Result<
+    ReadonlyArray<QueryStreamIndexRange>,
+    QueryStreamIndexPrefix.IndexPrefixWidthMismatchError
+  >;
+  (
+    fieldPaths: ReadonlyArray<string>,
+    orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
+    indexBounds: QueryStreamKeyBounds.IndexBounds,
+  ): Result.Result<
+    ReadonlyArray<QueryStreamIndexRange>,
+    QueryStreamIndexPrefix.IndexPrefixWidthMismatchError
+  >;
+} = dual(
+  3,
+  (
+    fieldPaths: ReadonlyArray<string>,
+    orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
+    indexBounds: QueryStreamKeyBounds.IndexBounds,
+  ): Result.Result<
+    ReadonlyArray<QueryStreamIndexRange>,
+    QueryStreamIndexPrefix.IndexPrefixWidthMismatchError
+  > =>
+    Result.gen(function* () {
+      const lowerIndexEntries = QueryStreamIndexPrefix.entries(
+        yield* QueryStreamIndexPrefix.make(
+          fieldPaths,
+          indexBounds.lower.keyValues,
+        ),
+      );
+      const upperIndexEntries = QueryStreamIndexPrefix.entries(
+        yield* QueryStreamIndexPrefix.make(
+          fieldPaths,
+          indexBounds.upper.keyValues,
+        ),
+      );
+      // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
+      // upper inclusive at `k`—the half-open (k, k]—both cut at
+      // successor(k).
+      if (QueryStreamKeyBounds.isEmpty(indexBounds)) {
+        return [];
+      }
 
-    const commonLength = pipe(
-      Array.zip(indexBounds.lower.keyValues, indexBounds.upper.keyValues),
-      Array.takeWhile(
-        ([lowerValue, upperValue]) =>
-          QueryStreamKeyValues.ValueOrder(lowerValue, upperValue) === 0,
-      ),
-      Array.length,
-    );
-    const equalities = pipe(
-      Array.take(lowerIndexEntries, commonLength),
-      Array.map(([fieldPath, value]) => ({ fieldPath, value })),
-    );
+      const commonLength = pipe(
+        Array.zip(indexBounds.lower.keyValues, indexBounds.upper.keyValues),
+        Array.takeWhile(
+          ([lowerValue, upperValue]) =>
+            QueryStreamKeyValues.ValueOrder(lowerValue, upperValue) === 0,
+        ),
+        Array.length,
+      );
+      const equalities = pipe(
+        Array.take(lowerIndexEntries, commonLength),
+        Array.map(([fieldPath, value]) => ({ fieldPath, value })),
+      );
 
-    const lower = peelBound(
-      Array.drop(lowerIndexEntries, commonLength),
-      indexBounds.lower.inclusive ? "gte" : "gt",
-    );
-    const upper = peelBound(
-      Array.drop(upperIndexEntries, commonLength),
-      indexBounds.upper.inclusive ? "lte" : "lt",
-    );
+      const lower = peelBound(
+        Array.drop(lowerIndexEntries, commonLength),
+        indexBounds.lower.inclusive ? "gte" : "gt",
+      );
+      const upper = peelBound(
+        Array.drop(upperIndexEntries, commonLength),
+        indexBounds.upper.inclusive ? "lte" : "lt",
+      );
 
-    const startIndexRanges = Array.map(lower.peeled, ({ indexEntries, tag }) =>
-      rangeFor(equalities, indexEntries, tag),
-    );
-    const endIndexRanges = Array.reverse(
-      Array.map(upper.peeled, ({ indexEntries, tag }) =>
-        rangeFor(equalities, indexEntries, tag),
-      ),
-    );
+      const startIndexRanges = Array.map(
+        lower.peeled,
+        ({ indexEntries, tag }) => rangeFor(equalities, indexEntries, tag),
+      );
+      const endIndexRanges = Array.reverse(
+        Array.map(upper.peeled, ({ indexEntries, tag }) =>
+          rangeFor(equalities, indexEntries, tag),
+        ),
+      );
 
-    const { indexEntries: lowerFinalIndexEntries, tag: lowerFinalTag } =
-      lower.final;
-    const { indexEntries: upperFinalIndexEntries, tag: upperFinalTag } =
-      upper.final;
-    const middleIndexRange =
-      Array.isReadonlyArrayNonEmpty(lowerFinalIndexEntries) &&
-      Array.isReadonlyArrayNonEmpty(upperFinalIndexEntries)
-        ? make({
-            equalities,
-            bounded: Option.some({
-              fieldPath: Array.headNonEmpty(lowerFinalIndexEntries)[0],
-              interval: Interval.Between({
-                lower: {
-                  value: Array.headNonEmpty(lowerFinalIndexEntries)[1],
-                  inclusive: lowerFinalTag === "gte",
-                },
-                upper: {
-                  value: Array.headNonEmpty(upperFinalIndexEntries)[1],
-                  inclusive: upperFinalTag === "lte",
-                },
+      const { indexEntries: lowerFinalIndexEntries, tag: lowerFinalTag } =
+        lower.final;
+      const { indexEntries: upperFinalIndexEntries, tag: upperFinalTag } =
+        upper.final;
+      const middleIndexRange =
+        Array.isReadonlyArrayNonEmpty(lowerFinalIndexEntries) &&
+        Array.isReadonlyArrayNonEmpty(upperFinalIndexEntries)
+          ? make({
+              equalities,
+              bounded: Option.some({
+                fieldPath: Array.headNonEmpty(lowerFinalIndexEntries)[0],
+                interval: Interval.Between({
+                  lower: {
+                    value: Array.headNonEmpty(lowerFinalIndexEntries)[1],
+                    inclusive: lowerFinalTag === "gte",
+                  },
+                  upper: {
+                    value: Array.headNonEmpty(upperFinalIndexEntries)[1],
+                    inclusive: upperFinalTag === "lte",
+                  },
+                }),
               }),
-            }),
-          })
-        : Array.isReadonlyArrayNonEmpty(lowerFinalIndexEntries)
-          ? rangeFor(equalities, lowerFinalIndexEntries, lowerFinalTag)
-          : rangeFor(equalities, upperFinalIndexEntries, upperFinalTag);
+            })
+          : Array.isReadonlyArrayNonEmpty(lowerFinalIndexEntries)
+            ? rangeFor(equalities, lowerFinalIndexEntries, lowerFinalTag)
+            : rangeFor(equalities, upperFinalIndexEntries, upperFinalTag);
 
-    const indexRanges = Array.appendAll(
-      Array.appendAll(startIndexRanges, Array.of(middleIndexRange)),
-      endIndexRanges,
-    );
-    return orderDirection === "desc" ? Array.reverse(indexRanges) : indexRanges;
-  });
+      const indexRanges = Array.appendAll(
+        Array.appendAll(startIndexRanges, Array.of(middleIndexRange)),
+        endIndexRanges,
+      );
+      return orderDirection === "desc"
+        ? Array.reverse(indexRanges)
+        : indexRanges;
+    }),
+);
 
 /**
  * Derive full-index bounds directly from the structural range.

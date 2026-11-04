@@ -1,3 +1,4 @@
+import * as Array from "effect/Array";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
@@ -14,12 +15,12 @@ class CurrentUser extends Context.Service<
   { readonly name: string }
 >()("@confect/core/test/MiddlewareSpec.test/CurrentUser") {}
 
-class NotSignedIn extends Schema.TaggedError<NotSignedIn>()(
+class NotSignedIn extends Schema.TaggedError<NotSignedIn, {}>()(
   "NotSignedIn",
   {},
 ) {}
 
-class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
   id: Schema.String,
 }) {}
 
@@ -205,7 +206,7 @@ describe("GroupSpec.middleware", () => {
       .addFunction(mutation)
       .middleware(MutationOnly);
 
-    expect(group.middlewareSpecs.map((m) => m.key)).toStrictEqual([
+    expect(Array.map(group.middlewareSpecs, (m) => m.key)).toStrictEqual([
       "RequireUser",
       "MutationOnly",
     ]);
@@ -332,7 +333,7 @@ describe("FunctionSpec.middleware", () => {
   it("appends middleware to the function in attachment order", () => {
     const covered = mutation.middleware(MutationOnly).middleware(RequireUser);
 
-    expect(covered.middlewareSpecs.map((m) => m.key)).toStrictEqual([
+    expect(Array.map(covered.middlewareSpecs, (m) => m.key)).toStrictEqual([
       "MutationOnly",
       "RequireUser",
     ]);

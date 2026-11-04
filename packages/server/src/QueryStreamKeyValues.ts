@@ -1,3 +1,4 @@
+import { dual } from "effect/Function";
 import {
   convexToJson,
   jsonToConvex,
@@ -74,8 +75,15 @@ export type QueryStreamKeyValues = typeof QueryStreamKeyValues.Type;
  *
  * @experimental
  */
-export const ValueOrder: Order_.Order<KeyValue> = Order_.make(
-  (self, that) => Math.sign(compareValues(self, that)) as -1 | 0 | 1,
+export const ValueOrder: {
+  (that: KeyValue): (self: KeyValue) => -1 | 0 | 1;
+  (self: KeyValue, that: KeyValue): -1 | 0 | 1;
+} = dual(
+  2,
+  Order_.make(
+    (self: KeyValue, that: KeyValue) =>
+      Math.sign(compareValues(self, that)) as -1 | 0 | 1,
+  ),
 );
 
 const AscendingOrder = Order_.Array(ValueOrder);
@@ -96,17 +104,28 @@ export const Order = (
 /**
  * @experimental
  */
-export const extract = (
-  encoded: Record.ReadonlyRecord<string, unknown>,
-  keyPaths: ReadonlyArray<ReadonlyArray<string>>,
-): QueryStreamKeyValues =>
-  Array.map(keyPaths, (path) =>
-    Array.reduce(
-      path,
-      encoded as unknown,
-      (value, segment) =>
-        (value as Record.ReadonlyRecord<string, unknown> | undefined)?.[
-          segment
-        ],
-    ),
-  ) as QueryStreamKeyValues;
+export const extract: {
+  (
+    keyPaths: ReadonlyArray<ReadonlyArray<string>>,
+  ): (encoded: Record.ReadonlyRecord<string, unknown>) => QueryStreamKeyValues;
+  (
+    encoded: Record.ReadonlyRecord<string, unknown>,
+    keyPaths: ReadonlyArray<ReadonlyArray<string>>,
+  ): QueryStreamKeyValues;
+} = dual(
+  2,
+  (
+    encoded: Record.ReadonlyRecord<string, unknown>,
+    keyPaths: ReadonlyArray<ReadonlyArray<string>>,
+  ): QueryStreamKeyValues =>
+    Array.map(keyPaths, (path) =>
+      Array.reduce(
+        path,
+        encoded as unknown,
+        (value, segment) =>
+          (value as Record.ReadonlyRecord<string, unknown> | undefined)?.[
+            segment
+          ],
+      ),
+    ) as QueryStreamKeyValues,
+);

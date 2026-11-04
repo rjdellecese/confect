@@ -12,11 +12,16 @@
   ],
   "jsPlugins": [
     "confect-oxlint-rules",
-    { "name": "jsdoc-style", "specifier": "eslint-plugin-jsdoc" }
+    {
+      "name": "jsdoc-style",
+      "specifier": "eslint-plugin-jsdoc"
+    }
   ],
   "settings": {
     "jsdoc": {
-      "tagNamePreference": { "typeParam": "typeParam" }
+      "tagNamePreference": {
+        "typeParam": "typeParam"
+      }
     }
   },
   "options": {
@@ -52,12 +57,22 @@
         "preserveMainDescriptionPostDelimiter": true
       }
     ],
-    "jsdoc-style/no-multi-asterisks": ["error", { "allowWhitespace": true }],
+    "jsdoc-style/no-multi-asterisks": [
+      "error",
+      {
+        "allowWhitespace": true
+      }
+    ],
     "jsdoc-style/require-asterisk-prefix": "error",
     "jsdoc-style/require-hyphen-before-param-description": [
       "error",
       "always",
-      { "tags": { "template": "always", "typeParam": "always" } }
+      {
+        "tags": {
+          "template": "always",
+          "typeParam": "always"
+        }
+      }
     ],
     "no-unused-vars": [
       "error",
@@ -76,49 +91,156 @@
     "typescript/no-unnecessary-type-assertion": "off",
     "typescript/no-unnecessary-type-arguments": "off",
     "typescript/no-unnecessary-type-parameters": "off",
-    "effecttsgo/any-unknown-in-error-context": "error",
-    "effecttsgo/deterministic-keys": "error",
-    "effecttsgo/strict-effect-provide": "off",
-    "effecttsgo/async-function": "warn",
-    "effecttsgo/crypto-random-uuid": "warn",
-    "effecttsgo/crypto-random-uuid-in-effect": "warn",
-    "effecttsgo/extends-native-error": "warn",
-    "effecttsgo/global-console": "warn",
-    "effecttsgo/global-console-in-effect": "warn",
-    "effecttsgo/global-date": "warn",
-    "effecttsgo/global-date-in-effect": "warn",
-    "effecttsgo/global-fetch": "warn",
-    "effecttsgo/global-fetch-in-effect": "warn",
-    "effecttsgo/global-random": "warn",
-    "effecttsgo/global-random-in-effect": "warn",
-    "effecttsgo/global-timers": "warn",
-    "effecttsgo/global-timers-in-effect": "warn",
-    "effecttsgo/instance-of-schema": "warn",
-    "effecttsgo/new-promise": "warn",
-    "effecttsgo/node-builtin-import": "warn",
-    "effecttsgo/process-env": "warn",
-    "effecttsgo/process-env-in-effect": "warn",
-    "effecttsgo/schema-class-missing-brand": "off",
-    "effecttsgo/unstable-api-usage": "off",
-    "effecttsgo/effect-try-without-catch": "off",
     "typescript/no-generated-empty-object-type": "off",
-    "effecttsgo/global-json-in-effect": "warn",
-    "effecttsgo/match-to-result-or-option": "off"
+    "effecttsgo/abort-controller-in-effect": "error",
+    "effecttsgo/acquire-release-disposable": "error",
+    "effecttsgo/all-of-map-to-for-each": "error",
+    "effecttsgo/any-unknown-in-error-context": "error",
+    "effecttsgo/api-stability-leak": "error",
+    "effecttsgo/async-function": "error",
+    "effecttsgo/catch-all-tag-dispatch-to-catch-tag": "error",
+    "effecttsgo/catch-all-to-map-error": "error",
+    "effecttsgo/catch-chain-to-first-success-of": "error",
+    "effecttsgo/catch-conditional-refail-to-catch-if": "error",
+    "effecttsgo/catch-die-to-or-die": "error",
+    "effecttsgo/catch-if-tag-to-catch-tag": "error",
+    "effecttsgo/catch-refail-to-tap-error": "error",
+    "effecttsgo/catch-tag-to-catch-reason": "error",
+    "effecttsgo/catch-to-ignore": "error",
+    "effecttsgo/catch-to-or-else-succeed": "error",
+    "effecttsgo/catch-unfailable-effect": "error",
+    "effecttsgo/class-self-mismatch": "error",
+    "effecttsgo/crypto-random-uuid": "error",
+    "effecttsgo/crypto-random-uuid-in-effect": "error",
+    "effecttsgo/deterministic-keys": "error",
+    "effecttsgo/duplicate-package": "error",
+    "effecttsgo/effect-do-notation": "error",
+    "effecttsgo/effect-fn-iife": "error",
+    "effecttsgo/effect-fn-implicit-any": "error",
+    "effecttsgo/effect-fn-opportunity": "error",
+    "effecttsgo/effect-gen-uses-adapter": "error",
+    "effecttsgo/effect-in-failure": "error",
+    "effecttsgo/effect-in-void-success": "error",
+    "effecttsgo/effect-map-flatten": "error",
+    "effecttsgo/effect-map-void": "error",
+    "effecttsgo/effect-sleep-zero-to-yield-now": "error",
+    "effecttsgo/effect-succeed-with-undefined": "error",
+    "effecttsgo/effect-succeed-with-void": "error",
+    "effecttsgo/effect-try-without-catch": "error",
+    "effecttsgo/error-payload-shadows-name": "error",
+    "effecttsgo/experimental-api-usage": "error",
+    "effecttsgo/extends-native-error": "error",
+    "effecttsgo/fail-cause-to-constructor": "error",
+    "effecttsgo/flat-map-conditional-to-filter-or-fail": "error",
+    "effecttsgo/flat-map-identity-to-flatten": "error",
+    "effecttsgo/flat-map-ignored-param-to-and-then": "error",
+    "effecttsgo/flat-map-to-map": "error",
+    "effecttsgo/flat-map-to-tap": "error",
+    "effecttsgo/floating-effect": "error",
+    "effecttsgo/floating-effect-in-vitest": "error",
+    "effecttsgo/generic-effect-services": "error",
+    "effecttsgo/global-console": "error",
+    "effecttsgo/global-console-in-effect": "error",
+    "effecttsgo/global-date": "error",
+    "effecttsgo/global-date-in-effect": "error",
+    "effecttsgo/global-error-in-effect-catch": "error",
+    "effecttsgo/global-error-in-effect-failure": "error",
+    "effecttsgo/global-fetch": "error",
+    "effecttsgo/global-fetch-in-effect": "error",
+    "effecttsgo/global-json": "error",
+    "effecttsgo/global-json-in-effect": "error",
+    "effecttsgo/global-random": "error",
+    "effecttsgo/global-random-in-effect": "error",
+    "effecttsgo/global-timers": "error",
+    "effecttsgo/global-timers-in-effect": "error",
+    "effecttsgo/instance-of-schema": "error",
+    "effecttsgo/layer-merge-all-with-dependencies": "error",
+    "effecttsgo/lazy-effect": "error",
+    "effecttsgo/lazy-promise-in-effect-sync": "error",
+    "effecttsgo/leaking-requirements": "error",
+    "effecttsgo/manual-metric-tap-to-track": "error",
+    "effecttsgo/map-const-to-as": "error",
+    "effecttsgo/map-map-error-to-map-both": "error",
+    "effecttsgo/map-some-catch-no-such-element": "error",
+    "effecttsgo/map-some-to-as-some": "error",
+    "effecttsgo/match-boolean-to-is-success": "error",
+    "effecttsgo/match-effect-to-map-both": "error",
+    "effecttsgo/match-effect-to-match": "error",
+    "effecttsgo/match-to-result-or-option": "error",
+    "effecttsgo/missed-pipeable-opportunity": "error",
+    "effecttsgo/missing-effect-context": "error",
+    "effecttsgo/missing-effect-error": "error",
+    "effecttsgo/missing-effect-service-dependency": "error",
+    "effecttsgo/missing-layer-context": "error",
+    "effecttsgo/missing-pipeable-signature": "error",
+    "effecttsgo/missing-return-yield-star": "error",
+    "effecttsgo/missing-star-in-yield-effect-gen": "error",
+    "effecttsgo/multiple-catch-tag": "error",
+    "effecttsgo/multiple-effect-provide": "error",
+    "effecttsgo/nested-effect-gen-yield": "error",
+    "effecttsgo/new-promise": "error",
+    "effecttsgo/new-schema-class": "error",
+    "effecttsgo/node-builtin-import": "error",
+    "effecttsgo/non-object-effect-service-type": "error",
+    "effecttsgo/obsolete-match-import": "error",
+    "effecttsgo/obsolete-schema-import": "error",
+    "effecttsgo/option-match-to-from-option": "error",
+    "effecttsgo/outdated-api": "error",
+    "effecttsgo/overridden-schema-constructor": "error",
+    "effecttsgo/prefer-barrel-import": "error",
+    "effecttsgo/prefer-effect-array": "error",
+    "effecttsgo/prefer-effect-record": "error",
+    "effecttsgo/prefer-effect-string": "error",
+    "effecttsgo/prefer-namespace-import": "error",
+    "effecttsgo/prefer-schema-over-json": "error",
+    "effecttsgo/prefer-schema-tagged-error": "error",
+    "effecttsgo/prefer-schema-type-property": "error",
+    "effecttsgo/prefer-succeed-some-or-none": "error",
+    "effecttsgo/prefer-typed-schema-decoder": "error",
+    "effecttsgo/prefer-unsafe-constructor": "error",
+    "effecttsgo/process-env": "error",
+    "effecttsgo/process-env-in-effect": "error",
+    "effecttsgo/promise-in-effect-success": "error",
+    "effecttsgo/provide-layer-succeed-to-provide-service": "error",
+    "effecttsgo/provide-merge-all-to-array": "error",
+    "effecttsgo/race-first-with-sleep-to-timeout": "error",
+    "effecttsgo/redundant-map-error": "error",
+    "effecttsgo/redundant-or-die": "error",
+    "effecttsgo/redundant-schema-tag-identifier": "error",
+    "effecttsgo/result-match-to-from-result": "error",
+    "effecttsgo/return-effect-in-gen": "error",
+    "effecttsgo/run-effect-inside-effect": "error",
+    "effecttsgo/run-of-exit-to-run-exit": "error",
+    "effecttsgo/schema-class-missing-brand": "error",
+    "effecttsgo/schema-class-object-literal": "error",
+    "effecttsgo/schema-literal-non-finite": "error",
+    "effecttsgo/schema-number": "error",
+    "effecttsgo/schema-opaque-instance-member": "error",
+    "effecttsgo/schema-struct-with-tag": "error",
+    "effecttsgo/schema-sync": "error",
+    "effecttsgo/schema-sync-in-effect": "error",
+    "effecttsgo/schema-union-of-literals": "error",
+    "effecttsgo/scope-in-layer-effect": "error",
+    "effecttsgo/service-not-as-class": "error",
+    "effecttsgo/strict-boolean-expressions": "error",
+    "effecttsgo/strict-effect-provide": "error",
+    "effecttsgo/suspend-fail-to-fail-sync": "error",
+    "effecttsgo/sync-to-succeed": "error",
+    "effecttsgo/timeout-catch-tag-to-timeout-or-else": "error",
+    "effecttsgo/try-catch-in-effect-gen": "error",
+    "effecttsgo/type-union-to-schema-union": "error",
+    "effecttsgo/unknown-in-effect-catch": "error",
+    "effecttsgo/unnecessary-arrow-block": "error",
+    "effecttsgo/unnecessary-effect-gen": "error",
+    "effecttsgo/unnecessary-fail-yieldable-error": "error",
+    "effecttsgo/unnecessary-pipe": "error",
+    "effecttsgo/unnecessary-pipe-chain": "error",
+    "effecttsgo/unnecessary-typeof-type": "error",
+    "effecttsgo/unsafe-effect-type-assertion": "error",
+    "effecttsgo/unstable-api-usage": "error",
+    "effecttsgo/yield-in-call-argument": "error"
   },
   "overrides": [
-    {
-      "files": ["packages/js/test/HttpClient.test.ts"],
-      "rules": { "effecttsgo/run-effect-inside-effect": "off" }
-    },
-    {
-      "files": [
-        "packages/cli/src/Evaluation.ts",
-        "packages/cli/test/Evaluation.test.ts"
-      ],
-      "rules": {
-        "effecttsgo/node-builtin-import": "off"
-      }
-    },
     {
       "files": ["**/*.{ts,tsx,mts,cts}"],
       "rules": {
@@ -131,7 +253,12 @@
       "rules": {
         "unicorn/filename-case": [
           "error",
-          { "cases": { "camelCase": true, "pascalCase": true } }
+          {
+            "cases": {
+              "camelCase": true,
+              "pascalCase": true
+            }
+          }
         ]
       }
     },

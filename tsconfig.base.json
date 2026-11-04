@@ -23,12 +23,7 @@
     "noImplicitThis": true,
     "noUncheckedIndexedAccess": false,
     "strictNullChecks": true,
-    "removeComments": false,
-    "plugins": [
-      {
-        "name": "@effect/language-service",
-        "diagnostics": false
-      }
-    ]
-  }
+    "removeComments": false
+  },
+  "extends": "./tsconfig.effect.json"
 }

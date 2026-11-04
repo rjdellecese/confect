@@ -19,6 +19,9 @@ class ApiGroup extends HttpApiGroup.make("notes")
   .annotate(OpenApi.Title, "Notes")
   .annotate(OpenApi.Description, "Operations on notes.") {}
 
+/**
+ * @internal
+ */
 export class Api extends HttpApi.make("Api")
   .annotate(OpenApi.Title, "Confect Example")
   .annotate(
@@ -51,5 +54,7 @@ const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
 
 /**
  * Registers {@link Api}'s routes, with its group handlers provided.
+ *
+ * @internal
  */
 export const layer = HttpApiBuilder.layer(Api).pipe(Layer.provide(ApiLive));

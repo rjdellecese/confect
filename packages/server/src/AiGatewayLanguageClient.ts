@@ -13,24 +13,33 @@ export {
 
 /**
  * The client service configured for Convex AI gateway language models.
+ *
+ * @stability unstable
  */
 export const AiGatewayLanguageClient = OpenAiClient.OpenAiClient;
 export type AiGatewayLanguageClient = OpenAiClient.OpenAiClient;
 
 /**
  * Construct a language client using the current Effect HTTP client.
+ *
+ * @stability unstable
  */
 export const make: Effect.Effect<
   OpenAiClient.Service,
   AiGatewayServiceToken.AiGatewayError,
   HttpClient.HttpClient
 > = InternalAiGatewayLanguageClient.make.pipe(
-  Effect.provide(AiGatewayServiceToken.layer),
+  Effect.provideService(
+    AiGatewayServiceToken.AiGatewayServiceToken,
+    AiGatewayServiceToken.service,
+  ),
 );
 
 /**
  * Provide the AI gateway language model client using the current Effect HTTP
  * client.
+ *
+ * @stability unstable
  */
 export const layer: Layer.Layer<
   AiGatewayLanguageClient,

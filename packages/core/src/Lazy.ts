@@ -1,3 +1,5 @@
+import { dual } from "effect/Function";
+
 /**
  * Install a lazy memoised property on `target`. The first access runs
  * `compute()` and replaces the getter with a plain, non-writable data property
@@ -15,23 +17,36 @@
  * `@confect/core`'s lazy `FunctionSpec` schemas and lazy `Table`
  * `Fields`/`Doc`), so there is no chance of the two drifting apart.
  */
-export const defineProperty = <T extends object, K extends PropertyKey>(
-  target: T,
-  key: K,
-  compute: () => unknown,
-): void => {
-  Object.defineProperty(target, key, {
-    configurable: true,
-    enumerable: true,
-    get(this: T) {
-      const value = compute();
-      Object.defineProperty(this, key, {
-        value,
-        writable: false,
-        enumerable: true,
-        configurable: false,
-      });
-      return value;
-    },
-  });
-};
+export const defineProperty: {
+  <K extends PropertyKey>(
+    key: K,
+    compute: () => unknown,
+  ): <T extends object>(target: T) => void;
+  <T extends object, K extends PropertyKey>(
+    target: T,
+    key: K,
+    compute: () => unknown,
+  ): void;
+} = dual(
+  3,
+  <T extends object, K extends PropertyKey>(
+    target: T,
+    key: K,
+    compute: () => unknown,
+  ): void => {
+    Object.defineProperty(target, key, {
+      configurable: true,
+      enumerable: true,
+      get(this: T) {
+        const value = compute();
+        Object.defineProperty(this, key, {
+          value,
+          writable: false,
+          enumerable: true,
+          configurable: false,
+        });
+        return value;
+      },
+    });
+  },
+);
