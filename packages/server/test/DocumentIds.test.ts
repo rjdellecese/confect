@@ -1,3 +1,5 @@
+import * as Layer from "effect/Layer";
+import * as Arr from "effect/Array";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as DocumentIds from "@confect/server/DocumentIds";
 import * as Table from "@confect/server/Table";
@@ -58,29 +60,37 @@ describe("DocumentIds", () => {
       expect(native.normalizeId).not.toHaveBeenCalled();
 
       return Effect.gen(function* () {
-        const ids = yield* DocumentIds.DocumentIds<typeof databaseSchema>();
-        const parsed = ids.parse("notes", "notes:id");
-        const identified = ids.identify("_storage:id");
-        expect(native.normalizeId).not.toHaveBeenCalled();
-        expect(native.system.normalizeId).not.toHaveBeenCalled();
-        expect(yield* parsed).toEqual(Option.some("notes:id"));
-        expect(yield* parsed).toEqual(Option.some("notes:id"));
-        expect(native.normalizeId).toHaveBeenCalledTimes(2);
-        expect(yield* identified).toEqual(
-          Option.some({ table: "_storage", id: "_storage:id" }),
-        );
-        expect(
-          vi
-            .mocked(native.normalizeId)
-            .mock.contexts.every((ctx) => ctx === native),
-        ).toBe(true);
-        expect(
-          vi
-            .mocked(native.system.normalizeId)
-            .mock.contexts.every((ctx) => ctx === native.system),
-        ).toBe(true);
-        expect(fields).not.toHaveBeenCalled();
-      }).pipe(Effect.provide(layer));
+        const services = yield* Layer.build(layer);
+        return yield* Effect.gen(function* () {
+          const ids = yield* DocumentIds.DocumentIds<typeof databaseSchema>();
+          const parsed = ids.parse("notes", "notes:id");
+          const identified = ids.identify("_storage:id");
+          expect(native.normalizeId).not.toHaveBeenCalled();
+          expect(native.system.normalizeId).not.toHaveBeenCalled();
+          const parsedResult = yield* parsed;
+          expect(parsedResult).toEqual(Option.some("notes:id"));
+          const parsedResult2 = yield* parsed;
+          expect(parsedResult2).toEqual(Option.some("notes:id"));
+          expect(native.normalizeId).toHaveBeenCalledTimes(2);
+          const identifiedResult = yield* identified;
+          expect(identifiedResult).toEqual(
+            Option.some({ table: "_storage", id: "_storage:id" }),
+          );
+          expect(
+            Arr.every(
+              vi.mocked(native.normalizeId).mock.contexts,
+              (ctx) => ctx === native,
+            ),
+          ).toBe(true);
+          expect(
+            Arr.every(
+              vi.mocked(native.system.normalizeId).mock.contexts,
+              (ctx) => ctx === native.system,
+            ),
+          ).toBe(true);
+          expect(fields).not.toHaveBeenCalled();
+        }).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped);
     },
   );
 
@@ -95,10 +105,10 @@ describe("DocumentIds", () => {
       Effect.gen(function* () {
         const ids = DocumentIds.make(schema, makeNative());
         const input = `${table}:id`;
-        expect(yield* ids.parse(table, input)).toEqual(Option.some(input));
-        expect(yield* ids.identify(input)).toEqual(
-          Option.some({ table, id: input }),
-        );
+        const parseResult = yield* ids.parse(table, input);
+        expect(parseResult).toEqual(Option.some(input));
+        const identifyResult = yield* ids.identify(input);
+        expect(identifyResult).toEqual(Option.some({ table, id: input }));
       }),
   );
 
@@ -107,8 +117,10 @@ describe("DocumentIds", () => {
     (input) =>
       Effect.gen(function* () {
         const ids = DocumentIds.make(schema, makeNative());
-        expect(yield* ids.parse("notes", input)).toEqual(Option.none());
-        expect(yield* ids.identify(input)).toEqual(Option.none());
+        const parseResult2 = yield* ids.parse("notes", input);
+        expect(parseResult2).toEqual(Option.none());
+        const identifyResult2 = yield* ids.identify(input);
+        expect(identifyResult2).toEqual(Option.none());
       }),
   );
 
@@ -117,9 +129,12 @@ describe("DocumentIds", () => {
     () =>
       Effect.gen(function* () {
         const ids = DocumentIds.make(schema, makeNative());
-        expect(yield* ids.parse("notes", "users:id")).toEqual(Option.none());
-        expect(yield* ids.parse("notes", "legacy")).toEqual(Option.none());
-        expect(yield* ids.identify("legacy")).toEqual(Option.none());
+        const parseResult3 = yield* ids.parse("notes", "users:id");
+        expect(parseResult3).toEqual(Option.none());
+        const parseResult4 = yield* ids.parse("notes", "legacy");
+        expect(parseResult4).toEqual(Option.none());
+        const identifyResult3 = yield* ids.identify("legacy");
+        expect(identifyResult3).toEqual(Option.none());
       }),
   );
 
@@ -129,7 +144,8 @@ describe("DocumentIds", () => {
       Effect.gen(function* () {
         const native = makeNative();
         const ids = DocumentIds.make(schema, native);
-        expect(yield* ids.identify("missing")).toEqual(Option.none());
+        const identifyResult4 = yield* ids.identify("missing");
+        expect(identifyResult4).toEqual(Option.none());
         expect(native.normalizeId).toHaveBeenCalledTimes(2);
         expect(vi.mocked(native.normalizeId).mock.calls).toEqual(
           expect.arrayContaining([
@@ -151,7 +167,8 @@ describe("DocumentIds", () => {
         );
         vi.mocked(native.normalizeId).mockImplementation(normalize);
         vi.mocked(native.system.normalizeId).mockImplementation(normalize);
-        expect(Option.isSome(yield* ids.identify("matching-id"))).toBe(true);
+        const identifyResult5 = yield* ids.identify("matching-id");
+        expect(Option.isSome(identifyResult5)).toBe(true);
         expect(normalize).toHaveBeenCalledTimes(1);
       }),
   );
@@ -160,7 +177,8 @@ describe("DocumentIds", () => {
     Effect.gen(function* () {
       const native = makeNative();
       const ids = DocumentIds.make(DatabaseSchema.make({}), native);
-      expect(yield* ids.identify("_storage:id")).toEqual(
+      const identifyResult6 = yield* ids.identify("_storage:id");
+      expect(identifyResult6).toEqual(
         Option.some({ table: "_storage", id: "_storage:id" }),
       );
       expect(native.normalizeId).not.toHaveBeenCalled();
@@ -181,21 +199,18 @@ describe("DocumentIds", () => {
         throw failure;
       });
       const ids = DocumentIds.make(schema, native);
-      expect(
-        yield* ids
-          .parse("notes", "notes:id")
-          .pipe(Effect.catchDefect(Effect.succeed)),
-      ).toBe(failure);
-      expect(
-        yield* ids
-          .identify("notes:id")
-          .pipe(Effect.catchDefect(Effect.succeed)),
-      ).toBe(failure);
-      expect(
-        yield* ids
-          .parse("_storage", "_storage:id")
-          .pipe(Effect.catchDefect(Effect.succeed)),
-      ).toBe(failure);
+      const pipeResult = yield* ids
+        .parse("notes", "notes:id")
+        .pipe(Effect.catchDefect(Effect.succeed));
+      expect(pipeResult).toBe(failure);
+      const pipeResult2 = yield* ids
+        .identify("notes:id")
+        .pipe(Effect.catchDefect(Effect.succeed));
+      expect(pipeResult2).toBe(failure);
+      const pipeResult3 = yield* ids
+        .parse("_storage", "_storage:id")
+        .pipe(Effect.catchDefect(Effect.succeed));
+      expect(pipeResult3).toBe(failure);
     }),
   );
 
@@ -203,33 +218,45 @@ describe("DocumentIds", () => {
     "preserves table-specific IDs and correlated identification results",
     () =>
       Effect.gen(function* () {
-        const ids = yield* DocumentIds.DocumentIds<typeof schema>();
-        expectTypeOf(ids.parse("notes", "input")).toEqualTypeOf<
-          Effect.Effect<Option.Option<GenericId<"notes">>>
-        >();
-        expectTypeOf(ids.parse("_storage", "input")).toEqualTypeOf<
-          Effect.Effect<Option.Option<GenericId<"_storage">>>
-        >();
-        expectTypeOf<"unknown">().not.toExtend<
-          Parameters<typeof ids.parse>[0]
-        >();
-        expectTypeOf<keyof typeof ids>().toEqualTypeOf<"parse" | "identify">();
-        const identified = yield* ids.identify("users:id");
-        expectTypeOf(identified).toEqualTypeOf<
-          Option.Option<
-            | { readonly table: "notes"; readonly id: GenericId<"notes"> }
-            | { readonly table: "users"; readonly id: GenericId<"users"> }
-            | { readonly table: "_storage"; readonly id: GenericId<"_storage"> }
-            | {
-                readonly table: "_scheduled_functions";
-                readonly id: GenericId<"_scheduled_functions">;
-              }
-          >
-        >();
-        expect(Option.isSome(identified)).toBe(true);
-        if (Option.isSome(identified) && identified.value.table === "users") {
-          expectTypeOf(identified.value.id).toEqualTypeOf<GenericId<"users">>();
-        }
-      }).pipe(Effect.provide(DocumentIds.layer(schema, makeNative()))),
+        const services = yield* Layer.build(
+          DocumentIds.layer(schema, makeNative()),
+        );
+        return yield* Effect.gen(function* () {
+          const ids = yield* DocumentIds.DocumentIds<typeof schema>();
+          expectTypeOf(ids.parse("notes", "input")).toEqualTypeOf<
+            Effect.Effect<Option.Option<GenericId<"notes">>>
+          >();
+          expectTypeOf(ids.parse("_storage", "input")).toEqualTypeOf<
+            Effect.Effect<Option.Option<GenericId<"_storage">>>
+          >();
+          expectTypeOf<"unknown">().not.toExtend<
+            Parameters<typeof ids.parse>[0]
+          >();
+          expectTypeOf<keyof typeof ids>().toEqualTypeOf<
+            "parse" | "identify"
+          >();
+          const identified = yield* ids.identify("users:id");
+          expectTypeOf(identified).toEqualTypeOf<
+            Option.Option<
+              | { readonly table: "notes"; readonly id: GenericId<"notes"> }
+              | { readonly table: "users"; readonly id: GenericId<"users"> }
+              | {
+                  readonly table: "_storage";
+                  readonly id: GenericId<"_storage">;
+                }
+              | {
+                  readonly table: "_scheduled_functions";
+                  readonly id: GenericId<"_scheduled_functions">;
+                }
+            >
+          >();
+          expect(Option.isSome(identified)).toBe(true);
+          if (Option.isSome(identified) && identified.value.table === "users") {
+            expectTypeOf(identified.value.id).toEqualTypeOf<
+              GenericId<"users">
+            >();
+          }
+        }).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped),
   );
 });

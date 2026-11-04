@@ -1,3 +1,4 @@
+import { dual } from "effect/Function";
 import { type GroupSpec, Identifier } from "@confect/core";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -26,7 +27,7 @@ export const GroupSummary = Schema.Struct({
   runtime: Schema.Literals(["Convex", "Node"]),
   functionNames: Schema.Array(Schema.NonEmptyString),
 });
-export interface GroupSummary extends Schema.Schema.Type<typeof GroupSummary> {}
+export type GroupSummary = typeof GroupSummary.Type;
 
 export interface GroupTree {
   readonly runtime: "Convex" | "Node";
@@ -70,10 +71,10 @@ export interface GenerationSnapshot extends Snapshot {}
 
 const Entries = Schema.Array(Schema.Tuple([Schema.String, GroupTree]));
 const CanonicalSpecPath = SpecModulePath.SpecModulePath.check(
-  Schema.makeFilter((path) => !path.includes("\\")),
+  Schema.makeFilter((path) => !String.includes("\\")(path)),
 );
 const rootPath = (path: SpecModulePath.SpecModulePath) =>
-  GroupPath.make(String.split(path.slice(0, -".spec.ts".length), "/"));
+  GroupPath.make(String.split(String.slice(0, -".spec.ts".length)(path), "/"));
 
 const parseTree = (
   relativePath: SpecModulePath.SpecModulePath,
@@ -87,7 +88,7 @@ const parseTree = (
           Identifier.validateConfectFunctionIdentifier(name);
       },
       catch: () =>
-        new SnapshotError({
+        SnapshotError.make({
           reason: "NoncanonicalFunctionNames",
           relativePath,
           pathSegments: path.pathSegments,
@@ -98,18 +99,18 @@ const parseTree = (
       tree.functionNames.length
     ) {
       return yield* Result.fail(
-        new SnapshotError({
+        SnapshotError.make({
           reason: "NoncanonicalFunctionNames",
           relativePath,
           pathSegments: path.pathSegments,
         }),
       );
     }
-    for (const [name, child] of Object.entries(tree.groups)) {
+    for (const [name, child] of Record.toEntries(tree.groups)) {
       yield* Result.try({
         try: () => Identifier.validateConfectFunctionIdentifier(name),
         catch: () =>
-          new SnapshotError({
+          SnapshotError.make({
             reason: "NoncanonicalPath",
             relativePath,
             pathSegments: [...path.pathSegments, name],
@@ -132,14 +133,13 @@ const fromEntries = (
       const relativePath = yield* Schema.decodeResult(CanonicalSpecPath)(
         key,
       ).pipe(
-        Result.mapError(
-          (cause) =>
-            new SnapshotError({
-              reason: "NoncanonicalPath",
-              relativePath: key,
-              pathSegments: [],
-              cause,
-            }),
+        Result.mapError((cause) =>
+          SnapshotError.make({
+            reason: "NoncanonicalPath",
+            relativePath: key,
+            pathSegments: [],
+            cause,
+          }),
         ),
       );
       const path = rootPath(relativePath);
@@ -149,7 +149,7 @@ const fromEntries = (
             Identifier.validateConfectFunctionIdentifier(segment);
         },
         catch: () =>
-          new SnapshotError({
+          SnapshotError.make({
             reason: "NoncanonicalPath",
             relativePath,
             pathSegments: path.pathSegments,
@@ -157,7 +157,7 @@ const fromEntries = (
       });
       if (HashMap.has(leaves, relativePath)) {
         return yield* Result.fail(
-          new SnapshotError({
+          SnapshotError.make({
             reason: "DuplicateLeaf",
             relativePath,
             pathSegments: path.pathSegments,
@@ -177,14 +177,13 @@ export const parse = (
   SnapshotError | ParentChildNameCollisionError
 > =>
   Schema.decodeUnknownResult(Entries)(input).pipe(
-    Result.mapError(
-      (cause) =>
-        new SnapshotError({
-          reason: "InvalidShape",
-          relativePath: "",
-          pathSegments: [],
-          cause,
-        }),
+    Result.mapError((cause) =>
+      SnapshotError.make({
+        reason: "InvalidShape",
+        relativePath: "",
+        pathSegments: [],
+        cause,
+      }),
     ),
     Result.flatMap(fromEntries),
   );
@@ -226,20 +225,39 @@ const summarize = (group: GroupSpec.AnyWithProps): GroupTree => ({
   groups: Record.map(group.groups, summarize),
 });
 
-export const update = (
-  snapshot: GenerationSnapshot,
-  leaves: ReadonlyArray<LoadedLeafModule>,
-): Result.Result<
-  GenerationSnapshot,
-  SnapshotError | ParentChildNameCollisionError
-> =>
-  Result.gen(function* () {
-    if (leaves.length === 0) return snapshot;
-    const replacement = yield* fromLoadedLeaves(leaves);
-    return yield* Snapshot.parseLeaves(
-      HashMap.union(snapshot.leaves, replacement.leaves),
-    );
-  });
+export const update: {
+  (
+    leaves: ReadonlyArray<LoadedLeafModule>,
+  ): (
+    snapshot: GenerationSnapshot,
+  ) => Result.Result<
+    GenerationSnapshot,
+    SnapshotError | ParentChildNameCollisionError
+  >;
+  (
+    snapshot: GenerationSnapshot,
+    leaves: ReadonlyArray<LoadedLeafModule>,
+  ): Result.Result<
+    GenerationSnapshot,
+    SnapshotError | ParentChildNameCollisionError
+  >;
+} = dual(
+  2,
+  (
+    snapshot: GenerationSnapshot,
+    leaves: ReadonlyArray<LoadedLeafModule>,
+  ): Result.Result<
+    GenerationSnapshot,
+    SnapshotError | ParentChildNameCollisionError
+  > =>
+    Result.gen(function* () {
+      if (leaves.length === 0) return snapshot;
+      const replacement = yield* fromLoadedLeaves(leaves);
+      return yield* Snapshot.parseLeaves(
+        HashMap.union(snapshot.leaves, replacement.leaves),
+      );
+    }),
+);
 
 export const fromLoadedLeaves = (
   leaves: ReadonlyArray<LoadedLeafModule>,
@@ -248,10 +266,11 @@ export const fromLoadedLeaves = (
   SnapshotError | ParentChildNameCollisionError
 > =>
   parse(
-    leaves.map(
+    Array.map(
+      leaves,
       (leaf) =>
         [
-          leaf.relativePath.replaceAll("\\", "/"),
+          String.replaceAll("\\", "/")(leaf.relativePath),
           summarize(leaf.spec),
         ] as const,
     ),
@@ -268,7 +287,7 @@ const groups = (snapshot: GenerationSnapshot): ReadonlyArray<GroupSummary> => {
       functionNames: Array.sort(tree.functionNames, String.Order),
     },
     ...Array.flatMap(
-      Array.sort(Object.keys(tree.groups), String.Order),
+      Array.sort(Record.keys(tree.groups), String.Order),
       (name: string) => visit(GroupPath.append(path, name), tree.groups[name]!),
     ),
   ];
@@ -283,7 +302,7 @@ export const functionPaths = (
   FunctionPaths.FunctionPaths.make(
     HashSet.fromIterable(
       Array.flatMap(groups(snapshot), (group) =>
-        group.functionNames.map((name) =>
+        Array.map(group.functionNames, (name) =>
           FunctionPath.FunctionPath.make({ groupPath: group.path, name }),
         ),
       ),
@@ -304,38 +323,53 @@ export interface ModulePlan {
   readonly changed: ReadonlyArray<GroupSummary>;
 }
 
-export const plan = (
-  snapshot: GenerationSnapshot,
-  existing: Iterable<GroupPath.GroupPath>,
-): ModulePlan => {
-  const current = generatedGroups(snapshot);
-  return {
-    removed: Array.fromIterable(existing).filter(
-      (path) => !HashMap.has(current, path),
-    ),
-    changed: Array.fromIterable(HashMap.values(current)),
-  };
-};
+export const plan: {
+  (
+    existing: Iterable<GroupPath.GroupPath>,
+  ): (snapshot: GenerationSnapshot) => ModulePlan;
+  (
+    snapshot: GenerationSnapshot,
+    existing: Iterable<GroupPath.GroupPath>,
+  ): ModulePlan;
+} = dual(
+  2,
+  (
+    snapshot: GenerationSnapshot,
+    existing: Iterable<GroupPath.GroupPath>,
+  ): ModulePlan => {
+    const current = generatedGroups(snapshot);
+    return {
+      removed: Array.filter(
+        Array.fromIterable(existing),
+        (path) => !HashMap.has(current, path),
+      ),
+      changed: current.pipe(HashMap.values, Array.fromIterable),
+    };
+  },
+);
 
 const equivalentGroup = Schema.toEquivalence(GroupSummary);
 
-export const diff = (
-  before: GenerationSnapshot,
-  after: GenerationSnapshot,
-): ModulePlan => {
-  const previous = generatedGroups(before);
-  const current = generatedGroups(after);
-  return {
-    removed: Array.filter(
-      HashMap.keys(previous),
-      (path) => !HashMap.has(current, path),
-    ),
-    changed: Array.filter(HashMap.values(current), (group) => {
-      const old = HashMap.get(previous, group.path);
-      return Option.isNone(old) || !equivalentGroup(old.value, group);
-    }),
-  };
-};
+export const diff: {
+  (after: GenerationSnapshot): (before: GenerationSnapshot) => ModulePlan;
+  (before: GenerationSnapshot, after: GenerationSnapshot): ModulePlan;
+} = dual(
+  2,
+  (before: GenerationSnapshot, after: GenerationSnapshot): ModulePlan => {
+    const previous = generatedGroups(before);
+    const current = generatedGroups(after);
+    return {
+      removed: Array.filter(
+        HashMap.keys(previous),
+        (path) => !HashMap.has(current, path),
+      ),
+      changed: Array.filter(HashMap.values(current), (group) => {
+        const old = HashMap.get(previous, group.path);
+        return Option.isNone(old) || !equivalentGroup(old.value, group);
+      }),
+    };
+  },
+);
 
 const parseNoParentChildNameCollisions = (
   leaves: HashMap.HashMap<SpecModulePath.SpecModulePath, GroupTree>,
@@ -347,19 +381,19 @@ const parseNoParentChildNameCollisions = (
     const segments = rootPath(childPath).pathSegments;
     for (let depth = 1; depth < segments.length; depth++) {
       const parentPath = SpecModulePath.SpecModulePath.make(
-        `${segments.slice(0, depth).join("/")}.spec.ts`,
+        `${Array.join(segments.slice(0, depth), "/")}.spec.ts`,
       );
       const parent = HashMap.get(leaves, parentPath);
       if (Option.isNone(parent)) continue;
       const collisionName = segments[depth]!;
       const collisionKind = parent.value.functionNames.includes(collisionName)
         ? "function"
-        : Object.hasOwn(parent.value.groups, collisionName)
+        : Record.has(parent.value.groups, collisionName)
           ? "group"
           : undefined;
       if (collisionKind !== undefined) {
         return Result.fail(
-          new ParentChildNameCollisionError({
+          ParentChildNameCollisionError.make({
             parentSpecPath: parentPath,
             childSpecPath: childPath,
             collisionName,

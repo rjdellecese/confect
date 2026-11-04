@@ -1,3 +1,4 @@
+import * as Str from "effect/String";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { ConvexHttpClient } from "convex/browser";
 import * as Context from "effect/Context";
@@ -13,15 +14,15 @@ import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 
-class BackendNotReadyError extends Schema.TaggedError<BackendNotReadyError>()(
-  "BackendNotReadyError",
-  { message: Schema.String },
-) {}
+class BackendNotReadyError extends Schema.TaggedError<
+  BackendNotReadyError,
+  { readonly brand: unique symbol }
+>()("BackendNotReadyError", { message: Schema.String }) {}
 
-class BackendVersionLookupError extends Schema.TaggedError<BackendVersionLookupError>()(
-  "BackendVersionLookupError",
-  { message: Schema.String },
-) {}
+class BackendVersionLookupError extends Schema.TaggedError<
+  BackendVersionLookupError,
+  { readonly brand: unique symbol }
+>()("BackendVersionLookupError", { message: Schema.String }) {}
 
 export class LocalBackend extends Context.Service<
   LocalBackend,
@@ -89,14 +90,14 @@ const make = Effect.gen(function* () {
         handle.stdout.pipe(Stream.decodeText(), Stream.splitLines),
         handle.stderr.pipe(Stream.decodeText(), Stream.splitLines),
       ).pipe(
-        Stream.takeUntil((line) => line.includes(READY_LINE)),
+        Stream.takeUntil((line) => Str.includes(READY_LINE)(line)),
         Stream.runFold(
           () => ({ readySeen: false, versionLookupFailed: false }),
           (state, line) => ({
-            readySeen: line.includes(READY_LINE),
+            readySeen: Str.includes(READY_LINE)(line),
             versionLookupFailed:
               state.versionLookupFailed ||
-              line.includes("Failed to fetch latest backend version") ||
+              Str.includes("Failed to fetch latest backend version")(line) ||
               /version\.convex\.dev returned (?:429|5\d{2}):/.test(line),
           }),
         ),
@@ -108,11 +109,11 @@ const make = Effect.gen(function* () {
 
       const exitCode = yield* handle.exitCode;
       if (exitCode !== 0 && versionLookupFailed) {
-        return yield* new BackendVersionLookupError({
+        return yield* BackendVersionLookupError.make({
           message: `convex dev exited with code ${exitCode} after a transient backend version lookup failure`,
         });
       }
-      return yield* new BackendNotReadyError({
+      return yield* BackendNotReadyError.make({
         message: `convex dev exited with code ${exitCode} before printing "${READY_LINE}"`,
       });
     }).pipe(
@@ -133,7 +134,7 @@ const make = Effect.gen(function* () {
       duration: "90 seconds",
       orElse: () =>
         Effect.fail(
-          new BackendNotReadyError({
+          BackendNotReadyError.make({
             message: `convex dev did not print "${READY_LINE}" within 90s (cold-start binary download?)`,
           }),
         ),
@@ -141,6 +142,9 @@ const make = Effect.gen(function* () {
   );
 });
 
+/**
+ * @internal
+ */
 export const layer = Layer.effect(LocalBackend, make).pipe(
   Layer.provide(NodeServices.layer),
 );

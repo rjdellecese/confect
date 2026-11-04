@@ -1,3 +1,4 @@
+import * as Layer from "effect/Layer";
 import { FunctionSpec, Ref } from "@confect/core";
 import { MutationTransactionContext as BarrelControls } from "@confect/server";
 import * as MutationTransactionContext from "@confect/server/MutationTransactionContext";
@@ -8,7 +9,10 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
 
-class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedError<
+  NotFound,
+  { readonly brand: unique symbol }
+>()("NotFound", {
   id: Schema.String,
 }) {}
 
@@ -40,65 +44,75 @@ describe("MutationTransactionContext", () => {
       expect(runQuery).not.toHaveBeenCalled();
       expect(runMutation).not.toHaveBeenCalled();
       return Effect.gen(function* () {
-        const controls =
-          yield* MutationTransactionContext.MutationTransactionContext;
-        const args = { count: 1 };
-        const queryOptions = { transactionLimits: {}, useStaleSnapshot: false };
-        const mutationOptions = { transactionLimits: {} };
-        const query = controls.runQuery(queryRef, args, queryOptions);
-        const mutation = controls.runMutation(
-          mutationRef,
-          args,
-          mutationOptions,
-        );
-        expectTypeOf(query).toEqualTypeOf<
-          Effect.Effect<number, NotFound | Schema.SchemaError>
-        >();
-        expectTypeOf(mutation).toEqualTypeOf<
-          Effect.Effect<number, NotFound | Schema.SchemaError>
-        >();
-        expect(runQuery).not.toHaveBeenCalled();
-        expect(runMutation).not.toHaveBeenCalled();
-        expect(yield* query).toBe(2);
-        expect(yield* mutation).toBe(3);
-        expect(yield* query).toBe(2);
-        expect(yield* mutation).toBe(3);
-        expect(runQuery).toHaveBeenCalledWith(
-          Ref.getFunctionReference(queryRef),
-          { count: "1" },
-          queryOptions,
-        );
-        expect(runMutation).toHaveBeenCalledWith(
-          Ref.getFunctionReference(mutationRef),
-          { count: "1" },
-          mutationOptions,
-        );
-        expect(runQuery.mock.calls[0]?.[2]).toBe(queryOptions);
-        expect(runMutation.mock.calls[0]?.[2]).toBe(mutationOptions);
-        expect(runQuery.mock.contexts).toEqual([ctx, ctx]);
-        expect(runMutation.mock.contexts).toEqual([ctx, ctx]);
-        expect(args).toEqual({ count: 1 });
-        expect(queryOptions).toEqual({
-          transactionLimits: {},
-          useStaleSnapshot: false,
-        });
-        expect(mutationOptions).toEqual({ transactionLimits: {} });
-        const check = () => {
-          expectTypeOf(mutationRef).not.toExtend<
-            Parameters<typeof controls.runQuery>[0]
-          >();
-          expectTypeOf(queryRef).not.toExtend<
-            Parameters<typeof controls.runMutation>[0]
-          >();
-          expectTypeOf(
-            controls.runMutation(mutationRef, args, {
-              // @ts-expect-error Mutation controls do not accept stale-snapshot mutation options.
-              useStaleSnapshot: false,
-            }),
+        const services = yield* Layer.build(layer);
+        return yield* Effect.gen(function* () {
+          const controls =
+            yield* MutationTransactionContext.MutationTransactionContext;
+          const args = { count: 1 };
+          const queryOptions = {
+            transactionLimits: {},
+            useStaleSnapshot: false,
+          };
+          const mutationOptions = { transactionLimits: {} };
+          const query = controls.runQuery(queryRef, args, queryOptions);
+          const mutation = controls.runMutation(
+            mutationRef,
+            args,
+            mutationOptions,
           );
-        };
-        expectTypeOf(check).toBeFunction();
-      }).pipe(Effect.provide(layer));
+          expectTypeOf(query).toEqualTypeOf<
+            Effect.Effect<number, NotFound | Schema.SchemaError>
+          >();
+          expectTypeOf(mutation).toEqualTypeOf<
+            Effect.Effect<number, NotFound | Schema.SchemaError>
+          >();
+          expect(runQuery).not.toHaveBeenCalled();
+          expect(runMutation).not.toHaveBeenCalled();
+          const queryResult = yield* query;
+          expect(queryResult).toBe(2);
+          const mutationResult = yield* mutation;
+          expect(mutationResult).toBe(3);
+          const queryResult2 = yield* query;
+          expect(queryResult2).toBe(2);
+          const mutationResult2 = yield* mutation;
+          expect(mutationResult2).toBe(3);
+          expect(runQuery).toHaveBeenCalledWith(
+            Ref.getFunctionReference(queryRef),
+            { count: "1" },
+            queryOptions,
+          );
+          expect(runMutation).toHaveBeenCalledWith(
+            Ref.getFunctionReference(mutationRef),
+            { count: "1" },
+            mutationOptions,
+          );
+          expect(runQuery.mock.calls[0]?.[2]).toBe(queryOptions);
+          expect(runMutation.mock.calls[0]?.[2]).toBe(mutationOptions);
+          expect(runQuery.mock.contexts).toEqual([ctx, ctx]);
+          expect(runMutation.mock.contexts).toEqual([ctx, ctx]);
+          expect(args).toEqual({ count: 1 });
+          expect(queryOptions).toEqual({
+            transactionLimits: {},
+            useStaleSnapshot: false,
+          });
+          expect(mutationOptions).toEqual({ transactionLimits: {} });
+          const check = () => {
+            expectTypeOf(mutationRef).not.toExtend<
+              Parameters<typeof controls.runQuery>[0]
+            >();
+            expectTypeOf(queryRef).not.toExtend<
+              Parameters<typeof controls.runMutation>[0]
+            >();
+            expectTypeOf(
+              controls.runMutation(mutationRef, args, {
+                // @ts-expect-error Mutation controls do not accept stale-snapshot mutation options.
+                useStaleSnapshot: false,
+              }),
+            );
+          };
+          expectTypeOf(check).toBeFunction();
+        }).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped);
     },
   );
 
@@ -112,29 +126,36 @@ describe("MutationTransactionContext", () => {
         .mockResolvedValueOnce("invalid")
         .mockRejectedValueOnce(defect);
       return Effect.gen(function* () {
-        const controls =
-          yield* MutationTransactionContext.MutationTransactionContext;
-        const run = (count: number) =>
-          kind === "query"
-            ? controls.runQuery(queryRef, { count }, { useStaleSnapshot: true })
-            : controls.runMutation(mutationRef, { count }, {});
-        expect(yield* Effect.flip(run(1))).toEqual(new NotFound({ id: "abc" }));
-        expect(yield* Effect.flip(run(1))).toBeInstanceOf(Schema.SchemaError);
-        expect(yield* run(1).pipe(Effect.catchDefect(Effect.succeed))).toBe(
-          defect,
-        );
-        expect(yield* Effect.flip(run(Number.NaN))).toBeInstanceOf(
-          Schema.SchemaError,
-        );
-        expect(native).toHaveBeenCalledTimes(3);
-      }).pipe(
-        Effect.provide(
+        const services = yield* Layer.build(
           MutationTransactionContext.layer({
             runQuery: native,
             runMutation: native,
           }),
-        ),
-      );
+        );
+        return yield* Effect.gen(function* () {
+          const controls =
+            yield* MutationTransactionContext.MutationTransactionContext;
+          const run = (count: number) =>
+            kind === "query"
+              ? controls.runQuery(
+                  queryRef,
+                  { count },
+                  { useStaleSnapshot: true },
+                )
+              : controls.runMutation(mutationRef, { count }, {});
+          const flipResult = yield* Effect.flip(run(1));
+          expect(flipResult).toEqual(NotFound.make({ id: "abc" }));
+          const flipResult2 = yield* Effect.flip(run(1));
+          expect(flipResult2).toBeInstanceOf(Schema.SchemaError);
+          const pipeResult = yield* run(1).pipe(
+            Effect.catchDefect(Effect.succeed),
+          );
+          expect(pipeResult).toBe(defect);
+          const flipResult3 = yield* Effect.flip(run(Number.NaN));
+          expect(flipResult3).toBeInstanceOf(Schema.SchemaError);
+          expect(native).toHaveBeenCalledTimes(3);
+        }).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped);
     },
   );
 });

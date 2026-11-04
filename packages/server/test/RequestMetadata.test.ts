@@ -1,3 +1,4 @@
+import * as Layer from "effect/Layer";
 import { RequestMetadata as BarrelRequestMetadata } from "@confect/server";
 import * as RequestMetadata from "@confect/server/RequestMetadata";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -46,17 +47,24 @@ describe("RequestMetadata", () => {
       expect(getRequestMetadata).not.toHaveBeenCalled();
 
       return Effect.gen(function* () {
-        const metadata = yield* RequestMetadata.RequestMetadata;
-        const get = metadata.get();
+        const services = yield* Layer.build(layer);
+        return yield* Effect.gen(function* () {
+          const metadata = yield* RequestMetadata.RequestMetadata;
+          const get = metadata.get();
 
-        expectTypeOf(get).toEqualTypeOf<Effect.Effect<NativeRequestMetadata>>();
-        expect(getRequestMetadata).not.toHaveBeenCalled();
-        expect(yield* get).toBe(first);
-        expect(yield* get).toBe(second);
-        expect(getRequestMetadata).toHaveBeenCalledTimes(2);
-        expect(getRequestMetadata.mock.contexts[0]).toBe(meta);
-        expect(getRequestMetadata.mock.contexts[1]).toBe(meta);
-      }).pipe(Effect.provide(layer));
+          expectTypeOf(get).toEqualTypeOf<
+            Effect.Effect<NativeRequestMetadata>
+          >();
+          expect(getRequestMetadata).not.toHaveBeenCalled();
+          const getResult = yield* get;
+          expect(getResult).toBe(first);
+          const getResult2 = yield* get;
+          expect(getResult2).toBe(second);
+          expect(getRequestMetadata).toHaveBeenCalledTimes(2);
+          expect(getRequestMetadata.mock.contexts[0]).toBe(meta);
+          expect(getRequestMetadata.mock.contexts[1]).toBe(meta);
+        }).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped);
     },
   );
 
@@ -67,10 +75,14 @@ describe("RequestMetadata", () => {
     } satisfies Pick<MutationMeta, "getRequestMetadata">;
 
     return Effect.gen(function* () {
-      const metadata = yield* RequestMetadata.RequestMetadata;
-      expect(
-        yield* metadata.get().pipe(Effect.catchDefect(Effect.succeed)),
-      ).toBe(failure);
-    }).pipe(Effect.provide(RequestMetadata.layer(meta)));
+      const services = yield* Layer.build(RequestMetadata.layer(meta));
+      return yield* Effect.gen(function* () {
+        const metadata = yield* RequestMetadata.RequestMetadata;
+        const pipeResult = yield* metadata
+          .get()
+          .pipe(Effect.catchDefect(Effect.succeed));
+        expect(pipeResult).toBe(failure);
+      }).pipe(Effect.provideContext(services));
+    }).pipe(Effect.scoped);
   });
 });

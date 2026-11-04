@@ -155,6 +155,9 @@ export type ConvexRuntimeAction<
   R = never,
 > = Base<FunctionSpec_, ActionServices<DatabaseSchema_> | R>;
 
+/**
+ * @stability unstable
+ */
 export type NodeRuntimeAction<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends

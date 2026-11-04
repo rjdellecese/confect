@@ -1,4 +1,4 @@
-import { pipe } from "effect/Function";
+import { dual, pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
@@ -26,11 +26,12 @@ import { ProjectRoot } from "./ProjectRoot";
  */
 export const formatPath = (relativePath: string): string => {
   const lastSep = Math.max(
-    relativePath.lastIndexOf("/"),
-    relativePath.lastIndexOf("\\"),
+    Option.getOrElse(String.lastIndexOf("/")(relativePath), () => -1),
+    Option.getOrElse(String.lastIndexOf("\\")(relativePath), () => -1),
   );
-  const dir = lastSep < 0 ? "" : relativePath.slice(0, lastSep + 1);
-  const leaf = lastSep < 0 ? relativePath : relativePath.slice(lastSep + 1);
+  const dir = lastSep < 0 ? "" : String.slice(0, lastSep + 1)(relativePath);
+  const leaf =
+    lastSep < 0 ? relativePath : String.slice(lastSep + 1)(relativePath);
   return Ansi.blackBright(dir) + leaf;
 };
 
@@ -51,10 +52,19 @@ const logFile = (char: string, color: Ansi.Style) =>
     );
   });
 
+/**
+ * @internal
+ */
 export const logFileAdded = logFile("+", Ansi.green);
 
+/**
+ * @internal
+ */
 export const logFileRemoved = logFile("-", Ansi.red);
 
+/**
+ * @internal
+ */
 export const logFileModified = logFile("~", Ansi.yellow);
 
 // --- Function subline logs ---
@@ -126,17 +136,28 @@ const formatBuildMessage = (
 /**
  * Render a list of esbuild messages into a styled, gutter-prefixed block.
  */
-export const formatEsbuildMessages = (
-  errors: readonly esbuild.Message[],
-  formattedMessages: readonly string[],
-): string =>
-  pipe(
-    formattedMessages,
-    Array.map((message, i) => formatBuildMessage(errors[i], message)),
-    Array.join(""),
-    String.trimEnd,
-    withErrorGutterBlock,
-  );
+export const formatEsbuildMessages: {
+  (
+    formattedMessages: readonly string[],
+  ): (errors: readonly esbuild.Message[]) => string;
+  (
+    errors: readonly esbuild.Message[],
+    formattedMessages: readonly string[],
+  ): string;
+} = dual(
+  2,
+  (
+    errors: readonly esbuild.Message[],
+    formattedMessages: readonly string[],
+  ): string =>
+    pipe(
+      formattedMessages,
+      Array.map((message, i) => formatBuildMessage(errors[i], message)),
+      Array.join(""),
+      String.trimEnd,
+      withErrorGutterBlock,
+    ),
+);
 
 const renderImportFailedError = (error: ImportFailedError): string => {
   const causeMessage = Predicate.isError(error.cause)
@@ -185,7 +206,7 @@ export const renderBuildError = (error: BuildError): string =>
   );
 
 export const logBuildError = (error: BuildError) =>
-  Console.error(renderBuildError(error));
+  pipe(error, renderBuildError, Console.error);
 
 /**
  * Render a flat list of esbuild messages as a single error block with a generic

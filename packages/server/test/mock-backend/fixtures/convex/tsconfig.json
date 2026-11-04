@@ -1,4 +1,5 @@
 {
+  "extends": "../../../../../../tsconfig.effect.json",
   /* This TypeScript project config describes the environment that
    * Convex functions run in and is used to typecheck them.
    * You can modify it, but some settings are required to use Convex.

@@ -1,3 +1,4 @@
+import { dual } from "effect/Function";
 import type {
   ExpressionOrValue,
   FilterBuilder,
@@ -38,72 +39,92 @@ export type OrderedQuery<
   ) => Effect.Effect<PaginationResult<Doc>, Document.DocumentDecodeError>;
 };
 
-export const make = <Table_ extends Table.AnyWithProps>(
-  query: ConvexOrderedQuery<
-    TableInfo.ConvexTableInfo<TableInfo.TableInfo<Table_>>
-  >,
-  table: Table_,
-): OrderedQuery<TableInfo.TableInfo<Table_>> => {
-  type TableInfo_ = TableInfo.TableInfo<Table_>;
-  type OrderedQueryFunction<
-    FunctionName extends keyof OrderedQuery<TableInfo_>,
-  > = OrderedQuery<TableInfo_>[FunctionName];
+export const make = dual<
+  <Table_ extends Table.AnyWithProps>(
+    table: Table_,
+  ) => (
+    query: ConvexOrderedQuery<
+      TableInfo.ConvexTableInfo<TableInfo.TableInfo<Table_>>
+    >,
+  ) => OrderedQuery<TableInfo.TableInfo<Table_>>,
+  <Table_ extends Table.AnyWithProps>(
+    query: ConvexOrderedQuery<
+      TableInfo.ConvexTableInfo<TableInfo.TableInfo<Table_>>
+    >,
+    table: Table_,
+  ) => OrderedQuery<TableInfo.TableInfo<Table_>>
+>(
+  2,
+  <Table_ extends Table.AnyWithProps>(
+    query: ConvexOrderedQuery<
+      TableInfo.ConvexTableInfo<TableInfo.TableInfo<Table_>>
+    >,
+    table: Table_,
+  ): OrderedQuery<TableInfo.TableInfo<Table_>> => {
+    type TableInfo_ = TableInfo.TableInfo<Table_>;
+    type OrderedQueryFunction<
+      FunctionName extends keyof OrderedQuery<TableInfo_>,
+    > = OrderedQuery<TableInfo_>[FunctionName];
 
-  const streamEncoded = Stream.fromAsyncIterable(query, identity).pipe(
-    Stream.orDie,
-  );
-
-  const stream: OrderedQueryFunction<"stream"> = () =>
-    pipe(streamEncoded, Stream.mapEffect(Document.decode(table)));
-
-  const collect: OrderedQueryFunction<"collect"> = () =>
-    pipe(stream(), Stream.runCollect);
-
-  const take: OrderedQueryFunction<"take"> = (n: number) =>
-    pipe(
-      Effect.promise(() => query.take(n)),
-      Effect.flatMap((encoded) =>
-        Effect.forEach(encoded, Document.decode(table)),
-      ),
+    const streamEncoded = Stream.fromAsyncIterable(query, identity).pipe(
+      Stream.orDie,
     );
 
-  const first: OrderedQueryFunction<"first"> = () =>
-    Effect.map(take(1), Array.head);
+    const stream: OrderedQueryFunction<"stream"> = () =>
+      pipe(streamEncoded, Stream.mapEffect(Document.decode(table)));
 
-  const paginate: OrderedQueryFunction<"paginate"> = Effect.fn(
-    "OrderedQuery.paginate",
-  )(function* (options, filter) {
-    const filteredQuery = filter !== undefined ? query.filter(filter) : query;
+    const collect: OrderedQueryFunction<"collect"> = () =>
+      pipe(stream(), Stream.runCollect);
 
-    const paginationResult = yield* Effect.promise(() =>
-      filteredQuery.paginate(options),
-    );
+    const take: OrderedQueryFunction<"take"> = (n: number) =>
+      pipe(
+        Effect.promise(() => query.take(n)),
+        Effect.flatMap((encoded) =>
+          Effect.forEach(encoded, Document.decode(table)),
+        ),
+      );
 
-    const parsedPage = yield* Effect.forEach(
-      paginationResult.page,
-      Document.decode(table),
-    );
+    const first: OrderedQueryFunction<"first"> = () =>
+      Effect.map(take(1), Array.head);
+
+    const paginate: OrderedQueryFunction<"paginate"> = Effect.fn(
+      "OrderedQuery.paginate",
+    )(function* (options, filter) {
+      const filteredQuery = filter !== undefined ? query.filter(filter) : query;
+
+      const paginationResult = yield* Effect.promise(() =>
+        filteredQuery.paginate(options),
+      );
+
+      const parsedPage = yield* Effect.forEach(
+        paginationResult.page,
+        Document.decode(table),
+      );
+
+      return {
+        page: parsedPage,
+        isDone: paginationResult.isDone,
+        continueCursor: paginationResult.continueCursor,
+        /* v8 ignore start */
+        ...(paginationResult.splitCursor !== undefined &&
+        paginationResult.splitCursor !== null &&
+        paginationResult.splitCursor !== ""
+          ? { splitCursor: paginationResult.splitCursor }
+          : {}),
+        ...(paginationResult.pageStatus !== undefined &&
+        paginationResult.pageStatus !== null
+          ? { pageStatus: paginationResult.pageStatus }
+          : {}),
+        /* v8 ignore stop */
+      };
+    });
 
     return {
-      page: parsedPage,
-      isDone: paginationResult.isDone,
-      continueCursor: paginationResult.continueCursor,
-      /* v8 ignore start */
-      ...(paginationResult.splitCursor
-        ? { splitCursor: paginationResult.splitCursor }
-        : {}),
-      ...(paginationResult.pageStatus
-        ? { pageStatus: paginationResult.pageStatus }
-        : {}),
-      /* v8 ignore stop */
+      first,
+      take,
+      collect,
+      paginate,
+      stream,
     };
-  });
-
-  return {
-    first,
-    take,
-    collect,
-    paginate,
-    stream,
-  };
-};
+  },
+);

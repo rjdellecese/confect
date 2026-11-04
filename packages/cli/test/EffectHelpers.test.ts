@@ -1,3 +1,5 @@
+import * as Rec from "effect/Record";
+import * as Arr from "effect/Array";
 import { CodeBlockWriter } from "@confect/cli/CodeBlockWriter";
 import * as FunctionModule from "@confect/cli/FunctionModule";
 import * as templates from "@confect/cli/templates";
@@ -6,7 +8,6 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as MutableRef from "effect/MutableRef";
 import * as Option from "effect/Option";
-import * as Result from "effect/Result";
 import * as Tracer from "effect/Tracer";
 
 it.effect(
@@ -41,14 +42,14 @@ it.effect(
       };
       const defaultRender = FunctionModule.render(defaultOptions);
       defaultOptions.useNode = true;
-      expect(yield* defaultRender).not.toContain('"use node"');
-      expect(
-        yield* FunctionModule.render({
-          functionNames: ["next"],
-          registeredFunctionsImportPath: "./next",
-          useNode: true,
-        }),
-      ).toContain('"use node"');
+      const actual = yield* defaultRender;
+      expect(actual).not.toContain('"use node"');
+      const rendered = yield* FunctionModule.render({
+        functionNames: ["next"],
+        registeredFunctionsImportPath: "./next",
+        useNode: true,
+      });
+      expect(rendered).toContain('"use node"');
     }),
 );
 
@@ -72,7 +73,8 @@ it.effect(
         ],
       });
       const first = yield* render;
-      expect(yield* render).toBe(first);
+      const actual2 = yield* render;
+      expect(actual2).toBe(first);
       expect(first).toContain('["child"]: GroupSpec.make(),');
     }),
 );
@@ -99,25 +101,26 @@ it.effect(
       expectTypeOf(indented).toEqualTypeOf<
         Effect.Effect<void, "failure", Line>
       >();
-      expect(Object.hasOwn(second, "indent")).toBe(false);
+      expect(Rec.has(second, "indent")).toBe(false);
       expect(MutableRef.get(runs)).toBe(0);
-      expect(yield* second.toString()).toBe("");
+      const contents = yield* second.toString();
+      expect(contents).toBe("");
 
       yield* indented.pipe(Effect.provideService(Line, "line"));
       yield* indented.pipe(Effect.provideService(Line, "again"));
       yield* receiver(second.writeLine("bound"));
       yield* second.writeLine("outside");
-      expect(yield* first.toString()).toBe("");
-      expect(yield* second.toString()).toBe(
-        "    line\n    again\n    bound\noutside\n",
-      );
+      const contents2 = yield* first.toString();
+      expect(contents2).toBe("");
+      const contents3 = yield* second.toString();
+      expect(contents3).toBe("    line\n    again\n    bound\noutside\n");
       expect(MutableRef.get(runs)).toBe(2);
 
       const failed = yield* indented.pipe(
         Effect.provideService(Line, "fail"),
         Effect.result,
       );
-      assert(Result.isFailure(failed));
+      assert(failed._tag === "Failure");
       expect(failed.failure).toBe("failure");
     }),
 );
@@ -146,6 +149,6 @@ it.effect("keeps internal helpers within their caller's span", () =>
         Effect.provideService(Tracer.Tracer, tracer),
       );
     expect(parentName).toBe("caller");
-    expect(spans.map((span) => span.name)).toEqual(["caller"]);
+    expect(Arr.map(spans, (span) => span.name)).toEqual(["caller"]);
   }),
 );

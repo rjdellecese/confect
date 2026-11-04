@@ -1,3 +1,4 @@
+import * as Layer from "effect/Layer";
 import { ExecutionMetadata as BarrelExecutionMetadata } from "@confect/server";
 import * as ExecutionMetadata from "@confect/server/ExecutionMetadata";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -62,29 +63,36 @@ describe("ExecutionMetadata", () => {
       expect(getDeploymentMetadata).not.toHaveBeenCalled();
 
       return Effect.gen(function* () {
-        const metadata = yield* ExecutionMetadata.ExecutionMetadata;
-        const getFunction = metadata.getFunction();
-        const getDeployment = metadata.getDeployment();
+        const services = yield* Layer.build(layer);
+        return yield* Effect.gen(function* () {
+          const metadata = yield* ExecutionMetadata.ExecutionMetadata;
+          const getFunction = metadata.getFunction();
+          const getDeployment = metadata.getDeployment();
 
-        expectTypeOf(getFunction).toEqualTypeOf<
-          Effect.Effect<FunctionMetadata>
-        >();
-        expectTypeOf(getDeployment).toEqualTypeOf<
-          Effect.Effect<DeploymentMetadata>
-        >();
-        expect(getFunctionMetadata).not.toHaveBeenCalled();
-        expect(getDeploymentMetadata).not.toHaveBeenCalled();
-        expect(yield* getFunction).toBe(firstFunction);
-        expect(yield* getFunction).toBe(nextFunction);
-        expect(yield* getDeployment).toBe(firstDeployment);
-        expect(yield* getDeployment).toBe(nextDeployment);
-        expect(getFunctionMetadata).toHaveBeenCalledTimes(2);
-        expect(getDeploymentMetadata).toHaveBeenCalledTimes(2);
-        expect(getFunctionMetadata.mock.contexts[0]).toBe(meta);
-        expect(getFunctionMetadata.mock.contexts[1]).toBe(meta);
-        expect(getDeploymentMetadata.mock.contexts[0]).toBe(meta);
-        expect(getDeploymentMetadata.mock.contexts[1]).toBe(meta);
-      }).pipe(Effect.provide(layer));
+          expectTypeOf(getFunction).toEqualTypeOf<
+            Effect.Effect<FunctionMetadata>
+          >();
+          expectTypeOf(getDeployment).toEqualTypeOf<
+            Effect.Effect<DeploymentMetadata>
+          >();
+          expect(getFunctionMetadata).not.toHaveBeenCalled();
+          expect(getDeploymentMetadata).not.toHaveBeenCalled();
+          const getFunctionResult = yield* getFunction;
+          expect(getFunctionResult).toBe(firstFunction);
+          const getFunctionResult2 = yield* getFunction;
+          expect(getFunctionResult2).toBe(nextFunction);
+          const getDeploymentResult = yield* getDeployment;
+          expect(getDeploymentResult).toBe(firstDeployment);
+          const getDeploymentResult2 = yield* getDeployment;
+          expect(getDeploymentResult2).toBe(nextDeployment);
+          expect(getFunctionMetadata).toHaveBeenCalledTimes(2);
+          expect(getDeploymentMetadata).toHaveBeenCalledTimes(2);
+          expect(getFunctionMetadata.mock.contexts[0]).toBe(meta);
+          expect(getFunctionMetadata.mock.contexts[1]).toBe(meta);
+          expect(getDeploymentMetadata.mock.contexts[0]).toBe(meta);
+          expect(getDeploymentMetadata.mock.contexts[1]).toBe(meta);
+        }).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped);
     },
   );
 
@@ -100,15 +108,18 @@ describe("ExecutionMetadata", () => {
     >;
 
     return Effect.gen(function* () {
-      const metadata = yield* ExecutionMetadata.ExecutionMetadata;
-      expect(
-        yield* metadata.getFunction().pipe(Effect.catchDefect(Effect.succeed)),
-      ).toBe(functionFailure);
-      expect(
-        yield* metadata
+      const services = yield* Layer.build(ExecutionMetadata.layer(meta));
+      return yield* Effect.gen(function* () {
+        const metadata = yield* ExecutionMetadata.ExecutionMetadata;
+        const pipeResult = yield* metadata
+          .getFunction()
+          .pipe(Effect.catchDefect(Effect.succeed));
+        expect(pipeResult).toBe(functionFailure);
+        const pipeResult2 = yield* metadata
           .getDeployment()
-          .pipe(Effect.catchDefect(Effect.succeed)),
-      ).toBe(deploymentFailure);
-    }).pipe(Effect.provide(ExecutionMetadata.layer(meta)));
+          .pipe(Effect.catchDefect(Effect.succeed));
+        expect(pipeResult2).toBe(deploymentFailure);
+      }).pipe(Effect.provideContext(services));
+    }).pipe(Effect.scoped);
   });
 });

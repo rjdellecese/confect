@@ -1,4 +1,7 @@
+import * as String from "effect/String";
 import * as Clock from "effect/Clock";
+import * as Context from "effect/Context";
+import * as Layer from "effect/Layer";
 import * as Cache from "effect/Cache";
 import * as Duration from "effect/Duration";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
@@ -91,6 +94,9 @@ type RefreshOutcome = Data.TaggedEnum<{
 }>;
 const RefreshOutcome = Data.taggedEnum<RefreshOutcome>();
 
+/**
+ * @internal
+ */
 export const isRefreshSuccessful = (outcome: RefreshOutcome): boolean =>
   RefreshOutcome.$match(outcome, {
     Empty: () => true,
@@ -101,25 +107,29 @@ export const isRefreshSuccessful = (outcome: RefreshOutcome): boolean =>
       }),
   });
 
-export class OperationError extends Schema.TaggedError<OperationError>()(
-  "WatcherOperationError",
-  {
-    operation: Schema.Literals([
-      "create",
-      "watch",
-      "rebuild",
-      "dispose",
-      "refresh",
-    ]),
-    cause: Schema.Unknown,
-  },
-) {}
+export class OperationError extends Schema.TaggedError<
+  OperationError,
+  { readonly brand: unique symbol }
+>()("WatcherOperationError", {
+  operation: Schema.Literals([
+    "create",
+    "watch",
+    "rebuild",
+    "dispose",
+    "refresh",
+  ]),
+  cause: Schema.Unknown,
+}) {}
 
 const ReportedBuildFailure = Schema.Struct({
   errors: Schema.NonEmptyArray(Schema.Struct({ text: Schema.String })),
 });
-export const parseFailure = Schema.decodeUnknownOption(ReportedBuildFailure);
+export const parseFailure = (input: unknown) =>
+  Schema.decodeUnknownOption(ReportedBuildFailure)(input);
 
+/**
+ * @internal
+ */
 export const make = Effect.fnUntraced(function* () {
   const signal = yield* Queue.sliding<void>(1);
   const pendingRef = yield* Ref.make<Pending>(SyncState.empty);
@@ -222,7 +232,9 @@ const esbuildOptions = (
   pendingRef: Ref.Ref<Pending>,
   initial: Deferred.Deferred<void>,
 ): esbuild.BuildOptions => {
-  const encodeString = Schema.encodeSync(Schema.fromJsonString(Schema.String));
+  const encodeString = Schema.encodeResult(
+    Schema.fromJsonString(Schema.String),
+  );
   const groupKey = Option.match(config, {
     onNone: () => "",
     onSome: (selected) => selected.path,
@@ -231,9 +243,14 @@ const esbuildOptions = (
     ...TypeScriptConfig.buildOptions(config),
     absWorkingDir: projectRoot,
     stdin: {
-      contents: entries
-        .map((entry) => `import ${encodeString(entry.absolutePath)};`)
-        .join("\n"),
+      contents: Array.join(
+        Array.map(
+          entries,
+          (entry) =>
+            `import ${Result.getOrThrow(encodeString(entry.absolutePath))};`,
+        ),
+        "\n",
+      ),
       resolveDir: projectRoot,
       sourcefile: "confect-watch.ts",
       loader: "ts",
@@ -297,13 +314,15 @@ const esbuildOptions = (
             Effect.runPromise(
               Effect.gen(function* () {
                 const { generation } = yield* Ref.get(progressRef);
+                const observations = yield* Ref.get(stateRef);
                 const previous = Option.getOrElse(
-                  HashMap.get(yield* Ref.get(stateRef), groupKey),
+                  HashMap.get(observations, groupKey),
                   WatchBuild.State.Initial,
                 );
+                const capture = yield* Ref.get(captureRef);
                 const outcome = yield* WatchBuild.parse(
                   result,
-                  yield* Ref.get(captureRef),
+                  capture,
                   (file) => path.resolve(projectRoot, file),
                   digest,
                 );
@@ -320,7 +339,7 @@ const esbuildOptions = (
                     Affected: ({ paths }) =>
                       SyncState.add(
                         pending,
-                        entries.filter((entry) =>
+                        Array.filter(entries, (entry) =>
                           HashSet.has(paths, entry.inputPath),
                         ),
                       ),
@@ -328,7 +347,7 @@ const esbuildOptions = (
                       SyncState.reconcile(
                         SyncState.add(
                           pending,
-                          entries.filter((entry) =>
+                          Array.filter(entries, (entry) =>
                             HashSet.has(paths, entry.inputPath),
                           ),
                         ),
@@ -360,11 +379,10 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
   const fs = yield* FileSystem.FileSystem;
   const projectRoot = yield* ProjectRoot.get;
   const confectDirectory = yield* ConfectDirectory.get;
-  const generatedDirectory = path.join(
-    yield* fs.realPath(confectDirectory),
-    "_generated",
-  );
-  const digest = yield* Digest.Digest;
+  const realConfectDirectory = yield* fs.realPath(confectDirectory);
+  const generatedDirectory = path.join(realConfectDirectory, "_generated");
+  const cryptoContext = yield* Layer.build(NodeCrypto.layerDigest);
+  const digest = Context.get(cryptoContext, Digest.Digest);
   const completedInitial = Deferred.make<void>().pipe(
     Effect.tap((initial) => Deferred.succeed(initial, undefined)),
   );
@@ -374,7 +392,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     const current = yield* Ref.get(watcher.lifecycle);
     const entries = yield* EntryPoint.discover;
     const desiredPaths = HashSet.fromIterable(
-      entries.map((entry) => entry.absolutePath),
+      Array.map(entries, (entry) => entry.absolutePath),
     );
     const key = pipe(
       Array.fromIterable(desiredPaths),
@@ -400,7 +418,8 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
       Empty: () => Ref.update(pendingRef, SyncState.full),
       Active: ({ entries: previousEntries, scope }) =>
         Effect.gen(function* () {
-          const removedOptional = previousEntries.filter(
+          const removedOptional = Array.filter(
+            previousEntries,
             (entry) =>
               EntryPoint.isOptional(entry) &&
               !HashSet.has(desiredPaths, entry.absolutePath),
@@ -440,8 +459,8 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
         }),
       ),
     ).pipe(
-      Effect.mapError(
-        (cause) => new OperationError({ operation: "create", cause }),
+      Effect.mapError((cause) =>
+        OperationError.make({ operation: "create", cause }),
       ),
     );
     const partitions = Array.groupWith(
@@ -461,22 +480,21 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
         const captureRef = yield* Ref.make(WatchBuild.emptyCapture);
         const progress = yield* Ref.make(WatchBuild.initialProgress);
         const initial = yield* Deferred.make<void>();
-        const notExternal = [
-          ...TypeScriptConfig.aliasPatterns(config),
-          ...Array.getSomes(
-            yield* Effect.forEach(
-              Array.dedupe(
-                Array.map(groupEntries, (entry) =>
-                  path.dirname(entry.absolutePath),
-                ),
-              ),
-              PackageSelfReference.discover,
-            ).pipe(
-              Effect.mapError(
-                (cause) => new OperationError({ operation: "create", cause }),
-              ),
+        const selfReferences = yield* Effect.forEach(
+          Array.dedupe(
+            Array.map(groupEntries, (entry) =>
+              path.dirname(entry.absolutePath),
             ),
           ),
+          PackageSelfReference.discover,
+        ).pipe(
+          Effect.mapError((cause) =>
+            OperationError.make({ operation: "create", cause }),
+          ),
+        );
+        const notExternal = [
+          ...TypeScriptConfig.aliasPatterns(config),
+          ...Array.getSomes(selfReferences),
         ];
         const context = yield* Effect.acquireRelease(
           Effect.tryPromise({
@@ -500,13 +518,13 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
                 ),
               ),
             catch: (cause) =>
-              new OperationError({ operation: "create", cause }),
+              OperationError.make({ operation: "create", cause }),
           }),
           (ctx) =>
             Effect.tryPromise({
               try: () => ctx.dispose(),
               catch: (cause) =>
-                new OperationError({ operation: "dispose", cause }),
+                OperationError.make({ operation: "dispose", cause }),
             }).pipe(Effect.orDie),
         ).pipe(Scope.provide(scope));
         const requestIds = new WeakMap<
@@ -537,7 +555,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
     yield* Effect.forEach(groups, ({ context }) =>
       Effect.tryPromise({
         try: () => context.watch(),
-        catch: (cause) => new OperationError({ operation: "watch", cause }),
+        catch: (cause) => OperationError.make({ operation: "watch", cause }),
       }),
     );
     yield* Effect.forEach(groups, (group) =>
@@ -553,7 +571,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
   return yield* Effect.forever(
     Queue.take(restartQueue).pipe(Effect.andThen(sync)),
   );
-}, Effect.provide(NodeCrypto.layerDigest));
+});
 
 const refresh = Effect.fnUntraced(function* (watcher: State) {
   return yield* watcher.lock.withPermit(
@@ -563,7 +581,7 @@ const refresh = Effect.fnUntraced(function* (watcher: State) {
         Empty: () => Effect.succeed(RefreshOutcome.Empty()),
         Uninitialized: () =>
           Effect.fail(
-            new OperationError({
+            OperationError.make({
               operation: "refresh",
               cause: "The dependency watcher is not initialized",
             }),
@@ -579,12 +597,11 @@ const refresh = Effect.fnUntraced(function* (watcher: State) {
                     Failed: () => Effect.succeed(true),
                     Succeeded: ({ snapshot }) =>
                       group.verifyInputs(snapshot).pipe(
-                        Effect.mapError(
-                          ({ cause }) =>
-                            new OperationError({
-                              operation: "refresh",
-                              cause,
-                            }),
+                        Effect.mapError(({ cause }) =>
+                          OperationError.make({
+                            operation: "refresh",
+                            cause,
+                          }),
                         ),
                       ),
                   }),
@@ -614,8 +631,10 @@ const refreshGroup = Effect.fnUntraced(function* ({
   progress,
   verifyInputs,
 }: WatchGroup) {
-  const runSync = Effect.runSyncWith(yield* Effect.context());
-  const barrier = WatchBuild.captureBarrier(yield* Ref.get(progress));
+  const effectContext = yield* Effect.context();
+  const runSync = Effect.runSyncWith(effectContext);
+  const previousProgress = yield* Ref.get(progress);
+  const barrier = WatchBuild.captureBarrier(previousProgress);
   const rebuild = Effect.gen(function* () {
     const built = yield* Effect.tryPromise({
       try: () => {
@@ -627,7 +646,7 @@ const refreshGroup = Effect.fnUntraced(function* ({
         );
         return promise;
       },
-      catch: (cause) => new OperationError({ operation: "rebuild", cause }),
+      catch: (cause) => OperationError.make({ operation: "rebuild", cause }),
     }).pipe(Effect.result);
     const currentProgress = yield* Ref.get(progress);
     const completed = WatchBuild.getCompletion(currentProgress);
@@ -640,7 +659,7 @@ const refreshGroup = Effect.fnUntraced(function* ({
         Option.isNone(completed) ||
         !WatchBuild.Outcome.$is("Failed")(completed.value.outcome)
       )
-        return yield* new OperationError({
+        return yield* OperationError.make({
           operation: "rebuild",
           cause: rejected.value.errors,
         });
@@ -648,12 +667,11 @@ const refreshGroup = Effect.fnUntraced(function* ({
     if (WatchBuild.joinedWithoutCompletion(currentProgress))
       return Option.none<WatchBuild.Completion>();
     const observed = yield* Effect.fromOption(completed).pipe(
-      Effect.mapError(
-        () =>
-          new OperationError({
-            operation: "rebuild",
-            cause: "esbuild completed without a build observation",
-          }),
+      Effect.mapError(() =>
+        OperationError.make({
+          operation: "rebuild",
+          cause: "esbuild completed without a build observation",
+        }),
       ),
     );
     if (
@@ -661,8 +679,8 @@ const refreshGroup = Effect.fnUntraced(function* ({
       WatchBuild.Outcome.$is("Succeeded")(observed.outcome)
     ) {
       const unchanged = yield* verifyInputs(observed.outcome.snapshot).pipe(
-        Effect.mapError(
-          ({ cause }) => new OperationError({ operation: "refresh", cause }),
+        Effect.mapError(({ cause }) =>
+          OperationError.make({ operation: "refresh", cause }),
         ),
       );
       if (!unchanged) return Option.none<WatchBuild.Completion>();
@@ -723,7 +741,7 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
           if (
             relative === "" ||
             relative === ".." ||
-            relative.startsWith(`..${path.sep}`) ||
+            String.startsWith(`..${path.sep}`)(relative) ||
             path.isAbsolute(relative)
           )
             return false;
@@ -797,11 +815,11 @@ const handleConfectChange = ({
   restart: Effect.Effect<unknown>;
   restartEntry: (entry: EntryPoint.Kind) => Effect.Effect<unknown>;
 }) => {
-  if (relativePath.split(/[/\\]/).includes("_generated")) {
+  if (String.split(/[/\\]/)(relativePath).includes("_generated")) {
     return Effect.void;
   }
 
-  if (!relativePath.endsWith(".ts")) {
+  if (!String.endsWith(".ts")(relativePath)) {
     return Effect.void;
   }
 

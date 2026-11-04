@@ -1,6 +1,6 @@
 import { type GroupSpec, Spec } from "@confect/core";
 import * as Path from "effect/Path";
-import { pipe } from "effect/Function";
+import { dual, pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -11,7 +11,7 @@ import * as String from "effect/String";
 /**
  * The path to a group in the Confect API.
  */
-export class GroupPath extends Schema.Class<GroupPath>("GroupPath")({
+export class GroupPath extends Schema.Class<GroupPath, {}>("GroupPath")({
   pathSegments: Schema.NonEmptyArray(Schema.NonEmptyString),
 }) {}
 
@@ -24,12 +24,18 @@ export const make = (pathSegments: readonly [string, ...string[]]): GroupPath =>
 /**
  * Append a group name to a GroupPath to create a new GroupPath.
  */
-export const append = (groupPath: GroupPath, groupName: string): GroupPath =>
-  make([...groupPath.pathSegments, groupName]);
+export const append: {
+  (groupName: string): (groupPath: GroupPath) => GroupPath;
+  (groupPath: GroupPath, groupName: string): GroupPath;
+} = dual(2, (groupPath: GroupPath, groupName: string): GroupPath =>
+  make([...groupPath.pathSegments, groupName]),
+);
 
 /**
  * Expects a path string of the form `./group1/group2.ts`, relative to the
  * Convex functions directory.
+ *
+ * @internal
  */
 export const fromGroupModulePath = Effect.fnUntraced(function* (
   groupModulePath: string,
@@ -46,7 +52,7 @@ export const fromGroupModulePath = Effect.fnUntraced(function* (
     yield* Effect.logDebug(Array.append(dirSegments, name));
     return make(Array.append(dirSegments, name));
   } else {
-    return yield* new GroupModulePathIsNotATypeScriptFileError({
+    return yield* GroupModulePathIsNotATypeScriptFileError.make({
       path: groupModulePath,
     });
   }
@@ -54,6 +60,8 @@ export const fromGroupModulePath = Effect.fnUntraced(function* (
 
 /**
  * Get the module path for a group, relative to the Convex functions directory.
+ *
+ * @internal
  */
 export const modulePath = Effect.fnUntraced(function* (groupPath: GroupPath) {
   const path = yield* Path.Path;
@@ -61,25 +69,36 @@ export const modulePath = Effect.fnUntraced(function* (groupPath: GroupPath) {
   return path.join(...groupPath.pathSegments) + ".ts";
 });
 
-export const getGroupSpec = (
-  spec: Spec.AnyWithProps,
-  groupPath: GroupPath,
-): Option.Option<GroupSpec.AnyWithProps> =>
-  pipe(
-    groupPath.pathSegments,
-    Array.matchLeft({
-      onEmpty: () => Option.none(),
-      onNonEmpty: (head, tail) =>
-        pipe(
-          Record.get(Spec.groups(spec), head),
-          Option.flatMap((group) =>
-            Array.isArrayNonEmpty(tail)
-              ? getGroupSpecHelper(group, tail)
-              : Option.some(group),
+export const getGroupSpec: {
+  (
+    groupPath: GroupPath,
+  ): (spec: Spec.AnyWithProps) => Option.Option<GroupSpec.AnyWithProps>;
+  (
+    spec: Spec.AnyWithProps,
+    groupPath: GroupPath,
+  ): Option.Option<GroupSpec.AnyWithProps>;
+} = dual(
+  2,
+  (
+    spec: Spec.AnyWithProps,
+    groupPath: GroupPath,
+  ): Option.Option<GroupSpec.AnyWithProps> =>
+    pipe(
+      groupPath.pathSegments,
+      Array.matchLeft({
+        onEmpty: () => Option.none(),
+        onNonEmpty: (head, tail) =>
+          pipe(
+            Record.get(Spec.groups(spec), head),
+            Option.flatMap((group) =>
+              Array.isArrayNonEmpty(tail)
+                ? getGroupSpecHelper(group, tail)
+                : Option.some(group),
+            ),
           ),
-        ),
-    }),
-  );
+      }),
+    ),
+);
 
 const getGroupSpecHelper = (
   group: GroupSpec.AnyWithProps,
@@ -104,12 +123,12 @@ const getGroupSpecHelper = (
 export const toString = (groupPath: GroupPath) =>
   Array.join(groupPath.pathSegments, ".");
 
-export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedError<GroupModulePathIsNotATypeScriptFileError>()(
-  "GroupModulePathIsNotATypeScriptFileError",
-  {
-    path: Schema.NonEmptyString,
-  },
-) {
+export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedError<
+  GroupModulePathIsNotATypeScriptFileError,
+  { readonly brand: unique symbol }
+>()("GroupModulePathIsNotATypeScriptFileError", {
+  path: Schema.NonEmptyString,
+}) {
   override get message(): string {
     return `Expected group module path to end with .ts, got ${this.path}`;
   }

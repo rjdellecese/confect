@@ -81,7 +81,7 @@ describe("QueryStreamKeyLayout", () => {
           QueryStreamKeyLayout.InvalidEqualityPrefixError
         >
       >();
-      const error = Result.getOrThrow(Result.flip(result));
+      const error = result.pipe(Result.flip, Result.getOrThrow);
       expect(error).toBeInstanceOf(
         QueryStreamKeyLayout.InvalidEqualityPrefixError,
       );
@@ -223,7 +223,7 @@ describe("QueryStreamKeyLayout", () => {
       expectTypeOf(result).toEqualTypeOf<
         Result.Result<number, QueryStreamKeyLayout.InvalidLabelPrefixError>
       >();
-      const error = Result.getOrThrow(Result.flip(result));
+      const error = result.pipe(Result.flip, Result.getOrThrow);
       expect(error).toBeInstanceOf(
         QueryStreamKeyLayout.InvalidLabelPrefixError,
       );
@@ -307,9 +307,10 @@ describe("QueryStreamKeyLayout", () => {
     ).toBe(true);
     expect(QueryStreamKeyLayout.Equivalence(single, composed)).toBe(true);
     expect(QueryStreamKeyLayout.Equivalence(single, explicit)).toBe(false);
-    const mismatch = Result.getOrThrow(
-      Result.flip(QueryStreamKeyLayout.validateEquivalence(single, explicit)),
-    );
+    const mismatch = QueryStreamKeyLayout.validateEquivalence(
+      single,
+      explicit,
+    ).pipe(Result.flip, Result.getOrThrow);
     expect(mismatch).toBeInstanceOf(
       QueryStreamKeyLayout.KeyLayoutMismatchError,
     );
@@ -398,7 +399,7 @@ describe("QueryStreamKeyLayout", () => {
           QueryStreamKeyLayout.LabelCountMismatchError
         >
       >();
-      const error = Result.getOrThrow(Result.flip(result));
+      const error = result.pipe(Result.flip, Result.getOrThrow);
       expect(error).toBeInstanceOf(
         QueryStreamKeyLayout.LabelCountMismatchError,
       );

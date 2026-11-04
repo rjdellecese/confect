@@ -1,5 +1,6 @@
 import type { PaginationOptions as ConvexPaginationOptions } from "convex/server";
 import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
 import { expect, expectTypeOf, test } from "@effect/vitest";
 import * as PaginationOptions from "@confect/core/PaginationOptions";
 
@@ -10,7 +11,10 @@ test("PaginationOptions' type extends Convex type", () => {
 });
 
 test("decodes the payloads Convex's paginated client sends", () => {
-  const decode = Schema.decodeUnknownSync(PaginationOptions.PaginationOptions);
+  const decode = (input: unknown) =>
+    Result.getOrThrow(
+      Schema.decodeUnknownResult(PaginationOptions.PaginationOptions)(input),
+    );
 
   // `usePaginatedQuery` from `convex/react` always includes `id`.
   expect(decode({ numItems: 10, cursor: null, id: 1 })).toEqual({

@@ -1,3 +1,4 @@
+import { dual } from "effect/Function";
 import * as NodeWorker from "@effect/platform-node/NodeWorker";
 import { fork } from "node:child_process";
 import * as Console from "effect/Console";
@@ -31,11 +32,14 @@ export const RequestContext = Schema.Struct({
 });
 export type RequestContext = typeof RequestContext.Type;
 
-export class EvaluationError extends Schema.TaggedError<EvaluationError>()(
-  "EvaluationError",
-  { diagnostic: Schema.String },
-) {}
+export class EvaluationError extends Schema.TaggedError<
+  EvaluationError,
+  { readonly brand: unique symbol }
+>()("EvaluationError", { diagnostic: Schema.String }) {}
 
+/**
+ * @internal
+ */
 export const requests = RpcGroup.make(
   Rpc.make("Previous", {
     payload: RequestContext,
@@ -97,27 +101,29 @@ const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
             evaluator.kill("SIGKILL");
           }),
       );
+      const workerContext = yield* Layer.build(
+        RpcClient.layerProtocolWorker({ size: 1 }).pipe(
+          Layer.provide(NodeWorker.layer(() => child)),
+        ),
+      );
       return yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(requests);
         return yield* run(client, requestContext);
-      }).pipe(
-        Effect.provide(
-          RpcClient.layerProtocolWorker({ size: 1 }).pipe(
-            Layer.provide(NodeWorker.layer(() => child)),
-          ),
-        ),
-      );
+      }).pipe(Effect.provideContext(workerContext));
     }),
   ).pipe(
     Effect.catchTags({
       WorkerError: (error) =>
-        Effect.fail(new EvaluationError({ diagnostic: error.message })),
+        Effect.fail(EvaluationError.make({ diagnostic: error.message })),
       RpcClientError: (error) =>
-        Effect.fail(new EvaluationError({ diagnostic: error.message })),
+        Effect.fail(EvaluationError.make({ diagnostic: error.message })),
     }),
   );
 });
 
+/**
+ * @internal
+ */
 export const loadPreviousFunctionPaths = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -140,19 +146,42 @@ export const generate = generateSnapshot.pipe(
   Effect.map(GenerationSnapshot.functionPaths),
 );
 
-export const updateDeclarations = (
-  snapshot: GenerationSnapshot.GenerationSnapshot,
-  declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
-  paths: ReadonlyArray<ImplModulePath>,
-) =>
-  withWorker((client, requestContext) =>
-    client.Update({
-      ...requestContext,
-      snapshot,
-      declarations,
-      paths,
-    }),
-  );
+export const updateDeclarations: {
+  (
+    declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
+    paths: ReadonlyArray<ImplModulePath>,
+  ): (
+    snapshot: GenerationSnapshot.GenerationSnapshot,
+  ) => Effect.Effect<
+    GenerationSnapshot.GenerationSnapshot,
+    EvaluationError,
+    ConfectDirectory | ConvexDirectory | ProjectRoot
+  >;
+  (
+    snapshot: GenerationSnapshot.GenerationSnapshot,
+    declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
+    paths: ReadonlyArray<ImplModulePath>,
+  ): Effect.Effect<
+    GenerationSnapshot.GenerationSnapshot,
+    EvaluationError,
+    ConfectDirectory | ConvexDirectory | ProjectRoot
+  >;
+} = dual(
+  3,
+  (
+    snapshot: GenerationSnapshot.GenerationSnapshot,
+    declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
+    paths: ReadonlyArray<ImplModulePath>,
+  ) =>
+    withWorker((client, requestContext) =>
+      client.Update({
+        ...requestContext,
+        snapshot,
+        declarations,
+        paths,
+      }),
+    ),
+);
 
 export const validate = (paths: ReadonlyArray<ImplModulePath>) =>
   withWorker((client, requestContext) =>

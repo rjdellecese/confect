@@ -2,7 +2,7 @@ import { MiddlewareSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 import type { Viewer } from "./ProvideViewer.spec";
 
-export class NameRejected extends Schema.TaggedError<NameRejected>()(
+export class NameRejected extends Schema.TaggedError<NameRejected, {}>()(
   "NameRejected",
   {
     minLength: Schema.Finite,

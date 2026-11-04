@@ -79,11 +79,10 @@ describe("QueryStreamKeyBounds", () => {
       name: "different implicit ID positions",
       actual: Layout.concat(
         Result.getOrThrow(Layout.fromIndex([])),
-        Result.getOrThrow(
-          Layout.rename(
-            Result.getOrThrow(Layout.fromIndex(["_id"])),
-            Labels.make(["score"]),
-          ),
+        Layout.fromIndex(["_id"]).pipe(
+          Result.getOrThrow,
+          Layout.rename(Labels.make(["score"])),
+          Result.getOrThrow,
         ),
       ),
     },
@@ -95,7 +94,7 @@ describe("QueryStreamKeyBounds", () => {
     const mismatch = (
       result: Result.Result<unknown, Layout.KeyLayoutMismatchError>,
     ) => {
-      const error = Result.getOrThrow(Result.flip(result));
+      const error = result.pipe(Result.flip, Result.getOrThrow);
       expect(error).toBeInstanceOf(Layout.KeyLayoutMismatchError);
       expect(error.expectedKeyLayout).toBe(layout);
       expect(error.actualKeyLayout).toBe(actual);
@@ -120,17 +119,15 @@ describe("QueryStreamKeyBounds", () => {
     ]) {
       mismatch(QueryStreamKeyBounds.fromParsed(layout, endpoints));
     }
-    mismatch(
-      QueryStreamKeyBounds.tightestParsedLower(
-        Option.getOrThrow(bounded.lower),
-        endpoint,
-      ),
+    bounded.lower.pipe(
+      Option.getOrThrow,
+      QueryStreamKeyBounds.tightestParsedLower(endpoint),
+      mismatch,
     );
-    mismatch(
-      QueryStreamKeyBounds.tightestParsedUpper(
-        Option.getOrThrow(bounded.upper),
-        endpoint,
-      ),
+    bounded.upper.pipe(
+      Option.getOrThrow,
+      QueryStreamKeyBounds.tightestParsedUpper(endpoint),
+      mismatch,
     );
   });
 

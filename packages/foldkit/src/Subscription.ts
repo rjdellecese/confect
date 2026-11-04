@@ -1,3 +1,4 @@
+import { dual } from "effect/Function";
 import * as PaginationError from "@confect/core/PaginationError";
 import type * as Ref from "@confect/core/Ref";
 import * as Effect from "effect/Effect";
@@ -87,24 +88,40 @@ type ArgsConfig<Query extends Ref.AnyConfectPublicQuery, Model> = {
  * need control over the entry's dependencies (custom gating, extra
  * dependencies).
  */
-export const reactiveQueryStream =
+export const reactiveQueryStream: {
+  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
+    handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
+  ): (
+    ref: Query,
+  ) => (
+    ...args: Ref.OptionalArgs<Query>
+  ) => Stream.Stream<SuccessMessage | ErrorMessage, never, Client.Client>;
+  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
+    ref: Query,
+    handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
+  ): (
+    ...args: Ref.OptionalArgs<Query>
+  ) => Stream.Stream<SuccessMessage | ErrorMessage, never, Client.Client>;
+} = dual(
+  2,
   <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
     ref: Query,
     handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
   ) =>
-  (
-    ...args: Ref.OptionalArgs<Query>
-  ): Stream.Stream<SuccessMessage | ErrorMessage, never, Client.Client> =>
-    Client.Client.pipe(
-      Effect.map((client) => client.reactiveQueryResult(ref, ...args)),
-      Stream.unwrap,
-      Stream.map(
-        Result.match({
-          onSuccess: handlers.onSuccess,
-          onFailure: handlers.onError,
-        }),
+    (
+      ...args: Ref.OptionalArgs<Query>
+    ): Stream.Stream<SuccessMessage | ErrorMessage, never, Client.Client> =>
+      Client.Client.pipe(
+        Effect.map((client) => client.reactiveQueryResult(ref, ...args)),
+        Stream.unwrap,
+        Stream.map(
+          Result.match({
+            onSuccess: handlers.onSuccess,
+            onFailure: handlers.onError,
+          }),
+        ),
       ),
-    );
+);
 
 /**
  * A complete Foldkit subscription entry for a Confect reactive query. The

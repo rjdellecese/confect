@@ -1,3 +1,4 @@
+import * as Layer from "effect/Layer";
 import type { StorageWriter as ConvexStorageWriter } from "convex/server";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -18,12 +19,17 @@ const fakeConvexStorageWriter = {
 describe("StorageWriter", () => {
   it.effect("generateUploadUrl decodes the string Convex returns", () =>
     Effect.gen(function* () {
-      const storageWriter = yield* StorageWriter;
+      const services = yield* Layer.build(
+        StorageWriter.layer(fakeConvexStorageWriter),
+      );
+      return yield* Effect.gen(function* () {
+        const storageWriter = yield* StorageWriter;
 
-      const url = yield* storageWriter.generateUploadUrl;
+        const url = yield* storageWriter.generateUploadUrl;
 
-      expect(url).toBeInstanceOf(URL);
-      expect(url.href).toBe(uploadUrl);
-    }).pipe(Effect.provide(StorageWriter.layer(fakeConvexStorageWriter))),
+        expect(url).toBeInstanceOf(URL);
+        expect(url.href).toBe(uploadUrl);
+      }).pipe(Effect.provideContext(services));
+    }).pipe(Effect.scoped),
   );
 });

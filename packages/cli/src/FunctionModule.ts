@@ -48,6 +48,9 @@ const renderEffect = Effect.fnUntraced(function* ({
   return yield* cbw.toString();
 });
 
+/**
+ * @internal
+ */
 export const generateGroupModule = ({
   groupPath,
   functionNames,
@@ -108,6 +111,8 @@ const generateGroupModuleEffect = Effect.fnUntraced(function* ({
  * path mirrors the group's path one-to-one (see
  * `registeredFunctionsRelativePath` in `LeafModule.ts`) for both Convex and
  * Node groups.
+ *
+ * @internal
  */
 export const registeredFunctionsImportPathForGroup = Effect.fnUntraced(
   function* (groupPath: GroupPath.GroupPath, modulePath: string) {
@@ -144,6 +149,9 @@ const logGroupPaths = Effect.fnUntraced(function* <R>(
   );
 });
 
+/**
+ * @internal
+ */
 export const generateFunctions = Effect.fnUntraced(function* (
   snapshot: GenerationSnapshot.GenerationSnapshot,
 ) {
@@ -152,6 +160,9 @@ export const generateFunctions = Effect.fnUntraced(function* (
   return GenerationSnapshot.functionPaths(snapshot);
 });
 
+/**
+ * @internal
+ */
 export const applyFunctionPlan = Effect.fnUntraced(function* (
   plan: GenerationSnapshot.ModulePlan,
 ) {
@@ -194,6 +205,9 @@ const getGroupPathsFromFs = Effect.gen(function* () {
   return GroupPaths.GroupPaths.make(HashSet.fromIterable(groupPathArray));
 });
 
+/**
+ * @internal
+ */
 export const removeGroups = Effect.fnUntraced(function* (
   groupPaths: GroupPaths.GroupPaths,
 ) {
@@ -216,6 +230,9 @@ export const removeGroups = Effect.fnUntraced(function* (
   );
 });
 
+/**
+ * @internal
+ */
 export const writeGroups = (
   groups: ReadonlyArray<GenerationSnapshot.GroupSummary>,
 ) =>

@@ -93,7 +93,7 @@ layer(NodeServices.layer)("TypeScriptConfig", (it) => {
           }),
           Effect.result,
         );
-        assert(Result.isFailure(result));
+        assert(result._tag === "Failure");
         expect(result.failure.cause).toBe(error);
       }).pipe(Effect.scoped),
   );

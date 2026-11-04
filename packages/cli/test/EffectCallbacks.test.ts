@@ -87,7 +87,10 @@ class Prefix extends Context.Service<Prefix, string>()(
   "@confect/cli/test/EffectCallbacks.test/Prefix",
 ) {}
 
-class Rejected extends Schema.TaggedError<Rejected>()("Rejected", {
+class Rejected extends Schema.TaggedError<
+  Rejected,
+  { readonly brand: unique symbol }
+>()("Rejected", {
   relativePath: Schema.String,
 }) {}
 
@@ -108,7 +111,7 @@ it.effect(
           [entry.relativePath, index] as const,
         ]);
         if (entry.tableName === "rejected") {
-          return yield* new Rejected({ relativePath: entry.relativePath });
+          return yield* Rejected.make({ relativePath: entry.relativePath });
         }
         return `${prefix}${entry.relativePath}:${index}`;
       });
@@ -133,16 +136,16 @@ it.effect(
       expectTypeOf<typeof visits>().not.toExtend<
         Effect.Effect<Array<string>, Rejected>
       >();
-      expect(yield* Ref.get(calls)).toEqual([]);
+      const current = yield* Ref.get(calls);
+      expect(current).toEqual([]);
       const supplied = visits.pipe(Effect.provideService(Prefix, "./"));
       expectTypeOf(supplied).toEqualTypeOf<
         Effect.Effect<Array<string>, Rejected>
       >();
-      expect(yield* supplied).toEqual([
-        "./tables/first.ts:0",
-        "./tables/second.ts:1",
-      ]);
-      expect(yield* Ref.get(calls)).toEqual([
+      const actual = yield* supplied;
+      expect(actual).toEqual(["./tables/first.ts:0", "./tables/second.ts:1"]);
+      const current2 = yield* Ref.get(calls);
+      expect(current2).toEqual([
         ["tables/first.ts", 0],
         ["tables/second.ts", 1],
       ]);
@@ -152,7 +155,7 @@ it.effect(
         visit,
       ).pipe(Effect.provideService(Prefix, "./"), Effect.flip);
       expect(error).toEqual(
-        new Rejected({ relativePath: "tables/rejected.ts" }),
+        Rejected.make({ relativePath: "tables/rejected.ts" }),
       );
     }),
 );
@@ -172,8 +175,7 @@ it.effect("preserves generic callback specialization through forEach", () =>
     expectTypeOf(result).toEqualTypeOf<
       Effect.Effect<Array<"value">, Rejected, Prefix>
     >();
-    expect(yield* result.pipe(Effect.provideService(Prefix, "unused"))).toEqual(
-      ["value"],
-    );
+    const actual2 = yield* result.pipe(Effect.provideService(Prefix, "unused"));
+    expect(actual2).toEqual(["value"]);
   }),
 );

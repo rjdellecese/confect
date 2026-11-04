@@ -1,3 +1,4 @@
+import * as Str from "effect/String";
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -52,7 +53,7 @@ const firstNoteForViewer = FunctionImpl.make(
         .pipe(Effect.orDie);
 
       if (Option.isNone(note)) {
-        return yield* new NoNotes();
+        return yield* NoNotes.make();
       }
 
       return `${viewer.username}: ${note.value.text}`;
@@ -67,7 +68,7 @@ const shoutName = FunctionImpl.make(
     Effect.gen(function* () {
       const { username } = yield* Viewer;
 
-      return username.toUpperCase();
+      return Str.toUpperCase(username);
     }),
 );
 

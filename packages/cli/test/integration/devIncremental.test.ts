@@ -1,3 +1,7 @@
+import * as Arr from "effect/Array";
+import { pipe } from "effect/Function";
+import * as Option from "effect/Option";
+import * as Str from "effect/String";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -34,14 +38,15 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           );
           yield* watching.waitFor("DISCOVERY:discovered");
           yield* watching.waitFor(success);
-          expect(yield* Ref.get(watching.output)).not.toContain(
-            "Performing initial sync",
-          );
+          const current = yield* Ref.get(watching.output);
+          expect(current).not.toContain("Performing initial sync");
           const incremental = yield* project.generatedFiles;
           const once = yield* project.start("codegen");
           yield* once.waitFor(success);
-          expect(Number(yield* once.handle.exitCode)).toBe(0);
-          expect(yield* project.generatedFiles).toEqual(incremental);
+          const actual = yield* once.handle.exitCode;
+          expect(Number(actual)).toBe(0);
+          const actual2 = yield* project.generatedFiles;
+          expect(actual2).toEqual(incremental);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -73,10 +78,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             );
             yield* watching.waitFor(marker);
             yield* watching.waitFor(success);
-            expect(yield* Ref.get(watching.output)).not.toContain(
-              "FULL_GENERATION",
-            );
-            expect(yield* project.generatedFiles).toEqual(generated);
+            const current2 = yield* Ref.get(watching.output);
+            expect(current2).not.toContain("FULL_GENERATION");
+            const actual3 = yield* project.generatedFiles;
+            expect(actual3).toEqual(generated);
           }
         }).pipe(Effect.scoped),
       { timeout: 30000 },
@@ -101,36 +106,43 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           );
           yield* project.write(
             "confect/other.impl.ts",
-            `${Project.impl.replace('"./notes.spec"', '"./other.spec"')}\nconsole.log("IMPL:other");\n`,
+            `${pipe(Project.impl, Str.replace('"./notes.spec"', '"./other.spec"'))}\nconsole.log("IMPL:other");\n`,
           );
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
           yield* Ref.set(watching.output, "");
           yield* project.write(
             "confect/notes.spec.ts",
-            `${Project.spec.replace('name: "list"', 'name: "latest"')}\nconsole.log("SPEC:notes");\n`,
+            `${pipe(Project.spec, Str.replace('name: "list"', 'name: "latest"'))}\nconsole.log("SPEC:notes");\n`,
           );
           yield* project.write(
             "confect/notes.impl.ts",
-            `${Project.impl.replace('"list"', '"latest"')}\nconsole.log("IMPL:notes");\n`,
+            `${pipe(Project.impl, Str.replace('"list"', '"latest"'))}\nconsole.log("IMPL:notes");\n`,
           );
           yield* watching.waitFor("IMPL:notes");
           yield* watching.waitFor(success);
           const updated = yield* Ref.get(watching.output);
-          expect(updated.match(/SPEC:notes/g)).toHaveLength(1);
+          expect(
+            Option.getOrNull(pipe(updated, Str.match(/SPEC:notes/g))),
+          ).toHaveLength(1);
           expect(updated).not.toContain("SPEC:other");
           expect(updated).not.toContain("IMPL:other");
           const incremental = yield* project.generatedFiles;
           const fresh = yield* project.start("codegen");
           yield* fresh.waitFor(success);
-          expect(Number(yield* fresh.handle.exitCode)).toBe(0);
-          expect(yield* project.generatedFiles).toEqual(incremental);
+          const actual4 = yield* fresh.handle.exitCode;
+          expect(Number(actual4)).toBe(0);
+          const actual5 = yield* project.generatedFiles;
+          expect(actual5).toEqual(incremental);
           yield* Ref.set(watching.output, "");
           yield* project.write(
             "confect/tables/notes.ts",
-            Project.table.replace(
-              "text: Schema.String",
-              "text: Schema.String, archived: Schema.Boolean",
+            pipe(
+              Project.table,
+              Str.replace(
+                "text: Schema.String",
+                "text: Schema.String, archived: Schema.Boolean",
+              ),
             ),
           );
           yield* watching.waitFor("IMPL:other");
@@ -138,7 +150,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const tableUpdate = yield* Ref.get(watching.output);
           expect(tableUpdate).toContain("IMPL:notes");
           expect(tableUpdate).toContain("IMPL:other");
-          expect(yield* project.generatedFiles).toEqual(incremental);
+          const actual6 = yield* project.generatedFiles;
+          expect(actual6).toEqual(incremental);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -174,11 +187,11 @@ if (existsSync(block)) {
           yield* watching.waitFor("DECLARATION_BLOCKED");
           yield* project.write(
             "confect/notes.spec.ts",
-            Project.spec.replace('name: "list"', 'name: "latest"'),
+            pipe(Project.spec, Str.replace('name: "list"', 'name: "latest"')),
           );
           yield* project.write(
             "confect/notes.impl.ts",
-            Project.impl.replace('"list"', '"latest"') + gate,
+            pipe(Project.impl, Str.replace('"list"', '"latest"')) + gate,
           );
           yield* project.write("release", "");
           yield* watching.waitFor(success);
@@ -190,8 +203,10 @@ if (existsSync(block)) {
           const incremental = yield* project.generatedFiles;
           const fresh = yield* project.start("codegen");
           yield* fresh.waitFor(success);
-          expect(Number(yield* fresh.handle.exitCode)).toBe(0);
-          expect(yield* project.generatedFiles).toEqual(incremental);
+          const actual7 = yield* fresh.handle.exitCode;
+          expect(Number(actual7)).toBe(0);
+          const actual8 = yield* project.generatedFiles;
+          expect(actual8).toEqual(incremental);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -214,7 +229,7 @@ if (existsSync(block)) {
   unlinkSync(block);
 }
 `;
-          const otherImpl = `${Project.impl.replace('"./notes.spec"', '"./other.spec"')}\nprocess.stdout.write("SECOND:1\\n");\n`;
+          const otherImpl = `${pipe(Project.impl, Str.replace('"./notes.spec"', '"./other.spec"'))}\nprocess.stdout.write("SECOND:1\\n");\n`;
           yield* project.write("confect/notes.impl.ts", gatedImpl);
           yield* project.write("confect/other.spec.ts", Project.spec);
           yield* project.write("confect/other.impl.ts", otherImpl);
@@ -235,7 +250,7 @@ if (existsSync(block)) {
           yield* watching.waitFor("VALIDATION_BLOCKED");
           yield* project.write(
             "confect/other.impl.ts",
-            otherImpl.replace("SECOND:1", "SECOND:2"),
+            pipe(otherImpl, Str.replace("SECOND:1", "SECOND:2")),
           );
           yield* project.write("release", "");
           yield* watching.waitFor("SECOND:2");
@@ -256,13 +271,19 @@ if (existsSync(block)) {
             yield* project.write(`confect/${name}.spec.ts`, Project.spec);
             yield* project.write(
               `confect/${name}.impl.ts`,
-              [
-                name === "unrelated"
-                  ? "const version = 0;"
-                  : 'import { version } from "../shared";',
-                Project.impl.replace('"./notes.spec"', `"./${name}.spec"`),
-                `process.stdout.write("EVALUATED:${name}:" + version + "\\n");`,
-              ].join("\n"),
+              Arr.join(
+                [
+                  name === "unrelated"
+                    ? "const version = 0;"
+                    : 'import { version } from "../shared";',
+                  pipe(
+                    Project.impl,
+                    Str.replace('"./notes.spec"', `"./${name}.spec"`),
+                  ),
+                  `process.stdout.write("EVALUATED:${name}:" + version + "\\n");`,
+                ],
+                "\n",
+              ),
             );
           }
           yield* project.write(
@@ -278,9 +299,8 @@ if (existsSync(block)) {
           yield* project.write("shared.ts", "export const version = 2;\n");
           yield* watching.waitFor("Dependencies may have changed");
           yield* watching.waitFor(success);
-          const reload = (yield* Ref.get(watching.output)).slice(
-            initial.length,
-          );
+          const current3 = yield* Ref.get(watching.output);
+          const reload = pipe(current3, Str.slice(initial.length));
           expect(reload).toContain("EVALUATED:notes:2");
           expect(reload).toContain("EVALUATED:other:2");
           expect(reload).not.toContain("EVALUATED:unrelated");
@@ -309,7 +329,7 @@ if (existsSync(block)) {
                 project.write(`confect/${name}.spec.ts`, Project.spec),
                 project.write(
                   `confect/${name}.impl.ts`,
-                  `${Project.impl.replace('"./notes.spec"', `"./${name}.spec"`)}\nprocess.stdout.write("${unrelatedMarker}\\n");\n`,
+                  `${pipe(Project.impl, Str.replace('"./notes.spec"', `"./${name}.spec"`))}\nprocess.stdout.write("${unrelatedMarker}\\n");\n`,
                 ),
               ]),
           );
@@ -323,7 +343,7 @@ if (existsSync(block)) {
           yield* project.write("confect/tables/notes.ts", Project.table);
           yield* watching.waitFor(success);
           const initial = yield* Ref.get(watching.output);
-          expect(initial.split(unrelatedMarker)).toHaveLength(
+          expect(Str.split(initial, unrelatedMarker)).toHaveLength(
             unrelatedGroups + 1,
           );
           yield* project.write(
@@ -332,11 +352,10 @@ if (existsSync(block)) {
           );
           yield* watching.waitFor("Dependencies may have changed");
           yield* watching.waitFor(success);
-          const reload = (yield* Ref.get(watching.output)).slice(
-            initial.length,
-          );
+          const current4 = yield* Ref.get(watching.output);
+          const reload = pipe(current4, Str.slice(initial.length));
           expect(reload).toContain(changedMarker);
-          expect(reload.split(unrelatedMarker)).toHaveLength(1);
+          expect(Str.split(reload, unrelatedMarker)).toHaveLength(1);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );

@@ -1,3 +1,4 @@
+import * as Arr from "effect/Array";
 import { QueryStreamKeyLabels as PublicKeyLabels } from "@confect/server";
 import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -21,7 +22,7 @@ describe("QueryStreamKeyLabels", () => {
     expectTypeOf(labels[0]).toEqualTypeOf<"author">();
     expectTypeOf(labels.length).toEqualTypeOf<2>();
     expectTypeOf(
-      labels.map((name) => name),
+      Arr.map(labels, (name) => name),
     ).not.toExtend<QueryStreamKeyLabels.QueryStreamKeyLabels>();
   });
 

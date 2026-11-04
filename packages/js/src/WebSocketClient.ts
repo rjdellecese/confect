@@ -1,5 +1,7 @@
+import { dual } from "effect/Function";
 import { ConvexClient } from "convex/browser";
 import * as Context from "effect/Context";
+import { pipe } from "effect/Function";
 import * as Layer from "effect/Layer";
 import * as Ref from "@confect/core/Ref";
 import * as Effect from "effect/Effect";
@@ -8,12 +10,12 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
-export class WebSocketClientError extends Schema.TaggedError<WebSocketClientError>()(
-  "WebSocketClientError",
-  {
-    cause: Schema.Defect(),
-  },
-) {}
+export class WebSocketClientError extends Schema.TaggedError<
+  WebSocketClientError,
+  {}
+>()("WebSocketClientError", {
+  cause: Schema.Defect(),
+}) {}
 
 const runQuery = Effect.fn("WebSocketClient.query")(
   <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
@@ -48,7 +50,7 @@ const make = (
         const runFork = Effect.runForkWith(context);
         convexClient.setAuth(
           (args) => runPromise(Effect.suspend(() => fetchToken(args))),
-          ...(onChange
+          ...(onChange !== undefined
             ? [
                 (isAuthenticated: boolean) => {
                   runFork(Effect.suspend(() => onChange(isAuthenticated)));
@@ -59,7 +61,7 @@ const make = (
       });
 
     const mapUnknownError = (cause: unknown) =>
-      new WebSocketClientError({ cause });
+      WebSocketClientError.make({ cause });
 
     const query = <Query extends Ref.AnyPublicQuery>(
       ref: Query,
@@ -139,7 +141,8 @@ const make = (
 
       return Stream.unwrap(
         Effect.match(Ref.encodeArgs(ref, args), {
-          onFailure: (error) => Stream.succeed<QueryResult>(Result.fail(error)),
+          onFailure: (error) =>
+            pipe(error, Result.fail, Stream.succeed<QueryResult>),
           onSuccess: (encodedArgs) =>
             Stream.callback<Result.Result<unknown, ReactiveQueryError<Query>>>(
               (queue) =>
@@ -165,10 +168,7 @@ const make = (
           Result.match(result, {
             onFailure: (error) => Effect.succeed(Result.fail(error)),
             onSuccess: (encodedReturns) =>
-              Effect.match(Ref.decodeReturns(ref, encodedReturns), {
-                onFailure: Result.fail,
-                onSuccess: Result.succeed,
-              }),
+              Ref.decodeReturns(ref, encodedReturns).pipe(Effect.result),
           }),
         ),
       );
@@ -211,7 +211,16 @@ export const WebSocketClient = Context.Service<
 
 export type WebSocketClient = typeof WebSocketClient.Identifier;
 
-export const layer = (
-  address: string,
-  options?: ConstructorParameters<typeof ConvexClient>[1],
-) => Layer.effect(WebSocketClient, make(address, options));
+export const layer: {
+  (
+    options?: ConstructorParameters<typeof ConvexClient>[1],
+  ): (address: string) => Layer.Layer<Effect.Success<ReturnType<typeof make>>>;
+  (
+    address: string,
+    options?: ConstructorParameters<typeof ConvexClient>[1],
+  ): Layer.Layer<Effect.Success<ReturnType<typeof make>>>;
+} = dual(
+  (args) => typeof args[0] === "string",
+  (address: string, options?: ConstructorParameters<typeof ConvexClient>[1]) =>
+    Layer.effect(WebSocketClient, make(address, options)),
+);

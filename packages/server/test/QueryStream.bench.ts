@@ -36,22 +36,24 @@ const paginationOpts: QueryStream.PaginateOptions = {
   cursor: null,
 };
 
-bench("filter", () => {
-  return QueryStream.filter(notes, (note) => note.tag !== "hidden");
-}).types([15, "instantiations"]);
+bench("filter", () =>
+  QueryStream.filter(notes, (note) => note.tag !== "hidden")).types([
+  15,
+  "instantiations",
+]);
 
-bench("merge", () => {
-  return QueryStream.merge([notes, moreNotes]);
-}).types([25, "instantiations"]);
+bench("merge", () => QueryStream.merge([notes, moreNotes])).types([
+  25,
+  "instantiations",
+]);
 
-bench("flatMap", () => {
-  return QueryStream.flatMap(notes, messagesOf, {
+bench("flatMap", () =>
+  QueryStream.flatMap(notes, messagesOf, {
     innerKeyLayout: messagesLayout,
-  });
-}).types([54, "instantiations"]);
+  })).types([54, "instantiations"]);
 
-bench("stream → filter → merge → flatMap → paginate", () => {
-  return QueryStream.merge([
+bench("stream → filter → merge → flatMap → paginate", () =>
+  QueryStream.merge([
     QueryStream.filter(notes, (note) => note.tag !== "hidden"),
     moreNotes,
   ]).pipe(
@@ -59,5 +61,4 @@ bench("stream → filter → merge → flatMap → paginate", () => {
       innerKeyLayout: messagesLayout,
     }),
     QueryStream.paginate(paginationOpts),
-  );
-}).types([877, "instantiations"]);
+  )).types([877, "instantiations"]);

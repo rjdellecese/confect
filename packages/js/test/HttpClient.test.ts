@@ -4,6 +4,7 @@ import * as HttpClient from "@confect/js/HttpClient";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 
@@ -58,7 +59,10 @@ const argsActionRef = Ref.make(
   }),
 );
 
-class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedError<
+  NotFound,
+  { readonly brand: unique symbol }
+>()("NotFound", {
   id: Schema.String,
 }) {}
 
@@ -91,6 +95,18 @@ const actionWithError = Ref.make(
     error: () => NotFound,
   }),
 );
+
+it("supports pipeable layer construction with optional options", () => {
+  const defaultLayer = HttpClient.layer()("https://example-123.convex.cloud");
+  const configuredLayer = HttpClient.layer({ logger: false })(
+    "https://example-123.convex.cloud",
+  );
+  expect(Layer.isLayer(defaultLayer)).toBe(true);
+  expect(Layer.isLayer(configuredLayer)).toBe(true);
+  expectTypeOf(configuredLayer).toEqualTypeOf<
+    ReturnType<typeof HttpClient.layer>
+  >();
+});
 
 it("preserves generic arguments, results, and error channels", () => {
   const check = (client: HttpClient.HttpClient) => {
@@ -164,13 +180,15 @@ it.effect(
         readonly body: BodyInit | null | undefined;
         readonly response: Deferred.Deferred<Response>;
       }>();
+      const context = yield* Effect.context<never>();
+      const runPromise = Effect.runPromiseWith(context);
       const fetch: typeof globalThis.fetch = Object.assign(
         (_input: RequestInfo | URL, init?: RequestInit) =>
           Effect.gen(function* () {
             const response = yield* Deferred.make<Response>();
             yield* Queue.offer(requests, { body: init?.body, response });
             return yield* Deferred.await(response);
-          }).pipe(Effect.runPromise),
+          }).pipe(runPromise),
         { preconnect: () => {} },
       );
       const ref = Ref.make(
@@ -181,12 +199,16 @@ it.effect(
           returns: () => Schema.FiniteFromString,
         }),
       );
+      const services = yield* Layer.build(
+        HttpClient.layer("https://example-123.convex.cloud", { fetch }),
+      );
       yield* Effect.gen(function* () {
         const client = yield* HttpClient.HttpClient;
         const args = { value: 3 };
         const options = { skipQueue: true };
         const bypass = client.mutation(ref, args, options);
-        expect(yield* Queue.size(requests)).toBe(0);
+        const observed1 = yield* Queue.size(requests);
+        expect(observed1).toBe(0);
 
         const first = yield* client
           .mutation(ref, { value: 1 })
@@ -198,20 +220,18 @@ it.effect(
         yield* Effect.yieldNow;
         const immediate = yield* bypass.pipe(Effect.forkScoped);
         const immediateRequest = yield* Queue.take(requests);
-        expect(
-          yield* Schema.decodeUnknownEffect(
-            Schema.fromJsonString(Schema.Unknown),
-          )(firstRequest.body),
-        ).toEqual({
+        const observed2 = yield* Schema.decodeUnknownEffect(
+          Schema.fromJsonString(Schema.Unknown),
+        )(firstRequest.body);
+        expect(observed2).toEqual({
           path: "numbers:echo",
           format: "convex_encoded_json",
           args: [{ value: "1" }],
         });
-        expect(
-          yield* Schema.decodeUnknownEffect(
-            Schema.fromJsonString(Schema.Unknown),
-          )(immediateRequest.body),
-        ).toEqual({
+        const observed3 = yield* Schema.decodeUnknownEffect(
+          Schema.fromJsonString(Schema.Unknown),
+        )(immediateRequest.body);
+        expect(observed3).toEqual({
           path: "numbers:echo",
           format: "convex_encoded_json",
           args: [{ value: "3" }],
@@ -220,20 +240,22 @@ it.effect(
           immediateRequest.response,
           Response.json({ status: "success", value: "3" }),
         );
-        expect(yield* Fiber.join(immediate)).toBe(3);
-        expect(yield* Queue.size(requests)).toBe(0);
+        const observed4 = yield* Fiber.join(immediate);
+        expect(observed4).toBe(3);
+        const observed5 = yield* Queue.size(requests);
+        expect(observed5).toBe(0);
 
         yield* Deferred.succeed(
           firstRequest.response,
           Response.json({ status: "success", value: "1" }),
         );
-        expect(yield* Fiber.join(first)).toBe(1);
+        const observed6 = yield* Fiber.join(first);
+        expect(observed6).toBe(1);
         const queuedRequest = yield* Queue.take(requests);
-        expect(
-          yield* Schema.decodeUnknownEffect(
-            Schema.fromJsonString(Schema.Unknown),
-          )(queuedRequest.body),
-        ).toEqual({
+        const observed7 = yield* Schema.decodeUnknownEffect(
+          Schema.fromJsonString(Schema.Unknown),
+        )(queuedRequest.body);
+        expect(observed7).toEqual({
           path: "numbers:echo",
           format: "convex_encoded_json",
           args: [{ value: "2" }],
@@ -242,13 +264,10 @@ it.effect(
           queuedRequest.response,
           Response.json({ status: "success", value: "2" }),
         );
-        expect(yield* Fiber.join(queued)).toBe(2);
+        const observed8 = yield* Fiber.join(queued);
+        expect(observed8).toBe(2);
         expect(args).toEqual({ value: 3 });
         expect(options).toEqual({ skipQueue: true });
-      }).pipe(
-        Effect.provide(
-          HttpClient.layer("https://example-123.convex.cloud", { fetch }),
-        ),
-      );
+      }).pipe(Effect.provideContext(services));
     }).pipe(Effect.scoped),
 );

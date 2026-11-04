@@ -2,6 +2,9 @@ import { FunctionSpec, Ref } from "@confect/core";
 import { act, renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
 import * as Schema from "effect/Schema";
+import * as Arr from "effect/Array";
+import * as Rec from "effect/Record";
+import * as Result from "effect/Result";
 import * as MutableRef from "effect/MutableRef";
 import { assert, beforeEach, describe, expect, test } from "@effect/vitest";
 import { vi } from "vitest";
@@ -39,7 +42,10 @@ const listWithArgs = Ref.make(
   }),
 );
 
-class Boom extends Schema.TaggedError<Boom>()("Boom", {
+class Boom extends Schema.TaggedError<
+  Boom,
+  { readonly brand: unique symbol }
+>()("Boom", {
   reason: Schema.String,
 }) {}
 
@@ -59,17 +65,28 @@ const listOrFail = Ref.make(
  */
 const responses = MutableRef.make(new Map<string, unknown>());
 
+const encodeJson = Schema.Unknown.pipe(
+  Schema.fromJsonString,
+  Schema.encodeResult,
+);
+
 const respond = (paginationOpts: object, result: unknown) => {
-  MutableRef.get(responses).set(JSON.stringify(paginationOpts), result);
+  MutableRef.get(responses).set(
+    encodeJson(paginationOpts).pipe(Result.getOrThrow),
+    result,
+  );
 };
 
 const subscribedOpts = () =>
-  Object.values(
-    useQueriesMock.mock.lastCall![0] as Record<
-      string,
-      { args: { paginationOpts: object } }
-    >,
-  ).map((request) => request.args.paginationOpts);
+  Arr.map(
+    Rec.values(
+      useQueriesMock.mock.lastCall![0] as Record<
+        string,
+        { args: { paginationOpts: object } }
+      >,
+    ),
+    (request) => request.args.paginationOpts,
+  );
 
 /**
  * Snapshot `result.current` without TypeScript carrying narrowing from an
@@ -83,13 +100,10 @@ beforeEach(() => {
   useQueriesMock.mockReset();
   useQueriesMock.mockImplementation(
     (queries: Record<string, { args: { paginationOpts: unknown } }>) =>
-      Object.fromEntries(
-        Object.entries(queries).map(([key, request]) => [
-          key,
-          MutableRef.get(responses).get(
-            JSON.stringify(request.args.paginationOpts),
-          ),
-        ]),
+      Rec.map(queries, (request) =>
+        MutableRef.get(responses).get(
+          encodeJson(request.args.paginationOpts).pipe(Result.getOrThrow),
+        ),
       ),
   );
 });
@@ -104,6 +118,22 @@ const respondFirstPage = (result: object) => {
 };
 
 describe("useStreamPaginatedQuery", () => {
+  test("supports pipeable stream paginated hooks", () => {
+    const { result } = renderHook(() =>
+      useStreamPaginatedQuery<typeof listWithArgs>(
+        { count: 42 },
+        { initialNumItems: 2 },
+      )(listWithArgs),
+    );
+    expect(result.current._tag).toBe("LoadingFirstPage");
+    const request = Rec.values(
+      useQueriesMock.mock.lastCall![0] as Record<string, { args: unknown }>,
+    )[0]!;
+    expect(request.args).toEqual({
+      count: "42",
+      paginationOpts: { numItems: 2, cursor: null },
+    });
+  });
   test("pins the first page to its range once loaded, decoding its items", () => {
     respond(
       { numItems: 2, cursor: null },
@@ -156,7 +186,7 @@ describe("useStreamPaginatedQuery", () => {
       ),
     );
 
-    const request = Object.values(
+    const request = Rec.values(
       useQueriesMock.mock.lastCall![0] as Record<string, { args: object }>,
     )[0]!;
     expect(request.args).toEqual({

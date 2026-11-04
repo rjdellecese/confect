@@ -298,7 +298,8 @@ describe("forEachBranchLeaves", () => {
           () => Ref.update(count, (value) => value + 1),
         );
 
-        expect(yield* Ref.get(count)).toBe(3);
+        const getResult = yield* Ref.get(count);
+        expect(getResult).toBe(3);
       }),
     );
 
@@ -314,7 +315,8 @@ describe("forEachBranchLeaves", () => {
           () => Effect.fail("test error"),
         );
 
-        expect(yield* Effect.flip(effect)).toBe("test error");
+        const flipResult = yield* Effect.flip(effect);
+        expect(flipResult).toBe("test error");
       }),
     );
 

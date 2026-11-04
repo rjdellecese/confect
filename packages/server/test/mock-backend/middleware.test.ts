@@ -1,3 +1,4 @@
+import * as RecordEffect from "effect/Record";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { FunctionSpec, GroupSpec, MiddlewareSpec, Ref } from "@confect/core";
 import {
@@ -29,7 +30,8 @@ import { NameTooShort } from "./fixtures/confect/middleware/RequireLongName.spec
 import * as TestConfect from "./TestConfect";
 
 const expectFailure = <A, E>(result: Result.Result<A, E>): E => {
-  assert(Result.isFailure(result));
+  const isFailure2 = Result.isFailure(result);
+  assert(isFailure2);
   return result.failure;
 };
 
@@ -54,13 +56,13 @@ const listNoteTexts = Effect.gen(function* () {
         .collect();
       return Array.map(notes, (note) => note.text);
     }),
-    Schema.mutable(Schema.Array(Schema.String)),
+    Schema.String.pipe(Schema.Array, Schema.mutable),
   );
 }).pipe(Effect.orDie);
 
-describe("middleware", () => {
+it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
   describe("provides", () => {
-    it.effect("provides a service to a query handler", () =>
+    test.effect("provides a service to a query handler", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
         yield* insertUser("ada");
@@ -68,10 +70,10 @@ describe("middleware", () => {
         const name = yield* c.query(refs.public.groups.middleware.viewerName);
 
         expect(name).toBe("ada");
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
 
-    it.effect("provides a service to a mutation handler", () =>
+    test.effect("provides a service to a mutation handler", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
         yield* insertUser("grace");
@@ -81,10 +83,10 @@ describe("middleware", () => {
         );
 
         expect(name).toBe("grace");
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
 
-    it.effect(
+    test.effect(
       "provides a service to an action handler via the per-function-type QueryRunner strategy",
       () =>
         Effect.gen(function* () {
@@ -96,12 +98,12 @@ describe("middleware", () => {
           );
 
           expect(name).toBe("alan");
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
   });
 
   describe("typed errors", () => {
-    it.effect(
+    test.effect(
       "middleware short-circuit surfaces as its typed error on a query",
       () =>
         Effect.gen(function* () {
@@ -112,10 +114,10 @@ describe("middleware", () => {
           );
 
           expect(expectFailure(result)).toBeInstanceOf(NoViewer);
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
 
-    it.effect(
+    test.effect(
       "middleware short-circuit surfaces as its typed error on an action",
       () =>
         Effect.gen(function* () {
@@ -126,10 +128,10 @@ describe("middleware", () => {
           );
 
           expect(expectFailure(result)).toBeInstanceOf(NoViewer);
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
 
-    it.effect(
+    test.effect(
       "a function's own error and its middleware's error both decode on the client",
       () =>
         Effect.gen(function* () {
@@ -147,10 +149,10 @@ describe("middleware", () => {
             c.query(refs.public.groups.middleware.firstNoteForViewer),
           );
           expect(expectFailure(noNotes)).toBeInstanceOf(NoNotes);
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
 
-    it("types a covered function's ref error as the union of its own and its middleware's errors", () => {
+    test("types a covered function's ref error as the union of its own and its middleware's errors", () => {
       expectTypeOf<
         Ref.Error<typeof refs.public.groups.middleware.firstNoteForViewer>
       >().toEqualTypeOf<NoNotes | NoViewer>();
@@ -161,7 +163,7 @@ describe("middleware", () => {
   });
 
   describe("cross-middleware requires", () => {
-    it.effect(
+    test.effect(
       "a middleware consumes a service provided by an earlier middleware",
       () =>
         Effect.gen(function* () {
@@ -173,35 +175,39 @@ describe("middleware", () => {
           );
 
           expect(shouted).toBe("ADA");
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
 
-    it.effect("fails with its own typed error using the required service", () =>
-      Effect.gen(function* () {
-        const c = yield* TestConfect.TestConfect;
-        yield* insertUser("ab");
+    test.effect(
+      "fails with its own typed error using the required service",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* insertUser("ab");
 
-        const result = yield* Effect.result(
-          c.query(refs.public.groups.middleware.shoutName),
-        );
+          const result = yield* Effect.result(
+            c.query(refs.public.groups.middleware.shoutName),
+          );
 
-        expect(expectFailure(result)).toBeInstanceOf(NameTooShort);
-      }).pipe(Effect.provide(TestConfect.layer)),
+          expect(expectFailure(result)).toBeInstanceOf(NameTooShort);
+        }),
     );
 
-    it.effect("the providing middleware's short-circuit still runs first", () =>
-      Effect.gen(function* () {
-        const c = yield* TestConfect.TestConfect;
+    test.effect(
+      "the providing middleware's short-circuit still runs first",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
 
-        const result = yield* Effect.result(
-          c.query(refs.public.groups.middleware.shoutName),
-        );
+          const result = yield* Effect.result(
+            c.query(refs.public.groups.middleware.shoutName),
+          );
 
-        expect(expectFailure(result)).toBeInstanceOf(NoViewer);
-      }).pipe(Effect.provide(TestConfect.layer)),
+          expect(expectFailure(result)).toBeInstanceOf(NoViewer);
+        }),
     );
 
-    it("joins both middlewares' errors in the covered function's ref union", () => {
+    test("joins both middlewares' errors in the covered function's ref union", () => {
       expectTypeOf<
         Ref.Error<typeof refs.public.groups.middleware.shoutName>
       >().toEqualTypeOf<NoViewer | NameTooShort>();
@@ -209,7 +215,7 @@ describe("middleware", () => {
   });
 
   describe("ordering and short-circuiting", () => {
-    it.effect(
+    test.effect(
       "group middleware run in attachment order, then function-level middleware, then the handler",
       () =>
         Effect.gen(function* () {
@@ -227,10 +233,10 @@ describe("middleware", () => {
             "function",
             "handler",
           ]);
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
 
-    it.effect(
+    test.effect(
       "an outer middleware's short-circuit skips inner middleware and the handler",
       () =>
         Effect.gen(function* () {
@@ -244,17 +250,18 @@ describe("middleware", () => {
           );
 
           const error = expectFailure(result);
-          assert(Schema.is(GateClosed)(error));
+          const matchesSchema = Schema.is(GateClosed)(error);
+          assert(matchesSchema);
           expect(error.reason).toBe("blocked by gate");
 
           const texts = yield* listNoteTexts;
           expect(texts).toStrictEqual([]);
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
   });
 
   describe("function-level middleware", () => {
-    it.effect(
+    test.effect(
       "runs inside the group chain and short-circuits with its typed error",
       () =>
         Effect.gen(function* () {
@@ -273,10 +280,10 @@ describe("middleware", () => {
           // that), but a failed mutation rolls back its whole transaction—the markers they inserted are rolled back along with it.
           const texts = yield* listNoteTexts;
           expect(texts).toStrictEqual([]);
-        }).pipe(Effect.provide(TestConfect.layer)),
+        }),
     );
 
-    it.effect("does not cover the group's other functions", () =>
+    test.effect("does not cover the group's other functions", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
 
@@ -284,10 +291,10 @@ describe("middleware", () => {
 
         const texts = yield* listNoteTexts;
         expect(texts).toStrictEqual(["first", "second", "handler"]);
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
     );
 
-    it("adds its error to the covered function's ref union only", () => {
+    test("adds its error to the covered function's ref union only", () => {
       expectTypeOf<
         Ref.Error<typeof refs.public.groups.middlewareOrder.record>
       >().toEqualTypeOf<GateClosed | FunctionGateClosed>();
@@ -326,7 +333,7 @@ describe("middleware", () => {
       },
     ) {}
 
-    it.effect(
+    test.effect(
       "passes typed options through both implementation strategies in attachment order",
       () =>
         Effect.gen(function* () {
@@ -357,8 +364,8 @@ describe("middleware", () => {
               MiddlewareImpl.make(
                 databaseSchema,
                 GroupPolicy,
-                (effect, context) => {
-                  return Effect.gen(function* () {
+                (effect, context) =>
+                  Effect.gen(function* () {
                     expect(context).toEqual({
                       options: { label: context.options.label },
                       invocation: {
@@ -372,8 +379,7 @@ describe("middleware", () => {
                     const result = yield* effect;
                     events.push(`${context.options.label}:after`);
                     return result;
-                  });
-                },
+                  }),
               ),
             ),
             Layer.provide(
@@ -381,8 +387,8 @@ describe("middleware", () => {
                 databaseSchema,
                 FunctionPolicy,
                 {
-                  query: (effect, { options, invocation }) => {
-                    return Effect.gen(function* () {
+                  query: (effect, { options, invocation }) =>
+                    Effect.gen(function* () {
                       expect(options.tolerateMissing).toBe(true);
                       expect(invocation).toEqual({
                         name: "get",
@@ -392,8 +398,7 @@ describe("middleware", () => {
                       });
                       events.push("function");
                       return yield* effect;
-                    });
-                  },
+                    }),
                   mutation: (effect) => effect,
                   action: (effect) => effect,
                 },
@@ -404,7 +409,9 @@ describe("middleware", () => {
                 databaseSchema,
                 Observe,
                 (effect, context) => {
-                  expect(Object.hasOwn(context, "options")).toBe(false);
+                  expect(
+                    RecordEffect.has<string, unknown>(context, "options"),
+                  ).toBe(false);
                   expect(context).toStrictEqual({
                     invocation: {
                       name: "get",
@@ -423,7 +430,7 @@ describe("middleware", () => {
                 UndefinedPolicy,
                 {
                   query: (effect, context) => {
-                    expect(Object.hasOwn(context, "options")).toBe(true);
+                    expect(RecordEffect.has(context, "options")).toBe(true);
                     expect(context).toStrictEqual({
                       options: undefined,
                       invocation: {
@@ -447,18 +454,22 @@ describe("middleware", () => {
             databaseSchema,
             groupLayer,
           );
-          const c = yield* Effect.service(TestConfect.TestConfect).pipe(
-            Effect.provide(
+          const c = yield* Effect.gen(function* () {
+            const services = yield* Layer.build(
               TestConfect_.layer(databaseSchema, convexSchema, {
                 ...import.meta.glob("./fixtures/convex/_generated/*.js"),
                 "./fixtures/convex/options.ts": () =>
                   Promise.resolve(registered),
               }),
-            ),
-          );
-          expect(
-            yield* c.query(Ref.make("options", query), { id: "decoded" }),
-          ).toBe("ok");
+            );
+            return yield* Effect.service(TestConfect.TestConfect).pipe(
+              Effect.provideContext(services),
+            );
+          }).pipe(Effect.scoped);
+          const queryResult = yield* c.query(Ref.make("options", query), {
+            id: "decoded",
+          });
+          expect(queryResult).toBe("ok");
           expect(events).toEqual([
             "group",
             "function",
@@ -470,58 +481,69 @@ describe("middleware", () => {
         }),
     );
 
-    it.effect("lets the inner instance shadow the same provided service", () =>
-      Effect.gen(function* () {
-        class Value extends Context.Service<Value, string>()(
-          "@confect/server/test/mock-backend/middleware.test/Value",
-        ) {}
-        class ProvideValue extends MiddlewareSpec.MiddlewareSpec<
-          ProvideValue,
-          { provides: Value }
-        >()("ProvideValue", {
-          options: () => Schema.Struct({ value: Schema.String }),
-          functionTypes: { query: true, mutation: false, action: false },
-        }) {}
-        const query = FunctionSpec.publicQuery({
-          name: "get",
-          returns: () => Schema.String,
-        }).middleware(ProvideValue, { value: "inner" });
-        const group = GroupSpec.make()
-          .middleware(ProvideValue, { value: "outer" })
-          .addFunction(query);
-        const groupLayer = GroupImpl.make(databaseSchema, group).pipe(
-          Layer.provide(
-            FunctionImpl.make(databaseSchema, group, "get", () =>
-              Effect.service(Value),
+    test.effect(
+      "lets the inner instance shadow the same provided service",
+      () =>
+        Effect.gen(function* () {
+          class Value extends Context.Service<Value, string>()(
+            "@confect/server/test/mock-backend/middleware.test/Value",
+          ) {}
+          class ProvideValue extends MiddlewareSpec.MiddlewareSpec<
+            ProvideValue,
+            { provides: Value }
+          >()("ProvideValue", {
+            options: () => Schema.Struct({ value: Schema.String }),
+            functionTypes: { query: true, mutation: false, action: false },
+          }) {}
+          const query = FunctionSpec.publicQuery({
+            name: "get",
+            returns: () => Schema.String,
+          }).middleware(ProvideValue, { value: "inner" });
+          const group = GroupSpec.make()
+            .middleware(ProvideValue, { value: "outer" })
+            .addFunction(query);
+          const groupLayer = GroupImpl.make(databaseSchema, group).pipe(
+            Layer.provide(
+              FunctionImpl.make(databaseSchema, group, "get", () =>
+                Effect.service(Value),
+              ),
             ),
-          ),
-          Layer.provide(
-            MiddlewareImpl.make(
-              databaseSchema,
-              ProvideValue,
-              (effect, { options }) =>
-                Effect.provideService(effect, Value, options.value),
+            Layer.provide(
+              MiddlewareImpl.make(
+                databaseSchema,
+                ProvideValue,
+                (effect, { options }) =>
+                  Effect.provideService(effect, Value, options.value),
+              ),
             ),
-          ),
-          GroupImpl.finalize,
-        );
-        const registered = RegisteredFunctions.buildForGroup<typeof group>(
-          databaseSchema,
-          groupLayer,
-        );
-        const c = yield* Effect.service(TestConfect.TestConfect).pipe(
-          Effect.provide(
-            TestConfect_.layer(databaseSchema, convexSchema, {
-              ...import.meta.glob("./fixtures/convex/_generated/*.js"),
-              "./fixtures/convex/options.ts": () => Promise.resolve(registered),
-            }),
-          ),
-        );
-        expect(yield* c.query(Ref.make("options", query))).toBe("inner");
-      }),
+            GroupImpl.finalize,
+          );
+          const registered = RegisteredFunctions.buildForGroup<typeof group>(
+            databaseSchema,
+            groupLayer,
+          );
+          const c = yield* Effect.gen(function* () {
+            const services = yield* Layer.build(
+              TestConfect_.layer(databaseSchema, convexSchema, {
+                ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+                "./fixtures/convex/options.ts": () =>
+                  Promise.resolve(registered),
+              }),
+            );
+            return yield* Effect.service(TestConfect.TestConfect).pipe(
+              Effect.provideContext(services),
+            );
+          }).pipe(Effect.scoped);
+          const invocation = c.query(Ref.make("options", query));
+          expectTypeOf(invocation).toEqualTypeOf<
+            Effect.Effect<string, Schema.SchemaError>
+          >();
+          const queryResult2 = yield* invocation;
+          expect(queryResult2).toBe("inner");
+        }),
     );
 
-    it.effect(
+    test.effect(
       "carries per-attachment options through codegen, execution, and client error decoding",
       () =>
         Effect.gen(function* () {
@@ -542,18 +564,25 @@ describe("middleware", () => {
           expect(group.longName.middlewareAttachments[2]?.options).toEqual({
             minLength: 5,
           });
-          expect(yield* c.query(group.shortName)).toBe("ada");
-          expect(yield* Effect.result(c.query(group.longName))).toEqual(
-            Result.fail(new NameRejected({ minLength: 5 })),
+          const queryResult3 = yield* c.query(group.shortName);
+          expect(queryResult3).toBe("ada");
+          const resultResult = yield* Effect.result(c.query(group.longName));
+          expect(resultResult).toEqual(
+            Result.fail(NameRejected.make({ minLength: 5 })),
           );
-          expect(yield* Effect.result(c.mutation(group.mutation))).toEqual(
-            Result.fail(new NameRejected({ minLength: 4 })),
+          const resultResult2 = yield* Effect.result(
+            c.mutation(group.mutation),
           );
-          expect(yield* Effect.result(c.action(group.action))).toEqual(
-            Result.fail(new NameRejected({ minLength: 6 })),
+          expect(resultResult2).toEqual(
+            Result.fail(NameRejected.make({ minLength: 4 })),
           );
-          expect(yield* c.query(group.shortName)).toBe("ada");
-        }).pipe(Effect.provide(TestConfect.layer)),
+          const resultResult3 = yield* Effect.result(c.action(group.action));
+          expect(resultResult3).toEqual(
+            Result.fail(NameRejected.make({ minLength: 6 })),
+          );
+          const queryResult4 = yield* c.query(group.shortName);
+          expect(queryResult4).toBe("ada");
+        }),
     );
   });
 });

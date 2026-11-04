@@ -15,7 +15,8 @@ const make = (storageReader: ConvexStorageReader) => ({
         flow(
           Option.fromNullishOr,
           Option.match({
-            onNone: () => Effect.fail(new BlobNotFoundError({ id: storageId })),
+            onNone: () =>
+              Effect.fail(BlobNotFoundError.make({ id: storageId })),
             onSome: (doc) =>
               pipe(
                 doc,

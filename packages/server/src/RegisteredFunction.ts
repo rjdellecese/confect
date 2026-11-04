@@ -1,3 +1,5 @@
+import { dual } from "effect/Function";
+import * as Array from "effect/Array";
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as Lazy from "@confect/core/Lazy";
@@ -153,24 +155,36 @@ export const toConvexDefinition = <
  * composed effect's error channel is re-accounted by
  * {@link combineErrorSchemas}.
  */
-export const applyMiddleware = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-  invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
-): Effect.Effect<A, any, R> => {
-  return resolvedMiddlewares.reduceRight<Effect.Effect<any, any, any>>(
-    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The erased middleware error remains intact so runHandlerPromise can validate it against the combined error schema.
-    (wrapped, middleware) => {
-      const context =
-        "options" in middleware.middlewareSpec
-          ? { options: middleware.options, invocation }
-          : { invocation };
-      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
-      return middleware.middlewareImpl(wrapped, context);
-    },
-    effect,
-  );
-};
+export const applyMiddleware = dual<
+  (
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
+    invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
+  ) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, any, R>,
+  <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
+    invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
+  ) => Effect.Effect<A, any, R>
+>(
+  3,
+  <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
+    invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
+  ): Effect.Effect<A, any, R> =>
+    Array.reduceRight(
+      resolvedMiddlewares,
+      effect,
+      (wrapped: Effect.Effect<any, any, any>, middleware) => {
+        const context =
+          "options" in middleware.middlewareSpec
+            ? { options: middleware.options, invocation }
+            : { invocation };
+        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
+        return middleware.middlewareImpl(wrapped, context);
+      },
+    ),
+);
 
 /**
  * The error-schema allowlist for a function with middleware: the function's own
@@ -178,22 +192,35 @@ export const applyMiddleware = <A, E, R>(
  * schema. `undefined` (⇒ every failure dies) only when neither declares
  * one—mirroring the ref-side union clients decode against.
  */
-export const combineErrorSchemas = (
-  error: Schema.Codec<any, any> | undefined,
-  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-): Schema.Codec<any, any> | undefined => {
-  const schemas = [
-    ...(error !== undefined ? [error] : []),
-    ...MiddlewareSpec.errorSchemas(
-      resolvedMiddlewares.map(({ middlewareSpec }) => middlewareSpec),
-    ),
-  ];
-  return schemas.length === 0
-    ? undefined
-    : schemas.length === 1
-      ? schemas[0]
-      : Schema.Union(schemas);
-};
+export const combineErrorSchemas = dual<
+  (
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
+  ) => (
+    error: Schema.Codec<any, any> | undefined,
+  ) => Schema.Codec<any, any> | undefined,
+  (
+    error: Schema.Codec<any, any> | undefined,
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
+  ) => Schema.Codec<any, any> | undefined
+>(
+  2,
+  (
+    error: Schema.Codec<any, any> | undefined,
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
+  ): Schema.Codec<any, any> | undefined => {
+    const schemas = [
+      ...(error !== undefined ? [error] : []),
+      ...MiddlewareSpec.errorSchemas(
+        Array.map(resolvedMiddlewares, ({ middlewareSpec }) => middlewareSpec),
+      ),
+    ];
+    return schemas.length === 0
+      ? undefined
+      : schemas.length === 1
+        ? schemas[0]
+        : Schema.Union(schemas);
+  },
+);
 
 /**
  * Run the `Effect` as a `Promise`. The error schema acts as an allowlist of
@@ -254,9 +281,11 @@ export const runHandlerPromise =
             ),
           );
     return Effect.runPromise(
-      Effect.result(rethrowConvexErrorDefects(withConvexError)).pipe(
-        Effect.provide(ConvexLogger.layer),
+      withConvexError.pipe(
+        rethrowConvexErrorDefects,
+        Effect.result,
         Effect.provideService(Console.Console, globalThis.console),
+        Effect.provide(ConvexLogger.layer),
       ),
       runOptions,
     ).then(
@@ -370,15 +399,30 @@ export const baseActionLayer = <ConvexDataModel extends GenericDataModel>(
     Layer.succeed(ActionCtx.ActionCtx<ConvexDataModel>(), ctx),
   );
 
-export const actionLayer = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+export const actionLayer = dual<
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    ctx: GenericActionCtx<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >,
+  ) => (
+    databaseSchema: DatabaseSchema_,
+  ) => Layer.Layer<ActionServices<DatabaseSchema_>>,
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    databaseSchema: DatabaseSchema_,
+    ctx: GenericActionCtx<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >,
+  ) => Layer.Layer<ActionServices<DatabaseSchema_>>
 >(
-  databaseSchema: DatabaseSchema_,
-  ctx: GenericActionCtx<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-  >,
-) =>
-  Layer.mergeAll(
-    baseActionLayer(ctx),
-    VectorSearch.layer(ctx.vectorSearch.bind(ctx)),
-  );
+  2,
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    databaseSchema: DatabaseSchema_,
+    ctx: GenericActionCtx<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >,
+  ) =>
+    Layer.mergeAll(
+      baseActionLayer(ctx),
+      VectorSearch.layer(ctx.vectorSearch.bind(ctx)),
+    ),
+);

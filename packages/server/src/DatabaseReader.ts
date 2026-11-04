@@ -1,3 +1,5 @@
+import { dual } from "effect/Function";
+import * as Record from "effect/Record";
 import type { GenericDatabaseReader } from "convex/server";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
@@ -34,49 +36,65 @@ export interface DatabaseReaderService<
   >;
 }
 
-export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-  databaseSchema: DatabaseSchema_,
-  convexDatabaseReader: GenericDatabaseReader<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-  >,
-): DatabaseReaderService<DatabaseSchema_> => {
-  return {
-    table: <
-      const TableName extends Table.Name<IncludedTables<DatabaseSchema_>>,
-    >(
-      tableName: TableName,
-    ) => {
-      const isSystem = Object.hasOwn(Table.systemTables, tableName);
+export const make = dual<
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    convexDatabaseReader: GenericDatabaseReader<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >,
+  ) => (
+    databaseSchema: DatabaseSchema_,
+  ) => DatabaseReaderService<DatabaseSchema_>,
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    databaseSchema: DatabaseSchema_,
+    convexDatabaseReader: GenericDatabaseReader<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >,
+  ) => DatabaseReaderService<DatabaseSchema_>
+>(
+  2,
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    databaseSchema: DatabaseSchema_,
+    convexDatabaseReader: GenericDatabaseReader<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >,
+  ): DatabaseReaderService<DatabaseSchema_> =>
+    ({
+      table: <
+        const TableName extends Table.Name<IncludedTables<DatabaseSchema_>>,
+      >(
+        tableName: TableName,
+      ) => {
+        const isSystem = Record.has(Table.systemTables, tableName);
 
-      const baseDatabaseReader: BaseDatabaseReader<any> = isSystem
-        ? {
-            get: convexDatabaseReader.system.get.bind(
-              convexDatabaseReader.system,
-            ),
-            query: convexDatabaseReader.system.query.bind(
-              convexDatabaseReader.system,
-            ),
-          }
-        : {
-            get: convexDatabaseReader.get.bind(convexDatabaseReader),
-            query: convexDatabaseReader.query.bind(convexDatabaseReader),
-          };
+        const baseDatabaseReader: BaseDatabaseReader<any> = isSystem
+          ? {
+              get: convexDatabaseReader.system.get.bind(
+                convexDatabaseReader.system,
+              ),
+              query: convexDatabaseReader.system.query.bind(
+                convexDatabaseReader.system,
+              ),
+            }
+          : {
+              get: convexDatabaseReader.get.bind(convexDatabaseReader),
+              query: convexDatabaseReader.query.bind(convexDatabaseReader),
+            };
 
-      const table = (
-        isSystem
-          ? (Table.systemTables as Record<string, Table.AnyWithProps>)[
-              tableName
-            ]
-          : DatabaseSchema.tables(databaseSchema)[tableName]
-      ) as Table.WithName<IncludedTables<DatabaseSchema_>, TableName>;
+        const table = (
+          isSystem
+            ? (Table.systemTables as Record<string, Table.AnyWithProps>)[
+                tableName
+              ]
+            : DatabaseSchema.tables(databaseSchema)[tableName]
+        ) as Table.WithName<IncludedTables<DatabaseSchema_>, TableName>;
 
-      return QueryInitializer.make<IncludedTables<DatabaseSchema_>, TableName>(
-        baseDatabaseReader,
-        table,
-      );
-    },
-  } as DatabaseReaderService<DatabaseSchema_>;
-};
+        return QueryInitializer.make<
+          IncludedTables<DatabaseSchema_>,
+          TableName
+        >(baseDatabaseReader, table);
+      },
+    }) as DatabaseReaderService<DatabaseSchema_>,
+);
 
 /**
  * The tag's _Identifier_ (the Effect requirements-channel type) is
@@ -106,13 +124,30 @@ export type DatabaseReader<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = DatabaseReaderService<DatabaseSchema_>;
 
-export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-  databaseSchema: DatabaseSchema_,
-  convexDatabaseReader: GenericDatabaseReader<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-  >,
-) =>
-  Layer.succeed(
-    DatabaseReader<DatabaseSchema_>(),
-    make(databaseSchema, convexDatabaseReader),
-  );
+export const layer = dual<
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    convexDatabaseReader: GenericDatabaseReader<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >,
+  ) => (
+    databaseSchema: DatabaseSchema_,
+  ) => Layer.Layer<DatabaseReader<DatabaseSchema_>>,
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    databaseSchema: DatabaseSchema_,
+    convexDatabaseReader: GenericDatabaseReader<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >,
+  ) => Layer.Layer<DatabaseReader<DatabaseSchema_>>
+>(
+  2,
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    databaseSchema: DatabaseSchema_,
+    convexDatabaseReader: GenericDatabaseReader<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >,
+  ) =>
+    Layer.succeed(
+      DatabaseReader<DatabaseSchema_>(),
+      make(databaseSchema, convexDatabaseReader),
+    ),
+);

@@ -1,3 +1,5 @@
+import * as Result from "effect/Result";
+import * as Array from "effect/Array";
 import type * as MiddlewareAttachment from "./MiddlewareAttachment";
 import type {
   DefaultFunctionArgs,
@@ -353,7 +355,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
           ...functionSpec.middlewareAttachments,
         ],
         get middlewareSpecs() {
-          return this.middlewareAttachments.map(({ spec }) => spec);
+          return Array.map(this.middlewareAttachments, ({ spec }) => spec);
         },
       };
 
@@ -396,7 +398,8 @@ export const hasErrorSchema = (ref: Any): boolean =>
       "Confect",
       (confectRef) =>
         "error" in confectRef ||
-        confectRef.middlewareSpecs.some(
+        Array.some(
+          confectRef.middlewareSpecs,
           (middlewareSpec) => "error" in middlewareSpec,
         ),
     ),
@@ -404,77 +407,143 @@ export const hasErrorSchema = (ref: Any): boolean =>
     Match.exhaustive,
   );
 
-export const encodeArgs = <Ref_ extends Any>(
+export function encodeArgs<Ref_ extends Any>(
+  ref: Ref_,
+): (args: Args<Ref_>) => Effect.Effect<unknown, Schema.SchemaError>;
+export function encodeArgs<Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
-): Effect.Effect<unknown, Schema.SchemaError> =>
-  Match.value<Any>(ref).pipe(
+): Effect.Effect<unknown, Schema.SchemaError>;
+export function encodeArgs<Ref_ extends Any>(
+  ...input: [ref: Ref_] | [ref: Ref_, args: Args<Ref_>]
+):
+  | Effect.Effect<unknown, Schema.SchemaError>
+  | ((args: Args<Ref_>) => Effect.Effect<unknown, Schema.SchemaError>) {
+  if (input.length === 1) return (args) => encodeArgs(input[0], args);
+  const [ref, args] = input;
+  return Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
       Schema.encodeEffect(confectRef.args)(args),
     ),
     Match.tag("Convex", () => Effect.succeed(args)),
     Match.exhaustive,
   );
+}
 
-export const decodeReturns = <Ref_ extends Any>(
+export function decodeReturns<Ref_ extends Any>(
+  ref: Ref_,
+): (returns: unknown) => Effect.Effect<Returns<Ref_>, Schema.SchemaError>;
+export function decodeReturns<Ref_ extends Any>(
   ref: Ref_,
   returns: unknown,
-): Effect.Effect<Returns<Ref_>, Schema.SchemaError> =>
-  Match.value<Any>(ref).pipe(
+): Effect.Effect<Returns<Ref_>, Schema.SchemaError>;
+export function decodeReturns<Ref_ extends Any>(
+  ...input: [ref: Ref_] | [ref: Ref_, returns: unknown]
+):
+  | Effect.Effect<Returns<Ref_>, Schema.SchemaError>
+  | ((returns: unknown) => Effect.Effect<Returns<Ref_>, Schema.SchemaError>) {
+  if (input.length === 1) return (returns) => decodeReturns(input[0], returns);
+  const [ref, returns] = input;
+  return Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
       Schema.decodeUnknownEffect(confectRef.returns)(returns),
     ),
     Match.tag("Convex", () => Effect.succeed(returns as Returns<Ref_>)),
     Match.exhaustive,
   );
+}
 
-export const encodeArgsSync = <Ref_ extends Any>(
+export function encodeArgsSync<Ref_ extends Any>(
+  ref: Ref_,
+): (args: Args<Ref_>) => unknown;
+export function encodeArgsSync<Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
-): unknown =>
-  Match.value<Any>(ref).pipe(
+): unknown;
+export function encodeArgsSync<Ref_ extends Any>(
+  ...input: [ref: Ref_] | [ref: Ref_, args: Args<Ref_>]
+): unknown {
+  if (input.length === 1)
+    return (args: Args<Ref_>) => encodeArgsSync(input[0], args);
+  const [ref, args] = input;
+  return Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.encodeSync(confectRef.args)(args),
+      Result.getOrThrow(Schema.encodeResult(confectRef.args)(args)),
     ),
     Match.tag("Convex", () => args),
     Match.exhaustive,
   );
+}
 
-export const decodeArgsSync = <Ref_ extends Any>(
+export function decodeArgsSync<Ref_ extends Any>(
+  ref: Ref_,
+): (encodedArgs: unknown) => Args<Ref_>;
+export function decodeArgsSync<Ref_ extends Any>(
   ref: Ref_,
   encodedArgs: unknown,
-): Args<Ref_> =>
-  Match.value<Any>(ref).pipe(
+): Args<Ref_>;
+export function decodeArgsSync<Ref_ extends Any>(
+  ...input: [ref: Ref_] | [ref: Ref_, encodedArgs: unknown]
+): Args<Ref_> | ((encodedArgs: unknown) => Args<Ref_>) {
+  if (input.length === 1)
+    return (encodedArgs) => decodeArgsSync(input[0], encodedArgs);
+  const [ref, encodedArgs] = input;
+  return Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.decodeUnknownSync(confectRef.args)(encodedArgs),
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(confectRef.args)(encodedArgs),
+      ),
     ),
     Match.tag("Convex", () => encodedArgs),
     Match.exhaustive,
   ) as Args<Ref_>;
+}
 
-export const encodeReturnsSync = <Ref_ extends Any>(
+export function encodeReturnsSync<Ref_ extends Any>(
+  ref: Ref_,
+): (returns: Returns<Ref_>) => unknown;
+export function encodeReturnsSync<Ref_ extends Any>(
   ref: Ref_,
   returns: Returns<Ref_>,
-): unknown =>
-  Match.value<Any>(ref).pipe(
+): unknown;
+export function encodeReturnsSync<Ref_ extends Any>(
+  ...input: [ref: Ref_] | [ref: Ref_, returns: Returns<Ref_>]
+): unknown {
+  if (input.length === 1)
+    return (returns: Returns<Ref_>) => encodeReturnsSync(input[0], returns);
+  const [ref, returns] = input;
+  return Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.encodeSync(confectRef.returns)(returns),
+      Result.getOrThrow(Schema.encodeResult(confectRef.returns)(returns)),
     ),
     Match.tag("Convex", () => returns),
     Match.exhaustive,
   );
+}
 
-export const decodeReturnsSync = <Ref_ extends Any>(
+export function decodeReturnsSync<Ref_ extends Any>(
+  ref: Ref_,
+): (encodedReturns: unknown) => Returns<Ref_>;
+export function decodeReturnsSync<Ref_ extends Any>(
   ref: Ref_,
   encodedReturns: unknown,
-): Returns<Ref_> =>
-  Match.value<Any>(ref).pipe(
+): Returns<Ref_>;
+export function decodeReturnsSync<Ref_ extends Any>(
+  ...input: [ref: Ref_] | [ref: Ref_, encodedReturns: unknown]
+): Returns<Ref_> | ((encodedReturns: unknown) => Returns<Ref_>) {
+  if (input.length === 1)
+    return (encodedReturns) => decodeReturnsSync(input[0], encodedReturns);
+  const [ref, encodedReturns] = input;
+  return Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.decodeUnknownSync(confectRef.returns)(encodedReturns),
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(confectRef.returns)(encodedReturns),
+      ),
     ),
     Match.tag("Convex", () => encodedReturns),
     Match.exhaustive,
   ) as Returns<Ref_>;
+}
 
 const ConvexErrorIdentifier = Symbol.for("ConvexError");
 
@@ -493,9 +562,23 @@ export const isConvexError = (error: unknown): error is ConvexError<Value> =>
  * callbacks for streamed subscriptions) to the same error semantics that
  * `runWithCodec` provides.
  */
-export const decodeErrorOrElse =
-  <Ref_ extends Any, E>(ref: Ref_, mapUnknownError: (error: unknown) => E) =>
-  (error: unknown): Error<Ref_> | E => {
+export function decodeErrorOrElse<Ref_ extends Any>(
+  ref: Ref_,
+): <E>(
+  mapUnknownError: (error: unknown) => E,
+) => (error: unknown) => Error<Ref_> | E;
+export function decodeErrorOrElse<Ref_ extends Any, E>(
+  ref: Ref_,
+  mapUnknownError: (error: unknown) => E,
+): (error: unknown) => Error<Ref_> | E;
+export function decodeErrorOrElse<Ref_ extends Any, E>(
+  ref: Ref_,
+  mapUnknownError?: (error: unknown) => E,
+) {
+  if (mapUnknownError === undefined)
+    return <Fallback>(fallback: (error: unknown) => Fallback) =>
+      decodeErrorOrElse(ref, fallback);
+  return (error: unknown): Error<Ref_> | E => {
     if (isConvexError(error)) {
       const decoded = decodeErrorOption(ref, error.data);
       if (Option.isSome(decoded)) {
@@ -504,6 +587,7 @@ export const decodeErrorOrElse =
     }
     return mapUnknownError(error);
   };
+}
 
 const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
   Match.value(ref).pipe(
@@ -533,17 +617,33 @@ const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
  * responsible for deciding what to do (typically: surface the original value as
  * a defect).
  */
-export const decodeError = <Ref_ extends Any>(
+export function decodeError<Ref_ extends Any>(
+  ref: Ref_,
+): (
+  encodedError: unknown,
+) => Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError>;
+export function decodeError<Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
-): Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError> =>
-  Option.match(errorSchemaOf(ref), {
+): Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError>;
+export function decodeError<Ref_ extends Any>(
+  ...input: [ref: Ref_] | [ref: Ref_, encodedError: unknown]
+):
+  | Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError>
+  | ((
+      encodedError: unknown,
+    ) => Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError>) {
+  if (input.length === 1)
+    return (encodedError) => decodeError(input[0], encodedError);
+  const [ref, encodedError] = input;
+  return Option.match(errorSchemaOf(ref), {
     onNone: () => Effect.succeed(Option.none<Error<Ref_>>()),
     onSome: (schema) =>
       Effect.asSome(
         Schema.decodeUnknownEffect(schema)(encodedError),
       ) as Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError>,
   });
+}
 
 /**
  * Synchronous counterpart to `decodeError`. Returns `None` when the value is
@@ -559,17 +659,29 @@ export const decodeError = <Ref_ extends Any>(
  * matching `Schema.decodeUnknownOption`: the sibling `*Sync` helpers in this
  * module all throw on a parse failure, and this one deliberately doesn't.
  */
-export const decodeErrorOption = <Ref_ extends Any>(
+export function decodeErrorOption<Ref_ extends Any>(
+  ref: Ref_,
+): (encodedError: unknown) => Option.Option<Error<Ref_>>;
+export function decodeErrorOption<Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
-): Option.Option<Error<Ref_>> =>
-  Option.flatMap(
+): Option.Option<Error<Ref_>>;
+export function decodeErrorOption<Ref_ extends Any>(
+  ...input: [ref: Ref_] | [ref: Ref_, encodedError: unknown]
+):
+  | Option.Option<Error<Ref_>>
+  | ((encodedError: unknown) => Option.Option<Error<Ref_>>) {
+  if (input.length === 1)
+    return (encodedError) => decodeErrorOption(input[0], encodedError);
+  const [ref, encodedError] = input;
+  return Option.flatMap(
     errorSchemaOf(ref),
     (schema) =>
       Schema.decodeUnknownOption(schema)(encodedError) as Option.Option<
         Error<Ref_>
       >,
   );
+}
 
 const missingPaginatedProvenanceError = (ref: Any) =>
   new globalThis.Error(
@@ -600,36 +712,60 @@ const paginatedKind = (ref: AnyConfect): FunctionProvenance.Paginated =>
  * the caller. Requires a ref built with `FunctionSpec.publicPaginatedQuery` (or
  * `internalPaginatedQuery`).
  */
-export const encodePaginatedQueryArgsSync = <
+export function encodePaginatedQueryArgsSync<
+  Ref_ extends AnyPublicPaginatedQuery,
+>(ref: Ref_): (args: Omit<Args<Ref_>, "paginationOpts">) => unknown;
+export function encodePaginatedQueryArgsSync<
+  Ref_ extends AnyPublicPaginatedQuery,
+>(ref: Ref_, args: Omit<Args<Ref_>, "paginationOpts">): unknown;
+export function encodePaginatedQueryArgsSync<
   Ref_ extends AnyPublicPaginatedQuery,
 >(
-  ref: Ref_,
-  args: Omit<Args<Ref_>, "paginationOpts">,
-): unknown =>
-  Match.value<Any>(ref).pipe(
+  ...input: [ref: Ref_] | [ref: Ref_, args: Omit<Args<Ref_>, "paginationOpts">]
+): unknown {
+  if (input.length === 1)
+    return (args: Omit<Args<Ref_>, "paginationOpts">) =>
+      encodePaginatedQueryArgsSync(input[0], args);
+  const [ref, args] = input;
+  return Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.encodeUnknownSync(paginatedKind(confectRef).userArgs)(args),
+      Result.getOrThrow(
+        Schema.encodeUnknownResult(paginatedKind(confectRef).userArgs)(args),
+      ),
     ),
     Match.tag("Convex", () => args),
     Match.exhaustive,
   );
+}
 
 /**
  * Decode a page of a paginated query's results via the ref's item schema.
  * Requires a ref built with `FunctionSpec.publicPaginatedQuery` (or
  * `internalPaginatedQuery`).
  */
-export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
+export function decodePaginationPageSync<Ref_ extends AnyPublicPaginatedQuery>(
+  ref: Ref_,
+): (encodedPage: unknown) => Returns<Ref_>["page"];
+export function decodePaginationPageSync<Ref_ extends AnyPublicPaginatedQuery>(
   ref: Ref_,
   encodedPage: unknown,
-): Returns<Ref_>["page"] =>
-  Match.value<Any>(ref).pipe(
+): Returns<Ref_>["page"];
+export function decodePaginationPageSync<Ref_ extends AnyPublicPaginatedQuery>(
+  ...input: [ref: Ref_] | [ref: Ref_, encodedPage: unknown]
+): Returns<Ref_>["page"] | ((encodedPage: unknown) => Returns<Ref_>["page"]) {
+  if (input.length === 1)
+    return (encodedPage) => decodePaginationPageSync(input[0], encodedPage);
+  const [ref, encodedPage] = input;
+  return Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.decodeUnknownSync(paginatedKind(confectRef).page)(encodedPage),
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(paginatedKind(confectRef).page)(encodedPage),
+      ),
     ),
     Match.tag("Convex", () => encodedPage),
     Match.exhaustive,
   ) as Returns<Ref_>["page"];
+}
 
 /**
  * Encode args via the ref's args schema, invoke `call`, decode returns via the

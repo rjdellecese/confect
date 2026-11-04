@@ -1,3 +1,7 @@
+import * as Arr from "effect/Array";
+import { pipe } from "effect/Function";
+import * as Str from "effect/String";
+import * as Rec from "effect/Record";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -42,12 +46,15 @@ import notes from "./notes.spec";
 export default GroupImpl.make(databaseSchema, notes).pipe(GroupImpl.finalize);
 `;
 
+/**
+ * @internal
+ */
 export const writtenFiles = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const writes = yield* Ref.make<ReadonlyArray<string>>([]);
     const record = (file: string) =>
-      file.endsWith(".ts")
+      pipe(file, Str.endsWith(".ts"))
         ? Ref.update(writes, (paths) => [...paths, file])
         : Effect.void;
     yield* effect.pipe(
@@ -62,6 +69,9 @@ export const writtenFiles = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     return yield* Ref.get(writes);
   });
 
+/**
+ * @internal
+ */
 export const installPackages = Effect.fnUntraced(function* (root: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -81,6 +91,9 @@ export const installPackages = Effect.fnUntraced(function* (root: string) {
   }
 });
 
+/**
+ * @internal
+ */
 export const make = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -128,7 +141,7 @@ export const make = Effect.gen(function* () {
     );
     const waitFor = (text: string) =>
       Queue.take(lines).pipe(
-        Effect.repeat({ while: (line) => !line.includes(text) }),
+        Effect.repeat({ while: (line) => !pipe(line, Str.includes(text)) }),
         Effect.timeoutOption("15 seconds"),
         Effect.flatMap((result) =>
           Ref.get(output).pipe(
@@ -144,23 +157,21 @@ export const make = Effect.gen(function* () {
     const files = yield* Effect.forEach(
       ["confect/_generated", "convex"],
       (directory) =>
-        fs
-          .readDirectory(path.join(root, directory), { recursive: true })
-          .pipe(
-            Effect.map((entries) =>
-              entries
-                .filter((entry) => entry.endsWith(".ts"))
-                .map((entry) => path.join(directory, entry)),
+        fs.readDirectory(path.join(root, directory), { recursive: true }).pipe(
+          Effect.map((entries) =>
+            Arr.map(
+              Arr.filter(entries, (entry) => pipe(entry, Str.endsWith(".ts"))),
+              (entry) => path.join(directory, entry),
             ),
           ),
+        ),
     );
-    return Object.fromEntries(
-      yield* Effect.forEach(files.flat(), (file) =>
-        fs
-          .readFileString(path.join(root, file))
-          .pipe(Effect.map((contents) => [file, contents] as const)),
-      ),
+    const actual = yield* Effect.forEach(files.flat(), (file) =>
+      fs
+        .readFileString(path.join(root, file))
+        .pipe(Effect.map((contents) => [file, contents] as const)),
     );
+    return Rec.fromEntries(actual);
   });
   const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(

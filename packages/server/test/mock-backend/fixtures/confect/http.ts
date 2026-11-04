@@ -22,6 +22,9 @@ class NotesGroup extends HttpApiGroup.make("notes").add(
   }),
 ) {}
 
+/**
+ * @internal
+ */
 export class NotesApi extends HttpApi.make("NotesApi")
   .add(NotesGroup)
   .prefix("/api") {}
@@ -68,7 +71,7 @@ const http = ConfectHttpRouter.make(
       "GET",
       "/logging/disabled",
       Effect.logWarning("hidden").pipe(
-        Effect.provide(Logger.layer([])),
+        Effect.provideService(Logger.CurrentLoggers, new Set()),
         Effect.as(HttpServerResponse.text("silent")),
       ),
     ),

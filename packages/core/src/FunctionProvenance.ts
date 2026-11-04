@@ -214,7 +214,7 @@ export const ConfectPaginated = <
   Lazy.defineProperty(kind, "userArgs", () => Schema.Struct(userArgs()));
   Lazy.defineProperty(kind, "item", item);
   Lazy.defineProperty(kind, "page", () =>
-    Schema.mutable(Schema.Array(paginatedKind.item)),
+    paginatedKind.item.pipe(Schema.Array, Schema.mutable),
   );
 
   const provenance = { _tag: "Confect" as const, kind: paginatedKind };

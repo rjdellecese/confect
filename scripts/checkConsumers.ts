@@ -1,3 +1,6 @@
+import * as Arr from "effect/Array";
+import * as Str from "effect/String";
+import * as Record from "effect/Record";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { tmpdir } from "node:os";
@@ -9,6 +12,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+import * as Result from "effect/Result";
+import { dual } from "effect/Function";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import { consumerFiles } from "./consumerFixture";
@@ -28,9 +33,12 @@ import {
   type Profile,
 } from "./consumerCompatibility";
 
-const encodeJson = Schema.encodeSync(
-  Schema.fromJsonString(Schema.Unknown, { space: 2 }),
-);
+const encodeJson = (value: unknown) =>
+  Result.getOrThrow(
+    Schema.encodeResult(Schema.fromJsonString(Schema.Unknown, { space: 2 }))(
+      value,
+    ),
+  );
 
 const manifestAt = Effect.fn("Consumer.manifestAt")(function* (
   directory: string,
@@ -42,40 +50,64 @@ const manifestAt = Effect.fn("Consumer.manifestAt")(function* (
     .pipe(Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(Manifest))));
 });
 
-export const cleanEnvironment = (
-  directory: string,
-  executablePath: string,
-  delimiter: string,
-  repository: string,
-): Record<string, string> => ({
-  PATH: executablePath
-    .split(delimiter)
-    .filter(
-      (part) => !part.includes("node_modules") && !part.startsWith(repository),
-    )
-    .join(delimiter),
-  HOME: `${directory}/home`,
-  XDG_CONFIG_HOME: `${directory}/config`,
-  XDG_DATA_HOME: `${directory}/data`,
-  XDG_CACHE_HOME: `${directory}/cache`,
-  npm_config_userconfig: `${directory}/empty.npmrc`,
-  npm_config_globalconfig: `${directory}/empty-global.npmrc`,
-  npm_config_registry: "https://registry.npmjs.org/",
-  npm_config_cache: `${directory}/npm-cache`,
-  CI: "true",
-  NO_COLOR: "1",
-});
+export const cleanEnvironment: {
+  (
+    executablePath: string,
+    delimiter: string,
+    repository: string,
+  ): (directory: string) => Record<string, string>;
+  (
+    directory: string,
+    executablePath: string,
+    delimiter: string,
+    repository: string,
+  ): Record<string, string>;
+} = dual(
+  4,
+  (
+    directory: string,
+    executablePath: string,
+    delimiter: string,
+    repository: string,
+  ): Record<string, string> => ({
+    PATH: Arr.join(
+      Arr.filter(
+        Str.split(delimiter)(executablePath),
+        (part) =>
+          !Str.includes("node_modules")(part) &&
+          !Str.startsWith(repository)(part),
+      ),
+      delimiter,
+    ),
+    HOME: `${directory}/home`,
+    XDG_CONFIG_HOME: `${directory}/config`,
+    XDG_DATA_HOME: `${directory}/data`,
+    XDG_CACHE_HOME: `${directory}/cache`,
+    npm_config_userconfig: `${directory}/empty.npmrc`,
+    npm_config_globalconfig: `${directory}/empty-global.npmrc`,
+    npm_config_registry: "https://registry.npmjs.org/",
+    npm_config_cache: `${directory}/npm-cache`,
+    CI: "true",
+    NO_COLOR: "1",
+  }),
+);
 
+/**
+ * @internal
+ */
 export const packageManagerExecutable = Effect.fn(
   "Consumer.packageManagerExecutable",
 )(function* (manager: Manager, executablePath: string, repository: string) {
   const fs = yield* FileSystem.FileSystem;
   const executable = Bun.which(manager, { PATH: executablePath });
-  if (
-    !executable ||
-    (yield* fs.realPath(executable)).startsWith(`${repository}/`)
-  ) {
-    return yield* new ConsumerGateFailure({
+  const isWorkspaceExecutable =
+    executable === null
+      ? false
+      : yield* fs
+          .realPath(executable)
+          .pipe(Effect.map(Str.startsWith(`${repository}/`)));
+  if (executable === null || isWorkspaceExecutable) {
+    return yield* ConsumerGateFailure.make({
       phase: "package manager executable",
       details: { manager, executable },
     });
@@ -95,7 +127,9 @@ const command = Effect.fn("Consumer.command")(
     const handle = yield* spawner.spawn(
       ChildProcess.make(program, args, {
         cwd,
-        ...(env ? { env, extendEnv: false } : { extendEnv: true }),
+        ...(env !== undefined
+          ? { env, extendEnv: false }
+          : { extendEnv: true }),
         stdin: "ignore",
       }),
     );
@@ -109,7 +143,7 @@ const command = Effect.fn("Consumer.command")(
     );
     const output = `${result.stdout}${result.stderr}`;
     if (result.status !== 0)
-      return yield* new ConsumerGateFailure({
+      return yield* ConsumerGateFailure.make({
         phase,
         details: { program, args, status: result.status, output },
       });
@@ -141,25 +175,26 @@ const resolutions = Effect.fn("Consumer.resolutions")(function* (
   manifest: Manifest,
 ) {
   const result: Record<string, string> = {};
-  for (const name of Object.keys({
+  for (const name of Record.keys({
     ...manifest.dependencies,
     ...manifest.optionalDependencies,
     ...manifest.peerDependencies,
   })) {
     const location = yield* resolvePackage(directory, name);
-    if (location) result[name] = location;
+    if (location !== undefined && location !== "") result[name] = location;
   }
   return result;
 });
 
+/**
+ * @internal
+ */
 export const inspectGraph = Effect.fn("Consumer.inspectGraph")(function* (
   directory: string,
 ) {
-  const rootResolutions = yield* resolutions(
-    directory,
-    yield* manifestAt(directory),
-  );
-  const queue = Object.values(rootResolutions);
+  const rootManifest = yield* manifestAt(directory);
+  const rootResolutions = yield* resolutions(directory, rootManifest);
+  const queue = Record.values(rootResolutions);
   const packages = new Map<string, InstalledPackage>();
   for (let i = 0; i < queue.length; i++) {
     const location = queue[i]!;
@@ -171,7 +206,7 @@ export const inspectGraph = Effect.fn("Consumer.inspectGraph")(function* (
       manifest,
       resolutions: dependencies,
     });
-    queue.push(...Object.values(dependencies));
+    queue.push(...Record.values(dependencies));
   }
   return { packages: [...packages.values()], rootResolutions };
 });
@@ -187,24 +222,29 @@ const candidatesFor = Effect.fn("Consumer.candidatesFor")(function* (
   const sources = yield* Effect.forEach(profiles[profile].packages, (name) =>
     manifestAt(path.join(repository, "packages", name)),
   );
-  const versions = Object.fromEntries(
-    sources.map((manifest) => [manifest.name, manifest.version]),
+  const versions = Record.fromEntries(
+    Arr.map(sources, (manifest) => [manifest.name, manifest.version]),
   );
-  const output = artifacts
-    ? path.resolve(artifacts)
-    : path.join(directory, "artifacts");
+  const output =
+    artifacts !== undefined && artifacts !== ""
+      ? path.resolve(artifacts)
+      : path.join(directory, "artifacts");
   yield* fs.makeDirectory(output, { recursive: true });
   const candidates: Array<Candidate> = [];
   for (const source of sources) {
     const tarball = path.join(
       output,
-      `${source.name.replace("@", "").replace("/", "-")}-${source.version}.tgz`,
+      `${Str.replace("/", "-")(Str.replace("@", "")(source.name))}-${source.version}.tgz`,
     );
-    if (!artifacts)
+    if (artifacts === undefined || artifacts === "")
       yield* command(
         "pnpm",
         ["pack", "--pack-destination", output],
-        path.join(repository, "packages", source.name.replace("@confect/", "")),
+        path.join(
+          repository,
+          "packages",
+          Str.replace("@confect/", "")(source.name),
+        ),
         undefined,
         "pack",
       );
@@ -218,12 +258,13 @@ const candidatesFor = Effect.fn("Consumer.candidatesFor")(function* (
       Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(Manifest))),
     );
     const problems = packedManifestProblems(source, packed, versions);
-    if (problems.length)
-      return yield* new ConsumerGateFailure({
+    if (problems.length > 0)
+      return yield* ConsumerGateFailure.make({
         phase: "packed manifest",
         details: problems,
       });
-    const integrity = `sha512-${new Bun.CryptoHasher("sha512").update(yield* fs.readFile(tarball)).digest("base64")}`;
+    const tarballBytes = yield* fs.readFile(tarball);
+    const integrity = `sha512-${new Bun.CryptoHasher("sha512").update(tarballBytes).digest("base64")}`;
     candidates.push({ manifest: packed, tarball, integrity });
   }
   return candidates;
@@ -271,13 +312,13 @@ const verifyProvenance = Effect.fn("Consumer.verifyProvenance")(function* (
         provenanceProblems(
           candidate,
           entry,
-          entry?.resolved
-            ? path.resolve(directory, entry.resolved.slice(5))
+          entry?.resolved !== undefined && entry.resolved !== ""
+            ? path.resolve(directory, Str.slice(5)(entry.resolved))
             : undefined,
           manager,
-        ).length
+        ).length > 0
       )
-        return yield* new ConsumerGateFailure({
+        return yield* ConsumerGateFailure.make({
           phase: "candidate provenance",
           details: {
             package: candidate.manifest.name,
@@ -307,13 +348,13 @@ const verifyProvenance = Effect.fn("Consumer.verifyProvenance")(function* (
         provenanceProblems(
           candidate,
           entry,
-          entry?.resolved
-            ? path.resolve(directory, entry.resolved.slice(5))
+          entry?.resolved !== undefined && entry.resolved !== ""
+            ? path.resolve(directory, Str.slice(5)(entry.resolved))
             : undefined,
           manager,
-        ).length
+        ).length > 0
       )
-        return yield* new ConsumerGateFailure({
+        return yield* ConsumerGateFailure.make({
           phase: "candidate provenance",
           details: {
             package: candidate.manifest.name,
@@ -325,6 +366,9 @@ const verifyProvenance = Effect.fn("Consumer.verifyProvenance")(function* (
   }
 });
 
+/**
+ * @internal
+ */
 export const checkConsumer = Effect.fn("Consumer.check")(function* (
   profile: Profile,
   lane: Lane,
@@ -337,8 +381,8 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
   const directory = yield* fs
     .makeTempDirectory({ directory: tmpdir(), prefix: "confect-consumer-" })
     .pipe(Effect.flatMap(fs.realPath));
-  if (directory.startsWith(`${repository}/`))
-    return yield* new ConsumerGateFailure({
+  if (Str.startsWith(`${repository}/`)(directory))
+    return yield* ConsumerGateFailure.make({
       phase: "isolation",
       details: directory,
     });
@@ -385,8 +429,8 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
       );
     const dependencies = {
       ...consumerDependencies(profile, lane),
-      ...Object.fromEntries(
-        candidates.map(({ manifest, tarball }) => [
+      ...Record.fromEntries(
+        Arr.map(candidates, ({ manifest, tarball }) => [
           manifest.name,
           `file:${tarball}`,
         ]),
@@ -417,24 +461,26 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
       path.join(directory, "pnpm-workspace.yaml"),
       "packages: []\nallowBuilds:\n  esbuild: true\nstrictPeerDependencies: true\nminimumReleaseAge: 0\n",
     );
+    const nodeVersion = yield* command(
+      "node",
+      ["--version"],
+      directory,
+      env,
+      "node version",
+    );
+    const managerVersion = yield* command(
+      executable,
+      ["--version"],
+      directory,
+      env,
+      "manager version",
+    );
     result.tools = {
       packageManagerExecutable: executable,
-      node: (yield* command(
-        "node",
-        ["--version"],
-        directory,
-        env,
-        "node version",
-      )).trim(),
-      [manager]: (yield* command(
-        executable,
-        ["--version"],
-        directory,
-        env,
-        "manager version",
-      )).trim(),
+      node: Str.trim(nodeVersion),
+      [manager]: Str.trim(managerVersion),
     };
-    for (const [file, contents] of Object.entries(consumerFiles(profile))) {
+    for (const [file, contents] of Record.toEntries(consumerFiles(profile))) {
       const target = path.join(directory, file);
       yield* fs.makeDirectory(path.dirname(target), { recursive: true });
       yield* fs.writeFileString(target, contents);
@@ -446,8 +492,8 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
     const output = yield* command(executable, args, directory, env, "install");
     result.installOutput = output;
     const problems = installProblems(0, output);
-    if (problems.length)
-      return yield* new ConsumerGateFailure({
+    if (problems.length > 0)
+      return yield* ConsumerGateFailure.make({
         phase: "install diagnostics",
         details: { problems, output },
       });
@@ -459,8 +505,8 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
       graph.rootResolutions,
       directory,
     );
-    if (invalid.length)
-      return yield* new ConsumerGateFailure({
+    if (invalid.length > 0)
+      return yield* ConsumerGateFailure.make({
         phase: "installed graph",
         details: invalid,
       });
@@ -519,7 +565,7 @@ if (import.meta.main) {
       (lane !== "baseline" && lane !== "fresh") ||
       (manager !== "npm" && manager !== "pnpm")
     )
-      return yield* new ConsumerGateFailure({
+      return yield* ConsumerGateFailure.make({
         phase: "arguments",
         details:
           "Usage: --profile react|foldkit --lane baseline|fresh --manager npm|pnpm [--artifacts DIR] [--report FILE]",
@@ -549,7 +595,7 @@ if (import.meta.main) {
       `Full graph, artifact identities, and diagnostics: ${report}`,
     );
     if (result.acceptance !== "passed")
-      return yield* new ConsumerGateFailure({
+      return yield* ConsumerGateFailure.make({
         phase: "acceptance",
         details: result.failure,
       });

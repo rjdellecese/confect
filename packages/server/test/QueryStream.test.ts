@@ -1,3 +1,4 @@
+import * as Arr from "effect/Array";
 import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import { identity } from "effect/Function";
@@ -105,7 +106,8 @@ describe("QueryStream.merge", () => {
             direction,
             Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
             Stream.fromIterable(
-              ranks.map(
+              Arr.map(
+                ranks,
                 (rank) =>
                   new QueryStream.Element({
                     doc: Option.some(`${label}:${rank}`),
@@ -232,7 +234,8 @@ describe("QueryStream key layouts", () => {
         () => QueryStream.empty<string>()(layout),
         { innerKeyLayout: explicitFirst },
       );
-      expect(yield* Stream.runCollect(joined)).toEqual([]);
+      const runCollectResult = yield* Stream.runCollect(joined);
+      expect(runCollectResult).toEqual([]);
       layout = implicitFirst;
       const defect = yield* Stream.runCollect(joined).pipe(
         Effect.catchDefect(Effect.succeed),
@@ -355,7 +358,8 @@ describe.each(["asc", "desc"] as const)(
             order,
             Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
             Stream.fromIterable(
-              values.map(
+              Arr.map(
+                values,
                 (value) =>
                   new QueryStream.Element({
                     doc: Option.some(value),
@@ -462,7 +466,8 @@ describe.each(["asc", "desc"] as const)(
             identity,
           ),
           Stream.fromIterable(
-            ids.map(
+            Arr.map(
+              ids,
               (id) =>
                 new QueryStream.Element({
                   doc: Option.some(id),
@@ -485,13 +490,10 @@ describe.each(["asc", "desc"] as const)(
         });
 
         expect([...first.page, ...second.page]).toEqual(ids);
-        expect(
-          QueryStreamKey.values(
-            yield* Schema.decodeEffect(
-              QueryStreamCursor.fromKeyLayout(source.keyLayout),
-            )(first.continueCursor),
-          ),
-        ).toEqual(["apple", 1, ids[0]]);
+        const value2 = yield* Schema.decodeEffect(
+          QueryStreamCursor.fromKeyLayout(source.keyLayout),
+        )(first.continueCursor);
+        expect(QueryStreamKey.values(value2)).toEqual(["apple", 1, ids[0]]);
         expect(end).toMatchObject({
           page: [],
           isDone: true,
@@ -538,7 +540,8 @@ describe("QueryStream", () => {
 
   it.effect("consumes constructed elements as present documents only", () =>
     Effect.gen(function* () {
-      expect(yield* Stream.runCollect(source)).toEqual([1, 3]);
+      const runCollectResult2 = yield* Stream.runCollect(source);
+      expect(runCollectResult2).toEqual([1, 3]);
     }),
   );
 
@@ -804,7 +807,7 @@ describe("QueryStream.ReadBudgetExceededError", () => {
 
   it("accepts zero row and byte counts", () => {
     expect(
-      new QueryStream.ReadBudgetExceededError({
+      QueryStream.ReadBudgetExceededError.make({
         rowsRead: 0,
         bytesRead: 0,
       }),
@@ -812,7 +815,7 @@ describe("QueryStream.ReadBudgetExceededError", () => {
   });
 
   it("preserves the pagination error tag and details", () => {
-    const error = new QueryStream.ReadBudgetExceededError({
+    const error = QueryStream.ReadBudgetExceededError.make({
       rowsRead: 2,
       bytesRead: 20,
     });

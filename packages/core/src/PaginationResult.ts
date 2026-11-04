@@ -8,7 +8,7 @@ export const PaginationResult = <Doc extends Schema.Codec<any, any>>(
   Doc: Doc,
 ) =>
   Schema.Struct({
-    page: Schema.mutable(Schema.Array(Doc)),
+    page: Doc.pipe(Schema.Array, Schema.mutable),
     isDone: Schema.Boolean,
     continueCursor: Schema.String,
     splitCursor: Schema.optionalKey(Schema.Union([Schema.String, Schema.Null])),

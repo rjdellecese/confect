@@ -4,7 +4,9 @@ import * as GroupPath from "./GroupPath";
 /**
  * The path to a function in the Confect API.
  */
-export class FunctionPath extends Schema.Class<FunctionPath>("FunctionPath")({
+export class FunctionPath extends Schema.Class<FunctionPath, {}>(
+  "FunctionPath",
+)({
   groupPath: GroupPath.GroupPath,
   name: Schema.NonEmptyString,
 }) {}

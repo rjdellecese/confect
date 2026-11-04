@@ -1,8 +1,8 @@
+import { layer } from "@effect/vitest";
 import { assert, expect, it } from "@effect/vitest";
 import * as WatchBuild from "@confect/cli/WatchBuild";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as Digest from "effect/crypto/Digest";
-import * as Exit from "effect/Exit";
 import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
 import * as FileSystem from "effect/FileSystem";
@@ -54,38 +54,43 @@ const successfulOutcome = WatchBuild.Outcome.Succeeded({
 const request = (progress: WatchBuild.Progress) =>
   WatchBuild.request(progress, WatchBuild.makeRequestId());
 
-it.effect("fingerprints inputs and outputs with the Node SHA-256 service", () =>
-  Effect.gen(function* () {
-    const digest = yield* Digest.Digest;
-    const contents = new TextEncoder().encode("abc");
-    const expected =
-      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-    const input = {
-      ...result(),
-      outputFiles: [{ path: "out.js", contents, hash: "hash", text: "abc" }],
-    };
-    const capture = {
-      ...WatchBuild.emptyCapture,
-      fingerprints: HashMap.make(["input.ts", expected]),
-    };
-    const outcome = yield* WatchBuild.parse(
-      input,
-      capture,
-      (file) => file,
-      digest,
-    );
-    assert(outcome._tag === "Succeeded");
-    expect(outcome.snapshot.outputHash).toBe(expected);
-    expect(
-      yield* WatchBuild.verifyInputs(
-        outcome.snapshot,
-        FileSystem.makeNoop({ readFile: () => Effect.succeed(contents) }),
-        digest,
-      ),
-    ).toBe(true);
-    expect(contents).toEqual(new TextEncoder().encode("abc"));
-  }).pipe(Effect.provide(NodeCrypto.layerDigest)),
-);
+layer(NodeCrypto.layerDigest)("runtime services", (runtimeIt) => {
+  runtimeIt.effect(
+    "fingerprints inputs and outputs with the Node SHA-256 service",
+    () =>
+      Effect.gen(function* () {
+        const digest = yield* Digest.Digest;
+        const contents = new TextEncoder().encode("abc");
+        const expected =
+          "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        const input = {
+          ...result(),
+          outputFiles: [
+            { path: "out.js", contents, hash: "hash", text: "abc" },
+          ],
+        };
+        const capture = {
+          ...WatchBuild.emptyCapture,
+          fingerprints: HashMap.make(["input.ts", expected]),
+        };
+        const outcome = yield* WatchBuild.parse(
+          input,
+          capture,
+          (file) => file,
+          digest,
+        );
+        assert(outcome._tag === "Succeeded");
+        expect(outcome.snapshot.outputHash).toBe(expected);
+        const actual = yield* WatchBuild.verifyInputs(
+          outcome.snapshot,
+          FileSystem.makeNoop({ readFile: () => Effect.succeed(contents) }),
+          digest,
+        );
+        expect(actual).toBe(true);
+        expect(contents).toEqual(new TextEncoder().encode("abc"));
+      }),
+  );
+});
 
 it("combines configuration snapshots without losing shared-helper dependents", () => {
   const first = WatchBuild.Outcome.Succeeded({
@@ -151,16 +156,16 @@ it.effect(
         ...crypto,
         digest: (_algorithm, contents) => Effect.succeed(contents),
       });
-      expect(yield* WatchBuild.verifyInputs(captured, fs, hashing)).toBe(true);
-      expect(
-        yield* WatchBuild.verifyInputs(
-          captured,
-          FileSystem.makeNoop({
-            readFile: () => Effect.succeed(new Uint8Array([3])),
-          }),
-          hashing,
-        ),
-      ).toBe(false);
+      const actual2 = yield* WatchBuild.verifyInputs(captured, fs, hashing);
+      expect(actual2).toBe(true);
+      const actual3 = yield* WatchBuild.verifyInputs(
+        captured,
+        FileSystem.makeNoop({
+          readFile: () => Effect.succeed(new Uint8Array([3])),
+        }),
+        hashing,
+      );
+      expect(actual3).toBe(false);
       expect(captured.fingerprints).toEqual(HashMap.make(["input.ts", "0102"]));
     }),
 );
@@ -191,7 +196,7 @@ it.effect.each(["read", "digest"] as const)(
           digest: () => Effect.die(cause),
         }),
       ).pipe(Effect.exit);
-      assert(Exit.isFailure(verified));
+      assert(verified._tag === "Failure");
       expect(verified.cause.reasons).toMatchObject([
         operation === "read"
           ? {
@@ -658,7 +663,7 @@ it.effect(
           digest: () => Effect.die(cause),
         }),
       ).pipe(Effect.exit);
-      assert(Exit.isFailure(outputFailure));
+      assert(outputFailure._tag === "Failure");
       expect(outputFailure.cause.reasons).toMatchObject([
         { _tag: "Die", defect: cause },
       ]);

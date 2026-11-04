@@ -60,7 +60,7 @@
     "test:js:local-backend": "pnpm --filter @confect/js test:local-backend",
     "test:server:local-backend": "pnpm --filter @confect/server test:local-backend",
     "test:server:mock-backend": "pnpm --filter @confect/server test:mock-backend",
-    "typecheck": "tsrs -b tsconfig.packages.json tsconfig.json tools/oxlint-rules/tsconfig.json && pnpm --filter confect-test-types typecheck",
+    "typecheck": "tsrs -b tsconfig.packages.json tsconfig.json packages/cli/bin/tsconfig.json tools/oxlint-rules/tsconfig.json && pnpm --filter confect-test-types typecheck",
     "typecheck:inexact": "tsrs -b tsconfig.packages.json && vp run --filter \"@confect/*\" --filter confect-test-types --filter confect-local-backend typecheck:inexact",
     "version-packages": "changeset version && pnpm format"
   }

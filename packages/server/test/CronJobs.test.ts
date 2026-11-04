@@ -1,3 +1,5 @@
+import * as Result from "effect/Result";
+import * as RecordEffect from "effect/Record";
 import { FunctionSpec, Ref } from "@confect/core";
 import * as Cron from "effect/Cron";
 import * as DateTime from "effect/DateTime";
@@ -371,11 +373,11 @@ describe("CronJobs.add", () => {
         ),
       );
 
-    expect(Object.keys(result.cronJobs)).toEqual([
+    expect(RecordEffect.keys(result.cronJobs)).toEqual([
       "clear sessions",
       "send digest",
     ]);
-    expect(Object.keys(result.convexCronJobs.crons)).toEqual([
+    expect(RecordEffect.keys(result.convexCronJobs.crons)).toEqual([
       "clear sessions",
       "send digest",
     ]);
@@ -399,10 +401,10 @@ describe("CronJobs.add", () => {
     const empty = CronJobs.make();
     const withJob = empty.add(CronJob.make("clear sessions", cron, ref));
 
-    expect(Object.keys(empty.cronJobs)).toEqual([]);
-    expect(Object.keys(empty.convexCronJobs.crons)).toEqual([]);
-    expect(Object.keys(withJob.cronJobs)).toEqual(["clear sessions"]);
-    expect(Object.keys(withJob.convexCronJobs.crons)).toEqual([
+    expect(RecordEffect.keys(empty.cronJobs)).toEqual([]);
+    expect(RecordEffect.keys(empty.convexCronJobs.crons)).toEqual([]);
+    expect(RecordEffect.keys(withJob.cronJobs)).toEqual(["clear sessions"]);
+    expect(RecordEffect.keys(withJob.convexCronJobs.crons)).toEqual([
       "clear sessions",
     ]);
   });
@@ -465,7 +467,11 @@ describe("CronJobs.add", () => {
     const result = CronJobs.make().add(
       CronJob.make("clear sessions", cron, ref),
     );
-    const parsed = JSON.parse(JSON.stringify(result.convexCronJobs.crons));
+    const parsed = Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+      Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))(
+        result.convexCronJobs.crons,
+      ).pipe(Result.getOrThrow),
+    ).pipe(Result.getOrThrow);
 
     expect(parsed).toEqual({
       "clear sessions": {
