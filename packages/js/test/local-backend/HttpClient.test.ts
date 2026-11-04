@@ -163,6 +163,41 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
       }).pipe(Effect.provide(clientLayer)),
     );
 
+    it.effect(
+      "keeps HTTP mutation codecs and errors when bypassing the queue",
+      () =>
+        Effect.gen(function* () {
+          const client = yield* HttpClient.HttpClient;
+          const options = { skipQueue: true };
+          expect(yield* client.mutation(mutation, { value: 42 }, options)).toBe(
+            42,
+          );
+          const noArgs = Ref.make(
+            "clients",
+            FunctionSpec.publicMutation({
+              name: "echoMutation",
+              returns: () => Schema.FiniteFromString,
+            }),
+          );
+          expect(yield* client.mutation(noArgs, undefined, options)).toBe(0);
+          expect(yield* client.mutation(noArgs, {}, options)).toBe(0);
+          const typed = yield* Effect.result(
+            client.mutation(mutation, { value: 42, failure: "typed" }, options),
+          );
+          assert(Result.isFailure(typed));
+          expect(typed.failure).toEqual(new MissingValue({ caseId: "echo" }));
+          const unknown = yield* Effect.result(
+            client.mutation(
+              mutation,
+              { value: 42, failure: "unknown" },
+              options,
+            ),
+          );
+          assert(Result.isFailure(unknown));
+          expect(unknown.failure).toBeInstanceOf(HttpClient.HttpClientError);
+        }).pipe(Effect.provide(clientLayer)),
+    );
+
     it.effect("reports argument and return codec failures", () =>
       Effect.gen(function* () {
         const client = yield* HttpClient.HttpClient;
