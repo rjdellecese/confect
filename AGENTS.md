@@ -43,7 +43,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 
 ## Tools
 
-- `tools/bench-harness` - Private package that runs `@ark/attest` type benchmarks on tsrs; see its README and toolchain benchmark report
+- `tools/bench-harness` - Private package that runs `@ark/attest` type benchmarks on tsrs; see its README
 - `tools/local-backend` - Private shared Convex backend harness, fixtures, and Vitest configuration for client and server integration tests; see its README
 
 ## TypeScript
