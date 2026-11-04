@@ -239,10 +239,11 @@ export default implementation;`,
           ChildProcess.make(process.execPath, [
             fileURLToPath(
               new URL(
-                "bin/tsc",
-                import.meta.resolve("typescript/package.json"),
+                "dist/effect-tsgo.cjs",
+                import.meta.resolve("@effect/tsgo/package.json"),
               ),
             ),
+            "tsrs",
             "-p",
             directory,
           ]),
@@ -410,10 +411,11 @@ export const plainString: Id<"_storage"> = "not-an-id";
           ChildProcess.make(process.execPath, [
             fileURLToPath(
               new URL(
-                "bin/tsc",
-                import.meta.resolve("typescript/package.json"),
+                "dist/effect-tsgo.cjs",
+                import.meta.resolve("@effect/tsgo/package.json"),
               ),
             ),
+            "tsrs",
             "-p",
             directory,
           ]),
@@ -612,10 +614,11 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
           ChildProcess.make(process.execPath, [
             fileURLToPath(
               new URL(
-                "bin/tsc",
-                import.meta.resolve("typescript/package.json"),
+                "dist/effect-tsgo.cjs",
+                import.meta.resolve("@effect/tsgo/package.json"),
               ),
             ),
+            "tsrs",
             "-p",
             directory,
           ]),
@@ -652,10 +655,11 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
           ChildProcess.make(process.execPath, [
             fileURLToPath(
               new URL(
-                "bin/tsc",
-                import.meta.resolve("typescript/package.json"),
+                "dist/effect-tsgo.cjs",
+                import.meta.resolve("@effect/tsgo/package.json"),
               ),
             ),
+            "tsrs",
             "-p",
             directory,
             "--noEmit",

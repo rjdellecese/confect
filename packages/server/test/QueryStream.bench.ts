@@ -38,17 +38,17 @@ const paginationOpts: QueryStream.PaginateOptions = {
 
 bench("filter", () => {
   return QueryStream.filter(notes, (note) => note.tag !== "hidden");
-}).types([186, "instantiations"]);
+}).types([15, "instantiations"]);
 
 bench("merge", () => {
   return QueryStream.merge([notes, moreNotes]);
-}).types([52, "instantiations"]);
+}).types([25, "instantiations"]);
 
 bench("flatMap", () => {
   return QueryStream.flatMap(notes, messagesOf, {
     innerKeyLayout: messagesLayout,
   });
-}).types([335, "instantiations"]);
+}).types([54, "instantiations"]);
 
 bench("stream → filter → merge → flatMap → paginate", () => {
   return QueryStream.merge([
@@ -60,4 +60,4 @@ bench("stream → filter → merge → flatMap → paginate", () => {
     }),
     QueryStream.paginate(paginationOpts),
   );
-}).types([1292, "instantiations"]);
+}).types([877, "instantiations"]);

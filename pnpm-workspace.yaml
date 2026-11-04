@@ -27,12 +27,24 @@ minimumReleaseAgeExclude:
   - "@effect/vitest@4.1.0"
   - effect@4.1.0
   - exsolve@1.2.0
+  - "@effect/tsgo-darwin-arm64@0.67.1"
+  - "@effect/tsgo-darwin-x64@0.67.1"
+  - "@effect/tsgo-linux-arm64@0.67.1"
+  - "@effect/tsgo-linux-arm@0.67.1"
+  - "@effect/tsgo-linux-x64@0.67.1"
+  - "@effect/tsgo-win32-arm64@0.67.1"
+  - "@effect/tsgo-win32-x64@0.67.1"
+  - "@effect/tsgo@0.67.1"
+  - tsrs@0.21.0-ts7.1.0-beta
 
 overrides:
   convex: 1.49.0
   effect: 4.1.0
   react: 19.3.1
   react-dom: 19.3.1
+
+patchedDependencies:
+  "@ark/attest@0.58.0": patches/@ark__attest@0.58.0.patch
 
 packageExtensions:
   "@mintlify/mdx":

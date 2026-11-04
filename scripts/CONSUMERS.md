@@ -38,7 +38,8 @@ Installer peer warnings fail even when the command exits zero.
 
 On a valid graph, the installed CLI generates a representative application. Its
 public imports and generated refs/services are typechecked against installed
-declarations, then its schema/ref/Layer smoke runs. No workspace aliases are used.
+declarations using the pinned Effect-enabled `tsrs`, then its schema/ref/Layer
+smoke runs. No workspace aliases are used.
 
 ## Profiles and claims
 

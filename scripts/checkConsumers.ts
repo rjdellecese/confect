@@ -391,7 +391,8 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
           `file:${tarball}`,
         ]),
       ),
-      typescript: "7.0.2",
+      "@effect/tsgo": "0.67.1",
+      tsrs: "0.21.0-ts7.1.0-beta",
       tsx: "4.23.15",
       "@types/node": "26.6.4",
       "@types/react": "19.3.0",
@@ -475,8 +476,8 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
       "installed CLI codegen",
     );
     result.typecheck = yield* command(
-      path.join(directory, "node_modules/.bin/tsc"),
-      ["--noEmit"],
+      path.join(directory, "node_modules/.bin/effect-tsgo"),
+      ["tsrs", "--noEmit"],
       directory,
       env,
       "installed declaration typecheck",

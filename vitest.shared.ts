@@ -62,6 +62,7 @@ export default defineConfig({
   test: {
     exclude: [...configDefaults.exclude, "**/*.spec.ts"],
     typecheck: {
+      checker: "tsrs",
       enabled: true,
       include: ["test/**/*.test.ts"],
     },
