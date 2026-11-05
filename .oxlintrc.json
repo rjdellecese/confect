@@ -172,7 +172,7 @@
     "effecttsgo/missing-effect-error": "error",
     "effecttsgo/missing-effect-service-dependency": "error",
     "effecttsgo/missing-layer-context": "error",
-    "effecttsgo/missing-pipeable-signature": "error",
+    "effecttsgo/missing-pipeable-signature": "off",
     "effecttsgo/missing-return-yield-star": "error",
     "effecttsgo/missing-star-in-yield-effect-gen": "error",
     "effecttsgo/multiple-catch-tag": "error",

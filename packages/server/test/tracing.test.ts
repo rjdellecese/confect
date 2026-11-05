@@ -36,33 +36,33 @@ class OperationFailure extends Schema.TaggedError<
   { readonly brand: unique symbol }
 >()("OperationFailure", { reason: Schema.String }) {}
 
-const queryRef = Ref.make({
-  namespace: "operations",
-  spec: FunctionSpec.internalQuery({
+const queryRef = Ref.make(
+  "operations",
+  FunctionSpec.internalQuery({
     name: "query",
     args: () => ({ value: Schema.FiniteFromString }),
     returns: () => Schema.FiniteFromString,
     error: () => OperationFailure,
   }),
-});
-const mutationRef = Ref.make({
-  namespace: "operations",
-  spec: FunctionSpec.internalMutation({
+);
+const mutationRef = Ref.make(
+  "operations",
+  FunctionSpec.internalMutation({
     name: "mutation",
     args: () => ({ value: Schema.FiniteFromString }),
     returns: () => Schema.FiniteFromString,
     error: () => OperationFailure,
   }),
-});
-const actionRef = Ref.make({
-  namespace: "operations",
-  spec: FunctionSpec.internalAction({
+);
+const actionRef = Ref.make(
+  "operations",
+  FunctionSpec.internalAction({
     name: "action",
     args: () => ({ value: Schema.FiniteFromString }),
     returns: () => Schema.FiniteFromString,
     error: () => OperationFailure,
   }),
-});
+);
 
 const makeRecorder = Effect.gen(function* () {
   const baseTracer = yield* Effect.service(Tracer.Tracer);

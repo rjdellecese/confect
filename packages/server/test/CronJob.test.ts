@@ -6,23 +6,23 @@ import { describe, expect, test } from "@effect/vitest";
 import * as CronJob from "@confect/server/CronJob";
 
 const makeMutationRef = (functionNamespace: string, name: string) =>
-  Ref.make({
-    namespace: functionNamespace,
-    spec: FunctionSpec.internalMutation({
+  Ref.make(
+    functionNamespace,
+    FunctionSpec.internalMutation({
       name,
       returns: () => Schema.Void,
     }),
-  });
+  );
 
 const makeMutationRefWithArgs = (functionNamespace: string, name: string) =>
-  Ref.make({
-    namespace: functionNamespace,
-    spec: FunctionSpec.internalMutation({
+  Ref.make(
+    functionNamespace,
+    FunctionSpec.internalMutation({
       name,
       args: () => ({ email: Schema.String }),
       returns: () => Schema.Void,
     }),
-  });
+  );
 
 describe("CronJob.make", () => {
   test("creates a CronJob with a Cron schedule", () => {

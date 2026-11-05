@@ -52,8 +52,9 @@ The workspace uses the Rust TypeScript compiler, `tsrs`. The root `prepare` scri
 
 Lint runs through `effect-tsgo --tsrs-lint vp lint` (or `vp check`) so type-aware rules also use Rust. `pnpm oxlint` wraps the standalone linter with the same integration; bare `pnpm exec oxlint` and `pnpm exec vp lint` bypass it. The Zed Oxlint server uses the same wrapper. Keep `@effect/tsgo`, `tsrs`, and Oxlint on versions listed together in Effect's supported-component table. These integrations support Linux glibc x64/ARM64, macOS x64/ARM64, and Windows x64, not Linux musl or Windows ARM64.
 
-Every Effect lint rule is explicitly enabled as an error, including rules
-disabled by upstream presets. `scripts/effectLint.test.ts` checks coverage
+Every Effect lint rule except `missing-pipeable-signature` is explicitly enabled
+as an error, including rules disabled by upstream presets. Do not change API
+shapes to satisfy the disabled pipeability rule. `scripts/effectLint.test.ts` checks coverage
 against the installed plugin's schema so upgrades cannot silently omit new
 rules. Fix findings rather than disabling rules. The `allowedUnstableApis`
 list in `tsconfig.effect.json` grants individual upstream and integration exports

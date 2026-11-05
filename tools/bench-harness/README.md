@@ -15,7 +15,7 @@ Every benchmark command explicitly selects `--checker tsrs`, so a missing Rust
 binary fails instead of silently switching to Go. The root `prepare` script
 patches the installed `tsrs` binary with `@effect/tsgo`'s build; this covers both
 attest's API process and its compiler subprocesses. Effect diagnostics remain
-disabled for compiler processes in `tsconfig.effect.json`; all Effect lint rules
+disabled for compiler processes in `tsconfig.effect.json`; Effect lint rules
 run through the separate Oxlint integration.
 
 `typescript@7.1.0-beta` is still required by attest's imports and its native/JS

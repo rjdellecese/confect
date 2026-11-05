@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import type * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import * as Record from "effect/Record";
@@ -60,44 +59,33 @@ export const register = <Group extends GroupSpec.AnyWithProps>(
     definitions,
   ) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>;
 
-export const buildForGroup = dual<
-  <Group extends GroupSpec.AnyWithProps>(
-    groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
-  ) => (databaseSchema: DatabaseSchema.AnyWithProps) => ForGroup<Group>,
-  <Group extends GroupSpec.AnyWithProps>(
-    databaseSchema: DatabaseSchema.AnyWithProps,
-    groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
-  ) => ForGroup<Group>
->(
-  2,
-  <Group extends GroupSpec.AnyWithProps>(
-    databaseSchema: DatabaseSchema.AnyWithProps,
-    groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
-  ): ForGroup<Group> => {
-    const { functionRegistryItems, middlewareRegistryItems } =
-      GroupRegistry.make(groupLayer);
-    return mapLeaves<
-      FunctionRegistryItem.AnyWithProps,
-      RegisteredConvexFunction.Definition
-    >(
-      functionRegistryItems as {
-        [key: string]: FunctionRegistryItem.AnyWithProps;
-      },
-      FunctionRegistryItem.isFunctionRegistryItem,
-      (item) =>
-        Match.value(item).pipe(
-          Match.tag("Convex", ({ handler }) =>
-            RegisteredConvexFunction.Definition.Registered({ handler }),
-          ),
-          Match.tag("Confect", (confect) =>
-            RegisteredConvexFunction.prepare(
-              databaseSchema,
-              confect,
-              ResolvedMiddleware.resolve(confect, middlewareRegistryItems),
-            ),
-          ),
-          Match.exhaustive,
+export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
+  databaseSchema: DatabaseSchema.AnyWithProps,
+  groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
+): ForGroup<Group> => {
+  const { functionRegistryItems, middlewareRegistryItems } =
+    GroupRegistry.make(groupLayer);
+  return mapLeaves<
+    FunctionRegistryItem.AnyWithProps,
+    RegisteredConvexFunction.Definition
+  >(
+    functionRegistryItems as {
+      [key: string]: FunctionRegistryItem.AnyWithProps;
+    },
+    FunctionRegistryItem.isFunctionRegistryItem,
+    (item) =>
+      Match.value(item).pipe(
+        Match.tag("Convex", ({ handler }) =>
+          RegisteredConvexFunction.Definition.Registered({ handler }),
         ),
-    ) as ForGroup<Group>;
-  },
-);
+        Match.tag("Confect", (confect) =>
+          RegisteredConvexFunction.prepare(
+            databaseSchema,
+            confect,
+            ResolvedMiddleware.resolve(confect, middlewareRegistryItems),
+          ),
+        ),
+        Match.exhaustive,
+      ),
+  ) as ForGroup<Group>;
+};

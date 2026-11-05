@@ -391,8 +391,8 @@ const make = <
       name,
       functionProvenance:
         args === undefined
-          ? FunctionProvenance.Confect({ args: () => ({}), returns, error })
-          : FunctionProvenance.Confect({ args, returns, error }),
+          ? FunctionProvenance.Confect(() => ({}), returns, error)
+          : FunctionProvenance.Confect(args, returns, error),
       middlewareAttachments: [],
     });
   }
@@ -466,16 +466,8 @@ const makePaginated = <
       name,
       functionProvenance:
         args === undefined
-          ? FunctionProvenance.ConfectPaginated({
-              userArgs: () => ({}),
-              item,
-              error,
-            })
-          : FunctionProvenance.ConfectPaginated({
-              userArgs: args,
-              item,
-              error,
-            }),
+          ? FunctionProvenance.ConfectPaginated(() => ({}), item, error)
+          : FunctionProvenance.ConfectPaginated(args, item, error),
       middlewareAttachments: [],
     });
   }

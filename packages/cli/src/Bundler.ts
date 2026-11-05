@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import * as BundleRequire from "bundle-require";
 import { resolveModulePath } from "exsolve";
-import { dual, constUndefined, identity, pipe } from "effect/Function";
+import { constUndefined, identity, pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Chunk from "effect/Chunk";
 import * as Cause from "effect/Cause";
@@ -120,14 +120,13 @@ const resolveExternalEsm = Option.liftThrowable(
     resolveModulePath(specifier, { from: importer, conditions }),
 );
 
-export const resolveModule: {
-  (importer: string): (specifier: string) => Option.Option<string>;
-  (specifier: string, importer: string): Option.Option<string>;
-} = dual(2, (specifier: string, importer: string): Option.Option<string> =>
+export const resolveModule = (
+  specifier: string,
+  importer: string,
+): Option.Option<string> =>
   Option.orElse(resolveEsm(specifier, importer), () =>
     resolveCjs(specifier, importer),
-  ),
-);
+  );
 
 /**
  * Bundles first-party workspace dependencies that `bundle-require` would
@@ -141,63 +140,46 @@ export const resolveModule: {
  *
  * @internal
  */
-export const bundleWorkspacePlugin: {
-  (
-    fs: FileSystem.FileSystem,
-    skipPatterns: ReadonlyArray<string | RegExp>,
-  ): (path: Path.Path) => esbuild.Plugin;
-  (
-    path: Path.Path,
-    fs: FileSystem.FileSystem,
-    skipPatterns: ReadonlyArray<string | RegExp>,
-  ): esbuild.Plugin;
-} = dual(
-  3,
-  (
-    path: Path.Path,
-    fs: FileSystem.FileSystem,
-    skipPatterns: ReadonlyArray<string | RegExp>,
-  ): esbuild.Plugin => ({
-    name: "confect:bundle-workspace",
-    setup(build) {
-      const patterns = [...skipPatterns];
-      build.onResolve({ filter: /^[^./]/ }, (args) => {
-        if (args.namespace !== "file" && args.namespace !== "")
-          return undefined;
-        if (isBuiltin(args.path) || path.isAbsolute(args.path))
-          return undefined;
-        if (BundleRequire.match(args.path, patterns)) {
-          return undefined;
-        }
+export const bundleWorkspacePlugin = (
+  path: Path.Path,
+  fs: FileSystem.FileSystem,
+  skipPatterns: ReadonlyArray<string | RegExp>,
+): esbuild.Plugin => ({
+  name: "confect:bundle-workspace",
+  setup(build) {
+    const patterns = [...skipPatterns];
+    build.onResolve({ filter: /^[^./]/ }, (args) => {
+      if (args.namespace !== "file" && args.namespace !== "") return undefined;
+      if (isBuiltin(args.path) || path.isAbsolute(args.path)) return undefined;
+      if (BundleRequire.match(args.path, patterns)) {
+        return undefined;
+      }
 
-        const importer =
-          args.importer !== ""
-            ? args.importer
-            : path.join(args.resolveDir, "_");
+      const importer =
+        args.importer !== "" ? args.importer : path.join(args.resolveDir, "_");
 
-        return Option.match(resolveModule(args.path, importer), {
-          onNone: () => ({
-            path: args.path,
-            external: true,
-            warnings: [
-              {
-                text: `Confect could not resolve workspace dependency "${args.path}" (imported from ${importer}) to bundle it; leaving it external.`,
-              },
-            ],
-          }),
-          onSome: (resolved) =>
-            Effect.runPromise(
-              fs.realPath(resolved).pipe(Effect.orElseSucceed(() => resolved)),
-            ).then((real) =>
-              pipe(real, String.split(path.sep), Array.contains("node_modules"))
-                ? undefined
-                : { path: real },
-            ),
-        });
+      return Option.match(resolveModule(args.path, importer), {
+        onNone: () => ({
+          path: args.path,
+          external: true,
+          warnings: [
+            {
+              text: `Confect could not resolve workspace dependency "${args.path}" (imported from ${importer}) to bundle it; leaving it external.`,
+            },
+          ],
+        }),
+        onSome: (resolved) =>
+          Effect.runPromise(
+            fs.realPath(resolved).pipe(Effect.orElseSucceed(() => resolved)),
+          ).then((real) =>
+            pipe(real, String.split(path.sep), Array.contains("node_modules"))
+              ? undefined
+              : { path: real },
+          ),
       });
-    },
-  }),
-);
+    });
+  },
+});
 
 interface CapturedBuildResult {
   readonly metafile: esbuild.Metafile | undefined;
@@ -550,63 +532,52 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
  * finishes. The disposable evaluator, not this scope, owns Node's import
  * cache.
  */
-export const withBatch: {
-  <A, E, R>(
-    effect: Effect.Effect<A, E, R>,
-  ): (entryPoints: ReadonlyArray<string>) => Effect.Effect<A, E, R>;
-  <A, E, R>(
-    entryPoints: ReadonlyArray<string>,
-    effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E, R>;
-} = dual(
-  2,
-  <A, E, R>(
-    entryPoints: ReadonlyArray<string>,
-    effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E, R> =>
-    Effect.scopedWith((scope) =>
-      Effect.gen(function* () {
-        const current = yield* Effect.serviceOption(Batch);
-        if (
-          Option.isSome(current) &&
-          Array.every(entryPoints, (entry) =>
-            current.value.entryPoints.includes(entry),
-          )
+export const withBatch = <A, E, R>(
+  entryPoints: ReadonlyArray<string>,
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, R> =>
+  Effect.scopedWith((scope) =>
+    Effect.gen(function* () {
+      const current = yield* Effect.serviceOption(Batch);
+      if (
+        Option.isSome(current) &&
+        Array.every(entryPoints, (entry) =>
+          current.value.entryPoints.includes(entry),
         )
-          return yield* effect;
-        const compilation = yield* Effect.cached(
-          compileBatch(entryPoints).pipe(
-            Effect.provideService(Scope.Scope, scope),
-            Effect.asSome,
-            Effect.catchTag("BatchIncompatible", (error) =>
-              Effect.logDebug(
-                "Shared build skipped; falling back to individual builds.",
-                {
-                  entryPoints,
-                  reason: error.reason,
-                  detail: error.message,
-                },
-              ).pipe(Effect.as(Option.none<BatchCompilation>())),
-            ),
-            Effect.catch((error) =>
-              Effect.logDebug(
-                "Shared build failed; falling back to individual builds.",
-                {
-                  entryPoints,
-                  reason: "CompileFailure",
-                },
-                Cause.fail(error),
-              ).pipe(Effect.as(Option.none<BatchCompilation>())),
-            ),
+      )
+        return yield* effect;
+      const compilation = yield* Effect.cached(
+        compileBatch(entryPoints).pipe(
+          Effect.provideService(Scope.Scope, scope),
+          Effect.asSome,
+          Effect.catchTag("BatchIncompatible", (error) =>
+            Effect.logDebug(
+              "Shared build skipped; falling back to individual builds.",
+              {
+                entryPoints,
+                reason: error.reason,
+                detail: error.message,
+              },
+            ).pipe(Effect.as(Option.none<BatchCompilation>())),
           ),
-        );
-        return yield* Effect.provideService(effect, Batch, {
-          entryPoints,
-          compilation,
-        });
-      }),
-    ),
-);
+          Effect.catch((error) =>
+            Effect.logDebug(
+              "Shared build failed; falling back to individual builds.",
+              {
+                entryPoints,
+                reason: "CompileFailure",
+              },
+              Cause.fail(error),
+            ).pipe(Effect.as(Option.none<BatchCompilation>())),
+          ),
+        ),
+      );
+      return yield* Effect.provideService(effect, Batch, {
+        entryPoints,
+        compilation,
+      });
+    }),
+  );
 
 interface MetafileTraversal {
   readonly pending: Chunk.Chunk<string>;
@@ -905,39 +876,26 @@ export const directlyImports = Effect.fnUntraced(function* (
  * esbuild erases `import type` before it produces the metafile, so type-only
  * imports are not reported.
  */
-export const importersOfPackage: {
-  (
-    packageName: string,
-    where: (absolutePath: string) => boolean,
-  ): (bundled: Bundled) => ReadonlyArray<string>;
-  (
-    bundled: Bundled,
-    packageName: string,
-    where: (absolutePath: string) => boolean,
-  ): ReadonlyArray<string>;
-} = dual(
-  3,
-  (
-    bundled: Bundled,
-    packageName: string,
-    where: (absolutePath: string) => boolean,
-  ): ReadonlyArray<string> => {
-    const subpathPrefix = `${packageName}/`;
+export const importersOfPackage = (
+  bundled: Bundled,
+  packageName: string,
+  where: (absolutePath: string) => boolean,
+): ReadonlyArray<string> => {
+  const subpathPrefix = `${packageName}/`;
 
-    return Array.map(
-      Array.filter(
-        Record.toEntries(bundled.metafile.inputs),
-        ([absolutePath, input]) =>
-          where(absolutePath) &&
-          Array.some(
-            input.imports,
-            (imported) =>
-              imported.original === packageName ||
-              (imported.original !== undefined &&
-                String.startsWith(subpathPrefix)(imported.original)),
-          ),
-      ),
-      ([absolutePath]) => absolutePath,
-    );
-  },
-);
+  return Array.map(
+    Array.filter(
+      Record.toEntries(bundled.metafile.inputs),
+      ([absolutePath, input]) =>
+        where(absolutePath) &&
+        Array.some(
+          input.imports,
+          (imported) =>
+            imported.original === packageName ||
+            (imported.original !== undefined &&
+              String.startsWith(subpathPrefix)(imported.original)),
+        ),
+    ),
+    ([absolutePath]) => absolutePath,
+  );
+};

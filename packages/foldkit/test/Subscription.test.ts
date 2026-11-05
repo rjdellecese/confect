@@ -14,29 +14,29 @@ import * as PaginatedQuery from "@confect/foldkit/PaginatedQuery";
 import * as Subscription from "@confect/foldkit/Subscription";
 import * as TestClient from "./TestClient";
 
-const getQueryRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicQuery({
+const getQueryRef = Ref.make(
+  "notes",
+  FunctionSpec.publicQuery({
     name: "get",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({ text: Schema.String }),
   }),
-});
+);
 
-const listQueryRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicQuery({
+const listQueryRef = Ref.make(
+  "notes",
+  FunctionSpec.publicQuery({
     name: "list",
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
-const convexGetQueryRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.convexPublicQuery<
+const convexGetQueryRef = Ref.make(
+  "notes",
+  FunctionSpec.convexPublicQuery<
     RegisteredQuery<"public", { id: string }, { text: string }>
   >()("get"),
-});
+);
 
 interface Model {
   readonly noteId: Option.Option<string>;
@@ -62,21 +62,6 @@ const makeNoteEntry = () =>
   });
 
 layer(TestClient.layer, { buildPerTest: true })("Subscription", (it) => {
-  it.effect("supports pipeable reactive query streams", () =>
-    Effect.gen(function* () {
-      const testClient = yield* TestClient.TestClient;
-      yield* testClient.setReactiveQueryResults(
-        Stream.make(Result.succeed({ text: "hello" })),
-      );
-      const stream = Subscription.reactiveQueryStream<
-        typeof getQueryRef,
-        Message,
-        Message
-      >(noteHandlers)(getQueryRef);
-      const messages = yield* stream({ id: "abc" }).pipe(Stream.runCollect);
-      expect(messages).toEqual([SucceededGetNote({ note: { text: "hello" } })]);
-    }),
-  );
   describe("reactiveQuery", () => {
     it("extracts Option-wrapped args and defaults no-args queries open", () => {
       const entry = makeNoteEntry();
@@ -238,15 +223,15 @@ class PageDenied extends Schema.TaggedError<
   reason: Schema.String,
 }) {}
 
-const paginateRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicPaginatedQuery({
+const paginateRef = Ref.make(
+  "notes",
+  FunctionSpec.publicPaginatedQuery({
     name: "paginate",
     args: () => ({ channel: Schema.String }),
     item: () => Note,
     error: () => PageDenied,
   }),
-});
+);
 
 const Notes = PaginatedQuery.make(paginateRef);
 type PaginatedState = typeof Notes.schema.Type;
@@ -271,14 +256,14 @@ const makePaginatedEntry = () =>
     onSettled: (settlement) => SettledGetNotesPage({ settlement }),
   });
 
-const broadErrorPaginateRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicPaginatedQuery({
+const broadErrorPaginateRef = Ref.make(
+  "notes",
+  FunctionSpec.publicPaginatedQuery({
     name: "paginateBroadError",
     item: () => Note,
     error: () => Schema.Unknown,
   }),
-});
+);
 
 const BroadErrorNotes = PaginatedQuery.make(broadErrorPaginateRef);
 

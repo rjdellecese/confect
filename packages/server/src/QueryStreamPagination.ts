@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import * as Chunk from "effect/Chunk";
 import * as Data from "effect/Data";
 import * as Match from "effect/Match";
@@ -90,48 +89,33 @@ const Request = Data.taggedEnum<Request>();
 /**
  * @experimental
  */
-export const parseRequest: {
-  (
-    start: Start,
-    range: Range,
-  ): (
-    numItems: number,
-  ) => Result.Result<Request, InvalidPageSizeError | EmptyInitialPageError>;
-  (
-    numItems: number,
-    start: Start,
-    range: Range,
-  ): Result.Result<Request, InvalidPageSizeError | EmptyInitialPageError>;
-} = dual(
-  3,
-  (
-    numItems: number,
-    start: Start,
-    range: Range,
-  ): Result.Result<Request, InvalidPageSizeError | EmptyInitialPageError> =>
-    Result.flatMap(
-      Schema.decodeResult(PageSize)(numItems).pipe(
-        Result.mapError(() => InvalidPageSizeError.make({ numItems })),
-      ),
-      (size): Result.Result<Request, EmptyInitialPageError> =>
-        size === 0
-          ? Start.$match(start, {
-              Beginning: () => Result.fail(EmptyInitialPageError.make({})),
-              After: ({ cursor }) =>
-                Result.succeed(Request.Unchanged({ cursor })),
-            })
-          : Result.succeed(
-              Request.Scan({
-                numItems: size,
-                after: Start.$match(start, {
-                  Beginning: () => Option.none(),
-                  After: ({ key }) => Option.some(key),
-                }),
-                range,
-              }),
-            ),
+export const parseRequest = (
+  numItems: number,
+  start: Start,
+  range: Range,
+): Result.Result<Request, InvalidPageSizeError | EmptyInitialPageError> =>
+  Result.flatMap(
+    Schema.decodeResult(PageSize)(numItems).pipe(
+      Result.mapError(() => InvalidPageSizeError.make({ numItems })),
     ),
-);
+    (size): Result.Result<Request, EmptyInitialPageError> =>
+      size === 0
+        ? Start.$match(start, {
+            Beginning: () => Result.fail(EmptyInitialPageError.make({})),
+            After: ({ cursor }) =>
+              Result.succeed(Request.Unchanged({ cursor })),
+          })
+        : Result.succeed(
+            Request.Scan({
+              numItems: size,
+              after: Start.$match(start, {
+                Beginning: () => Option.none(),
+                After: ({ key }) => Option.some(key),
+              }),
+              range,
+            }),
+          ),
+  );
 
 /**
  * A nonempty scan, including filtered markers.
@@ -184,58 +168,41 @@ export const initial = <Doc>(): QueryStreamPagination<Doc> =>
 /**
  * @experimental
  */
-export const record: {
-  <Doc>(
-    self: QueryStreamPagination<Doc>,
-    doc: Option.Option<Doc>,
-    key: QueryStreamKey.Complete,
-    readLimit: boolean,
-  ): (request: ScanRequest) => QueryStreamPagination<Doc>;
-  <Doc>(
-    request: ScanRequest,
-    self: QueryStreamPagination<Doc>,
-    doc: Option.Option<Doc>,
-    key: QueryStreamKey.Complete,
-    readLimit: boolean,
-  ): QueryStreamPagination<Doc>;
-} = dual(
-  5,
-  <Doc>(
-    request: ScanRequest,
-    self: QueryStreamPagination<Doc>,
-    doc: Option.Option<Doc>,
-    key: QueryStreamKey.Complete,
-    readLimit: boolean,
-  ): QueryStreamPagination<Doc> =>
-    Match.value(self).pipe(
-      Match.tagsExhaustive({
-        Reading: (reading) => {
-          const progress = append(reading.progress, key);
-          const page = Option.match(doc, {
-            onNone: () => reading.page,
-            onSome: (value) => Chunk.append(reading.page, value),
+export const record = <Doc>(
+  request: ScanRequest,
+  self: QueryStreamPagination<Doc>,
+  doc: Option.Option<Doc>,
+  key: QueryStreamKey.Complete,
+  readLimit: boolean,
+): QueryStreamPagination<Doc> =>
+  Match.value(self).pipe(
+    Match.tagsExhaustive({
+      Reading: (reading) => {
+        const progress = append(reading.progress, key);
+        const page = Option.match(doc, {
+          onNone: () => reading.page,
+          onSome: (value) => Chunk.append(reading.page, value),
+        });
+        const continueReading = () =>
+          QueryStreamPagination.Reading({
+            page,
+            progress: Option.some(progress),
           });
-          const continueReading = () =>
-            QueryStreamPagination.Reading({
-              page,
-              progress: Option.some(progress),
+        return readLimit
+          ? QueryStreamPagination.ReadLimit({ page, progress })
+          : Range.$match(request.range, {
+              Unpinned: () =>
+                Chunk.size(page) >= request.numItems
+                  ? QueryStreamPagination.ItemLimit({ page, progress })
+                  : continueReading(),
+              ThroughKey: continueReading,
+              ThroughEnd: continueReading,
             });
-          return readLimit
-            ? QueryStreamPagination.ReadLimit({ page, progress })
-            : Range.$match(request.range, {
-                Unpinned: () =>
-                  Chunk.size(page) >= request.numItems
-                    ? QueryStreamPagination.ItemLimit({ page, progress })
-                    : continueReading(),
-                ThroughKey: continueReading,
-                ThroughEnd: continueReading,
-              });
-        },
-        ItemLimit: () => self,
-        ReadLimit: () => self,
-      }),
-    ),
-);
+      },
+      ItemLimit: () => self,
+      ReadLimit: () => self,
+    }),
+  );
 
 /**
  * @experimental
@@ -296,117 +263,102 @@ const SOFT_MAX_SCAN_LENGTH = 16000;
  *
  * @experimental
  */
-export const finish: {
-  <Doc>(
-    self: QueryStreamPagination<Doc>,
-    upstreamStopped: boolean,
-  ): (
-    request: ScanRequest,
-  ) => Result.Result<Outcome<Doc>, UnsafePageBoundaryError>;
-  <Doc>(
-    request: ScanRequest,
-    self: QueryStreamPagination<Doc>,
-    upstreamStopped: boolean,
-  ): Result.Result<Outcome<Doc>, UnsafePageBoundaryError>;
-} = dual(
-  3,
-  <Doc>(
-    request: ScanRequest,
-    self: QueryStreamPagination<Doc>,
-    upstreamStopped: boolean,
-  ): Result.Result<Outcome<Doc>, UnsafePageBoundaryError> => {
-    const page = Chunk.toArray(self.page);
-    const stopped = (
-      progress: Option.Option<Progress>,
-      readLimit: boolean,
-    ): Result.Result<Outcome<Doc>, UnsafePageBoundaryError> =>
-      Result.flatMap(
-        Result.fromOption(progress, () =>
-          UnsafePageBoundaryError.make({ reason: "NoProgress" }),
-        ),
-        (scanned): Result.Result<Outcome<Doc>, UnsafePageBoundaryError> => {
-          const splitKey = midpoint(scanned);
-          const atEnd = Range.$match(request.range, {
-            Unpinned: () => false,
-            ThroughEnd: () => false,
-            ThroughKey: ({ key }) =>
-              QueryStreamKeyValues.Order("asc")(splitKey.values, key.values) ===
-              0,
-          });
-          if (readLimit && atEnd) {
-            return Result.fail(
-              UnsafePageBoundaryError.make({ reason: "NoInteriorSplit" }),
-            );
-          }
-          const key = Chunk.lastNonEmpty(scanned);
-          if (readLimit)
-            return Result.succeed({
-              _tag: "SplitRequired",
-              page,
-              continuation: Continuation.Key({ key }),
-              splitKey,
-            });
-          return Result.succeed(
-            Chunk.size(scanned) >= SOFT_MAX_SCAN_LENGTH
-              ? {
-                  _tag: "SplitRecommended",
-                  page,
-                  continuation: Continuation.Key({ key }),
-                  splitKey,
-                }
-              : { _tag: "Continue", page, key },
-          );
-        },
-      );
-    const exhausted = (progress: Option.Option<Progress>): Outcome<Doc> => {
-      const finishRange = (
-        continuation: Continuation,
-        pinned: boolean,
-      ): Outcome<Doc> => {
-        const split = Option.filter(
-          progress,
-          (scanned) =>
-            pinned &&
-            (Chunk.size(scanned) >= SOFT_MAX_SCAN_LENGTH ||
-              page.length > request.numItems + 1),
-        );
-        return Option.match(split, {
-          onSome: (scanned): Outcome<Doc> => ({
-            _tag: "SplitRecommended",
-            page,
-            continuation,
-            splitKey: midpoint(scanned),
-          }),
-          onNone: () =>
-            Continuation.$match(continuation, {
-              End: (): Outcome<Doc> => ({ _tag: "Done", page }),
-              Key: ({ key }): Outcome<Doc> => ({
-                _tag: "Continue",
-                page,
-                key,
-              }),
-            }),
+export const finish = <Doc>(
+  request: ScanRequest,
+  self: QueryStreamPagination<Doc>,
+  upstreamStopped: boolean,
+): Result.Result<Outcome<Doc>, UnsafePageBoundaryError> => {
+  const page = Chunk.toArray(self.page);
+  const stopped = (
+    progress: Option.Option<Progress>,
+    readLimit: boolean,
+  ): Result.Result<Outcome<Doc>, UnsafePageBoundaryError> =>
+    Result.flatMap(
+      Result.fromOption(progress, () =>
+        UnsafePageBoundaryError.make({ reason: "NoProgress" }),
+      ),
+      (scanned): Result.Result<Outcome<Doc>, UnsafePageBoundaryError> => {
+        const splitKey = midpoint(scanned);
+        const atEnd = Range.$match(request.range, {
+          Unpinned: () => false,
+          ThroughEnd: () => false,
+          ThroughKey: ({ key }) =>
+            QueryStreamKeyValues.Order("asc")(splitKey.values, key.values) ===
+            0,
         });
-      };
-      return Range.$match(request.range, {
-        Unpinned: () => finishRange(Continuation.End(), false),
-        ThroughEnd: () => finishRange(Continuation.End(), true),
-        ThroughKey: ({ key }) => finishRange(Continuation.Key({ key }), true),
+        if (readLimit && atEnd) {
+          return Result.fail(
+            UnsafePageBoundaryError.make({ reason: "NoInteriorSplit" }),
+          );
+        }
+        const key = Chunk.lastNonEmpty(scanned);
+        if (readLimit)
+          return Result.succeed({
+            _tag: "SplitRequired",
+            page,
+            continuation: Continuation.Key({ key }),
+            splitKey,
+          });
+        return Result.succeed(
+          Chunk.size(scanned) >= SOFT_MAX_SCAN_LENGTH
+            ? {
+                _tag: "SplitRecommended",
+                page,
+                continuation: Continuation.Key({ key }),
+                splitKey,
+              }
+            : { _tag: "Continue", page, key },
+        );
+      },
+    );
+  const exhausted = (progress: Option.Option<Progress>): Outcome<Doc> => {
+    const finishRange = (
+      continuation: Continuation,
+      pinned: boolean,
+    ): Outcome<Doc> => {
+      const split = Option.filter(
+        progress,
+        (scanned) =>
+          pinned &&
+          (Chunk.size(scanned) >= SOFT_MAX_SCAN_LENGTH ||
+            page.length > request.numItems + 1),
+      );
+      return Option.match(split, {
+        onSome: (scanned): Outcome<Doc> => ({
+          _tag: "SplitRecommended",
+          page,
+          continuation,
+          splitKey: midpoint(scanned),
+        }),
+        onNone: () =>
+          Continuation.$match(continuation, {
+            End: (): Outcome<Doc> => ({ _tag: "Done", page }),
+            Key: ({ key }): Outcome<Doc> => ({
+              _tag: "Continue",
+              page,
+              key,
+            }),
+          }),
       });
     };
-    return Match.value(self).pipe(
-      Match.tagsExhaustive({
-        Reading: ({ progress }) =>
-          upstreamStopped
-            ? stopped(progress, true)
-            : progress.pipe(exhausted, Result.succeed),
-        ItemLimit: ({ progress }) =>
-          progress.pipe(Option.some, (scanned) =>
-            stopped(scanned, upstreamStopped),
-          ),
-        ReadLimit: ({ progress }) =>
-          progress.pipe(Option.some, (scanned) => stopped(scanned, true)),
-      }),
-    );
-  },
-);
+    return Range.$match(request.range, {
+      Unpinned: () => finishRange(Continuation.End(), false),
+      ThroughEnd: () => finishRange(Continuation.End(), true),
+      ThroughKey: ({ key }) => finishRange(Continuation.Key({ key }), true),
+    });
+  };
+  return Match.value(self).pipe(
+    Match.tagsExhaustive({
+      Reading: ({ progress }) =>
+        upstreamStopped
+          ? stopped(progress, true)
+          : progress.pipe(exhausted, Result.succeed),
+      ItemLimit: ({ progress }) =>
+        progress.pipe(Option.some, (scanned) =>
+          stopped(scanned, upstreamStopped),
+        ),
+      ReadLimit: ({ progress }) =>
+        progress.pipe(Option.some, (scanned) => stopped(scanned, true)),
+    }),
+  );
+};

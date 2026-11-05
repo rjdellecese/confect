@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
@@ -35,92 +34,49 @@ export const FunctionImpl = <Name_ extends string>({ name }: { name: Name_ }) =>
  * builders—so impls depend on `_generated/schema` (table schemas) rather than
  * `_generated/api` (which transitively imports every function spec).
  */
-export const make = dual<
-  <
-    DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-    Group extends GroupSpec.AnyWithProps,
-    const Name_ extends FunctionSpec.Name<GroupSpec.Functions<Group>>,
-  >(
-    group: Group,
-    name: Name_,
-    handler: Handler.WithName<
-      DatabaseSchema_,
-      GroupSpec.Functions<Group>,
-      Name_,
-      MiddlewareSpec.Provides<
-        | GroupSpec.MiddlewareSpecs<Group>
-        | FunctionSpec.MiddlewareSpecs<
-            FunctionSpec.WithName<GroupSpec.Functions<Group>, Name_>
-          >
-      >
-    >,
-  ) => (_databaseSchema: DatabaseSchema_) => Layer.Layer<FunctionImpl<Name_>>,
-  <
-    DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-    Group extends GroupSpec.AnyWithProps,
-    const Name_ extends FunctionSpec.Name<GroupSpec.Functions<Group>>,
-  >(
-    _databaseSchema: DatabaseSchema_,
-    group: Group,
-    name: Name_,
-    handler: Handler.WithName<
-      DatabaseSchema_,
-      GroupSpec.Functions<Group>,
-      Name_,
-      MiddlewareSpec.Provides<
-        | GroupSpec.MiddlewareSpecs<Group>
-        | FunctionSpec.MiddlewareSpecs<
-            FunctionSpec.WithName<GroupSpec.Functions<Group>, Name_>
-          >
-      >
-    >,
-  ) => Layer.Layer<FunctionImpl<Name_>>
+export const make = <
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Group extends GroupSpec.AnyWithProps,
+  const Name_ extends FunctionSpec.Name<GroupSpec.Functions<Group>>,
 >(
-  4,
-  <
-    DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-    Group extends GroupSpec.AnyWithProps,
-    const Name_ extends FunctionSpec.Name<GroupSpec.Functions<Group>>,
-  >(
-    _databaseSchema: DatabaseSchema_,
-    group: Group,
-    name: Name_,
-    handler: Handler.WithName<
-      DatabaseSchema_,
-      GroupSpec.Functions<Group>,
-      Name_,
-      MiddlewareSpec.Provides<
-        | GroupSpec.MiddlewareSpecs<Group>
-        | FunctionSpec.MiddlewareSpecs<
-            FunctionSpec.WithName<GroupSpec.Functions<Group>, Name_>
-          >
-      >
-    >,
-  ): Layer.Layer<FunctionImpl<Name_>> => {
-    const functionSpec = group.functions[name]!;
+  _databaseSchema: DatabaseSchema_,
+  group: Group,
+  name: Name_,
+  handler: Handler.WithName<
+    DatabaseSchema_,
+    GroupSpec.Functions<Group>,
+    Name_,
+    MiddlewareSpec.Provides<
+      | GroupSpec.MiddlewareSpecs<Group>
+      | FunctionSpec.MiddlewareSpecs<
+          FunctionSpec.WithName<GroupSpec.Functions<Group>, Name_>
+        >
+    >
+  >,
+): Layer.Layer<FunctionImpl<Name_>> => {
+  const functionSpec = group.functions[name]!;
 
-    return Layer.effect(
-      FunctionImpl<Name_>({ name }),
-      Effect.gen(function* () {
-        const registry = yield* Registry.Registry;
+  return Layer.effect(
+    FunctionImpl<Name_>({ name }),
+    Effect.gen(function* () {
+      const registry = yield* Registry.Registry;
 
-        yield* Ref.update(registry, (registryItems) =>
-          setNestedProperty(
-            registryItems,
-            [name],
-            FunctionRegistryItem.make({
-              functionSpec,
-              groupMiddlewareAttachments: group.middlewareAttachments,
-              handler,
-            }),
-          ),
-        );
+      yield* Ref.update(registry, (registryItems) =>
+        setNestedProperty(
+          registryItems,
+          [name],
+          FunctionRegistryItem.make({
+            functionSpec,
+            groupMiddlewareAttachments: group.middlewareAttachments,
+            handler,
+          }),
+        ),
+      );
 
-        return { name };
-      }),
-    );
-  },
-);
+      return { name };
+    }),
+  );
+};
 
 /**
  * Get the function implementation service type for a specific function name.

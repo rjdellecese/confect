@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import { Ref } from "@confect/core";
 import type { DatabaseSchema, DataModel } from "@confect/server";
 import { RegisteredConvexFunction } from "@confect/server";
@@ -254,31 +253,16 @@ class TestConfectImpl<
     );
 }
 
-export const layer: {
-  (
-    convexSchemaDefinition: SchemaDefinition<GenericSchema, true>,
-    modules: Record<string, () => Promise<any>>,
-  ): <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-    databaseSchema: DatabaseSchema_,
-  ) => Layer.Layer<TestConfect<DatabaseSchema_>>;
-  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-    databaseSchema: DatabaseSchema_,
-    convexSchemaDefinition: SchemaDefinition<GenericSchema, true>,
-    modules: Record<string, () => Promise<any>>,
-  ): Layer.Layer<TestConfect<DatabaseSchema_>>;
-} = dual(
-  3,
-  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-    databaseSchema: DatabaseSchema_,
-    convexSchemaDefinition: SchemaDefinition<GenericSchema, true>,
-    modules: Record<string, () => Promise<any>>,
-  ): Layer.Layer<TestConfect<DatabaseSchema_>> =>
-    Layer.sync(
-      TestConfect<DatabaseSchema_>(),
-      () =>
-        new TestConfectImpl(
-          databaseSchema,
-          convexTest(convexSchemaDefinition, modules) as any,
-        ),
-    ),
-);
+export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+  databaseSchema: DatabaseSchema_,
+  convexSchemaDefinition: SchemaDefinition<GenericSchema, true>,
+  modules: Record<string, () => Promise<any>>,
+): Layer.Layer<TestConfect<DatabaseSchema_>> =>
+  Layer.sync(
+    TestConfect<DatabaseSchema_>(),
+    () =>
+      new TestConfectImpl(
+        databaseSchema,
+        convexTest(convexSchemaDefinition, modules) as any,
+      ),
+  );

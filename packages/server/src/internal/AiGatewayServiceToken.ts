@@ -113,6 +113,9 @@ export const service = make(getConvexServiceToken);
 
 export const layer = Layer.succeed(AiGatewayServiceToken, service);
 
+/**
+ * @internal
+ */
 export const transformClientRequest = (serviceToken: Service) =>
   HttpClient.mapRequestEffect((request) =>
     serviceToken.get("ai-gateway").pipe(

@@ -25,22 +25,22 @@ vi.mock("convex/react", () => ({
 
 const Item = Schema.Struct({ value: Schema.FiniteFromString });
 
-const list = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicPaginatedQuery({
+const list = Ref.make(
+  "notes",
+  FunctionSpec.publicPaginatedQuery({
     name: "list",
     item: () => Item,
   }),
-});
+);
 
-const listWithArgs = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicPaginatedQuery({
+const listWithArgs = Ref.make(
+  "notes",
+  FunctionSpec.publicPaginatedQuery({
     name: "listWithArgs",
     args: () => ({ count: Schema.FiniteFromString }),
     item: () => Item,
   }),
-});
+);
 
 class Boom extends Schema.TaggedError<
   Boom,
@@ -49,14 +49,14 @@ class Boom extends Schema.TaggedError<
   reason: Schema.String,
 }) {}
 
-const listOrFail = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicPaginatedQuery({
+const listOrFail = Ref.make(
+  "notes",
+  FunctionSpec.publicPaginatedQuery({
     name: "listOrFail",
     item: () => Item,
     error: () => Boom,
   }),
-});
+);
 
 /**
  * The mock serves each subscribed page from `responses`, keyed by the page's
@@ -118,22 +118,6 @@ const respondFirstPage = (result: object) => {
 };
 
 describe("useStreamPaginatedQuery", () => {
-  test("supports pipeable stream paginated hooks", () => {
-    const { result } = renderHook(() =>
-      useStreamPaginatedQuery<typeof listWithArgs>(
-        { count: 42 },
-        { initialNumItems: 2 },
-      )(listWithArgs),
-    );
-    expect(result.current._tag).toBe("LoadingFirstPage");
-    const request = Rec.values(
-      useQueriesMock.mock.lastCall![0] as Record<string, { args: unknown }>,
-    )[0]!;
-    expect(request.args).toEqual({
-      count: "42",
-      paginationOpts: { numItems: 2, cursor: null },
-    });
-  });
   test("pins the first page to its range once loaded, decoding its items", () => {
     respond(
       { numItems: 2, cursor: null },

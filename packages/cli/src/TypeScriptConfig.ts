@@ -81,6 +81,9 @@ const parents = (path: Path.Path, directory: string): ReadonlyArray<string> =>
     ),
   );
 
+/**
+ * @internal
+ */
 export const discover = Effect.fnUntraced(function* (directory: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;

@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import * as ConvexFunctionDefinitions from "./ConvexFunctionDefinitions";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
@@ -80,23 +79,10 @@ export interface AnyWithProps {
  * before shared registration. Node groups use
  * `RegisteredNodeFunction.buildForGroup` from the Node entry.
  */
-export const buildForGroup = dual<
-  <Group extends GroupSpec.AnyWithProps>(
-    groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
-  ) => (
-    databaseSchema: DatabaseSchema.AnyWithProps,
-  ) => RegisteredFunctionsForGroupSpec<Group>,
-  <Group extends GroupSpec.AnyWithProps>(
-    databaseSchema: DatabaseSchema.AnyWithProps,
-    groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
-  ) => RegisteredFunctionsForGroupSpec<Group>
->(
-  2,
-  <Group extends GroupSpec.AnyWithProps>(
-    databaseSchema: DatabaseSchema.AnyWithProps,
-    groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
-  ): RegisteredFunctionsForGroupSpec<Group> =>
-    ConvexFunctionDefinitions.register<Group>(
-      ConvexFunctionDefinitions.buildForGroup(databaseSchema, groupLayer),
-    ),
-);
+export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
+  databaseSchema: DatabaseSchema.AnyWithProps,
+  groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
+): RegisteredFunctionsForGroupSpec<Group> =>
+  ConvexFunctionDefinitions.register<Group>(
+    ConvexFunctionDefinitions.buildForGroup(databaseSchema, groupLayer),
+  );

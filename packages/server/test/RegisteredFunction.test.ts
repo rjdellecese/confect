@@ -18,10 +18,9 @@ describe("runHandlerPromise", () => {
   it.effect("encodes declared errors without wrapping the ConvexError", () =>
     Effect.promise(() =>
       expect(
-        RegisteredFunction.runHandlerPromise({
-          effect: Effect.fail({ count: 2 }),
-          errorSchema: Schema.Struct({ count: Schema.FiniteFromString }),
-        }),
+        RegisteredFunction.runHandlerPromise(
+          Schema.Struct({ count: Schema.FiniteFromString }),
+        )(Effect.fail({ count: 2 })),
       ).rejects.toEqual(new ConvexError({ count: "2" })),
     ),
   );
@@ -29,10 +28,9 @@ describe("runHandlerPromise", () => {
   it.effect("does not expose undeclared errors as ConvexError data", () =>
     Effect.promise(() =>
       expect(
-        RegisteredFunction.runHandlerPromise({
-          effect: Effect.fail({ secret: "server-only" }),
-          errorSchema: undefined,
-        }),
+        RegisteredFunction.runHandlerPromise(undefined)(
+          Effect.fail({ secret: "server-only" }),
+        ),
       ).rejects.not.toBeInstanceOf(ConvexError),
     ),
   );
@@ -40,10 +38,9 @@ describe("runHandlerPromise", () => {
   it.effect("does not expose an error that its schema cannot encode", () =>
     Effect.promise(() =>
       expect(
-        RegisteredFunction.runHandlerPromise({
-          effect: Effect.fail({ count: "not a number" }),
-          errorSchema: Schema.Struct({ count: Schema.FiniteFromString }),
-        }),
+        RegisteredFunction.runHandlerPromise(
+          Schema.Struct({ count: Schema.FiniteFromString }),
+        )(Effect.fail({ count: "not a number" })),
       ).rejects.not.toBeInstanceOf(ConvexError),
     ),
   );
@@ -52,10 +49,7 @@ describe("runHandlerPromise", () => {
     const defect = new ConvexError({ message: "InvalidCursor" });
     return Effect.promise(() =>
       expect(
-        RegisteredFunction.runHandlerPromise({
-          effect: Effect.die(defect),
-          errorSchema: undefined,
-        }),
+        RegisteredFunction.runHandlerPromise(undefined)(Effect.die(defect)),
       ).rejects.toBe(defect),
     );
   });
@@ -72,16 +66,12 @@ describe("runHandlerPromise", () => {
       );
       const [first, second] = yield* Effect.promise(() =>
         Promise.all([
-          RegisteredFunction.runHandlerPromise({
-            effect: inspect,
-            errorSchema: undefined,
-            runOptions: { scheduler: firstScheduler },
-          }),
-          RegisteredFunction.runHandlerPromise({
-            effect: inspect,
-            errorSchema: undefined,
-            runOptions: { scheduler: secondScheduler },
-          }),
+          RegisteredFunction.runHandlerPromise(undefined, {
+            scheduler: firstScheduler,
+          })(inspect),
+          RegisteredFunction.runHandlerPromise(undefined, {
+            scheduler: secondScheduler,
+          })(inspect),
         ]),
       );
       expect(first.id).not.toBe(second.id);
@@ -96,20 +86,16 @@ describe("runHandlerPromise", () => {
       const first = { ...original, info: vi.fn() };
       const second = { ...original, info: vi.fn() };
       const release = yield* Deferred.make<void>();
+      const run = RegisteredFunction.runHandlerPromise(undefined);
       yield* Effect.promise(() => {
         globalThis.console = first;
-        const firstResult = RegisteredFunction.runHandlerPromise({
-          errorSchema: undefined,
-          effect: release.pipe(
-            Deferred.await,
-            Effect.andThen(Effect.log("first")),
-          ),
-        });
+        const firstResult = run(
+          release.pipe(Deferred.await, Effect.andThen(Effect.log("first"))),
+        );
         globalThis.console = second;
-        const secondResult = RegisteredFunction.runHandlerPromise({
-          errorSchema: undefined,
-          effect: Effect.log("second"),
-        }).finally(() => Deferred.doneUnsafe(release, Effect.void));
+        const secondResult = run(Effect.log("second")).finally(() =>
+          Deferred.doneUnsafe(release, Effect.void),
+        );
         return Promise.all([firstResult, secondResult]).finally(() => {
           globalThis.console = original;
         });
@@ -131,18 +117,13 @@ describe("runHandlerPromise", () => {
         Context.get(Context.empty(), Console.Console);
         const first = { ...original, info: vi.fn(), log: vi.fn() };
         const second = { ...original, info: vi.fn(), log: vi.fn() };
+        const run = RegisteredFunction.runHandlerPromise(undefined);
         yield* Effect.promise(() => {
           globalThis.console = first;
-          return RegisteredFunction.runHandlerPromise({
-            errorSchema: undefined,
-            effect: Effect.log("first"),
-          })
+          return run(Effect.log("first"))
             .then(() => {
               globalThis.console = second;
-              return RegisteredFunction.runHandlerPromise({
-                errorSchema: undefined,
-                effect: Effect.log("second"),
-              });
+              return run(Effect.log("second"));
             })
             .finally(() => {
               globalThis.console = original;
@@ -168,10 +149,10 @@ describe("runHandlerPromise", () => {
           debug: vi.fn(),
           info: vi.fn(),
         };
+        const run = RegisteredFunction.runHandlerPromise(undefined);
         const loggers = yield* Effect.promise(() =>
-          RegisteredFunction.runHandlerPromise({
-            errorSchema: undefined,
-            effect: Effect.gen(function* () {
+          run(
+            Effect.gen(function* () {
               yield* Effect.logTrace("hidden trace");
               yield* Effect.logDebug("hidden debug");
               yield* Effect.logInfo("visible");
@@ -179,7 +160,7 @@ describe("runHandlerPromise", () => {
               expect(MinimumLogLevelResult).toBe("Info");
               return yield* Logger.CurrentLoggers;
             }).pipe(Effect.provideService(Console.Console, console)),
-          }),
+          ),
         );
         expect(loggers.has(Logger.tracerLogger)).toBe(true);
         expect(console.debug).not.toHaveBeenCalled();
@@ -189,16 +170,15 @@ describe("runHandlerPromise", () => {
 
         const custom = vi.fn();
         yield* Effect.promise(() =>
-          RegisteredFunction.runHandlerPromise({
-            errorSchema: undefined,
-            effect: Effect.logInfo("custom").pipe(
+          run(
+            Effect.logInfo("custom").pipe(
               Effect.provideService(
                 Logger.CurrentLoggers,
                 new Set([Logger.make(custom)]),
               ),
               Effect.provideService(Console.Console, console),
             ),
-          }),
+          ),
         );
         expect(custom).toHaveBeenCalledOnce();
         expect(console.info).toHaveBeenCalledOnce();

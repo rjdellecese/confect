@@ -2,25 +2,8 @@ import * as Record from "effect/Record";
 import { describe, expect, test } from "@effect/vitest";
 import * as Lazy from "@confect/core/Lazy";
 import * as MutableRef from "effect/MutableRef";
-import { pipe } from "effect/Function";
 
 describe("Lazy.defineProperty", () => {
-  test("supports pipeable installation without evaluating the computation", () => {
-    const target = { value: 0 };
-    const calls = MutableRef.make(0);
-    const install = Lazy.defineProperty("value", () => {
-      MutableRef.increment(calls);
-      return 42;
-    });
-
-    pipe(target, install);
-
-    expect(MutableRef.get(calls)).toBe(0);
-    expect(target.value).toBe(42);
-    expect(target.value).toBe(42);
-    expect(MutableRef.get(calls)).toBe(1);
-  });
-
   test("does not run compute until the property is first accessed", () => {
     const target = {} as { value: number };
     const calls = MutableRef.make(0);

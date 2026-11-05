@@ -43,22 +43,6 @@ describe("name validation", () => {
 });
 
 describe("withName", () => {
-  it("supports pipeable names and child assembly without modifying inputs", () => {
-    const group = GroupSpec.make();
-    const child = GroupSpec.makeNode();
-    const named = GroupSpec.withName("notes")(group);
-    const assembled = GroupSpec.addGroupsAt({ child })(named);
-
-    expectTypeOf(named.name).toEqualTypeOf<"notes">();
-    expect(named.name).toBe("notes");
-    expect(group.name).toBe("");
-    expect(assembled.name).toBe("notes");
-    expect(assembled.groups.child.name).toBe("child");
-    expect(assembled.groups.child.runtime).toBe("Node");
-    expect(child.name).toBe("");
-    expect(named.groups).toEqual({});
-  });
-
   it("returns the input unchanged when the name already matches", () => {
     const group = GroupSpec.withName("notes", GroupSpec.make());
 
@@ -186,11 +170,8 @@ describe("addGroupsAt", () => {
 
   it("checks group inputs without accumulating their types", () => {
     expectTypeOf(
-      GroupSpec.addGroupsAt(GroupSpec.make(), {}),
-    ).toEqualTypeOf<GroupSpec.AnyWithProps>();
-    expectTypeOf(
-      GroupSpec.addGroupsAt({})(GroupSpec.make()),
-    ).toEqualTypeOf<GroupSpec.AnyWithProps>();
+      GroupSpec.addGroupsAt,
+    ).returns.toEqualTypeOf<GroupSpec.AnyWithProps>();
     expectTypeOf<GroupSpec.Any>().not.toExtend<
       Parameters<typeof GroupSpec.addGroupsAt>[0]
     >();

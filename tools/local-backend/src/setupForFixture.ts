@@ -1,5 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { dual, pipe } from "effect/Function";
+import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Path from "effect/Path";
 import * as ChildProcess from "effect/process/ChildProcess";
@@ -47,11 +47,7 @@ const confectCliEntryUrl = new URL(
  * to the repo, and CI verifies (via the `verify-codegen-committed` action) that
  * codegen produces no changes—i.e. that the committed outputs are up-to-date.
  */
-export const setupForFixture: {
-  (fixtureSubpath: string): (baseDir: string) => () => Promise<void>;
-  (baseDir: string, fixtureSubpath: string): () => Promise<void>;
-} = dual(
-  2,
+export const setupForFixture =
   (baseDir: string, fixtureSubpath: string) => () =>
     pipe(
       Effect.gen(function* () {
@@ -67,5 +63,4 @@ export const setupForFixture: {
       }),
       Effect.provide(NodeServices.layer),
       Effect.runPromise,
-    ),
-);
+    );

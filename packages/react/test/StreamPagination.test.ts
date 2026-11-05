@@ -1,34 +1,45 @@
 import { expect, expectTypeOf, test } from "@effect/vitest";
 import * as StreamPagination from "@confect/react/StreamPagination";
 
-test("supports pipeable state initialization with optional read budgets", () => {
-  expect(StreamPagination.initial()(2)).toEqual(StreamPagination.initial(2));
+test("initializes page requests with optional read budgets", () => {
+  expect(StreamPagination.initial(2).pages).toEqual({
+    "0": { numItems: 2, cursor: null },
+  });
   const budget = { maximumRowsRead: 100 };
-  expect(StreamPagination.initial(budget)(2)).toEqual(
-    StreamPagination.initial(2, budget),
-  );
+  expect(StreamPagination.initial(2, budget).pages).toEqual({
+    "0": { numItems: 2, cursor: null, maximumRowsRead: 100 },
+  });
   expect(budget).toEqual({ maximumRowsRead: 100 });
 });
 
-test("supports pipeable pin, split, and load-more transitions", () => {
+test("keeps pin, split, and load-more transitions immutable", () => {
   const state = StreamPagination.initial(2);
-  const pinned = StreamPagination.pin("end")("0")(state);
-  const split = StreamPagination.split("middle")("0")(state);
-  const more = StreamPagination.loadMore(2)("end")(state);
-  expect(pinned).toEqual(StreamPagination.pin("0", "end")(state));
-  expect(split).toEqual(StreamPagination.split("0", "middle")(state));
-  expect(more).toEqual(StreamPagination.loadMore("end", 2)(state));
+  const pinned = StreamPagination.pin("0", "end")(state);
+  const split = StreamPagination.split("0", "middle")(state);
+  const more = StreamPagination.loadMore("end", 2)(state);
+  expect(pinned.pages["1"]).toEqual({
+    numItems: 2,
+    cursor: null,
+    endCursor: "end",
+  });
+  expect(split.pages["1"]).toEqual({
+    numItems: 2,
+    cursor: null,
+    endCursor: "middle",
+  });
+  expect(split.pages["2"]).toEqual({ numItems: 2, cursor: "middle" });
+  expect(more.pages["2"]).toEqual({ numItems: 2, cursor: "end" });
   expect(
-    StreamPagination.loadMore(2, { maximumBytesRead: 100 })("end")(state),
-  ).toEqual(
-    StreamPagination.loadMore("end", 2, { maximumBytesRead: 100 })(state),
-  );
+    StreamPagination.loadMore("end", 2, { maximumBytesRead: 100 })(state).pages[
+      "2"
+    ],
+  ).toEqual({ numItems: 2, cursor: "end", maximumBytesRead: 100 });
   expect(state).toEqual(StreamPagination.initial(2));
 });
 
-test("supports pipeable request mapping and result interpretation", () => {
+test("maps requests and interprets loaded page results", () => {
   const state = StreamPagination.initial(2);
-  const requests = StreamPagination.pageRequests((page) => page.cursor)(state);
+  const requests = StreamPagination.pageRequests(state, (page) => page.cursor);
   expectTypeOf(requests).toEqualTypeOf<
     Readonly<Record<string, string | null>>
   >();
@@ -37,7 +48,7 @@ test("supports pipeable request mapping and result interpretation", () => {
     "0": { page: [1, 2], isDone: true, continueCursor: "end" },
   };
   const options = { initialNumItems: 2, isInvalidCursorError: () => false };
-  const interpreted = StreamPagination.interpret(results, options)(state);
+  const interpreted = StreamPagination.interpret(state, results, options);
   expect(interpreted._tag).toBe("Interpreted");
   if (interpreted._tag === "Interpreted") {
     expect(interpreted.items).toEqual([1, 2]);

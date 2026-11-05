@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import * as String from "effect/String";
 import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
@@ -182,22 +181,19 @@ export const start = (progress: Progress): Progress => ({
 export const captureBarrier = (progress: Progress): Barrier =>
   Barrier(progress.generation);
 
-export const request: {
-  (id: RequestId): (progress: Progress) => Progress;
-  (progress: Progress, id: RequestId): Progress;
-} = dual(2, (progress: Progress, id: RequestId): Progress => ({
+export const request = (progress: Progress, id: RequestId): Progress => ({
   ...progress,
   request:
     Option.isSome(progress.lastRequest) && progress.lastRequest.value === id
       ? Request.Joined()
       : Request.Pending(),
   lastRequest: Option.some(id),
-}));
+});
 
-export const complete: {
-  (completion: Completion): (progress: Progress) => Progress;
-  (progress: Progress, completion: Completion): Progress;
-} = dual(2, (progress: Progress, completion: Completion): Progress => ({
+export const complete = (
+  progress: Progress,
+  completion: Completion,
+): Progress => ({
   ...progress,
   request: Request.$match(progress.request, {
     Idle: (idle) => idle,
@@ -205,7 +201,7 @@ export const complete: {
     Joined: () => Request.Completed({ completion }),
     Completed: (completed) => completed,
   }),
-}));
+});
 
 export const getCompletion = (progress: Progress): Option.Option<Completion> =>
   Request.$match(progress.request, {
@@ -223,14 +219,8 @@ export const endRequest = (progress: Progress): Progress => ({
   request: Request.Idle(),
 });
 
-export const isFresh: {
-  (completion: Completion): (barrier: Barrier) => boolean;
-  (barrier: Barrier, completion: Completion): boolean;
-} = dual(
-  2,
-  (barrier: Barrier, completion: Completion): boolean =>
-    completion.generation > barrier,
-);
+export const isFresh = (barrier: Barrier, completion: Completion): boolean =>
+  completion.generation > barrier;
 
 /**
  * @internal
@@ -285,10 +275,10 @@ export const lastSuccessful = (state: State): Option.Option<Snapshot> =>
     Failed: ({ lastSuccessful: snapshot }) => snapshot,
   });
 
-export const observe: {
-  (outcome: Outcome): (previous: State) => State;
-  (previous: State, outcome: Outcome): State;
-} = dual(2, (previous: State, outcome: Outcome): State =>
+/**
+ * @internal
+ */
+export const observe = (previous: State, outcome: Outcome): State =>
   Outcome.$match(outcome, {
     Succeeded: ({ snapshot, warnings }) =>
       State.Succeeded({ snapshot, warnings }),
@@ -311,8 +301,7 @@ export const observe: {
               ),
             ),
       }),
-  }),
-);
+  });
 
 /**
  * @internal
@@ -341,86 +330,77 @@ export type Change = Data.TaggedEnum<{
 }>;
 export const Change = Data.taggedEnum<Change>();
 
-export const diff: {
-  (
-    current: State,
-    generatedDirectoryPrefix: string,
-  ): (previous: State) => Change;
-  (previous: State, current: State, generatedDirectoryPrefix: string): Change;
-} = dual(
-  3,
-  (
-    previous: State,
-    current: State,
-    generatedDirectoryPrefix: string,
-  ): Change => {
-    const previousFingerprints = fingerprints(previous);
-    const currentFingerprints = fingerprints(current);
-    const files = HashSet.union(
-      previousFingerprints.pipe(HashMap.keys, HashSet.fromIterable),
-      currentFingerprints.pipe(HashMap.keys, HashSet.fromIterable),
-    );
-    const changed = Array.filter(
-      Array.fromIterable(files),
-      (file) =>
-        !Equal.equals(
-          HashMap.get(previousFingerprints, file),
-          HashMap.get(currentFingerprints, file),
-        ),
-    );
-    const sources = Array.filter(
-      changed,
-      (file) => !String.startsWith(generatedDirectoryPrefix)(file),
-    );
-    const recovered =
-      State.$is("Failed")(previous) && State.$is("Succeeded")(current);
-    const untrackedOutput = recovered
-      ? Option.match(lastSuccessful(previous), {
-          onNone: () => false,
-          onSome: (baseline) =>
-            Equal.equals(baseline.fingerprints, currentFingerprints) &&
-            !Equal.equals(
-              Option.some(baseline.outputHash),
-              outputHash(current),
-            ),
-        })
-      : changed.length === 0 &&
-        !Equal.equals(outputHash(previous), outputHash(current));
-    if (
-      State.$is("Initial")(previous) ||
-      (Array.some(sources, (file) => HashMap.has(previousFingerprints, file)) &&
-        State.$is("Failed")(current)) ||
-      untrackedOutput
-    )
-      return Change.Full();
+/**
+ * @internal
+ */
+export const diff = (
+  previous: State,
+  current: State,
+  generatedDirectoryPrefix: string,
+): Change => {
+  const previousFingerprints = fingerprints(previous);
+  const currentFingerprints = fingerprints(current);
+  const files = HashSet.union(
+    previousFingerprints.pipe(HashMap.keys, HashSet.fromIterable),
+    currentFingerprints.pipe(HashMap.keys, HashSet.fromIterable),
+  );
+  const changed = Array.filter(
+    Array.fromIterable(files),
+    (file) =>
+      !Equal.equals(
+        HashMap.get(previousFingerprints, file),
+        HashMap.get(currentFingerprints, file),
+      ),
+  );
+  const sources = Array.filter(
+    changed,
+    (file) => !String.startsWith(generatedDirectoryPrefix)(file),
+  );
+  const recovered =
+    State.$is("Failed")(previous) && State.$is("Succeeded")(current);
+  const untrackedOutput = recovered
+    ? Option.match(lastSuccessful(previous), {
+        onNone: () => false,
+        onSome: (baseline) =>
+          Equal.equals(baseline.fingerprints, currentFingerprints) &&
+          !Equal.equals(Option.some(baseline.outputHash), outputHash(current)),
+      })
+    : changed.length === 0 &&
+      !Equal.equals(outputHash(previous), outputHash(current));
+  if (
+    State.$is("Initial")(previous) ||
+    (Array.some(sources, (file) => HashMap.has(previousFingerprints, file)) &&
+      State.$is("Failed")(current)) ||
+    untrackedOutput
+  )
+    return Change.Full();
 
-    const graph = Option.match(lastSuccessful(current), {
-      onNone: () => HashMap.empty<string, HashSet.HashSet<string>>(),
-      onSome: (snapshot) => snapshot.graph,
-    });
-    const previousGraph = Option.match(lastSuccessful(previous), {
-      onNone: () => HashMap.empty<string, HashSet.HashSet<string>>(),
-      onSome: (snapshot) => snapshot.graph,
-    });
-    const affectedSources =
-      recovered && State.$is("Failed")(previous)
-        ? Array.fromIterable(
-            HashSet.union(
-              HashSet.fromIterable(sources),
-              HashSet.filter(
-                previous.discovered,
-                (file) => !String.startsWith(generatedDirectoryPrefix)(file),
-              ),
+  const graph = Option.match(lastSuccessful(current), {
+    onNone: () => HashMap.empty<string, HashSet.HashSet<string>>(),
+    onSome: (snapshot) => snapshot.graph,
+  });
+  const previousGraph = Option.match(lastSuccessful(previous), {
+    onNone: () => HashMap.empty<string, HashSet.HashSet<string>>(),
+    onSome: (snapshot) => snapshot.graph,
+  });
+  const affectedSources =
+    recovered && State.$is("Failed")(previous)
+      ? Array.fromIterable(
+          HashSet.union(
+            HashSet.fromIterable(sources),
+            HashSet.filter(
+              previous.discovered,
+              (file) => !String.startsWith(generatedDirectoryPrefix)(file),
             ),
-          )
-        : sources;
-    const paths = HashSet.union(
-      WatchGraph.affected(graph, affectedSources),
-      WatchGraph.affected(previousGraph, affectedSources),
-    );
-    return recovered ? Change.Recovered({ paths }) : Change.Affected({ paths });
-  },
-);
+          ),
+        )
+      : sources;
+  const paths = HashSet.union(
+    WatchGraph.affected(graph, affectedSources),
+    WatchGraph.affected(previousGraph, affectedSources),
+  );
+  return recovered ? Change.Recovered({ paths }) : Change.Affected({ paths });
+};
 
 /**
  * @internal

@@ -1,7 +1,7 @@
 import * as Array from "effect/Array";
 import * as Data from "effect/Data";
 import * as Equivalence_ from "effect/Equivalence";
-import { identity, dual } from "effect/Function";
+import { identity } from "effect/Function";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
@@ -196,98 +196,68 @@ export class LabelCountMismatchError extends Schema.TaggedError<
  *
  * @experimental
  */
-export const fromIndex: {
-  <const Count extends number>(
-    eqCount: Count,
-  ): <const FieldPaths extends ReadonlyArray<string>>(
-    fieldPaths: FieldPaths,
-  ) => Result.Result<
-    QueryStreamKeyLayout<
-      QueryStreamKeyLabels.QueryStreamKeyLabels<
-        RemainingFieldPaths<FieldPaths, Count>
-      >
-    >,
-    InvalidEqualityPrefixError
-  >;
-  <const FieldPaths extends ReadonlyArray<string>>(
-    fieldPaths: FieldPaths,
-  ): Result.Result<
-    QueryStreamKeyLayout<QueryStreamKeyLabels.QueryStreamKeyLabels<FieldPaths>>,
-    InvalidEqualityPrefixError
-  >;
-
-  <const FieldPaths extends ReadonlyArray<string>, const Count extends number>(
-    fieldPaths: FieldPaths,
-    eqCount: Count,
-  ): Result.Result<
-    QueryStreamKeyLayout<
-      QueryStreamKeyLabels.QueryStreamKeyLabels<
-        RemainingFieldPaths<FieldPaths, Count>
-      >
-    >,
-    InvalidEqualityPrefixError
-  >;
-} = dual(
-  (args) => typeof args[0] !== "number",
-  (
-    fieldPaths: ReadonlyArray<string>,
-    eqCount = 0,
-  ): Result.Result<QueryStreamKeyLayout, InvalidEqualityPrefixError> => {
-    if (
-      !Number.isInteger(eqCount) ||
-      eqCount < 0 ||
-      eqCount > fieldPaths.length
-    ) {
-      return Result.fail(
-        InvalidEqualityPrefixError.make({ fieldPaths, eqCount }),
-      );
-    }
-    const visible = Array.map(Array.drop(fieldPaths, eqCount), (label) =>
-      Position.Visible({ label }),
+export function fromIndex<const FieldPaths extends ReadonlyArray<string>>(
+  fieldPaths: FieldPaths,
+): Result.Result<
+  QueryStreamKeyLayout<QueryStreamKeyLabels.QueryStreamKeyLabels<FieldPaths>>,
+  InvalidEqualityPrefixError
+>;
+/**
+ * @experimental
+ */
+export function fromIndex<
+  const FieldPaths extends ReadonlyArray<string>,
+  const Count extends number,
+>(
+  fieldPaths: FieldPaths,
+  eqCount: Count,
+): Result.Result<
+  QueryStreamKeyLayout<
+    QueryStreamKeyLabels.QueryStreamKeyLabels<
+      RemainingFieldPaths<FieldPaths, Count>
+    >
+  >,
+  InvalidEqualityPrefixError
+>;
+export function fromIndex(
+  fieldPaths: ReadonlyArray<string>,
+  eqCount = 0,
+): Result.Result<QueryStreamKeyLayout, InvalidEqualityPrefixError> {
+  if (
+    !Number.isInteger(eqCount) ||
+    eqCount < 0 ||
+    eqCount > fieldPaths.length
+  ) {
+    return Result.fail(
+      InvalidEqualityPrefixError.make({ fieldPaths, eqCount }),
     );
-    const keyPositions = Option.exists(
-      Array.last(fieldPaths),
-      (fieldPath) => fieldPath === "_id",
-    )
-      ? visible
-      : Array.append(visible, Position.ImplicitId());
-    return Result.succeed(make(keyPositions));
-  },
-);
+  }
+  const visible = Array.map(Array.drop(fieldPaths, eqCount), (label) =>
+    Position.Visible({ label }),
+  );
+  const keyPositions = Option.exists(
+    Array.last(fieldPaths),
+    (fieldPath) => fieldPath === "_id",
+  )
+    ? visible
+    : Array.append(visible, Position.ImplicitId());
+  return Result.succeed(make(keyPositions));
+}
+
 /**
  * Concatenate layouts without losing component tiebreakers.
  *
  * @experimental
  */
-export const concat: {
-  <RightKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
-    that: QueryStreamKeyLayout<RightKeyLabels>,
-  ): <LeftKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
-    self: QueryStreamKeyLayout<LeftKeyLabels>,
-  ) => QueryStreamKeyLayout<
-    QueryStreamKeyLabels.Concat<LeftKeyLabels, RightKeyLabels>
-  >;
-  <
-    LeftKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
-    RightKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
-  >(
-    self: QueryStreamKeyLayout<LeftKeyLabels>,
-    that: QueryStreamKeyLayout<RightKeyLabels>,
-  ): QueryStreamKeyLayout<
-    QueryStreamKeyLabels.Concat<LeftKeyLabels, RightKeyLabels>
-  >;
-} = dual(
-  2,
-  <
-    LeftKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
-    RightKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
-  >(
-    self: QueryStreamKeyLayout<LeftKeyLabels>,
-    that: QueryStreamKeyLayout<RightKeyLabels>,
-  ): QueryStreamKeyLayout<
-    QueryStreamKeyLabels.Concat<LeftKeyLabels, RightKeyLabels>
-  > => make(Array.appendAll(positions(self), positions(that))),
-);
+export const concat = <
+  LeftKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  RightKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+>(
+  self: QueryStreamKeyLayout<LeftKeyLabels>,
+  that: QueryStreamKeyLayout<RightKeyLabels>,
+): QueryStreamKeyLayout<
+  QueryStreamKeyLabels.Concat<LeftKeyLabels, RightKeyLabels>
+> => make(Array.appendAll(positions(self), positions(that)));
 
 /**
  * Format visible labels and implicit IDs for diagnostics.
@@ -356,10 +326,8 @@ const PositionsEquivalence = Equivalence_.Array<Position>((self, that) =>
 /**
  * @experimental
  */
-export const Equivalence: {
-  (that: QueryStreamKeyLayout): (self: QueryStreamKeyLayout) => boolean;
-  (self: QueryStreamKeyLayout, that: QueryStreamKeyLayout): boolean;
-} = dual(2, Equivalence_.mapInput(PositionsEquivalence, positions));
+export const Equivalence: Equivalence_.Equivalence<QueryStreamKeyLayout> =
+  Equivalence_.mapInput(PositionsEquivalence, positions);
 
 /**
  * @experimental
@@ -379,28 +347,15 @@ export class KeyLayoutMismatchError extends Schema.TaggedError<
 /**
  * @experimental
  */
-export const validateEquivalence: {
-  (
-    actualKeyLayout: QueryStreamKeyLayout,
-  ): (
-    expectedKeyLayout: QueryStreamKeyLayout,
-  ) => Result.Result<void, KeyLayoutMismatchError>;
-  (
-    expectedKeyLayout: QueryStreamKeyLayout,
-    actualKeyLayout: QueryStreamKeyLayout,
-  ): Result.Result<void, KeyLayoutMismatchError>;
-} = dual(
-  2,
-  (
-    expectedKeyLayout: QueryStreamKeyLayout,
-    actualKeyLayout: QueryStreamKeyLayout,
-  ): Result.Result<void, KeyLayoutMismatchError> =>
-    Equivalence(expectedKeyLayout, actualKeyLayout)
-      ? Result.succeed(undefined)
-      : Result.fail(
-          KeyLayoutMismatchError.make({ expectedKeyLayout, actualKeyLayout }),
-        ),
-);
+export const validateEquivalence = (
+  expectedKeyLayout: QueryStreamKeyLayout,
+  actualKeyLayout: QueryStreamKeyLayout,
+): Result.Result<void, KeyLayoutMismatchError> =>
+  Equivalence(expectedKeyLayout, actualKeyLayout)
+    ? Result.succeed(undefined)
+    : Result.fail(
+        KeyLayoutMismatchError.make({ expectedKeyLayout, actualKeyLayout }),
+      );
 
 /**
  * Parse a visible label prefix and resolve its runtime width. Implicit IDs
@@ -408,96 +363,64 @@ export const validateEquivalence: {
  *
  * @experimental
  */
-export const resolvePrefix: {
-  (
-    prefixKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
-  ): (
-    self: QueryStreamKeyLayout,
-  ) => Result.Result<number, InvalidLabelPrefixError>;
-  (
-    self: QueryStreamKeyLayout,
-    prefixKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
-  ): Result.Result<number, InvalidLabelPrefixError>;
-} = dual(
-  2,
-  (
-    self: QueryStreamKeyLayout,
-    prefixKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
-  ): Result.Result<number, InvalidLabelPrefixError> => {
-    const keyLabels = visibleLabels(self);
-    if (!QueryStreamKeyLabels.hasPrefix(keyLabels, prefixKeyLabels)) {
-      return Result.fail(
-        InvalidLabelPrefixError.make({ keyLabels, prefixKeyLabels }),
-      );
-    }
-    return Result.succeed(
-      Option.match(
-        Array.get(visiblePositions(self), prefixKeyLabels.length - 1),
-        {
-          onNone: () => 0,
-          onSome: (position) => position + 1,
-        },
-      ),
+export const resolvePrefix = (
+  self: QueryStreamKeyLayout,
+  prefixKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
+): Result.Result<number, InvalidLabelPrefixError> => {
+  const keyLabels = visibleLabels(self);
+  if (!QueryStreamKeyLabels.hasPrefix(keyLabels, prefixKeyLabels)) {
+    return Result.fail(
+      InvalidLabelPrefixError.make({ keyLabels, prefixKeyLabels }),
     );
-  },
-);
+  }
+  return Result.succeed(
+    Option.match(
+      Array.get(visiblePositions(self), prefixKeyLabels.length - 1),
+      {
+        onNone: () => 0,
+        onSome: (position) => position + 1,
+      },
+    ),
+  );
+};
 
 /**
  * Relabel visible positions, preserving every implicit ID.
  *
  * @experimental
  */
-export const rename: {
-  <ReplacementKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
-    replacementKeyLabels: ReplacementKeyLabels,
-  ): (
-    self: QueryStreamKeyLayout,
-  ) => Result.Result<
-    QueryStreamKeyLayout<ReplacementKeyLabels>,
-    LabelCountMismatchError
-  >;
-  <ReplacementKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
-    self: QueryStreamKeyLayout,
-    replacementKeyLabels: ReplacementKeyLabels,
-  ): Result.Result<
-    QueryStreamKeyLayout<ReplacementKeyLabels>,
-    LabelCountMismatchError
-  >;
-} = dual(
-  2,
-  <ReplacementKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
-    self: QueryStreamKeyLayout,
-    replacementKeyLabels: ReplacementKeyLabels,
-  ): Result.Result<
-    QueryStreamKeyLayout<ReplacementKeyLabels>,
-    LabelCountMismatchError
-  > => {
-    const [consumed, renamed] = Array.mapAccum(
-      positions(self),
-      0,
-      (index, position): readonly [number, Option.Option<Position>] =>
-        Position.$match(position, {
-          ImplicitId: () => [index, Option.some(position)] as const,
-          Visible: () =>
-            [
-              index + 1,
-              Option.map(Array.get(replacementKeyLabels, index), (label) =>
-                Position.Visible({ label }),
-              ),
-            ] as const,
-        }),
-    );
-    const parsed =
-      consumed === replacementKeyLabels.length
-        ? Option.all(renamed)
-        : Option.none();
-    return Result.fromOption(
-      Option.map(parsed, make<ReplacementKeyLabels>),
-      () =>
-        LabelCountMismatchError.make({
-          keyLabels: visibleLabels(self),
-          replacementKeyLabels,
-        }),
-    );
-  },
-);
+export const rename = <
+  ReplacementKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+>(
+  self: QueryStreamKeyLayout,
+  replacementKeyLabels: ReplacementKeyLabels,
+): Result.Result<
+  QueryStreamKeyLayout<ReplacementKeyLabels>,
+  LabelCountMismatchError
+> => {
+  const [consumed, renamed] = Array.mapAccum(
+    positions(self),
+    0,
+    (index, position): readonly [number, Option.Option<Position>] =>
+      Position.$match(position, {
+        ImplicitId: () => [index, Option.some(position)] as const,
+        Visible: () =>
+          [
+            index + 1,
+            Option.map(Array.get(replacementKeyLabels, index), (label) =>
+              Position.Visible({ label }),
+            ),
+          ] as const,
+      }),
+  );
+  const parsed =
+    consumed === replacementKeyLabels.length
+      ? Option.all(renamed)
+      : Option.none();
+  return Result.fromOption(Option.map(parsed, make<ReplacementKeyLabels>), () =>
+    LabelCountMismatchError.make({
+      keyLabels: visibleLabels(self),
+      replacementKeyLabels,
+    }),
+  );
+};

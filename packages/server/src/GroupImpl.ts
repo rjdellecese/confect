@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Registry from "./Registry";
@@ -83,69 +82,34 @@ export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({
  * `_generated/schema` symmetric with `FunctionImpl.make`). Neither is read at
  * runtime.
  */
-export const make: {
-  <
-    DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-    Group extends GroupSpec.AnyWithProps,
-  >(
-    _group: Group &
-      MiddlewareSpec.ValidateImplRequires<
-        GroupSpec.Functions<Group>,
-        GroupSpec.MiddlewareSpecs<Group>
-      >,
-  ): (
-    _databaseSchema: DatabaseSchema_,
-  ) => Layer.Layer<
-    GroupImpl<"Unfinalized">,
-    never,
-    FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
-  >;
-  <
-    DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-    Group extends GroupSpec.AnyWithProps,
-  >(
-    _databaseSchema: DatabaseSchema_,
-    _group: Group &
-      MiddlewareSpec.ValidateImplRequires<
-        GroupSpec.Functions<Group>,
-        GroupSpec.MiddlewareSpecs<Group>
-      >,
-  ): Layer.Layer<
-    GroupImpl<"Unfinalized">,
-    never,
-    FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
-  >;
-} = dual(
-  2,
-  <
-    DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-    Group extends GroupSpec.AnyWithProps,
-  >(
-    _databaseSchema: DatabaseSchema_,
-    _group: Group &
-      MiddlewareSpec.ValidateImplRequires<
-        GroupSpec.Functions<Group>,
-        GroupSpec.MiddlewareSpecs<Group>
-      >,
-  ): Layer.Layer<
-    GroupImpl<"Unfinalized">,
-    never,
-    FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
-  > =>
-    Layer.succeed(
-      GroupImpl<"Unfinalized">({ finalizationStatus: "Unfinalized" }),
-      {
-        [TypeId]: TypeId,
-        finalizationStatus: "Unfinalized" as const,
-        registeredFunctionNames: [],
-        registeredMiddlewareKeys: [],
-      },
-    ) as Layer.Layer<
-      GroupImpl<"Unfinalized">,
-      never,
-      FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
+export const make = <
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Group extends GroupSpec.AnyWithProps,
+>(
+  _databaseSchema: DatabaseSchema_,
+  _group: Group &
+    MiddlewareSpec.ValidateImplRequires<
+      GroupSpec.Functions<Group>,
+      GroupSpec.MiddlewareSpecs<Group>
     >,
-);
+): Layer.Layer<
+  GroupImpl<"Unfinalized">,
+  never,
+  FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
+> =>
+  Layer.succeed(
+    GroupImpl<"Unfinalized">({ finalizationStatus: "Unfinalized" }),
+    {
+      [TypeId]: TypeId,
+      finalizationStatus: "Unfinalized" as const,
+      registeredFunctionNames: [],
+      registeredMiddlewareKeys: [],
+    },
+  ) as Layer.Layer<
+    GroupImpl<"Unfinalized">,
+    never,
+    FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
+  >;
 
 const findUnfinalizedGroupImpl = <S>(
   context: Context.Context<S>,

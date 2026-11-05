@@ -167,32 +167,13 @@ const makeExtendAst = (
  * the system fields attached, and encoding an extended schema emits the system
  * fields alongside the table fields.
  */
-export function extendWithSystemFields<TableName extends string>(
-  tableName: TableName,
-): <TableSchema extends Schema.Codec<any, any>>(
-  schema: TableSchema,
-) => ExtendWithSystemFields<TableName, TableSchema>;
-export function extendWithSystemFields<
+export const extendWithSystemFields = <
   TableName extends string,
   TableSchema extends Schema.Codec<any, any>,
 >(
   tableName: TableName,
   schema: TableSchema,
-): ExtendWithSystemFields<TableName, TableSchema>;
-export function extendWithSystemFields<
-  TableName extends string,
-  TableSchema extends Schema.Codec<any, any>,
->(
-  tableName: TableName,
-  schema?: TableSchema,
-):
-  | ExtendWithSystemFields<TableName, TableSchema>
-  | (<S extends Schema.Codec<any, any>>(
-      input: S,
-    ) => ExtendWithSystemFields<TableName, S>) {
-  if (schema === undefined)
-    return <S extends Schema.Codec<any, any>>(input: S) =>
-      extendWithSystemFields(tableName, input);
+): ExtendWithSystemFields<TableName, TableSchema> => {
   const system = SystemFields(tableName).fields;
 
   const extendAst = makeExtendAst(
@@ -233,7 +214,7 @@ export function extendWithSystemFields<
     TableName,
     TableSchema
   >;
-}
+};
 
 /**
  * Applies the system fields to a single struct, mirroring

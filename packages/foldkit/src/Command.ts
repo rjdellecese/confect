@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import type * as Ref from "@confect/core/Ref";
 import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
@@ -154,91 +153,43 @@ const run = <Ref_ extends Ref.AnyConfect, SuccessMessage, ErrorMessage>(
  * folded into a Message. Reach for these when the factory below doesn't fit: a
  * custom args schema, `interrupt`, or a Command that makes several calls.
  */
-export const queryEffect: {
-  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
-    handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
-  ): (
-    ref: Query,
-  ) => (
-    ...args: Ref.OptionalArgs<Query>
-  ) => Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client>;
-  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
-    ref: Query,
-    handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
-  ): (
-    ...args: Ref.OptionalArgs<Query>
-  ) => Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client>;
-} = dual(
-  2,
+export const queryEffect =
   <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
     ref: Query,
     handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
   ) =>
-    (
-      ...args: Ref.OptionalArgs<Query>
-    ): Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client> =>
-      run(handlers, (client) => client.query(ref, ...args)),
-);
+  (
+    ...args: Ref.OptionalArgs<Query>
+  ): Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client> =>
+    run(handlers, (client) => client.query(ref, ...args));
 
 /**
  * An execute body for a hand-written `Command.define`—every failure already
  * folded into a Message. See `queryEffect`.
  */
-export const mutationEffect: {
-  <Mutation extends Ref.AnyConfectPublicMutation, SuccessMessage, ErrorMessage>(
-    handlers: Handlers<Mutation, SuccessMessage, ErrorMessage>,
-  ): (
-    ref: Mutation,
-  ) => (
-    ...args: Ref.OptionalArgs<Mutation>
-  ) => Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client>;
-  <Mutation extends Ref.AnyConfectPublicMutation, SuccessMessage, ErrorMessage>(
-    ref: Mutation,
-    handlers: Handlers<Mutation, SuccessMessage, ErrorMessage>,
-  ): (
-    ...args: Ref.OptionalArgs<Mutation>
-  ) => Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client>;
-} = dual(
-  2,
+export const mutationEffect =
   <Mutation extends Ref.AnyConfectPublicMutation, SuccessMessage, ErrorMessage>(
     ref: Mutation,
     handlers: Handlers<Mutation, SuccessMessage, ErrorMessage>,
   ) =>
-    (
-      ...args: Ref.OptionalArgs<Mutation>
-    ): Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client> =>
-      run(handlers, (client) => client.mutation(ref, ...args)),
-);
+  (
+    ...args: Ref.OptionalArgs<Mutation>
+  ): Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client> =>
+    run(handlers, (client) => client.mutation(ref, ...args));
 
 /**
  * An execute body for a hand-written `Command.define`—every failure already
  * folded into a Message. See `queryEffect`.
  */
-export const actionEffect: {
-  <Action extends Ref.AnyConfectPublicAction, SuccessMessage, ErrorMessage>(
-    handlers: Handlers<Action, SuccessMessage, ErrorMessage>,
-  ): (
-    ref: Action,
-  ) => (
-    ...args: Ref.OptionalArgs<Action>
-  ) => Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client>;
-  <Action extends Ref.AnyConfectPublicAction, SuccessMessage, ErrorMessage>(
-    ref: Action,
-    handlers: Handlers<Action, SuccessMessage, ErrorMessage>,
-  ): (
-    ...args: Ref.OptionalArgs<Action>
-  ) => Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client>;
-} = dual(
-  2,
+export const actionEffect =
   <Action extends Ref.AnyConfectPublicAction, SuccessMessage, ErrorMessage>(
     ref: Action,
     handlers: Handlers<Action, SuccessMessage, ErrorMessage>,
   ) =>
-    (
-      ...args: Ref.OptionalArgs<Action>
-    ): Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client> =>
-      run(handlers, (client) => client.action(ref, ...args)),
-);
+  (
+    ...args: Ref.OptionalArgs<Action>
+  ): Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client> =>
+    run(handlers, (client) => client.action(ref, ...args));
 
 type RunWithArgs<Ref_ extends Ref.AnyConfect, Message> = (
   ...args: Ref.OptionalArgs<Ref_>
@@ -363,155 +314,91 @@ const makeFactory = <BoundRef extends Ref.AnyConfect>(
     handlers: Handlers<Ref_, SuccessMessage, ErrorMessage>,
   ) => RunWithArgs<Ref_, SuccessMessage | ErrorMessage>,
 ) => {
-  const factory: {
-    <
-      Ref_ extends BoundRef,
-      const Messages extends ReadonlyArray<Schema.Top>,
-      SuccessMessage extends Schema.Schema.Type<Messages[number]>,
-      ErrorMessage extends Schema.Schema.Type<Messages[number]>,
-      KeyField extends keyof SchemaArgs<Ref_> & string,
-    >(
-      ref: Ref_,
-      config: KeyedFactoryConfig<
-        Ref_,
-        Messages,
-        SuccessMessage,
-        ErrorMessage,
-        KeyField
-      >,
-    ): <const Name extends string>(
-      name: Name,
-    ) => KeyedInterruptibleDefinition<
-      Name,
+  function factory<
+    const Name extends string,
+    Ref_ extends BoundRef,
+    const Messages extends ReadonlyArray<Schema.Top>,
+    SuccessMessage extends Schema.Schema.Type<Messages[number]>,
+    ErrorMessage extends Schema.Schema.Type<Messages[number]>,
+    KeyField extends keyof SchemaArgs<Ref_> & string,
+  >(
+    name: Name,
+    ref: Ref_,
+    config: KeyedFactoryConfig<
       Ref_,
-      KeyField,
-      SuccessMessage | ErrorMessage
-    >;
-    <
-      const Name extends string,
-      Ref_ extends BoundRef,
-      const Messages extends ReadonlyArray<Schema.Top>,
-      SuccessMessage extends Schema.Schema.Type<Messages[number]>,
-      ErrorMessage extends Schema.Schema.Type<Messages[number]>,
-      KeyField extends keyof SchemaArgs<Ref_> & string,
-    >(
-      name: Name,
-      ref: Ref_,
-      config: KeyedFactoryConfig<
-        Ref_,
-        Messages,
-        SuccessMessage,
-        ErrorMessage,
-        KeyField
-      >,
-    ): KeyedInterruptibleDefinition<
-      Name,
-      Ref_,
-      KeyField,
-      SuccessMessage | ErrorMessage
-    >;
-    <
-      Ref_ extends BoundRef,
-      const Messages extends ReadonlyArray<Schema.Top>,
-      SuccessMessage extends Schema.Schema.Type<Messages[number]>,
-      ErrorMessage extends Schema.Schema.Type<Messages[number]>,
-    >(
-      ref: Ref_,
-      config: NameKeyedFactoryConfig<
-        Ref_,
-        Messages,
-        SuccessMessage,
-        ErrorMessage
-      >,
-    ): <const Name extends string>(
-      name: Name,
-    ) => InterruptibleDefinition<Name, Ref_, SuccessMessage | ErrorMessage>;
-    <
-      const Name extends string,
-      Ref_ extends BoundRef,
-      const Messages extends ReadonlyArray<Schema.Top>,
-      SuccessMessage extends Schema.Schema.Type<Messages[number]>,
-      ErrorMessage extends Schema.Schema.Type<Messages[number]>,
-    >(
-      name: Name,
-      ref: Ref_,
-      config: NameKeyedFactoryConfig<
-        Ref_,
-        Messages,
-        SuccessMessage,
-        ErrorMessage
-      >,
-    ): InterruptibleDefinition<Name, Ref_, SuccessMessage | ErrorMessage>;
-    <
-      Ref_ extends BoundRef,
-      const Messages extends ReadonlyArray<Schema.Top>,
-      SuccessMessage extends Schema.Schema.Type<Messages[number]>,
-      ErrorMessage extends Schema.Schema.Type<Messages[number]>,
-    >(
-      ref: Ref_,
-      config: StandardFactoryConfig<
-        Ref_,
-        Messages,
-        SuccessMessage,
-        ErrorMessage
-      >,
-    ): <const Name extends string>(
-      name: Name,
-    ) => Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
-    <
-      const Name extends string,
-      Ref_ extends BoundRef,
-      const Messages extends ReadonlyArray<Schema.Top>,
-      SuccessMessage extends Schema.Schema.Type<Messages[number]>,
-      ErrorMessage extends Schema.Schema.Type<Messages[number]>,
-    >(
-      name: Name,
-      ref: Ref_,
-      config: StandardFactoryConfig<
-        Ref_,
-        Messages,
-        SuccessMessage,
-        ErrorMessage
-      >,
-    ): Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
-  } = dual(
-    3,
-    function factory<
-      const Name extends string,
-      Ref_ extends BoundRef,
+      Messages,
       SuccessMessage,
       ErrorMessage,
-      KeyField extends keyof SchemaArgs<Ref_> & string,
-    >(
-      name: Name,
-      ref: Ref_,
-      config: FactoryConfig<
-        Ref_,
-        ReadonlyArray<Schema.Top>,
-        SuccessMessage,
-        ErrorMessage
-      > & {
-        readonly interrupt?: InterruptOption<Ref_, KeyField>;
-      },
-    ): Definition<Name, Ref_, SuccessMessage | ErrorMessage> {
-      const runWithArgs = effectHelper(ref, config);
-      return Match.value(config.interrupt).pipe(
-        Match.withReturnType<
-          Definition<Name, Ref_, SuccessMessage | ErrorMessage>
-        >(),
-        Match.when(undefined, () =>
-          makeDefinition(name, ref, config.messages, runWithArgs),
-        ),
-        Match.when(true, (interrupt) =>
-          makeDefinition(name, ref, config.messages, runWithArgs, interrupt),
-        ),
-        Match.when(Match.defined, (interrupt) =>
-          makeDefinition(name, ref, config.messages, runWithArgs, interrupt),
-        ),
-        Match.exhaustive,
-      );
+      KeyField
+    >,
+  ): KeyedInterruptibleDefinition<
+    Name,
+    Ref_,
+    KeyField,
+    SuccessMessage | ErrorMessage
+  >;
+  function factory<
+    const Name extends string,
+    Ref_ extends BoundRef,
+    const Messages extends ReadonlyArray<Schema.Top>,
+    SuccessMessage extends Schema.Schema.Type<Messages[number]>,
+    ErrorMessage extends Schema.Schema.Type<Messages[number]>,
+  >(
+    name: Name,
+    ref: Ref_,
+    config: NameKeyedFactoryConfig<
+      Ref_,
+      Messages,
+      SuccessMessage,
+      ErrorMessage
+    >,
+  ): InterruptibleDefinition<Name, Ref_, SuccessMessage | ErrorMessage>;
+  function factory<
+    const Name extends string,
+    Ref_ extends BoundRef,
+    const Messages extends ReadonlyArray<Schema.Top>,
+    SuccessMessage extends Schema.Schema.Type<Messages[number]>,
+    ErrorMessage extends Schema.Schema.Type<Messages[number]>,
+  >(
+    name: Name,
+    ref: Ref_,
+    config: StandardFactoryConfig<Ref_, Messages, SuccessMessage, ErrorMessage>,
+  ): Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
+  function factory<
+    const Name extends string,
+    Ref_ extends BoundRef,
+    SuccessMessage,
+    ErrorMessage,
+    KeyField extends keyof SchemaArgs<Ref_> & string,
+  >(
+    name: Name,
+    ref: Ref_,
+    config: FactoryConfig<
+      Ref_,
+      ReadonlyArray<Schema.Top>,
+      SuccessMessage,
+      ErrorMessage
+    > & {
+      readonly interrupt?: InterruptOption<Ref_, KeyField>;
     },
-  );
+  ): Definition<Name, Ref_, SuccessMessage | ErrorMessage> {
+    const runWithArgs = effectHelper(ref, config);
+    return Match.value(config.interrupt).pipe(
+      Match.withReturnType<
+        Definition<Name, Ref_, SuccessMessage | ErrorMessage>
+      >(),
+      Match.when(undefined, () =>
+        makeDefinition(name, ref, config.messages, runWithArgs),
+      ),
+      Match.when(true, (interrupt) =>
+        makeDefinition(name, ref, config.messages, runWithArgs, interrupt),
+      ),
+      Match.when(Match.defined, (interrupt) =>
+        makeDefinition(name, ref, config.messages, runWithArgs, interrupt),
+      ),
+      Match.exhaustive,
+    );
+  }
 
   return factory;
 };

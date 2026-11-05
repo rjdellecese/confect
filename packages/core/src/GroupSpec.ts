@@ -1,5 +1,4 @@
 import * as Option from "effect/Option";
-import { dual } from "effect/Function";
 import * as Array from "effect/Array";
 import * as MiddlewareAttachment from "./MiddlewareAttachment";
 import * as Predicate from "effect/Predicate";
@@ -284,16 +283,7 @@ export function withName<const Name_ extends string, Group extends Any>(
   name: Name_,
   group: Group,
 ): NamedAt<Group, Name_>;
-export function withName<const Name_ extends string>(
-  name: Name_,
-): <Group extends Any>(group: Group) => NamedAt<Group, Name_>;
-export function withName(
-  name: string,
-  group?: Any,
-):
-  | AnyWithProps
-  | (<Group extends Any>(input: Group) => NamedAt<Group, string>) {
-  if (group === undefined) return (input) => withName(name, input);
+export function withName(name: string, group: Any): AnyWithProps {
   validateConfectFunctionIdentifier(name);
   const group_ = group as AnyWithProps;
 
@@ -310,32 +300,21 @@ export function withName(
   });
 }
 
-export const addGroupsAt: {
-  (
-    children: Record.ReadonlyRecord<string, AnyWithProps>,
-  ): (group: AnyWithProps) => AnyWithProps;
-  (
-    group: AnyWithProps,
-    children: Record.ReadonlyRecord<string, AnyWithProps>,
-  ): AnyWithProps;
-} = dual(
-  2,
-  (
-    group: AnyWithProps,
-    children: Record.ReadonlyRecord<string, AnyWithProps>,
-  ): AnyWithProps =>
-    makeProto({
-      runtime: group.runtime,
-      name: group.name,
-      functions: group.functions,
-      groups: Record.union(
-        group.groups,
-        Record.map(children, (child, name) => withName(name, child)),
-        (_existing, incoming) => incoming,
-      ),
-      middlewareAttachments: group.middlewareAttachments,
-    }),
-);
+export const addGroupsAt = (
+  group: AnyWithProps,
+  children: Record.ReadonlyRecord<string, AnyWithProps>,
+): AnyWithProps =>
+  makeProto({
+    runtime: group.runtime,
+    name: group.name,
+    functions: group.functions,
+    groups: Record.union(
+      group.groups,
+      Record.map(children, (child, name) => withName(name, child)),
+      (_existing, incoming) => incoming,
+    ),
+    middlewareAttachments: group.middlewareAttachments,
+  });
 
 export const validateMiddleware = (
   group: AnyWithProps,

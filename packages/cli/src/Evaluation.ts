@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import * as NodeWorker from "@effect/platform-node/NodeWorker";
 // oxlint-disable-next-line effecttsgo/node-builtin-import -- Process isolation and advanced IPC require native fork; Effect's process handle cannot back NodeWorker.
 import { fork } from "node:child_process";
@@ -147,42 +146,19 @@ export const generate = generateSnapshot.pipe(
   Effect.map(GenerationSnapshot.functionPaths),
 );
 
-export const updateDeclarations: {
-  (
-    declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
-    paths: ReadonlyArray<ImplModulePath>,
-  ): (
-    snapshot: GenerationSnapshot.GenerationSnapshot,
-  ) => Effect.Effect<
-    GenerationSnapshot.GenerationSnapshot,
-    EvaluationError,
-    ConfectDirectory | ConvexDirectory | ProjectRoot
-  >;
-  (
-    snapshot: GenerationSnapshot.GenerationSnapshot,
-    declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
-    paths: ReadonlyArray<ImplModulePath>,
-  ): Effect.Effect<
-    GenerationSnapshot.GenerationSnapshot,
-    EvaluationError,
-    ConfectDirectory | ConvexDirectory | ProjectRoot
-  >;
-} = dual(
-  3,
-  (
-    snapshot: GenerationSnapshot.GenerationSnapshot,
-    declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
-    paths: ReadonlyArray<ImplModulePath>,
-  ) =>
-    withWorker((client, requestContext) =>
-      client.Update({
-        ...requestContext,
-        snapshot,
-        declarations,
-        paths,
-      }),
-    ),
-);
+export const updateDeclarations = (
+  snapshot: GenerationSnapshot.GenerationSnapshot,
+  declarations: Array.NonEmptyReadonlyArray<EntryPoint.Declaration>,
+  paths: ReadonlyArray<ImplModulePath>,
+) =>
+  withWorker((client, requestContext) =>
+    client.Update({
+      ...requestContext,
+      snapshot,
+      declarations,
+      paths,
+    }),
+  );
 
 export const validate = (paths: ReadonlyArray<ImplModulePath>) =>
   withWorker((client, requestContext) =>

@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Chunk from "effect/Chunk";
 import * as Data from "effect/Data";
@@ -38,62 +37,40 @@ export type Declaration = typeof Declaration.Type;
 /**
  * @internal
  */
-export const planDeclarations: {
-  (
-    affectedImpls: ReadonlyArray<ImplModulePath>,
-    path: Path.Path,
-  ): (declarations: Array.NonEmptyReadonlyArray<Declaration>) => {
-    readonly tables: ReadonlyArray<TableModule>;
-    readonly paths: ReadonlyArray<ImplModulePath>;
-  };
-  (
-    declarations: Array.NonEmptyReadonlyArray<Declaration>,
-    affectedImpls: ReadonlyArray<ImplModulePath>,
-    path: Path.Path,
-  ): {
-    readonly tables: ReadonlyArray<TableModule>;
-    readonly paths: ReadonlyArray<ImplModulePath>;
-  };
-} = dual(
-  3,
-  (
-    declarations: Array.NonEmptyReadonlyArray<Declaration>,
-    affectedImpls: ReadonlyArray<ImplModulePath>,
-    path: Path.Path,
-  ): {
-    readonly tables: ReadonlyArray<TableModule>;
-    readonly paths: ReadonlyArray<ImplModulePath>;
-  } => {
-    const plan = Array.reduce(
-      declarations,
-      {
-        tables: Chunk.empty<TableModule>(),
-        paths: HashSet.fromIterable(affectedImpls),
-      },
-      (state, declaration) =>
-        Declaration.match(declaration, {
-          Spec: ({ relativePath }) => ({
-            ...state,
-            paths: HashSet.add(
-              state.paths,
-              SpecModulePath.toImpl(relativePath),
-            ),
-          }),
-          Table: ({ relativePath }) => ({
-            ...state,
-            tables: Chunk.append(state.tables, {
-              relativePath,
-              tableName: path.parse(relativePath).name,
-            }),
+export const planDeclarations = (
+  declarations: Array.NonEmptyReadonlyArray<Declaration>,
+  affectedImpls: ReadonlyArray<ImplModulePath>,
+  path: Path.Path,
+): {
+  readonly tables: ReadonlyArray<TableModule>;
+  readonly paths: ReadonlyArray<ImplModulePath>;
+} => {
+  const plan = Array.reduce(
+    declarations,
+    {
+      tables: Chunk.empty<TableModule>(),
+      paths: HashSet.fromIterable(affectedImpls),
+    },
+    (state, declaration) =>
+      Declaration.match(declaration, {
+        Spec: ({ relativePath }) => ({
+          ...state,
+          paths: HashSet.add(state.paths, SpecModulePath.toImpl(relativePath)),
+        }),
+        Table: ({ relativePath }) => ({
+          ...state,
+          tables: Chunk.append(state.tables, {
+            relativePath,
+            tableName: path.parse(relativePath).name,
           }),
         }),
-    );
-    return {
-      tables: Chunk.toReadonlyArray(plan.tables),
-      paths: Array.fromIterable(plan.paths),
-    };
-  },
-);
+      }),
+  );
+  return {
+    tables: Chunk.toReadonlyArray(plan.tables),
+    paths: Array.fromIterable(plan.paths),
+  };
+};
 
 export type EntryPoint = Kind & {
   readonly absolutePath: string;
@@ -173,16 +150,15 @@ export const discover = Effect.gen(function* () {
   // codegen.
   const convexDirectory = yield* ConvexDirectory.get;
   const absolutePath = path.join(convexDirectory, CONVEX_CONFIG_FILENAME);
-  let convexConfigEntryOption = Option.none<EntryPoint>();
-  if (yield* fs.exists(absolutePath)) {
-    convexConfigEntryOption = Option.some<EntryPoint>({
-      ...Kind.Config(),
-      absolutePath,
-      inputPath: yield* fs
-        .realPath(absolutePath)
-        .pipe(Effect.orElseSucceed(() => absolutePath)),
-    });
-  }
+  const convexConfigEntryOption = (yield* fs.exists(absolutePath))
+    ? Option.some<EntryPoint>({
+        ...Kind.Config(),
+        absolutePath,
+        inputPath: yield* fs
+          .realPath(absolutePath)
+          .pipe(Effect.orElseSucceed(() => absolutePath)),
+      })
+    : Option.none<EntryPoint>();
 
   return Array.getSomes([
     ...fixedEntryOptions,

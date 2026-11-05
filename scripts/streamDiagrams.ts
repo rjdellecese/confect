@@ -6,7 +6,6 @@ import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Console from "effect/Console";
 import * as Schema from "effect/Schema";
-import { dual } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -62,39 +61,29 @@ const keyCell = (key: string): string => Str.padEnd(COLUMN_WIDTH)(`  ${key}`);
  * to the name. `start` shifts both right by that many columns—an inner stream
  * of a join begins where its outer element is.
  */
-export const track: {
-  (
-    cells: ReadonlyArray<Cell>,
-    end?: string,
-    start?: number,
-  ): (name: string) => string;
-  (
-    name: string,
-    cells: ReadonlyArray<Cell>,
-    end?: string,
-    start?: number,
-  ): string;
-} = dual(
-  (args) => typeof args[0] === "string",
-  (name: string, cells: ReadonlyArray<Cell>, end = "┤", start = 0): string => {
-    if (COLUMN_WIDTH * start <= -1) {
-      throw new RangeError(`Invalid count value: ${COLUMN_WIDTH * start}`);
-    }
-    const indent = Str.repeat(COLUMN_WIDTH * start)(" ");
-    return (
-      indent +
-      name +
-      "\n" +
-      indent +
-      CORNER +
-      Arr.join(
-        Arr.map(cells, (label) => (label === undefined ? gap : cell(label))),
-        "",
-      ) +
-      end
-    );
-  },
-);
+export const track = (
+  name: string,
+  cells: ReadonlyArray<Cell>,
+  end = "┤",
+  start = 0,
+): string => {
+  if (COLUMN_WIDTH * start <= -1) {
+    throw new RangeError(`Invalid count value: ${COLUMN_WIDTH * start}`);
+  }
+  const indent = Str.repeat(COLUMN_WIDTH * start)(" ");
+  return (
+    indent +
+    name +
+    "\n" +
+    indent +
+    CORNER +
+    Arr.join(
+      Arr.map(cells, (label) => (label === undefined ? gap : cell(label))),
+      "",
+    ) +
+    end
+  );
+};
 
 /**
  * The keys printed beneath a track's elements.

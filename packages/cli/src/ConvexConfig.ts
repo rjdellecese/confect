@@ -1,4 +1,4 @@
-import { dual, pipe } from "effect/Function";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
@@ -300,30 +300,17 @@ export const discoverInstalledComponents = Effect.fn(
  *
  * @internal
  */
-export const typeImportPath: {
-  (
-    componentDefinitionPath: string,
-    confectGeneratedDirectory: string,
-  ): (path: Path.Path) => string;
-  (
-    path: Path.Path,
-    componentDefinitionPath: string,
-    confectGeneratedDirectory: string,
-  ): string;
-} = dual(
-  3,
-  (
-    path: Path.Path,
-    componentDefinitionPath: string,
-    confectGeneratedDirectory: string,
-  ): string => {
-    if (!path.isAbsolute(componentDefinitionPath)) {
-      return componentDefinitionPath;
-    }
-    const relative = toPosixPath(
-      path,
-      path.relative(confectGeneratedDirectory, componentDefinitionPath),
-    );
-    return String.startsWith(".")(relative) ? relative : `./${relative}`;
-  },
-);
+export const typeImportPath = (
+  path: Path.Path,
+  componentDefinitionPath: string,
+  confectGeneratedDirectory: string,
+): string => {
+  if (!path.isAbsolute(componentDefinitionPath)) {
+    return componentDefinitionPath;
+  }
+  const relative = toPosixPath(
+    path,
+    path.relative(confectGeneratedDirectory, componentDefinitionPath),
+  );
+  return String.startsWith(".")(relative) ? relative : `./${relative}`;
+};

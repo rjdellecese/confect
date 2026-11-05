@@ -16,7 +16,7 @@ import type {
   VUnion,
 } from "convex/values";
 import { v } from "convex/values";
-import { dual, pipe } from "effect/Function";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
@@ -303,124 +303,93 @@ export const isRecursive = (ast: SchemaAST.AST): boolean =>
     Match.exhaustive,
   );
 
-export const compileAst: {
-  (
-    isOptionalPropertyOfTypeLiteral?: boolean,
-  ): (
-    ast: SchemaAST.AST,
-  ) => Effect.Effect<
-    Validator<any, any, any>,
-    | UnsupportedSchemaTypeError
-    | UnsupportedPropertySignatureKeyTypeError
-    | IndexSignaturesAreNotSupportedError
-    | MixedIndexAndPropertySignaturesAreNotSupportedError
-    | OptionalTupleElementsAreNotSupportedError
-    | EmptyTupleIsNotSupportedError
-    | EmptyUnionIsNotSupportedError
-  >;
-  (
-    ast: SchemaAST.AST,
-    isOptionalPropertyOfTypeLiteral?: boolean,
-  ): Effect.Effect<
-    Validator<any, any, any>,
-    | UnsupportedSchemaTypeError
-    | UnsupportedPropertySignatureKeyTypeError
-    | IndexSignaturesAreNotSupportedError
-    | MixedIndexAndPropertySignaturesAreNotSupportedError
-    | OptionalTupleElementsAreNotSupportedError
-    | EmptyTupleIsNotSupportedError
-    | EmptyUnionIsNotSupportedError
-  >;
-} = dual(
-  (args) => typeof args[0] === "object",
-  (
-    ast: SchemaAST.AST,
-    isOptionalPropertyOfTypeLiteral = false,
-  ): Effect.Effect<
-    Validator<any, any, any>,
-    | UnsupportedSchemaTypeError
-    | UnsupportedPropertySignatureKeyTypeError
-    | IndexSignaturesAreNotSupportedError
-    | MixedIndexAndPropertySignaturesAreNotSupportedError
-    | OptionalTupleElementsAreNotSupportedError
-    | EmptyTupleIsNotSupportedError
-    | EmptyUnionIsNotSupportedError
-  > =>
-    isRecursive(ast)
-      ? Effect.succeed(v.any())
-      : pipe(
-          ast,
-          Match.value,
-          Match.tag("Literal", ({ literal }) =>
-            pipe(
-              literal,
-              Match.value,
-              Match.whenOr(
-                Match.string,
-                Match.number,
-                Match.bigint,
-                Match.boolean,
-                (l) => v.literal(l),
-              ),
-              Match.exhaustive,
-              Effect.succeed,
+export const compileAst = (
+  ast: SchemaAST.AST,
+  isOptionalPropertyOfTypeLiteral = false,
+): Effect.Effect<
+  Validator<any, any, any>,
+  | UnsupportedSchemaTypeError
+  | UnsupportedPropertySignatureKeyTypeError
+  | IndexSignaturesAreNotSupportedError
+  | MixedIndexAndPropertySignaturesAreNotSupportedError
+  | OptionalTupleElementsAreNotSupportedError
+  | EmptyTupleIsNotSupportedError
+  | EmptyUnionIsNotSupportedError
+> =>
+  isRecursive(ast)
+    ? Effect.succeed(v.any())
+    : pipe(
+        ast,
+        Match.value,
+        Match.tag("Literal", ({ literal }) =>
+          pipe(
+            literal,
+            Match.value,
+            Match.whenOr(
+              Match.string,
+              Match.number,
+              Match.bigint,
+              Match.boolean,
+              (l) => v.literal(l),
             ),
+            Match.exhaustive,
+            Effect.succeed,
           ),
-          Match.tag("Null", () => Effect.succeed(v.null())),
-          Match.tag("Boolean", () => Effect.succeed(v.boolean())),
-          Match.tag("String", (stringAst) =>
-            GenericId.tableName(stringAst).pipe(
-              Option.match({
-                onNone: () => Effect.succeed(v.string()),
-                onSome: (tableName) => Effect.succeed(v.id(tableName)),
+        ),
+        Match.tag("Null", () => Effect.succeed(v.null())),
+        Match.tag("Boolean", () => Effect.succeed(v.boolean())),
+        Match.tag("String", (stringAst) =>
+          GenericId.tableName(stringAst).pipe(
+            Option.match({
+              onNone: () => Effect.succeed(v.string()),
+              onSome: (tableName) => Effect.succeed(v.id(tableName)),
+            }),
+          ),
+        ),
+        Match.tag("Number", () => Effect.succeed(v.float64())),
+        Match.tag("BigInt", () => Effect.succeed(v.int64())),
+        Match.tag("Union", (unionAst) =>
+          handleUnion(unionAst, isOptionalPropertyOfTypeLiteral),
+        ),
+        Match.tag("Objects", (objectsAst) => handleObjects(objectsAst)),
+        Match.tag("Arrays", (arraysAst) => handleArrays(arraysAst)),
+        Match.tag("Unknown", "Any", () => Effect.succeed(v.any())),
+        Match.tag("Declaration", (declaration) =>
+          Effect.mapBoth(
+            // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Codec inputs are context-free, but Effect's SchemaAST.DeclarationRun erases their requirements to `any`.
+            declaration.run(declaration.typeParameters)(
+              new ArrayBuffer(0),
+              declaration,
+              {},
+            ) as Effect.Effect<ArrayBuffer, unknown, never>,
+            {
+              onSuccess: () => v.bytes(),
+              onFailure: () =>
+                UnsupportedSchemaTypeError.make({
+                  schemaType: declaration._tag,
+                }),
+            },
+          ),
+        ),
+        Match.tag("Suspend", () => Effect.succeed(v.any())),
+        Match.tag(
+          "UniqueSymbol",
+          "Symbol",
+          "Undefined",
+          "Void",
+          "Never",
+          "Enum",
+          "TemplateLiteral",
+          "ObjectKeyword",
+          () =>
+            Effect.fail(
+              UnsupportedSchemaTypeError.make({
+                schemaType: ast._tag,
               }),
             ),
-          ),
-          Match.tag("Number", () => Effect.succeed(v.float64())),
-          Match.tag("BigInt", () => Effect.succeed(v.int64())),
-          Match.tag("Union", (unionAst) =>
-            handleUnion(unionAst, isOptionalPropertyOfTypeLiteral),
-          ),
-          Match.tag("Objects", (objectsAst) => handleObjects(objectsAst)),
-          Match.tag("Arrays", (arraysAst) => handleArrays(arraysAst)),
-          Match.tag("Unknown", "Any", () => Effect.succeed(v.any())),
-          Match.tag("Declaration", (declaration) =>
-            Effect.mapBoth(
-              // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Codec inputs are context-free, but Effect's SchemaAST.DeclarationRun erases their requirements to `any`.
-              declaration.run(declaration.typeParameters)(
-                new ArrayBuffer(0),
-                declaration,
-                {},
-              ) as Effect.Effect<ArrayBuffer, unknown, never>,
-              {
-                onSuccess: () => v.bytes(),
-                onFailure: () =>
-                  UnsupportedSchemaTypeError.make({
-                    schemaType: declaration._tag,
-                  }),
-              },
-            ),
-          ),
-          Match.tag("Suspend", () => Effect.succeed(v.any())),
-          Match.tag(
-            "UniqueSymbol",
-            "Symbol",
-            "Undefined",
-            "Void",
-            "Never",
-            "Enum",
-            "TemplateLiteral",
-            "ObjectKeyword",
-            () =>
-              Effect.fail(
-                UnsupportedSchemaTypeError.make({
-                  schemaType: ast._tag,
-                }),
-              ),
-          ),
-          Match.exhaustive,
         ),
-);
+        Match.exhaustive,
+      );
 
 const handleUnion = (
   { types }: SchemaAST.Union,

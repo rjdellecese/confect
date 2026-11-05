@@ -15,7 +15,7 @@ import * as Stream from "effect/Stream";
 import config from "../.oxlintrc.json" with { type: "json" };
 import effectPolicy from "../tsconfig.effect.json" with { type: "json" };
 
-test("enables every installed Effect rule as an error", () => {
+test("enables every installed Effect rule except missing pipeable signatures", () => {
   const require = createRequire(import.meta.url);
   const schema: unknown = require(
     fileURLToPath(
@@ -41,13 +41,17 @@ test("enables every installed Effect rule as an error", () => {
   expect(effectRules.length).toBeGreaterThan(0);
   const configuredRules: Readonly<Record<string, unknown>> = config.rules;
   for (const rule of effectRules) {
-    expect(configuredRules[rule], rule).toBe("error");
+    expect(configuredRules[rule], rule).toBe(
+      rule === "effecttsgo/missing-pipeable-signature" ? "off" : "error",
+    );
   }
   for (const override of config.overrides) {
     const rules: Readonly<Record<string, unknown>> = override.rules;
     for (const rule of effectRules) {
       if (rule in rules) {
-        expect(rules[rule], rule).toBe("error");
+        expect(rules[rule], rule).toBe(
+          rule === "effecttsgo/missing-pipeable-signature" ? "off" : "error",
+        );
       }
     }
   }

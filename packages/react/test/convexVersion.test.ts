@@ -26,13 +26,13 @@ vi.mock("convex/react", () => ({
   }),
 }));
 
-const paginatedQuery = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicPaginatedQuery({
+const paginatedQuery = Ref.make(
+  "notes",
+  FunctionSpec.publicPaginatedQuery({
     name: "listPaginated",
     item: () => Schema.Struct({ value: Schema.Finite }),
   }),
-});
+);
 
 test("usePaginatedQuery refuses to run on a convex version that always throws", () => {
   expect(() =>
