@@ -22,8 +22,14 @@ const definition = {
   returns: () => Schema.FiniteFromString,
   error: () => NotFound,
 };
-const queryRef = Ref.make("notes", FunctionSpec.publicQuery(definition));
-const mutationRef = Ref.make("notes", FunctionSpec.publicMutation(definition));
+const queryRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicQuery(definition),
+});
+const mutationRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicMutation(definition),
+});
 
 describe("MutationTransactionContext", () => {
   it("exports the same service through the barrel and native option types", () => {

@@ -27,9 +27,9 @@ const make = (runAction: GenericActionCtx<any>["runAction"]) => ({
     ),
 });
 
-export const ActionRunner = Context.Service<ReturnType<typeof make>>(
-  "@confect/server/ActionRunner",
-);
+export const ActionRunner =
+  // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
+  Context.Service<ReturnType<typeof make>>("@confect/server/ActionRunner");
 export type ActionRunner = typeof ActionRunner.Identifier;
 
 export const layer = (runAction: GenericActionCtx<any>["runAction"]) =>

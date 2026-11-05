@@ -60,6 +60,9 @@ list in `tsconfig.effect.json` grants individual upstream and integration export
 that the existing platform, HTTP, AI, and test integrations deliberately depend on;
 it is not a blanket permission for an unstable package or namespace. Review
 new grants explicitly, and keep public API stability annotations accurate.
+Keep compatibility exceptions local and documented: existing structural service
+identifiers retain their public requirement types, and Convex handler entry
+points provide invocation-local layers before the terminal runner executes them.
 
 ## Build System
 

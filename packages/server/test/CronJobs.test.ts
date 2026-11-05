@@ -10,32 +10,32 @@ import * as CronJob from "@confect/server/CronJob";
 import * as CronJobs from "@confect/server/CronJobs";
 
 const makeMutationRef = (functionNamespace: string, name: string) =>
-  Ref.make(
-    functionNamespace,
-    FunctionSpec.internalMutation({
+  Ref.make({
+    namespace: functionNamespace,
+    spec: FunctionSpec.internalMutation({
       name,
       returns: () => Schema.Void,
     }),
-  );
+  });
 
 const makeActionRef = (functionNamespace: string, name: string) =>
-  Ref.make(
-    functionNamespace,
-    FunctionSpec.internalAction({
+  Ref.make({
+    namespace: functionNamespace,
+    spec: FunctionSpec.internalAction({
       name,
       returns: () => Schema.Void,
     }),
-  );
+  });
 
 const makeMutationRefWithArgs = (functionNamespace: string, name: string) =>
-  Ref.make(
-    functionNamespace,
-    FunctionSpec.internalMutation({
+  Ref.make({
+    namespace: functionNamespace,
+    spec: FunctionSpec.internalMutation({
       name,
       args: () => ({ email: Schema.String }),
       returns: () => Schema.Void,
     }),
-  );
+  });
 
 describe("cronToConvexCronString", () => {
   test("daily at 4:00 UTC", () => {

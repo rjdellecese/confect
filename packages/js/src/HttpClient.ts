@@ -116,9 +116,9 @@ const make = (
  * Works in any JS runtime that supports `fetch`. Wraps
  * [ConvexHttpClient](https://docs.convex.dev/api/classes/browser.ConvexHttpClient).
  */
-export const HttpClient = Context.Service<ReturnType<typeof make>>(
-  "@confect/js/HttpClient",
-);
+export const HttpClient =
+  // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
+  Context.Service<ReturnType<typeof make>>("@confect/js/HttpClient");
 
 export type HttpClient = typeof HttpClient.Identifier;
 

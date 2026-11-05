@@ -78,9 +78,11 @@ const State = Data.taggedEnum<State>();
 /**
  * @experimental
  */
-export const QueryStreamReadBudget = Context.Service<QueryStreamReadBudget>(
-  "@confect/server/QueryStreamReadBudget",
-);
+export const QueryStreamReadBudget =
+  // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
+  Context.Service<QueryStreamReadBudget>(
+    "@confect/server/QueryStreamReadBudget",
+  );
 
 const isExhausted = (state: State, limits: Limits): boolean =>
   State.$match(state, {

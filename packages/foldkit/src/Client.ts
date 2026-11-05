@@ -33,9 +33,11 @@ export const make = (webSocketClient: WebSocketClient.WebSocketClient) =>
  * Subscriptions. It combines the WebSocket API with the pagination-session id
  * allocator required by Convex's query cache.
  */
-export const Client = Context.Service<Effect.Success<ReturnType<typeof make>>>(
-  "@confect/foldkit/Client",
-);
+export const Client =
+  // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
+  Context.Service<Effect.Success<ReturnType<typeof make>>>(
+    "@confect/foldkit/Client",
+  );
 
 export type Client = typeof Client.Identifier;
 

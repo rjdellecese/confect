@@ -29,39 +29,39 @@ const echoDefinition = {
   returns: () => Schema.FiniteFromString,
   error: () => MissingValue,
 };
-const query = Ref.make(
-  "clients",
-  FunctionSpec.publicQuery({
+const query = Ref.make({
+  namespace: "clients",
+  spec: FunctionSpec.publicQuery({
     ...echoDefinition,
     name: "echoQuery",
   }),
-);
-const mutation = Ref.make(
-  "clients",
-  FunctionSpec.publicMutation({
+});
+const mutation = Ref.make({
+  namespace: "clients",
+  spec: FunctionSpec.publicMutation({
     ...echoDefinition,
     name: "echoMutation",
   }),
-);
-const action = Ref.make(
-  "clients",
-  FunctionSpec.publicAction({
+});
+const action = Ref.make({
+  namespace: "clients",
+  spec: FunctionSpec.publicAction({
     ...echoDefinition,
     name: "echoAction",
   }),
-);
-const read = Ref.make(
-  "clients",
-  FunctionSpec.publicQuery({
+});
+const read = Ref.make({
+  namespace: "clients",
+  spec: FunctionSpec.publicQuery({
     name: "read",
     args: () => ({ caseId: Schema.String }),
     returns: () => Schema.FiniteFromString,
     error: () => MissingValue,
   }),
-);
-const write = Ref.make(
-  "clients",
-  FunctionSpec.publicMutation({
+});
+const write = Ref.make({
+  namespace: "clients",
+  spec: FunctionSpec.publicMutation({
     name: "write",
     args: () => ({
       caseId: Schema.String,
@@ -69,7 +69,7 @@ const write = Ref.make(
     }),
     returns: () => Schema.Null,
   }),
-);
+});
 
 const clientLayer = Layer.unwrap(
   Effect.gen(function* () {
@@ -182,18 +182,21 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
         Effect.gen(function* () {
           const client = yield* WebSocketClient.WebSocketClient;
           const returns = () => Schema.FiniteFromString;
-          const noArgsQueryRef = Ref.make(
-            "clients",
-            FunctionSpec.publicQuery({ name: "echoQuery", returns }),
-          );
-          const noArgsMutationRef = Ref.make(
-            "clients",
-            FunctionSpec.publicMutation({ name: "echoMutation", returns }),
-          );
-          const noArgsActionRef = Ref.make(
-            "clients",
-            FunctionSpec.publicAction({ name: "echoAction", returns }),
-          );
+          const noArgsQueryRef = Ref.make({
+            namespace: "clients",
+            spec: FunctionSpec.publicQuery({ name: "echoQuery", returns }),
+          });
+          const noArgsMutationRef = Ref.make({
+            namespace: "clients",
+            spec: FunctionSpec.publicMutation({
+              name: "echoMutation",
+              returns,
+            }),
+          });
+          const noArgsActionRef = Ref.make({
+            namespace: "clients",
+            spec: FunctionSpec.publicAction({ name: "echoAction", returns }),
+          });
           type NoArgsRef =
             | typeof noArgsQueryRef
             | typeof noArgsMutationRef
@@ -201,24 +204,27 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
           expectTypeOf<Ref.Error<NoArgsRef>>().toEqualTypeOf<never>();
           expectTypeOf<Ref.Returns<NoArgsRef>>().toEqualTypeOf<number>();
           const observed2 = yield* client.query(
-            Ref.make(
-              "clients",
-              FunctionSpec.publicQuery({ name: "echoQuery", returns }),
-            ),
+            Ref.make({
+              namespace: "clients",
+              spec: FunctionSpec.publicQuery({ name: "echoQuery", returns }),
+            }),
           );
           expect(observed2).toBe(0);
           const observed3 = yield* client.mutation(
-            Ref.make(
-              "clients",
-              FunctionSpec.publicMutation({ name: "echoMutation", returns }),
-            ),
+            Ref.make({
+              namespace: "clients",
+              spec: FunctionSpec.publicMutation({
+                name: "echoMutation",
+                returns,
+              }),
+            }),
           );
           expect(observed3).toBe(0);
           const observed4 = yield* client.action(
-            Ref.make(
-              "clients",
-              FunctionSpec.publicAction({ name: "echoAction", returns }),
-            ),
+            Ref.make({
+              namespace: "clients",
+              spec: FunctionSpec.publicAction({ name: "echoAction", returns }),
+            }),
           );
           expect(observed4).toBe(0);
         }),
@@ -227,28 +233,28 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
       it.effect("reports argument and return codec failures", () =>
         Effect.gen(function* () {
           const client = yield* WebSocketClient.WebSocketClient;
-          const invalidArgs = Ref.make(
-            "clients",
-            FunctionSpec.publicQuery({
+          const invalidArgs = Ref.make({
+            namespace: "clients",
+            spec: FunctionSpec.publicQuery({
               name: "echoQuery",
               args: () => ({ value: Schema.String.check(Schema.isNonEmpty()) }),
               returns: () => Schema.String,
             }),
-          );
+          });
           const encoding = yield* Effect.result(
             client.query(invalidArgs, { value: "" }),
           );
           const encodingIsFailure = Result.isFailure(encoding);
           assert(encodingIsFailure);
           expect(encoding.failure).toBeInstanceOf(Schema.SchemaError);
-          const invalidReturns = Ref.make(
-            "clients",
-            FunctionSpec.publicQuery({
+          const invalidReturns = Ref.make({
+            namespace: "clients",
+            spec: FunctionSpec.publicQuery({
               name: "echoQuery",
               args: () => ({ value: Schema.String }),
               returns: () => Schema.FiniteFromString,
             }),
-          );
+          });
           const decoding = yield* Effect.result(
             client.query(invalidReturns, { value: "not a number" }),
           );

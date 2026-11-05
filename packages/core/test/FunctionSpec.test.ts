@@ -180,7 +180,7 @@ describe("laziness invariant", () => {
     const spec = makeSpec({
       error: () => MutableRef.set(errorBuilt, true),
     });
-    const ref = Ref.make("ns", spec);
+    const ref = Ref.make({ namespace: "ns", spec });
 
     expect(Ref.hasErrorSchema(ref)).toBe(true);
     expect(MutableRef.get(errorBuilt)).toBe(false);
@@ -196,7 +196,7 @@ describe("laziness invariant", () => {
       returns: () => MutableRef.set(returnsBuilt, true),
       error: () => MutableRef.set(errorBuilt, true),
     });
-    const ref = Ref.make("ns", spec);
+    const ref = Ref.make({ namespace: "ns", spec });
 
     expect(MutableRef.get(argsBuilt)).toBe(false);
     expect(MutableRef.get(returnsBuilt)).toBe(false);
@@ -219,7 +219,7 @@ describe("laziness invariant", () => {
       name: "noError",
       returns: () => Schema.Null,
     });
-    const ref = Ref.make("ns", spec);
+    const ref = Ref.make({ namespace: "ns", spec });
 
     expect(Ref.hasErrorSchema(ref)).toBe(false);
     expect("error" in spec.functionProvenance).toBe(false);
@@ -307,7 +307,7 @@ describe("paginated queries", () => {
       const spec = makePaginatedSpec({
         error: () => MutableRef.set(errorBuilt, true),
       });
-      const ref = Ref.make("ns", spec);
+      const ref = Ref.make({ namespace: "ns", spec });
 
       expect(Ref.hasErrorSchema(ref)).toBe(true);
       expect(MutableRef.get(errorBuilt)).toBe(false);

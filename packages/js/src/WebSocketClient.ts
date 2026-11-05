@@ -205,9 +205,11 @@ const make = (
  * Wraps
  * [ConvexClient](https://docs.convex.dev/api/classes/browser.ConvexClient).
  */
-export const WebSocketClient = Context.Service<
-  Effect.Success<ReturnType<typeof make>>
->("@confect/js/WebSocketClient");
+export const WebSocketClient =
+  // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
+  Context.Service<Effect.Success<ReturnType<typeof make>>>(
+    "@confect/js/WebSocketClient",
+  );
 
 export type WebSocketClient = typeof WebSocketClient.Identifier;
 

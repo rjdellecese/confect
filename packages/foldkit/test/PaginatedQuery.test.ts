@@ -11,30 +11,30 @@ import * as PaginatedQuery from "@confect/foldkit/PaginatedQuery";
 
 const Note = Schema.Struct({ text: Schema.String });
 
-const paginateRef = Ref.make(
-  "notes",
-  FunctionSpec.publicPaginatedQuery({
+const paginateRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicPaginatedQuery({
     name: "paginate",
     args: () => ({ channel: Schema.String }),
     item: () => Note,
   }),
-);
+});
 
-const paginateNoArgsRef = Ref.make(
-  "notes",
-  FunctionSpec.publicPaginatedQuery({
+const paginateNoArgsRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicPaginatedQuery({
     name: "paginateAll",
     item: () => Note,
   }),
-);
+});
 
-const standardQueryRef = Ref.make(
-  "notes",
-  FunctionSpec.publicQuery({
+const standardQueryRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicQuery({
     name: "list",
     returns: () => Schema.Struct({}),
   }),
-);
+});
 
 const Notes = PaginatedQuery.make(paginateRef);
 

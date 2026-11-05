@@ -324,19 +324,23 @@ type FromFunctionSpecHelper<
           Error_
         >;
 
-export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
+export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>({
+  namespace,
+  spec,
+  groupMiddlewareAttachments = [],
+}: {
   /**
-   * The namespace portion of a Convex function name, i.e. the part before the
-   * colon. For example, for `myGroupDir/myGroupMod:myFunc` this would be
-   * `myGroupDir/myGroupMod`.
+   * The part of a Convex function name before the colon, such as `notes/list`.
    */
-  convexFunctionNamespace: string,
-  functionSpec: FunctionSpec_,
-  groupMiddlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment> = [],
-): FromFunctionSpec<FunctionSpec_> => {
-  const convexFunctionName = `${convexFunctionNamespace}:${functionSpec.name}`;
+  readonly namespace: string;
+  readonly spec: FunctionSpec_;
+  readonly groupMiddlewareAttachments?:
+    | ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>
+    | undefined;
+}): FromFunctionSpec<FunctionSpec_> => {
+  const convexFunctionName = `${namespace}:${spec.name}`;
 
-  return Match.value(functionSpec.functionProvenance).pipe(
+  return Match.value(spec.functionProvenance).pipe(
     Match.tag(
       "Convex",
       (): Any =>
@@ -352,10 +356,13 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
         kind: provenance.kind,
         middlewareAttachments: [
           ...groupMiddlewareAttachments,
-          ...functionSpec.middlewareAttachments,
+          ...spec.middlewareAttachments,
         ],
         get middlewareSpecs() {
-          return Array.map(this.middlewareAttachments, ({ spec }) => spec);
+          return Array.map(
+            this.middlewareAttachments,
+            (attachment) => attachment.spec,
+          );
         },
       };
 
