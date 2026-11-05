@@ -528,14 +528,24 @@ layer(NodeServices.layer)("pending work ownership", (test) => {
 });
 
 it("parses reported build rejections without confusing operation errors or malformed diagnostics", () => {
-  expect(Watcher.parseFailure({ errors: [{ text: "syntax error" }] })).toEqual(
-    Option.some({ errors: [{ text: "syntax error" }] }),
-  );
-  expect(Watcher.parseFailure({ errors: [] })).toEqual(Option.none());
-  expect(Watcher.parseFailure({ errors: ["invalid"] })).toEqual(Option.none());
-  expect(Watcher.parseFailure(new Error("service stopped"))).toEqual(
-    Option.none(),
-  );
+  expect(
+    Schema.decodeOption(Watcher.ReportedBuildFailure)({
+      errors: [{ text: "syntax error" }],
+    }),
+  ).toEqual(Option.some({ errors: [{ text: "syntax error" }] }));
+  expect(
+    Schema.decodeUnknownOption(Watcher.ReportedBuildFailure)({ errors: [] }),
+  ).toEqual(Option.none());
+  expect(
+    Schema.decodeUnknownOption(Watcher.ReportedBuildFailure)({
+      errors: ["invalid"],
+    }),
+  ).toEqual(Option.none());
+  expect(
+    Schema.decodeUnknownOption(Watcher.ReportedBuildFailure)(
+      new Error("service stopped"),
+    ),
+  ).toEqual(Option.none());
 });
 
 layer(NodeServices.layer, { excludeTestServices: true })(

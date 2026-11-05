@@ -20,9 +20,7 @@ const START_MARKER = "# skills-lock:start";
 const END_MARKER = "# skills-lock:end";
 const GENERATED_COMMENT =
   "# Generated from skills-lock.json by `pnpm skills:sync-ignore`.";
-const quoteJsonString = Schema.encodeResult(
-  Schema.fromJsonString(Schema.String),
-);
+const JsonString = Schema.fromJsonString(Schema.String);
 
 export class SkillIgnoreError extends Schema.TaggedError<
   SkillIgnoreError,
@@ -82,8 +80,12 @@ export const vendoredSkillDirectories = Effect.fnUntraced(function* (
     const directory = installedDirectoryName(skillName);
     const existing = directories.get(directory);
     if (existing !== undefined) {
-      const existingName = Result.getOrThrow(quoteJsonString(existing));
-      const conflictingName = Result.getOrThrow(quoteJsonString(skillName));
+      const existingName = Result.getOrThrow(
+        Schema.encodeResult(JsonString)(existing),
+      );
+      const conflictingName = Result.getOrThrow(
+        Schema.encodeResult(JsonString)(skillName),
+      );
       return yield* SkillIgnoreError.make({
         reason: `${LOCK_FILE} entries ${existingName} and ${conflictingName} map to the same installed directory`,
       });

@@ -2323,8 +2323,6 @@ export const paginate: {
       options: PaginateOptions,
     ) {
       const cursorSchema = QueryStreamCursor.fromKeyLayout(self.keyLayout);
-      const encodeCursor = Schema.encodeEffect(cursorSchema);
-      const decodeCursor = Schema.decodeEffect(cursorSchema);
       const complete = (keyValues: QueryStreamKeyValues.QueryStreamKeyValues) =>
         Result.getOrThrowWith(
           QueryStreamKey.complete(self.keyLayout, keyValues),
@@ -2334,7 +2332,7 @@ export const paginate: {
         start: Option.match(Option.fromNullOr(options.cursor), {
           onNone: () => Effect.succeed(QueryStreamPagination.Start.Beginning()),
           onSome: (cursor) =>
-            Effect.map(decodeCursor(cursor), (key) =>
+            Effect.map(Schema.decodeEffect(cursorSchema)(cursor), (key) =>
               QueryStreamPagination.Start.After({
                 cursor,
                 key,
@@ -2346,7 +2344,7 @@ export const paginate: {
           onSome: (cursor) =>
             cursor === QueryStreamCursor.END_CURSOR
               ? Effect.succeed(QueryStreamPagination.Range.ThroughEnd())
-              : Effect.map(decodeCursor(cursor), (key) =>
+              : Effect.map(Schema.decodeEffect(cursorSchema)(cursor), (key) =>
                   QueryStreamPagination.Range.ThroughKey({
                     key,
                   }),
@@ -2425,7 +2423,9 @@ export const paginate: {
         return yield* ReadBudgetExceededError.make(counts);
       }
       const encode = (key: QueryStreamKey.Complete) =>
-        encodeCursor(key).pipe(Effect.catchTag("SchemaError", Effect.die));
+        Schema.encodeEffect(cursorSchema)(key).pipe(
+          Effect.catchTag("SchemaError", Effect.die),
+        );
       const encodeSplit = (
         result: Extract<
           QueryStreamPagination.Outcome<Doc>,

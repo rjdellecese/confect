@@ -121,10 +121,9 @@ export class OperationError extends Schema.TaggedError<
   cause: Schema.Unknown,
 }) {}
 
-const ReportedBuildFailure = Schema.Struct({
+export const ReportedBuildFailure = Schema.Struct({
   errors: Schema.NonEmptyArray(Schema.Struct({ text: Schema.String })),
 });
-export const parseFailure = Schema.decodeUnknownOption(ReportedBuildFailure);
 
 /**
  * @internal
@@ -231,9 +230,7 @@ const esbuildOptions = (
   pendingRef: Ref.Ref<Pending>,
   initial: Deferred.Deferred<void>,
 ): esbuild.BuildOptions => {
-  const encodeString = Schema.encodeResult(
-    Schema.fromJsonString(Schema.String),
-  );
+  const JsonString = Schema.fromJsonString(Schema.String);
   const groupKey = Option.match(config, {
     onNone: () => "",
     onSome: (selected) => selected.path,
@@ -246,7 +243,7 @@ const esbuildOptions = (
         Array.map(
           entries,
           (entry) =>
-            `import ${Result.getOrThrow(encodeString(entry.absolutePath))};`,
+            `import ${Result.getOrThrow(Schema.encodeResult(JsonString)(entry.absolutePath))};`,
         ),
         "\n",
       ),
@@ -650,7 +647,9 @@ const refreshGroup = Effect.fnUntraced(function* ({
     const currentProgress = yield* Ref.get(progress);
     const completed = WatchBuild.getCompletion(currentProgress);
     if (Result.isFailure(built)) {
-      const rejected = parseFailure(built.failure.cause);
+      const rejected = Schema.decodeUnknownOption(ReportedBuildFailure)(
+        built.failure.cause,
+      );
       if (Option.isNone(rejected)) return yield* built.failure;
       if (WatchBuild.joinedWithoutCompletion(currentProgress))
         return Option.none<WatchBuild.Completion>();

@@ -73,7 +73,7 @@ const b = (value) => p(value, E.Schema.encodeResult(X), E.Result.getOrThrow);`,
 const decode = S.decodeUnknownSync;
 const configured = decode(X);
 const a = (value) => configured(value);`,
-        missing: 1,
+        missing: 2,
       },
       {
         name: "reports wrappers with fixed schema construction and options",
@@ -89,11 +89,27 @@ const adapter = { decode: (value) => Schema.decodeResult(S)(value) };`,
         missing: 0,
       },
       {
-        name: "allows direct configured functions and inline codec calls",
+        name: "reports stored codec functions but allows inline codec calls",
         code: `const decodeOptions = Schema.decodeResult(S);
 const encode = Schema.encodeSync(S);
 const value = Schema.decodeResult(S)(input).pipe(Result.getOrThrow);
 const result = pipe(input, Schema.decodeResult(S), Result.getOrThrow);`,
+        missing: 2,
+      },
+      {
+        name: "reports stored configuration and exported codec aliases",
+        code: `const encodeJson = Schema.encodeResult(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
+const alias = encodeJson;
+export default alias;
+let decode = Schema.decodeResult(S, { errors: "all" });`,
+        missing: 4,
+      },
+      {
+        name: "allows reusable schemas constructors and inline combinators",
+        code: `const Json = Schema.fromJsonString(Schema.Unknown, { space: 2 });
+const encoded = Schema.encodeResult(Json)(input);
+const value = Options.make(input);
+const effect = Effect.flatMap(source, Schema.decodeEffect(Json));`,
         missing: 0,
       },
       {

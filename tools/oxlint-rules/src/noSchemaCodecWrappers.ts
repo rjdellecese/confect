@@ -19,6 +19,9 @@ type Codec = {
   readonly arguments: ReadonlyArray<ESTree.Node>;
 };
 
+const codecMethod =
+  /^(?:decode|encode)(?:Unknown)?(?:Sync|Effect|Promise|Option|Result)?$/;
+
 const variableIn = (
   scope: OxlintScope | null,
   name: string,
@@ -146,12 +149,17 @@ const codecFactory = (
     Array.some(node.arguments, (argument) => argument.type === "SpreadElement")
   )
     return undefined;
+  if (
+    node.callee.type === "MemberExpression" &&
+    (node.callee.computed ||
+      node.callee.property.type !== "Identifier" ||
+      !codecMethod.test(node.callee.property.name))
+  )
+    return undefined;
   const api = resolveApi(source, node.callee);
   return api?.module === "Schema" &&
     api.member !== undefined &&
-    /^(?:decode|encode)(?:Unknown)?(?:Sync|Effect|Promise|Option|Result)?$/.test(
-      api.member,
-    )
+    codecMethod.test(api.member)
     ? { method: api.member, arguments: node.arguments }
     : undefined;
 };
@@ -234,10 +242,25 @@ export const noSchemaCodecWrappers = Rule.define({
   meta: Rule.meta({
     type: "suggestion",
     description:
-      "Use Schema decoding and encoding APIs directly instead of thin forwarding functions.",
+      "Use Schema decoding and encoding APIs directly instead of forwarding functions or stored codec functions.",
   }),
   create: function* () {
     const ctx = yield* RuleContext;
+    const checkBinding = (
+      node: ESTree.VariableDeclarator | ESTree.ExportDefaultDeclaration,
+    ) => {
+      const value =
+        node.type === "VariableDeclarator" ? node.init : node.declaration;
+      if (value == null) return Effect.void;
+      const codec = codecFactory(ctx.sourceCode, value);
+      if (codec === undefined) return Effect.void;
+      return ctx.report(
+        Diagnostic.make({
+          node,
+          message: `Use Schema.${codec.method} at the call site instead of storing the codec function. Store reusable configuration on the schema or codec.`,
+        }),
+      );
+    };
     const check = (node: ESTree.Node) => {
       if (
         node.type !== "ArrowFunctionExpression" &&
@@ -295,6 +318,8 @@ export const noSchemaCodecWrappers = Rule.define({
       );
     };
     return Visitor.merge(
+      Visitor.on("VariableDeclarator", checkBinding),
+      Visitor.on("ExportDefaultDeclaration", checkBinding),
       Visitor.on("ArrowFunctionExpression", check),
       Visitor.on("FunctionExpression", check),
       Visitor.on("FunctionDeclaration", check),
