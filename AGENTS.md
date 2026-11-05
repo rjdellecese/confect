@@ -63,6 +63,8 @@ new grants explicitly, and keep public API stability annotations accurate.
 Keep compatibility exceptions local and documented: existing structural service
 identifiers retain their public requirement types, and Convex handler entry
 points provide invocation-local layers before the terminal runner executes them.
+The CLI evaluator retains native fork IPC for process isolation and compatibility
+with user modules; its adapter and lifecycle tests have line-scoped exceptions.
 
 ## Build System
 
