@@ -13,7 +13,6 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as Result from "effect/Result";
-import { dual } from "effect/Function";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import { consumerFiles } from "./consumerFixture";
@@ -50,47 +49,32 @@ const manifestAt = Effect.fn("Consumer.manifestAt")(function* (
     .pipe(Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(Manifest))));
 });
 
-export const cleanEnvironment: {
-  (
-    executablePath: string,
-    delimiter: string,
-    repository: string,
-  ): (directory: string) => Record<string, string>;
-  (
-    directory: string,
-    executablePath: string,
-    delimiter: string,
-    repository: string,
-  ): Record<string, string>;
-} = dual(
-  4,
-  (
-    directory: string,
-    executablePath: string,
-    delimiter: string,
-    repository: string,
-  ): Record<string, string> => ({
-    PATH: Arr.join(
-      Arr.filter(
-        Str.split(delimiter)(executablePath),
-        (part) =>
-          !Str.includes("node_modules")(part) &&
-          !Str.startsWith(repository)(part),
-      ),
-      delimiter,
+export const cleanEnvironment = (
+  directory: string,
+  executablePath: string,
+  delimiter: string,
+  repository: string,
+): Record<string, string> => ({
+  PATH: Arr.join(
+    Arr.filter(
+      Str.split(delimiter)(executablePath),
+      (part) =>
+        !Str.includes("node_modules")(part) &&
+        !Str.startsWith(repository)(part),
     ),
-    HOME: `${directory}/home`,
-    XDG_CONFIG_HOME: `${directory}/config`,
-    XDG_DATA_HOME: `${directory}/data`,
-    XDG_CACHE_HOME: `${directory}/cache`,
-    npm_config_userconfig: `${directory}/empty.npmrc`,
-    npm_config_globalconfig: `${directory}/empty-global.npmrc`,
-    npm_config_registry: "https://registry.npmjs.org/",
-    npm_config_cache: `${directory}/npm-cache`,
-    CI: "true",
-    NO_COLOR: "1",
-  }),
-);
+    delimiter,
+  ),
+  HOME: `${directory}/home`,
+  XDG_CONFIG_HOME: `${directory}/config`,
+  XDG_DATA_HOME: `${directory}/data`,
+  XDG_CACHE_HOME: `${directory}/cache`,
+  npm_config_userconfig: `${directory}/empty.npmrc`,
+  npm_config_globalconfig: `${directory}/empty-global.npmrc`,
+  npm_config_registry: "https://registry.npmjs.org/",
+  npm_config_cache: `${directory}/npm-cache`,
+  CI: "true",
+  NO_COLOR: "1",
+});
 
 /**
  * @internal

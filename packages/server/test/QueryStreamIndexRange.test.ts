@@ -192,20 +192,12 @@ describe("QueryStreamIndexRange.apply", () => {
           ["text"]
         >()[tag]("text", value);
         const result = QueryStreamIndexRange.apply(range, receiver);
-        const applyToReceiver = QueryStreamIndexRange.apply(receiver);
-        const curriedResult = applyToReceiver(range);
         expectTypeOf(result).toEqualTypeOf<ConvexIndexRange>();
-        expectTypeOf(curriedResult).toEqualTypeOf<ConvexIndexRange>();
-        expectTypeOf(applyToReceiver)
-          .parameter(0)
-          .toEqualTypeOf<QueryStreamIndexRange.QueryStreamIndexRange>();
-        expectTypeOf<{}>().not.toExtend<
-          Parameters<typeof applyToReceiver>[0]
-        >();
+        expectTypeOf(QueryStreamIndexRange.apply)
+          .parameter(1)
+          .toEqualTypeOf<ConvexIndexRangeBuilder<GenericDocument, string[]>>();
         expect(result).toHaveProperty("calls", [[tag, "text", value]]);
         expect(result).not.toBe(receiver);
-        expect(curriedResult).toHaveProperty("calls", [[tag, "text", value]]);
-        expect(curriedResult).not.toBe(receiver);
         expect(receiver.calls).toEqual([]);
       }
     },

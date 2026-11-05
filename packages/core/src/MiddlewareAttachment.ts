@@ -1,5 +1,4 @@
 import * as Data from "effect/Data";
-import { dual } from "effect/Function";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type * as MiddlewareSpec from "./MiddlewareSpec";
@@ -58,63 +57,50 @@ export const formatValidationError = ValidationError.$match({
     `Middleware "${middlewareKey}" has equivalent options at attachments ${previousIndex + 1} and ${attachmentIndex + 1} on ${location}`,
 });
 
-export const validateAll: {
-  (
-    location: string,
-  ): (
-    attachments: ReadonlyArray<MiddlewareAttachment>,
-  ) => Result.Result<void, ValidationError>;
-  (
-    attachments: ReadonlyArray<MiddlewareAttachment>,
-    location: string,
-  ): Result.Result<void, ValidationError>;
-} = dual(
-  2,
-  (
-    attachments: ReadonlyArray<MiddlewareAttachment>,
-    location: string,
-  ): Result.Result<void, ValidationError> => {
-    for (const [index, attachment] of attachments.entries()) {
-      const schema = attachment.spec.options;
-      if (schema !== undefined && !Schema.is(schema)(attachment.options)) {
+export const validateAll = (
+  attachments: ReadonlyArray<MiddlewareAttachment>,
+  location: string,
+): Result.Result<void, ValidationError> => {
+  for (const [index, attachment] of attachments.entries()) {
+    const schema = attachment.spec.options;
+    if (schema !== undefined && !Schema.is(schema)(attachment.options)) {
+      return Result.fail(
+        ValidationError.InvalidOptions({
+          middlewareKey: attachment.spec.key,
+          location,
+          attachmentIndex: index,
+        }),
+      );
+    }
+    const equivalent =
+      schema === undefined ? undefined : Schema.toEquivalence(schema);
+    for (const [previousIndex, previous] of attachments.entries()) {
+      if (previousIndex === index) break;
+      if (previous.spec.key !== attachment.spec.key) continue;
+      if (previous.spec !== attachment.spec) {
         return Result.fail(
-          ValidationError.InvalidOptions({
+          ValidationError.ConflictingSpecs({
             middlewareKey: attachment.spec.key,
             location,
             attachmentIndex: index,
+            previousIndex,
           }),
         );
       }
-      const equivalent =
-        schema === undefined ? undefined : Schema.toEquivalence(schema);
-      for (const [previousIndex, previous] of attachments.entries()) {
-        if (previousIndex === index) break;
-        if (previous.spec.key !== attachment.spec.key) continue;
-        if (previous.spec !== attachment.spec) {
-          return Result.fail(
-            ValidationError.ConflictingSpecs({
-              middlewareKey: attachment.spec.key,
-              location,
-              attachmentIndex: index,
-              previousIndex,
-            }),
-          );
-        }
-        if (
-          equivalent === undefined ||
-          equivalent(previous.options, attachment.options)
-        ) {
-          return Result.fail(
-            ValidationError.EquivalentOptions({
-              middlewareKey: attachment.spec.key,
-              location,
-              attachmentIndex: index,
-              previousIndex,
-            }),
-          );
-        }
+      if (
+        equivalent === undefined ||
+        equivalent(previous.options, attachment.options)
+      ) {
+        return Result.fail(
+          ValidationError.EquivalentOptions({
+            middlewareKey: attachment.spec.key,
+            location,
+            attachmentIndex: index,
+            previousIndex,
+          }),
+        );
       }
     }
-    return Result.void;
-  },
-);
+  }
+  return Result.void;
+};

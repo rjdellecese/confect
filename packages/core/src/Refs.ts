@@ -123,11 +123,11 @@ const makeHelper = (
       return Record.union(
         makeHelper(group.groups, Option.some(currentConvexFunctionNamespace)),
         Record.map(group.functions, (function_) =>
-          Ref.make({
-            namespace: currentConvexFunctionNamespace,
-            spec: function_,
-            groupMiddlewareAttachments: group.middlewareAttachments,
-          }),
+          Ref.make(
+            currentConvexFunctionNamespace,
+            function_,
+            group.middlewareAttachments,
+          ),
         ),
         (_subGroup, _function) => {
           throw new Error(

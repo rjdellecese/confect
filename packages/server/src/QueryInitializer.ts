@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import type {
   OrderedQuery as ConvexOrderedQuery,
   QueryInitializer as ConvexQueryInitializer,
@@ -211,289 +210,246 @@ export interface QueryInitializer<
   };
 }
 
-export const make = dual<
-  <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
-    table: Table.WithName<Tables, TableName>,
-  ) => (
-    convexDatabaseReader: BaseDatabaseReader<
-      DataModel.ToConvex<DataModel.FromTables<Tables>>
-    >,
-  ) => QueryInitializer<DataModel.FromTables<Tables>, TableName>,
-  <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
-    convexDatabaseReader: BaseDatabaseReader<
-      DataModel.ToConvex<DataModel.FromTables<Tables>>
-    >,
-    table: Table.WithName<Tables, TableName>,
-  ) => QueryInitializer<DataModel.FromTables<Tables>, TableName>
+export const make = <
+  Tables extends Table.AnyWithProps,
+  TableName extends Table.Name<Tables>,
 >(
-  2,
-  <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
-    convexDatabaseReader: BaseDatabaseReader<
-      DataModel.ToConvex<DataModel.FromTables<Tables>>
+  convexDatabaseReader: BaseDatabaseReader<
+    DataModel.ToConvex<DataModel.FromTables<Tables>>
+  >,
+  table: Table.WithName<Tables, TableName>,
+): QueryInitializer<DataModel.FromTables<Tables>, TableName> => {
+  const tableName = table.tableName;
+  type DataModel_ = DataModel.FromTables<Tables>;
+  type ConvexDataModel_ = DataModel.ToConvex<DataModel_>;
+  type ThisQueryInitializer = QueryInitializer<DataModel_, TableName>;
+  type QueryInitializerFunction<
+    FunctionName extends keyof ThisQueryInitializer,
+  > = ThisQueryInitializer[FunctionName];
+
+  const getByIndex = <
+    IndexName extends keyof Indexes<
+      DataModel.TableInfoWithName<DataModel_, TableName>
     >,
-    table: Table.WithName<Tables, TableName>,
-  ): QueryInitializer<DataModel.FromTables<Tables>, TableName> => {
-    const tableName = table.tableName;
-    type DataModel_ = DataModel.FromTables<Tables>;
-    type ConvexDataModel_ = DataModel.ToConvex<DataModel_>;
-    type ThisQueryInitializer = QueryInitializer<DataModel_, TableName>;
-    type QueryInitializerFunction<
-      FunctionName extends keyof ThisQueryInitializer,
-    > = ThisQueryInitializer[FunctionName];
+  >(
+    indexName: IndexName,
+    indexFieldValues: IndexFieldTypesForEq<
+      DataModel.ToConvex<DataModel_>,
+      TableName,
+      Indexes<DataModel.TableInfoWithName<DataModel_, TableName>>[IndexName]
+    >,
+  ): Effect.Effect<
+    DataModel.DocumentWithName<DataModel_, TableName>,
+    Document.DocumentDecodeError | GetByIndexFailure
+  > => {
+    const indexFieldPaths: GenericTableIndexes[keyof GenericTableIndexes] = (
+      table.indexes as GenericTableIndexes
+    )[indexName as keyof GenericTableIndexes]!;
 
-    const getByIndex = <
-      IndexName extends keyof Indexes<
-        DataModel.TableInfoWithName<DataModel_, TableName>
-      >,
-    >(
-      indexName: IndexName,
-      indexFieldValues: IndexFieldTypesForEq<
-        DataModel.ToConvex<DataModel_>,
-        TableName,
-        Indexes<DataModel.TableInfoWithName<DataModel_, TableName>>[IndexName]
-      >,
-    ): Effect.Effect<
-      DataModel.DocumentWithName<DataModel_, TableName>,
-      Document.DocumentDecodeError | GetByIndexFailure
-    > => {
-      const indexFieldPaths: GenericTableIndexes[keyof GenericTableIndexes] = (
-        table.indexes as GenericTableIndexes
-      )[indexName as keyof GenericTableIndexes]!;
-
-      return pipe(
-        Effect.promise(() =>
-          convexDatabaseReader
-            .query(tableName)
-            .withIndex(indexName, (q) =>
-              Array.reduce(
-                indexFieldValues,
-                q,
-                (q_, v, i) => q_.eq(indexFieldPaths[i] as any, v as any) as any,
-              ),
-            )
-            .unique(),
-        ),
-        Effect.andThen((value) =>
-          Effect.fromResult(
-            Result.fromNullishOr(value, () =>
-              GetByIndexFailure.make({
-                tableName,
-                indexName: indexName as string,
-                indexFieldValues,
-              }),
-            ),
-          ),
-        ),
-        Effect.andThen(Document.decode(table)),
-      );
-    };
-
-    const get: QueryInitializerFunction<"get"> = ((
-      ...args: Parameters<QueryInitializerFunction<"get">>
-    ) => {
-      if (args.length === 1) {
-        const id = args[0] as GenericId<TableName>;
-
-        return getById<Tables, TableName>(convexDatabaseReader, table)(id);
-      } else {
-        const [indexName, ...indexFieldValues] = args;
-
-        return getByIndex(
-          indexName as keyof Indexes<
-            DataModel.TableInfoWithName<DataModel_, TableName>
-          >,
-          indexFieldValues,
-        );
-      }
-    }) as QueryInitializerFunction<"get">;
-
-    const index: QueryInitializerFunction<"index"> = <
-      IndexName extends keyof Indexes<
-        DataModel.TableInfoWithName<DataModel_, TableName>
-      >,
-    >(
-      indexName: IndexName,
-      indexRangeOrOrder?:
-        | ((
-            q: IndexRangeBuilder<
-              DataModel.TableInfoWithName_<
-                DataModel_,
-                TableName
-              >["convexDocument"],
-              NamedIndex<
-                DataModel.TableInfoWithName<DataModel_, TableName>,
-                IndexName
-              >
-            >,
-          ) => IndexRange)
-        | OrderDirection,
-      order?: OrderDirection,
-    ) => {
-      const {
-        applyWithIndex,
-        applyOrder,
-      }: {
-        applyWithIndex: (
-          queryInitializer: ConvexQueryInitializer<
-            NamedTableInfo<ConvexDataModel_, TableName>
-          >,
-        ) => Query<NamedTableInfo<ConvexDataModel_, TableName>>;
-        applyOrder: (
-          query: Query<NamedTableInfo<ConvexDataModel_, TableName>>,
-        ) => ConvexOrderedQuery<NamedTableInfo<ConvexDataModel_, TableName>>;
-      } =
-        indexRangeOrOrder === undefined
-          ? {
-              applyWithIndex: (q) => q.withIndex(indexName),
-              applyOrder: (q) => q.order("asc"),
-            }
-          : typeof indexRangeOrOrder === "function"
-            ? order === undefined
-              ? {
-                  applyWithIndex: (q) =>
-                    q.withIndex(indexName, indexRangeOrOrder),
-                  applyOrder: (q) => q.order("asc"),
-                }
-              : {
-                  applyWithIndex: (q) =>
-                    q.withIndex(indexName, indexRangeOrOrder),
-                  applyOrder: (q) => q.order(order),
-                }
-            : {
-                applyWithIndex: (q) => q.withIndex(indexName),
-                applyOrder: (q) => q.order(indexRangeOrOrder),
-              };
-
-      const orderedQuery = pipe(
-        convexDatabaseReader.query(tableName),
-        applyWithIndex,
-        applyOrder,
-      );
-
-      return OrderedQuery.make(orderedQuery, table);
-    };
-
-    const stream: QueryInitializerFunction<"stream"> = ((
-      indexName: string,
-      indexRangeOrOrder?:
-        | ((
-            q: QueryStreamIndexRange.Builder<any, any>,
-          ) => QueryStreamIndexRange.QueryStreamIndexRange)
-        | OrderDirection,
-      maybeOrder?: OrderDirection,
-    ) => {
-      const orderDirection = Predicate.isString(indexRangeOrOrder)
-        ? indexRangeOrOrder
-        : (maybeOrder ?? "asc");
-
-      // Without a range callback, the leaf scans the entire index.
-      const indexRange = Predicate.isFunction(indexRangeOrOrder)
-        ? indexRangeOrOrder(QueryStreamIndexRange.builder())
-        : QueryStreamIndexRange.builder();
-
-      // The type-level field tuple appends the `_creationTime` tiebreaker, but
-      // the runtime `table.indexes` record stores only the declared fields—append it here.
-      const indexFieldPaths: ReadonlyArray<string> =
-        indexName === "by_id"
-          ? ["_id"]
-          : indexName === "by_creation_time"
-            ? ["_creationTime"]
-            : pipe(
-                Option.fromUndefinedOr(
-                  (
-                    table.indexes as ReadonlyRecord<
-                      string,
-                      ReadonlyArray<string>
-                    >
-                  )[indexName],
-                ),
-                // An unknown index name is a defect, not an empty field list:
-                // silently empty fields would make key extraction and range
-                // splitting target the wrong fields.
-                Option.getOrThrowWith(
-                  () =>
-                    new Error(
-                      `QueryInitializer.stream: table "${tableName}" has no index named "${indexName}"`,
-                    ),
-                ),
-                Array.append("_creationTime"),
-              );
-
-      return QueryStream.fromReflection({
-        reader: convexDatabaseReader as QueryStream.ReflectionReader,
-        table,
-        indexName,
-        indexFieldPaths,
-        indexRange,
-        orderDirection,
-      });
-    }) as QueryInitializerFunction<"stream">;
-
-    const search: QueryInitializerFunction<"search"> = (
-      indexName,
-      searchFilter,
-    ) =>
-      OrderedQuery.make(
+    return pipe(
+      Effect.promise(() =>
         convexDatabaseReader
           .query(tableName)
-          .withSearchIndex(indexName, searchFilter),
-        table,
+          .withIndex(indexName, (q) =>
+            Array.reduce(
+              indexFieldValues,
+              q,
+              (q_, v, i) => q_.eq(indexFieldPaths[i] as any, v as any) as any,
+            ),
+          )
+          .unique(),
+      ),
+      Effect.andThen((value) =>
+        Effect.fromResult(
+          Result.fromNullishOr(value, () =>
+            GetByIndexFailure.make({
+              tableName,
+              indexName: indexName as string,
+              indexFieldValues,
+            }),
+          ),
+        ),
+      ),
+      Effect.andThen(Document.decode(table)),
+    );
+  };
+
+  const get: QueryInitializerFunction<"get"> = ((
+    ...args: Parameters<QueryInitializerFunction<"get">>
+  ) => {
+    if (args.length === 1) {
+      const id = args[0] as GenericId<TableName>;
+
+      return getById<Tables, TableName>(convexDatabaseReader, table)(id);
+    } else {
+      const [indexName, ...indexFieldValues] = args;
+
+      return getByIndex(
+        indexName as keyof Indexes<
+          DataModel.TableInfoWithName<DataModel_, TableName>
+        >,
+        indexFieldValues,
       );
+    }
+  }) as QueryInitializerFunction<"get">;
 
-    return {
-      get,
-      index,
-      search,
-      stream,
-    };
-  },
-);
+  const index: QueryInitializerFunction<"index"> = <
+    IndexName extends keyof Indexes<
+      DataModel.TableInfoWithName<DataModel_, TableName>
+    >,
+  >(
+    indexName: IndexName,
+    indexRangeOrOrder?:
+      | ((
+          q: IndexRangeBuilder<
+            DataModel.TableInfoWithName_<
+              DataModel_,
+              TableName
+            >["convexDocument"],
+            NamedIndex<
+              DataModel.TableInfoWithName<DataModel_, TableName>,
+              IndexName
+            >
+          >,
+        ) => IndexRange)
+      | OrderDirection,
+    order?: OrderDirection,
+  ) => {
+    const {
+      applyWithIndex,
+      applyOrder,
+    }: {
+      applyWithIndex: (
+        queryInitializer: ConvexQueryInitializer<
+          NamedTableInfo<ConvexDataModel_, TableName>
+        >,
+      ) => Query<NamedTableInfo<ConvexDataModel_, TableName>>;
+      applyOrder: (
+        query: Query<NamedTableInfo<ConvexDataModel_, TableName>>,
+      ) => ConvexOrderedQuery<NamedTableInfo<ConvexDataModel_, TableName>>;
+    } =
+      indexRangeOrOrder === undefined
+        ? {
+            applyWithIndex: (q) => q.withIndex(indexName),
+            applyOrder: (q) => q.order("asc"),
+          }
+        : typeof indexRangeOrOrder === "function"
+          ? order === undefined
+            ? {
+                applyWithIndex: (q) =>
+                  q.withIndex(indexName, indexRangeOrOrder),
+                applyOrder: (q) => q.order("asc"),
+              }
+            : {
+                applyWithIndex: (q) =>
+                  q.withIndex(indexName, indexRangeOrOrder),
+                applyOrder: (q) => q.order(order),
+              }
+          : {
+              applyWithIndex: (q) => q.withIndex(indexName),
+              applyOrder: (q) => q.order(indexRangeOrOrder),
+            };
 
-export const getById = dual<
-  <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
-    table: Table.WithName<Tables, TableName>,
-  ) => (
-    convexDatabaseReader: BaseDatabaseReader<
-      DataModel.ToConvex<DataModel.FromTables<Tables>>
-    >,
-  ) => (
-    id: GenericId<TableName>,
-  ) => Effect.Effect<
-    DataModel.DocumentWithName<DataModel.FromTables<Tables>, TableName>,
-    GetByIdFailure | Document.DocumentDecodeError
-  >,
-  <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
-    convexDatabaseReader: BaseDatabaseReader<
-      DataModel.ToConvex<DataModel.FromTables<Tables>>
-    >,
-    table: Table.WithName<Tables, TableName>,
-  ) => (
-    id: GenericId<TableName>,
-  ) => Effect.Effect<
-    DataModel.DocumentWithName<DataModel.FromTables<Tables>, TableName>,
-    GetByIdFailure | Document.DocumentDecodeError
-  >
->(
-  2,
+    const orderedQuery = pipe(
+      convexDatabaseReader.query(tableName),
+      applyWithIndex,
+      applyOrder,
+    );
+
+    return OrderedQuery.make(orderedQuery, table);
+  };
+
+  const stream: QueryInitializerFunction<"stream"> = ((
+    indexName: string,
+    indexRangeOrOrder?:
+      | ((
+          q: QueryStreamIndexRange.Builder<any, any>,
+        ) => QueryStreamIndexRange.QueryStreamIndexRange)
+      | OrderDirection,
+    maybeOrder?: OrderDirection,
+  ) => {
+    const orderDirection = Predicate.isString(indexRangeOrOrder)
+      ? indexRangeOrOrder
+      : (maybeOrder ?? "asc");
+
+    // Without a range callback, the leaf scans the entire index.
+    const indexRange = Predicate.isFunction(indexRangeOrOrder)
+      ? indexRangeOrOrder(QueryStreamIndexRange.builder())
+      : QueryStreamIndexRange.builder();
+
+    // The type-level field tuple appends the `_creationTime` tiebreaker, but
+    // the runtime `table.indexes` record stores only the declared fields—append it here.
+    const indexFieldPaths: ReadonlyArray<string> =
+      indexName === "by_id"
+        ? ["_id"]
+        : indexName === "by_creation_time"
+          ? ["_creationTime"]
+          : pipe(
+              Option.fromUndefinedOr(
+                (
+                  table.indexes as ReadonlyRecord<string, ReadonlyArray<string>>
+                )[indexName],
+              ),
+              // An unknown index name is a defect, not an empty field list:
+              // silently empty fields would make key extraction and range
+              // splitting target the wrong fields.
+              Option.getOrThrowWith(
+                () =>
+                  new Error(
+                    `QueryInitializer.stream: table "${tableName}" has no index named "${indexName}"`,
+                  ),
+              ),
+              Array.append("_creationTime"),
+            );
+
+    return QueryStream.fromReflection({
+      reader: convexDatabaseReader as QueryStream.ReflectionReader,
+      table,
+      indexName,
+      indexFieldPaths,
+      indexRange,
+      orderDirection,
+    });
+  }) as QueryInitializerFunction<"stream">;
+
+  const search: QueryInitializerFunction<"search"> = (
+    indexName,
+    searchFilter,
+  ) =>
+    OrderedQuery.make(
+      convexDatabaseReader
+        .query(tableName)
+        .withSearchIndex(indexName, searchFilter),
+      table,
+    );
+
+  return {
+    get,
+    index,
+    search,
+    stream,
+  };
+};
+
+export const getById =
   <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
     convexDatabaseReader: BaseDatabaseReader<
       DataModel.ToConvex<DataModel.FromTables<Tables>>
     >,
     table: Table.WithName<Tables, TableName>,
   ) =>
-    (id: GenericId<TableName>) =>
-      pipe(
-        Effect.promise(() => convexDatabaseReader.get(id)),
-        Effect.andThen((value) =>
-          Effect.fromResult(
-            Result.fromNullishOr(value, () =>
-              GetByIdFailure.make({ tableName: table.tableName, id }),
-            ),
+  (id: GenericId<TableName>) =>
+    pipe(
+      Effect.promise(() => convexDatabaseReader.get(id)),
+      Effect.andThen((value) =>
+        Effect.fromResult(
+          Result.fromNullishOr(value, () =>
+            GetByIdFailure.make({ tableName: table.tableName, id }),
           ),
         ),
-        Effect.andThen(Document.decode(table)),
       ),
-);
+      Effect.andThen(Document.decode(table)),
+    );
 
 export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
   "GetByIdFailure",

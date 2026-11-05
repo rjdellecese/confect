@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import * as Array from "effect/Array";
 import * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
@@ -26,67 +25,48 @@ export interface ResolvedMiddleware {
  * implementation services are keyed by string, so the type system cannot
  * distinguish same-key specs.
  */
-export const resolve = dual<
-  (
-    middlewareRegistryItems: ReadonlyMap<
-      string,
-      MiddlewareRegistryItem.MiddlewareRegistryItem
-    >,
-  ) => (
-    functionRegistryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,
-  ) => ReadonlyArray<ResolvedMiddleware>,
-  (
-    functionRegistryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,
-    middlewareRegistryItems: ReadonlyMap<
-      string,
-      MiddlewareRegistryItem.MiddlewareRegistryItem
-    >,
-  ) => ReadonlyArray<ResolvedMiddleware>
->(
-  2,
-  (
-    functionRegistryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,
-    middlewareRegistryItems: ReadonlyMap<
-      string,
-      MiddlewareRegistryItem.MiddlewareRegistryItem
-    >,
-  ): ReadonlyArray<ResolvedMiddleware> => {
-    Result.getOrThrowWith(
-      MiddlewareAttachment.validateAll(
-        functionRegistryItem.middlewareAttachments,
-        `function "${functionRegistryItem.name}"`,
-      ),
-      (error) => new Error(MiddlewareAttachment.formatValidationError(error)),
-    );
-    return Array.map(
+export const resolve = (
+  functionRegistryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,
+  middlewareRegistryItems: ReadonlyMap<
+    string,
+    MiddlewareRegistryItem.MiddlewareRegistryItem
+  >,
+): ReadonlyArray<ResolvedMiddleware> => {
+  Result.getOrThrowWith(
+    MiddlewareAttachment.validateAll(
       functionRegistryItem.middlewareAttachments,
-      ({ spec: middlewareSpec, options }) => {
-        const registered = middlewareRegistryItems.get(middlewareSpec.key);
-        if (registered === undefined) {
-          throw new Error(
-            `Middleware "${middlewareSpec.key}" is attached to this group's spec, but no implementation was provided—pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,
-          );
-        }
-        if (registered.middlewareSpec !== middlewareSpec) {
-          throw new Error(
-            `Middleware "${middlewareSpec.key}" attached to function "${functionRegistryItem.name}" has an implementation registered for a different spec with the same key. Register the implementation using the attached middleware spec.`,
-          );
-        }
+      `function "${functionRegistryItem.name}"`,
+    ),
+    (error) => new Error(MiddlewareAttachment.formatValidationError(error)),
+  );
+  return Array.map(
+    functionRegistryItem.middlewareAttachments,
+    ({ spec: middlewareSpec, options }) => {
+      const registered = middlewareRegistryItems.get(middlewareSpec.key);
+      if (registered === undefined) {
+        throw new Error(
+          `Middleware "${middlewareSpec.key}" is attached to this group's spec, but no implementation was provided—pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,
+        );
+      }
+      if (registered.middlewareSpec !== middlewareSpec) {
+        throw new Error(
+          `Middleware "${middlewareSpec.key}" attached to function "${functionRegistryItem.name}" has an implementation registered for a different spec with the same key. Register the implementation using the attached middleware spec.`,
+        );
+      }
 
-        const middlewareImpl =
-          registered.impls[functionRegistryItem.functionType];
-        if (middlewareImpl === undefined) {
-          throw new Error(
-            `Middleware "${middlewareSpec.key}" has no implementation for function type "${functionRegistryItem.functionType}", the type of function "${functionRegistryItem.name}". Declare the function type in the middleware's \`functionTypes\` and cover it in \`MiddlewareImpl.makeByFunctionType\`.`,
-          );
-        }
+      const middlewareImpl =
+        registered.impls[functionRegistryItem.functionType];
+      if (middlewareImpl === undefined) {
+        throw new Error(
+          `Middleware "${middlewareSpec.key}" has no implementation for function type "${functionRegistryItem.functionType}", the type of function "${functionRegistryItem.name}". Declare the function type in the middleware's \`functionTypes\` and cover it in \`MiddlewareImpl.makeByFunctionType\`.`,
+        );
+      }
 
-        return {
-          middlewareImpl,
-          middlewareSpec,
-          options,
-        };
-      },
-    );
-  },
-);
+      return {
+        middlewareImpl,
+        middlewareSpec,
+        options,
+      };
+    },
+  );
+};

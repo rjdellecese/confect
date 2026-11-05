@@ -1,4 +1,4 @@
-import { dual, pipe } from "effect/Function";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
@@ -136,28 +136,17 @@ const formatBuildMessage = (
 /**
  * Render a list of esbuild messages into a styled, gutter-prefixed block.
  */
-export const formatEsbuildMessages: {
-  (
-    formattedMessages: readonly string[],
-  ): (errors: readonly esbuild.Message[]) => string;
-  (
-    errors: readonly esbuild.Message[],
-    formattedMessages: readonly string[],
-  ): string;
-} = dual(
-  2,
-  (
-    errors: readonly esbuild.Message[],
-    formattedMessages: readonly string[],
-  ): string =>
-    pipe(
-      formattedMessages,
-      Array.map((message, i) => formatBuildMessage(errors[i], message)),
-      Array.join(""),
-      String.trimEnd,
-      withErrorGutterBlock,
-    ),
-);
+export const formatEsbuildMessages = (
+  errors: readonly esbuild.Message[],
+  formattedMessages: readonly string[],
+): string =>
+  pipe(
+    formattedMessages,
+    Array.map((message, i) => formatBuildMessage(errors[i], message)),
+    Array.join(""),
+    String.trimEnd,
+    withErrorGutterBlock,
+  );
 
 const renderImportFailedError = (error: ImportFailedError): string => {
   const causeMessage = Predicate.isError(error.cause)

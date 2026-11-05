@@ -33,8 +33,9 @@ since their pins move with their ranges.
   Effect release's supported-component table. Lint and Zed launch through the
   workspace's `effect-tsgo` proxy, so no separate editor version pin is needed.
   The `prepare` script patches only `tsrs`, for compiler scripts, Vitest, and
-  the native benchmark harness. Every Effect rule must stay enabled as an
-  error, including newly introduced rules; `scripts/effectLint.test.ts` checks
+  the native benchmark harness. Every Effect rule except the intentionally
+  disabled `missing-pipeable-signature` must stay enabled as an error, including
+  newly introduced rules; `scripts/effectLint.test.ts` checks
   the installed schema against the configuration. Fix new findings and review
   any new export-specific unstable-API grants rather than disabling rules.
   Verify the native type-benchmark harness too; its patched

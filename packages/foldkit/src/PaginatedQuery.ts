@@ -532,24 +532,13 @@ export const getSubscriptionRequest = <Item_, UserArgs_, Error_>(
 /**
  * Attaches the client-allocated pagination id to a logical request.
  */
-export const allocateRequest: {
-  (
-    paginationId: number,
-  ): <UserArgs_>(request: SubscriptionRequest<UserArgs_>) => Request<UserArgs_>;
-  <UserArgs_>(
-    request: SubscriptionRequest<UserArgs_>,
-    paginationId: number,
-  ): Request<UserArgs_>;
-} = Function.dual(
-  2,
-  <UserArgs_>(
-    request: SubscriptionRequest<UserArgs_>,
-    paginationId: number,
-  ): Request<UserArgs_> => ({
-    ...request,
-    paginationId,
-  }),
-);
+export const allocateRequest = <UserArgs_>(
+  request: SubscriptionRequest<UserArgs_>,
+  paginationId: number,
+): Request<UserArgs_> => ({
+  ...request,
+  paginationId,
+});
 
 const phaseData = <Item_, Error_>(
   phase: Phase<Item_, Error_>,
@@ -699,49 +688,38 @@ export const first = <Item_, UserArgs_, Error_>(
 /**
  * Whether a request still names the machine's live pagination session/page.
  */
-export const isCurrentRequest: {
-  <UserArgs_>(
-    candidate: Request<UserArgs_>,
-  ): <Item_, Error_>(state: State<Item_, UserArgs_, Error_>) => boolean;
-  <Item_, UserArgs_, Error_>(
-    state: State<Item_, UserArgs_, Error_>,
-    candidate: Request<UserArgs_>,
-  ): boolean;
-} = Function.dual(
-  2,
-  <Item_, UserArgs_, Error_>(
-    state: State<Item_, UserArgs_, Error_>,
-    candidate: Request<UserArgs_>,
-  ): boolean =>
-    Match.value(state).pipe(
-      Match.tag("Idle", () => false),
-      Match.tag("Active", (active) =>
-        Match.value(active.paginationId).pipe(
-          Match.tag("None", () =>
-            Match.value(
-              active.generation === candidate.generation &&
-                active.requestId === candidate.requestId &&
-                descriptorEquals(active.current, candidate.descriptor),
-            ).pipe(
-              Match.when(true, () => true),
-              Match.when(false, () => false),
-              Match.exhaustive,
-            ),
-          ),
-          Match.tag(
-            "Some",
-            ({ value }) =>
-              active.generation === candidate.generation &&
-              value === candidate.paginationId &&
+export const isCurrentRequest = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+  candidate: Request<UserArgs_>,
+): boolean =>
+  Match.value(state).pipe(
+    Match.tag("Idle", () => false),
+    Match.tag("Active", (active) =>
+      Match.value(active.paginationId).pipe(
+        Match.tag("None", () =>
+          Match.value(
+            active.generation === candidate.generation &&
               active.requestId === candidate.requestId &&
               descriptorEquals(active.current, candidate.descriptor),
+          ).pipe(
+            Match.when(true, () => true),
+            Match.when(false, () => false),
+            Match.exhaustive,
           ),
-          Match.exhaustive,
         ),
+        Match.tag(
+          "Some",
+          ({ value }) =>
+            active.generation === candidate.generation &&
+            value === candidate.paginationId &&
+            active.requestId === candidate.requestId &&
+            descriptorEquals(active.current, candidate.descriptor),
+        ),
+        Match.exhaustive,
       ),
-      Match.exhaustive,
     ),
-);
+    Match.exhaustive,
+  );
 
 const pageFromResult = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,

@@ -1,5 +1,4 @@
 import * as Result from "effect/Result";
-import * as Record from "effect/Record";
 import { pipe } from "effect/Function";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
@@ -10,34 +9,6 @@ import type { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
 
 describe("extendWithSystemFields", () => {
-  test("supports pipeable extension while preserving the table and field types", () => {
-    const schema = Schema.Struct({ content: Schema.String });
-    const extend = SystemFields.extendWithSystemFields("notes");
-    const extended = schema.pipe(extend);
-    const direct = SystemFields.extendWithSystemFields("notes", schema);
-
-    expectTypeOf(extended).toEqualTypeOf<typeof direct>();
-    const document = { content: "Hello", _id: "abc123", _creationTime: 1 };
-    expect(
-      Result.getOrThrow(Schema.decodeUnknownResult(extended)(document)),
-    ).toEqual(document);
-    expect(Record.keys(schema.fields)).toEqual(["content"]);
-    const decoded = Result.getOrThrow(
-      Schema.decodeUnknownResult(
-        SystemFields.extendWithSystemFields(
-          "notes",
-          Schema.Struct({ content: Schema.String }),
-        ),
-      )(document),
-    );
-    expectTypeOf(decoded).toEqualTypeOf<{
-      readonly content: string;
-      readonly _id: GenericId<"notes">;
-      readonly _creationTime: number;
-    }>();
-    expect(decoded).toEqual(document);
-  });
-
   describe("schema-level checks", () => {
     const Range = Schema.Struct({ min: Schema.Finite, max: Schema.Finite });
     const orderedRange = Schema.makeFilter(

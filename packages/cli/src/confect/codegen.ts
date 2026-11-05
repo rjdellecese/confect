@@ -208,6 +208,9 @@ export const codegenHandler = generateWithSnapshot.pipe(
   Effect.map(({ functionPaths }) => ({ functionPaths })),
 );
 
+/**
+ * @internal
+ */
 export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
   function* (
     snapshot: GenerationSnapshot.GenerationSnapshot,

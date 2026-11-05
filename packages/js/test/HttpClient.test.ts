@@ -8,56 +8,56 @@ import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 
-const noArgsQueryRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicQuery({
+const noArgsQueryRef = Ref.make(
+  "notes",
+  FunctionSpec.publicQuery({
     name: "list",
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
-const argsQueryRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicQuery({
+const argsQueryRef = Ref.make(
+  "notes",
+  FunctionSpec.publicQuery({
     name: "get",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
-const noArgsMutationRef = Ref.make({
-  namespace: "tasks",
-  spec: FunctionSpec.publicMutation({
+const noArgsMutationRef = Ref.make(
+  "tasks",
+  FunctionSpec.publicMutation({
     name: "cleanup",
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
-const argsMutationRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicMutation({
+const argsMutationRef = Ref.make(
+  "notes",
+  FunctionSpec.publicMutation({
     name: "insert",
     args: () => ({ text: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
-const noArgsActionRef = Ref.make({
-  namespace: "random",
-  spec: FunctionSpec.publicAction({
+const noArgsActionRef = Ref.make(
+  "random",
+  FunctionSpec.publicAction({
     name: "getNumber",
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
-const argsActionRef = Ref.make({
-  namespace: "email",
-  spec: FunctionSpec.publicAction({
+const argsActionRef = Ref.make(
+  "email",
+  FunctionSpec.publicAction({
     name: "send",
     args: () => ({ to: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
 class NotFound extends Schema.TaggedError<
   NotFound,
@@ -66,47 +66,35 @@ class NotFound extends Schema.TaggedError<
   id: Schema.String,
 }) {}
 
-const queryWithError = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicQuery({
+const queryWithError = Ref.make(
+  "notes",
+  FunctionSpec.publicQuery({
     name: "getOrFail",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({ text: Schema.String }),
     error: () => NotFound,
   }),
-});
+);
 
-const mutationWithError = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicMutation({
+const mutationWithError = Ref.make(
+  "notes",
+  FunctionSpec.publicMutation({
     name: "deleteOrFail",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
-});
+);
 
-const actionWithError = Ref.make({
-  namespace: "tasks",
-  spec: FunctionSpec.publicAction({
+const actionWithError = Ref.make(
+  "tasks",
+  FunctionSpec.publicAction({
     name: "runOrFail",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
-});
-
-it("supports pipeable layer construction with optional options", () => {
-  const defaultLayer = HttpClient.layer()("https://example-123.convex.cloud");
-  const configuredLayer = HttpClient.layer({ logger: false })(
-    "https://example-123.convex.cloud",
-  );
-  expect(Layer.isLayer(defaultLayer)).toBe(true);
-  expect(Layer.isLayer(configuredLayer)).toBe(true);
-  expectTypeOf(configuredLayer).toEqualTypeOf<
-    ReturnType<typeof HttpClient.layer>
-  >();
-});
+);
 
 it("preserves generic arguments, results, and error channels", () => {
   const check = (client: HttpClient.HttpClient) => {
@@ -191,14 +179,14 @@ it.effect(
           }).pipe(runPromise),
         { preconnect: () => {} },
       );
-      const ref = Ref.make({
-        namespace: "numbers",
-        spec: FunctionSpec.publicMutation({
+      const ref = Ref.make(
+        "numbers",
+        FunctionSpec.publicMutation({
           name: "echo",
           args: () => ({ value: Schema.FiniteFromString }),
           returns: () => Schema.FiniteFromString,
         }),
-      });
+      );
       const services = yield* Layer.build(
         HttpClient.layer("https://example-123.convex.cloud", { fetch }),
       );

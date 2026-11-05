@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import type * as OpenAiClient from "@effect/ai-openai-compat/OpenAiClient";
 import * as OpenAiLanguageModel from "@effect/ai-openai-compat/OpenAiLanguageModel";
 import type * as Effect from "effect/Effect";
@@ -30,35 +29,14 @@ export interface Options {
  *
  * @stability unstable
  */
-export const model = dual<
-  (
-    config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">,
-  ) => (
-    modelId: string,
-  ) => AiModel.Model<
-    "openai",
-    LanguageModel.LanguageModel,
-    OpenAiClient.OpenAiClient
-  >,
-  (
-    modelId: string,
-    config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">,
-  ) => AiModel.Model<
-    "openai",
-    LanguageModel.LanguageModel,
-    OpenAiClient.OpenAiClient
-  >
->(
-  (args) => typeof args[0] === "string",
-  (
-    modelId: string,
-    config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">,
-  ): AiModel.Model<
-    "openai",
-    LanguageModel.LanguageModel,
-    OpenAiClient.OpenAiClient
-  > => OpenAiLanguageModel.model(modelId, config),
-);
+export const model = (
+  modelId: string,
+  config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">,
+): AiModel.Model<
+  "openai",
+  LanguageModel.LanguageModel,
+  OpenAiClient.OpenAiClient
+> => OpenAiLanguageModel.model(modelId, config);
 
 /**
  * Construct a language-model service backed by the Convex AI gateway.

@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import * as Array from "effect/Array";
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
@@ -155,36 +154,23 @@ export const toConvexDefinition = <
  * composed effect's error channel is re-accounted by
  * {@link combineErrorSchemas}.
  */
-export const applyMiddleware = dual<
-  (
-    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-    invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
-  ) => <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, any, R>,
-  <A, E, R>(
-    effect: Effect.Effect<A, E, R>,
-    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-    invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
-  ) => Effect.Effect<A, any, R>
->(
-  3,
-  <A, E, R>(
-    effect: Effect.Effect<A, E, R>,
-    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-    invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
-  ): Effect.Effect<A, any, R> =>
-    Array.reduceRight(
-      resolvedMiddlewares,
-      effect,
-      (wrapped: Effect.Effect<any, any, any>, middleware) => {
-        const context =
-          "options" in middleware.middlewareSpec
-            ? { options: middleware.options, invocation }
-            : { invocation };
-        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
-        return middleware.middlewareImpl(wrapped, context);
-      },
-    ),
-);
+export const applyMiddleware = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
+  invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
+): Effect.Effect<A, any, R> =>
+  Array.reduceRight(
+    resolvedMiddlewares,
+    effect,
+    (wrapped: Effect.Effect<any, any, any>, middleware) => {
+      const context =
+        "options" in middleware.middlewareSpec
+          ? { options: middleware.options, invocation }
+          : { invocation };
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
+      return middleware.middlewareImpl(wrapped, context);
+    },
+  );
 
 /**
  * The error-schema allowlist for a function with middleware: the function's own
@@ -192,35 +178,22 @@ export const applyMiddleware = dual<
  * schema. `undefined` (⇒ every failure dies) only when neither declares
  * one—mirroring the ref-side union clients decode against.
  */
-export const combineErrorSchemas = dual<
-  (
-    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-  ) => (
-    error: Schema.Codec<any, any> | undefined,
-  ) => Schema.Codec<any, any> | undefined,
-  (
-    error: Schema.Codec<any, any> | undefined,
-    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-  ) => Schema.Codec<any, any> | undefined
->(
-  2,
-  (
-    error: Schema.Codec<any, any> | undefined,
-    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-  ): Schema.Codec<any, any> | undefined => {
-    const schemas = [
-      ...(error !== undefined ? [error] : []),
-      ...MiddlewareSpec.errorSchemas(
-        Array.map(resolvedMiddlewares, ({ middlewareSpec }) => middlewareSpec),
-      ),
-    ];
-    return schemas.length === 0
-      ? undefined
-      : schemas.length === 1
-        ? schemas[0]
-        : Schema.Union(schemas);
-  },
-);
+export const combineErrorSchemas = (
+  error: Schema.Codec<any, any> | undefined,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
+): Schema.Codec<any, any> | undefined => {
+  const schemas = [
+    ...(error !== undefined ? [error] : []),
+    ...MiddlewareSpec.errorSchemas(
+      Array.map(resolvedMiddlewares, ({ middlewareSpec }) => middlewareSpec),
+    ),
+  ];
+  return schemas.length === 0
+    ? undefined
+    : schemas.length === 1
+      ? schemas[0]
+      : Schema.Union(schemas);
+};
 
 /**
  * Run the `Effect` as a `Promise`. The error schema acts as an allowlist of
@@ -248,57 +221,54 @@ export const combineErrorSchemas = dual<
  * op counter survives context pops, so a cooperative yield can fire inside
  * those wrappers—only a root-context scheduler covers them.
  */
-export const runHandlerPromise = <A, E>({
-  effect,
-  errorSchema,
-  runOptions,
-}: {
-  readonly effect: Effect.Effect<A, E>;
-  readonly errorSchema: Schema.Codec<any, any> | undefined;
-  readonly runOptions?:
-    | {
-        readonly scheduler?: EffectScheduler.Scheduler | undefined;
-      }
-    | undefined;
-}): Promise<A> => {
-  // A `ConvexError` defect escapes into the (escaped) failure channel so
-  // the `throw` below rethrows it with its identity intact.
-  const rethrowConvexErrorDefects = Effect.catchDefect(
-    (defect: unknown): Effect.Effect<never, ConvexError<any>> =>
-      defect instanceof ConvexError ? Effect.fail(defect) : Effect.die(defect),
-  );
+export const runHandlerPromise =
+  (
+    errorSchema: Schema.Codec<any, any> | undefined,
+    runOptions?: {
+      readonly scheduler?: EffectScheduler.Scheduler | undefined;
+    },
+  ) =>
+  <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
+    // A `ConvexError` defect escapes into the (escaped) failure channel so
+    // the `throw` below rethrows it with its identity intact.
+    const rethrowConvexErrorDefects = Effect.catchDefect(
+      (defect: unknown): Effect.Effect<never, ConvexError<any>> =>
+        defect instanceof ConvexError
+          ? Effect.fail(defect)
+          : Effect.die(defect),
+    );
 
-  const withConvexError =
-    errorSchema === undefined
-      ? Effect.orDie(effect)
-      : effect.pipe(
-          Effect.catch((typedError) =>
-            pipe(
-              Schema.encodeEffect(errorSchema)(typedError),
-              Effect.catchTag("SchemaError", Effect.die),
-              Effect.andThen((encodedError) =>
-                Effect.fail(new ConvexError(encodedError)),
+    const withConvexError =
+      errorSchema === undefined
+        ? Effect.orDie(effect)
+        : effect.pipe(
+            Effect.catch((typedError) =>
+              pipe(
+                Schema.encodeEffect(errorSchema)(typedError),
+                Effect.catchTag("SchemaError", Effect.die),
+                Effect.andThen((encodedError) =>
+                  Effect.fail(new ConvexError(encodedError)),
+                ),
               ),
             ),
-          ),
-        );
-  return Effect.runPromise(
-    withConvexError.pipe(
-      rethrowConvexErrorDefects,
-      Effect.result,
-      Effect.provideService(Console.Console, globalThis.console),
-      Effect.provide(ConvexLogger.layer),
-    ),
-    runOptions,
-  ).then(
-    Result.match({
-      onFailure: (error) => {
-        throw error;
-      },
-      onSuccess: (value) => value,
-    }),
-  );
-};
+          );
+    return Effect.runPromise(
+      withConvexError.pipe(
+        rethrowConvexErrorDefects,
+        Effect.result,
+        Effect.provideService(Console.Console, globalThis.console),
+        Effect.provide(ConvexLogger.layer),
+      ),
+      runOptions,
+    ).then(
+      Result.match({
+        onFailure: (error) => {
+          throw error;
+        },
+        onSuccess: (value) => value,
+      }),
+    );
+  };
 
 export const actionFunctionBase = <
   Schema extends DatabaseSchema.AnyWithProps,
@@ -335,35 +305,32 @@ export const actionFunctionBase = <
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
-    runHandlerPromise({
-      errorSchema: combineErrorSchemas(error, resolvedMiddlewares),
-      effect: Effect.gen(function* () {
-        const decodedArgs = yield* pipe(
-          actualArgs,
-          Schema.decodeUnknownEffect(args),
-          Effect.catchTag("SchemaError", Effect.die),
-        );
-        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
-        const decodedReturns = yield* applyMiddleware(
-          handler(decodedArgs),
-          resolvedMiddlewares,
-          {
-            name,
-            functionType: "action",
-            functionVisibility,
-            args: decodedArgs,
-          },
-        ).pipe(
-          // oxlint-disable-next-line effecttsgo/strict-effect-provide -- This Convex entry point provides invocation-local services before runHandlerPromise executes the handler.
-          Effect.provide(createLayer(ctx)),
-        );
-        return yield* pipe(
-          decodedReturns,
-          Schema.encodeEffect(returns),
-          Effect.catchTag("SchemaError", Effect.die),
-        );
-      }),
-    }),
+    Effect.gen(function* () {
+      const decodedArgs = yield* pipe(
+        actualArgs,
+        Schema.decodeUnknownEffect(args),
+        Effect.catchTag("SchemaError", Effect.die),
+      );
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
+      const decodedReturns = yield* applyMiddleware(
+        handler(decodedArgs),
+        resolvedMiddlewares,
+        {
+          name,
+          functionType: "action",
+          functionVisibility,
+          args: decodedArgs,
+        },
+      ).pipe(
+        // oxlint-disable-next-line effecttsgo/strict-effect-provide -- This Convex entry point provides invocation-local services before runHandlerPromise executes the handler.
+        Effect.provide(createLayer(ctx)),
+      );
+      return yield* pipe(
+        decodedReturns,
+        Schema.encodeEffect(returns),
+        Effect.catchTag("SchemaError", Effect.die),
+      );
+    }).pipe(runHandlerPromise(combineErrorSchemas(error, resolvedMiddlewares))),
 });
 
 export type ActionServices<
@@ -407,30 +374,15 @@ export const baseActionLayer = <ConvexDataModel extends GenericDataModel>(
     Layer.succeed(ActionCtx.ActionCtx<ConvexDataModel>(), ctx),
   );
 
-export const actionLayer = dual<
-  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-    ctx: GenericActionCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-    >,
-  ) => (
-    databaseSchema: DatabaseSchema_,
-  ) => Layer.Layer<ActionServices<DatabaseSchema_>>,
-  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-    databaseSchema: DatabaseSchema_,
-    ctx: GenericActionCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-    >,
-  ) => Layer.Layer<ActionServices<DatabaseSchema_>>
+export const actionLayer = <
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(
-  2,
-  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-    databaseSchema: DatabaseSchema_,
-    ctx: GenericActionCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-    >,
-  ) =>
-    Layer.mergeAll(
-      baseActionLayer(ctx),
-      VectorSearch.layer(ctx.vectorSearch.bind(ctx)),
-    ),
-);
+  databaseSchema: DatabaseSchema_,
+  ctx: GenericActionCtx<
+    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+  >,
+) =>
+  Layer.mergeAll(
+    baseActionLayer(ctx),
+    VectorSearch.layer(ctx.vectorSearch.bind(ctx)),
+  );

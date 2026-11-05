@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Schema from "effect/Schema";
 import type * as esbuild from "esbuild";
@@ -47,11 +46,10 @@ const isEsbuildBuildFailure = (error: unknown): error is esbuild.BuildFailure =>
   "errors" in error &&
   Array.isArray((error as esbuild.BuildFailure).errors);
 
-export const fromBundlerError: {
-  (error: BundlerError): (file: string) => BuildError;
-  (file: string, error: BundlerError): BuildError;
-} = dual(2, (file: string, error: BundlerError): BuildError =>
+export const fromBundlerError = (
+  file: string,
+  error: BundlerError,
+): BuildError =>
   isEsbuildBuildFailure(error.cause)
     ? BundleFailedError.make({ file, errors: error.cause.errors })
-    : ImportFailedError.make({ file, cause: error.cause }),
-);
+    : ImportFailedError.make({ file, cause: error.cause });

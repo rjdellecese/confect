@@ -1,7 +1,7 @@
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
-import { dual, pipe } from "effect/Function";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as DateTime from "effect/DateTime";
@@ -26,12 +26,8 @@ export const removePathExtension = Effect.fnUntraced(function* (
 /**
  * @internal
  */
-export const toPosixPath: {
-  (pathStr: string): (path: Path.Path) => string;
-  (path: Path.Path, pathStr: string): string;
-} = dual(2, (path: Path.Path, pathStr: string): string =>
-  pipe(String.split(pathStr, path.sep), Array.join("/")),
-);
+export const toPosixPath = (path: Path.Path, pathStr: string): string =>
+  pipe(String.split(pathStr, path.sep), Array.join("/"));
 
 /**
  * Ensures a relative path is a valid ESM/TS module specifier (e.g. `spec` →

@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import { type GroupSpec, Identifier } from "@confect/core";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -225,39 +224,20 @@ const summarize = (group: GroupSpec.AnyWithProps): GroupTree => ({
   groups: Record.map(group.groups, summarize),
 });
 
-export const update: {
-  (
-    leaves: ReadonlyArray<LoadedLeafModule>,
-  ): (
-    snapshot: GenerationSnapshot,
-  ) => Result.Result<
-    GenerationSnapshot,
-    SnapshotError | ParentChildNameCollisionError
-  >;
-  (
-    snapshot: GenerationSnapshot,
-    leaves: ReadonlyArray<LoadedLeafModule>,
-  ): Result.Result<
-    GenerationSnapshot,
-    SnapshotError | ParentChildNameCollisionError
-  >;
-} = dual(
-  2,
-  (
-    snapshot: GenerationSnapshot,
-    leaves: ReadonlyArray<LoadedLeafModule>,
-  ): Result.Result<
-    GenerationSnapshot,
-    SnapshotError | ParentChildNameCollisionError
-  > =>
-    Result.gen(function* () {
-      if (leaves.length === 0) return snapshot;
-      const replacement = yield* fromLoadedLeaves(leaves);
-      return yield* Snapshot.parseLeaves(
-        HashMap.union(snapshot.leaves, replacement.leaves),
-      );
-    }),
-);
+export const update = (
+  snapshot: GenerationSnapshot,
+  leaves: ReadonlyArray<LoadedLeafModule>,
+): Result.Result<
+  GenerationSnapshot,
+  SnapshotError | ParentChildNameCollisionError
+> =>
+  Result.gen(function* () {
+    if (leaves.length === 0) return snapshot;
+    const replacement = yield* fromLoadedLeaves(leaves);
+    return yield* Snapshot.parseLeaves(
+      HashMap.union(snapshot.leaves, replacement.leaves),
+    );
+  });
 
 export const fromLoadedLeaves = (
   leaves: ReadonlyArray<LoadedLeafModule>,
@@ -323,53 +303,39 @@ export interface ModulePlan {
   readonly changed: ReadonlyArray<GroupSummary>;
 }
 
-export const plan: {
-  (
-    existing: Iterable<GroupPath.GroupPath>,
-  ): (snapshot: GenerationSnapshot) => ModulePlan;
-  (
-    snapshot: GenerationSnapshot,
-    existing: Iterable<GroupPath.GroupPath>,
-  ): ModulePlan;
-} = dual(
-  2,
-  (
-    snapshot: GenerationSnapshot,
-    existing: Iterable<GroupPath.GroupPath>,
-  ): ModulePlan => {
-    const current = generatedGroups(snapshot);
-    return {
-      removed: Array.filter(
-        Array.fromIterable(existing),
-        (path) => !HashMap.has(current, path),
-      ),
-      changed: current.pipe(HashMap.values, Array.fromIterable),
-    };
-  },
-);
+export const plan = (
+  snapshot: GenerationSnapshot,
+  existing: Iterable<GroupPath.GroupPath>,
+): ModulePlan => {
+  const current = generatedGroups(snapshot);
+  return {
+    removed: Array.filter(
+      Array.fromIterable(existing),
+      (path) => !HashMap.has(current, path),
+    ),
+    changed: current.pipe(HashMap.values, Array.fromIterable),
+  };
+};
 
 const equivalentGroup = Schema.toEquivalence(GroupSummary);
 
-export const diff: {
-  (after: GenerationSnapshot): (before: GenerationSnapshot) => ModulePlan;
-  (before: GenerationSnapshot, after: GenerationSnapshot): ModulePlan;
-} = dual(
-  2,
-  (before: GenerationSnapshot, after: GenerationSnapshot): ModulePlan => {
-    const previous = generatedGroups(before);
-    const current = generatedGroups(after);
-    return {
-      removed: Array.filter(
-        HashMap.keys(previous),
-        (path) => !HashMap.has(current, path),
-      ),
-      changed: Array.filter(HashMap.values(current), (group) => {
-        const old = HashMap.get(previous, group.path);
-        return Option.isNone(old) || !equivalentGroup(old.value, group);
-      }),
-    };
-  },
-);
+export const diff = (
+  before: GenerationSnapshot,
+  after: GenerationSnapshot,
+): ModulePlan => {
+  const previous = generatedGroups(before);
+  const current = generatedGroups(after);
+  return {
+    removed: Array.filter(
+      HashMap.keys(previous),
+      (path) => !HashMap.has(current, path),
+    ),
+    changed: Array.filter(HashMap.values(current), (group) => {
+      const old = HashMap.get(previous, group.path);
+      return Option.isNone(old) || !equivalentGroup(old.value, group);
+    }),
+  };
+};
 
 const parseNoParentChildNameCollisions = (
   leaves: HashMap.HashMap<SpecModulePath.SpecModulePath, GroupTree>,

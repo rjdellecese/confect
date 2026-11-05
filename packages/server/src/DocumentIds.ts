@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import type { GenericDatabaseReader } from "convex/server";
 import type { GenericId } from "convex/values";
 import * as Context from "effect/Context";
@@ -38,90 +37,60 @@ export const DocumentIds = <
 >(): DocumentIdsTag<Schema> =>
   Context.Service<DocumentIds<Schema>>("@confect/server/DocumentIds");
 
-export const make = dual<
-  <Schema extends DatabaseSchema.AnyWithProps>(
-    reader: GenericDatabaseReader<
-      DataModel.ToConvex<DataModel.FromSchema<Schema>>
-    >,
-  ) => (schema: Schema) => DocumentIds<Schema>,
-  <Schema extends DatabaseSchema.AnyWithProps>(
-    schema: Schema,
-    reader: GenericDatabaseReader<
-      DataModel.ToConvex<DataModel.FromSchema<Schema>>
-    >,
-  ) => DocumentIds<Schema>
->(
-  2,
-  <Schema extends DatabaseSchema.AnyWithProps>(
-    schema: Schema,
-    reader: GenericDatabaseReader<
-      DataModel.ToConvex<DataModel.FromSchema<Schema>>
-    >,
-  ): DocumentIds<Schema> => {
-    const normalize = <Name extends DatabaseSchema.AllTableNames<Schema>>(
-      table: Name,
-      input: string,
-    ): GenericId<Name> | null =>
-      (Record.has<string, unknown>(Table.systemTables, table)
-        ? reader.system.normalizeId(
-            table as DatabaseSchema.SystemTableNames,
-            input,
-          )
-        : reader.normalizeId(
-            table as DatabaseSchema.TableNames<Schema>,
-            input,
-          )) as GenericId<Name> | null;
+export const make = <Schema extends DatabaseSchema.AnyWithProps>(
+  schema: Schema,
+  reader: GenericDatabaseReader<
+    DataModel.ToConvex<DataModel.FromSchema<Schema>>
+  >,
+): DocumentIds<Schema> => {
+  const normalize = <Name extends DatabaseSchema.AllTableNames<Schema>>(
+    table: Name,
+    input: string,
+  ): GenericId<Name> | null =>
+    (Record.has<string, unknown>(Table.systemTables, table)
+      ? reader.system.normalizeId(
+          table as DatabaseSchema.SystemTableNames,
+          input,
+        )
+      : reader.normalizeId(
+          table as DatabaseSchema.TableNames<Schema>,
+          input,
+        )) as GenericId<Name> | null;
 
-    return {
-      parse: Effect.fn("DocumentIds.parse")(
-        <const Name extends DatabaseSchema.AllTableNames<Schema>>(
-          table: Name,
-          input: string,
-        ) =>
-          Effect.sync(() => {
-            const id = normalize(table, input);
-            return id === input ? Option.some(id) : Option.none();
-          }),
-      ),
-      identify: Effect.fn("DocumentIds.identify")((input: string) =>
+  return {
+    parse: Effect.fn("DocumentIds.parse")(
+      <const Name extends DatabaseSchema.AllTableNames<Schema>>(
+        table: Name,
+        input: string,
+      ) =>
         Effect.sync(() => {
-          const tables = [
-            ...Struct.keys(DatabaseSchema.tables(schema)),
-            ...Struct.keys(Table.systemTables),
-          ] as ReadonlyArray<DatabaseSchema.AllTableNames<Schema>>;
-          for (const table of tables) {
-            const id = normalize(table, input);
-            if (id === input) {
-              return Option.some({ table, id } as IdentifiedId<
-                DatabaseSchema.AllTableNames<Schema>
-              >);
-            }
-          }
-          return Option.none();
+          const id = normalize(table, input);
+          return id === input ? Option.some(id) : Option.none();
         }),
-      ),
-    };
-  },
-);
+    ),
+    identify: Effect.fn("DocumentIds.identify")((input: string) =>
+      Effect.sync(() => {
+        const tables = [
+          ...Struct.keys(DatabaseSchema.tables(schema)),
+          ...Struct.keys(Table.systemTables),
+        ] as ReadonlyArray<DatabaseSchema.AllTableNames<Schema>>;
+        for (const table of tables) {
+          const id = normalize(table, input);
+          if (id === input) {
+            return Option.some({ table, id } as IdentifiedId<
+              DatabaseSchema.AllTableNames<Schema>
+            >);
+          }
+        }
+        return Option.none();
+      }),
+    ),
+  };
+};
 
-export const layer = dual<
-  <Schema extends DatabaseSchema.AnyWithProps>(
-    reader: GenericDatabaseReader<
-      DataModel.ToConvex<DataModel.FromSchema<Schema>>
-    >,
-  ) => (schema: Schema) => Layer.Layer<DocumentIds<Schema>>,
-  <Schema extends DatabaseSchema.AnyWithProps>(
-    schema: Schema,
-    reader: GenericDatabaseReader<
-      DataModel.ToConvex<DataModel.FromSchema<Schema>>
-    >,
-  ) => Layer.Layer<DocumentIds<Schema>>
->(
-  2,
-  <Schema extends DatabaseSchema.AnyWithProps>(
-    schema: Schema,
-    reader: GenericDatabaseReader<
-      DataModel.ToConvex<DataModel.FromSchema<Schema>>
-    >,
-  ) => Layer.succeed(DocumentIds<Schema>(), make(schema, reader)),
-);
+export const layer = <Schema extends DatabaseSchema.AnyWithProps>(
+  schema: Schema,
+  reader: GenericDatabaseReader<
+    DataModel.ToConvex<DataModel.FromSchema<Schema>>
+  >,
+) => Layer.succeed(DocumentIds<Schema>(), make(schema, reader));

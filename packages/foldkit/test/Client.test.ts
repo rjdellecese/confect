@@ -2,22 +2,10 @@ import { expect, expectTypeOf, layer } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as Layer from "effect/Layer";
 import * as Client from "@confect/foldkit/Client";
 import * as TestClient from "./TestClient";
 
 layer(TestClient.layer, { buildPerTest: true })("Client", (it) => {
-  it("supports pipeable layer construction with optional options", () => {
-    const defaultLayer = Client.layer()("https://example-123.convex.cloud");
-    const configuredLayer = Client.layer({ logger: false })(
-      "https://example-123.convex.cloud",
-    );
-    expect(Layer.isLayer(defaultLayer)).toBe(true);
-    expect(Layer.isLayer(configuredLayer)).toBe(true);
-    expectTypeOf(configuredLayer).toEqualTypeOf<
-      ReturnType<typeof Client.layer>
-    >();
-  });
   it.effect("preserves authentication callback requirements", () =>
     Effect.gen(function* () {
       class Token extends Context.Service<Token, string>()(

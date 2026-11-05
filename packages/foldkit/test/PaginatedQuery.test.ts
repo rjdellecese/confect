@@ -11,30 +11,30 @@ import * as PaginatedQuery from "@confect/foldkit/PaginatedQuery";
 
 const Note = Schema.Struct({ text: Schema.String });
 
-const paginateRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicPaginatedQuery({
+const paginateRef = Ref.make(
+  "notes",
+  FunctionSpec.publicPaginatedQuery({
     name: "paginate",
     args: () => ({ channel: Schema.String }),
     item: () => Note,
   }),
-});
+);
 
-const paginateNoArgsRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicPaginatedQuery({
+const paginateNoArgsRef = Ref.make(
+  "notes",
+  FunctionSpec.publicPaginatedQuery({
     name: "paginateAll",
     item: () => Note,
   }),
-});
+);
 
-const standardQueryRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicQuery({
+const standardQueryRef = Ref.make(
+  "notes",
+  FunctionSpec.publicQuery({
     name: "list",
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
 const Notes = PaginatedQuery.make(paginateRef);
 
@@ -668,18 +668,6 @@ describe("PaginatedQuery", () => {
       expectTypeOf(PaginatedQuery.getItems(loadedPageOne())).toEqualTypeOf<
         Option.Option<ReadonlyArray<Item>>
       >();
-    });
-
-    it("supports pipeable request allocation and correlation", () => {
-      const state = initial();
-      const allocated = PaginatedQuery.allocateRequest(42)(
-        PaginatedQuery.getSubscriptionRequest(state),
-      );
-      expectTypeOf(allocated).toEqualTypeOf<PaginatedQuery.Request<Args>>();
-      expect(allocated).toEqual(request(state, 42));
-      const isCurrent = PaginatedQuery.isCurrentRequest(allocated);
-      expect(isCurrent(state)).toBe(true);
-      expect(isCurrent(Notes.idle)).toBe(false);
     });
 
     it("includes the formal invalid-cursor settlement error", () => {

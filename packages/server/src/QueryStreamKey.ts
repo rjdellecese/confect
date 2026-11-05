@@ -1,5 +1,4 @@
 import * as Schema from "effect/Schema";
-import { dual } from "effect/Function";
 import * as Data from "effect/Data";
 import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
@@ -55,70 +54,44 @@ export class KeyWidthMismatchError extends Schema.TaggedError<
 /**
  * @experimental
  */
-export const complete: {
-  (
-    values: QueryStreamKeyValues.QueryStreamKeyValues,
-  ): (
-    layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  ) => Result.Result<Complete, KeyWidthMismatchError>;
-  (
-    layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-    values: QueryStreamKeyValues.QueryStreamKeyValues,
-  ): Result.Result<Complete, KeyWidthMismatchError>;
-} = dual(
-  2,
-  (
-    layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-    values: QueryStreamKeyValues.QueryStreamKeyValues,
-  ): Result.Result<Complete, KeyWidthMismatchError> => {
-    const width = QueryStreamKeyLayout.runtimeWidth(layout);
-    return values.length === width
-      ? Result.succeed(
-          QueryStreamKey.Complete({ [TypeId]: TypeId, layout, values }),
-        )
-      : Result.fail(
-          KeyWidthMismatchError.make({
-            kind: "complete",
-            width,
-            actual: values.length,
-          }),
-        );
-  },
-);
+export const complete = (
+  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  values: QueryStreamKeyValues.QueryStreamKeyValues,
+): Result.Result<Complete, KeyWidthMismatchError> => {
+  const width = QueryStreamKeyLayout.runtimeWidth(layout);
+  return values.length === width
+    ? Result.succeed(
+        QueryStreamKey.Complete({ [TypeId]: TypeId, layout, values }),
+      )
+    : Result.fail(
+        KeyWidthMismatchError.make({
+          kind: "complete",
+          width,
+          actual: values.length,
+        }),
+      );
+};
 
 /**
  * @experimental
  */
-export const prefix: {
-  (
-    values: QueryStreamKeyValues.QueryStreamKeyValues,
-  ): (
-    layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-  ) => Result.Result<Prefix, KeyWidthMismatchError>;
-  (
-    layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-    values: QueryStreamKeyValues.QueryStreamKeyValues,
-  ): Result.Result<Prefix, KeyWidthMismatchError>;
-} = dual(
-  2,
-  (
-    layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
-    values: QueryStreamKeyValues.QueryStreamKeyValues,
-  ): Result.Result<Prefix, KeyWidthMismatchError> => {
-    const width = QueryStreamKeyLayout.runtimeWidth(layout);
-    return values.length <= width
-      ? Result.succeed(
-          QueryStreamKey.Prefix({ [TypeId]: TypeId, layout, values }),
-        )
-      : Result.fail(
-          KeyWidthMismatchError.make({
-            kind: "prefix",
-            width,
-            actual: values.length,
-          }),
-        );
-  },
-);
+export const prefix = (
+  layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  values: QueryStreamKeyValues.QueryStreamKeyValues,
+): Result.Result<Prefix, KeyWidthMismatchError> => {
+  const width = QueryStreamKeyLayout.runtimeWidth(layout);
+  return values.length <= width
+    ? Result.succeed(
+        QueryStreamKey.Prefix({ [TypeId]: TypeId, layout, values }),
+      )
+    : Result.fail(
+        KeyWidthMismatchError.make({
+          kind: "prefix",
+          width,
+          actual: values.length,
+        }),
+      );
+};
 
 // A complete key already satisfies the prefix width guarantee.
 /**

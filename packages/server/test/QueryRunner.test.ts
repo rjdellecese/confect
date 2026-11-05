@@ -23,17 +23,14 @@ const definition = {
   returns: () => Schema.FiniteFromString,
   error: () => NotFound,
 };
-const ref = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicQuery(definition),
-});
-const emptyRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicQuery({
+const ref = Ref.make("notes", FunctionSpec.publicQuery(definition));
+const emptyRef = Ref.make(
+  "notes",
+  FunctionSpec.publicQuery({
     name: "empty",
     returns: () => Schema.String,
   }),
-});
+);
 
 describe("QueryRunner", () => {
   it.effect(
@@ -315,10 +312,7 @@ describe("QueryRunner", () => {
               >
             >();
             expectTypeOf(
-              Ref.make({
-                namespace: "notes",
-                spec: FunctionSpec.publicMutation(definition),
-              }),
+              Ref.make("notes", FunctionSpec.publicMutation(definition)),
             ).not.toExtend<Parameters<typeof runner.runQuery>[0]>();
             expectTypeOf(
               // @ts-expect-error Required arguments cannot be omitted.

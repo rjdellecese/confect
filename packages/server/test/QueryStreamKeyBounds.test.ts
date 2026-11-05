@@ -79,10 +79,11 @@ describe("QueryStreamKeyBounds", () => {
       name: "different implicit ID positions",
       actual: Layout.concat(
         Result.getOrThrow(Layout.fromIndex([])),
-        Layout.fromIndex(["_id"]).pipe(
-          Result.getOrThrow,
-          Layout.rename(Labels.make(["score"])),
-          Result.getOrThrow,
+        Result.getOrThrow(
+          Layout.rename(
+            Result.getOrThrow(Layout.fromIndex(["_id"])),
+            Labels.make(["score"]),
+          ),
         ),
       ),
     },
@@ -119,15 +120,17 @@ describe("QueryStreamKeyBounds", () => {
     ]) {
       mismatch(QueryStreamKeyBounds.fromParsed(layout, endpoints));
     }
-    bounded.lower.pipe(
-      Option.getOrThrow,
-      QueryStreamKeyBounds.tightestParsedLower(endpoint),
-      mismatch,
+    mismatch(
+      QueryStreamKeyBounds.tightestParsedLower(
+        Option.getOrThrow(bounded.lower),
+        endpoint,
+      ),
     );
-    bounded.upper.pipe(
-      Option.getOrThrow,
-      QueryStreamKeyBounds.tightestParsedUpper(endpoint),
-      mismatch,
+    mismatch(
+      QueryStreamKeyBounds.tightestParsedUpper(
+        Option.getOrThrow(bounded.upper),
+        endpoint,
+      ),
     );
   });
 

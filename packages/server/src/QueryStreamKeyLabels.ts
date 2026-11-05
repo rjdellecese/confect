@@ -1,5 +1,4 @@
 import * as Schema from "effect/Schema";
-import { dual } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
 
@@ -60,17 +59,9 @@ export function make(names: ReadonlyArray<string>): QueryStreamKeyLabels {
  *
  * @experimental
  */
-export const hasPrefix: {
-  (
-    prefixKeyLabels: QueryStreamKeyLabels,
-  ): (self: QueryStreamKeyLabels) => boolean;
-  (self: QueryStreamKeyLabels, prefixKeyLabels: QueryStreamKeyLabels): boolean;
-} = dual(
-  2,
-  (
-    self: QueryStreamKeyLabels,
-    prefixKeyLabels: QueryStreamKeyLabels,
-  ): boolean =>
-    prefixKeyLabels.length <= self.length &&
-    Array.every(prefixKeyLabels, (label, index) => label === self[index]),
-);
+export const hasPrefix = (
+  self: QueryStreamKeyLabels,
+  prefixKeyLabels: QueryStreamKeyLabels,
+): boolean =>
+  prefixKeyLabels.length <= self.length &&
+  Array.every(prefixKeyLabels, (label, index) => label === self[index]);

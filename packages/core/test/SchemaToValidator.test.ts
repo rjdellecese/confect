@@ -18,7 +18,6 @@ import {
 import type { Brand } from "effect";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { pipe } from "effect/Function";
 import * as Result from "effect/Result";
 
 describe("UnsupportedPropertySignatureKeyTypeError", () => {
@@ -363,19 +362,6 @@ describe("ID schemas", () => {
 });
 
 describe("compiler preprocessing", () => {
-  it.effect(
-    "supports pipeable compilation with optional property configuration",
-    () =>
-      Effect.gen(function* () {
-        const ast = Schema.String.ast;
-        const required = yield* pipe(ast, compileAst());
-        const optional = yield* pipe(ast, compileAst(true));
-
-        expect(required).toEqual(v.string());
-        expect(optional).toEqual(v.string());
-      }),
-  );
-
   it.effect("captures union members before executing the compiler effect", () =>
     Effect.gen(function* () {
       const ast = Schema.Union([Schema.String, Schema.Boolean]).ast;

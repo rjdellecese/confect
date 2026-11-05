@@ -5,21 +5,6 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 describe("validateAll", () => {
-  it("supports pipeable validation with the same success and error contract", () => {
-    const validate = MiddlewareAttachment.validateAll("test chain");
-    expect(validate([])).toEqual(Result.void);
-    expect(
-      validate([{ spec: RequireRole, options: { roles: ["Buyer"] } }]),
-    ).toEqual(Result.void);
-    const attachments = [
-      { spec: RequireRole, options: { roles: ["Buyer"] } },
-      { spec: RequireRole, options: { roles: ["Buyer"] } },
-    ];
-    expect(validate(attachments)).toEqual(
-      MiddlewareAttachment.validateAll(attachments, "test chain"),
-    );
-  });
-
   class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
     "RequireRole",
     {

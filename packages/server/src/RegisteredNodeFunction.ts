@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   actionGeneric,
@@ -10,7 +9,7 @@ import type { Effect } from "effect";
 import type { Schema } from "effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
-import * as DatabaseSchema from "./DatabaseSchema";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import * as RegisteredFunction from "./RegisteredFunction";
 import * as FunctionRegistryItem from "./FunctionRegistryItem";
 import * as ResolvedMiddleware from "./ResolvedMiddleware";
@@ -20,83 +19,57 @@ import type * as GroupImpl from "./GroupImpl";
 import type * as RegisteredFunctions from "./RegisteredFunctions";
 import { mapLeaves } from "./internal/utils";
 
-export const buildForGroup = dual<
-  <Group extends GroupSpec.AnyWithProps>(
-    groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
-  ) => (
-    databaseSchema: DatabaseSchema.AnyWithProps,
-  ) => RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>,
-  <Group extends GroupSpec.AnyWithProps>(
-    databaseSchema: DatabaseSchema.AnyWithProps,
-    groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
-  ) => RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>
->(
-  2,
-  <Group extends GroupSpec.AnyWithProps>(
-    databaseSchema: DatabaseSchema.AnyWithProps,
-    groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
-  ): RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group> => {
-    const { functionRegistryItems, middlewareRegistryItems } =
-      GroupRegistry.make(groupLayer);
-    return mapLeaves<FunctionRegistryItem.AnyWithProps, RegisteredFunction.Any>(
-      functionRegistryItems as {
-        [key: string]: FunctionRegistryItem.AnyWithProps;
-      },
-      FunctionRegistryItem.isFunctionRegistryItem,
-      (item) =>
-        Match.value(item).pipe(
-          Match.tag("Convex", ({ handler }) => handler),
-          Match.tag("Confect", (confect) =>
-            make(
-              databaseSchema,
-              confect,
-              ResolvedMiddleware.resolve(confect, middlewareRegistryItems),
-            ),
+export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
+  databaseSchema: DatabaseSchema.AnyWithProps,
+  groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
+): RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group> => {
+  const { functionRegistryItems, middlewareRegistryItems } =
+    GroupRegistry.make(groupLayer);
+  return mapLeaves<FunctionRegistryItem.AnyWithProps, RegisteredFunction.Any>(
+    functionRegistryItems as {
+      [key: string]: FunctionRegistryItem.AnyWithProps;
+    },
+    FunctionRegistryItem.isFunctionRegistryItem,
+    (item) =>
+      Match.value(item).pipe(
+        Match.tag("Convex", ({ handler }) => handler),
+        Match.tag("Confect", (confect) =>
+          make(
+            databaseSchema,
+            confect,
+            ResolvedMiddleware.resolve(confect, middlewareRegistryItems),
           ),
-          Match.exhaustive,
         ),
-    ) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>;
-  },
-);
-
-export const make = dual<
-  (
-    item: FunctionRegistryItem.ConfectFunctionRegistryItem,
-    resolvedMiddlewares?: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-  ) => (databaseSchema: DatabaseSchema.AnyWithProps) => RegisteredFunction.Any,
-  (
-    databaseSchema: DatabaseSchema.AnyWithProps,
-    item: FunctionRegistryItem.ConfectFunctionRegistryItem,
-    resolvedMiddlewares?: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-  ) => RegisteredFunction.Any
->(
-  (args) => DatabaseSchema.isDatabaseSchema(args[0]),
-  (
-    databaseSchema: DatabaseSchema.AnyWithProps,
-    item: FunctionRegistryItem.ConfectFunctionRegistryItem,
-    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
-  ): RegisteredFunction.Any => {
-    const genericFunction = Match.value(item.functionVisibility).pipe(
-      Match.when("public", () => actionGeneric),
-      Match.when("internal", () => internalActionGeneric),
-      Match.exhaustive,
-    );
-
-    return genericFunction(
-      RegisteredFunction.toConvexDefinition(
-        nodeActionFunction(databaseSchema, {
-          name: item.name,
-          functionVisibility: item.functionVisibility,
-          args: item.args,
-          returns: item.returns,
-          error: item.error,
-          handler: item.handler,
-          resolvedMiddlewares,
-        }),
+        Match.exhaustive,
       ),
-    );
-  },
-);
+  ) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>;
+};
+
+export const make = (
+  databaseSchema: DatabaseSchema.AnyWithProps,
+  item: FunctionRegistryItem.ConfectFunctionRegistryItem,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
+): RegisteredFunction.Any => {
+  const genericFunction = Match.value(item.functionVisibility).pipe(
+    Match.when("public", () => actionGeneric),
+    Match.when("internal", () => internalActionGeneric),
+    Match.exhaustive,
+  );
+
+  return genericFunction(
+    RegisteredFunction.toConvexDefinition(
+      nodeActionFunction(databaseSchema, {
+        name: item.name,
+        functionVisibility: item.functionVisibility,
+        args: item.args,
+        returns: item.returns,
+        error: item.error,
+        handler: item.handler,
+        resolvedMiddlewares,
+      }),
+    ),
+  );
+};
 
 const nodeActionFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

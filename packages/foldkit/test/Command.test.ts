@@ -12,32 +12,32 @@ import * as Command from "@confect/foldkit/Command";
 import * as Client from "@confect/foldkit/Client";
 import * as TestClient from "./TestClient";
 
-const listQueryRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicQuery({
+const listQueryRef = Ref.make(
+  "notes",
+  FunctionSpec.publicQuery({
     name: "list",
     args: () => ({}),
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
-const insertMutationRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicMutation({
+const insertMutationRef = Ref.make(
+  "notes",
+  FunctionSpec.publicMutation({
     name: "insert",
     args: () => ({ text: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
-const sendActionRef = Ref.make({
-  namespace: "email",
-  spec: FunctionSpec.publicAction({
+const sendActionRef = Ref.make(
+  "email",
+  FunctionSpec.publicAction({
     name: "send",
     args: () => ({ to: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
-});
+);
 
 class NotFound extends Schema.TaggedError<
   NotFound,
@@ -46,15 +46,15 @@ class NotFound extends Schema.TaggedError<
   id: Schema.String,
 }) {}
 
-const deleteMutationRef = Ref.make({
-  namespace: "notes",
-  spec: FunctionSpec.publicMutation({
+const deleteMutationRef = Ref.make(
+  "notes",
+  FunctionSpec.publicMutation({
     name: "deleteOrFail",
     args: () => ({ id: Schema.String, scope: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
-});
+);
 
 const Message = defineMessageUnion({
   SucceededSaveNote: { note: Schema.Unknown },
@@ -74,46 +74,6 @@ const saveNoteConfig = {
 };
 
 layer(TestClient.layer, { buildPerTest: true })("Command", (it) => {
-  it.effect("supports pipeable factories and effect helpers", () =>
-    Effect.gen(function* () {
-      const Fetch = Command.query(listQueryRef, saveNoteConfig)("Fetch");
-      const Save = Command.mutation(insertMutationRef, {
-        ...saveNoteConfig,
-        interrupt: true,
-      })("Save");
-      const Send = Command.action(sendActionRef, saveNoteConfig)("Send");
-      expectTypeOf(Fetch.name).toEqualTypeOf<"Fetch">();
-      expectTypeOf(Save).parameters.toEqualTypeOf<
-        [{ readonly text: string }]
-      >();
-      expect(Save({ text: "hello" }).key).toBe("Save");
-      const fetched = yield* Fetch().effect;
-      const saved = yield* Save({ text: "hello" }).effect;
-      const sent = yield* Send({ to: "test@example.com" }).effect;
-      expect(fetched._tag).toBe("SucceededSaveNote");
-      expect(saved._tag).toBe("SucceededSaveNote");
-      expect(sent._tag).toBe("SucceededSaveNote");
-      const query = Command.queryEffect<typeof listQueryRef, Message, Message>(
-        saveNoteHandlers,
-      )(listQueryRef);
-      const mutation = Command.mutationEffect<
-        typeof insertMutationRef,
-        Message,
-        Message
-      >(saveNoteHandlers)(insertMutationRef);
-      const action = Command.actionEffect<
-        typeof sendActionRef,
-        Message,
-        Message
-      >(saveNoteHandlers)(sendActionRef);
-      const queried = yield* query();
-      const mutated = yield* mutation({ text: "hello" });
-      const acted = yield* action({ to: "test@example.com" });
-      expect(queried._tag).toBe("SucceededSaveNote");
-      expect(mutated._tag).toBe("SucceededSaveNote");
-      expect(acted._tag).toBe("SucceededSaveNote");
-    }),
-  );
   describe("definition factories", () => {
     it("carry the Command name and the CommandDefinitionTypeId brand", () => {
       const SaveNote = Command.mutation(

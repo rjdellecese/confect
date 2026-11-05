@@ -1,4 +1,3 @@
-import { dual } from "effect/Function";
 import * as Ref from "@confect/core/Ref";
 import { ConvexHttpClient, type HttpMutationOptions } from "convex/browser";
 import * as Context from "effect/Context";
@@ -122,18 +121,7 @@ export const HttpClient =
 
 export type HttpClient = typeof HttpClient.Identifier;
 
-export const layer: {
-  (
-    options?: ConstructorParameters<typeof ConvexHttpClient>[1],
-  ): (address: string) => Layer.Layer<ReturnType<typeof make>>;
-  (
-    address: string,
-    options?: ConstructorParameters<typeof ConvexHttpClient>[1],
-  ): Layer.Layer<ReturnType<typeof make>>;
-} = dual(
-  (args) => typeof args[0] === "string",
-  (
-    address: string,
-    options?: ConstructorParameters<typeof ConvexHttpClient>[1],
-  ) => Layer.sync(HttpClient, () => make(address, options)),
-);
+export const layer = (
+  address: string,
+  options?: ConstructorParameters<typeof ConvexHttpClient>[1],
+) => Layer.sync(HttpClient, () => make(address, options));

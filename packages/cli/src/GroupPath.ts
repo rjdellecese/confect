@@ -1,6 +1,6 @@
 import { type GroupSpec, Spec } from "@confect/core";
 import * as Path from "effect/Path";
-import { dual, pipe } from "effect/Function";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -24,12 +24,8 @@ export const make = (pathSegments: readonly [string, ...string[]]): GroupPath =>
 /**
  * Append a group name to a GroupPath to create a new GroupPath.
  */
-export const append: {
-  (groupName: string): (groupPath: GroupPath) => GroupPath;
-  (groupPath: GroupPath, groupName: string): GroupPath;
-} = dual(2, (groupPath: GroupPath, groupName: string): GroupPath =>
-  make([...groupPath.pathSegments, groupName]),
-);
+export const append = (groupPath: GroupPath, groupName: string): GroupPath =>
+  make([...groupPath.pathSegments, groupName]);
 
 /**
  * Expects a path string of the form `./group1/group2.ts`, relative to the
@@ -69,36 +65,25 @@ export const modulePath = Effect.fnUntraced(function* (groupPath: GroupPath) {
   return path.join(...groupPath.pathSegments) + ".ts";
 });
 
-export const getGroupSpec: {
-  (
-    groupPath: GroupPath,
-  ): (spec: Spec.AnyWithProps) => Option.Option<GroupSpec.AnyWithProps>;
-  (
-    spec: Spec.AnyWithProps,
-    groupPath: GroupPath,
-  ): Option.Option<GroupSpec.AnyWithProps>;
-} = dual(
-  2,
-  (
-    spec: Spec.AnyWithProps,
-    groupPath: GroupPath,
-  ): Option.Option<GroupSpec.AnyWithProps> =>
-    pipe(
-      groupPath.pathSegments,
-      Array.matchLeft({
-        onEmpty: () => Option.none(),
-        onNonEmpty: (head, tail) =>
-          pipe(
-            Record.get(Spec.groups(spec), head),
-            Option.flatMap((group) =>
-              Array.isArrayNonEmpty(tail)
-                ? getGroupSpecHelper(group, tail)
-                : Option.some(group),
-            ),
+export const getGroupSpec = (
+  spec: Spec.AnyWithProps,
+  groupPath: GroupPath,
+): Option.Option<GroupSpec.AnyWithProps> =>
+  pipe(
+    groupPath.pathSegments,
+    Array.matchLeft({
+      onEmpty: () => Option.none(),
+      onNonEmpty: (head, tail) =>
+        pipe(
+          Record.get(Spec.groups(spec), head),
+          Option.flatMap((group) =>
+            Array.isArrayNonEmpty(tail)
+              ? getGroupSpecHelper(group, tail)
+              : Option.some(group),
           ),
-      }),
-    ),
-);
+        ),
+    }),
+  );
 
 const getGroupSpecHelper = (
   group: GroupSpec.AnyWithProps,
