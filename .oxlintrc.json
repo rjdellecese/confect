@@ -47,6 +47,7 @@
     "**/.mintlify/**"
   ],
   "rules": {
+    "confect/no-schema-codec-wrappers": "error",
     "confect/require-query-stream-experimental": "error",
     "jsdoc-style/check-alignment": "error",
     "jsdoc-style/check-line-alignment": [

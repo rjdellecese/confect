@@ -32,11 +32,6 @@ const decodeUncached = (
     SystemFields.extendWithSystemFields(tableName, tableSchema),
   )(convexDocument).pipe(Result.getOrThrow);
 
-const encodeUncached = (
-  tableSchema: typeof NoteSchema,
-  document: ReturnType<typeof decodeUncached>,
-) => Schema.encodeResult(tableSchema)(document).pipe(Result.getOrThrow);
-
 describe("Document.decode", () => {
   it.effect("uses the decoder installed for the bound table Doc lazily", () =>
     Effect.gen(function* () {
@@ -189,7 +184,9 @@ describe("Document.encode", () => {
   it.effect("encodes documents identically to an uncached encoder", () =>
     Effect.gen(function* () {
       const decoded = decodeUncached("notes", NoteSchema, convexNote);
-      const expected = encodeUncached(NoteSchema, decoded);
+      const expected = Schema.encodeResult(NoteSchema)(decoded).pipe(
+        Result.getOrThrow,
+      );
 
       const encoded = yield* Document.encode(decoded, notes);
 

@@ -14,10 +14,7 @@ import {
   vendoredSkillDirectories,
 } from "./syncSkillIgnore";
 
-const encodeJson = (value: unknown) =>
-  Result.getOrThrow(
-    Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))(value),
-  );
+const encodeJson = Schema.encodeResult(Schema.fromJsonString(Schema.Unknown));
 
 const runTest = <A, E>(
   effect: Effect.Effect<A, E, BunServices.BunServices>,
@@ -34,7 +31,7 @@ test("derives sorted installed directories from the lock", () =>
           "Convex Best Practices": {},
           effect: {},
         },
-      });
+      }).pipe(Result.getOrThrow);
 
       const directories = yield* vendoredSkillDirectories(lock);
       expect(directories).toEqual(["convex-best-practices", "effect", "zed"]);
@@ -59,7 +56,7 @@ test("rejects malformed, unsupported, and colliding lock entries", () =>
         encodeJson({
           version: 1,
           skills: { "same skill": {}, "same-skill": {} },
-        }),
+        }).pipe(Result.getOrThrow),
       ).pipe(Effect.flip);
       expect(collision.message).toMatch(/same installed directory/u);
     }),
@@ -108,7 +105,9 @@ test("writes generated output and detects later drift", () =>
       const ignorePath = path.join(cwd, ".ignore");
       yield* fs.writeFileString(
         lockPath,
-        encodeJson({ version: 1, skills: { effect: {} } }),
+        encodeJson({ version: 1, skills: { effect: {} } }).pipe(
+          Result.getOrThrow,
+        ),
       );
       yield* fs.writeFileString(ignorePath, "dist/\n");
 
@@ -124,7 +123,7 @@ test("writes generated output and detects later drift", () =>
         encodeJson({
           version: 1,
           skills: { effect: {}, vitest: {} },
-        }),
+        }).pipe(Result.getOrThrow),
       );
       const drift = yield* syncSkillIgnore({ check: true, cwd }).pipe(
         Effect.flip,

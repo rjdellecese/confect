@@ -11,13 +11,14 @@ test("PaginationOptions' type extends Convex type", () => {
 });
 
 test("decodes the payloads Convex's paginated client sends", () => {
-  const decode = (input: unknown) =>
-    Result.getOrThrow(
-      Schema.decodeUnknownResult(PaginationOptions.PaginationOptions)(input),
-    );
+  const decode = Schema.decodeUnknownResult(
+    PaginationOptions.PaginationOptions,
+  );
 
   // `usePaginatedQuery` from `convex/react` always includes `id`.
-  expect(decode({ numItems: 10, cursor: null, id: 1 })).toEqual({
+  expect(
+    decode({ numItems: 10, cursor: null, id: 1 }).pipe(Result.getOrThrow),
+  ).toEqual({
     numItems: 10,
     cursor: null,
     id: 1,
@@ -32,7 +33,7 @@ test("decodes the payloads Convex's paginated client sends", () => {
       id: 1,
       maximumRowsRead: 100,
       maximumBytesRead: 1000,
-    }),
+    }).pipe(Result.getOrThrow),
   ).toEqual({
     numItems: 10,
     cursor: "abc",

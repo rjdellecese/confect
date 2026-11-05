@@ -32,12 +32,9 @@ import {
   type Profile,
 } from "./consumerCompatibility";
 
-const encodeJson = (value: unknown) =>
-  Result.getOrThrow(
-    Schema.encodeResult(Schema.fromJsonString(Schema.Unknown, { space: 2 }))(
-      value,
-    ),
-  );
+const encodeJson = Schema.encodeResult(
+  Schema.fromJsonString(Schema.Unknown, { space: 2 }),
+);
 
 const manifestAt = Effect.fn("Consumer.manifestAt")(function* (
   directory: string,
@@ -435,7 +432,7 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
         type: "module",
         packageManager: toolchain.packageManager,
         dependencies,
-      }),
+      }).pipe(Result.getOrThrow),
     );
     yield* fs.writeFileString(
       path.join(directory, ".npmrc"),
@@ -566,14 +563,17 @@ if (import.meta.main) {
       values.report ?? path.join(String(result.directory), "result.json"),
     );
     yield* fs.makeDirectory(path.dirname(report), { recursive: true });
-    yield* fs.writeFileString(report, `${encodeJson(result)}\n`);
+    yield* fs.writeFileString(
+      report,
+      `${encodeJson(result).pipe(Result.getOrThrow)}\n`,
+    );
     yield* Console.log(
       encodeJson({
         ...result,
         graph: undefined,
         installOutput: undefined,
         candidates: undefined,
-      }),
+      }).pipe(Result.getOrThrow),
     );
     yield* Console.log(
       `Full graph, artifact identities, and diagnostics: ${report}`,

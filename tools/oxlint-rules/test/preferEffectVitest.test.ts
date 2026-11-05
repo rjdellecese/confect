@@ -94,6 +94,7 @@ describe("plugin", () => {
   it("registers the rule under the confect namespace", () => {
     expect(confectPlugin.meta.name).toBe("confect");
     expect(Record.keys(confectPlugin.rules)).toEqual([
+      "no-schema-codec-wrappers",
       "prefer-effect-vitest",
       "prefer-test-each",
       "require-query-stream-experimental",
