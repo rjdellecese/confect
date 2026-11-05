@@ -32,9 +32,7 @@ import {
   type Profile,
 } from "./consumerCompatibility";
 
-const encodeJson = Schema.encodeResult(
-  Schema.fromJsonString(Schema.Unknown, { space: 2 }),
-);
+const Json = Schema.fromJsonString(Schema.Unknown, { space: 2 });
 
 const manifestAt = Effect.fn("Consumer.manifestAt")(function* (
   directory: string,
@@ -425,7 +423,7 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
     result.requested = dependencies;
     yield* fs.writeFileString(
       path.join(directory, "package.json"),
-      encodeJson({
+      Schema.encodeResult(Json)({
         name: "confect-consumer",
         version: "0.0.0",
         private: true,
@@ -565,10 +563,10 @@ if (import.meta.main) {
     yield* fs.makeDirectory(path.dirname(report), { recursive: true });
     yield* fs.writeFileString(
       report,
-      `${encodeJson(result).pipe(Result.getOrThrow)}\n`,
+      `${Schema.encodeResult(Json)(result).pipe(Result.getOrThrow)}\n`,
     );
     yield* Console.log(
-      encodeJson({
+      Schema.encodeResult(Json)({
         ...result,
         graph: undefined,
         installOutput: undefined,

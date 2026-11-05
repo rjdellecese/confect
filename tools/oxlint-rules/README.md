@@ -7,7 +7,8 @@ by the root `.oxlintrc.json`.
 
 Use Effect Schema's decoding and encoding functions directly instead of adding
 functions that only forward their parameters to a codec. The rule also detects
-forwarding wrappers that unwrap a codec result with `Result.getOrThrow`.
+forwarding wrappers that unwrap a codec result with `Result.getOrThrow`, as well
+as stored encoding/decoding functions such as `const decode = Schema.decodeResult(Options)`.
 
 Reported:
 
@@ -22,14 +23,16 @@ Use the API at the call site:
 const options = Schema.decodeResult(Options)(input).pipe(Result.getOrThrow);
 ```
 
-Binding a configured codec directly is also allowed:
+Store reusable configuration on the schema or codec, not on a particular
+encoding or decoding function:
 
 ```ts
-const decode = Schema.decodeResult(Options);
-const options = decode(input).pipe(Result.getOrThrow);
+const Json = Schema.fromJsonString(Schema.Unknown, { space: 2 });
+const encoded = Schema.encodeResult(Json)(input).pipe(Result.getOrThrow);
 ```
 
-The rule checks standalone helpers and default-export functions: expression-bodied
+The rule checks variable bindings and default exports for stored codec functions.
+It also checks standalone helpers and default-export functions: expression-bodied
 arrows and functions with a single return.
 Each parameter must be forwarded unchanged exactly once. It resolves real
 imports from `effect` and its `Schema`, `Result`, and `Function` subpaths,
@@ -44,6 +47,12 @@ object methods are also excluded: their enclosing API can require an adapter.
 For example, an array callback receives an index as its second argument, whereas
 a Schema codec accepts parse options there; passing the codec directly is not
 necessarily type-compatible or behavior-preserving.
+Inline codec use in combinators is allowed, as is schema construction with
+`Options.make(input)` when its constructor semantics are appropriate.
+
+`packages/server/test/Document.bench.ts` has a narrow configuration exception:
+its cached-codec benchmarks must retain stored functions to measure the intended
+comparison. The benchmark cases and baselines are unchanged.
 
 There is deliberately no autofix. Moving codec construction out of a function
 can change when a schema is evaluated, and removing `Result.getOrThrow` changes

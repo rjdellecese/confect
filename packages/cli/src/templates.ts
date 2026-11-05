@@ -510,9 +510,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
       `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
     );
   } else {
-    const encodeString = Schema.encodeEffect(
-      Schema.fromJsonString(Schema.String),
-    );
+    const JsonString = Schema.fromJsonString(Schema.String);
     const bindings = (
       group: GroupSpec.AnyWithProps,
       path: string,
@@ -524,7 +522,9 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
             string,
             FunctionSpec.AnyWithProps,
           ]) {
-            const key = yield* encodeString(name).pipe(Effect.orDie);
+            const key = yield* Schema.encodeEffect(JsonString)(name).pipe(
+              Effect.orDie,
+            );
             const definition = `${path}[${key}]`;
             return `[${key}]: ${
               functionSpec.functionProvenance._tag === "Convex"
@@ -539,7 +539,9 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
             string,
             GroupSpec.AnyWithProps,
           ]) {
-            const key = yield* encodeString(name).pipe(Effect.orDie);
+            const key = yield* Schema.encodeEffect(JsonString)(name).pipe(
+              Effect.orDie,
+            );
             const childBindings = yield* bindings(child, `${path}[${key}]`);
             return `[${key}]: ${childBindings},`;
           }),

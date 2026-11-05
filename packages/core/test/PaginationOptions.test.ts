@@ -11,13 +11,13 @@ test("PaginationOptions' type extends Convex type", () => {
 });
 
 test("decodes the payloads Convex's paginated client sends", () => {
-  const decode = Schema.decodeUnknownResult(
-    PaginationOptions.PaginationOptions,
-  );
-
   // `usePaginatedQuery` from `convex/react` always includes `id`.
   expect(
-    decode({ numItems: 10, cursor: null, id: 1 }).pipe(Result.getOrThrow),
+    Schema.decodeResult(PaginationOptions.PaginationOptions)({
+      numItems: 10,
+      cursor: null,
+      id: 1,
+    }).pipe(Result.getOrThrow),
   ).toEqual({
     numItems: 10,
     cursor: null,
@@ -26,7 +26,7 @@ test("decodes the payloads Convex's paginated client sends", () => {
 
   // Page splits include `endCursor`; the budget fields are also protocol-legal.
   expect(
-    decode({
+    Schema.decodeResult(PaginationOptions.PaginationOptions)({
       numItems: 10,
       cursor: "abc",
       endCursor: "def",

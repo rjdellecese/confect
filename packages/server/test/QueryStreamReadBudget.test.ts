@@ -27,14 +27,17 @@ describe("QueryStreamReadBudget", () => {
 
   it.effect("decodes absent limits and zero", () =>
     Effect.gen(function* () {
-      const decode = Schema.decodeEffect(QueryStreamReadBudget.Limits);
       const unlimited = {
         maximumRowsRead: Option.none(),
         maximumBytesRead: Option.none(),
       };
-      const decodeResult = yield* decode({});
+      const decodeResult = yield* Schema.decodeEffect(
+        QueryStreamReadBudget.Limits,
+      )({});
       expect(decodeResult).toEqual(unlimited);
-      const decodeResult2 = yield* decode({
+      const decodeResult2 = yield* Schema.decodeEffect(
+        QueryStreamReadBudget.Limits,
+      )({
         maximumRowsRead: 0,
         maximumBytesRead: 0,
       });

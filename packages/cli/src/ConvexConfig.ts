@@ -130,11 +130,11 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
           const componentDefinitionPath = isBareSpecifier
             ? String.replace(CONVEX_CONFIG_SUFFIX, "")(specifier)
             : path.dirname(args.path);
-          const encodeString = Schema.encodeEffect(
-            Schema.fromJsonString(Schema.String),
+          const JsonString = Schema.fromJsonString(Schema.String);
+          const modulePath = yield* Schema.encodeEffect(JsonString)(args.path);
+          const definitionPath = yield* Schema.encodeEffect(JsonString)(
+            componentDefinitionPath,
           );
-          const modulePath = yield* encodeString(args.path);
-          const definitionPath = yield* encodeString(componentDefinitionPath);
 
           // The real module is imported (not inlined) so any nested
           // `convex.config` imports resolve from the definition's own file

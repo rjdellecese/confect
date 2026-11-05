@@ -243,6 +243,12 @@
   },
   "overrides": [
     {
+      "files": ["packages/server/test/Document.bench.ts"],
+      "rules": {
+        "confect/no-schema-codec-wrappers": "off"
+      }
+    },
+    {
       "files": ["**/*.{ts,tsx,mts,cts}"],
       "rules": {
         "typescript/consistent-type-imports": "error",
