@@ -4,8 +4,8 @@ import * as Str from "effect/String";
 import * as Arr from "effect/Array";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
-import { fork } from "node:child_process";
-import type * as ChildProcess from "node:child_process";
+import { Worker } from "node:worker_threads";
+import type * as WorkerThreads from "node:worker_threads";
 import { vi } from "vitest";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
@@ -26,10 +26,15 @@ import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import { SpecModulePath } from "@confect/cli/SpecModulePath";
 import * as Project from "./integration/Project";
 
-vi.mock("node:child_process", (importOriginal) =>
-  importOriginal<typeof ChildProcess>().then((original) => ({
+vi.mock("node:worker_threads", (importOriginal) =>
+  importOriginal<typeof WorkerThreads>().then((original) => ({
     ...original,
-    fork: vi.fn(original.fork),
+    Worker: vi.fn(function (
+      filename: string | URL,
+      options?: WorkerThreads.WorkerOptions,
+    ) {
+      return new original.Worker(filename, options);
+    }),
   })),
 );
 
@@ -49,18 +54,16 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           get: Effect.succeed(path.join(project.root, "convex")),
         }),
       );
-    vi.mocked(fork).mockClear();
+    vi.mocked(Worker).mockClear();
     return { ...project, provide };
   });
 
   const expectWorkersExited = () => {
-    const workers = vi.mocked(fork).mock.results;
+    const workers = vi.mocked(Worker).mock.results;
     expect(workers.length).toBeGreaterThan(0);
     for (const result of workers) {
       assert(result.type === "return");
-      expect(
-        result.value.exitCode !== null || result.value.signalCode !== null,
-      ).toBe(true);
+      expect(result.value.threadId).toBe(-1);
     }
   };
 
@@ -70,7 +73,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
     { level: "Debug", reason: "UnattributedWarnings" },
     { level: "Info", reason: "UnattributedWarnings" },
   ] as const)(
-    "honors $level logging for $reason inside the child evaluator",
+    "honors $level logging for $reason inside the worker evaluator",
     ({ level, reason }) =>
       Effect.gen(function* () {
         const project = yield* setup;
@@ -83,14 +86,15 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           );
         }
         const original = yield* Effect.promise(() =>
-          vi.importActual<typeof ChildProcess>("node:child_process"),
+          vi.importActual<typeof WorkerThreads>("node:worker_threads"),
         );
         const closed = yield* Deferred.make<void>();
         const output: string[] = [];
-        vi.mocked(fork).mockImplementationOnce((filename) => {
-          const child = original.fork(filename, {
-            serialization: "advanced",
-            stdio: ["ignore", "pipe", "pipe", "ipc"],
+        vi.mocked(Worker).mockImplementationOnce(function (filename, options) {
+          const child = new original.Worker(filename, {
+            ...options,
+            stdout: true,
+            stderr: true,
           });
           assert(child.stdout);
           assert(child.stderr);
@@ -100,7 +104,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           child.stderr.on("data", (chunk: Buffer) => {
             output.push(chunk.toString());
           });
-          child.once("close", () => Deferred.doneUnsafe(closed, Effect.void));
+          child.once("exit", () => Deferred.doneUnsafe(closed, Effect.void));
           return child;
         });
         const result = yield* project
@@ -216,7 +220,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           Evaluation.loadPreviousFunctionPaths,
         );
         expect(HashSet.size(previous)).toBe(0);
-        expect(vi.mocked(fork)).not.toHaveBeenCalled();
+        expect(vi.mocked(Worker)).not.toHaveBeenCalled();
       }).pipe(Effect.scoped),
   );
 
@@ -275,22 +279,100 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
     { timeout: 30000 },
   );
 
-  it.effect(
-    "recovers after a user module exits its evaluator",
-    () =>
+  it.effect.each([0, 23])(
+    "recovers after a user module exits its evaluator with code %s",
+    (code) =>
       Effect.gen(function* () {
         const project = yield* setup;
         yield* project.provide(Evaluation.generate);
         yield* project.write(
           "confect/notes.impl.ts",
-          `${Project.impl}\nprocess.exit(23);\n`,
+          `${Project.impl}\nprocess.exit(${code});\n`,
         );
         const paths = [ImplModulePath.make("notes.impl.ts")];
         const failed = yield* project
           .provide(Evaluation.validate(paths))
           .pipe(Effect.result);
         assert(failed._tag === "Failure");
-        expect(failed.failure.diagnostic).toContain("23");
+        expect(failed.failure.diagnostic).toContain(`code: ${code}`);
+        expectWorkersExited();
+        yield* project.write("confect/notes.impl.ts", Project.impl);
+        yield* project.provide(Evaluation.validate(paths));
+        expectWorkersExited();
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
+
+  it.effect(
+    "inherits Node flags and forwards user output without mixing it into RPC",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        yield* project.provide(Evaluation.generate);
+        const flags = yield* Schema.String.pipe(
+          Schema.Array,
+          Schema.fromJsonString,
+          Schema.encodeEffect,
+        )(process.execArgv);
+        yield* project.write(
+          "confect/notes.impl.ts",
+          `${Project.impl}
+if (JSON.stringify(process.execArgv) !== JSON.stringify(${flags})) {
+  throw new Error("Evaluator lost inherited Node flags");
+}
+console.log("EVALUATION_STDOUT");
+console.error("EVALUATION_STDERR");
+`,
+        );
+        const original = yield* Effect.promise(() =>
+          vi.importActual<typeof WorkerThreads>("node:worker_threads"),
+        );
+        const stdout: string[] = [];
+        const stderr: string[] = [];
+        vi.mocked(Worker).mockImplementationOnce(function (...args) {
+          const worker = new original.Worker(...args);
+          worker.stdout.on("data", (chunk: Buffer) => {
+            stdout.push(chunk.toString());
+          });
+          worker.stderr.on("data", (chunk: Buffer) => {
+            stderr.push(chunk.toString());
+          });
+          return worker;
+        });
+        yield* project.provide(
+          Evaluation.validate([ImplModulePath.make("notes.impl.ts")]),
+        );
+        expect(Arr.join(stdout, "")).toContain("EVALUATION_STDOUT");
+        expect(Arr.join(stderr, "")).toContain("EVALUATION_STDERR");
+        expectWorkersExited();
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
+
+  it.effect(
+    "recovers after an uncaught asynchronous error terminates an evaluator",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* setup;
+        yield* project.provide(Evaluation.generate);
+        yield* project.write(
+          "confect/notes.impl.ts",
+          `${Project.impl}
+queueMicrotask(() => { throw new Error("Uncaught evaluator failure"); });
+await new Promise(() => {});
+`,
+        );
+        const paths = [ImplModulePath.make("notes.impl.ts")];
+        const failed = yield* project
+          .provide(Evaluation.validate(paths))
+          .pipe(Effect.result);
+        assert(failed._tag === "Failure");
+        expect(failed.failure.diagnostic).toContain(
+          "An error event was emitted",
+        );
+        expect(failed.failure.diagnostic).toContain(
+          "Uncaught evaluator failure",
+        );
         expectWorkersExited();
         yield* project.write("confect/notes.impl.ts", Project.impl);
         yield* project.provide(Evaluation.validate(paths));
@@ -306,10 +388,10 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
         const project = yield* setup;
         const started = yield* Deferred.make<void>();
         const original = yield* Effect.promise(() =>
-          vi.importActual<typeof ChildProcess>("node:child_process"),
+          vi.importActual<typeof WorkerThreads>("node:worker_threads"),
         );
-        vi.mocked(fork).mockImplementationOnce((...args) => {
-          const child = original.fork(...args);
+        vi.mocked(Worker).mockImplementationOnce(function (...args) {
+          const child = new original.Worker(...args);
           Deferred.doneUnsafe(started, Effect.void);
           return child;
         });
@@ -335,12 +417,12 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
         );
         const blocked = yield* Deferred.make<void>();
         const original = yield* Effect.promise(() =>
-          vi.importActual<typeof ChildProcess>("node:child_process"),
+          vi.importActual<typeof WorkerThreads>("node:worker_threads"),
         );
-        vi.mocked(fork).mockImplementationOnce((filename) => {
-          const child = original.fork(filename, {
-            serialization: "advanced",
-            stdio: ["ignore", "pipe", "inherit", "ipc"],
+        vi.mocked(Worker).mockImplementationOnce(function (filename, options) {
+          const child = new original.Worker(filename, {
+            ...options,
+            stdout: true,
           });
           assert(child.stdout);
           child.stdout.on("data", (data: Buffer) => {

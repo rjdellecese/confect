@@ -1,6 +1,7 @@
-import { dual } from "effect/Function";
+import { dual, pipe } from "effect/Function";
 import * as NodeWorker from "@effect/platform-node/NodeWorker";
-import { fork } from "node:child_process";
+import { Worker } from "node:worker_threads";
+import * as Cause from "effect/Cause";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -85,25 +86,18 @@ const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
   };
   return yield* Effect.scoped(
     Effect.gen(function* () {
-      const child = yield* Effect.acquireRelease(
-        Effect.sync(() =>
-          fork(new URL("../dist/EvaluationWorker.mjs", import.meta.url), {
-            serialization: "advanced",
-          }),
+      const worker = yield* Effect.acquireRelease(
+        Effect.sync(
+          () =>
+            new Worker(
+              new URL("../dist/EvaluationWorker.mjs", import.meta.url),
+            ),
         ),
-        (evaluator) =>
-          Effect.callback<void>((resume) => {
-            if (evaluator.exitCode !== null || evaluator.signalCode !== null) {
-              resume(Effect.void);
-              return;
-            }
-            evaluator.once("exit", () => resume(Effect.void));
-            evaluator.kill("SIGKILL");
-          }),
+        (evaluator) => Effect.promise(() => evaluator.terminate()),
       );
       const workerContext = yield* Layer.build(
         RpcClient.layerProtocolWorker({ size: 1 }).pipe(
-          Layer.provide(NodeWorker.layer(() => child)),
+          Layer.provide(NodeWorker.layer(() => worker)),
         ),
       );
       return yield* Effect.gen(function* () {
@@ -114,9 +108,17 @@ const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
   ).pipe(
     Effect.catchTags({
       WorkerError: (error) =>
-        Effect.fail(EvaluationError.make({ diagnostic: error.message })),
+        Effect.fail(
+          EvaluationError.make({
+            diagnostic: pipe(error.reason, Cause.fail, Cause.pretty),
+          }),
+        ),
       RpcClientError: (error) =>
-        Effect.fail(EvaluationError.make({ diagnostic: error.message })),
+        Effect.fail(
+          EvaluationError.make({
+            diagnostic: pipe(error.reason, Cause.fail, Cause.pretty),
+          }),
+        ),
     }),
   );
 });
