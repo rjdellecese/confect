@@ -124,8 +124,7 @@ export class OperationError extends Schema.TaggedError<
 const ReportedBuildFailure = Schema.Struct({
   errors: Schema.NonEmptyArray(Schema.Struct({ text: Schema.String })),
 });
-export const parseFailure = (input: unknown) =>
-  Schema.decodeUnknownOption(ReportedBuildFailure)(input);
+export const parseFailure = Schema.decodeUnknownOption(ReportedBuildFailure);
 
 /**
  * @internal

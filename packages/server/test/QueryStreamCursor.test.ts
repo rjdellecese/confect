@@ -219,17 +219,16 @@ describe("QueryStreamCursor serialization", () => {
     const layout = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["text"]));
     const other = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["body"]));
     const codec = QueryStreamCursor.fromKeyLayout(layout);
-    const encode = (key: QueryStreamKey.Complete) =>
-      Schema.encodeResult(codec)(key).pipe(Result.getOrThrow);
+    const encode = Schema.encodeResult(codec);
     expectTypeOf(encode).parameter(0).toEqualTypeOf<QueryStreamKey.Complete>();
-    expect(() => encode(complete(other, ["hello", "id"]))).toThrow(
-      "Cursor key does not belong to the stream layout",
-    );
+    expect(() =>
+      encode(complete(other, ["hello", "id"])).pipe(Result.getOrThrow),
+    ).toThrow("Cursor key does not belong to the stream layout");
     expect(
       Result.isFailure(Schema.encodeUnknownResult(codec)(["hello", "id"])),
     ).toBe(true);
     const decoded = Schema.decodeResult(codec)(
-      encode(complete(layout, ["hello", "id"])),
+      encode(complete(layout, ["hello", "id"])).pipe(Result.getOrThrow),
     ).pipe(Result.getOrThrow);
     expect(QueryStreamKey.layout(decoded)).toBe(layout);
     expect(QueryStreamKey.values(decoded)).toEqual(["hello", "id"]);

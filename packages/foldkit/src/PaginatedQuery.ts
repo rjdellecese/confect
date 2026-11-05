@@ -273,9 +273,6 @@ const firstDescriptor = (): PageDescriptor => ({
   endCursor: Option.none(),
 });
 
-const decodeOptions = (options: Options): Options =>
-  Schema.decodeResult(Options)(options).pipe(Result.getOrThrow);
-
 const initialState = <Item_, UserArgs_, Error_>(
   generation: number,
   args: UserArgs_,
@@ -284,7 +281,7 @@ const initialState = <Item_, UserArgs_, Error_>(
   State.Active<Item_, UserArgs_, Error_>({
     generation,
     args,
-    options: decodeOptions(options),
+    options: Schema.decodeResult(Options)(options).pipe(Result.getOrThrow),
     paginationId: Option.none(),
     requestId: 1,
     current: firstDescriptor(),
