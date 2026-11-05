@@ -132,11 +132,15 @@ export const Confect = <
   const ArgsFields_ extends ArgsFields,
   Returns extends Schema.Codec<any, any>,
   Error extends Schema.Codec<any, any> = never,
->(
-  args: () => ArgsFields_,
-  returns: () => Returns,
-  error?: () => Error,
-): Confect<ArgsFields_, Returns, Error, Standard> => {
+>({
+  args,
+  returns,
+  error,
+}: {
+  readonly args: () => ArgsFields_;
+  readonly returns: () => Returns;
+  readonly error?: (() => Error) | undefined;
+}): Confect<ArgsFields_, Returns, Error, Standard> => {
   const provenance = { _tag: "Confect" as const, kind: Standard };
 
   Lazy.defineProperty(provenance, "args", () => Schema.Struct(args()));
@@ -203,11 +207,15 @@ export const ConfectPaginated = <
   const UserArgsFields_ extends ArgsFields,
   Item extends Schema.Codec<any, any>,
   Error extends Schema.Codec<any, any> = never,
->(
-  userArgs: () => UserArgsFields_,
-  item: () => Item,
-  error?: () => Error,
-): ConfectPaginated<UserArgsFields_, Item, Error> => {
+>({
+  userArgs,
+  item,
+  error,
+}: {
+  readonly userArgs: () => UserArgsFields_;
+  readonly item: () => Item;
+  readonly error?: (() => Error) | undefined;
+}): ConfectPaginated<UserArgsFields_, Item, Error> => {
   const kind = { _tag: "Paginated" as const };
   const paginatedKind = kind as Paginated<UserArgsFields_, Item>;
 

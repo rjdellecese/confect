@@ -12,32 +12,32 @@ import * as Command from "@confect/foldkit/Command";
 import * as Client from "@confect/foldkit/Client";
 import * as TestClient from "./TestClient";
 
-const listQueryRef = Ref.make(
-  "notes",
-  FunctionSpec.publicQuery({
+const listQueryRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicQuery({
     name: "list",
     args: () => ({}),
     returns: () => Schema.Struct({}),
   }),
-);
+});
 
-const insertMutationRef = Ref.make(
-  "notes",
-  FunctionSpec.publicMutation({
+const insertMutationRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicMutation({
     name: "insert",
     args: () => ({ text: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
-);
+});
 
-const sendActionRef = Ref.make(
-  "email",
-  FunctionSpec.publicAction({
+const sendActionRef = Ref.make({
+  namespace: "email",
+  spec: FunctionSpec.publicAction({
     name: "send",
     args: () => ({ to: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
-);
+});
 
 class NotFound extends Schema.TaggedError<
   NotFound,
@@ -46,15 +46,15 @@ class NotFound extends Schema.TaggedError<
   id: Schema.String,
 }) {}
 
-const deleteMutationRef = Ref.make(
-  "notes",
-  FunctionSpec.publicMutation({
+const deleteMutationRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicMutation({
     name: "deleteOrFail",
     args: () => ({ id: Schema.String, scope: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
-);
+});
 
 const Message = defineMessageUnion({
   SucceededSaveNote: { note: Schema.Unknown },

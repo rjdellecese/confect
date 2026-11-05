@@ -228,13 +228,12 @@ export const combineErrorSchemas = dual<
  *
  * - With a schema: typed errors are schema-encoded and wrapped in a
  *   `ConvexError`, then thrown so Convex surfaces the data to the client.
- *   `Effect.either` escapes the failure channel before `runPromise` so the
+ *   `Effect.result` escapes the failure channel before `runPromise` so the
  *   thrown `ConvexError` retains its `Symbol.for("ConvexError")` identity
  *   instead of being wrapped in Effect's `FiberFailure`.
- * - Without a schema: every failure is converted to a defect via `Effect.orDie`,
- *   so nothing—not even a `ConvexError` the handler placed in its error
- *   channel—reaches the client as a `ConvexError`. The fiber dies and
- *   `runPromise` rejects with a generic failure.
+ * - Without a schema: failures are converted to defects via `Effect.orDie` rather
+ *   than schema-encoded. Ordinary defects reject with Effect's fiber failure;
+ *   `ConvexError` defects retain the passthrough behavior below.
  *
  * Either way, a `ConvexError` _defect_—thrown imperatively rather than placed
  * in the error channel, e.g. the pagination protocol's `InvalidCursor` signal
@@ -249,54 +248,57 @@ export const combineErrorSchemas = dual<
  * op counter survives context pops, so a cooperative yield can fire inside
  * those wrappers—only a root-context scheduler covers them.
  */
-export const runHandlerPromise =
-  (
-    errorSchema: Schema.Codec<any, any> | undefined,
-    runOptions?: {
-      readonly scheduler?: EffectScheduler.Scheduler | undefined;
-    },
-  ) =>
-  <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
-    // A `ConvexError` defect escapes into the (escaped) failure channel so
-    // the `throw` below rethrows it with its identity intact.
-    const rethrowConvexErrorDefects = Effect.catchDefect(
-      (defect: unknown): Effect.Effect<never, ConvexError<any>> =>
-        defect instanceof ConvexError
-          ? Effect.fail(defect)
-          : Effect.die(defect),
-    );
+export const runHandlerPromise = <A, E>({
+  effect,
+  errorSchema,
+  runOptions,
+}: {
+  readonly effect: Effect.Effect<A, E>;
+  readonly errorSchema: Schema.Codec<any, any> | undefined;
+  readonly runOptions?:
+    | {
+        readonly scheduler?: EffectScheduler.Scheduler | undefined;
+      }
+    | undefined;
+}): Promise<A> => {
+  // A `ConvexError` defect escapes into the (escaped) failure channel so
+  // the `throw` below rethrows it with its identity intact.
+  const rethrowConvexErrorDefects = Effect.catchDefect(
+    (defect: unknown): Effect.Effect<never, ConvexError<any>> =>
+      defect instanceof ConvexError ? Effect.fail(defect) : Effect.die(defect),
+  );
 
-    const withConvexError =
-      errorSchema === undefined
-        ? Effect.orDie(effect)
-        : effect.pipe(
-            Effect.catch((typedError) =>
-              pipe(
-                Schema.encodeEffect(errorSchema)(typedError),
-                Effect.catchTag("SchemaError", Effect.die),
-                Effect.andThen((encodedError) =>
-                  Effect.fail(new ConvexError(encodedError)),
-                ),
+  const withConvexError =
+    errorSchema === undefined
+      ? Effect.orDie(effect)
+      : effect.pipe(
+          Effect.catch((typedError) =>
+            pipe(
+              Schema.encodeEffect(errorSchema)(typedError),
+              Effect.catchTag("SchemaError", Effect.die),
+              Effect.andThen((encodedError) =>
+                Effect.fail(new ConvexError(encodedError)),
               ),
             ),
-          );
-    return Effect.runPromise(
-      withConvexError.pipe(
-        rethrowConvexErrorDefects,
-        Effect.result,
-        Effect.provideService(Console.Console, globalThis.console),
-        Effect.provide(ConvexLogger.layer),
-      ),
-      runOptions,
-    ).then(
-      Result.match({
-        onFailure: (error) => {
-          throw error;
-        },
-        onSuccess: (value) => value,
-      }),
-    );
-  };
+          ),
+        );
+  return Effect.runPromise(
+    withConvexError.pipe(
+      rethrowConvexErrorDefects,
+      Effect.result,
+      Effect.provideService(Console.Console, globalThis.console),
+      Effect.provide(ConvexLogger.layer),
+    ),
+    runOptions,
+  ).then(
+    Result.match({
+      onFailure: (error) => {
+        throw error;
+      },
+      onSuccess: (value) => value,
+    }),
+  );
+};
 
 export const actionFunctionBase = <
   Schema extends DatabaseSchema.AnyWithProps,
@@ -333,29 +335,35 @@ export const actionFunctionBase = <
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
-    Effect.gen(function* () {
-      const decodedArgs = yield* pipe(
-        actualArgs,
-        Schema.decodeUnknownEffect(args),
-        Effect.catchTag("SchemaError", Effect.die),
-      );
-      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
-      const decodedReturns = yield* applyMiddleware(
-        handler(decodedArgs),
-        resolvedMiddlewares,
-        {
-          name,
-          functionType: "action",
-          functionVisibility,
-          args: decodedArgs,
-        },
-      ).pipe(Effect.provide(createLayer(ctx)));
-      return yield* pipe(
-        decodedReturns,
-        Schema.encodeEffect(returns),
-        Effect.catchTag("SchemaError", Effect.die),
-      );
-    }).pipe(runHandlerPromise(combineErrorSchemas(error, resolvedMiddlewares))),
+    runHandlerPromise({
+      errorSchema: combineErrorSchemas(error, resolvedMiddlewares),
+      effect: Effect.gen(function* () {
+        const decodedArgs = yield* pipe(
+          actualArgs,
+          Schema.decodeUnknownEffect(args),
+          Effect.catchTag("SchemaError", Effect.die),
+        );
+        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
+        const decodedReturns = yield* applyMiddleware(
+          handler(decodedArgs),
+          resolvedMiddlewares,
+          {
+            name,
+            functionType: "action",
+            functionVisibility,
+            args: decodedArgs,
+          },
+        ).pipe(
+          // oxlint-disable-next-line effecttsgo/strict-effect-provide -- This Convex entry point provides invocation-local services before runHandlerPromise executes the handler.
+          Effect.provide(createLayer(ctx)),
+        );
+        return yield* pipe(
+          decodedReturns,
+          Schema.encodeEffect(returns),
+          Effect.catchTag("SchemaError", Effect.die),
+        );
+      }),
+    }),
 });
 
 export type ActionServices<

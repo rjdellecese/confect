@@ -57,9 +57,9 @@ const make = (nativeRunMutation: GenericActionCtx<any>["runMutation"]) => {
   return { runMutation };
 };
 
-export const MutationRunner = Context.Service<ReturnType<typeof make>>(
-  "@confect/server/MutationRunner",
-);
+export const MutationRunner =
+  // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
+  Context.Service<ReturnType<typeof make>>("@confect/server/MutationRunner");
 export type MutationRunner = typeof MutationRunner.Identifier;
 
 export const layer = (runMutation: GenericActionCtx<any>["runMutation"]) =>

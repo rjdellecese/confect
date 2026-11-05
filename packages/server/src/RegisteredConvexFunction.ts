@@ -262,55 +262,54 @@ const queryFunction = <
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
-    Effect.gen(function* () {
-      const decodedArgs = yield* pipe(
-        actualArgs,
-        Schema.decodeUnknownEffect(args),
-        Effect.catchTag("SchemaError", Effect.die),
-      );
-      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
-      const decodedReturns = yield* RegisteredFunction.applyMiddleware(
-        handler(decodedArgs),
+    RegisteredFunction.runHandlerPromise({
+      errorSchema: RegisteredFunction.combineErrorSchemas(
+        error,
         resolvedMiddlewares,
-        {
-          name,
-          functionType: "query",
-          functionVisibility,
-          args: decodedArgs,
-        },
-      ).pipe(
-        Effect.provide([
-          DatabaseReader.layer(databaseSchema, ctx.db),
-          DocumentIds.layer(databaseSchema, ctx.db),
-          Auth.layer(ctx.auth),
-          ExecutionMetadata.layer(ctx.meta),
-          TransactionMetadata.layer(ctx.meta),
-          Storage.layer(ctx.storage),
-          QueryRunner.layer(ctx.runQuery),
-          QueryTransactionContext.layer(ctx),
-          Layer.succeed(
-            QueryCtx.QueryCtx<
-              DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-            >(),
-            ctx,
-          ),
-          ConvexConfigProvider.layer,
-        ]),
-      );
-      return yield* pipe(
-        decodedReturns,
-        Schema.encodeEffect(returns),
-        Effect.catchTag("SchemaError", Effect.die),
-      );
-    }).pipe(
-      Effect.provideService(Clock.Clock, queryClock),
-      RegisteredFunction.runHandlerPromise(
-        RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
-        {
-          scheduler: new EffectScheduler.MixedScheduler("sync"),
-        },
       ),
-    ),
+      runOptions: { scheduler: new EffectScheduler.MixedScheduler("sync") },
+      effect: Effect.gen(function* () {
+        const decodedArgs = yield* pipe(
+          actualArgs,
+          Schema.decodeUnknownEffect(args),
+          Effect.catchTag("SchemaError", Effect.die),
+        );
+        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
+        const decodedReturns = yield* RegisteredFunction.applyMiddleware(
+          handler(decodedArgs),
+          resolvedMiddlewares,
+          {
+            name,
+            functionType: "query",
+            functionVisibility,
+            args: decodedArgs,
+          },
+        ).pipe(
+          Effect.provide([
+            DatabaseReader.layer(databaseSchema, ctx.db),
+            DocumentIds.layer(databaseSchema, ctx.db),
+            Auth.layer(ctx.auth),
+            ExecutionMetadata.layer(ctx.meta),
+            TransactionMetadata.layer(ctx.meta),
+            Storage.layer(ctx.storage),
+            QueryRunner.layer(ctx.runQuery),
+            QueryTransactionContext.layer(ctx),
+            Layer.succeed(
+              QueryCtx.QueryCtx<
+                DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+              >(),
+              ctx,
+            ),
+            ConvexConfigProvider.layer,
+          ]),
+        );
+        return yield* pipe(
+          decodedReturns,
+          Schema.encodeEffect(returns),
+          Effect.catchTag("SchemaError", Effect.die),
+        );
+      }).pipe(Effect.provideService(Clock.Clock, queryClock)),
+    }),
 });
 
 export const mutationLayer = dual<
@@ -406,36 +405,39 @@ const mutationFunction = <
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
-    Effect.gen(function* () {
-      const decodedArgs = yield* pipe(
-        actualArgs,
-        Schema.decodeUnknownEffect(args),
-        Effect.catchTag("SchemaError", Effect.die),
-      );
-      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
-      const decodedReturns = yield* RegisteredFunction.applyMiddleware(
-        handler(decodedArgs),
+    RegisteredFunction.runHandlerPromise({
+      errorSchema: RegisteredFunction.combineErrorSchemas(
+        error,
         resolvedMiddlewares,
-        {
-          name,
-          functionType: "mutation",
-          functionVisibility,
-          args: decodedArgs,
-        },
-      ).pipe(Effect.provide(mutationLayer(databaseSchema, ctx)));
-      return yield* pipe(
-        decodedReturns,
-        Schema.encodeEffect(returns),
-        Effect.catchTag("SchemaError", Effect.die),
-      );
-    }).pipe(
-      RegisteredFunction.runHandlerPromise(
-        RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
-        {
-          scheduler: new EffectScheduler.MixedScheduler("sync"),
-        },
       ),
-    ),
+      runOptions: { scheduler: new EffectScheduler.MixedScheduler("sync") },
+      effect: Effect.gen(function* () {
+        const decodedArgs = yield* pipe(
+          actualArgs,
+          Schema.decodeUnknownEffect(args),
+          Effect.catchTag("SchemaError", Effect.die),
+        );
+        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
+        const decodedReturns = yield* RegisteredFunction.applyMiddleware(
+          handler(decodedArgs),
+          resolvedMiddlewares,
+          {
+            name,
+            functionType: "mutation",
+            functionVisibility,
+            args: decodedArgs,
+          },
+        ).pipe(
+          // oxlint-disable-next-line effecttsgo/strict-effect-provide -- This Convex entry point provides invocation-local services before runHandlerPromise executes the handler.
+          Effect.provide(mutationLayer(databaseSchema, ctx)),
+        );
+        return yield* pipe(
+          decodedReturns,
+          Schema.encodeEffect(returns),
+          Effect.catchTag("SchemaError", Effect.die),
+        );
+      }),
+    }),
 });
 
 const convexActionFunction = <

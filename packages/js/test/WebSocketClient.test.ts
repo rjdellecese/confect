@@ -36,56 +36,56 @@ class AuthObserver extends Context.Service<
   }
 >()("@confect/js/test/WebSocketClient.test/AuthObserver") {}
 
-const noArgsQueryRef = Ref.make(
-  "notes",
-  FunctionSpec.publicQuery({
+const noArgsQueryRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicQuery({
     name: "list",
     returns: () => Schema.Struct({}),
   }),
-);
+});
 
-const argsQueryRef = Ref.make(
-  "notes",
-  FunctionSpec.publicQuery({
+const argsQueryRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicQuery({
     name: "get",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
-);
+});
 
-const noArgsMutationRef = Ref.make(
-  "tasks",
-  FunctionSpec.publicMutation({
+const noArgsMutationRef = Ref.make({
+  namespace: "tasks",
+  spec: FunctionSpec.publicMutation({
     name: "cleanup",
     returns: () => Schema.Struct({}),
   }),
-);
+});
 
-const argsMutationRef = Ref.make(
-  "notes",
-  FunctionSpec.publicMutation({
+const argsMutationRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicMutation({
     name: "insert",
     args: () => ({ text: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
-);
+});
 
-const noArgsActionRef = Ref.make(
-  "random",
-  FunctionSpec.publicAction({
+const noArgsActionRef = Ref.make({
+  namespace: "random",
+  spec: FunctionSpec.publicAction({
     name: "getNumber",
     returns: () => Schema.Struct({}),
   }),
-);
+});
 
-const argsActionRef = Ref.make(
-  "email",
-  FunctionSpec.publicAction({
+const argsActionRef = Ref.make({
+  namespace: "email",
+  spec: FunctionSpec.publicAction({
     name: "send",
     args: () => ({ to: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
-);
+});
 
 class NotFound extends Schema.TaggedError<
   NotFound,
@@ -94,35 +94,35 @@ class NotFound extends Schema.TaggedError<
   id: Schema.String,
 }) {}
 
-const queryWithError = Ref.make(
-  "notes",
-  FunctionSpec.publicQuery({
+const queryWithError = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicQuery({
     name: "getOrFail",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({ text: Schema.String }),
     error: () => NotFound,
   }),
-);
+});
 
-const mutationWithError = Ref.make(
-  "notes",
-  FunctionSpec.publicMutation({
+const mutationWithError = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicMutation({
     name: "deleteOrFail",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
-);
+});
 
-const actionWithError = Ref.make(
-  "tasks",
-  FunctionSpec.publicAction({
+const actionWithError = Ref.make({
+  namespace: "tasks",
+  spec: FunctionSpec.publicAction({
     name: "runOrFail",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
-);
+});
 
 it("preserves generic arguments, results, and error channels", () => {
   const check = (client: WebSocketClient.WebSocketClient) => {

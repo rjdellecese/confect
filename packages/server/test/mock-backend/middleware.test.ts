@@ -466,9 +466,12 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
               Effect.provideContext(services),
             );
           }).pipe(Effect.scoped);
-          const queryResult = yield* c.query(Ref.make("options", query), {
-            id: "decoded",
-          });
+          const queryResult = yield* c.query(
+            Ref.make({ namespace: "options", spec: query }),
+            {
+              id: "decoded",
+            },
+          );
           expect(queryResult).toBe("ok");
           expect(events).toEqual([
             "group",
@@ -534,7 +537,9 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
               Effect.provideContext(services),
             );
           }).pipe(Effect.scoped);
-          const invocation = c.query(Ref.make("options", query));
+          const invocation = c.query(
+            Ref.make({ namespace: "options", spec: query }),
+          );
           expectTypeOf(invocation).toEqualTypeOf<
             Effect.Effect<string, Schema.SchemaError>
           >();

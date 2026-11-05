@@ -47,60 +47,60 @@ class NotFound extends Schema.TaggedError<
   id: Schema.String,
 }) {}
 
-const queryWithError = Ref.make(
-  "notes",
-  FunctionSpec.publicQuery({
+const queryWithError = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicQuery({
     name: "getOrFail",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({ text: Schema.String }),
     error: () => NotFound,
   }),
-);
+});
 
-const queryNoError = Ref.make(
-  "notes",
-  FunctionSpec.publicQuery({
+const queryNoError = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicQuery({
     name: "list",
     returns: () => Schema.Array(Schema.Struct({ text: Schema.String })),
   }),
-);
+});
 
-const mutationWithError = Ref.make(
-  "notes",
-  FunctionSpec.publicMutation({
+const mutationWithError = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicMutation({
     name: "deleteOrFail",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
-);
+});
 
-const mutationNoError = Ref.make(
-  "notes",
-  FunctionSpec.publicMutation({
+const mutationNoError = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicMutation({
     name: "insert",
     args: () => ({ text: Schema.String }),
     returns: () => Schema.String,
   }),
-);
+});
 
-const actionWithError = Ref.make(
-  "tasks",
-  FunctionSpec.publicAction({
+const actionWithError = Ref.make({
+  namespace: "tasks",
+  spec: FunctionSpec.publicAction({
     name: "runOrFail",
     args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
-);
+});
 
-const actionNoError = Ref.make(
-  "tasks",
-  FunctionSpec.publicAction({
+const actionNoError = Ref.make({
+  namespace: "tasks",
+  spec: FunctionSpec.publicAction({
     name: "ping",
     returns: () => Schema.String,
   }),
-);
+});
 
 beforeEach(() => {
   useConvexQueryMock.mockReset();
@@ -464,36 +464,36 @@ describe("useAction", () => {
 describe("usePaginatedQuery", () => {
   const paginatedDoc = Schema.Struct({ value: Schema.FiniteFromString });
 
-  const paginatedQuery = Ref.make(
-    "notes",
-    FunctionSpec.publicPaginatedQuery({
+  const paginatedQuery = Ref.make({
+    namespace: "notes",
+    spec: FunctionSpec.publicPaginatedQuery({
       name: "listPaginated",
       args: () => ({ count: Schema.FiniteFromString }),
       item: () => paginatedDoc,
     }),
-  );
+  });
 
-  const paginatedQueryNoExtraArgs = Ref.make(
-    "notes",
-    FunctionSpec.publicPaginatedQuery({
+  const paginatedQueryNoExtraArgs = Ref.make({
+    namespace: "notes",
+    spec: FunctionSpec.publicPaginatedQuery({
       name: "listAllPaginated",
       item: () => paginatedDoc,
     }),
-  );
+  });
 
   class PaginationFailed extends Schema.TaggedError<
     PaginationFailed,
     { readonly brand: unique symbol }
   >()("PaginationFailed", { reason: Schema.String }) {}
 
-  const paginatedQueryWithError = Ref.make(
-    "notes",
-    FunctionSpec.publicPaginatedQuery({
+  const paginatedQueryWithError = Ref.make({
+    namespace: "notes",
+    spec: FunctionSpec.publicPaginatedQuery({
       name: "listPaginatedOrFail",
       item: () => paginatedDoc,
       error: () => PaginationFailed,
     }),
-  );
+  });
 
   const user = (
     partial: Partial<{

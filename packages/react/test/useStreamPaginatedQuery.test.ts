@@ -25,22 +25,22 @@ vi.mock("convex/react", () => ({
 
 const Item = Schema.Struct({ value: Schema.FiniteFromString });
 
-const list = Ref.make(
-  "notes",
-  FunctionSpec.publicPaginatedQuery({
+const list = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicPaginatedQuery({
     name: "list",
     item: () => Item,
   }),
-);
+});
 
-const listWithArgs = Ref.make(
-  "notes",
-  FunctionSpec.publicPaginatedQuery({
+const listWithArgs = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicPaginatedQuery({
     name: "listWithArgs",
     args: () => ({ count: Schema.FiniteFromString }),
     item: () => Item,
   }),
-);
+});
 
 class Boom extends Schema.TaggedError<
   Boom,
@@ -49,14 +49,14 @@ class Boom extends Schema.TaggedError<
   reason: Schema.String,
 }) {}
 
-const listOrFail = Ref.make(
-  "notes",
-  FunctionSpec.publicPaginatedQuery({
+const listOrFail = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicPaginatedQuery({
     name: "listOrFail",
     item: () => Item,
     error: () => Boom,
   }),
-);
+});
 
 /**
  * The mock serves each subscribed page from `responses`, keyed by the page's

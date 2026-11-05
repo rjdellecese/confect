@@ -17,15 +17,15 @@ class NotFound extends Schema.TaggedError<
   id: Schema.String,
 }) {}
 
-const ref = Ref.make(
-  "notes",
-  FunctionSpec.publicQuery({
+const ref = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicQuery({
     name: "count",
     args: () => ({ count: Schema.FiniteFromString }),
     returns: () => Schema.FiniteFromString,
     error: () => NotFound,
   }),
-);
+});
 
 describe("QueryTransactionContext", () => {
   it("exports a distinct nominal service and native limit types", () => {

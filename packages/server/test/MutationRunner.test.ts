@@ -22,11 +22,17 @@ const definition = {
   returns: () => Schema.FiniteFromString,
   error: () => NotFound,
 };
-const ref = Ref.make("notes", FunctionSpec.publicMutation(definition));
-const emptyRef = Ref.make(
-  "notes",
-  FunctionSpec.publicMutation({ name: "empty", returns: () => Schema.String }),
-);
+const ref = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicMutation(definition),
+});
+const emptyRef = Ref.make({
+  namespace: "notes",
+  spec: FunctionSpec.publicMutation({
+    name: "empty",
+    returns: () => Schema.String,
+  }),
+});
 
 describe("MutationRunner", () => {
   it.effect(
@@ -219,7 +225,10 @@ describe("MutationRunner", () => {
               >
             >();
             expectTypeOf(
-              Ref.make("notes", FunctionSpec.publicQuery(definition)),
+              Ref.make({
+                namespace: "notes",
+                spec: FunctionSpec.publicQuery(definition),
+              }),
             ).not.toExtend<Parameters<typeof runner.runMutation>[0]>();
             expectTypeOf(
               // @ts-expect-error Required arguments cannot be omitted.

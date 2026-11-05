@@ -44,9 +44,9 @@ const make = (scheduler: ConvexScheduler) => ({
   },
 });
 
-export const Scheduler = Context.Service<ReturnType<typeof make>>(
-  "@confect/server/Scheduler",
-);
+export const Scheduler =
+  // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
+  Context.Service<ReturnType<typeof make>>("@confect/server/Scheduler");
 export type Scheduler = typeof Scheduler.Identifier;
 
 export const layer = (scheduler: ConvexScheduler) =>

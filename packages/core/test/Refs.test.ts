@@ -27,7 +27,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
-    const expectedRef = Ref.make("notes", list);
+    const expectedRef = Ref.make({ namespace: "notes", spec: list });
 
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),
@@ -57,7 +57,7 @@ describe("make", () => {
       email: GroupSpec.makeNode().addFunction(send),
     });
     const refs = Refs.make(spec);
-    const expectedRef = Ref.make("groups/notes", list);
+    const expectedRef = Ref.make({ namespace: "groups/notes", spec: list });
 
     expect(Record.keys(refs.public).sort(String.Order)).toEqual([
       "databaseReader",
@@ -241,7 +241,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
-    const expectedRef = Ref.make("notes", listSpec);
+    const expectedRef = Ref.make({ namespace: "notes", spec: listSpec });
 
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),
