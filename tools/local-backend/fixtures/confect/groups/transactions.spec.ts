@@ -69,4 +69,18 @@ export default GroupSpec.make()
       args: () => ({ caseId: Schema.String, stale: Schema.Boolean }),
       returns: () => Schema.Array(Schema.String),
     }),
+  )
+  .addFunction(
+    FunctionSpec.publicMutation({
+      name: "patchAll",
+      args: () => ({
+        caseId: Schema.String,
+        via: Schema.Literals(["confect", "convex"]),
+      }),
+      returns: () =>
+        Schema.Struct({
+          documentsRead: Schema.Finite,
+          bytesRead: Schema.Finite,
+        }),
+    }),
   );

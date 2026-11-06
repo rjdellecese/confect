@@ -6,8 +6,10 @@ import refs from "../_generated/refs";
 import {
   DatabaseReader,
   DatabaseWriter,
+  MutationCtx,
   MutationRunner,
   QueryRunner,
+  TransactionMetadata,
 } from "../_generated/services";
 import transactions, { RejectedWrite } from "./transactions.spec";
 
@@ -164,6 +166,40 @@ const staleRead = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
+// Reads a case's notes, then patches each one through Confect's
+// `DatabaseWriter` or through Convex's `ctx.db.patch`, and reports what the
+// mutation read.
+const patchAll = FunctionImpl.make(
+  databaseSchema,
+  transactions,
+  "patchAll",
+  ({ caseId, via }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      const writer = yield* DatabaseWriter;
+      const ctx = yield* MutationCtx;
+      const notes = yield* reader
+        .table("transactionNotes")
+        .index("by_caseId", (q) => q.eq("caseId", caseId))
+        .collect();
+      for (const note of notes) {
+        const patch = { value: `${note.value}-patched` };
+        if (via === "confect") {
+          yield* writer.table("transactionNotes").patch(note._id, patch);
+        } else {
+          yield* Effect.promise(() =>
+            ctx.db.patch("transactionNotes", note._id, patch),
+          );
+        }
+      }
+      const metrics = yield* (yield* TransactionMetadata).getMetrics();
+      return {
+        documentsRead: metrics.documentsRead.used,
+        bytesRead: metrics.bytesRead.used,
+      };
+    }).pipe(Effect.orDie),
+);
+
 export default GroupImpl.make(databaseSchema, transactions).pipe(
   Layer.provide(read),
   Layer.provide(write),
@@ -173,5 +209,6 @@ export default GroupImpl.make(databaseSchema, transactions).pipe(
   Layer.provide(limitedWrite),
   Layer.provide(rollback),
   Layer.provide(staleRead),
+  Layer.provide(patchAll),
   GroupImpl.finalize,
 );

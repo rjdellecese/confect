@@ -3,6 +3,7 @@ import registeredFunctions from "../../confect/_generated/registeredFunctions/gr
 export const limitedRead = registeredFunctions.limitedRead;
 export const limitedReadFromMutation = registeredFunctions.limitedReadFromMutation;
 export const limitedWrite = registeredFunctions.limitedWrite;
+export const patchAll = registeredFunctions.patchAll;
 export const read = registeredFunctions.read;
 export const rollback = registeredFunctions.rollback;
 export const seed = registeredFunctions.seed;
