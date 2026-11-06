@@ -1,5 +1,11 @@
 # @confect/core
 
+## 10.6.0
+
+### Patch Changes
+
+- 4a019bd: Preserve schema validation errors, backend handler isolation, and client query and subscription behavior while updating the Effect integration.
+
 ## 10.5.0
 
 No changes in this release.

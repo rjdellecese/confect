@@ -1,5 +1,12 @@
 # @confect/cli
 
+## 10.6.0
+
+### Patch Changes
+
+- f8d47d9: Allow `@confect/cli` to use `bundle-require` 5.0.0 and `code-block-writer` 13.0.2 without changing its upper compatibility bounds.
+- 536d8cd: Preserve `confect codegen` and `confect dev` behavior while updating their Effect integration.
+
 ## 10.5.0
 
 ### Minor Changes
