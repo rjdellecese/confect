@@ -1,3 +1,5 @@
+import * as Record from "effect/Record";
+import * as Array from "effect/Array";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
@@ -181,13 +183,15 @@ export const make = <
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
   layerFromImpls(
     middlewareSpec,
-    Object.fromEntries(
-      MiddlewareSpec.allFunctionTypes
-        .filter((functionType) => middlewareSpec.functionTypes[functionType])
-        .map((functionType) => [
-          functionType,
-          impl as MiddlewareSpec.AnyMiddlewareImpl,
-        ]),
+    Record.fromEntries(
+      Array.map(
+        Array.filter(
+          MiddlewareSpec.allFunctionTypes,
+          (functionType) => middlewareSpec.functionTypes[functionType],
+        ),
+        (functionType) =>
+          [functionType, impl as MiddlewareSpec.AnyMiddlewareImpl] as const,
+      ),
     ),
   );
 

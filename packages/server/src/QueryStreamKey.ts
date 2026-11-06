@@ -1,8 +1,13 @@
+import * as Schema from "effect/Schema";
 import * as Data from "effect/Data";
 import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "./QueryStreamKeyLayout";
 import type * as QueryStreamKeyValues from "./QueryStreamKeyValues";
+
+const NumberValue = Schema.declare<number>(
+  (value): value is number => typeof value === "number",
+);
 
 const TypeId = "~@confect/server/QueryStreamKey";
 
@@ -33,13 +38,14 @@ export type Prefix = Data.TaggedEnum.Value<QueryStreamKey, "Prefix">;
 /**
  * @experimental
  */
-export class KeyWidthMismatchError extends Data.TaggedError(
-  "KeyWidthMismatchError",
-)<{
-  readonly kind: "complete" | "prefix";
-  readonly width: number;
-  readonly actual: number;
-}> {
+export class KeyWidthMismatchError extends Schema.TaggedError<
+  KeyWidthMismatchError,
+  {}
+>()("KeyWidthMismatchError", {
+  kind: Schema.Literals(["complete", "prefix"]),
+  width: NumberValue,
+  actual: NumberValue,
+}) {
   override get message(): string {
     return `Invalid ${this.kind} key width (${this.actual}); expected ${this.kind === "complete" ? "exactly" : "at most"} ${this.width}`;
   }
@@ -58,7 +64,7 @@ export const complete = (
         QueryStreamKey.Complete({ [TypeId]: TypeId, layout, values }),
       )
     : Result.fail(
-        new KeyWidthMismatchError({
+        KeyWidthMismatchError.make({
           kind: "complete",
           width,
           actual: values.length,
@@ -79,7 +85,7 @@ export const prefix = (
         QueryStreamKey.Prefix({ [TypeId]: TypeId, layout, values }),
       )
     : Result.fail(
-        new KeyWidthMismatchError({
+        KeyWidthMismatchError.make({
           kind: "prefix",
           width,
           actual: values.length,

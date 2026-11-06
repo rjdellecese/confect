@@ -1,7 +1,11 @@
+import * as Str from "effect/String";
+import * as Record from "effect/Record";
+import * as Option from "effect/Option";
+import * as Arr from "effect/Array";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Console from "effect/Console";
-import * as Data from "effect/Data";
+import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -28,11 +32,10 @@ const COLUMN_WIDTH = 12;
  */
 const CORNER = "╰";
 
-export class StreamDiagramsError extends Data.TaggedError(
-  "StreamDiagramsError",
-)<{
-  readonly reason: string;
-}> {
+export class StreamDiagramsError extends Schema.TaggedError<
+  StreamDiagramsError,
+  {}
+>()("StreamDiagramsError", { reason: Schema.String }) {
   readonly [Runtime.errorReported] = false;
 
   override get message(): string {
@@ -46,11 +49,11 @@ export class StreamDiagramsError extends Data.TaggedError(
 type Cell = string | undefined;
 
 export const cell = (label: string): string =>
-  `─ ${label} `.padEnd(COLUMN_WIDTH, "─");
+  Str.padEnd(COLUMN_WIDTH, "─")(`─ ${label} `);
 
-const gap = "─".repeat(COLUMN_WIDTH);
+const gap = Str.repeat(COLUMN_WIDTH)("─");
 
-const keyCell = (key: string): string => `  ${key}`.padEnd(COLUMN_WIDTH);
+const keyCell = (key: string): string => Str.padEnd(COLUMN_WIDTH)(`  ${key}`);
 
 /**
  * A track: a named stream, one cell per column, ending in `end`. The name is
@@ -64,14 +67,20 @@ export const track = (
   end = "┤",
   start = 0,
 ): string => {
-  const indent = " ".repeat(COLUMN_WIDTH * start);
+  if (COLUMN_WIDTH * start <= -1) {
+    throw new RangeError(`Invalid count value: ${COLUMN_WIDTH * start}`);
+  }
+  const indent = Str.repeat(COLUMN_WIDTH * start)(" ");
   return (
     indent +
     name +
     "\n" +
     indent +
     CORNER +
-    cells.map((label) => (label === undefined ? gap : cell(label))).join("") +
+    Arr.join(
+      Arr.map(cells, (label) => (label === undefined ? gap : cell(label))),
+      "",
+    ) +
     end
   );
 };
@@ -81,9 +90,12 @@ export const track = (
  */
 export const keys = (values: ReadonlyArray<Cell>): string =>
   " " +
-  values
-    .map((key) => (key === undefined ? " ".repeat(COLUMN_WIDTH) : keyCell(key)))
-    .join("");
+  Arr.join(
+    Arr.map(values, (key) =>
+      key === undefined ? Str.repeat(COLUMN_WIDTH)(" ") : keyCell(key),
+    ),
+    "",
+  );
 
 /**
  * The operation between an input track and its output.
@@ -91,13 +103,16 @@ export const keys = (values: ReadonlyArray<Cell>): string =>
 const op = (text: string): string => `╞═ ${text} ═╡`;
 
 const lines = (...rows: ReadonlyArray<string>): string =>
-  rows.map((row) => row.trimEnd()).join("\n");
+  Arr.join(
+    Arr.map(rows, (row) => Str.trimEnd(row)),
+    "\n",
+  );
 
 /**
  * A cursor between two keys, drawn at the start of column `column`.
  */
 const cursorAt = (column: number): string =>
-  " ".repeat(1 + COLUMN_WIDTH * column) + "╎";
+  Str.repeat(1 + COLUMN_WIDTH * column)(" ") + "╎";
 
 const BY_TEXT = ["n1", "n3", "n2", "n5", "n4", "n6"];
 const BY_TEXT_KEYS = [
@@ -266,7 +281,7 @@ export const diagrams: Readonly<Record<string, string>> = {
   narrow: lines(
     track("by_text", BY_TEXT),
     keys(BY_TEXT_KEYS),
-    `${cursorAt(3)} start${" ".repeat(COLUMN_WIDTH * 2 - 7)}╎ end`,
+    `${cursorAt(3)} start${Str.repeat(COLUMN_WIDTH * 2 - 7)(" ")}╎ end`,
     "",
     op("narrow: start exclusive, end inclusive"),
     "",
@@ -284,11 +299,11 @@ export const diagrams: Readonly<Record<string, string>> = {
     "",
     op("paginate({ numItems: 2, cursor: [apple,3] })"),
     "",
-    `${cursorAt(2)}${cell("n2").slice(1)}${cell("n5")}╎  continueCursor: [banana,5]`,
+    `${cursorAt(2)}${Str.slice(1)(cell("n2"))}${cell("n5")}╎  continueCursor: [banana,5]`,
     "",
     op("paginate({ numItems: 2, cursor: [banana,5] })"),
     "",
-    `${cursorAt(4)}${cell("n4").slice(1)}${cell("(n6)")}┤  isDone: true`,
+    `${cursorAt(4)}${Str.slice(1)(cell("n4"))}${cell("(n6)")}┤  isDone: true`,
   ),
 
   "end-cursor": lines(
@@ -297,7 +312,7 @@ export const diagrams: Readonly<Record<string, string>> = {
     "",
     op("paginate({ cursor: [apple,3], endCursor: [banana,5], numItems: 2 })"),
     "",
-    `${cursorAt(2)}${cell("n2").slice(1)}${cell("n5")}╎  exactly this range, however many documents it holds`,
+    `${cursorAt(2)}${Str.slice(1)(cell("n2"))}${cell("n5")}╎  exactly this range, however many documents it holds`,
   ),
 };
 
@@ -313,24 +328,30 @@ export const renderDiagrams = Effect.fnUntraced(function* (
 ): Effect.fn.Return<string, StreamDiagramsError> {
   const seen = new Set<string>();
   let unknown: string | undefined;
-  const rendered = source.replace(MARKED_BLOCK, (match, name: string) => {
+  let rendered = "";
+  let offset = 0;
+  for (const match of Str.matchAll(MARKED_BLOCK)(source)) {
+    const name = match[1] ?? "";
     const diagram = diagrams[name];
     if (diagram === undefined) {
       unknown ??= name;
-      return match;
+      continue;
     }
     seen.add(name);
-    return `{/* stream-diagram: ${name} */}\n\n\`\`\`text\n${diagram}\n\`\`\``;
-  });
+    rendered += Str.slice(offset, match.index)(source);
+    rendered += `{/* stream-diagram: ${name} */}\n\n\`\`\`text\n${diagram}\n\`\`\``;
+    offset = (match.index ?? offset) + match[0].length;
+  }
+  rendered += Str.slice(offset)(source);
   if (unknown !== undefined) {
-    return yield* new StreamDiagramsError({
+    return yield* StreamDiagramsError.make({
       reason: `${PAGE} references an unknown diagram: ${unknown}`,
     });
   }
-  const unused = Object.keys(diagrams).filter((name) => !seen.has(name));
+  const unused = Arr.filter(Record.keys(diagrams), (name) => !seen.has(name));
   if (unused.length > 0) {
-    return yield* new StreamDiagramsError({
-      reason: `${PAGE} has no block for: ${unused.join(", ")}`,
+    return yield* StreamDiagramsError.make({
+      reason: `${PAGE} has no block for: ${Arr.join(unused, ", ")}`,
     });
   }
   return rendered;
@@ -341,6 +362,9 @@ export interface SyncOptions {
   readonly cwd?: string;
 }
 
+/**
+ * @internal
+ */
 export const syncStreamDiagrams = Effect.fn("StreamDiagrams.sync")(function* (
   options: SyncOptions = {},
 ) {
@@ -356,7 +380,7 @@ export const syncStreamDiagrams = Effect.fn("StreamDiagrams.sync")(function* (
   }
 
   if (options.check === true) {
-    return yield* new StreamDiagramsError({
+    return yield* StreamDiagramsError.make({
       reason: `${PAGE} diagrams are stale; run \`pnpm docs:stream-diagrams\``,
     });
   }
@@ -365,12 +389,17 @@ export const syncStreamDiagrams = Effect.fn("StreamDiagrams.sync")(function* (
   yield* Console.log(`updated ${PAGE} diagrams`);
 });
 
+/**
+ * @internal
+ */
 export const streamDiagramsMain = Effect.fn("StreamDiagrams.main")(function* (
   args: ReadonlyArray<string>,
 ) {
-  const unknownArgument = args.find((argument) => argument !== "--check");
+  const unknownArgument = Option.getOrUndefined(
+    Arr.findFirst(args, (argument) => argument !== "--check"),
+  );
   if (unknownArgument !== undefined) {
-    return yield* new StreamDiagramsError({
+    return yield* StreamDiagramsError.make({
       reason: `Unknown argument: ${unknownArgument}`,
     });
   }

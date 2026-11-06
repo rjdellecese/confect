@@ -1,3 +1,4 @@
+import { pipe } from "effect/Function";
 import * as FileSystem from "effect/FileSystem";
 import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
 import * as Path from "effect/Path";
@@ -21,7 +22,6 @@ import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import { DatabaseSchema, GroupImpl } from "@confect/server";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
-import * as Result from "effect/Result";
 import * as String from "effect/String";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -160,11 +160,10 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
   layer(pathLayer)(`LeafModule paths, discovered as ${name}`, (it) => {
     it.effect("groupPathFromRelativeModulePath maps nested spec files", () =>
       Effect.gen(function* () {
-        expect(
-          yield* groupPathFromRelativeModulePath(
-            p("notesAndRandom", "notes.spec.ts"),
-          ),
-        ).toEqual({
+        const actual = yield* groupPathFromRelativeModulePath(
+          p("notesAndRandom", "notes.spec.ts"),
+        );
+        expect(actual).toEqual({
           pathSegments: ["notesAndRandom", "notes"],
           groupPathDot: "notesAndRandom.notes",
         });
@@ -175,9 +174,10 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
       "specPathForImpl maps impl paths to sibling spec paths, keeping the platform separator",
       () =>
         Effect.gen(function* () {
-          expect(
-            yield* specPathForImpl(p("notesAndRandom", "notes.impl.ts")),
-          ).toBe(p("notesAndRandom", "notes.spec.ts"));
+          const actual2 = yield* specPathForImpl(
+            p("notesAndRandom", "notes.impl.ts"),
+          );
+          expect(actual2).toBe(p("notesAndRandom", "notes.spec.ts"));
         }),
     );
 
@@ -185,9 +185,10 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
       "implPathForSpec maps spec paths to sibling impl paths, keeping the platform separator",
       () =>
         Effect.gen(function* () {
-          expect(
-            yield* implPathForSpec(p("notesAndRandom", "notes.spec.ts")),
-          ).toBe(p("notesAndRandom", "notes.impl.ts"));
+          const actual3 = yield* implPathForSpec(
+            p("notesAndRandom", "notes.spec.ts"),
+          );
+          expect(actual3).toBe(p("notesAndRandom", "notes.impl.ts"));
         }),
     );
 
@@ -195,11 +196,10 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
       "specImportPathFromGenerated builds a POSIX specifier, not a filesystem path",
       () =>
         Effect.gen(function* () {
-          expect(
-            yield* specImportPathFromGenerated(
-              p("notesAndRandom", "notes.spec.ts"),
-            ),
-          ).toBe("../notesAndRandom/notes.spec");
+          const actual4 = yield* specImportPathFromGenerated(
+            p("notesAndRandom", "notes.spec.ts"),
+          );
+          expect(actual4).toBe("../notesAndRandom/notes.spec");
         }),
     );
 
@@ -274,7 +274,7 @@ export default GroupSpec.make().middleware(Policy, { roles: ["Internal"] }).addF
             loadSpec(leaf),
           ),
         );
-        assert(Result.isFailure(result));
+        assert(result._tag === "Failure");
         assert(result.failure._tag === "InvalidMiddlewareAttachmentError");
         expect(result.failure.specPath).toBe(leaf.relativePath);
         expect(result.failure.message).toMatch(
@@ -344,7 +344,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
         ),
       );
 
-      assert(Result.isFailure(result));
+      assert(result._tag === "Failure");
       expect(result.failure._tag).toBe("SpecMissingDefaultGroupSpecError");
     }),
   );
@@ -360,7 +360,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
         ),
       );
 
-      assert(Result.isFailure(result));
+      assert(result._tag === "Failure");
       assert(result.failure._tag === "BundleFailedError");
       expect(result.failure.errors.length).toBeGreaterThan(0);
     }),
@@ -404,7 +404,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
           ),
         );
 
-        assert(Result.isFailure(result));
+        assert(result._tag === "Failure");
         assert(result.failure._tag === "SpecImportsServerError");
         expect(result.failure.specPath).toBe("groups/_leakyTable.spec.ts");
         expect(result.failure.importerPaths).toStrictEqual([
@@ -424,7 +424,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
         ),
       );
 
-      assert(Result.isFailure(result));
+      assert(result._tag === "Failure");
       assert(result.failure._tag === "SpecImportsServerError");
       expect(result.failure.importerPaths).toStrictEqual([
         "groups/_leaky.spec.ts",
@@ -457,7 +457,7 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
           ),
         );
 
-        assert(Result.isFailure(result));
+        assert(result._tag === "Failure");
         assert(result.failure._tag === "SpecImportsServerError");
         expect(result.failure.specPath).toBe(
           "groups/_leakyViaMiddleware.spec.ts",
@@ -513,12 +513,13 @@ layer(LeafModuleLayer)("discovery", (it) => {
           path.join("_generated", "notes.impl.ts"),
           path.join("groups", "nested.impl.ts"),
         ];
+        const services = yield* Layer.build(
+          FileSystem.layerNoop({
+            readDirectory: () => Effect.succeed(files),
+          }),
+        );
         const implFiles = yield* discoverLeafImplFiles.pipe(
-          Effect.provide(
-            FileSystem.layerNoop({
-              readDirectory: () => Effect.succeed(files),
-            }),
-          ),
+          Effect.provideContext(services),
         );
         expect(implFiles).toEqual([
           "notes.impl.ts",
@@ -576,7 +577,7 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
         (spy) => Effect.sync(() => spy.mockRestore()),
       );
       yield* validateImpl(loaded);
-      expect(bundle.mock.calls.map(([entry]) => entry)).toEqual([
+      expect(Array.map(bundle.mock.calls, ([entry]) => entry)).toEqual([
         path.resolve(fixtureConfect, "groups/notes.impl.ts"),
       ]);
     }).pipe(Effect.scoped),
@@ -595,7 +596,7 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
       yield* Effect.acquireRelease(
         Effect.sync(() =>
           vi.spyOn(Bundler, "bundle").mockImplementation((entry) =>
-            entry.endsWith(".spec.ts")
+            pipe(entry, String.endsWith(".spec.ts"))
               ? Effect.succeed({
                   module: { default: groupSpec },
                   metafile: { inputs: {}, outputs: {} },
@@ -605,8 +606,9 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
         ),
         (spy) => Effect.sync(() => spy.mockRestore()),
       );
-      const result = yield* Effect.result(validateImpl(yield* loadSpec(leaf)));
-      assert(Result.isFailure(result));
+      const actual5 = yield* loadSpec(leaf);
+      const result = yield* Effect.result(validateImpl(actual5));
+      assert(result._tag === "Failure");
       expect(result.failure).toMatchObject({
         _tag: "ImplMissingFunctionsError",
         missingFunctionNames: ["missing"],
@@ -628,7 +630,7 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
       yield* Effect.acquireRelease(
         Effect.sync(() =>
           vi.spyOn(Bundler, "bundle").mockImplementation((entry) =>
-            entry.endsWith(".spec.ts")
+            pipe(entry, String.endsWith(".spec.ts"))
               ? Effect.succeed({
                   module: { default: groupSpec },
                   metafile: { inputs: {}, outputs: {} },
@@ -638,8 +640,9 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
         ),
         (spy) => Effect.sync(() => spy.mockRestore()),
       );
-      const result = yield* Effect.result(validateImpl(yield* loadSpec(leaf)));
-      assert(Result.isFailure(result));
+      const actual6 = yield* loadSpec(leaf);
+      const result = yield* Effect.result(validateImpl(actual6));
+      assert(result._tag === "Failure");
       expect(result.failure).toMatchObject({
         _tag: "ImplMissingMiddlewareError",
         missingMiddlewareKeys: ["Required"],
@@ -650,14 +653,16 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
   it.effect("accepts a valid leaf impl paired with its spec", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/notes.spec.ts");
-      yield* validateImpl(yield* loadSpec(leaf));
+      const actual7 = yield* loadSpec(leaf);
+      yield* validateImpl(actual7);
     }),
   );
 
   it.effect("accepts a leaf impl that imports a CJS package", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/cjsImporter.spec.ts");
-      yield* validateImpl(yield* loadSpec(leaf));
+      const actual8 = yield* loadSpec(leaf);
+      yield* validateImpl(actual8);
     }),
   );
 
@@ -676,7 +681,7 @@ export default Layer.empty;
         ),
       );
 
-      assert(Result.isFailure(result));
+      assert(result._tag === "Failure");
       expect(result.failure._tag).toBe("ImplMissingSpecImportError");
     }),
   );
@@ -693,7 +698,7 @@ export default notes;
         ),
       );
 
-      assert(Result.isFailure(result));
+      assert(result._tag === "Failure");
       expect(result.failure._tag).toBe("ImplMissingDefaultLayerError");
     }),
   );
@@ -710,7 +715,7 @@ export default GroupImpl.make(
         ),
       );
 
-      assert(Result.isFailure(result));
+      assert(result._tag === "Failure");
       assert(result.failure._tag === "BundleFailedError");
       expect(result.failure.errors.length).toBeGreaterThan(0);
     }),
@@ -781,7 +786,7 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
           ),
         );
 
-        assert(Result.isFailure(result));
+        assert(result._tag === "Failure");
         expect(result.failure._tag).toBe("ImplNotFinalizedError");
       }),
   );
@@ -822,7 +827,7 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
           ),
         );
 
-        assert(Result.isFailure(result));
+        assert(result._tag === "Failure");
         assert(result.failure._tag === "ImplMissingFunctionsError");
         // The reported group path is the impl/spec leaf's own filesystem
         // location, which points at the file that is missing functions.
@@ -838,9 +843,10 @@ const emptyLeafBundle = (
   entry: string,
   spec = GroupSpec.make(),
 ): Bundler.Bundled => {
-  if (entry.endsWith(".spec.ts"))
+  if (pipe(entry, String.endsWith(".spec.ts")))
     return { module: { default: spec }, metafile: { inputs: {}, outputs: {} } };
-  const specPath = entry.slice(0, -".impl.ts".length) + ".spec.ts";
+  const specPath =
+    pipe(entry, String.slice(0, -".impl.ts".length)) + ".spec.ts";
   return {
     module: {
       default: GroupImpl.make(DatabaseSchema.make({}), GroupSpec.make()).pipe(
@@ -885,20 +891,27 @@ layer(
         ImplModulePath.make("nested/notes.impl.ts"),
         ImplModulePath.make("node/tasks.impl.ts"),
       ];
-      expect(yield* validateImplFiles(paths)).toBeUndefined();
+      const actual9 = yield* validateImplFiles(paths);
+      expect(actual9).toBeUndefined();
       expect(paths).toEqual(["nested/notes.impl.ts", "node/tasks.impl.ts"]);
       expect(
-        bundle.mock.calls
-          .filter(([entry]) => entry.endsWith(".spec.ts"))
-          .map(([entry]) => entry),
+        Array.map(
+          Array.filter(bundle.mock.calls, ([entry]) =>
+            pipe(entry, String.endsWith(".spec.ts")),
+          ),
+          ([entry]) => entry,
+        ),
       ).toEqual([
         path.resolve("/confect", "nested", "notes.spec.ts"),
         path.resolve("/confect", "node", "tasks.spec.ts"),
       ]);
       expect(
-        bundle.mock.calls
-          .filter(([entry]) => entry.endsWith(".impl.ts"))
-          .map(([entry]) => entry),
+        Array.map(
+          Array.filter(bundle.mock.calls, ([entry]) =>
+            pipe(entry, String.endsWith(".impl.ts")),
+          ),
+          ([entry]) => entry,
+        ),
       ).toEqual([
         path.resolve("/confect", "nested", "notes.impl.ts"),
         path.resolve("/confect", "node", "tasks.impl.ts"),
@@ -932,7 +945,7 @@ layer(
         (spy) => Effect.sync(() => spy.mockRestore()),
       );
       const fiber = yield* validateImplFiles(
-        Array.range(0, 8).map((index) =>
+        Array.map(Array.range(0, 8), (index) =>
           ImplModulePath.make(`group${index}.impl.ts`),
         ),
       ).pipe(Effect.forkScoped);
@@ -943,10 +956,14 @@ layer(
       yield* Fiber.join(fiber);
       expect(maximum).toBe(4);
       expect(
-        bundle.mock.calls.filter(([entry]) => entry.endsWith(".spec.ts")),
+        Array.filter(bundle.mock.calls, ([entry]) =>
+          pipe(entry, String.endsWith(".spec.ts")),
+        ),
       ).toHaveLength(9);
       expect(
-        bundle.mock.calls.filter(([entry]) => entry.endsWith(".impl.ts")),
+        Array.filter(bundle.mock.calls, ([entry]) =>
+          pipe(entry, String.endsWith(".impl.ts")),
+        ),
       ).toHaveLength(9);
     }).pipe(Effect.scoped),
   );
@@ -956,18 +973,16 @@ layer(
     (missing) =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
+        const services2 = yield* Layer.build(
+          FileSystem.layerNoop({
+            exists: (file) =>
+              Effect.succeed(!pipe(file, String.endsWith(`.${missing}.ts`))),
+          }),
+        );
         const result = yield* validateImplFiles([
           ImplModulePath.make("nested/notes.impl.ts"),
-        ]).pipe(
-          Effect.provide(
-            FileSystem.layerNoop({
-              exists: (file) =>
-                Effect.succeed(!file.endsWith(`.${missing}.ts`)),
-            }),
-          ),
-          Effect.result,
-        );
-        assert(Result.isFailure(result));
+        ]).pipe(Effect.provideContext(services2), Effect.result);
+        assert(result._tag === "Failure");
         if (missing === "spec") {
           expect(result.failure).toMatchObject({
             _tag: "MissingSpecFileError",
@@ -991,9 +1006,9 @@ const collisionLeaf = (
 ): LeafModule => ({
   relativePath,
   pathSegments,
-  groupPathDot: pathSegments.join("."),
+  groupPathDot: Array.join(pathSegments, "."),
   exportName: pathSegments[pathSegments.length - 1]!,
-  specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
+  specImportPath: `../${pipe(relativePath, String.slice(0, -".ts".length))}`,
 });
 
 const emptyReturns = Schema.Null;
@@ -1065,8 +1080,11 @@ layer(LeafModuleLayer)("validateNoParentChildNameCollisions", (it) => {
           ]),
         );
 
-        assert(Result.isFailure(result));
-        assert(Schema.is(ParentChildNameCollisionError)(result.failure));
+        assert(result._tag === "Failure");
+        const validCollision = Schema.is(ParentChildNameCollisionError)(
+          result.failure,
+        );
+        assert(validCollision);
         expect(result.failure._tag).toBe("ParentChildNameCollisionError");
         expect(result.failure.collisionKind).toBe("function");
         expect(result.failure.collisionName).toBe("archived");
@@ -1101,8 +1119,11 @@ layer(LeafModuleLayer)("validateNoParentChildNameCollisions", (it) => {
           ]),
         );
 
-        assert(Result.isFailure(result));
-        assert(Schema.is(ParentChildNameCollisionError)(result.failure));
+        assert(result._tag === "Failure");
+        const validCollision2 = Schema.is(ParentChildNameCollisionError)(
+          result.failure,
+        );
+        assert(validCollision2);
         expect(result.failure._tag).toBe("ParentChildNameCollisionError");
         expect(result.failure.collisionKind).toBe("group");
         expect(result.failure.collisionName).toBe("archived");
@@ -1144,7 +1165,7 @@ layer(LeafModuleLayer)("validateNoParentChildNameCollisions", (it) => {
         const result = yield* Effect.result(
           validateNoParentChildNameCollisions([child, parent]),
         );
-        assert(Result.isFailure(result));
+        assert(result._tag === "Failure");
         expect(result.failure).toMatchObject({
           collisionKind: "function",
           collisionName: "archived",
@@ -1226,8 +1247,11 @@ for (const { name, pathLayer, sep } of [
             ]),
           );
 
-          assert(Result.isFailure(result));
-          assert(Schema.is(ParentChildNameCollisionError)(result.failure));
+          assert(result._tag === "Failure");
+          const validCollision3 = Schema.is(ParentChildNameCollisionError)(
+            result.failure,
+          );
+          assert(validCollision3);
           expect(result.failure._tag).toBe("ParentChildNameCollisionError");
           expect(result.failure.collisionName).toBe("archived");
         }),

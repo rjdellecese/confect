@@ -1,3 +1,4 @@
+import * as String from "effect/String";
 import * as Schema from "effect/Schema";
 import { ImplModulePath } from "./ImplModulePath";
 import * as RelativeModulePath from "./RelativeModulePath";
@@ -9,7 +10,7 @@ export const SpecModulePath = RelativeModulePath.withSuffix(".spec.ts").pipe(
 export type SpecModulePath = typeof SpecModulePath.Type;
 
 export const toImpl = (path: SpecModulePath): ImplModulePath =>
-  ImplModulePath.make(`${path.slice(0, -".spec.ts".length)}.impl.ts`);
+  ImplModulePath.make(`${String.slice(0, -".spec.ts".length)(path)}.impl.ts`);
 
 export const fromImpl = (path: ImplModulePath): SpecModulePath =>
-  SpecModulePath.make(`${path.slice(0, -".impl.ts".length)}.spec.ts`);
+  SpecModulePath.make(`${String.slice(0, -".impl.ts".length)(path)}.spec.ts`);

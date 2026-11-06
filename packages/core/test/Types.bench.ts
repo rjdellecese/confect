@@ -3,15 +3,16 @@ import type { IsRecursive } from "@confect/core/Types";
 
 void ({} as IsRecursive<any>);
 
-bench("IsRecursive<string>", () => {
-  return {} as IsRecursive<string>;
-}).types([25, "instantiations"]);
+bench("IsRecursive<string>", () => ({}) as IsRecursive<string>).types([
+  19,
+  "instantiations",
+]);
 
 type DeepObject = { a: { b: { c: { d: { e: { value: string } } } } } };
 
-bench("IsRecursive (deep object)", () => {
-  return {} as IsRecursive<DeepObject>;
-}).types([394, "instantiations"]);
+bench("IsRecursive (deep object)", () => ({}) as IsRecursive<DeepObject>).types(
+  [375, "instantiations"],
+);
 
 type OptionalObject = {
   status?: string;
@@ -19,9 +20,8 @@ type OptionalObject = {
   saved?: Array<{ status?: string }>;
 };
 
-bench("IsRecursive (assignable optional structures)", () => {
-  return {} as IsRecursive<OptionalObject>;
-}).types([431, "instantiations"]);
+bench("IsRecursive (assignable optional structures)", () =>
+  ({}) as IsRecursive<OptionalObject>).types([321, "instantiations"]);
 
 type SharedChild = { value: string; items: readonly number[] };
 type SharedObject = {
@@ -31,9 +31,8 @@ type SharedObject = {
   d: SharedChild;
 };
 
-bench("IsRecursive (shared subtrees)", () => {
-  return {} as IsRecursive<SharedObject>;
-}).types([300, "instantiations"]);
+bench("IsRecursive (shared subtrees)", () =>
+  ({}) as IsRecursive<SharedObject>).types([280, "instantiations"]);
 
 type ObjectUnion =
   | { kind: "text"; text: string }
@@ -43,22 +42,18 @@ type ObjectUnion =
   | { kind: "object"; value: SharedObject }
   | { kind: "optional"; value?: OptionalObject };
 
-bench("IsRecursive (object union)", () => {
-  return {} as IsRecursive<ObjectUnion>;
-}).types([1347, "instantiations"]);
+bench("IsRecursive (object union)", () =>
+  ({}) as IsRecursive<ObjectUnion>).types([1236, "instantiations"]);
 
 type RecursiveObject = { next?: RecursiveObject };
 type RecursiveArray = RecursiveArray[];
 type RecursiveUnion = string | { children: readonly RecursiveUnion[] };
 
-bench("IsRecursive (recursive object)", () => {
-  return {} as IsRecursive<RecursiveObject>;
-}).types([230, "instantiations"]);
+bench("IsRecursive (recursive object)", () =>
+  ({}) as IsRecursive<RecursiveObject>).types([132, "instantiations"]);
 
-bench("IsRecursive (recursive array)", () => {
-  return {} as IsRecursive<RecursiveArray>;
-}).types([186, "instantiations"]);
+bench("IsRecursive (recursive array)", () =>
+  ({}) as IsRecursive<RecursiveArray>).types([89, "instantiations"]);
 
-bench("IsRecursive (recursive union)", () => {
-  return {} as IsRecursive<RecursiveUnion>;
-}).types([433, "instantiations"]);
+bench("IsRecursive (recursive union)", () =>
+  ({}) as IsRecursive<RecursiveUnion>).types([334, "instantiations"]);

@@ -1,3 +1,4 @@
+import * as String from "effect/String";
 import * as Array from "effect/Array";
 import * as Console from "effect/Console";
 import { pipe } from "effect/Function";
@@ -12,149 +13,152 @@ import { formatPath, renderBuildError } from "./log";
 
 // --- Variants ---
 
-export class MissingImplFileError extends Schema.TaggedError<MissingImplFileError>()(
-  "MissingImplFileError",
-  {
-    specPath: Schema.String,
-    expectedImplPath: Schema.String,
-  },
-) {}
+export class MissingImplFileError extends Schema.TaggedError<
+  MissingImplFileError,
+  { readonly brand: unique symbol }
+>()("MissingImplFileError", {
+  specPath: Schema.String,
+  expectedImplPath: Schema.String,
+}) {}
 
-export class MissingSpecFileError extends Schema.TaggedError<MissingSpecFileError>()(
-  "MissingSpecFileError",
-  {
-    implPath: Schema.String,
-    expectedSpecPath: Schema.String,
-  },
-) {}
+export class MissingSpecFileError extends Schema.TaggedError<
+  MissingSpecFileError,
+  { readonly brand: unique symbol }
+>()("MissingSpecFileError", {
+  implPath: Schema.String,
+  expectedSpecPath: Schema.String,
+}) {}
 
-export class SpecMissingDefaultGroupSpecError extends Schema.TaggedError<SpecMissingDefaultGroupSpecError>()(
-  "SpecMissingDefaultGroupSpecError",
-  {
-    specPath: Schema.String,
-  },
-) {}
+export class SpecMissingDefaultGroupSpecError extends Schema.TaggedError<
+  SpecMissingDefaultGroupSpecError,
+  { readonly brand: unique symbol }
+>()("SpecMissingDefaultGroupSpecError", {
+  specPath: Schema.String,
+}) {}
 
-export class SpecImportsServerError extends Schema.TaggedError<SpecImportsServerError>()(
-  "SpecImportsServerError",
-  {
-    specPath: Schema.String,
-    importerPaths: Schema.Array(Schema.String),
-  },
-) {}
+export class SpecImportsServerError extends Schema.TaggedError<
+  SpecImportsServerError,
+  { readonly brand: unique symbol }
+>()("SpecImportsServerError", {
+  specPath: Schema.String,
+  importerPaths: Schema.Array(Schema.String),
+}) {}
 
-export class InvalidMiddlewareAttachmentError extends Schema.TaggedError<InvalidMiddlewareAttachmentError>()(
-  "InvalidMiddlewareAttachmentError",
-  { specPath: Schema.String, message: Schema.String },
-) {}
+export class InvalidMiddlewareAttachmentError extends Schema.TaggedError<
+  InvalidMiddlewareAttachmentError,
+  { readonly brand: unique symbol }
+>()("InvalidMiddlewareAttachmentError", {
+  specPath: Schema.String,
+  message: Schema.String,
+}) {}
 
-export class ImplMissingSpecImportError extends Schema.TaggedError<ImplMissingSpecImportError>()(
-  "ImplMissingSpecImportError",
-  {
-    implPath: Schema.String,
-    expectedSpecPath: Schema.String,
-  },
-) {}
+export class ImplMissingSpecImportError extends Schema.TaggedError<
+  ImplMissingSpecImportError,
+  { readonly brand: unique symbol }
+>()("ImplMissingSpecImportError", {
+  implPath: Schema.String,
+  expectedSpecPath: Schema.String,
+}) {}
 
-export class ImplMissingDefaultLayerError extends Schema.TaggedError<ImplMissingDefaultLayerError>()(
-  "ImplMissingDefaultLayerError",
-  {
-    implPath: Schema.String,
-  },
-) {}
+export class ImplMissingDefaultLayerError extends Schema.TaggedError<
+  ImplMissingDefaultLayerError,
+  { readonly brand: unique symbol }
+>()("ImplMissingDefaultLayerError", {
+  implPath: Schema.String,
+}) {}
 
-export class ImplNotFinalizedError extends Schema.TaggedError<ImplNotFinalizedError>()(
-  "ImplNotFinalizedError",
-  {
-    implPath: Schema.String,
-  },
-) {}
+export class ImplNotFinalizedError extends Schema.TaggedError<
+  ImplNotFinalizedError,
+  { readonly brand: unique symbol }
+>()("ImplNotFinalizedError", {
+  implPath: Schema.String,
+}) {}
 
-export class ImplMissingFunctionsError extends Schema.TaggedError<ImplMissingFunctionsError>()(
-  "ImplMissingFunctionsError",
-  {
-    implPath: Schema.String,
-    groupPath: Schema.String,
-    missingFunctionNames: Schema.Array(Schema.String),
-  },
-) {}
+export class ImplMissingFunctionsError extends Schema.TaggedError<
+  ImplMissingFunctionsError,
+  { readonly brand: unique symbol }
+>()("ImplMissingFunctionsError", {
+  implPath: Schema.String,
+  groupPath: Schema.String,
+  missingFunctionNames: Schema.Array(Schema.String),
+}) {}
 
-export class ImplMissingMiddlewareError extends Schema.TaggedError<ImplMissingMiddlewareError>()(
-  "ImplMissingMiddlewareError",
-  {
-    implPath: Schema.String,
-    groupPath: Schema.String,
-    missingMiddlewareKeys: Schema.Array(Schema.String),
-  },
-) {}
+export class ImplMissingMiddlewareError extends Schema.TaggedError<
+  ImplMissingMiddlewareError,
+  { readonly brand: unique symbol }
+>()("ImplMissingMiddlewareError", {
+  implPath: Schema.String,
+  groupPath: Schema.String,
+  missingMiddlewareKeys: Schema.Array(Schema.String),
+}) {}
 
-export class ParentChildNameCollisionError extends Schema.TaggedError<ParentChildNameCollisionError>()(
-  "ParentChildNameCollisionError",
-  {
-    parentSpecPath: Schema.String,
-    childSpecPath: Schema.String,
-    collisionName: Schema.String,
-    collisionKind: Schema.Literals(["function", "group"]),
-  },
-) {}
+export class ParentChildNameCollisionError extends Schema.TaggedError<
+  ParentChildNameCollisionError,
+  { readonly brand: unique symbol }
+>()("ParentChildNameCollisionError", {
+  parentSpecPath: Schema.String,
+  childSpecPath: Schema.String,
+  collisionName: Schema.String,
+  collisionKind: Schema.Literals(["function", "group"]),
+}) {}
 
-export class InvalidTableDefaultExportError extends Schema.TaggedError<InvalidTableDefaultExportError>()(
-  "InvalidTableDefaultExportError",
-  {
-    tablePath: Schema.String,
-  },
-) {}
+export class InvalidTableDefaultExportError extends Schema.TaggedError<
+  InvalidTableDefaultExportError,
+  { readonly brand: unique symbol }
+>()("InvalidTableDefaultExportError", {
+  tablePath: Schema.String,
+}) {}
 
-export class InvalidTableFilenameError extends Schema.TaggedError<InvalidTableFilenameError>()(
-  "InvalidTableFilenameError",
-  {
-    tablePath: Schema.String,
-    reason: Schema.String,
-  },
-) {}
+export class InvalidTableFilenameError extends Schema.TaggedError<
+  InvalidTableFilenameError,
+  { readonly brand: unique symbol }
+>()("InvalidTableFilenameError", {
+  tablePath: Schema.String,
+  reason: Schema.String,
+}) {}
 
-export class DuplicateTableNameError extends Schema.TaggedError<DuplicateTableNameError>()(
-  "DuplicateTableNameError",
-  {
-    // Every table name that more than one file resolves to, each paired with
-    // the colliding file paths. All collisions are captured in a single pass
-    // so the user can fix them together rather than re-running codegen once
-    // per conflict.
-    collisions: Schema.Array(
-      Schema.Struct({
-        tableName: Schema.String,
-        tablePaths: Schema.Array(Schema.String),
-      }),
-    ),
-  },
-) {}
+export class DuplicateTableNameError extends Schema.TaggedError<
+  DuplicateTableNameError,
+  { readonly brand: unique symbol }
+>()("DuplicateTableNameError", {
+  // Every table name that more than one file resolves to, each paired with
+  // the colliding file paths. All collisions are captured in a single pass
+  // so the user can fix them together rather than re-running codegen once
+  // per conflict.
+  collisions: Schema.Array(
+    Schema.Struct({
+      tableName: Schema.String,
+      tablePaths: Schema.Array(Schema.String),
+    }),
+  ),
+}) {}
 
-export class LegacySchemaFileError extends Schema.TaggedError<LegacySchemaFileError>()(
-  "LegacySchemaFileError",
-  {
-    schemaPath: Schema.String,
-  },
-) {}
+export class LegacySchemaFileError extends Schema.TaggedError<
+  LegacySchemaFileError,
+  { readonly brand: unique symbol }
+>()("LegacySchemaFileError", {
+  schemaPath: Schema.String,
+}) {}
 
-export class ConflictingDocNameError extends Schema.TaggedError<ConflictingDocNameError>()(
-  "ConflictingDocNameError",
-  {
-    collisions: Schema.Array(
-      Schema.Struct({
-        docName: Schema.String,
-        tableNames: Schema.Array(Schema.String),
-      }),
-    ),
-  },
-) {}
+export class ConflictingDocNameError extends Schema.TaggedError<
+  ConflictingDocNameError,
+  { readonly brand: unique symbol }
+>()("ConflictingDocNameError", {
+  collisions: Schema.Array(
+    Schema.Struct({
+      docName: Schema.String,
+      tableNames: Schema.Array(Schema.String),
+    }),
+  ),
+}) {}
 
-export class InvalidConvexConfigError extends Schema.TaggedError<InvalidConvexConfigError>()(
-  "InvalidConvexConfigError",
-  {
-    configPath: Schema.String,
-    reason: Schema.String,
-  },
-) {}
+export class InvalidConvexConfigError extends Schema.TaggedError<
+  InvalidConvexConfigError,
+  { readonly brand: unique symbol }
+>()("InvalidConvexConfigError", {
+  configPath: Schema.String,
+  reason: Schema.String,
+}) {}
 
 export const CodegenError = Schema.Union([
   SnapshotError,
@@ -190,17 +194,17 @@ const cross = Ansi.red("✘");
 
 const stemFromSpecPath = (specPath: string): string => {
   const lastSep = Math.max(
-    specPath.lastIndexOf("/"),
-    specPath.lastIndexOf("\\"),
+    Option.getOrElse(String.lastIndexOf("/")(specPath), () => -1),
+    Option.getOrElse(String.lastIndexOf("\\")(specPath), () => -1),
   );
-  const basename = lastSep < 0 ? specPath : specPath.slice(lastSep + 1);
-  return basename.endsWith(".spec.ts")
-    ? basename.slice(0, -".spec.ts".length)
+  const basename = lastSep < 0 ? specPath : String.slice(lastSep + 1)(specPath);
+  return String.endsWith(".spec.ts")(basename)
+    ? String.slice(0, -".spec.ts".length)(basename)
     : basename;
 };
 
 const singleLine = (...parts: ReadonlyArray<string>): string =>
-  `${cross} ${parts.join("")}`;
+  `${cross} ${Array.join(parts, "")}`;
 
 const renderMissingImplFileError = (error: MissingImplFileError): string =>
   singleLine(
@@ -232,7 +236,7 @@ const renderSpecMissingDefaultGroupSpecError = (
 const renderSpecImportsServerError = (
   error: SpecImportsServerError,
 ): string => {
-  const importers = error.importerPaths.join(", ");
+  const importers = Array.join(error.importerPaths, ", ");
   return singleLine(
     "Spec ",
     formatPath(error.specPath),
@@ -270,7 +274,7 @@ const renderImplNotFinalizedError = (error: ImplNotFinalizedError): string =>
 const renderImplMissingFunctionsError = (
   error: ImplMissingFunctionsError,
 ): string => {
-  const names = error.missingFunctionNames.join(", ");
+  const names = Array.join(error.missingFunctionNames, ", ");
   return singleLine(
     "Impl ",
     formatPath(error.implPath),
@@ -281,7 +285,7 @@ const renderImplMissingFunctionsError = (
 const renderImplMissingMiddlewareError = (
   error: ImplMissingMiddlewareError,
 ): string => {
-  const keys = error.missingMiddlewareKeys.join(", ");
+  const keys = Array.join(error.missingMiddlewareKeys, ", ");
   return singleLine(
     "Impl ",
     formatPath(error.implPath),
@@ -310,12 +314,14 @@ const renderInvalidTableFilenameError = (
 const renderDuplicateTableNameError = (
   error: DuplicateTableNameError,
 ): string => {
-  const conflicts = error.collisions
-    .map(
+  const conflicts = Array.join(
+    Array.map(
+      error.collisions,
       ({ tableName, tablePaths }) =>
-        `\`${tableName}\` (${tablePaths.join(", ")})`,
-    )
-    .join("; ");
+        `\`${tableName}\` (${Array.join(tablePaths, ", ")})`,
+    ),
+    "; ",
+  );
   return singleLine(
     `Multiple files under \`confect/tables/\` resolve to the same table name. Table names are derived from filenames, so each must be unique across the directory (including subdirectories); rename or remove all but one. Conflicts: ${conflicts}.`,
   );
@@ -377,7 +383,9 @@ export const renderCodegenError = (error: CodegenError): string => {
       singleLine(
         `Invalid generation metadata (${reason})`,
         relativePath === "" ? "" : ` for ${relativePath}`,
-        pathSegments.length === 0 ? "." : ` at ${pathSegments.join("/")}.`,
+        pathSegments.length === 0
+          ? "."
+          : ` at ${Array.join(pathSegments, "/")}.`,
       ),
     ),
     Match.tag("MissingImplFileError", renderMissingImplFileError),
@@ -420,7 +428,7 @@ export const renderCodegenError = (error: CodegenError): string => {
 };
 
 export const logCodegenError = (error: CodegenError) =>
-  Console.error(renderCodegenError(error));
+  pipe(error, renderCodegenError, Console.error);
 
 // --- Effect combinators ---
 

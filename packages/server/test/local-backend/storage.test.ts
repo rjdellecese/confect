@@ -41,19 +41,17 @@ layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
         client.query(Ref.getFunctionReference(storage.getUrl), { storageId }),
       );
       expect(new URL(url).pathname).toContain("/api/storage/");
-      expect(
-        yield* HttpClient.get(url).pipe(
-          Effect.flatMap(HttpClientResponse.filterStatusOk),
-          Effect.flatMap((response) => response.text),
-        ),
-      ).toBe(text);
-      expect(
-        yield* Effect.promise(() =>
-          client.mutation(Ref.getFunctionReference(storage.deleteBlob), {
-            storageId,
-          }),
-        ),
-      ).toBeNull();
+      const pipeResult = yield* HttpClient.get(url).pipe(
+        Effect.flatMap(HttpClientResponse.filterStatusOk),
+        Effect.flatMap((response) => response.text),
+      );
+      expect(pipeResult).toBe(text);
+      const promiseResult = yield* Effect.promise(() =>
+        client.mutation(Ref.getFunctionReference(storage.deleteBlob), {
+          storageId,
+        }),
+      );
+      expect(promiseResult).toBeNull();
       yield* Effect.promise(() =>
         expect(
           client.query(Ref.getFunctionReference(storage.getUrl), { storageId }),

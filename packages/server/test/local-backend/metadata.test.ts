@@ -1,3 +1,4 @@
+import * as Layer from "effect/Layer";
 import { Ref } from "@confect/core";
 import { expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -79,18 +80,22 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
 
     it.effect("provides metadata in HTTP handlers", () =>
       Effect.gen(function* () {
-        yield* LocalBackend.LocalBackend;
-        const response = yield* HttpClient.get(
-          "http://127.0.0.1:3211/context-metadata",
-        );
+        const services = yield* Layer.build(FetchHttpClient.layer);
+        return yield* Effect.gen(function* () {
+          yield* LocalBackend.LocalBackend;
+          const response = yield* HttpClient.get(
+            "http://127.0.0.1:3211/context-metadata",
+          );
 
-        expect(response.status).toBe(200);
-        expect(yield* response.json).toEqual({
-          functionName: expect.any(String),
-          deploymentName: expect.any(String),
-          requestId: expect.any(String),
-        });
-      }).pipe(Effect.provide(FetchHttpClient.layer)),
+          expect(response.status).toBe(200);
+          const jsonResult = yield* response.json;
+          expect(jsonResult).toEqual({
+            functionName: expect.any(String),
+            deploymentName: expect.any(String),
+            requestId: expect.any(String),
+          });
+        }).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped),
     );
   },
 );

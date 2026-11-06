@@ -1,4 +1,5 @@
 import * as NodeWorker from "@effect/platform-node/NodeWorker";
+// oxlint-disable-next-line effecttsgo/node-builtin-import -- Process isolation and advanced IPC require native fork; Effect's process handle cannot back NodeWorker.
 import { fork } from "node:child_process";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
@@ -31,11 +32,14 @@ export const RequestContext = Schema.Struct({
 });
 export type RequestContext = typeof RequestContext.Type;
 
-export class EvaluationError extends Schema.TaggedError<EvaluationError>()(
-  "EvaluationError",
-  { diagnostic: Schema.String },
-) {}
+export class EvaluationError extends Schema.TaggedError<
+  EvaluationError,
+  { readonly brand: unique symbol }
+>()("EvaluationError", { diagnostic: Schema.String }) {}
 
+/**
+ * @internal
+ */
 export const requests = RpcGroup.make(
   Rpc.make("Previous", {
     payload: RequestContext,
@@ -97,27 +101,29 @@ const withWorker = Effect.fn("Evaluation.withWorker")(function* <A>(
             evaluator.kill("SIGKILL");
           }),
       );
+      const workerContext = yield* Layer.build(
+        RpcClient.layerProtocolWorker({ size: 1 }).pipe(
+          Layer.provide(NodeWorker.layer(() => child)),
+        ),
+      );
       return yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(requests);
         return yield* run(client, requestContext);
-      }).pipe(
-        Effect.provide(
-          RpcClient.layerProtocolWorker({ size: 1 }).pipe(
-            Layer.provide(NodeWorker.layer(() => child)),
-          ),
-        ),
-      );
+      }).pipe(Effect.provideContext(workerContext));
     }),
   ).pipe(
     Effect.catchTags({
       WorkerError: (error) =>
-        Effect.fail(new EvaluationError({ diagnostic: error.message })),
+        Effect.fail(EvaluationError.make({ diagnostic: error.message })),
       RpcClientError: (error) =>
-        Effect.fail(new EvaluationError({ diagnostic: error.message })),
+        Effect.fail(EvaluationError.make({ diagnostic: error.message })),
     }),
   );
 });
 
+/**
+ * @internal
+ */
 export const loadPreviousFunctionPaths = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;

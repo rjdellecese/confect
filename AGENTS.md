@@ -43,33 +43,50 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 
 ## Tools
 
-- `tools/bench-harness` - Private package that hands `@ark/attest` the TypeScript version the type benchmarks need; see its README
+- `tools/bench-harness` - Private package that runs `@ark/attest` type benchmarks on tsrs; see its README
 - `tools/local-backend` - Private shared Convex backend harness, fixtures, and Vitest configuration for client and server integration tests; see its README
 
 ## TypeScript
 
-The workspace is on TypeScript 7, so `tsc` is a native binary and the `typescript` package no longer exports a JavaScript compiler API—anything that needs to _drive_ the compiler rather than _run_ it has to either spawn `tsc` or use `typescript/unstable/*`. Effect's language service comes from `@effect/tsgo` (not `@effect/language-service`, which supports only TypeScript 5 and 6): the root `prepare` script patches both TypeScript and Oxlint. TypeScript provides Effect editor features with duplicate diagnostics disabled, while Oxlint reports Effect diagnostics through the `effecttsgo` plugin; configure their severities in `.oxlintrc.json`.
+The workspace uses the Rust TypeScript compiler, `tsrs`. The root `prepare` script patches its installed binary with `@effect/tsgo`'s build, so workspace scripts, Vitest's `checker: "tsrs"`, and the native type-benchmark harness all use the Effect-enabled compiler. Run `pnpm prepare` if you install with lifecycle scripts disabled. Tests and isolated consumer checks can also launch it directly through `effect-tsgo tsrs`. Zed launches that proxy with `--lsp --stdio`; open the repository root and make the pinned Bun available on its PATH. Bun avoids the proxy's Node `execve` path leaving LSP stdin nonblocking. Compiler Effect diagnostics stay disabled to avoid duplicates; Oxlint owns them through the `effecttsgo` plugin in `.oxlintrc.json`.
+
+Lint runs through `effect-tsgo --tsrs-lint vp lint` (or `vp check`) so type-aware rules also use Rust. `pnpm oxlint` wraps the standalone linter with the same integration; bare `pnpm exec oxlint` and `pnpm exec vp lint` bypass it. The Zed Oxlint server uses the same wrapper. Keep `@effect/tsgo`, `tsrs`, and Oxlint on versions listed together in Effect's supported-component table. These integrations support Linux glibc x64/ARM64, macOS x64/ARM64, and Windows x64, not Linux musl or Windows ARM64.
+
+Every Effect lint rule except `missing-pipeable-signature` and `unstable-api-usage` is explicitly enabled
+as an error, including rules disabled by upstream presets. Do not change API
+shapes to satisfy the disabled pipeability rule. `scripts/effectLint.test.ts` checks coverage
+against the installed plugin's schema so upgrades cannot silently omit new
+rules. Fix findings rather than disabling additional rules. Unstable API usage
+is permitted globally: the platform, HTTP, AI, and test integrations deliberately
+depend on these APIs, so do not maintain per-export `allowedUnstableApis` grants.
+Keep public API stability annotations accurate; disabling the diagnostic does
+not make an unstable API stable.
+Keep compatibility exceptions local and documented: existing structural service
+identifiers retain their public requirement types, and Convex handler entry
+points provide invocation-local layers before the terminal runner executes them.
+The CLI evaluator retains native fork IPC for process isolation and compatibility
+with user modules; its adapter and lifecycle tests have line-scoped exceptions.
 
 ## Build System
 
-Packages are built with tsdown (JavaScript output) plus TypeScript project references: each package has a composite `tsconfig.src.json`, and `tsc -b` typechecks the graph in dependency order and emits the `.d.ts` declarations (tsdown is configured with `dts: false`). The exception is `@confect/cli`, which ships only a binary: it has no `tsconfig.src.json` and emits no declarations; its build is tsdown-only and its sources are typechecked by the root `tsconfig.json`.
+Packages are built with tsdown (JavaScript output) plus TypeScript project references: each package has a composite `tsconfig.src.json`, and `tsrs -b` typechecks the graph in dependency order and emits the `.d.ts` declarations (tsdown is configured with `dts: false`). The exception is `@confect/cli`, which ships only a binary: it has no `tsconfig.src.json` and emits no declarations; its build is tsdown-only and its sources are typechecked by the root `tsconfig.json`.
 
-**Critical: packages must be rebuilt with `pnpm build` after source changes for those changes to be reflected outside their package directory.** Consumers import from `dist/`, not `src/`. During development, use `pnpm dev` to watch-rebuild all packages automatically: it runs tsdown in watch mode in every package (JavaScript output) alongside a single root `tsc -b --watch` over the project-reference graph (declaration output, in dependency order).
+**Critical: packages must be rebuilt with `pnpm build` after source changes for those changes to be reflected outside their package directory.** Consumers import from `dist/`, not `src/`. During development, use `pnpm dev` to watch-rebuild all packages automatically: it runs tsdown in watch mode in every package (JavaScript output) alongside a single root `tsrs -b --watch` over the project-reference graph (declaration output, in dependency order).
 
 Build, lint, and format run through Vite+ (`vp`), which orders packages by their dependency graph and caches results. There are no per-package script variants at the root; target a single package ad hoc with `vp run --filter <pkg> <task>` (e.g. `vp run --filter @confect/core build`). Tests run through Vitest directly (not `vp`); target one package's suite with `vitest run --project @confect/core`.
 
 ### Key Commands (run from repo root)
 
 - `pnpm build` - Build all @confect packages (cached, dependency-ordered)
-- `pnpm dev` - Watch-rebuild all packages (tsdown watchers + `tsc -b --watch` for declarations)
+- `pnpm dev` - Watch-rebuild all packages (tsdown watchers + `tsrs -b --watch` for declarations)
 - `pnpm dev:example`/`pnpm dev:docs` - Run the example app/docs site
 - `pnpm test` - Run all package test suites via Vitest (`vitest run`)
-- `pnpm typecheck` - Typecheck the package graph and test suites via `tsc -b` (project references, incremental)
+- `pnpm typecheck` - Typecheck the package graph and test suites via `tsrs -b` (project references, incremental)
 - `pnpm typecheck:inexact` - Refresh normal package declarations, then typecheck every package's sources and tests with `exactOptionalPropertyTypes: false`
 - `pnpm --filter example typecheck:inexact` - Typecheck both example projects with `exactOptionalPropertyTypes: false` (run `pnpm build` first)
 - `pnpm lint`/`pnpm lint:fix` - Lint (Oxlint + Syncpack); `lint:fix` writes fixes
 - `pnpm format`/`pnpm format:check` - Format (Oxfmt + Syncpack); `format` writes, `format:check` only checks
-- `pnpm check` - Format, lint, and type checks together (`vp check`)
+- `pnpm check` - Format, lint, and type checks together (`effect-tsgo --tsrs-lint vp check`)
 - `pnpm clean` - Remove dist, coverage, and node_modules everywhere
 
 ## Testing
@@ -104,7 +121,12 @@ cd apps/example
 pnpm dev
 ```
 
-This runs Vite, the Convex local backend, and the Confect codegen watcher concurrently.
+This runs Vite, the Convex local backend, the Confect codegen watcher, and a
+`tsrs` typecheck watcher concurrently. Convex's embedded checker only supports
+`tsc` and `tsgo`, so it is disabled in the example scripts. The Rust watcher
+reports frontend and backend errors without blocking Convex's hot pushes;
+`pnpm --filter example typecheck` and CI remain the blocking checks. The
+`convex-codegen` script runs a blocking Rust check after generation.
 
 #### Convex environment variables
 

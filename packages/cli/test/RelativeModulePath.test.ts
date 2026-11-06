@@ -38,12 +38,16 @@ it.each([
 });
 
 it("refines relative paths by suffix and nonempty filename stem", () => {
-  const parse = Schema.decodeOption(withSuffix(".spec.ts"));
-  expect(parse("groups/notes.spec.ts")).toEqual(
+  const SpecPath = withSuffix(".spec.ts");
+  expect(Schema.decodeOption(SpecPath)("groups/notes.spec.ts")).toEqual(
     Option.some("groups/notes.spec.ts"),
   );
-  expect(parse("groups/.spec.ts")).toEqual(Option.none());
-  expect(parse("notes.impl.ts")).toEqual(Option.none());
-  expect(parse("../notes.spec.ts")).toEqual(Option.none());
+  expect(Schema.decodeOption(SpecPath)("groups/.spec.ts")).toEqual(
+    Option.none(),
+  );
+  expect(Schema.decodeOption(SpecPath)("notes.impl.ts")).toEqual(Option.none());
+  expect(Schema.decodeOption(SpecPath)("../notes.spec.ts")).toEqual(
+    Option.none(),
+  );
   expectTypeOf<string>().not.toExtend<RelativeModulePath>();
 });

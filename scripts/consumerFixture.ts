@@ -1,8 +1,8 @@
 export const consumerFiles = (
   profile: "react" | "foldkit",
 ): Readonly<Record<string, string>> => ({
-  "tsconfig.json": `${JSON.stringify(
-    {
+  "tsconfig.json": `${Result.getOrThrow(
+    Schema.encodeResult(Schema.fromJsonString(Schema.Unknown, { space: 2 }))({
       compilerOptions: {
         target: "ESNext",
         module: "ESNext",
@@ -18,9 +18,7 @@ export const consumerFiles = (
       },
       include: ["**/*.ts", "**/*.tsx"],
       exclude: ["node_modules"],
-    },
-    null,
-    2,
+    }),
   )}\n`,
   "convex.json": '{ "functions": "convex/" }\n',
   "convex/convex.config.ts": `import { defineApp } from "convex/server";
@@ -208,3 +206,5 @@ export const command: Effect.Effect<Message, never, Client.Client> = FetchCount(
 `,
       }),
 });
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";

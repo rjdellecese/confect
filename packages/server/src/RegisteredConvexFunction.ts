@@ -250,25 +250,23 @@ const queryFunction = <
           args: decodedArgs,
         },
       ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            DatabaseReader.layer(databaseSchema, ctx.db),
-            DocumentIds.layer(databaseSchema, ctx.db),
-            Auth.layer(ctx.auth),
-            ExecutionMetadata.layer(ctx.meta),
-            TransactionMetadata.layer(ctx.meta),
-            Storage.layer(ctx.storage),
-            QueryRunner.layer(ctx.runQuery),
-            QueryTransactionContext.layer(ctx),
-            Layer.succeed(
-              QueryCtx.QueryCtx<
-                DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-              >(),
-              ctx,
-            ),
-            ConvexConfigProvider.layer,
+        Effect.provide([
+          DatabaseReader.layer(databaseSchema, ctx.db),
+          DocumentIds.layer(databaseSchema, ctx.db),
+          Auth.layer(ctx.auth),
+          ExecutionMetadata.layer(ctx.meta),
+          TransactionMetadata.layer(ctx.meta),
+          Storage.layer(ctx.storage),
+          QueryRunner.layer(ctx.runQuery),
+          QueryTransactionContext.layer(ctx),
+          Layer.succeed(
+            QueryCtx.QueryCtx<
+              DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+            >(),
+            ctx,
           ),
-        ),
+          ConvexConfigProvider.layer,
+        ]),
       );
       return yield* pipe(
         decodedReturns,
@@ -279,9 +277,7 @@ const queryFunction = <
       Effect.provideService(Clock.Clock, queryClock),
       RegisteredFunction.runHandlerPromise(
         RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
-        {
-          scheduler: new EffectScheduler.MixedScheduler("sync"),
-        },
+        { scheduler: new EffectScheduler.MixedScheduler("sync") },
       ),
     ),
 });
@@ -384,7 +380,10 @@ const mutationFunction = <
           functionVisibility,
           args: decodedArgs,
         },
-      ).pipe(Effect.provide(mutationLayer(databaseSchema, ctx)));
+      ).pipe(
+        // oxlint-disable-next-line effecttsgo/strict-effect-provide -- This Convex entry point provides invocation-local services before runHandlerPromise executes the handler.
+        Effect.provide(mutationLayer(databaseSchema, ctx)),
+      );
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
@@ -393,9 +392,7 @@ const mutationFunction = <
     }).pipe(
       RegisteredFunction.runHandlerPromise(
         RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
-        {
-          scheduler: new EffectScheduler.MixedScheduler("sync"),
-        },
+        { scheduler: new EffectScheduler.MixedScheduler("sync") },
       ),
     ),
 });

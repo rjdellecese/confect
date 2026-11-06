@@ -1,3 +1,4 @@
+import * as Array from "effect/Array";
 import * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Result from "effect/Result";
@@ -38,7 +39,8 @@ export const resolve = (
     ),
     (error) => new Error(MiddlewareAttachment.formatValidationError(error)),
   );
-  return functionRegistryItem.middlewareAttachments.map(
+  return Array.map(
+    functionRegistryItem.middlewareAttachments,
     ({ spec: middlewareSpec, options }) => {
       const registered = middlewareRegistryItems.get(middlewareSpec.key);
       if (registered === undefined) {

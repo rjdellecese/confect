@@ -95,7 +95,7 @@ describe("QueryStreamKeyBounds", () => {
     const mismatch = (
       result: Result.Result<unknown, Layout.KeyLayoutMismatchError>,
     ) => {
-      const error = Result.getOrThrow(Result.flip(result));
+      const error = result.pipe(Result.flip, Result.getOrThrow);
       expect(error).toBeInstanceOf(Layout.KeyLayoutMismatchError);
       expect(error.expectedKeyLayout).toBe(layout);
       expect(error.actualKeyLayout).toBe(actual);

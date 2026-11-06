@@ -69,15 +69,20 @@ import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 import * as QueryStreamPagination from "./QueryStreamPagination";
 import * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 
+const OrderDirection = Schema.Literals(["asc", "desc"]);
+
 /**
  * A page exhausted its read budget without a safe logical continuation.
  *
  * @experimental
  */
-export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceededError>()(
-  "ReadBudgetExceededError",
-  { rowsRead: Schema.Natural, bytesRead: Schema.Natural },
-) {
+export class ReadBudgetExceededError extends Schema.TaggedError<
+  ReadBudgetExceededError,
+  {}
+>()("ReadBudgetExceededError", {
+  rowsRead: Schema.Natural,
+  bytesRead: Schema.Natural,
+}) {
   override get message() {
     return "The read budget was exhausted before a safe page boundary; increase the budget or simplify the query";
   }
@@ -91,14 +96,15 @@ export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceed
  *
  * @experimental
  */
-export class IncompatibleStreamsError extends Data.TaggedError(
-  "IncompatibleStreamsError",
-)<{
-  readonly expectedOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection;
-  readonly actualOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection;
-  readonly expectedKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
-  readonly actualKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
-}> {
+export class IncompatibleStreamsError extends Schema.TaggedError<
+  IncompatibleStreamsError,
+  {}
+>()("IncompatibleStreamsError", {
+  expectedOrderDirection: OrderDirection,
+  actualOrderDirection: OrderDirection,
+  expectedKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  actualKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+}) {
   override get message(): string {
     return `QueryStream.merge: all streams must share an order and key layout (got ${this.expectedOrderDirection} ${QueryStreamKeyLayout.format(this.expectedKeyLayout)} and ${this.actualOrderDirection} ${QueryStreamKeyLayout.format(this.actualKeyLayout)})`;
   }
@@ -111,12 +117,13 @@ export class IncompatibleStreamsError extends Data.TaggedError(
  *
  * @experimental
  */
-export class InnerStreamOrderMismatchError extends Data.TaggedError(
-  "InnerStreamOrderMismatchError",
-)<{
-  readonly expectedOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection;
-  readonly actualOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection;
-}> {
+export class InnerStreamOrderMismatchError extends Schema.TaggedError<
+  InnerStreamOrderMismatchError,
+  {}
+>()("InnerStreamOrderMismatchError", {
+  expectedOrderDirection: OrderDirection,
+  actualOrderDirection: OrderDirection,
+}) {
   override get message(): string {
     return `QueryStream.flatMap: inner stream order (${this.actualOrderDirection}) differs from the outer stream's (${this.expectedOrderDirection})`;
   }
@@ -129,12 +136,13 @@ export class InnerStreamOrderMismatchError extends Data.TaggedError(
  *
  * @experimental
  */
-export class InnerStreamLayoutMismatchError extends Data.TaggedError(
-  "InnerStreamLayoutMismatchError",
-)<{
-  readonly expectedKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
-  readonly actualKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout;
-}> {
+export class InnerStreamLayoutMismatchError extends Schema.TaggedError<
+  InnerStreamLayoutMismatchError,
+  {}
+>()("InnerStreamLayoutMismatchError", {
+  expectedKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  actualKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+}) {
   override get message(): string {
     return `QueryStream.flatMap: inner stream key layout (${QueryStreamKeyLayout.format(this.actualKeyLayout)}) differs from innerKeyLayout (${QueryStreamKeyLayout.format(this.expectedKeyLayout)})`;
   }
@@ -147,9 +155,10 @@ export class InnerStreamLayoutMismatchError extends Data.TaggedError(
  *
  * @experimental
  */
-export class MissingReversalRecipeError extends Data.TaggedError(
-  "MissingReversalRecipeError",
-) {
+export class MissingReversalRecipeError extends Schema.TaggedError<
+  MissingReversalRecipeError,
+  {}
+>()("MissingReversalRecipeError", {}) {
   override get message(): string {
     return "QueryStream.reverse: this stream cannot be reversed without a reversal recipe";
   }
@@ -762,7 +771,9 @@ const mergeStep =
       const filled = yield* Effect.forEach(sources, fillMergeSource, {
         concurrency: (yield* readBudget.isUnlimited) ? "unbounded" : 1,
       });
-      if (filled.some((source) => MergeSource.$is("BudgetLimited")(source)))
+      if (
+        Array.some(filled, (source) => MergeSource.$is("BudgetLimited")(source))
+      )
         return undefined;
       const isEarlier = Order.isLessThan(keyOrder);
 
@@ -851,7 +862,7 @@ export const merge = <
       !QueryStreamKeyLayout.Equivalence(stream.keyLayout, head.keyLayout),
   );
   if (Option.isSome(incompatible)) {
-    throw new IncompatibleStreamsError({
+    throw IncompatibleStreamsError.make({
       expectedOrderDirection: head.orderDirection,
       actualOrderDirection: incompatible.value.orderDirection,
       expectedKeyLayout: head.keyLayout,
@@ -1265,15 +1276,15 @@ export const flatMap = dual<
     E | E2,
     R | R2
   >
->(3, (self, f, options): Any => {
-  return makeFlatMap(
+>(3, (self, f, options): Any =>
+  makeFlatMap(
     self,
     f,
     options.innerKeyLayout,
     Option.fromUndefinedOr(options.onEmpty),
     { lower: Option.none(), upper: Option.none() },
-  );
-});
+  ),
+);
 
 /**
  * Inner bounds that apply only to the outer row whose key values are
@@ -1392,13 +1403,13 @@ const makeFlatMap = <
     inner: QueryStream<Doc2, InnerKeyLabels, OrderDirection, E2, R2>,
   ): QueryStream<Doc2, InnerKeyLabels, OrderDirection, E2, R2> => {
     if (inner.orderDirection !== self.orderDirection) {
-      throw new InnerStreamOrderMismatchError({
+      throw InnerStreamOrderMismatchError.make({
         expectedOrderDirection: self.orderDirection,
         actualOrderDirection: inner.orderDirection,
       });
     }
     if (!QueryStreamKeyLayout.Equivalence(inner.keyLayout, innerKeyLayout)) {
-      throw new InnerStreamLayoutMismatchError({
+      throw InnerStreamLayoutMismatchError.make({
         expectedKeyLayout: innerKeyLayout,
         actualKeyLayout: inner.keyLayout,
       });
@@ -1634,10 +1645,10 @@ export const distinct = dual<
     self: QueryStream<Doc, KeyLabels, OrderDirection, E, R>,
     prefixNames: PrefixNames,
   ) => QueryStream<Doc, KeyLabels, OrderDirection, E, R>
->(2, (self, prefixNames) => {
+>(2, (self, prefixNames) =>
   // Groups are runs of equal *runtime* prefixes, so a prefix that reaches
   // past a tiebreaker (into a `flatMap` result's inner key) includes it.
-  return makeDistinct(
+  makeDistinct(
     self,
     Result.getOrThrowWith(
       QueryStreamKeyLayout.resolvePrefix(
@@ -1648,8 +1659,8 @@ export const distinct = dual<
     ),
     self.orderDirection,
     QueryStreamKeyBounds.unbounded(self.keyLayout),
-  );
-});
+  ),
+);
 
 /**
  * Relabel visible key positions without changing values or their order. This
@@ -1948,7 +1959,7 @@ export const reverse = <
   R
 > => {
   if (self.reverseWith === undefined) {
-    throw new MissingReversalRecipeError();
+    throw MissingReversalRecipeError.make({});
   }
   return self.reverseWith();
 };
@@ -2146,7 +2157,7 @@ const narrowInMemory = <
  *
  * @experimental
  */
-export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
+export class NotUniqueError extends Schema.TaggedError<NotUniqueError, {}>()(
   "NotUniqueError",
   {},
 ) {
@@ -2179,7 +2190,7 @@ export const unique = Effect.fn("QueryStream.unique")(
       Stream.runCollect,
       Effect.flatMap((docs) =>
         docs.length >= 2
-          ? Effect.fail(new NotUniqueError())
+          ? Effect.fail(NotUniqueError.make({}))
           : Effect.succeed(Array.head(docs)),
       ),
     ),
@@ -2312,8 +2323,6 @@ export const paginate: {
       options: PaginateOptions,
     ) {
       const cursorSchema = QueryStreamCursor.fromKeyLayout(self.keyLayout);
-      const encodeCursor = Schema.encodeEffect(cursorSchema);
-      const decodeCursor = Schema.decodeEffect(cursorSchema);
       const complete = (keyValues: QueryStreamKeyValues.QueryStreamKeyValues) =>
         Result.getOrThrowWith(
           QueryStreamKey.complete(self.keyLayout, keyValues),
@@ -2323,7 +2332,7 @@ export const paginate: {
         start: Option.match(Option.fromNullOr(options.cursor), {
           onNone: () => Effect.succeed(QueryStreamPagination.Start.Beginning()),
           onSome: (cursor) =>
-            Effect.map(decodeCursor(cursor), (key) =>
+            Effect.map(Schema.decodeEffect(cursorSchema)(cursor), (key) =>
               QueryStreamPagination.Start.After({
                 cursor,
                 key,
@@ -2335,7 +2344,7 @@ export const paginate: {
           onSome: (cursor) =>
             cursor === QueryStreamCursor.END_CURSOR
               ? Effect.succeed(QueryStreamPagination.Range.ThroughEnd())
-              : Effect.map(decodeCursor(cursor), (key) =>
+              : Effect.map(Schema.decodeEffect(cursorSchema)(cursor), (key) =>
                   QueryStreamPagination.Range.ThroughKey({
                     key,
                   }),
@@ -2411,10 +2420,12 @@ export const paginate: {
       const outcome = QueryStreamPagination.finish(request, collected, stopped);
       if (Result.isFailure(outcome)) {
         const counts = yield* readBudget.getReadCounts;
-        return yield* new ReadBudgetExceededError(counts);
+        return yield* ReadBudgetExceededError.make(counts);
       }
       const encode = (key: QueryStreamKey.Complete) =>
-        encodeCursor(key).pipe(Effect.catchTag("SchemaError", Effect.die));
+        Schema.encodeEffect(cursorSchema)(key).pipe(
+          Effect.catchTag("SchemaError", Effect.die),
+        );
       const encodeSplit = (
         result: Extract<
           QueryStreamPagination.Outcome<Doc>,
@@ -2466,7 +2477,7 @@ export const paginate: {
         Schema.decodeEffect(QueryStreamReadBudget.Limits)(options).pipe(
           Effect.catchTag("SchemaError", (cause) =>
             Effect.die(
-              new QueryStreamReadBudget.InvalidReadLimitError({ cause }),
+              QueryStreamReadBudget.InvalidReadLimitError.make({ cause }),
             ),
           ),
           Effect.flatMap(QueryStreamReadBudget.make),

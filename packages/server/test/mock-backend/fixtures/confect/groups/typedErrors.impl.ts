@@ -25,7 +25,7 @@ const getNoteOrFail = FunctionImpl.make(
       return yield* reader
         .table("notes")
         .get(noteId)
-        .pipe(Effect.mapError(() => new NotFound({ id: noteId })));
+        .pipe(Effect.mapError(() => NotFound.make({ id: noteId })));
     }),
 );
 
@@ -36,7 +36,7 @@ const deleteNoteOrFail = FunctionImpl.make(
   ({ noteId, asAdmin }) =>
     Effect.gen(function* () {
       if (!asAdmin) {
-        return yield* new Forbidden({ reason: "admin required" });
+        return yield* Forbidden.make({ reason: "admin required" });
       }
 
       const reader = yield* DatabaseReader;
@@ -45,7 +45,7 @@ const deleteNoteOrFail = FunctionImpl.make(
       yield* reader
         .table("notes")
         .get(noteId)
-        .pipe(Effect.mapError(() => new NotFound({ id: noteId })));
+        .pipe(Effect.mapError(() => NotFound.make({ id: noteId })));
 
       yield* writer.table("notes").delete(noteId);
 
@@ -60,10 +60,10 @@ const failingAction = FunctionImpl.make(
   ({ kind }) =>
     Match.value(kind).pipe(
       Match.when("notFound", () =>
-        Effect.fail(new NotFound({ id: "missing" })),
+        Effect.fail(NotFound.make({ id: "missing" })),
       ),
       Match.when("forbidden", () =>
-        Effect.fail(new Forbidden({ reason: "no access" })),
+        Effect.fail(Forbidden.make({ reason: "no access" })),
       ),
       Match.exhaustive,
     ),
@@ -79,7 +79,7 @@ const insertThenFail = FunctionImpl.make(
 
       yield* writer.table("notes").insert({ text }).pipe(Effect.orDie);
 
-      return yield* new NotFound({ id: "rolled-back" });
+      return yield* NotFound.make({ id: "rolled-back" });
     }),
 );
 
@@ -171,7 +171,7 @@ const internalGetNoteOrFail = FunctionImpl.make(
       return yield* reader
         .table("notes")
         .get(noteId)
-        .pipe(Effect.mapError(() => new NotFound({ id: noteId })));
+        .pipe(Effect.mapError(() => NotFound.make({ id: noteId })));
     }),
 );
 

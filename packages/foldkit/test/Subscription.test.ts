@@ -1,5 +1,5 @@
 import { FunctionSpec, PaginationError, Ref } from "@confect/core";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, layer } from "@effect/vitest";
 import type { RegisteredQuery } from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
@@ -61,7 +61,7 @@ const makeNoteEntry = () =>
     onError: (error) => FailedGetNote({ error }),
   });
 
-describe("Subscription", () => {
+layer(TestClient.layer, { buildPerTest: true })("Subscription", (it) => {
   describe("reactiveQuery", () => {
     it("extracts Option-wrapped args and defaults no-args queries open", () => {
       const entry = makeNoteEntry();
@@ -89,8 +89,9 @@ describe("Subscription", () => {
         );
 
         expect(messages).toEqual([]);
-        expect(yield* testClient.calls()).toEqual([]);
-      }).pipe(Effect.provide(TestClient.layer)),
+        const observed1 = yield* testClient.calls;
+        expect(observed1).toEqual([]);
+      }),
     );
 
     it.effect(
@@ -98,7 +99,9 @@ describe("Subscription", () => {
       () =>
         Effect.gen(function* () {
           const testClient = yield* TestClient.TestClient;
-          const error = new Client.WebSocketClientError({ cause: "bad query" });
+          const error = Client.WebSocketClientError.make({
+            cause: "bad query",
+          });
           yield* testClient.setReactiveQueryResults(
             Stream.make(
               Result.succeed({ text: "a" }),
@@ -118,14 +121,15 @@ describe("Subscription", () => {
             FailedGetNote({ error }),
             SucceededGetNote({ note: { text: "b" } }),
           ]);
-          expect(yield* testClient.calls()).toEqual([
+          const observed2 = yield* testClient.calls;
+          expect(observed2).toEqual([
             {
               method: "reactiveQuery",
               name: "notes:get",
               args: { id: "abc" },
             },
           ]);
-        }).pipe(Effect.provide(TestClient.layer)),
+        }),
     );
 
     it("derives dependency equivalence from the ref args schema", () => {
@@ -189,14 +193,15 @@ describe("Subscription", () => {
         );
 
         expect(messages).toEqual([SucceededGetNote({ note: { text: "raw" } })]);
-        expect(yield* testClient.calls()).toEqual([
+        const observed3 = yield* testClient.calls;
+        expect(observed3).toEqual([
           {
             method: "reactiveQuery",
             name: "notes:get",
             args: { id: "abc" },
           },
         ]);
-      }).pipe(Effect.provide(TestClient.layer)),
+      }),
     );
 
     it("rejects Convex-provenance refs at the type level", () => {
@@ -211,7 +216,10 @@ describe("Subscription", () => {
 
 const Note = Schema.Struct({ text: Schema.String });
 
-class PageDenied extends Schema.TaggedError<PageDenied>()("PageDenied", {
+class PageDenied extends Schema.TaggedError<
+  PageDenied,
+  { readonly brand: unique symbol }
+>()("PageDenied", {
   reason: Schema.String,
 }) {}
 
@@ -301,7 +309,7 @@ const failPage = (
   state: PaginatedActive,
   error: PaginatedQuery.Error<
     typeof paginateRef
-  > = new Client.WebSocketClientError({ cause: "offline" }),
+  > = Client.WebSocketClientError.make({ cause: "offline" }),
 ): PaginatedActive =>
   PaginatedQuery.settle(state, {
     request: allocatedRequest(state),
@@ -318,378 +326,398 @@ const streamFor = (
     request: Option.some(request),
   }));
 
-describe("Subscription.paginatedQuery", () => {
-  describe("modelToDependencies", () => {
-    it("opens Active and closes Idle machines", () => {
-      const entry = makePaginatedEntry();
-      const state = initialMachine();
-
-      expect(entry.modelToDependencies({ notes: state })).toEqual({
-        request: Option.some(PaginatedQuery.getSubscriptionRequest(state)),
-      });
-      expect(entry.modelToDependencies({ notes: Notes.idle })).toEqual({
-        request: Option.none(),
-      });
-    });
-
-    it("keeps subscriptions open through Failure and Stale", () => {
-      const entry = makePaginatedEntry();
-      const failed = failPage(initialMachine());
-      const stale = failPage(settlePage(initialMachine()));
-
-      expect(entry.modelToDependencies({ notes: failed }).request).toEqual(
-        Option.some(PaginatedQuery.getSubscriptionRequest(failed)),
-      );
-      expect(entry.modelToDependencies({ notes: stale }).request).toEqual(
-        Option.some(PaginatedQuery.getSubscriptionRequest(stale)),
-      );
-    });
-  });
-
-  describe("dependenciesToStream", () => {
-    it.effect("allocates an id and emits the first correlated settlement", () =>
-      Effect.gen(function* () {
-        const testClient = yield* TestClient.TestClient;
-        yield* testClient.setReactiveQueryResults(
-          Stream.make(
-            Result.succeed({
-              page: [{ text: "a" }],
-              isDone: false,
-              continueCursor: "c1",
-            }),
-          ),
-        );
+layer(TestClient.layer, { buildPerTest: true })(
+  "Subscription.paginatedQuery",
+  (it) => {
+    describe("modelToDependencies", () => {
+      it("opens Active and closes Idle machines", () => {
         const entry = makePaginatedEntry();
         const state = initialMachine();
-        const subscriptionRequest =
-          PaginatedQuery.getSubscriptionRequest(state);
 
-        const messages = yield* Stream.runCollect(
-          streamFor(entry, subscriptionRequest),
-        );
-
-        expect(messages).toHaveLength(1);
-        const message = messages[0]!;
-        const paginationId = message.settlement.request.paginationId;
-        expect(message.settlement.result).toEqual(
-          Result.succeed({
-            page: [{ text: "a" }],
-            isDone: false,
-            continueCursor: "c1",
-          }),
-        );
-        expect(yield* testClient.calls()).toEqual([
-          {
-            method: "reactiveQuery",
-            name: "notes:paginate",
-            args: {
-              channel: "general",
-              paginationOpts: {
-                numItems: 2,
-                cursor: null,
-                id: paginationId,
-                maximumRowsRead: 100,
-                maximumBytesRead: 1_000,
-              },
-            },
-          },
-        ]);
-      }).pipe(Effect.provide(TestClient.layer)),
-    );
-
-    it.effect("reuses an installed id and passes a pinned end cursor", () =>
-      Effect.gen(function* () {
-        const testClient = yield* TestClient.TestClient;
-        yield* testClient.setReactiveQueryResults(
-          Stream.make(
-            Result.succeed({ page: [], isDone: false, continueCursor: "s" }),
-          ),
-        );
-        const entry = makePaginatedEntry();
-        const logicalRequest = {
-          ...PaginatedQuery.getSubscriptionRequest(initialMachine()),
-          paginationId: Option.some(42),
-          descriptor: { cursor: null, endCursor: Option.some("s") },
-        };
-
-        const messages = yield* Stream.runCollect(
-          streamFor(entry, logicalRequest),
-        );
-
-        expect(messages[0]!.settlement.request.paginationId).toBe(42);
-        const calls = yield* testClient.calls();
-        expect(calls[0]!.args).toEqual({
-          channel: "general",
-          paginationOpts: {
-            numItems: 2,
-            cursor: null,
-            endCursor: "s",
-            id: 42,
-            maximumRowsRead: 100,
-            maximumBytesRead: 1_000,
-          },
+        expect(entry.modelToDependencies({ notes: state })).toEqual({
+          request: Option.some(PaginatedQuery.getSubscriptionRequest(state)),
         });
-      }).pipe(Effect.provide(TestClient.layer)),
-    );
+        expect(entry.modelToDependencies({ notes: Notes.idle })).toEqual({
+          request: Option.none(),
+        });
+      });
 
-    it.effect("reserves a restored id before allocating another session", () =>
-      Effect.gen(function* () {
-        const testClient = yield* TestClient.TestClient;
-        yield* testClient.setReactiveQueryResults(
-          Stream.make(
-            Result.succeed({ page: [], isDone: true, continueCursor: "" }),
-          ),
-        );
+      it("keeps subscriptions open through Failure and Stale", () => {
         const entry = makePaginatedEntry();
-        const restoredRequest = {
-          ...PaginatedQuery.getSubscriptionRequest(initialMachine()),
-          paginationId: Option.some(42_000),
-        };
+        const failed = failPage(initialMachine());
+        const stale = failPage(settlePage(initialMachine()));
 
-        const restoredMessages = yield* Stream.runCollect(
-          streamFor(entry, restoredRequest),
+        expect(entry.modelToDependencies({ notes: failed }).request).toEqual(
+          Option.some(PaginatedQuery.getSubscriptionRequest(failed)),
         );
-        const freshMessages = yield* Stream.runCollect(
-          streamFor(
-            entry,
-            PaginatedQuery.getSubscriptionRequest(initialMachine()),
-          ),
+        expect(entry.modelToDependencies({ notes: stale }).request).toEqual(
+          Option.some(PaginatedQuery.getSubscriptionRequest(stale)),
         );
+      });
+    });
 
-        expect(restoredMessages[0]!.settlement.request.paginationId).toBe(
-          42_000,
-        );
-        expect(freshMessages[0]!.settlement.request.paginationId).toBe(42_001);
-      }).pipe(Effect.provide(TestClient.layer)),
-    );
+    describe("dependenciesToStream", () => {
+      it.effect(
+        "allocates an id and emits the first correlated settlement",
+        () =>
+          Effect.gen(function* () {
+            const testClient = yield* TestClient.TestClient;
+            yield* testClient.setReactiveQueryResults(
+              Stream.make(
+                Result.succeed({
+                  page: [{ text: "a" }],
+                  isDone: false,
+                  continueCursor: "c1",
+                }),
+              ),
+            );
+            const entry = makePaginatedEntry();
+            const state = initialMachine();
+            const subscriptionRequest =
+              PaginatedQuery.getSubscriptionRequest(state);
 
-    it.effect("emits a failure and a later success from one live stream", () =>
-      Effect.gen(function* () {
-        const testClient = yield* TestClient.TestClient;
-        const error = new PageDenied({ reason: "temporarily private" });
-        yield* testClient.setReactiveQueryResults(
-          Stream.make(
-            Result.fail(error),
-            Result.succeed({
-              page: [{ text: "now visible" }],
-              isDone: true,
-              continueCursor: "",
-            }),
-          ),
-        );
-        const entry = makePaginatedEntry();
+            const messages = yield* Stream.runCollect(
+              streamFor(entry, subscriptionRequest),
+            );
 
-        const messages = yield* Stream.runCollect(
-          streamFor(
-            entry,
-            PaginatedQuery.getSubscriptionRequest(initialMachine()),
-          ),
-        );
-
-        expect(messages).toHaveLength(2);
-        expect(messages[0]!.settlement.result).toEqual(
-          Result.fail(PaginatedQuery.FunctionError({ error })),
-        );
-        expect(messages[1]!.settlement.result).toEqual(
-          Result.succeed({
-            page: [{ text: "now visible" }],
-            isDone: true,
-            continueCursor: "",
+            expect(messages).toHaveLength(1);
+            const message = messages[0]!;
+            const paginationId = message.settlement.request.paginationId;
+            expect(message.settlement.result).toEqual(
+              Result.succeed({
+                page: [{ text: "a" }],
+                isDone: false,
+                continueCursor: "c1",
+              }),
+            );
+            const observed4 = yield* testClient.calls;
+            expect(observed4).toEqual([
+              {
+                method: "reactiveQuery",
+                name: "notes:paginate",
+                args: {
+                  channel: "general",
+                  paginationOpts: {
+                    numItems: 2,
+                    cursor: null,
+                    id: paginationId,
+                    maximumRowsRead: 100,
+                    maximumBytesRead: 1_000,
+                  },
+                },
+              },
+            ]);
           }),
-        );
-        expect(yield* testClient.calls()).toHaveLength(1);
-      }).pipe(Effect.provide(TestClient.layer)),
-    );
+      );
 
-    it.effect(
-      "normalizes invalid cursors and carries infrastructure errors directly",
-      () =>
+      it.effect("reuses an installed id and passes a pinned end cursor", () =>
         Effect.gen(function* () {
           const testClient = yield* TestClient.TestClient;
-          const cause = new ConvexError({
-            isConvexSystemError: true,
-            paginationError: "InvalidCursor",
-          });
-          const transportError = new Client.WebSocketClientError({
-            cause: new Error("offline"),
-          });
-          const decoded = Schema.decodeUnknownResult(Schema.Finite)("bad");
-          if (Result.isSuccess(decoded)) {
-            throw new Error("expected schema decoding to fail");
-          }
           yield* testClient.setReactiveQueryResults(
             Stream.make(
-              Result.fail(new Client.WebSocketClientError({ cause })),
-              Result.fail(transportError),
-              Result.fail(decoded.failure),
+              Result.succeed({ page: [], isDone: false, continueCursor: "s" }),
             ),
           );
           const entry = makePaginatedEntry();
+          const logicalRequest = {
+            ...PaginatedQuery.getSubscriptionRequest(initialMachine()),
+            paginationId: Option.some(42),
+            descriptor: { cursor: null, endCursor: Option.some("s") },
+          };
 
           const messages = yield* Stream.runCollect(
-            streamFor(
-              entry,
-              PaginatedQuery.getSubscriptionRequest(initialMachine()),
-            ),
+            streamFor(entry, logicalRequest),
           );
 
-          expect(messages[0]!.settlement.result).toEqual(
-            Result.fail(new PaginationError.InvalidCursor({ cause })),
-          );
-          expect(messages[1]!.settlement.result).toEqual(
-            Result.fail(transportError),
-          );
-          expect(messages[2]!.settlement.result).toEqual(
-            Result.fail(decoded.failure),
-          );
-        }).pipe(Effect.provide(TestClient.layer)),
-    );
+          expect(messages[0]!.settlement.request.paginationId).toBe(42);
+          const calls = yield* testClient.calls;
+          expect(calls[0]!.args).toEqual({
+            channel: "general",
+            paginationOpts: {
+              numItems: 2,
+              cursor: null,
+              endCursor: "s",
+              id: 42,
+              maximumRowsRead: 100,
+              maximumBytesRead: 1_000,
+            },
+          });
+        }),
+      );
 
-    it.effect(
-      "normalizes raw invalid cursors accepted by a broad function error schema",
-      () =>
+      it.effect(
+        "reserves a restored id before allocating another session",
+        () =>
+          Effect.gen(function* () {
+            const testClient = yield* TestClient.TestClient;
+            yield* testClient.setReactiveQueryResults(
+              Stream.make(
+                Result.succeed({ page: [], isDone: true, continueCursor: "" }),
+              ),
+            );
+            const entry = makePaginatedEntry();
+            const restoredRequest = {
+              ...PaginatedQuery.getSubscriptionRequest(initialMachine()),
+              paginationId: Option.some(42_000),
+            };
+
+            const restoredMessages = yield* Stream.runCollect(
+              streamFor(entry, restoredRequest),
+            );
+            const freshMessages = yield* Stream.runCollect(
+              streamFor(
+                entry,
+                PaginatedQuery.getSubscriptionRequest(initialMachine()),
+              ),
+            );
+
+            expect(restoredMessages[0]!.settlement.request.paginationId).toBe(
+              42_000,
+            );
+            expect(freshMessages[0]!.settlement.request.paginationId).toBe(
+              42_001,
+            );
+          }),
+      );
+
+      it.effect(
+        "emits a failure and a later success from one live stream",
+        () =>
+          Effect.gen(function* () {
+            const testClient = yield* TestClient.TestClient;
+            const error = PageDenied.make({ reason: "temporarily private" });
+            yield* testClient.setReactiveQueryResults(
+              Stream.make(
+                Result.fail(error),
+                Result.succeed({
+                  page: [{ text: "now visible" }],
+                  isDone: true,
+                  continueCursor: "",
+                }),
+              ),
+            );
+            const entry = makePaginatedEntry();
+
+            const messages = yield* Stream.runCollect(
+              streamFor(
+                entry,
+                PaginatedQuery.getSubscriptionRequest(initialMachine()),
+              ),
+            );
+
+            expect(messages).toHaveLength(2);
+            expect(messages[0]!.settlement.result).toEqual(
+              Result.fail(PaginatedQuery.FunctionError({ error })),
+            );
+            expect(messages[1]!.settlement.result).toEqual(
+              Result.succeed({
+                page: [{ text: "now visible" }],
+                isDone: true,
+                continueCursor: "",
+              }),
+            );
+            const observed5 = yield* testClient.calls;
+            expect(observed5).toHaveLength(1);
+          }),
+      );
+
+      it.effect(
+        "normalizes invalid cursors and carries infrastructure errors directly",
+        () =>
+          Effect.gen(function* () {
+            const testClient = yield* TestClient.TestClient;
+            const cause = new ConvexError({
+              isConvexSystemError: true,
+              paginationError: "InvalidCursor",
+            });
+            const transportError = Client.WebSocketClientError.make({
+              cause: new Error("offline"),
+            });
+            const decoded = Schema.decodeUnknownResult(Schema.Finite)("bad");
+            if (Result.isSuccess(decoded)) {
+              throw new Error("expected schema decoding to fail");
+            }
+            yield* testClient.setReactiveQueryResults(
+              Stream.make(
+                Result.fail(Client.WebSocketClientError.make({ cause })),
+                Result.fail(transportError),
+                Result.fail(decoded.failure),
+              ),
+            );
+            const entry = makePaginatedEntry();
+
+            const messages = yield* Stream.runCollect(
+              streamFor(
+                entry,
+                PaginatedQuery.getSubscriptionRequest(initialMachine()),
+              ),
+            );
+
+            expect(messages[0]!.settlement.result).toEqual(
+              Result.fail(PaginationError.InvalidCursor.make({ cause })),
+            );
+            expect(messages[1]!.settlement.result).toEqual(
+              Result.fail(transportError),
+            );
+            expect(messages[2]!.settlement.result).toEqual(
+              Result.fail(decoded.failure),
+            );
+          }),
+      );
+
+      it.effect(
+        "normalizes raw invalid cursors accepted by a broad function error schema",
+        () =>
+          Effect.gen(function* () {
+            const testClient = yield* TestClient.TestClient;
+            const rawInvalidCursor = {
+              isConvexSystemError: true,
+              paginationError: "InvalidCursor",
+            } as const;
+            yield* testClient.setReactiveQueryResults(
+              Stream.make(Result.fail(rawInvalidCursor)),
+            );
+            const entry =
+              Subscription.paginatedQuery<BroadErrorPaginatedModel>()(
+                BroadErrorNotes,
+                {
+                  state: (model) => model.notes,
+                  onSettled: (settlement) => settlement,
+                },
+              );
+            const state = BroadErrorNotes.init(BroadErrorNotes.idle, {
+              initialNumItems: 2,
+            });
+            const request = PaginatedQuery.getSubscriptionRequest(state);
+
+            const settlements = yield* Stream.runCollect(
+              entry.dependenciesToStream(
+                { request: Option.some(request) },
+                () => ({ request: Option.some(request) }),
+              ),
+            );
+            const settlement = settlements[0]!;
+
+            expect(settlement.result).toEqual(
+              Result.fail(
+                PaginationError.InvalidCursor.make({ cause: rawInvalidCursor }),
+              ),
+            );
+            const reset = PaginatedQuery.settle(state, settlement);
+            expect(PaginatedQuery.isLoading(reset)).toBe(true);
+            if (!PaginatedQuery.isIdle(reset)) {
+              expect(reset.paginationId).toEqual(Option.none());
+              expect(reset.generation).toBe(state.generation + 1);
+            }
+          }),
+      );
+
+      it.effect("None dependencies produce an empty stream", () =>
         Effect.gen(function* () {
           const testClient = yield* TestClient.TestClient;
-          const rawInvalidCursor = {
-            isConvexSystemError: true,
-            paginationError: "InvalidCursor",
-          } as const;
-          yield* testClient.setReactiveQueryResults(
-            Stream.make(Result.fail(rawInvalidCursor)),
+          const entry = makePaginatedEntry();
+          const messages = yield* Stream.runCollect(
+            entry.dependenciesToStream({ request: Option.none() }, () => ({
+              request: Option.none(),
+            })),
           );
-          const entry = Subscription.paginatedQuery<BroadErrorPaginatedModel>()(
-            BroadErrorNotes,
-            {
-              state: (model) => model.notes,
-              onSettled: (settlement) => settlement,
-            },
-          );
-          const state = BroadErrorNotes.init(BroadErrorNotes.idle, {
-            initialNumItems: 2,
-          });
-          const request = PaginatedQuery.getSubscriptionRequest(state);
 
-          const settlements = yield* Stream.runCollect(
-            entry.dependenciesToStream(
-              { request: Option.some(request) },
-              () => ({ request: Option.some(request) }),
-            ),
-          );
-          const settlement = settlements[0]!;
-
-          expect(settlement.result).toEqual(
-            Result.fail(
-              new PaginationError.InvalidCursor({ cause: rawInvalidCursor }),
-            ),
-          );
-          const reset = PaginatedQuery.settle(state, settlement);
-          expect(PaginatedQuery.isLoading(reset)).toBe(true);
-          if (!PaginatedQuery.isIdle(reset)) {
-            expect(reset.paginationId).toEqual(Option.none());
-            expect(reset.generation).toBe(state.generation + 1);
-          }
-        }).pipe(Effect.provide(TestClient.layer)),
-    );
-
-    it.effect("None dependencies produce an empty stream", () =>
-      Effect.gen(function* () {
-        const testClient = yield* TestClient.TestClient;
-        const entry = makePaginatedEntry();
-        const messages = yield* Stream.runCollect(
-          entry.dependenciesToStream({ request: Option.none() }, () => ({
-            request: Option.none(),
-          })),
-        );
-
-        expect(messages).toEqual([]);
-        expect(yield* testClient.calls()).toEqual([]);
-      }).pipe(Effect.provide(TestClient.layer)),
-    );
-  });
-
-  describe("keep-alive equivalence", () => {
-    it("ignores only pagination-id installation", () => {
-      const entry = makePaginatedEntry();
-      const base = PaginatedQuery.getSubscriptionRequest(initialMachine());
-      const deps = (request: typeof base) => ({
-        request: Option.some(request),
-      });
-
-      expect(
-        entry.keepAliveEquivalence(
-          deps(base),
-          deps({ ...base, paginationId: Option.some(42) }),
-        ),
-      ).toBe(true);
-      expect(
-        entry.keepAliveEquivalence(
-          deps(base),
-          deps({ ...base, generation: base.generation + 1 }),
-        ),
-      ).toBe(false);
-      expect(
-        entry.keepAliveEquivalence(
-          deps(base),
-          deps({ ...base, requestId: base.requestId + 1 }),
-        ),
-      ).toBe(false);
-      expect(
-        entry.keepAliveEquivalence(
-          deps(base),
-          deps({ ...base, args: { channel: "random" } }),
-        ),
-      ).toBe(false);
-      expect(
-        entry.keepAliveEquivalence(deps(base), { request: Option.none() }),
-      ).toBe(false);
-    });
-  });
-
-  describe("construction", () => {
-    it("derives a settlement schema for every canonical error", () => {
-      const state = initialMachine();
-      const schemaResult = Schema.decodeUnknownResult(Schema.Finite)("bad");
-      if (Result.isSuccess(schemaResult)) {
-        throw new Error("expected schema decoding to fail");
-      }
-      const errors: ReadonlyArray<PaginatedQuery.Error<typeof paginateRef>> = [
-        PaginatedQuery.FunctionError({
-          error: new PageDenied({ reason: "private" }),
+          expect(messages).toEqual([]);
+          const observed6 = yield* testClient.calls;
+          expect(observed6).toEqual([]);
         }),
-        new PaginationError.InvalidCursor({ cause: "expired" }),
-        new Client.WebSocketClientError({ cause: "offline" }),
-        schemaResult.failure,
-      ];
-
-      for (const error of errors) {
-        const settlement = {
-          request: allocatedRequest(state),
-          result: Result.fail(error),
-        };
-        const encoded = Schema.encodeSync(Notes.settlement)(settlement);
-        expect(Schema.decodeUnknownSync(Notes.settlement)(encoded)).toEqual(
-          settlement,
-        );
-      }
-    });
-
-    it("requires a bundle and is accepted by Foldkit Subscription.make", () => {
-      const invalid = () =>
-        // @ts-expect-error—the bundle owns state and settlement schemas
-        Subscription.paginatedQuery<PaginatedModel>()(paginateRef, {
-          state: (model: PaginatedModel) => model.notes,
-          onSettled: SettledGetNotesPage,
-        });
-      const subscriptions = FoldkitSubscription.make<
-        PaginatedModel,
-        typeof SettledGetNotesPage.Type,
-        Client.Client
-      >()(() => ({ notesPage: makePaginatedEntry() }));
-
-      expect(typeof invalid).toBe("function");
-      expect(typeof subscriptions.notesPage.dependenciesToStream).toBe(
-        "function",
       );
     });
-  });
-});
+
+    describe("keep-alive equivalence", () => {
+      it("ignores only pagination-id installation", () => {
+        const entry = makePaginatedEntry();
+        const base = PaginatedQuery.getSubscriptionRequest(initialMachine());
+        const deps = (request: typeof base) => ({
+          request: Option.some(request),
+        });
+
+        expect(
+          entry.keepAliveEquivalence(
+            deps(base),
+            deps({ ...base, paginationId: Option.some(42) }),
+          ),
+        ).toBe(true);
+        expect(
+          entry.keepAliveEquivalence(
+            deps(base),
+            deps({ ...base, generation: base.generation + 1 }),
+          ),
+        ).toBe(false);
+        expect(
+          entry.keepAliveEquivalence(
+            deps(base),
+            deps({ ...base, requestId: base.requestId + 1 }),
+          ),
+        ).toBe(false);
+        expect(
+          entry.keepAliveEquivalence(
+            deps(base),
+            deps({ ...base, args: { channel: "random" } }),
+          ),
+        ).toBe(false);
+        expect(
+          entry.keepAliveEquivalence(deps(base), { request: Option.none() }),
+        ).toBe(false);
+      });
+    });
+
+    describe("construction", () => {
+      it("derives a settlement schema for every canonical error", () => {
+        const state = initialMachine();
+        const schemaResult = Schema.decodeUnknownResult(Schema.Finite)("bad");
+        if (Result.isSuccess(schemaResult)) {
+          throw new Error("expected schema decoding to fail");
+        }
+        const errors: ReadonlyArray<PaginatedQuery.Error<typeof paginateRef>> =
+          [
+            PaginatedQuery.FunctionError({
+              error: PageDenied.make({ reason: "private" }),
+            }),
+            PaginationError.InvalidCursor.make({ cause: "expired" }),
+            Client.WebSocketClientError.make({ cause: "offline" }),
+            schemaResult.failure,
+          ];
+
+        for (const error of errors) {
+          const settlement = {
+            request: allocatedRequest(state),
+            result: Result.fail(error),
+          };
+          const encoded = Schema.encodeResult(Notes.settlement)(
+            settlement,
+          ).pipe(Result.getOrThrow);
+          expect(
+            Schema.decodeUnknownResult(Notes.settlement)(encoded).pipe(
+              Result.getOrThrow,
+            ),
+          ).toEqual(settlement);
+        }
+      });
+
+      it("requires a bundle and is accepted by Foldkit Subscription.make", () => {
+        const invalid = () =>
+          // @ts-expect-error—the bundle owns state and settlement schemas
+          Subscription.paginatedQuery<PaginatedModel>()(paginateRef, {
+            state: (model: PaginatedModel) => model.notes,
+            onSettled: SettledGetNotesPage,
+          });
+        const subscriptions = FoldkitSubscription.make<
+          PaginatedModel,
+          typeof SettledGetNotesPage.Type,
+          Client.Client
+        >()(() => ({ notesPage: makePaginatedEntry() }));
+
+        expect(typeof invalid).toBe("function");
+        expect(typeof subscriptions.notesPage.dependenciesToStream).toBe(
+          "function",
+        );
+      });
+    });
+  },
+);

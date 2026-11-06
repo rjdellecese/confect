@@ -1,3 +1,4 @@
+import * as Record from "effect/Record";
 import type { GenericDatabaseReader } from "convex/server";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
@@ -39,14 +40,14 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   convexDatabaseReader: GenericDatabaseReader<
     DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
-): DatabaseReaderService<DatabaseSchema_> => {
-  return {
+): DatabaseReaderService<DatabaseSchema_> =>
+  ({
     table: <
       const TableName extends Table.Name<IncludedTables<DatabaseSchema_>>,
     >(
       tableName: TableName,
     ) => {
-      const isSystem = Object.hasOwn(Table.systemTables, tableName);
+      const isSystem = Record.has(Table.systemTables, tableName);
 
       const baseDatabaseReader: BaseDatabaseReader<any> = isSystem
         ? {
@@ -75,8 +76,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         table,
       );
     },
-  } as DatabaseReaderService<DatabaseSchema_>;
-};
+  }) as DatabaseReaderService<DatabaseSchema_>;
 
 /**
  * The tag's _Identifier_ (the Effect requirements-channel type) is

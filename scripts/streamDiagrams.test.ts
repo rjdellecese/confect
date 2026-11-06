@@ -1,3 +1,7 @@
+import * as Option from "effect/Option";
+import * as Arr from "effect/Array";
+import * as Record from "effect/Record";
+import * as Str from "effect/String";
 import { expect, test } from "bun:test";
 import * as Effect from "effect/Effect";
 import { cell, diagrams, keys, renderDiagrams, track } from "./streamDiagrams";
@@ -18,35 +22,44 @@ const renderedOrMessage = (source: string): Effect.Effect<string> =>
 const block = (name: string): string =>
   `{/* stream-diagram: ${name} */}\n\`\`\`text\nstale\n\`\`\``;
 
+const indexOf = (text: string | undefined, search: string) =>
+  text === undefined
+    ? undefined
+    : Option.getOrElse(Str.indexOf(search)(text), () => -1);
+
 test("tracks and their keys share columns", () => {
-  const [name, elements] = track("by_text", ["n1", undefined, "n2"]).split(
-    "\n",
+  const [name, elements] = Str.split("\n")(
+    track("by_text", ["n1", undefined, "n2"]),
   );
   const beneath = keys(["[apple,1]", undefined, "[banana,2]"]);
   expect(name).toBe("by_text");
-  expect(elements?.startsWith("╰")).toBe(true);
+  expect(
+    elements === undefined ? undefined : Str.startsWith("╰")(elements),
+  ).toBe(true);
   // Same width before the end marker, so keys sit beneath their elements.
   expect(elements?.length).toBe(beneath.length + 1);
-  expect(elements?.indexOf("n2")).toBe(beneath.indexOf("[banana,2]"));
+  expect(indexOf(elements, "n2")).toBe(
+    Option.getOrElse(Str.indexOf("[banana,2]")(beneath), () => -1),
+  );
   expect(cell("n1")).toHaveLength(cell("(n6)").length);
 });
 
 test("a track that starts later lines up with the outer track's columns", () => {
-  const [, outer] = track("admin", ["n1", undefined, "n4"]).split("\n");
-  const [name, inner] = track("of n4", ["c3"], "┤", 2).split("\n");
+  const [, outer] = Str.split("\n")(track("admin", ["n1", undefined, "n4"]));
+  const [name, inner] = Str.split("\n")(track("of n4", ["c3"], "┤", 2));
   // The corner sits under the name, and the inner element under the outer one.
-  expect(inner?.indexOf("╰")).toBe(name?.indexOf("of n4"));
-  expect(inner?.indexOf("c3")).toBe(outer?.indexOf("n4"));
+  expect(indexOf(inner, "╰")).toBe(indexOf(name, "of n4"));
+  expect(indexOf(inner, "c3")).toBe(indexOf(outer, "n4"));
 });
 
 test("renders every marked block and leaves the rest of the page alone", () =>
   runTest(
     Effect.gen(function* () {
       const full = yield* renderedOrMessage(
-        `intro\n${Object.keys(diagrams).map(block).join("\n\n")}\noutro`,
+        `intro\n${Arr.join(Arr.map(Record.keys(diagrams), block), "\n\n")}\noutro`,
       );
-      expect(full.startsWith("intro\n")).toBe(true);
-      expect(full.endsWith("\noutro")).toBe(true);
+      expect(Str.startsWith("intro\n")(full)).toBe(true);
+      expect(Str.endsWith("\noutro")(full)).toBe(true);
       expect(full).not.toContain("stale");
       expect(full).toContain(diagrams["legend"]);
     }),

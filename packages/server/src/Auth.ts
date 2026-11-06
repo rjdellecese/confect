@@ -12,7 +12,7 @@ const make = (auth: ConvexAuth) => ({
       flow(
         Option.fromNullishOr,
         Option.match({
-          onNone: () => Effect.fail(new NoUserIdentityFoundError()),
+          onNone: () => Effect.fail(NoUserIdentityFoundError.make()),
           onSome: Effect.succeed,
         }),
       ),
@@ -26,10 +26,10 @@ export class Auth extends Context.Service<Auth, ReturnType<typeof make>>()(
 
 export const layer = (auth: ConvexAuth) => Layer.succeed(Auth, make(auth));
 
-export class NoUserIdentityFoundError extends Schema.TaggedError<NoUserIdentityFoundError>()(
-  "NoUserIdentityFoundError",
-  {},
-) {
+export class NoUserIdentityFoundError extends Schema.TaggedError<
+  NoUserIdentityFoundError,
+  {}
+>()("NoUserIdentityFoundError", {}) {
   override get message(): string {
     return "No user identity found";
   }

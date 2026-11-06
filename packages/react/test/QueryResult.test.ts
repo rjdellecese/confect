@@ -166,7 +166,8 @@ describe("match", () => {
       .parameter(0)
       .toExtend<QueryResult.QueryResult<number, never>>();
     expectTypeOf(f).returns.toEqualTypeOf<string>();
-    expectTypeOf(f(QueryResult.succeed(1))).toEqualTypeOf<string>();
+    const succeeded = f(QueryResult.succeed(1));
+    expectTypeOf(succeeded).toEqualTypeOf<string>();
 
     QueryResult.match<number, never, string, string, string>({
       onLoading: (s) => `L:${s}`,

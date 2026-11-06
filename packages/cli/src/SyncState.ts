@@ -40,7 +40,7 @@ export const reconcile = (pending: Pending): Pending => ({
 export const add = (
   pending: Pending,
   entries: ReadonlyArray<Kind>,
-  forceFull = false,
+  forceFull: boolean = false,
 ): Pending => {
   const next = Array.reduce(
     entries,
@@ -60,7 +60,8 @@ export const add = (
         Impls: () => HashMap.empty<string, Declaration>(),
         Declarations: ({ entries: declarations }) =>
           HashMap.fromIterable(
-            declarations.map(
+            Array.map(
+              declarations,
               (entry) =>
                 [`${entry._tag}:${entry.relativePath}`, entry] as const,
             ),
@@ -94,7 +95,10 @@ export const add = (
       ),
   );
   const impls = Array.fromIterable(next.paths);
-  const declarations = Array.fromIterable(HashMap.values(next.declarations));
+  const declarations = next.declarations.pipe(
+    HashMap.values,
+    Array.fromIterable,
+  );
   return {
     work: next.needsFull
       ? Work.Full()

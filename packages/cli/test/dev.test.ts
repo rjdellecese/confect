@@ -1,3 +1,7 @@
+import { pipe } from "effect/Function";
+import * as Str from "effect/String";
+import * as Rec from "effect/Record";
+import * as Arr from "effect/Array";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
@@ -79,17 +83,18 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           );
           yield* project.write(
             "confect/notes.spec.ts",
-            `import { name } from "./name";\n${Project.spec.replace('name: "list"', "name")}`,
+            `import { name } from "./name";\n${pipe(Project.spec, Str.replace('name: "list"', "name"))}`,
           );
           yield* Effect.acquireRelease(
             Effect.sync(() =>
               vi
                 .spyOn(Console, "log")
                 .mockImplementation((...args) =>
-                  args.some(
+                  Arr.some(
+                    args,
                     (arg) =>
                       typeof arg === "string" &&
-                      arg.includes("Generated files are up-to-date"),
+                      pipe(arg, Str.includes("Generated files are up-to-date")),
                   )
                     ? Effect.sync(() => readyCount++).pipe(
                         Effect.andThen(Queue.offer(ready, undefined)),
@@ -104,9 +109,11 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             Effect.sync(() =>
               vi.spyOn(Console, "error").mockImplementation((...args) =>
                 Effect.forEach(
-                  args.filter(
+                  Arr.filter(
+                    args,
                     (arg): arg is string =>
-                      typeof arg === "string" && arg.includes("Build errors"),
+                      typeof arg === "string" &&
+                      pipe(arg, Str.includes("Build errors")),
                   ),
                   (text) => Queue.offer(errors, text),
                   { discard: true },
@@ -127,7 +134,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               : 'export const name = "pending";',
           );
           yield* fs.rename(replacement, helper);
-          expect(yield* Queue.take(errors)).toContain(message);
+          const actual2 = yield* Queue.take(errors);
+          expect(actual2).toContain(message);
           expect(readyCount).toBe(1);
           broken = false;
           yield* fs.writeFileString(replacement, 'export const name = "list";');
@@ -153,10 +161,14 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               vi.spyOn(Console, "log").mockImplementation((...args) =>
                 Effect.sync(() => {
                   if (
-                    args.some(
+                    Arr.some(
+                      args,
                       (arg) =>
                         typeof arg === "string" &&
-                        arg.includes("Generated files are up-to-date"),
+                        pipe(
+                          arg,
+                          Str.includes("Generated files are up-to-date"),
+                        ),
                     )
                   ) {
                     readyCount++;
@@ -176,8 +188,11 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                       ? "watcher service unavailable"
                       : "esbuild completed without metafile";
                   if (
-                    args.some(
-                      (arg) => typeof arg === "string" && arg.includes(message),
+                    Arr.some(
+                      args,
+                      (arg) =>
+                        typeof arg === "string" &&
+                        pipe(arg, Str.includes(message)),
                     )
                   )
                     Deferred.doneUnsafe(failure, Effect.void);
@@ -189,11 +204,12 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const context = vi.mocked(esbuild.context);
           const original = context.getMockImplementation();
           assert(original);
-          const runPromise = Effect.runPromiseWith(yield* Effect.context());
+          const actual3 = yield* Effect.context();
+          const runPromise = Effect.runPromiseWith(actual3);
           context.mockImplementation((options) =>
             runPromise(
               Effect.gen(function* () {
-                const actual = yield* Effect.tryPromise(() =>
+                const actual = yield* Effect.promise(() =>
                   original({
                     ...options,
                     plugins: [
@@ -255,7 +271,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const project = yield* Project.make;
-          const importPath = dependency.startsWith("confect/")
+          const importPath = pipe(dependency, Str.startsWith("confect/"))
             ? "./name"
             : "../name";
           yield* project.write(dependency, 'export const name = "first";\n');
@@ -284,10 +300,14 @@ export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionI
               vi.spyOn(Console, "log").mockImplementation((...args) =>
                 Effect.sync(() => {
                   if (
-                    args.some(
+                    Arr.some(
+                      args,
                       (arg) =>
                         typeof arg === "string" &&
-                        arg.includes("Generated files are up-to-date"),
+                        pipe(
+                          arg,
+                          Str.includes("Generated files are up-to-date"),
+                        ),
                     )
                   ) {
                     Deferred.doneUnsafe(ready, Effect.void);
@@ -297,7 +317,8 @@ export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionI
             ),
             (spy) => Effect.sync(() => spy.mockRestore()),
           );
-          const runPromise = Effect.runPromiseWith(yield* Effect.context());
+          const actual4 = yield* Effect.context();
+          const runPromise = Effect.runPromiseWith(actual4);
           const context = vi.mocked(esbuild.context);
           const original = context.getMockImplementation();
           assert(original);
@@ -366,12 +387,18 @@ export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionI
               project.write(`confect/${name}.spec.ts`, Project.spec),
               project.write(
                 `confect/${name}.impl.ts`,
-                Project.impl.replace('"./notes.spec"', `"./${name}.spec"`),
+                pipe(
+                  Project.impl,
+                  Str.replace('"./notes.spec"', `"./${name}.spec"`),
+                ),
               ),
             ]),
           );
           const unseen = new Set([
-            ...names.flatMap((name) => [`${name}.spec.ts`, `${name}.impl.ts`]),
+            ...Arr.flatMap(names, (name) => [
+              `${name}.spec.ts`,
+              `${name}.impl.ts`,
+            ]),
             path.join("tables", "notes.ts"),
           ]);
           const ready = yield* Deferred.make<void>();
@@ -388,7 +415,7 @@ export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionI
                   name: "observe-watcher-graphs",
                   setup(build) {
                     build.onEnd((result) => {
-                      for (const input of Object.keys(
+                      for (const input of Rec.keys(
                         result.metafile?.inputs ?? {},
                       )) {
                         unseen.delete(

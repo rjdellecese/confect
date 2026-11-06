@@ -1,3 +1,5 @@
+import * as Str from "effect/String";
+import * as Arr from "effect/Array";
 import { afterEach, expect, test } from "bun:test";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Effect from "effect/Effect";
@@ -32,7 +34,7 @@ const fixture = Effect.gen(function* () {
   const git = (...args: string[]) => {
     const result = Bun.spawnSync(["git", "-C", source, ...args]);
     expect(result.exitCode).toBe(0);
-    return result.stdout.toString().trim();
+    return Str.trim(result.stdout.toString());
   };
   const write = Effect.fnUntraced(function* (path: string, contents: string) {
     const file = join(source, path);
@@ -69,13 +71,14 @@ test("stages an exact docs snapshot and removes stale deployment workflows witho
       const { destination, git, prepare } = yield* fixture;
       const before = git("rev-parse", "release");
       expect(prepare().exitCode).toBe(0);
-      expect(git("-C", destination, "ls-files").split("\n")).toEqual([
+      expect(Str.split("\n")(git("-C", destination, "ls-files"))).toEqual([
         "apps/docs/current.mdx",
         "apps/docs/docs.json",
       ]);
-      expect(
-        yield* fs.readFileString(join(destination, "apps/docs/current.mdx")),
-      ).toBe("Current docs");
+      const currentDocs = yield* fs.readFileString(
+        join(destination, "apps/docs/current.mdx"),
+      );
+      expect(currentDocs).toBe("Current docs");
       expect(git("rev-parse", "release")).toBe(before);
       git("-C", destination, "commit", "-m", "Deploy fixture docs");
       expect(prepare().exitCode).toBe(0);
@@ -87,7 +90,7 @@ test("requires a full commit SHA reachable from main before changing the destina
   Effect.runPromise(
     Effect.gen(function* () {
       const { destination, git, prepare } = yield* fixture;
-      for (const ref of ["main", "--output=unexpected", "f".repeat(40)]) {
+      for (const ref of ["main", "--output=unexpected", Str.repeat(40)("f")]) {
         expect(prepare(ref).exitCode).not.toBe(0);
       }
       git("tag", "-a", "annotated", "-m", "Annotated fixture tag");
@@ -107,9 +110,10 @@ test("rejects the source checkout, non-root destinations, and dirty release chec
       expect(prepare(sha, join(destination, "apps/docs")).exitCode).not.toBe(0);
       yield* fs.writeFileString(join(destination, "untracked"), "keep me");
       expect(prepare().exitCode).not.toBe(0);
-      expect(yield* fs.readFileString(join(destination, "untracked"))).toBe(
-        "keep me",
+      const untrackedText = yield* fs.readFileString(
+        join(destination, "untracked"),
       );
+      expect(untrackedText).toBe("keep me");
       yield* fs.remove(join(destination, "untracked"));
       git("-C", destination, "checkout", "--detach");
       expect(prepare().exitCode).not.toBe(0);
@@ -119,25 +123,24 @@ test("rejects the source checkout, non-root destinations, and dirty release chec
 test("redirects legacy versioned navigation pages only to existing current pages", () =>
   Effect.runPromise(
     Effect.gen(function* () {
-      const pages = docsConfig.navigation.groups.flatMap((group) =>
-        group.pages.flatMap((page) =>
+      const pages = Arr.flatMap(docsConfig.navigation.groups, (group) =>
+        Arr.flatMap(group.pages, (page) =>
           typeof page === "string" ? [page] : page.pages,
         ),
       );
       expect(docsConfig.redirects).toEqual(
-        ["v9", "v10"].flatMap((version) =>
-          pages.map((page) => ({
+        Arr.flatMap(["v9", "v10"], (version) =>
+          Arr.map(pages, (page) => ({
             source: `/${version}/${page}`,
             destination: `/${page}`,
           })),
         ),
       );
       for (const page of pages) {
-        expect(
-          yield* fs.exists(
-            resolve(import.meta.dir, `../apps/docs/${page}.mdx`),
-          ),
-        ).toBe(true);
+        const pageExists = yield* fs.exists(
+          resolve(import.meta.dir, `../apps/docs/${page}.mdx`),
+        );
+        expect(pageExists).toBe(true);
       }
       expect(docsConfig.navigation).not.toHaveProperty("versions");
     }),

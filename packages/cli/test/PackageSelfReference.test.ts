@@ -28,7 +28,7 @@ layer(NodeServices.layer)("PackageSelfReference", (it) => {
         const found = yield* PackageSelfReference.discover(
           path.join(root, "nested"),
         );
-        assert(Option.isSome(found));
+        assert(found._tag === "Some");
         expect(found.value).toBe("@fixture/backend.v1");
         expect(BundleRequire.match("@fixture/backend.v1", [found.value])).toBe(
           true,
@@ -42,9 +42,10 @@ layer(NodeServices.layer)("PackageSelfReference", (it) => {
         expect(
           BundleRequire.match("@fixture/backend.v1-extra", [found.value]),
         ).toBe(false);
-        expect(
-          yield* PackageSelfReference.discover(path.join(root, "boundary")),
-        ).toEqual(Option.none());
+        const actual = yield* PackageSelfReference.discover(
+          path.join(root, "boundary"),
+        );
+        expect(actual).toEqual(Option.none());
       }).pipe(Effect.scoped),
   );
 
@@ -60,7 +61,8 @@ layer(NodeServices.layer)("PackageSelfReference", (it) => {
       const path = yield* Path.Path;
       const root = yield* fs.makeTempDirectoryScoped();
       yield* fs.writeFileString(path.join(root, "package.json"), metadata);
-      expect(yield* PackageSelfReference.discover(root)).toEqual(Option.none());
+      const actual2 = yield* PackageSelfReference.discover(root);
+      expect(actual2).toEqual(Option.none());
     }).pipe(Effect.scoped),
   );
 
@@ -72,9 +74,8 @@ layer(NodeServices.layer)("PackageSelfReference", (it) => {
         const path = yield* Path.Path;
         const root = yield* fs.makeTempDirectoryScoped();
         yield* fs.writeFileString(path.join(root, "package.json"), metadata);
-        expect(
-          yield* Effect.flip(PackageSelfReference.discover(root)),
-        ).toMatchObject({ _tag: "BundlerError" });
+        const actual3 = yield* Effect.flip(PackageSelfReference.discover(root));
+        expect(actual3).toMatchObject({ _tag: "BundlerError" });
       }).pipe(Effect.scoped),
   );
 });

@@ -1,3 +1,4 @@
+import * as Layer from "effect/Layer";
 import {
   AiGatewayLanguageClient,
   AiGatewayDecisionClient,
@@ -23,9 +24,12 @@ describe("AiGatewayDecisionClient", () => {
     ["make", AiGatewayDecisionClient.make],
     [
       "layer",
-      Effect.service(AiGatewayDecisionClient.AiGatewayDecisionClient).pipe(
-        Effect.provide(AiGatewayDecisionClient.layer),
-      ),
+      Effect.gen(function* () {
+        const services = yield* Layer.build(AiGatewayDecisionClient.layer);
+        return yield* Effect.service(
+          AiGatewayDecisionClient.AiGatewayDecisionClient,
+        ).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped),
     ],
   ] as const)("%s", (_name, make) => {
     it.effect("acquires a token once and authenticates decisions", () =>
@@ -136,7 +140,7 @@ describe("AiGatewayDecisionClient", () => {
         getServiceToken
           .mockReset()
           .mockResolvedValueOnce("construction-token")
-          .mockRejectedValueOnce({ code: new ErrorType()._tag });
+          .mockRejectedValueOnce({ code: ErrorType.make()._tag });
         const client = yield* make.pipe(
           Effect.provideService(
             HttpClient.HttpClient,
@@ -156,7 +160,7 @@ describe("AiGatewayDecisionClient", () => {
         if (error.reason._tag !== "NetworkError") {
           return;
         }
-        assert.strictEqual(error.reason.description, new ErrorType().message);
+        assert.strictEqual(error.reason.description, ErrorType.make().message);
       }),
     );
 
@@ -173,7 +177,7 @@ describe("AiGatewayDecisionClient", () => {
       Effect.gen(function* () {
         getServiceToken
           .mockReset()
-          .mockRejectedValue({ code: new ErrorType()._tag });
+          .mockRejectedValue({ code: ErrorType.make()._tag });
         const error = yield* make.pipe(
           Effect.provideService(
             HttpClient.HttpClient,
@@ -181,7 +185,7 @@ describe("AiGatewayDecisionClient", () => {
           ),
           Effect.flip,
         );
-        assert.strictEqual(error._tag, new ErrorType()._tag);
+        assert.strictEqual(error._tag, ErrorType.make()._tag);
       }),
     );
   });

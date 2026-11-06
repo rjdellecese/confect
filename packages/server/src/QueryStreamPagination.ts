@@ -7,6 +7,10 @@ import * as Schema from "effect/Schema";
 import type * as QueryStreamKey from "./QueryStreamKey";
 import * as QueryStreamKeyValues from "./QueryStreamKeyValues";
 
+const NumberValue = Schema.declare<number>(
+  (value): value is number => typeof value === "number",
+);
+
 const PageSize = Schema.Natural.pipe(
   Schema.brand("~@confect/server/QueryStreamPagination/PageSize"),
 );
@@ -15,11 +19,10 @@ type PageSize = typeof PageSize.Type;
 /**
  * @experimental
  */
-export class InvalidPageSizeError extends Data.TaggedError(
-  "InvalidPageSizeError",
-)<{
-  readonly numItems: number;
-}> {
+export class InvalidPageSizeError extends Schema.TaggedError<
+  InvalidPageSizeError,
+  {}
+>()("InvalidPageSizeError", { numItems: NumberValue }) {
   override get message(): string {
     return `QueryStream.paginate: numItems must be a nonnegative integer (received ${this.numItems})`;
   }
@@ -28,9 +31,10 @@ export class InvalidPageSizeError extends Data.TaggedError(
 /**
  * @experimental
  */
-export class EmptyInitialPageError extends Data.TaggedError(
-  "EmptyInitialPageError",
-) {
+export class EmptyInitialPageError extends Schema.TaggedError<
+  EmptyInitialPageError,
+  {}
+>()("EmptyInitialPageError", {}) {
   override get message(): string {
     return "QueryStream.paginate: numItems of 0 with a null cursor is not supported";
   }
@@ -92,12 +96,12 @@ export const parseRequest = (
 ): Result.Result<Request, InvalidPageSizeError | EmptyInitialPageError> =>
   Result.flatMap(
     Schema.decodeResult(PageSize)(numItems).pipe(
-      Result.mapError(() => new InvalidPageSizeError({ numItems })),
+      Result.mapError(() => InvalidPageSizeError.make({ numItems })),
     ),
     (size): Result.Result<Request, EmptyInitialPageError> =>
       size === 0
         ? Start.$match(start, {
-            Beginning: () => Result.fail(new EmptyInitialPageError()),
+            Beginning: () => Result.fail(EmptyInitialPageError.make({})),
             After: ({ cursor }) =>
               Result.succeed(Request.Unchanged({ cursor })),
           })
@@ -231,11 +235,12 @@ export type Outcome<Doc> = Data.TaggedEnum<{
 /**
  * @experimental
  */
-export class UnsafePageBoundaryError extends Data.TaggedError(
-  "UnsafePageBoundaryError",
-)<{
-  readonly reason: "NoProgress" | "NoInteriorSplit";
-}> {
+export class UnsafePageBoundaryError extends Schema.TaggedError<
+  UnsafePageBoundaryError,
+  {}
+>()("UnsafePageBoundaryError", {
+  reason: Schema.Literals(["NoProgress", "NoInteriorSplit"]),
+}) {
   override get message(): string {
     return Match.value(this.reason).pipe(
       Match.when(
@@ -269,9 +274,8 @@ export const finish = <Doc>(
     readLimit: boolean,
   ): Result.Result<Outcome<Doc>, UnsafePageBoundaryError> =>
     Result.flatMap(
-      Result.fromOption(
-        progress,
-        () => new UnsafePageBoundaryError({ reason: "NoProgress" }),
+      Result.fromOption(progress, () =>
+        UnsafePageBoundaryError.make({ reason: "NoProgress" }),
       ),
       (scanned): Result.Result<Outcome<Doc>, UnsafePageBoundaryError> => {
         const splitKey = midpoint(scanned);
@@ -284,7 +288,7 @@ export const finish = <Doc>(
         });
         if (readLimit && atEnd) {
           return Result.fail(
-            new UnsafePageBoundaryError({ reason: "NoInteriorSplit" }),
+            UnsafePageBoundaryError.make({ reason: "NoInteriorSplit" }),
           );
         }
         const key = Chunk.lastNonEmpty(scanned);
@@ -348,10 +352,13 @@ export const finish = <Doc>(
       Reading: ({ progress }) =>
         upstreamStopped
           ? stopped(progress, true)
-          : Result.succeed(exhausted(progress)),
+          : progress.pipe(exhausted, Result.succeed),
       ItemLimit: ({ progress }) =>
-        stopped(Option.some(progress), upstreamStopped),
-      ReadLimit: ({ progress }) => stopped(Option.some(progress), true),
+        progress.pipe(Option.some, (scanned) =>
+          stopped(scanned, upstreamStopped),
+        ),
+      ReadLimit: ({ progress }) =>
+        progress.pipe(Option.some, (scanned) => stopped(scanned, true)),
     }),
   );
 };

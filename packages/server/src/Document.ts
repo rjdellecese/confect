@@ -51,7 +51,7 @@ export const decode = Function.dual<
       Schema.decodeUnknownEffect(table.Doc),
       Effect.catchIf(Schema.isSchemaError, (schemaError) =>
         Effect.fail(
-          new DocumentDecodeError({
+          DocumentDecodeError.make({
             tableName: table.tableName,
             id: self._id,
             parseError: schemaError.message,
@@ -91,7 +91,7 @@ export const encode = Function.dual<
       Schema.encodeEffect(table.Fields),
       Effect.catchIf(Schema.isSchemaError, (schemaError) =>
         Effect.fail(
-          new DocumentEncodeError({
+          DocumentEncodeError.make({
             tableName: table.tableName,
             id: self._id,
             parseError: schemaError.message,
@@ -101,14 +101,14 @@ export const encode = Function.dual<
     ),
 );
 
-export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>()(
-  "DocumentDecodeError",
-  {
-    tableName: Schema.String,
-    id: Schema.String,
-    parseError: Schema.String,
-  },
-) {
+export class DocumentDecodeError extends Schema.TaggedError<
+  DocumentDecodeError,
+  {}
+>()("DocumentDecodeError", {
+  tableName: Schema.String,
+  id: Schema.String,
+  parseError: Schema.String,
+}) {
   override get message(): string {
     return documentErrorMessage({
       id: this.id,
@@ -118,14 +118,14 @@ export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>
   }
 }
 
-export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>()(
-  "DocumentEncodeError",
-  {
-    tableName: Schema.String,
-    id: Schema.String,
-    parseError: Schema.String,
-  },
-) {
+export class DocumentEncodeError extends Schema.TaggedError<
+  DocumentEncodeError,
+  {}
+>()("DocumentEncodeError", {
+  tableName: Schema.String,
+  id: Schema.String,
+  parseError: Schema.String,
+}) {
   override get message(): string {
     return documentErrorMessage({
       id: this.id,

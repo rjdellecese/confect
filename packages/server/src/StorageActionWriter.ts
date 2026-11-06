@@ -14,7 +14,8 @@ const make = (storageActionWriter: ConvexStorageActionWriter) => ({
         flow(
           Option.fromNullishOr,
           Option.match({
-            onNone: () => Effect.fail(new BlobNotFoundError({ id: storageId })),
+            onNone: () =>
+              Effect.fail(BlobNotFoundError.make({ id: storageId })),
             onSome: Effect.succeed,
           }),
         ),

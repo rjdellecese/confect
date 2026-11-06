@@ -15,9 +15,11 @@ const inspect = ({
 }) =>
   Effect.gen(function* () {
     const ids = yield* DocumentIds;
+    const parsed = yield* ids.parse(table, input);
+    const identified = yield* ids.identify(input);
     return {
-      parsed: Option.getOrNull(yield* ids.parse(table, input)),
-      identified: Option.getOrNull(yield* ids.identify(input)),
+      parsed: Option.getOrNull(parsed),
+      identified: Option.getOrNull(identified),
     };
   });
 

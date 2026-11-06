@@ -16,10 +16,10 @@ import * as Schema from "effect/Schema";
 import refs from "confect-local-backend/refs";
 import * as LocalBackend from "confect-local-backend/LocalBackend";
 
-class ConvexQueryError extends Schema.TaggedError<ConvexQueryError>()(
-  "ConvexQueryError",
-  { message: Schema.String },
-) {}
+class ConvexQueryError extends Schema.TaggedError<
+  ConvexQueryError,
+  { readonly brand: unique symbol }
+>()("ConvexQueryError", { message: Schema.String }) {}
 
 /**
  * Run a Confect query once over HTTP. Accepts a Confect `Ref` so the return
@@ -34,7 +34,7 @@ const queryOnce = <R extends Ref.AnyPublicQuery>(
     try: () =>
       client.query(Ref.getFunctionReference(ref), (args[0] ?? {}) as never),
     catch: (error) =>
-      new ConvexQueryError({ message: `query failed: ${String(error)}` }),
+      ConvexQueryError.make({ message: `query failed: ${String(error)}` }),
   });
 
 // `MAX_CACHE_AGE` plus 1s of slack for scheduling jitter.

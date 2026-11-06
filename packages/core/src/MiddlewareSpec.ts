@@ -1,3 +1,4 @@
+import * as Array from "effect/Array";
 import type { FunctionType, FunctionVisibility } from "convex/server";
 import type * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
@@ -247,7 +248,7 @@ type ValidateFunctionTypesConfig<Config extends SupportedFunctionTypes> =
 export const errorSchemas = (
   middlewareSpecs: ReadonlyArray<AnyMiddlewareSpec>,
 ): ReadonlyArray<Schema.Codec<any, any>> =>
-  middlewareSpecs.flatMap((middlewareSpec) =>
+  Array.flatMap(middlewareSpecs, (middlewareSpec) =>
     "error" in middlewareSpec && middlewareSpec.error !== undefined
       ? [middlewareSpec.error]
       : [],

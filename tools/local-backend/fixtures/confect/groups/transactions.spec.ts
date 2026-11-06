@@ -1,7 +1,7 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-export class RejectedWrite extends Schema.TaggedError<RejectedWrite>()(
+export class RejectedWrite extends Schema.TaggedError<RejectedWrite, {}>()(
   "RejectedWrite",
   {
     value: Schema.String,

@@ -1,3 +1,4 @@
+import * as Arr from "effect/Array";
 import { FunctionSpec, PaginationError, Ref } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type * as Data from "effect/Data";
@@ -92,7 +93,7 @@ const failure = (
   result: Result.fail(error),
 });
 
-const offline = () => new Client.WebSocketClientError({ cause: "offline" });
+const offline = () => Client.WebSocketClientError.make({ cause: "offline" });
 
 const initial = (): Active =>
   Notes.init(
@@ -287,11 +288,13 @@ describe("PaginatedQuery", () => {
       const before = Option.getOrThrow(PaginatedQuery.next(loadedPageOne()));
       const settlement = failure(
         before,
-        new PaginationError.InvalidCursor({ cause: "expired" }),
+        PaginationError.InvalidCursor.make({ cause: "expired" }),
       );
-      const decodedSettlement = Schema.decodeUnknownSync(Notes.settlement)(
-        Schema.encodeSync(Notes.settlement)(settlement),
-      );
+      const decodedSettlement = Schema.decodeUnknownResult(Notes.settlement)(
+        Schema.encodeResult(Notes.settlement)(settlement).pipe(
+          Result.getOrThrow,
+        ),
+      ).pipe(Result.getOrThrow);
       const state = PaginatedQuery.settle(before, decodedSettlement) as Active;
 
       expect(state.generation).toBe(before.generation + 1);
@@ -557,7 +560,9 @@ describe("PaginatedQuery", () => {
 
     it("exposes state predicates as refinements", () => {
       const state: State = loadedPageOne();
-      const successful = [state].find(PaginatedQuery.isSuccess)!;
+      const successful = Arr.findFirst([state], PaginatedQuery.isSuccess).pipe(
+        Option.getOrThrow,
+      );
       expectTypeOf(successful.phase.data).toEqualTypeOf<
         PaginatedQuery.Page<Item>
       >();
@@ -577,18 +582,28 @@ describe("PaginatedQuery", () => {
       );
 
       for (const state of [Notes.idle, loading, succeeded, refreshing, stale]) {
-        const encoded = Schema.encodeSync(Notes.schema)(state);
-        expect(Schema.decodeUnknownSync(Notes.schema)(encoded)).toEqual(state);
+        const encoded = Schema.encodeResult(Notes.schema)(state).pipe(
+          Result.getOrThrow,
+        );
+        expect(
+          Schema.decodeUnknownResult(Notes.schema)(encoded).pipe(
+            Result.getOrThrow,
+          ),
+        ).toEqual(state);
       }
 
       for (const settlement of [
         success(loading, [{ text: "a" }]),
         failure(loading, offline()),
       ]) {
-        const encoded = Schema.encodeSync(Notes.settlement)(settlement);
-        expect(Schema.decodeUnknownSync(Notes.settlement)(encoded)).toEqual(
-          settlement,
+        const encoded = Schema.encodeResult(Notes.settlement)(settlement).pipe(
+          Result.getOrThrow,
         );
+        expect(
+          Schema.decodeUnknownResult(Notes.settlement)(encoded).pipe(
+            Result.getOrThrow,
+          ),
+        ).toEqual(settlement);
       }
     });
 
@@ -599,7 +614,7 @@ describe("PaginatedQuery", () => {
         loading,
         failure(
           loading,
-          new Client.WebSocketClientError({ cause: new Error("offline") }),
+          Client.WebSocketClientError.make({ cause: new Error("offline") }),
         ),
       );
       const schemaResult = Schema.decodeUnknownResult(Schema.Finite)("bad");
@@ -614,12 +629,12 @@ describe("PaginatedQuery", () => {
         failure(refreshing, schemaResult.failure),
       );
 
-      const decodedNetworkFailure = Schema.decodeSync(jsonCodec)(
-        Schema.encodeSync(jsonCodec)(networkFailure),
-      );
-      const decodedSchemaFailure = Schema.decodeSync(jsonCodec)(
-        Schema.encodeSync(jsonCodec)(schemaFailure),
-      );
+      const decodedNetworkFailure = Schema.decodeResult(jsonCodec)(
+        Schema.encodeResult(jsonCodec)(networkFailure).pipe(Result.getOrThrow),
+      ).pipe(Result.getOrThrow);
+      const decodedSchemaFailure = Schema.decodeResult(jsonCodec)(
+        Schema.encodeResult(jsonCodec)(schemaFailure).pipe(Result.getOrThrow),
+      ).pipe(Result.getOrThrow);
 
       expect(PaginatedQuery.isFailure(decodedNetworkFailure)).toBe(true);
       if (PaginatedQuery.isFailure(decodedNetworkFailure)) {
@@ -656,7 +671,7 @@ describe("PaginatedQuery", () => {
     });
 
     it("includes the formal invalid-cursor settlement error", () => {
-      const error: PageError = new PaginatedQuery.InvalidCursor({
+      const error: PageError = PaginatedQuery.InvalidCursor.make({
         cause: "expired",
       });
       expect(error).toBeInstanceOf(PaginationError.InvalidCursor);

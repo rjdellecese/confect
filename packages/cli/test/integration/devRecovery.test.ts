@@ -1,3 +1,5 @@
+import { pipe } from "effect/Function";
+import * as Str from "effect/String";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -20,20 +22,22 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* Effect.gen(function* () {
             const once = yield* project.start("codegen");
             yield* once.waitFor('Unexpected ";"');
-            expect(yield* once.handle.exitCode).not.toBe(0);
-            expect(yield* Ref.get(once.output)).not.toContain(success);
+            const actual = yield* once.handle.exitCode;
+            expect(actual).not.toBe(0);
+            const current = yield* Ref.get(once.output);
+            expect(current).not.toContain(success);
           }).pipe(Effect.scoped);
           const watching = yield* project.start("dev");
           yield* watching.waitFor('Unexpected ";"');
-          expect(yield* Ref.get(watching.output)).not.toContain(success);
+          const current2 = yield* Ref.get(watching.output);
+          expect(current2).not.toContain(success);
           yield* project.write(
             `confect/${file}`,
             'import "./_generated/registeredFunctions/notes"; import "../convex/notes"; throw new Error("Optional runtime must not execute"); export default {};',
           );
           yield* watching.waitFor(success);
-          expect(yield* Ref.get(watching.output)).not.toContain(
-            "Optional runtime must not execute",
-          );
+          const current3 = yield* Ref.get(watching.output);
+          expect(current3).not.toContain("Optional runtime must not execute");
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -44,9 +48,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         Effect.gen(function* () {
           const project = yield* Project.make;
           yield* project.write("confect/other.spec.ts", Project.spec);
-          const otherImpl = Project.impl.replace(
-            '"./notes.spec"',
-            '"./other.spec"',
+          const otherImpl = pipe(
+            Project.impl,
+            Str.replace('"./notes.spec"', '"./other.spec"'),
           );
           yield* project.write("confect/other.impl.ts", otherImpl);
           const watching = yield* project.start("dev");
@@ -59,9 +63,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             `${otherImpl}\n// unrelated edit\n`,
           );
           yield* watching.waitFor("does not implement every function");
-          expect(
-            (yield* Ref.get(watching.output)).slice(before.length),
-          ).not.toContain(success);
+          const current4 = yield* Ref.get(watching.output);
+          expect(pipe(current4, Str.slice(before.length))).not.toContain(
+            success,
+          );
           yield* project.write("confect/notes.impl.ts", Project.impl);
           yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
@@ -80,13 +85,21 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const project = yield* Project.make;
-          const spec = directory
-            ? Project.spec.replaceAll('"./_generated/', '"../_generated/')
-            : Project.spec;
-          const impl = directory
-            ? Project.impl.replaceAll('"./_generated/', '"../_generated/')
-            : Project.impl;
-          if (directory) {
+          const spec =
+            directory !== ""
+              ? pipe(
+                  Project.spec,
+                  Str.replaceAll('"./_generated/', '"../_generated/'),
+                )
+              : Project.spec;
+          const impl =
+            directory !== ""
+              ? pipe(
+                  Project.impl,
+                  Str.replaceAll('"./_generated/', '"../_generated/'),
+                )
+              : Project.impl;
+          if (directory !== "") {
             yield* fs.makeDirectory(
               path.join(project.root, "confect", directory),
             );
@@ -100,22 +113,24 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* Effect.gen(function* () {
             const once = yield* project.start("codegen");
             yield* once.waitFor(`has no sibling ${missing}`);
-            expect(yield* once.handle.exitCode).not.toBe(0);
-            expect(yield* Ref.get(once.output)).not.toContain(success);
+            const actual2 = yield* once.handle.exitCode;
+            expect(actual2).not.toBe(0);
+            const current5 = yield* Ref.get(once.output);
+            expect(current5).not.toContain(success);
           }).pipe(Effect.scoped);
           yield* fs.remove(path.join(project.root, "confect/_generated"), {
             recursive: true,
           });
           const watching = yield* project.start("dev");
           yield* watching.waitFor(`has no sibling ${missing}`);
-          expect(yield* Ref.get(watching.output)).not.toContain(success);
+          const current6 = yield* Ref.get(watching.output);
+          expect(current6).not.toContain(success);
           yield* project.write(missingFile, missing === "spec" ? spec : impl);
           yield* watching.waitFor(success);
-          expect(
-            yield* fs.exists(
-              path.join(project.root, `convex/${directory}notes.ts`),
-            ),
-          ).toBe(true);
+          const actual3 = yield* fs.exists(
+            path.join(project.root, `convex/${directory}notes.ts`),
+          );
+          expect(actual3).toBe(true);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -132,7 +147,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const watching = yield* project.start("dev");
           yield* watching.waitFor("must default-export a Table");
           yield* watching.waitFor("must default-export a Table");
-          expect(yield* Ref.get(watching.output)).not.toContain(success);
+          const current7 = yield* Ref.get(watching.output);
+          expect(current7).not.toContain(success);
           yield* project.write("confect/tables/notes.ts", Project.table);
           yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
@@ -160,7 +176,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* watching.waitFor("Found a legacy");
           yield* watching.waitFor("Dependencies may have changed");
           yield* Effect.sleep("2 seconds");
-          expect(yield* Ref.get(watching.output)).not.toContain(success);
+          const current8 = yield* Ref.get(watching.output);
+          expect(current8).not.toContain(success);
           yield* fs.remove(path.join(project.root, "confect/schema.ts"));
           yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
@@ -190,7 +207,8 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             'import { GroupSpec } from "@confect/core";\nexport default GroupSpec.make();\n',
           );
           yield* watching.waitFor("has no sibling impl");
-          expect(yield* Ref.get(watching.output)).not.toContain(success);
+          const current9 = yield* Ref.get(watching.output);
+          expect(current9).not.toContain(success);
           yield* project.write("confect/notes.impl.ts", Project.emptyImpl);
           yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
@@ -217,27 +235,27 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             'export { default } from "../../labelTable";\n',
           );
           yield* watching.waitFor("has no sibling impl");
-          expect(
-            yield* fs.exists(
-              path.join(project.root, "confect/_generated/tables/labels.ts"),
-            ),
-          ).toBe(true);
+          const actual4 = yield* fs.exists(
+            path.join(project.root, "confect/_generated/tables/labels.ts"),
+          );
+          expect(actual4).toBe(true);
           yield* Ref.set(watching.output, "");
           yield* project.write("labelTable.ts", "export default {};\n");
           yield* watching.waitFor("must default-export a Table");
-          expect(yield* Ref.get(watching.output)).not.toContain(success);
+          const current10 = yield* Ref.get(watching.output);
+          expect(current10).not.toContain(success);
           yield* fs.remove(path.join(project.root, "confect/tables/labels.ts"));
           yield* watching.waitFor("has no sibling impl");
           yield* project.write("confect/notes.impl.ts", Project.impl);
           yield* watching.waitFor(success);
-          expect(
-            yield* fs.exists(
-              path.join(project.root, "confect/_generated/tables/labels.ts"),
-            ),
-          ).toBe(false);
+          const actual5 = yield* fs.exists(
+            path.join(project.root, "confect/_generated/tables/labels.ts"),
+          );
+          expect(actual5).toBe(false);
           const settled = yield* Ref.get(watching.output);
           yield* Effect.sleep("2 seconds");
-          expect(yield* Ref.get(watching.output)).toBe(settled);
+          const current11 = yield* Ref.get(watching.output);
+          expect(current11).toBe(settled);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );

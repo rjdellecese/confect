@@ -37,7 +37,7 @@ class DeclarationEmit extends Context.Service<
   DeclarationEmit,
   {
     /**
-     * Everything `tsc` printed. Declaration emit errors like TS7056 land here,
+     * Everything `tsrs` printed. Declaration emit errors like TS7056 land here,
      * and every assertion below expects it to be empty.
      */
     readonly diagnostics: string;
@@ -49,12 +49,9 @@ class DeclarationEmit extends Context.Service<
 >()("@confect/server/test/mock-backend/declarationEmit.test/DeclarationEmit") {}
 
 /**
- * TypeScript 7 is a native binary: the `typescript` package no longer exports a
- * JavaScript compiler API to build a `Program` with, so this drives the real
- * `tsc` over a generated project and reads what it wrote. `lib/tsc.js` is the
- * package's own launcher, which finds the platform binary—going through it
- * (rather than `node_modules/.bin/tsc`) keeps the spawn identical on Windows,
- * where the bin entry is a shell script.
+ * Drives the Effect-enabled `tsrs` over a generated project and reads its
+ * declarations. Launching the CLI with Node avoids platform-specific shell
+ * shims and uses the same compiler as the package builds.
  */
 const emitDeclarations = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -90,15 +87,15 @@ const emitDeclarations = Effect.gen(function* () {
 
   yield* fs.writeFileString(configPath, config);
 
-  const typescript = path.dirname(
-    yield* path.fromFileUrl(
-      new URL(import.meta.resolve("typescript/package.json")),
-    ),
+  const fromFileUrlResult = yield* path.fromFileUrl(
+    new URL(import.meta.resolve("@effect/tsgo/package.json")),
   );
+  const effectTsgo = path.dirname(fromFileUrlResult);
 
   const diagnostics = yield* spawner.string(
     ChildProcess.make(process.execPath, [
-      path.join(typescript, "lib", "tsc.js"),
+      path.join(effectTsgo, "dist", "effect-tsgo.cjs"),
+      "tsrs",
       "--project",
       configPath,
       "--pretty",

@@ -68,6 +68,8 @@ export type Services =
  * Layers are built with Confect's Convex-aware `ConfigProvider` in context, so
  * `Config` reads (e.g. in `Layer.unwrap`) resolve against Convex environment
  * variables.
+ *
+ * @stability unstable
  */
 export type Routes = Layer.Layer<
   never,
@@ -94,6 +96,8 @@ export type Routes = Layer.Layer<
  * Plain Convex routes can still be added to the returned router—Convex matches
  * exact paths first and longer path prefixes before the catch-all, so they take
  * precedence.
+ *
+ * @stability unstable
  */
 export const make = (routes: Routes): ConvexHttpRouter => {
   applyMonkeyPatches();
@@ -118,8 +122,10 @@ export const make = (routes: Routes): ConvexHttpRouter => {
   const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
-    const services = Effect.runSync(
-      Effect.scoped(Layer.build(RegisteredFunction.baseActionLayer(ctx))),
+    const services = RegisteredFunction.baseActionLayer(ctx).pipe(
+      Layer.build,
+      Effect.scoped,
+      Effect.runSync,
     );
     return handler(
       request,

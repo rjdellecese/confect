@@ -1,3 +1,5 @@
+import * as Option from "effect/Option";
+import * as Array from "effect/Array";
 import * as MiddlewareAttachment from "./MiddlewareAttachment";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
@@ -139,7 +141,7 @@ const Proto = {
   [TypeId]: TypeId,
 
   get middlewareSpecs() {
-    return this.middlewareAttachments.map(({ spec }) => spec);
+    return Array.map(this.middlewareAttachments, ({ spec }) => spec);
   },
 
   addFunction<Function extends FunctionSpec.AnyWithProps>(
@@ -148,17 +150,19 @@ const Proto = {
   ) {
     const this_ = this as AnyWithProps;
 
-    const overlapping = function_.middlewareAttachments.find(
+    const overlapping = Array.findFirst(
+      function_.middlewareAttachments,
       ({ spec: functionMiddlewareSpec }) =>
         !("options" in functionMiddlewareSpec) &&
-        this_.middlewareAttachments.some(
+        Array.some(
+          this_.middlewareAttachments,
           ({ spec: groupMiddlewareSpec }) =>
             groupMiddlewareSpec.key === functionMiddlewareSpec.key,
         ),
     );
-    if (overlapping !== undefined) {
+    if (Option.isSome(overlapping)) {
       throw new Error(
-        `Middleware "${overlapping.spec.key}" is attached to both function "${function_.name}" and its group`,
+        `Middleware "${overlapping.value.spec.key}" is attached to both function "${function_.name}" and its group`,
       );
     }
 
@@ -180,7 +184,8 @@ const Proto = {
 
     if (
       !("options" in middlewareSpec) &&
-      this_.middlewareAttachments.some(
+      Array.some(
+        this_.middlewareAttachments,
         ({ spec }) => spec.key === middlewareSpec.key,
       )
     ) {
@@ -189,10 +194,11 @@ const Proto = {
       );
     }
 
-    for (const function_ of Object.values(this_.functions)) {
+    for (const function_ of Record.values(this_.functions)) {
       if (
         !("options" in middlewareSpec) &&
-        function_.middlewareAttachments.some(
+        Array.some(
+          function_.middlewareAttachments,
           ({ spec }) => spec.key === middlewareSpec.key,
         )
       ) {
@@ -318,12 +324,12 @@ export const validateMiddleware = (
       group.middlewareAttachments,
       `group "${group.name}"`,
     );
-    for (const function_ of Object.values(group.functions)) {
+    for (const function_ of Record.values(group.functions)) {
       yield* MiddlewareAttachment.validateAll(
         [...group.middlewareAttachments, ...function_.middlewareAttachments],
         `function "${function_.name}"`,
       );
     }
-    for (const child of Object.values(group.groups))
+    for (const child of Record.values(group.groups))
       yield* validateMiddleware(child);
   });

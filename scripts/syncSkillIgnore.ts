@@ -1,7 +1,11 @@
+import * as Record from "effect/Record";
+import * as Str from "effect/String";
+import * as Option from "effect/Option";
+import * as Arr from "effect/Array";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Console from "effect/Console";
-import * as Data from "effect/Data";
+import * as Result from "effect/Result";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -16,11 +20,12 @@ const START_MARKER = "# skills-lock:start";
 const END_MARKER = "# skills-lock:end";
 const GENERATED_COMMENT =
   "# Generated from skills-lock.json by `pnpm skills:sync-ignore`.";
-const quoteJsonString = Schema.encodeSync(Schema.fromJsonString(Schema.String));
+const JsonString = Schema.fromJsonString(Schema.String);
 
-export class SkillIgnoreError extends Data.TaggedError("SkillIgnoreError")<{
-  readonly reason: string;
-}> {
+export class SkillIgnoreError extends Schema.TaggedError<
+  SkillIgnoreError,
+  {}
+>()("SkillIgnoreError", { reason: Schema.String }) {
   readonly [Runtime.errorReported] = false;
 
   override get message(): string {
@@ -36,11 +41,15 @@ export interface SyncOptions {
 // Lock keys are logical skill names, while the skills CLI installs them using
 // this normalized directory name. This mirrors skills@1.5.23's sanitizeName.
 export const installedDirectoryName = (name: string): string =>
-  name
-    .toLowerCase()
-    .replace(/[^a-z0-9._]+/g, "-")
-    .replace(/^[.-]+|[.-]+$/g, "")
-    .slice(0, 255) || "unnamed-skill";
+  Str.slice(
+    0,
+    255,
+  )(
+    Str.replace(
+      /^[.-]+|[.-]+$/g,
+      "",
+    )(Str.replace(/[^a-z0-9._]+/g, "-")(Str.toLowerCase(name))),
+  ) || "unnamed-skill";
 
 export const vendoredSkillDirectories = Effect.fnUntraced(function* (
   lockText: string,
@@ -48,32 +57,37 @@ export const vendoredSkillDirectories = Effect.fnUntraced(function* (
   const lock = yield* Schema.decodeEffect(
     Schema.fromJsonString(Schema.Unknown),
   )(lockText).pipe(
-    Effect.mapError(
-      () =>
-        new SkillIgnoreError({
-          reason: `Could not parse ${LOCK_FILE}`,
-        }),
+    Effect.mapError(() =>
+      SkillIgnoreError.make({
+        reason: `Could not parse ${LOCK_FILE}`,
+      }),
     ),
   );
 
   if (!Predicate.isObject(lock) || lock.version !== LOCK_VERSION) {
-    return yield* new SkillIgnoreError({
+    return yield* SkillIgnoreError.make({
       reason: `Unsupported ${LOCK_FILE} version; expected ${LOCK_VERSION}`,
     });
   }
   if (!Predicate.isObject(lock.skills)) {
-    return yield* new SkillIgnoreError({
+    return yield* SkillIgnoreError.make({
       reason: `${LOCK_FILE} must contain a skills object`,
     });
   }
 
   const directories = new Map<string, string>();
-  for (const skillName of Object.keys(lock.skills)) {
+  for (const skillName of Record.keys(lock.skills)) {
     const directory = installedDirectoryName(skillName);
     const existing = directories.get(directory);
     if (existing !== undefined) {
-      return yield* new SkillIgnoreError({
-        reason: `${LOCK_FILE} entries ${quoteJsonString(existing)} and ${quoteJsonString(skillName)} map to the same installed directory`,
+      const existingName = Result.getOrThrow(
+        Schema.encodeResult(JsonString)(existing),
+      );
+      const conflictingName = Result.getOrThrow(
+        Schema.encodeResult(JsonString)(skillName),
+      );
+      return yield* SkillIgnoreError.make({
+        reason: `${LOCK_FILE} entries ${existingName} and ${conflictingName} map to the same installed directory`,
       });
     }
     directories.set(directory, skillName);
@@ -85,39 +99,42 @@ export const vendoredSkillDirectories = Effect.fnUntraced(function* (
 export const renderManagedBlock = (
   directories: ReadonlyArray<string>,
 ): string =>
-  [
-    START_MARKER,
-    GENERATED_COMMENT,
-    ...directories.map((directory) => `.agents/skills/${directory}/`),
-    END_MARKER,
-  ].join("\n");
+  Arr.join(
+    [
+      START_MARKER,
+      GENERATED_COMMENT,
+      ...Arr.map(directories, (directory) => `.agents/skills/${directory}/`),
+      END_MARKER,
+    ],
+    "\n",
+  );
 
 export const updateManagedBlock = Effect.fnUntraced(function* (
   ignoreText: string,
   managedBlock: string,
 ) {
-  const lines = ignoreText.replaceAll("\r\n", "\n").split("\n");
+  const lines = Str.split("\n")(Str.replaceAll("\r\n", "\n")(ignoreText));
   if (lines.at(-1) === "") lines.pop();
 
-  const startIndexes = lines.flatMap((line, index) =>
+  const startIndexes = Arr.flatMap(lines, (line, index) =>
     line === START_MARKER ? [index] : [],
   );
-  const endIndexes = lines.flatMap((line, index) =>
+  const endIndexes = Arr.flatMap(lines, (line, index) =>
     line === END_MARKER ? [index] : [],
   );
 
   if (startIndexes.length !== endIndexes.length) {
-    return yield* new SkillIgnoreError({
+    return yield* SkillIgnoreError.make({
       reason: `${IGNORE_FILE} has an incomplete skills-lock block`,
     });
   }
   if (startIndexes.length > 1) {
-    return yield* new SkillIgnoreError({
+    return yield* SkillIgnoreError.make({
       reason: `${IGNORE_FILE} has multiple skills-lock blocks`,
     });
   }
 
-  const managedLines = managedBlock.split("\n");
+  const managedLines = Str.split("\n")(managedBlock);
   if (startIndexes.length === 0) {
     if (lines.length > 0 && lines.at(-1) !== "") lines.push("");
     lines.push(...managedLines);
@@ -125,14 +142,14 @@ export const updateManagedBlock = Effect.fnUntraced(function* (
     const start = startIndexes[0];
     const end = endIndexes[0];
     if (start > end) {
-      return yield* new SkillIgnoreError({
+      return yield* SkillIgnoreError.make({
         reason: `${IGNORE_FILE} has an invalid skills-lock block`,
       });
     }
     lines.splice(start, end - start + 1, ...managedLines);
   }
 
-  return `${lines.join("\n")}\n`;
+  return `${Arr.join(lines, "\n")}\n`;
 });
 
 const readIgnoreFile = Effect.fnUntraced(function* (path: string) {
@@ -140,6 +157,9 @@ const readIgnoreFile = Effect.fnUntraced(function* (path: string) {
   return (yield* fs.exists(path)) ? yield* fs.readFileString(path) : "";
 });
 
+/**
+ * @internal
+ */
 export const syncSkillIgnore = Effect.fn("SkillIgnore.sync")(function* (
   options: SyncOptions = {},
 ) {
@@ -164,7 +184,7 @@ export const syncSkillIgnore = Effect.fn("SkillIgnore.sync")(function* (
   }
 
   if (options.check === true) {
-    return yield* new SkillIgnoreError({
+    return yield* SkillIgnoreError.make({
       reason: `${IGNORE_FILE} does not match ${LOCK_FILE}; run \`pnpm skills:sync-ignore\``,
     });
   }
@@ -173,12 +193,17 @@ export const syncSkillIgnore = Effect.fn("SkillIgnore.sync")(function* (
   yield* Console.log(`updated ${IGNORE_FILE} from ${LOCK_FILE}`);
 });
 
+/**
+ * @internal
+ */
 export const syncSkillIgnoreMain = Effect.fn("SkillIgnore.main")(function* (
   args: ReadonlyArray<string>,
 ) {
-  const unknownArgument = args.find((argument) => argument !== "--check");
+  const unknownArgument = Option.getOrUndefined(
+    Arr.findFirst(args, (argument) => argument !== "--check"),
+  );
   if (unknownArgument !== undefined) {
-    return yield* new SkillIgnoreError({
+    return yield* SkillIgnoreError.make({
       reason: `Unknown argument: ${unknownArgument}`,
     });
   }

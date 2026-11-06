@@ -13,23 +13,32 @@ export {
 
 /**
  * The client configured for Convex AI gateway decisions.
+ *
+ * @stability unstable
  */
 export const AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 export type AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 
 /**
  * Construct a decision model client using the current Effect HTTP client.
+ *
+ * @stability unstable
  */
 export const make: Effect.Effect<
   OpenRouterClient.Service,
   AiGatewayServiceToken.AiGatewayError,
   HttpClient.HttpClient
 > = InternalAiGatewayDecisionClient.make.pipe(
-  Effect.provide(AiGatewayServiceToken.layer),
+  Effect.provideService(
+    AiGatewayServiceToken.AiGatewayServiceToken,
+    AiGatewayServiceToken.service,
+  ),
 );
 
 /**
  * Provide the AI gateway decision client using the current Effect HTTP client.
+ *
+ * @stability unstable
  */
 export const layer: Layer.Layer<
   AiGatewayDecisionClient,

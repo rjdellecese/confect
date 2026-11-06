@@ -15,8 +15,8 @@ import { NotesApi } from "./fixtures/confect/http";
 import * as TestConfect from "./TestConfect";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
 
-describe("HttpRouter", () => {
-  it.effect(
+it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
+  test.effect(
     "provides unified storage and both writer capabilities to HTTP handlers",
     () =>
       Effect.gen(function* () {
@@ -27,7 +27,8 @@ describe("HttpRouter", () => {
             Effect.gen(function* () {
               const storage = yield* Storage.Storage;
               const legacy = yield* StorageReader;
-              expect(yield* storage.generateUploadUrl).toBeInstanceOf(URL);
+              const generateUploadUrlResult = yield* storage.generateUploadUrl;
+              expect(generateUploadUrlResult).toBeInstanceOf(URL);
               const id = yield* storage.store(new Blob(["HTTP storage"]));
               expect((yield* storage.getUrl(id)).href).toBe(
                 (yield* legacy.getUrl(id)).href,
@@ -46,13 +47,12 @@ describe("HttpRouter", () => {
         });
         const response = yield* Effect.promise(() => t.fetch("/storage"));
         expect(response.status).toBe(200);
-        expect(yield* Effect.promise(() => response.text())).toBe(
-          "HTTP storage",
-        );
+        const promiseResult = yield* Effect.promise(() => response.text());
+        expect(promiseResult).toBe("HTTP storage");
       }),
   );
 
-  it.effect(
+  test.effect(
     "uses each request's console and respects route logger overrides",
     () =>
       Effect.gen(function* () {
@@ -79,10 +79,10 @@ describe("HttpRouter", () => {
           );
           expect(console.log).not.toHaveBeenCalled();
         }
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
   );
 
-  it.effect(
+  test.effect(
     "serves an HttpApi endpoint whose handler uses a Confect service",
     () =>
       Effect.gen(function* () {
@@ -107,49 +107,51 @@ describe("HttpRouter", () => {
         }>;
         assertEquals(body.length, 1);
         assertEquals(body[0]?.text, text);
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
   );
 
-  it.effect("serves a second HttpApi merged onto the same router", () =>
+  test.effect("serves a second HttpApi merged onto the same router", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
       const response = yield* c.fetch("/meta/ping");
       assertEquals(response.status, 200);
-      assertEquals(yield* Effect.promise(() => response.json()), "pong");
-    }).pipe(Effect.provide(TestConfect.layer)),
+      const promiseResult2 = yield* Effect.promise(() => response.json());
+      assertEquals(promiseResult2, "pong");
+    }),
   );
 
-  it.effect("serves a plain HttpRouter.add route", () =>
+  test.effect("serves a plain HttpRouter.add route", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
       const response = yield* c.fetch("/health");
       assertEquals(response.status, 200);
-      assertEquals(yield* Effect.promise(() => response.text()), "OK");
-    }).pipe(Effect.provide(TestConfect.layer)),
+      const promiseResult3 = yield* Effect.promise(() => response.text());
+      assertEquals(promiseResult3, "OK");
+    }),
   );
 
-  it.effect("global middleware modifies responses", () =>
+  test.effect("global middleware modifies responses", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
       const response = yield* c.fetch("/health");
       assertEquals(response.headers.get("x-confect-middleware"), "applied");
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect("serves the Scalar docs page", () =>
+  test.effect("serves the Scalar docs page", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
       const response = yield* c.fetch("/api/docs");
       assertEquals(response.status, 200);
       expect(response.headers.get("content-type")).toContain("text/html");
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 
-  it.effect(
+  test.effect(
     "a plain Convex route on the returned router shadows the catch-all",
     () =>
       Effect.gen(function* () {
@@ -157,19 +159,20 @@ describe("HttpRouter", () => {
 
         const response = yield* c.fetch("/convex-native");
         assertEquals(response.status, 200);
-        assertEquals(yield* Effect.promise(() => response.text()), "native");
+        const promiseResult4 = yield* Effect.promise(() => response.text());
+        assertEquals(promiseResult4, "native");
         // The Effect router (and so its global middleware) never ran.
         assertEquals(response.headers.get("x-confect-middleware"), null);
-      }).pipe(Effect.provide(TestConfect.layer)),
+      }),
   );
 
-  it.effect("unmatched paths get the Effect router's 404", () =>
+  test.effect("unmatched paths get the Effect router's 404", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
       const response = yield* c.fetch("/no-such-route");
       assertEquals(response.status, 404);
-    }).pipe(Effect.provide(TestConfect.layer)),
+    }),
   );
 });
 

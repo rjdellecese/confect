@@ -12,6 +12,9 @@ import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import * as templates from "./templates";
 
+/**
+ * @internal
+ */
 export const removePathExtension = Effect.fnUntraced(function* (
   pathStr: string,
 ) {
@@ -20,24 +23,30 @@ export const removePathExtension = Effect.fnUntraced(function* (
   return String.slice(0, -path.extname(pathStr).length)(pathStr);
 });
 
+/**
+ * @internal
+ */
 export const toPosixPath = (path: Path.Path, pathStr: string): string =>
   pipe(String.split(pathStr, path.sep), Array.join("/"));
 
 /**
  * Ensures a relative path is a valid ESM/TS module specifier (e.g. `spec` →
  * `./spec`).
+ *
+ * @internal
  */
 export const toModuleImportPath = Effect.fnUntraced(function* (
   relativePath: string,
 ) {
   const path = yield* Path.Path;
-  const withoutExt = toPosixPath(
-    path,
-    yield* removePathExtension(relativePath),
-  );
+  const pathWithoutExtension = yield* removePathExtension(relativePath);
+  const withoutExt = toPosixPath(path, pathWithoutExtension);
   return String.startsWith(".")(withoutExt) ? withoutExt : `./${withoutExt}`;
 });
 
+/**
+ * @internal
+ */
 export const writeFileStringAndLog = Effect.fnUntraced(function* (
   filePath: string,
   contents: string,
@@ -55,6 +64,9 @@ export const writeFileStringAndLog = Effect.fnUntraced(function* (
   }
 });
 
+/**
+ * @internal
+ */
 export const findProjectRoot = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -77,6 +89,9 @@ export const findProjectRoot = Effect.gen(function* () {
 
 export type WriteChange = "Added" | "Modified" | "Unchanged";
 
+/**
+ * @internal
+ */
 export const writeFileString = Effect.fnUntraced(function* (
   filePath: string,
   contents: string,
@@ -95,6 +110,9 @@ export const writeFileString = Effect.fnUntraced(function* (
   return "Unchanged";
 });
 
+/**
+ * @internal
+ */
 export const removePathIfExists = Effect.fnUntraced(function* (
   filePath: string,
 ): Effect.fn.Return<void, PlatformError, FileSystem.FileSystem> {
@@ -120,6 +138,8 @@ export const removePathIfExists = Effect.fnUntraced(function* (
  * notification to release Convex from a previous error. Ordinary successful
  * watch updates rely on their source/output changes instead of invalidating a
  * Convex push that may already be processing those changes.
+ *
+ * @internal
  */
 export const touchConvexSchema = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -156,25 +176,33 @@ const generateOptionalFile = Effect.fnUntraced(function* (
     path.dirname(convexFilePath),
     confectFilePath,
   );
-  const contents = yield* generateContents(
-    yield* toModuleImportPath(relativeImportPath),
-  );
+  const moduleImportPath = yield* toModuleImportPath(relativeImportPath);
+  const contents = yield* generateContents(moduleImportPath);
   const change = yield* writeFileString(convexFilePath, contents);
   return Option.some({ change, convexFilePath });
 });
 
+/**
+ * @internal
+ */
 export const generateHttp = generateOptionalFile(
   "http.ts",
   "http.ts",
   (importPath) => templates.http({ httpImportPath: importPath }),
 );
 
+/**
+ * @internal
+ */
 export const generateCrons = generateOptionalFile(
   "crons.ts",
   "crons.ts",
   (importPath) => templates.crons({ cronsImportPath: importPath }),
 );
 
+/**
+ * @internal
+ */
 export const generateAuthConfig = generateOptionalFile(
   "auth.ts",
   "auth.config.ts",

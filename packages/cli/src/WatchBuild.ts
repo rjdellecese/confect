@@ -1,3 +1,4 @@
+import * as String from "effect/String";
 import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
 import * as Digest from "effect/crypto/Digest";
@@ -14,6 +15,9 @@ import type { PlatformError } from "effect/PlatformError";
 import type * as esbuild from "esbuild";
 import * as WatchGraph from "./WatchGraph";
 
+/**
+ * @internal
+ */
 export type Failure = Data.TaggedEnum<{
   BuildFailed: {
     readonly errors: Array.NonEmptyReadonlyArray<esbuild.Message>;
@@ -21,13 +25,22 @@ export type Failure = Data.TaggedEnum<{
   InputCaptureFailed: { readonly file: string; readonly cause: PlatformError };
   InvalidBuildResult: { readonly missing: "metafile" | "outputFiles" };
 }>;
+/**
+ * @internal
+ */
 export const Failure = Data.taggedEnum<Failure>();
 export type Fingerprints = HashMap.HashMap<string, string>;
 
+/**
+ * @internal
+ */
 export interface Capture {
   readonly fingerprints: Fingerprints;
   readonly failures: HashMap.HashMap<string, Failure>;
 }
+/**
+ * @internal
+ */
 export const emptyCapture: Capture = {
   fingerprints: HashMap.empty(),
   failures: HashMap.empty(),
@@ -39,6 +52,9 @@ export interface Snapshot {
   readonly outputHash: string;
 }
 
+/**
+ * @internal
+ */
 export type Outcome = Data.TaggedEnum<{
   Succeeded: {
     readonly snapshot: Snapshot;
@@ -50,8 +66,14 @@ export type Outcome = Data.TaggedEnum<{
     readonly warnings: ReadonlyArray<esbuild.Message>;
   };
 }>;
+/**
+ * @internal
+ */
 export const Outcome = Data.taggedEnum<Outcome>();
 
+/**
+ * @internal
+ */
 export const combine = (
   outcomes: Array.NonEmptyReadonlyArray<Outcome>,
 ): Outcome => {
@@ -200,6 +222,9 @@ export const endRequest = (progress: Progress): Progress => ({
 export const isFresh = (barrier: Barrier, completion: Completion): boolean =>
   completion.generation > barrier;
 
+/**
+ * @internal
+ */
 export const verifyInputs = Effect.fn("WatchBuild.verifyInputs")(function* (
   snapshot: Snapshot,
   fs: FileSystem.FileSystem,
@@ -210,14 +235,19 @@ export const verifyInputs = Effect.fn("WatchBuild.verifyInputs")(function* (
     ([file, expected]) =>
       fs.readFile(file).pipe(
         Effect.flatMap((contents) => digest.digest(Digest.sha256, contents)),
-        Effect.map((hash) => Hex.encode(hash) === expected),
-        Effect.mapError((cause) => Failure.InputCaptureFailed({ file, cause })),
+        Effect.mapBoth({
+          onSuccess: (hash) => Hex.encode(hash) === expected,
+          onFailure: (cause) => Failure.InputCaptureFailed({ file, cause }),
+        }),
       ),
     { concurrency: 8 },
   );
   return Array.every(matches, (matchesInput) => matchesInput);
 });
 
+/**
+ * @internal
+ */
 export type State = Data.TaggedEnum<{
   Initial: {};
   Succeeded: {
@@ -230,8 +260,14 @@ export type State = Data.TaggedEnum<{
     readonly discovered: HashSet.HashSet<string>;
   };
 }>;
+/**
+ * @internal
+ */
 export const State = Data.taggedEnum<State>();
 
+/**
+ * @internal
+ */
 export const lastSuccessful = (state: State): Option.Option<Snapshot> =>
   State.$match(state, {
     Initial: () => Option.none(),
@@ -239,6 +275,9 @@ export const lastSuccessful = (state: State): Option.Option<Snapshot> =>
     Failed: ({ lastSuccessful: snapshot }) => snapshot,
   });
 
+/**
+ * @internal
+ */
 export const observe = (previous: State, outcome: Outcome): State =>
   Outcome.$match(outcome, {
     Succeeded: ({ snapshot, warnings }) =>
@@ -254,13 +293,19 @@ export const observe = (previous: State, outcome: Outcome): State =>
                 ? previous.discovered
                 : HashSet.empty(),
               HashSet.difference(
-                HashSet.fromIterable(HashMap.keys(observation.fingerprints)),
-                HashSet.fromIterable(HashMap.keys(fingerprints(previous))),
+                observation.fingerprints.pipe(
+                  HashMap.keys,
+                  HashSet.fromIterable,
+                ),
+                fingerprints(previous).pipe(HashMap.keys, HashSet.fromIterable),
               ),
             ),
       }),
   });
 
+/**
+ * @internal
+ */
 export const fingerprints = (state: State): Fingerprints =>
   State.$match(state, {
     Initial: () => HashMap.empty(),
@@ -268,6 +313,9 @@ export const fingerprints = (state: State): Fingerprints =>
     Failed: ({ observation }) => observation.fingerprints,
   });
 
+/**
+ * @internal
+ */
 export const outputHash = (state: State): Option.Option<string> =>
   State.$match(state, {
     Initial: () => Option.none(),
@@ -282,6 +330,9 @@ export type Change = Data.TaggedEnum<{
 }>;
 export const Change = Data.taggedEnum<Change>();
 
+/**
+ * @internal
+ */
 export const diff = (
   previous: State,
   current: State,
@@ -290,18 +341,20 @@ export const diff = (
   const previousFingerprints = fingerprints(previous);
   const currentFingerprints = fingerprints(current);
   const files = HashSet.union(
-    HashSet.fromIterable(HashMap.keys(previousFingerprints)),
-    HashSet.fromIterable(HashMap.keys(currentFingerprints)),
+    previousFingerprints.pipe(HashMap.keys, HashSet.fromIterable),
+    currentFingerprints.pipe(HashMap.keys, HashSet.fromIterable),
   );
-  const changed = Array.fromIterable(files).filter(
+  const changed = Array.filter(
+    Array.fromIterable(files),
     (file) =>
       !Equal.equals(
         HashMap.get(previousFingerprints, file),
         HashMap.get(currentFingerprints, file),
       ),
   );
-  const sources = changed.filter(
-    (file) => !file.startsWith(generatedDirectoryPrefix),
+  const sources = Array.filter(
+    changed,
+    (file) => !String.startsWith(generatedDirectoryPrefix)(file),
   );
   const recovered =
     State.$is("Failed")(previous) && State.$is("Succeeded")(current);
@@ -316,7 +369,7 @@ export const diff = (
       !Equal.equals(outputHash(previous), outputHash(current));
   if (
     State.$is("Initial")(previous) ||
-    (sources.some((file) => HashMap.has(previousFingerprints, file)) &&
+    (Array.some(sources, (file) => HashMap.has(previousFingerprints, file)) &&
       State.$is("Failed")(current)) ||
     untrackedOutput
   )
@@ -337,7 +390,7 @@ export const diff = (
             HashSet.fromIterable(sources),
             HashSet.filter(
               previous.discovered,
-              (file) => !file.startsWith(generatedDirectoryPrefix),
+              (file) => !String.startsWith(generatedDirectoryPrefix)(file),
             ),
           ),
         )
@@ -349,13 +402,16 @@ export const diff = (
   return recovered ? Change.Recovered({ paths }) : Change.Affected({ paths });
 };
 
+/**
+ * @internal
+ */
 export const parse = Effect.fn("WatchBuild.parse")(function* (
   result: esbuild.BuildResult,
   capture: Capture,
   resolve: (file: string) => string,
   digest: Digest.Digest["Service"],
 ) {
-  const failures = Array.fromIterable(HashMap.values(capture.failures));
+  const failures = capture.failures.pipe(HashMap.values, Array.fromIterable);
   if (Array.isReadonlyArrayNonEmpty(result.errors))
     failures.push(Failure.BuildFailed({ errors: result.errors }));
   if (Array.isReadonlyArrayNonEmpty(failures))
@@ -364,13 +420,16 @@ export const parse = Effect.fn("WatchBuild.parse")(function* (
       failures,
       warnings: result.warnings,
     });
-  if (!result.metafile)
+  if (result.metafile === undefined)
     return Outcome.Failed({
       fingerprints: capture.fingerprints,
       failures: [Failure.InvalidBuildResult({ missing: "metafile" })],
       warnings: result.warnings,
     });
-  if (!result.outputFiles || !Array.isReadonlyArrayNonEmpty(result.outputFiles))
+  if (
+    result.outputFiles === undefined ||
+    !Array.isReadonlyArrayNonEmpty(result.outputFiles)
+  )
     return Outcome.Failed({
       fingerprints: capture.fingerprints,
       failures: [Failure.InvalidBuildResult({ missing: "outputFiles" })],
@@ -383,25 +442,35 @@ export const parse = Effect.fn("WatchBuild.parse")(function* (
     snapshot: {
       fingerprints: capture.fingerprints,
       graph: WatchGraph.make(result.metafile, resolve),
-      outputHash: hashes.join(":"),
+      outputHash: Array.join(hashes, ":"),
     },
     warnings: result.warnings,
   });
 });
 
+/**
+ * @internal
+ */
 export const failureMessage = (failure: Failure): string =>
   Failure.$match(failure, {
-    BuildFailed: ({ errors }) => errors.map((error) => error.text).join("\n"),
+    BuildFailed: ({ errors }) =>
+      Array.join(
+        Array.map(errors, (error) => error.text),
+        "\n",
+      ),
     InputCaptureFailed: ({ file, cause }) =>
       `Could not fingerprint input ${file}: ${cause.message}`,
     InvalidBuildResult: ({ missing }) => `esbuild completed without ${missing}`,
   });
 
+/**
+ * @internal
+ */
 export const messages = (outcome: Outcome): ReadonlyArray<esbuild.Message> =>
   Outcome.$match(outcome, {
     Succeeded: () => [],
     Failed: ({ failures }) =>
-      failures.flatMap((failure) =>
+      Array.flatMap(failures, (failure) =>
         Match.value(failure).pipe(
           Match.tag("BuildFailed", ({ errors }) => errors),
           Match.tag(
@@ -423,6 +492,9 @@ export const messages = (outcome: Outcome): ReadonlyArray<esbuild.Message> =>
       ),
   });
 
+/**
+ * @internal
+ */
 export const diagnostics = (
   state: State,
 ): {

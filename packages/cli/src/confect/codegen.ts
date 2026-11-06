@@ -93,6 +93,9 @@ const LEGACY_PATHS = Effect.gen(function* () {
   ];
 });
 
+/**
+ * @internal
+ */
 export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
@@ -190,15 +193,24 @@ const runCodegen = Effect.gen(function* () {
   };
 });
 
+/**
+ * @internal
+ */
 export const generateWithSnapshot = runCodegen.pipe(
   Effect.withSpan("Cli.codegen"),
 );
 
+/**
+ * @internal
+ */
 export const codegenHandler = generateWithSnapshot.pipe(
   Effect.tap(() => touchConvexSchema),
   Effect.map(({ functionPaths }) => ({ functionPaths })),
 );
 
+/**
+ * @internal
+ */
 export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
   function* (
     snapshot: GenerationSnapshot.GenerationSnapshot,
@@ -349,11 +361,10 @@ const removeObsoleteRegisteredFunctions = Effect.fnUntraced(function* (
     return;
   }
 
-  const expected = new Set(
-    yield* Effect.forEach(leaves, (leaf) =>
-      registeredFunctionsRelativePath(leaf),
-    ),
+  const expectedPaths = yield* Effect.forEach(leaves, (leaf) =>
+    registeredFunctionsRelativePath(leaf),
   );
+  const expected = new Set(expectedPaths);
 
   const existing = yield* fs.readDirectory(registryRoot, { recursive: true });
   yield* Effect.forEach(existing, (relativePath) => {
@@ -397,6 +408,9 @@ const loadGeneratedSpec = Effect.gen(function* () {
 
 const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
 
+/**
+ * @internal
+ */
 export const loadPreviousFunctionPaths = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const specPath = yield* getGeneratedSpecPath;
@@ -454,7 +468,7 @@ const rejectLegacySchemaFile = Effect.gen(function* () {
   const legacyPath = path.join(confectDirectory, "schema.ts");
 
   if (yield* fs.exists(legacyPath)) {
-    return yield* new LegacySchemaFileError({ schemaPath: "schema.ts" });
+    return yield* LegacySchemaFileError.make({ schemaPath: "schema.ts" });
   }
 });
 
@@ -697,7 +711,7 @@ const validateNoDocNameCollisions = Effect.fnUntraced(function* (
   );
 
   if (Array.isReadonlyArrayNonEmpty(collisions)) {
-    return yield* new CodegenError.ConflictingDocNameError({ collisions });
+    return yield* CodegenError.ConflictingDocNameError.make({ collisions });
   }
 });
 
@@ -753,6 +767,8 @@ const generateRefs = Effect.gen(function* () {
  * {@link templates.components}). The file is emitted even when there is no
  * `convex.config.ts` (as an empty registry) so the import surface stays stable.
  * It must exist before impl validation because impl modules may import it.
+ *
+ * @internal
  */
 export const generateComponents = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;

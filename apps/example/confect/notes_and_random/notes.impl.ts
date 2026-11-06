@@ -117,7 +117,7 @@ const getOrFail = FunctionImpl.make(
       return yield* reader
         .table("notes")
         .get(noteId)
-        .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
+        .pipe(Effect.mapError(() => NoteNotFound.make({ noteId })));
     }),
 );
 

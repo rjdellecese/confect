@@ -9,7 +9,7 @@ const failingNodeAction = FunctionImpl.make(
   databaseSchema,
   typedErrorsNode,
   "failingNodeAction",
-  ({ id }) => Effect.fail(new NodeNotFound({ id })),
+  ({ id }) => Effect.fail(NodeNotFound.make({ id })),
 );
 
 export default GroupImpl.make(databaseSchema, typedErrorsNode).pipe(

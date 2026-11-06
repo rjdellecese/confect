@@ -1,3 +1,5 @@
+import * as Schema from "effect/Schema";
+import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
 
 /**
@@ -28,6 +30,15 @@ export type Concat<
       : never
     : never;
 
+/**
+ * @experimental
+ */
+export const QueryStreamKeyLabels = Schema.declare<QueryStreamKeyLabels>(
+  (value): value is QueryStreamKeyLabels =>
+    Array.isArray(value) &&
+    Array.every(value, (label) => typeof label === "string"),
+);
+
 const LabelsBrand = Brand.nominal<QueryStreamKeyLabels>();
 
 /**
@@ -53,4 +64,4 @@ export const hasPrefix = (
   prefixKeyLabels: QueryStreamKeyLabels,
 ): boolean =>
   prefixKeyLabels.length <= self.length &&
-  prefixKeyLabels.every((label, index) => label === self[index]);
+  Array.every(prefixKeyLabels, (label, index) => label === self[index]);

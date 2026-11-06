@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true,
-    "tsBuildInfoFile": "../../node_modules/.cache/tsc/oxlint-rules.tsbuildinfo"
+    "tsBuildInfoFile": "../../node_modules/.cache/tsrs/oxlint-rules.tsbuildinfo"
   },
   "include": ["*.ts", "src/**/*", "test/**/*"],
   "exclude": ["coverage", "node_modules"]

@@ -16,6 +16,9 @@ export class ProjectRoot extends Context.Service<
   static readonly get = ProjectRoot.use((service) => service.get);
 }
 
+/**
+ * @internal
+ */
 export const findProjectRoot = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -33,12 +36,14 @@ export const findProjectRoot = Effect.gen(function* () {
     fs.exists(path.join(dir, "package.json")),
   );
 
-  return yield* Effect.fromOption(
-    projectRoot,
-    () => new ProjectRootNotFoundError(),
+  return yield* Effect.fromOption(projectRoot, () =>
+    ProjectRootNotFoundError.make(),
   );
 });
 
+/**
+ * @internal
+ */
 export const layer = Layer.effect(
   ProjectRoot,
   Effect.gen(function* () {
@@ -50,10 +55,10 @@ export const layer = Layer.effect(
   }),
 ).pipe(Layer.provide(NodeFileSystem.layer));
 
-export class ProjectRootNotFoundError extends Schema.TaggedError<ProjectRootNotFoundError>()(
-  "ProjectRootNotFoundError",
-  {},
-) {
+export class ProjectRootNotFoundError extends Schema.TaggedError<
+  ProjectRootNotFoundError,
+  { readonly brand: unique symbol }
+>()("ProjectRootNotFoundError", {}) {
   override get message(): string {
     return "Could not find project root (no 'package.json' found)";
   }

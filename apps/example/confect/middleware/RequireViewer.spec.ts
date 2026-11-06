@@ -8,10 +8,10 @@ export class Viewer extends Context.Service<
   { readonly user: typeof users.Doc.Type }
 >()("example/confect/middleware/RequireViewer.spec/Viewer") {}
 
-export class NotSignedIn extends Schema.TaggedError<NotSignedIn>()(
-  "NotSignedIn",
-  {},
-) {}
+export class NotSignedIn extends Schema.TaggedError<
+  NotSignedIn,
+  { readonly brand: unique symbol }
+>()("NotSignedIn", {}) {}
 
 /**
  * Provides the current viewer (in this auth-less example: the most recently

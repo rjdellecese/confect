@@ -1,0 +1,13 @@
+diff --git a/out/ts7/server.js b/out/ts7/server.js
+--- a/out/ts7/server.js
++++ b/out/ts7/server.js
+@@ -54,8 +54,7 @@ const loadCompiler = () => {
+     if (compiler)
+         return compiler;
+     const name = getChecker() === "tsrs" ? "tsrs" : "typescript";
+-    // tsrs still exports the API from tsgo's previous unstable/ subpaths
+-    const entry = name === "tsrs" ? "tsrs/unstable" : "typescript";
++    const entry = name;
+     Object.assign(ast, requireTypeScript(`${entry}/ast`));
+     return (compiler = {
+         ...requireTypeScript(`${entry}/sync`),

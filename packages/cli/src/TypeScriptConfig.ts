@@ -21,13 +21,13 @@ export const TypeScriptConfig = Schema.Struct({
 });
 export type TypeScriptConfig = typeof TypeScriptConfig.Type;
 
-class DiscoveryRejected extends Schema.TaggedError<DiscoveryRejected>()(
-  "TypeScriptConfigDiscoveryRejected",
-  {
-    path: Schema.String,
-    reason: Schema.Literals(["ForbiddenFile", "NotRegularFile"]),
-  },
-) {}
+class DiscoveryRejected extends Schema.TaggedError<
+  DiscoveryRejected,
+  { readonly brand: unique symbol }
+>()("TypeScriptConfigDiscoveryRejected", {
+  path: Schema.String,
+  reason: Schema.Literals(["ForbiddenFile", "NotRegularFile"]),
+}) {}
 
 interface InheritedConfig {
   readonly aliases: Option.Option<ReadonlyArray<string>>;
@@ -81,6 +81,9 @@ const parents = (path: Path.Path, directory: string): ReadonlyArray<string> =>
     ),
   );
 
+/**
+ * @internal
+ */
 export const discover = Effect.fnUntraced(function* (directory: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -88,7 +91,7 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
   const selected = yield* Effect.findFirst(
     Array.filter(parents(path, directory), (candidate) => candidate !== root),
     (candidate) => fs.exists(path.join(candidate, "tsconfig.json")),
-  ).pipe(Effect.mapError((cause) => new BuildError.BundlerError({ cause })));
+  ).pipe(Effect.mapError((cause) => BuildError.BundlerError.make({ cause })));
   if (Option.isNone(selected)) return Option.none<TypeScriptConfig>();
 
   const read = Effect.fnUntraced(
@@ -102,7 +105,7 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
               path.basename(file) === ".env.local" ||
               path.basename(real) === ".env.local"
             )
-              return yield* new DiscoveryRejected({
+              return yield* DiscoveryRejected.make({
                 path: file,
                 reason: "ForbiddenFile",
               });
@@ -119,7 +122,7 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
       );
     },
     Effect.catch((cause: PlatformError.PlatformError | DiscoveryRejected) => {
-      const fail = () => Effect.fail(new BuildError.BundlerError({ cause }));
+      const fail = () => Effect.fail(BuildError.BundlerError.make({ cause }));
       return Match.value(cause).pipe(
         Match.tag("PlatformError", ({ reason }) =>
           Match.value(reason).pipe(
@@ -278,8 +281,8 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
   const file = path.join(selected.value, "tsconfig.json");
   const config = yield* visit(file, HashSet.empty());
   if (Option.isNone(config))
-    return yield* new BuildError.BundlerError({
-      cause: new DiscoveryRejected({ path: file, reason: "NotRegularFile" }),
+    return yield* BuildError.BundlerError.make({
+      cause: DiscoveryRejected.make({ path: file, reason: "NotRegularFile" }),
     });
   return Option.some({
     path: file,

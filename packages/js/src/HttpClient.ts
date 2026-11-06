@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
+export class HttpClientError extends Schema.TaggedError<HttpClientError, {}>()(
   "HttpClientError",
   {
     cause: Schema.Unknown,
@@ -38,7 +38,7 @@ const make = (
     client.clearAuth();
   });
 
-  const mapUnknownError = (cause: unknown) => new HttpClientError({ cause });
+  const mapUnknownError = (cause: unknown) => HttpClientError.make({ cause });
 
   const query = <Query extends Ref.AnyPublicQuery>(
     ref: Query,
@@ -115,9 +115,9 @@ const make = (
  * Works in any JS runtime that supports `fetch`. Wraps
  * [ConvexHttpClient](https://docs.convex.dev/api/classes/browser.ConvexHttpClient).
  */
-export const HttpClient = Context.Service<ReturnType<typeof make>>(
-  "@confect/js/HttpClient",
-);
+export const HttpClient =
+  // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
+  Context.Service<ReturnType<typeof make>>("@confect/js/HttpClient");
 
 export type HttpClient = typeof HttpClient.Identifier;
 

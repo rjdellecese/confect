@@ -1,6 +1,7 @@
 import {
   compileSchema,
   compileAst,
+  UnsupportedPropertySignatureKeyTypeError,
   type UndefinedOrValueToValidator,
   type ValueToValidator,
 } from "@confect/core/SchemaToValidator";
@@ -17,6 +18,28 @@ import {
 import type { Brand } from "effect";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
+
+describe("UnsupportedPropertySignatureKeyTypeError", () => {
+  it("preserves raw numeric and symbol keys through construction and schema decoding", () => {
+    for (const propertyKey of [NaN, Infinity, -Infinity, Symbol("key")]) {
+      const error = UnsupportedPropertySignatureKeyTypeError.make({
+        propertyKey,
+      });
+      const decoded = Result.getOrThrow(
+        Schema.decodeResult(UnsupportedPropertySignatureKeyTypeError)({
+          _tag: "UnsupportedPropertySignatureKeyTypeError",
+          propertyKey,
+        }),
+      );
+
+      expect(error.propertyKey).toBe(propertyKey);
+      expect(decoded).toBeInstanceOf(UnsupportedPropertySignatureKeyTypeError);
+      expect(decoded.propertyKey).toBe(propertyKey);
+      expect(error.message).toContain(propertyKey.toString());
+    }
+  });
+});
 
 describe("ValueToValidator", () => {
   it("preserves wide literal unions in required, optional, and nested validators", () => {
@@ -344,10 +367,12 @@ describe("compiler preprocessing", () => {
       const ast = Schema.Union([Schema.String, Schema.Boolean]).ast;
       const effect = compileAst(ast);
       Object.defineProperty(ast, "types", { value: [Schema.Null.ast] });
-
-      expect(yield* effect).toEqual(v.union(v.string(), v.boolean()));
-      expect(yield* effect).toEqual(v.union(v.string(), v.boolean()));
-      expect(yield* compileAst(ast)).toEqual(v.null());
+      const result1 = yield* effect;
+      expect(result1).toEqual(v.union(v.string(), v.boolean()));
+      const result2 = yield* effect;
+      expect(result2).toEqual(v.union(v.string(), v.boolean()));
+      const result3 = yield* compileAst(ast);
+      expect(result3).toEqual(v.null());
     }),
   );
 
@@ -358,10 +383,12 @@ describe("compiler preprocessing", () => {
         const ast = Schema.Tuple([Schema.String]).ast;
         const effect = compileAst(ast);
         Object.defineProperty(ast, "elements", { value: [Schema.Boolean.ast] });
-
-        expect(yield* effect).toEqual(v.array(v.string()));
-        expect(yield* effect).toEqual(v.array(v.string()));
-        expect(yield* compileAst(ast)).toEqual(v.array(v.boolean()));
+        const result4 = yield* effect;
+        expect(result4).toEqual(v.array(v.string()));
+        const result5 = yield* effect;
+        expect(result5).toEqual(v.array(v.string()));
+        const result6 = yield* compileAst(ast);
+        expect(result6).toEqual(v.array(v.boolean()));
       }),
   );
 
@@ -372,10 +399,12 @@ describe("compiler preprocessing", () => {
         const ast = Schema.Array(Schema.String).ast;
         const effect = compileAst(ast);
         Object.defineProperty(ast, "rest", { value: [Schema.Boolean.ast] });
-
-        expect(yield* effect).toEqual(v.array(v.string()));
-        expect(yield* effect).toEqual(v.array(v.string()));
-        expect(yield* compileAst(ast)).toEqual(v.array(v.boolean()));
+        const result7 = yield* effect;
+        expect(result7).toEqual(v.array(v.string()));
+        const result8 = yield* effect;
+        expect(result8).toEqual(v.array(v.string()));
+        const result9 = yield* compileAst(ast);
+        expect(result9).toEqual(v.array(v.boolean()));
       }),
   );
 });

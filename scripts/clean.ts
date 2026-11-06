@@ -3,6 +3,9 @@ import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 
+/**
+ * @internal
+ */
 export const clean = Effect.fn("Clean.remove")(function* (
   targets: ReadonlyArray<string>,
 ) {

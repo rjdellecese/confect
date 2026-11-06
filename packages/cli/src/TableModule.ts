@@ -1,3 +1,5 @@
+import * as String from "effect/String";
+import * as Record from "effect/Record";
 import { Identifier } from "@confect/core";
 import * as Table from "@confect/core/Table";
 import * as FileSystem from "effect/FileSystem";
@@ -38,6 +40,9 @@ const tableNameFromRelativePath = Effect.fnUntraced(function* (
   return name;
 });
 
+/**
+ * @internal
+ */
 export const discoverTableFiles = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -54,7 +59,9 @@ export const discoverTableFiles = Effect.gen(function* () {
 
   return pipe(
     allPaths,
-    Array.filter((p) => p.endsWith(".ts") && !p.endsWith(".test.ts")),
+    Array.filter(
+      (p) => String.endsWith(".ts")(p) && !String.endsWith(".test.ts")(p),
+    ),
     Array.map((p) => path.join(TABLES_DIRNAME, p)),
   );
 });
@@ -83,6 +90,8 @@ const byTableName = Order.mapInput(
  * the same table name (the directory is scanned recursively but names are
  * derived from the basename alone, so `tables/a/notes.ts` and
  * `tables/b/notes.ts` would collide).
+ *
+ * @internal
  */
 export const discover = Effect.gen(function* () {
   const relativePaths = yield* discoverTableFiles;
@@ -94,9 +103,9 @@ export const discover = Effect.gen(function* () {
       yield* Effect.try({
         try: () => Identifier.validateConfectTableIdentifier(tableName),
         catch: (e) =>
-          new InvalidTableFilenameError({
+          InvalidTableFilenameError.make({
             tablePath: relativePath,
-            reason: e instanceof Error ? e.message : String(e),
+            reason: e instanceof Error ? e.message : globalThis.String(e),
           }),
       });
       return { relativePath, tableName } satisfies TableModule;
@@ -106,17 +115,21 @@ export const discover = Effect.gen(function* () {
 
   const sorted = pipe(tableModules, Array.sortBy(byTableName));
 
-  const collisions = Object.entries(
-    Array.groupBy(sorted, (tableModule) => tableModule.tableName),
-  )
-    .filter(([, group]) => group.length > 1)
-    .map(([tableName, group]) => ({
+  const collisions = Array.map(
+    Array.filter(
+      Record.toEntries(
+        Array.groupBy(sorted, (tableModule) => tableModule.tableName),
+      ),
+      ([, group]) => group.length > 1,
+    ),
+    ([tableName, group]) => ({
       tableName,
       tablePaths: Array.map(group, (tableModule) => tableModule.relativePath),
-    }));
+    }),
+  );
 
   if (collisions.length > 0) {
-    return yield* new DuplicateTableNameError({ collisions });
+    return yield* DuplicateTableNameError.make({ collisions });
   }
 
   return sorted;
@@ -131,6 +144,8 @@ export const discover = Effect.gen(function* () {
  * Must run _after_ `_generated/id.ts` has been emitted, because user-authored
  * table modules typically `import { Id } from "../_generated/id"` for
  * cross-table references.
+ *
+ * @internal
  */
 export const validate = Effect.fnUntraced(function* (
   tableModules: ReadonlyArray<TableModule>,
@@ -147,15 +162,18 @@ export const validate = Effect.fnUntraced(function* (
     );
 
     if (!Table.isUnnamedTable(module.default)) {
-      return yield* new InvalidTableDefaultExportError({
+      return yield* InvalidTableDefaultExportError.make({
         tablePath: relativePath,
       });
     }
   });
 
-  const relativePaths = tableModules.map(({ relativePath }) => relativePath);
+  const relativePaths = Array.map(
+    tableModules,
+    ({ relativePath }) => relativePath,
+  );
   yield* Bundler.withBatch(
-    relativePaths.map((relativePath) =>
+    Array.map(relativePaths, (relativePath) =>
       path.resolve(confectDirectory, relativePath),
     ),
     Effect.forEach(relativePaths, validateRelativePath, { concurrency: 4 }),

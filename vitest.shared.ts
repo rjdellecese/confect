@@ -23,8 +23,9 @@ const discoverPackageAliases = Effect.gen(function* () {
   const path = yield* Path.Path;
 
   const packagesDir = path.resolve(import.meta.dirname, "packages");
+  const entries = yield* fs.readDirectory(packagesDir);
 
-  return yield* Effect.forEach(yield* fs.readDirectory(packagesDir), (entry) =>
+  return yield* Effect.forEach(entries, (entry) =>
     Effect.gen(function* () {
       const srcDir = path.join(packagesDir, entry, "src");
 
@@ -32,9 +33,10 @@ const discoverPackageAliases = Effect.gen(function* () {
         return [];
       }
 
-      const { name } = yield* Schema.decodeEffect(PackageManifest)(
-        yield* fs.readFileString(path.join(packagesDir, entry, "package.json")),
+      const contents = yield* fs.readFileString(
+        path.join(packagesDir, entry, "package.json"),
       );
+      const { name } = yield* Schema.decodeEffect(PackageManifest)(contents);
 
       return [
         {
@@ -62,6 +64,7 @@ export default defineConfig({
   test: {
     exclude: [...configDefaults.exclude, "**/*.spec.ts"],
     typecheck: {
+      checker: "tsrs",
       enabled: true,
       include: ["test/**/*.test.ts"],
     },

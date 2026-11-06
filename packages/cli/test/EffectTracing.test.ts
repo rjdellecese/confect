@@ -1,3 +1,4 @@
+import * as Arr from "effect/Array";
 import * as Project from "./integration/Project";
 import * as Bundler from "@confect/cli/Bundler";
 import * as CodegenError from "@confect/cli/CodegenError";
@@ -48,13 +49,16 @@ const makeProject = Effect.fnUntraced(function* () {
   );
   yield* fs.writeFileString(
     path.join(confect, "notes.impl.ts"),
-    [
-      'import { GroupImpl } from "@confect/server";',
-      'import databaseSchema from "./_generated/schema";',
-      'import notes from "./notes.spec";',
-      "export default GroupImpl.make(databaseSchema, notes).pipe(GroupImpl.finalize);",
-      "",
-    ].join("\n"),
+    Arr.join(
+      [
+        'import { GroupImpl } from "@confect/server";',
+        'import databaseSchema from "./_generated/schema";',
+        'import notes from "./notes.spec";',
+        "export default GroupImpl.make(databaseSchema, notes).pipe(GroupImpl.finalize);",
+        "",
+      ],
+      "\n",
+    ),
   );
   yield* fs.writeFileString(
     path.join(convex, "convex.config.ts"),
@@ -98,8 +102,9 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
               return MutableRef.get(relativePath);
             },
           };
+          const services = yield* Layer.build(directories);
           const validate = TableModule.validate([table]).pipe(
-            Effect.provide(directories),
+            Effect.provideContext(services),
           );
           expect(MutableRef.get(reads)).toBe(0);
           yield* validate;
@@ -119,8 +124,9 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
         Effect.gen(function* () {
           const { directories } = yield* makeProject();
           const { spans, tracer } = makeRecordingTracer();
+          const services2 = yield* Layer.build(directories);
           const pass = codegenHandler.pipe(
-            Effect.provide(directories),
+            Effect.provideContext(services2),
             Effect.provideService(Tracer.Tracer, tracer),
           );
 
@@ -130,7 +136,10 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           expect(first).not.toEqual([]);
           expect(second).toEqual([]);
 
-          const passes = spans.filter((span) => span.name === "Cli.codegen");
+          const passes = Arr.filter(
+            spans,
+            (span) => span.name === "Cli.codegen",
+          );
           expect(passes).toHaveLength(2);
           expect(passes[0]).not.toBe(passes[1]);
           for (const name of [
@@ -138,13 +147,14 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             "LeafModule.validateImpl",
             "ConvexConfig.discoverInstalledComponents",
           ]) {
-            const operations = spans.filter((span) => span.name === name);
+            const operations = Arr.filter(spans, (span) => span.name === name);
             expect(operations).toHaveLength(2);
             for (const operation of operations) {
               expect(passes).toContain(Option.getOrUndefined(operation.parent));
             }
           }
-          const bundles = spans.filter(
+          const bundles = Arr.filter(
+            spans,
             (span) => span.name === "Bundler.bundle",
           );
           expect(bundles.length).toBeGreaterThan(0);
@@ -183,16 +193,20 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           yield* fs.writeFileString(file, "export default {};\n");
           const { spans, tracer } = makeRecordingTracer();
 
+          const services3 = yield* Layer.build(directories);
           const result = yield* codegenHandler.pipe(
             CodegenError.catchAndLog,
-            Effect.provide(directories),
+            Effect.provideContext(services3),
             Effect.provideService(Tracer.Tracer, tracer),
           );
 
           expect(Option.isNone(result)).toBe(true);
           for (const operationName of ["Cli.codegen", name]) {
-            const span = spans.find(
-              (candidate) => candidate.name === operationName,
+            const span = Option.getOrUndefined(
+              Arr.findFirst(
+                spans,
+                (candidate) => candidate.name === operationName,
+              ),
             );
             assert(span !== undefined);
             assert(span.status._tag === "Ended");
@@ -216,7 +230,8 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
         yield* fs.writeFileString(entry, "export default 42;\n");
         expect((yield* bundle).module.default).toBe(42);
         yield* fs.remove(entry);
-        expect(Exit.isFailure(yield* Effect.exit(bundle))).toBe(true);
+        const actual = yield* Effect.exit(bundle);
+        expect(Exit.isFailure(actual)).toBe(true);
         expect(spans).toHaveLength(2);
         assert(spans[0]?.status._tag === "Ended");
         assert(spans[1]?.status._tag === "Ended");

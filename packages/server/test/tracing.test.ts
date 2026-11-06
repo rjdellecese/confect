@@ -1,3 +1,4 @@
+import * as Arr from "effect/Array";
 import { identity } from "effect/Function";
 import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
@@ -30,10 +31,10 @@ import * as Stream from "effect/Stream";
 import * as Tracer from "effect/Tracer";
 import { vi } from "vitest";
 
-class OperationFailure extends Schema.TaggedError<OperationFailure>()(
-  "OperationFailure",
-  { reason: Schema.String },
-) {}
+class OperationFailure extends Schema.TaggedError<
+  OperationFailure,
+  { readonly brand: unique symbol }
+>()("OperationFailure", { reason: Schema.String }) {}
 
 const queryRef = Ref.make(
   "operations",
@@ -150,7 +151,7 @@ describe("server operation tracing", () => {
           page,
         ]);
         expect(reads).toBe(6);
-        expect(recorder.spans.map((span) => span.name)).toEqual([
+        expect(Arr.map(recorder.spans, (span) => span.name)).toEqual([
           "caller",
           "QueryStream.unique",
           "QueryStream.paginate",
@@ -192,20 +193,20 @@ describe("server operation tracing", () => {
         const span = recorder.spans[0]!;
         expect(span.name).toBe("QueryStream.unique");
         assert(span.status._tag === "Ended");
-        assert(Exit.isFailure(span.status.exit));
-        expect(
-          Option.getOrThrow(Cause.findErrorOption(span.status.exit.cause)),
-        ).toBe(error);
-        expect(Cause.pretty(span.status.exit.cause)).toContain(
-          "QueryStream.unique",
+        const spanExit = span.status.exit;
+        const isFailure2 = Exit.isFailure(spanExit);
+        assert(isFailure2);
+        expect(Option.getOrThrow(Cause.findErrorOption(spanExit.cause))).toBe(
+          error,
         );
+        expect(Cause.pretty(spanExit.cause)).toContain("QueryStream.unique");
       }),
   );
 
   it.effect("preserves typed stream failures inside the pagination span", () =>
     Effect.gen(function* () {
       const recorder = yield* makeRecorder;
-      const failure = new OperationFailure({ reason: "query failed" });
+      const failure = OperationFailure.make({ reason: "query failed" });
       const source = new QueryStream.QueryStream(
         "asc",
         Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
@@ -221,13 +222,13 @@ describe("server operation tracing", () => {
       const span = recorder.spans[0]!;
       expect(span.name).toBe("QueryStream.paginate");
       assert(span.status._tag === "Ended");
-      assert(Exit.isFailure(span.status.exit));
-      expect(
-        Option.getOrThrow(Cause.findErrorOption(span.status.exit.cause)),
-      ).toBe(failure);
-      expect(Cause.pretty(span.status.exit.cause)).toContain(
-        "QueryStream.paginate",
+      const spanExit = span.status.exit;
+      const isFailure3 = Exit.isFailure(spanExit);
+      assert(isFailure3);
+      expect(Option.getOrThrow(Cause.findErrorOption(spanExit.cause))).toBe(
+        failure,
       );
+      expect(Cause.pretty(spanExit.cause)).toContain("QueryStream.paginate");
     }),
   );
 
@@ -267,28 +268,26 @@ describe("server operation tracing", () => {
           );
           expect(result).toEqual([7, 7, 7, 7]);
         }).pipe(
-          Effect.provide(
-            Layer.mergeAll(
-              QueryRunner.layer(
-                invoke as GenericActionCtx<GenericDataModel>["runQuery"],
-              ),
-              MutationRunner.layer(
-                invoke as GenericActionCtx<GenericDataModel>["runMutation"],
-              ),
-              ActionRunner.layer(
-                invoke as GenericActionCtx<GenericDataModel>["runAction"],
-              ),
+          Effect.provide([
+            QueryRunner.layer(
+              invoke as GenericActionCtx<GenericDataModel>["runQuery"],
             ),
-          ),
+            MutationRunner.layer(
+              invoke as GenericActionCtx<GenericDataModel>["runMutation"],
+            ),
+            ActionRunner.layer(
+              invoke as GenericActionCtx<GenericDataModel>["runAction"],
+            ),
+          ]),
         );
 
-        expect(invoke.mock.calls.map(([, args]) => args)).toEqual([
+        expect(Arr.map(invoke.mock.calls, ([, args]) => args)).toEqual([
           { value: "2" },
           { value: "3" },
           { value: "4" },
           { value: "2" },
         ]);
-        expect(recorder.spans.map((span) => span.name)).toEqual([
+        expect(Arr.map(recorder.spans, (span) => span.name)).toEqual([
           "caller",
           "QueryRunner.runQuery",
           "MutationRunner.runMutation",
@@ -314,16 +313,16 @@ describe("server operation tracing", () => {
             new ConvexError({ _tag: "OperationFailure", reason: "rejected" }),
           );
         const error = yield* Effect.gen(function* () {
-          const { runQuery } = yield* QueryRunner.QueryRunner;
-          return yield* Effect.flip(runQuery(queryRef, { value: 2 }));
-        }).pipe(
-          Effect.provide(
+          const services = yield* Layer.build(
             QueryRunner.layer(
               invoke as GenericActionCtx<GenericDataModel>["runQuery"],
             ),
-          ),
-          Effect.withTracer(recorder.tracer),
-        );
+          );
+          return yield* Effect.gen(function* () {
+            const { runQuery } = yield* QueryRunner.QueryRunner;
+            return yield* Effect.flip(runQuery(queryRef, { value: 2 }));
+          }).pipe(Effect.provideContext(services));
+        }).pipe(Effect.scoped, Effect.withTracer(recorder.tracer));
 
         assert.instanceOf(error, OperationFailure);
         expect(error.reason).toBe("rejected");
@@ -379,7 +378,7 @@ describe("server operation tracing", () => {
           [noteId, { value: "3" }],
           [noteId, { value: "4" }],
         ]);
-        expect(recorder.spans.map((span) => span.name)).toEqual([
+        expect(Arr.map(recorder.spans, (span) => span.name)).toEqual([
           "DatabaseWriter.insert",
           "DatabaseWriter.patch",
           "DatabaseWriter.replace",
@@ -448,7 +447,7 @@ describe("server operation tracing", () => {
         expect(results[1]).toEqual(results[0]);
         expect(filter.mock.calls).toEqual([[predicate], [predicate]]);
         expect(paginate.mock.calls).toEqual([[options], [options]]);
-        expect(recorder.spans.map((span) => span.name)).toEqual([
+        expect(Arr.map(recorder.spans, (span) => span.name)).toEqual([
           "OrderedQuery.paginate",
           "OrderedQuery.paginate",
         ]);

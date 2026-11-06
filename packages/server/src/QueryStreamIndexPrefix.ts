@@ -1,8 +1,12 @@
+import * as Schema from "effect/Schema";
 import * as Array from "effect/Array";
-import * as Data from "effect/Data";
 import * as Result from "effect/Result";
 import type * as QueryStreamKey from "./QueryStreamKey";
 import type * as QueryStreamKeyValues from "./QueryStreamKeyValues";
+
+const NumberValue = Schema.declare<number>(
+  (value): value is number => typeof value === "number",
+);
 
 const TypeId = "~@confect/server/QueryStreamIndexPrefix";
 
@@ -25,12 +29,13 @@ export interface QueryStreamIndexPrefix {
 /**
  * @experimental
  */
-export class IndexPrefixWidthMismatchError extends Data.TaggedError(
-  "IndexPrefixWidthMismatchError",
-)<{
-  readonly width: number;
-  readonly actual: number;
-}> {
+export class IndexPrefixWidthMismatchError extends Schema.TaggedError<
+  IndexPrefixWidthMismatchError,
+  {}
+>()("IndexPrefixWidthMismatchError", {
+  width: NumberValue,
+  actual: NumberValue,
+}) {
   override get message(): string {
     return `Invalid index prefix key width (${this.actual}); expected at most ${this.width}`;
   }
@@ -46,7 +51,7 @@ export const make = (
   keyValues.length <= fieldPaths.length
     ? Result.succeed({ [TypeId]: Array.zip(fieldPaths, keyValues) })
     : Result.fail(
-        new IndexPrefixWidthMismatchError({
+        IndexPrefixWidthMismatchError.make({
           width: fieldPaths.length,
           actual: keyValues.length,
         }),

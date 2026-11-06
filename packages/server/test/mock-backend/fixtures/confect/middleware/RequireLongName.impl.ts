@@ -10,7 +10,7 @@ export default MiddlewareImpl.make(databaseSchema, RequireLongName, (effect) =>
     const { username } = yield* Viewer;
 
     if (username.length < 3) {
-      return yield* new NameTooShort();
+      return yield* NameTooShort.make();
     }
 
     return yield* effect;

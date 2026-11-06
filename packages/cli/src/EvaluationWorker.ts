@@ -42,7 +42,7 @@ const evaluate = <A, E, R>(
     Effect.catchCause((cause) => {
       const failure = Cause.findErrorOption(cause);
       return Effect.fail(
-        new EvaluationError({
+        EvaluationError.make({
           diagnostic:
             Option.isSome(failure) && CodegenError.isCodegenError(failure.value)
               ? CodegenError.renderCodegenError(failure.value)

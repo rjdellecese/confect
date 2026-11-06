@@ -15,7 +15,7 @@
     "effect": "4.1.0",
     "foldkit": "0.170.0",
     "tsdown": "0.23.4",
-    "typescript": "7.0.2",
+    "tsrs": "0.21.0-ts7.1.0-beta",
     "unrun": "0.3.1",
     "vitest": "5.0.5"
   },
@@ -67,8 +67,8 @@
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",
-    "typecheck": "tsc -b tsconfig.src.json",
-    "typecheck:inexact": "tsc --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
+    "typecheck": "tsrs -b tsconfig.src.json",
+    "typecheck:inexact": "tsrs --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
   },
   "sideEffects": false,
   "type": "module",

@@ -1,3 +1,4 @@
+import * as Layer from "effect/Layer";
 import { AiGatewayLanguageClient } from "@confect/server";
 import * as LanguageClient from "@confect/server/AiGatewayLanguageClient";
 import { assert, describe, it } from "@effect/vitest";
@@ -31,9 +32,12 @@ describe("AiGatewayLanguageClient", () => {
     ["make", AiGatewayLanguageClient.make],
     [
       "layer",
-      Effect.service(AiGatewayLanguageClient.AiGatewayLanguageClient).pipe(
-        Effect.provide(AiGatewayLanguageClient.layer),
-      ),
+      Effect.gen(function* () {
+        const services = yield* Layer.build(AiGatewayLanguageClient.layer);
+        return yield* Effect.service(
+          AiGatewayLanguageClient.AiGatewayLanguageClient,
+        ).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped),
     ],
   ] as const)("%s", (_name, make) => {
     it.effect("authenticates language requests with the action token", () =>
@@ -133,7 +137,7 @@ describe("AiGatewayLanguageClient", () => {
         getServiceToken
           .mockReset()
           .mockResolvedValueOnce("construction-token")
-          .mockRejectedValueOnce({ code: new ErrorType()._tag });
+          .mockRejectedValueOnce({ code: ErrorType.make()._tag });
         const client = yield* make.pipe(
           Effect.provideService(
             HttpClient.HttpClient,
@@ -149,7 +153,7 @@ describe("AiGatewayLanguageClient", () => {
         if (error.reason._tag !== "NetworkError") {
           return;
         }
-        assert.strictEqual(error.reason.description, new ErrorType().message);
+        assert.strictEqual(error.reason.description, ErrorType.make().message);
       }),
     );
 
@@ -166,7 +170,7 @@ describe("AiGatewayLanguageClient", () => {
       Effect.gen(function* () {
         getServiceToken
           .mockReset()
-          .mockRejectedValue({ code: new ErrorType()._tag });
+          .mockRejectedValue({ code: ErrorType.make()._tag });
         const error = yield* make.pipe(
           Effect.provideService(
             HttpClient.HttpClient,

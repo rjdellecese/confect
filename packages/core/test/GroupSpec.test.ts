@@ -1,3 +1,5 @@
+import * as Record from "effect/Record";
+import * as Array from "effect/Array";
 import * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as GroupSpec from "@confect/core/GroupSpec";
@@ -118,13 +120,13 @@ describe("addGroupsAt", () => {
     expect(assembled.groups.replace.runtime).toBe("Node");
     expect(assembled.groups.replace.name).toBe("replace");
     expect(parent.groups.replace.runtime).toBe("Convex");
-    expect(Object.keys(parent.groups)).toEqual(["keep", "replace"]);
+    expect(Record.keys(parent.groups)).toEqual(["keep", "replace"]);
     expect(input).toEqual({ replace: node, extra: leaf });
     expect(leaf.name).toBe("");
     expect(node.name).toBe("");
-    expect(Object.keys(assembled.functions)).toEqual(["get"]);
-    expect(Object.keys(assembled.groups)).toEqual(["keep", "replace", "extra"]);
-    expect(Object.keys(assembled.groups.replace.functions)).toEqual(["send"]);
+    expect(Record.keys(assembled.functions)).toEqual(["get"]);
+    expect(Record.keys(assembled.groups)).toEqual(["keep", "replace", "extra"]);
+    expect(Record.keys(assembled.groups.replace.functions)).toEqual(["send"]);
   });
 
   it("accepts Convex children under Node parents and empty child records", () => {
@@ -140,7 +142,7 @@ describe("addGroupsAt", () => {
     expect(parent.groups).toEqual({});
     expect(empty.functions).toBe(assembled.functions);
     expect(empty.middlewareAttachments).toBe(assembled.middlewareAttachments);
-    expect(Object.keys(empty.groups)).toEqual(["child"]);
+    expect(Record.keys(empty.groups)).toEqual(["child"]);
   });
 
   it("validates child names without modifying inputs on failure", () => {
@@ -160,7 +162,7 @@ describe("addGroupsAt", () => {
       ["__proto__"]: GroupSpec.make(),
       constructor: GroupSpec.make(),
     });
-    expect(Object.hasOwn(group.groups, "__proto__")).toBe(true);
+    expect(Record.has(group.groups, "__proto__")).toBe(true);
     expect(group.groups.__proto__.name).toBe("__proto__");
     expect(group.groups.constructor.name).toBe("constructor");
     expect(Object.getPrototypeOf(group.groups)).toBe(Object.prototype);
@@ -237,7 +239,7 @@ describe("AddGroups", () => {
 });
 
 describe("middleware options", () => {
-  class AccessDenied extends Schema.TaggedError<AccessDenied>()(
+  class AccessDenied extends Schema.TaggedError<AccessDenied, {}>()(
     "AccessDenied",
     {},
   ) {}
@@ -299,10 +301,9 @@ describe("middleware options", () => {
     expectTypeOf<
       (typeof mixed.middlewareAttachments)[number]["options"]
     >().toEqualTypeOf<MiddlewareSpec.Options<typeof RequireRole> | undefined>();
-    expect(mixed.middlewareAttachments.map(({ options }) => options)).toEqual([
-      undefined,
-      { roles: ["Internal"] },
-    ]);
+    expect(
+      Array.map(mixed.middlewareAttachments, ({ options }) => options),
+    ).toEqual([undefined, { roles: ["Internal"] }]);
   });
 
   it("preserves attachments and derived specs through every group copy", () => {
@@ -319,7 +320,7 @@ describe("middleware options", () => {
     ]) {
       expect(copy.middlewareAttachments).toBe(group.middlewareAttachments);
       expect(copy.middlewareSpecs).toEqual([RequireRole, Observe]);
-      expect(Object.hasOwn(copy, "middlewareSpecs")).toBe(false);
+      expect(Record.has(copy, "middlewareSpecs")).toBe(false);
     }
     expect(group.functions).toEqual({});
     expect(group.groups).toEqual({});

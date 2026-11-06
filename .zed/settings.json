@@ -6,6 +6,15 @@
           "run": "onType",
           "fixKind": "safe_fix"
         }
+      },
+      "binary": {
+        "path": "bun",
+        "arguments": [
+          "./node_modules/@effect/tsgo/dist/effect-tsgo.cjs",
+          "--tsrs-lint",
+          "oxlint",
+          "--lsp"
+        ]
       }
     },
     "oxfmt": {
@@ -17,8 +26,14 @@
       }
     },
     "effect-tsgo": {
-      "settings": {
-        "package_version": "0.44.0"
+      "binary": {
+        "path": "bun",
+        "arguments": [
+          "./node_modules/@effect/tsgo/dist/effect-tsgo.cjs",
+          "tsrs",
+          "--lsp",
+          "--stdio"
+        ]
       }
     }
   },

@@ -1,3 +1,8 @@
+import * as Option from "effect/Option";
+import { pipe } from "effect/Function";
+import * as Str from "effect/String";
+import * as Rec from "effect/Record";
+import * as Arr from "effect/Array";
 import { pathToFileURL } from "node:url";
 import * as FileSystem from "effect/FileSystem";
 import * as Console from "effect/Console";
@@ -18,16 +23,16 @@ import * as Bundler from "@confect/cli/Bundler";
 
 const BundlerLayer = Layer.mergeAll(NodePath.layer, NodeFileSystem.layer);
 
-const tsconfigContents = JSON.stringify(
-  {
-    compilerOptions: {
-      moduleResolution: "Bundler",
-      paths: { "~/*": ["./*"] },
-    },
-  },
-  null,
-  2,
-);
+const tsconfigContents = `{
+  "compilerOptions": {
+    "moduleResolution": "Bundler",
+    "paths": {
+      "~/*": [
+        "./*"
+      ]
+    }
+  }
+}`;
 
 layer(BundlerLayer)("bundle", (it) => {
   it.effect(
@@ -267,9 +272,10 @@ layer(BundlerLayer)("importersOfPackage", (it) => {
         "@scope/lib",
         () => true,
       );
-      expect(
-        yield* Effect.forEach(importers, (importer) => fs.realPath(importer)),
-      ).toStrictEqual([yield* fs.realPath(entry)]);
+      const actual = yield* Effect.forEach(importers, (importer) =>
+        fs.realPath(importer),
+      );
+      expect(actual).toStrictEqual([yield* fs.realPath(entry)]);
     }).pipe(Effect.scoped),
   );
 
@@ -318,7 +324,7 @@ const fixture = Effect.fn("Bundler.test.fixture")(function* (
   const directory = yield* fs
     .makeTempDirectoryScoped()
     .pipe(Effect.flatMap((temporary) => fs.realPath(temporary)));
-  for (const [name, contents] of Object.entries(files)) {
+  for (const [name, contents] of Rec.toEntries(files)) {
     const file = path.join(directory, name);
     yield* fs.makeDirectory(path.dirname(file), { recursive: true });
     yield* fs.writeFileString(file, contents);
@@ -356,7 +362,8 @@ layer(BundlerLayer)("check", (it) => {
           Match.exhaustive,
         );
         yield* checked;
-        expect(yield* fs.readDirectory(directory)).toHaveLength(4);
+        const actual2 = yield* fs.readDirectory(directory);
+        expect(actual2).toHaveLength(4);
         yield* fs.writeFileString(
           file("src/dependency.ts"),
           "export default ;",
@@ -369,7 +376,8 @@ layer(BundlerLayer)("check", (it) => {
             cause: { errors: expect.any(Array) },
           },
         });
-        expect(yield* fs.readDirectory(directory)).toHaveLength(4);
+        const actual3 = yield* fs.readDirectory(directory);
+        expect(actual3).toHaveLength(4);
       }).pipe(Effect.scoped),
   );
 });
@@ -437,7 +445,7 @@ layer(BundlerLayer)("withBatch", (it) => {
           [first, second],
           Effect.all([Bundler.bundle(first), Bundler.bundle(second)]),
         );
-        expect(bundled.map((result) => result.module.value)).toEqual([
+        expect(Arr.map(bundled, (result) => result.module.value)).toEqual([
           "assigned",
           "defined",
         ]);
@@ -522,18 +530,13 @@ layer(BundlerLayer)("withBatch", (it) => {
             Bundler.bundle(file("nested/second.ts")),
           ]),
         );
+        const services = yield* ConfigProvider.fromUnknown({
+          NODE_OPTIONS: "--conditions=custom",
+        }).pipe(ConfigProvider.layer, Layer.build);
         const fallback = yield* Bundler.withBatch(
           [file("first.ts"), file("nested/second.ts")],
           Bundler.bundle(file("nested/second.ts")),
-        ).pipe(
-          Effect.provide(
-            ConfigProvider.layer(
-              ConfigProvider.fromUnknown({
-                NODE_OPTIONS: "--conditions=custom",
-              }),
-            ),
-          ),
-        );
+        ).pipe(Effect.provideContext(services));
         for (const bundled of [individual, first, second, fallback]) {
           expect(bundled.module.values).toEqual([
             "import",
@@ -549,8 +552,8 @@ layer(BundlerLayer)("withBatch", (it) => {
           ).toEqual([file("shared.ts")]);
           expect(bundled.metafile.inputs[file("leaf.ts")]).toBeDefined();
           expect(
-            Object.keys(bundled.metafile.inputs).some((input) =>
-              input.includes("node_modules"),
+            Arr.some(Rec.keys(bundled.metafile.inputs), (input) =>
+              pipe(input, Str.includes("node_modules")),
             ),
           ).toBe(false);
         }
@@ -614,6 +617,16 @@ layer(BundlerLayer)("withBatch", (it) => {
             concurrency: "unbounded",
           }),
         );
+        const services2 = yield* Layer.build(
+          Logger.layer([
+            Logger.make((event) => {
+              events.push(event);
+            }),
+          ]),
+        );
+        const services3 = yield* ConfigProvider.fromUnknown({
+          NODE_OPTIONS: nodeOptions,
+        }).pipe(ConfigProvider.layer, Layer.build);
         yield* Effect.gen(function* () {
           const results = yield* run;
           expect(results[0]?.module.shared).not.toBe(results[1]?.module.shared);
@@ -632,19 +645,9 @@ layer(BundlerLayer)("withBatch", (it) => {
           yield* run;
           expect(events).toHaveLength(2);
         }).pipe(
-          Effect.provide(
-            Logger.layer([
-              Logger.make((event) => {
-                events.push(event);
-              }),
-            ]),
-          ),
+          Effect.provideContext(services2),
           Effect.provideService(References.MinimumLogLevel, "Debug"),
-          Effect.provide(
-            ConfigProvider.layer(
-              ConfigProvider.fromUnknown({ NODE_OPTIONS: nodeOptions }),
-            ),
-          ),
+          Effect.provideContext(services3),
         );
       }).pipe(Effect.scoped),
   );
@@ -653,6 +656,13 @@ layer(BundlerLayer)("withBatch", (it) => {
     Effect.gen(function* () {
       const { file } = yield* fixture({ "first.ts": "export default 1;" });
       const events: Logger.Options<unknown>[] = [];
+      const services4 = yield* Layer.build(
+        Logger.layer([
+          Logger.make((event) => {
+            events.push(event);
+          }),
+        ]),
+      );
       yield* Effect.gen(function* () {
         yield* Bundler.withBatch(["/missing/entry.ts"], Effect.void);
         yield* Bundler.withBatch(
@@ -660,13 +670,7 @@ layer(BundlerLayer)("withBatch", (it) => {
           Bundler.bundle(file("first.ts")),
         );
       }).pipe(
-        Effect.provide(
-          Logger.layer([
-            Logger.make((event) => {
-              events.push(event);
-            }),
-          ]),
-        ),
+        Effect.provideContext(services4),
         Effect.provideService(References.MinimumLogLevel, "Debug"),
       );
       expect(events).toEqual([]);
@@ -704,28 +708,31 @@ layer(BundlerLayer)("withBatch", (it) => {
             expect(messages).toEqual([]);
             const second = yield* Bundler.bundle(entries[1]);
             expect(first.module.shared).toBe(second.module.shared);
-            expect(Object.keys(first.metafile.inputs).sort()).toEqual(
+            expect(Rec.keys(first.metafile.inputs).sort()).toEqual(
               [
                 yield* fs.realPath(file("source/first.ts")),
                 yield* fs.realPath(file("source/shared.ts")),
               ].sort(),
             );
-            expect(
-              yield* Bundler.directlyImports(
-                first,
-                file("linked-source/first.ts"),
-                file("linked-source/shared.ts"),
-              ),
-            ).toBe(true);
+            const actual4 = yield* Bundler.directlyImports(
+              first,
+              file("linked-source/first.ts"),
+              file("linked-source/shared.ts"),
+            );
+            expect(actual4).toBe(true);
             expect(
               Bundler.importersOfPackage(first, "dependency", () => true),
             ).toEqual([yield* fs.realPath(file("source/shared.ts"))]);
             expect(messages).toHaveLength(1);
-            expect(messages.join("\n")).toContain("warning.ts");
-            const artifacts = Object.keys(second.metafile.outputs);
+            expect(Arr.join(Arr.map(messages, String), "\n")).toContain(
+              "warning.ts",
+            );
+            const artifacts = Rec.keys(second.metafile.outputs);
             expect(artifacts.length).toBeGreaterThan(1);
-            for (const output of artifacts)
-              expect(output).toBe(yield* fs.realPath(output));
+            for (const output of artifacts) {
+              const canonical = yield* fs.realPath(output);
+              expect(output).toBe(canonical);
+            }
             return artifacts;
           }),
         ).pipe(
@@ -746,8 +753,10 @@ layer(BundlerLayer)("withBatch", (it) => {
             }),
           ),
         );
-        for (const output of outputs)
-          expect(yield* fs.exists(path.dirname(output))).toBe(false);
+        for (const output of outputs) {
+          const exists = yield* fs.exists(path.dirname(output));
+          expect(exists).toBe(false);
+        }
       }).pipe(Effect.scoped),
   );
 
@@ -774,9 +783,11 @@ layer(BundlerLayer)("withBatch", (it) => {
 
   it.effect("does not touch unused entries and preserves the inner error", () =>
     Effect.gen(function* () {
-      expect(
-        yield* Bundler.withBatch(["/missing/entry.ts"], Effect.succeed(42)),
-      ).toBe(42);
+      const actual5 = yield* Bundler.withBatch(
+        ["/missing/entry.ts"],
+        Effect.succeed(42),
+      );
+      expect(actual5).toBe(42);
       const failure = yield* Bundler.withBatch(
         ["/missing/entry.ts"],
         Effect.fail("inner failure"),
@@ -809,7 +820,7 @@ layer(BundlerLayer)("withBatch", (it) => {
         expect(
           [first.module.count, second.module.count].sort((a, b) => a - b),
         ).toEqual([1, 2]);
-        expect(Object.keys(first.metafile.inputs).sort()).toEqual(
+        expect(Rec.keys(first.metafile.inputs).sort()).toEqual(
           [
             yield* fs.realPath(file("first.ts")),
             yield* fs.realPath(file("shared.ts")),
@@ -821,20 +832,18 @@ layer(BundlerLayer)("withBatch", (it) => {
         expect(
           Bundler.importersOfPackage(second, "node:os", () => true),
         ).toEqual([yield* fs.realPath(file("nested/server.ts"))]);
-        expect(
-          yield* Bundler.directlyImports(
-            first,
-            file("first.ts"),
-            file("shared.ts"),
-          ),
-        ).toBe(true);
-        expect(
-          yield* Bundler.directlyImports(
-            first,
-            file("first.ts"),
-            file("nested/server.ts"),
-          ),
-        ).toBe(false);
+        const actual6 = yield* Bundler.directlyImports(
+          first,
+          file("first.ts"),
+          file("shared.ts"),
+        );
+        expect(actual6).toBe(true);
+        const actual7 = yield* Bundler.directlyImports(
+          first,
+          file("first.ts"),
+          file("nested/server.ts"),
+        );
+        expect(actual7).toBe(false);
       }).pipe(Effect.scoped),
   );
 
@@ -862,41 +871,43 @@ layer(BundlerLayer)("withBatch", (it) => {
             const unrelated = yield* Bundler.bundle(entries[1]);
             const repeated = yield* Bundler.bundle(entries[0]);
 
-            expect(Object.keys(first.metafile.inputs)).toEqual(
-              yield* Effect.forEach(
-                ["first.ts", "left.ts", "right.ts", "shared.ts"],
-                (name) => fs.realPath(file(name)),
-              ),
+            const actual8 = yield* Effect.forEach(
+              ["first.ts", "left.ts", "right.ts", "shared.ts"],
+              (name) => fs.realPath(file(name)),
             );
-            expect(Object.keys(unrelated.metafile.inputs)).toEqual([
+            expect(Rec.keys(first.metafile.inputs)).toEqual(actual8);
+            expect(Rec.keys(unrelated.metafile.inputs)).toEqual([
               yield* fs.realPath(file("unrelated.ts")),
             ]);
             expect(
-              Object.values(first.metafile.outputs)
-                .map((output) =>
-                  output.entryPoint
-                    ? path.basename(output.entryPoint)
-                    : "shared",
-                )
-                .sort(),
+              Arr.map(Rec.values(first.metafile.outputs), (output) =>
+                output.entryPoint !== undefined && output.entryPoint !== ""
+                  ? path.basename(output.entryPoint)
+                  : "shared",
+              ).sort(),
             ).toEqual(["first.ts", "left.ts", "right.ts", "shared"]);
-            expect(Object.keys(unrelated.metafile.outputs)).toHaveLength(1);
+            expect(Rec.keys(unrelated.metafile.outputs)).toHaveLength(1);
             expect(
-              Object.keys(first.metafile.outputs).some(
+              Arr.some(
+                Rec.keys(first.metafile.outputs),
                 (key) => key in unrelated.metafile.outputs,
               ),
             ).toBe(false);
-            for (const output of Object.values(first.metafile.outputs)) {
+            for (const output of Rec.values(first.metafile.outputs)) {
               for (const imported of output.imports) {
-                if (!imported.external)
+                if (imported.external !== true)
                   expect(first.metafile.outputs).toHaveProperty([
                     path.resolve(path.dirname(entries[0]), imported.path),
                   ]);
               }
             }
             expect(
-              Object.values(first.metafile.outputs).find(
-                (output) => !output.entryPoint,
+              Option.getOrUndefined(
+                Arr.findFirst(
+                  Rec.values(first.metafile.outputs),
+                  (output) =>
+                    output.entryPoint === undefined || output.entryPoint === "",
+                ),
               ),
             ).toMatchObject({
               imports: expect.arrayContaining([
@@ -946,14 +957,16 @@ layer(BundlerLayer)("withBatch", (it) => {
           [file("first.ts"), file("second.ts")],
           Effect.gen(function* () {
             const first = yield* Bundler.bundle(file("first.ts"));
-            const outputs = Object.keys(first.metafile.outputs);
+            const outputs = Rec.keys(first.metafile.outputs);
             expect(
-              outputs.some((output) =>
-                path.basename(output).startsWith("chunk-"),
+              Arr.some(outputs, (output) =>
+                pipe(path.basename(output), Str.startsWith("chunk-")),
               ),
             ).toBe(true);
-            for (const output of outputs)
-              expect(yield* fs.exists(output)).toBe(true);
+            for (const output of outputs) {
+              const exists = yield* fs.exists(output);
+              expect(exists).toBe(true);
+            }
             const second = yield* Bundler.bundle(file("second.ts")).pipe(
               Effect.result,
             );
@@ -965,8 +978,10 @@ layer(BundlerLayer)("withBatch", (it) => {
             return outputs;
           }),
         );
-        for (const output of artifacts)
-          expect(yield* fs.exists(path.dirname(output))).toBe(false);
+        for (const output of artifacts) {
+          const exists = yield* fs.exists(path.dirname(output));
+          expect(exists).toBe(false);
+        }
       }).pipe(Effect.scoped),
   );
 
@@ -1044,10 +1059,10 @@ layer(BundlerLayer)("withBatch", (it) => {
             Bundler.bundle(file("nested/second.ts")),
           ]),
         );
-        expect(batch.map((entry) => entry.module.default)).toEqual(
-          originals.map((entry) => entry.module.default),
+        expect(Arr.map(batch, (entry) => entry.module.default)).toEqual(
+          Arr.map(originals, (entry) => entry.module.default),
         );
-        expect(batch.map((entry) => entry.module.default)).toEqual([
+        expect(Arr.map(batch, (entry) => entry.module.default)).toEqual([
           "root",
           "nested",
         ]);
@@ -1088,9 +1103,9 @@ layer(BundlerLayer)("withBatch", (it) => {
           ]),
         );
         expect(first.module.shared).toBe(second.module.shared);
-        expect(yield* settle(first.module.load)).toBe(
-          yield* settle(original.module.load),
-        );
+        const actual9 = yield* settle(first.module.load);
+        const actual10 = yield* settle(original.module.load);
+        expect(actual9).toBe(actual10);
       }).pipe(Effect.scoped),
   );
 
@@ -1132,19 +1147,16 @@ layer(BundlerLayer)("withBatch", (it) => {
         "second.ts": 'export { shared } from "./shared";',
         "shared.ts": "export const shared = {};",
       });
+      const services5 = yield* ConfigProvider.fromUnknown({
+        NODE_OPTIONS: nodeOptions,
+      }).pipe(ConfigProvider.layer, Layer.build);
       const [first, second] = yield* Bundler.withBatch(
         [file("first.ts"), file("second.ts")],
         Effect.all([
           Bundler.bundle(file("first.ts")),
           Bundler.bundle(file("second.ts")),
         ]),
-      ).pipe(
-        Effect.provide(
-          ConfigProvider.layer(
-            ConfigProvider.fromUnknown({ NODE_OPTIONS: nodeOptions }),
-          ),
-        ),
-      );
+      ).pipe(Effect.provideContext(services5));
       expect(first.module.shared).not.toBe(second.module.shared);
     }).pipe(Effect.scoped),
   );
@@ -1168,7 +1180,7 @@ layer(BundlerLayer)("withBatch", (it) => {
             Bundler.bundle(file("nested/second.ts")),
           ]),
         );
-        expect(entries.map((entry) => entry.module.value)).toEqual([
+        expect(Arr.map(entries, (entry) => entry.module.value)).toEqual([
           "root",
           "nested",
         ]);
@@ -1184,6 +1196,13 @@ layer(BundlerLayer)("withBatch", (it) => {
           "first.ts": 'export const value = "valid";',
           "broken.ts": "export const value = ;",
         });
+        const services6 = yield* Layer.build(
+          Logger.layer([
+            Logger.make((event) => {
+              events.push(event);
+            }),
+          ]),
+        );
         yield* Bundler.withBatch(
           [file("first.ts"), file("broken.ts")],
           Effect.gen(function* () {
@@ -1211,13 +1230,7 @@ layer(BundlerLayer)("withBatch", (it) => {
             ).toBe("fixed");
           }),
         ).pipe(
-          Effect.provide(
-            Logger.layer([
-              Logger.make((event) => {
-                events.push(event);
-              }),
-            ]),
-          ),
+          Effect.provideContext(services6),
           Effect.provideService(References.MinimumLogLevel, "Debug"),
         );
         expect(events).toHaveLength(1);
@@ -1232,10 +1245,13 @@ layer(BundlerLayer)("withBatch", (it) => {
           ],
         });
         expect(
-          events.map((event) => Cause.pretty(event.cause)).join("\n"),
+          Arr.join(
+            Arr.map(events, (event) => Cause.pretty(event.cause)),
+            "\n",
+          ),
         ).toContain("broken.ts");
         expect(
-          events.map((event) => Cause.findErrorOption(event.cause)),
+          Arr.map(events, (event) => Cause.findErrorOption(event.cause)),
         ).toEqual([
           expect.objectContaining({
             value: expect.objectContaining({
@@ -1336,8 +1352,9 @@ layer(BundlerLayer)("withBatch", (it) => {
                 .pipe(
                   Effect.map((real) =>
                     real === file("short") ||
-                    real.startsWith(file("short") + path.sep)
-                      ? file("canonical") + real.slice(file("short").length)
+                    pipe(real, Str.startsWith(file("short") + path.sep))
+                      ? file("canonical") +
+                        pipe(real, Str.slice(file("short").length))
                       : real,
                   ),
                 ),
@@ -1351,7 +1368,7 @@ layer(BundlerLayer)("withBatch", (it) => {
             }),
           ),
         );
-        expect(Object.keys(bundled.metafile.inputs).sort()).toEqual(
+        expect(Rec.keys(bundled.metafile.inputs).sort()).toEqual(
           [file("canonical/first.ts"), file("canonical/shared.ts")].sort(),
         );
         expect(
@@ -1360,7 +1377,9 @@ layer(BundlerLayer)("withBatch", (it) => {
           expect.objectContaining({ path: file("canonical/shared.ts") }),
         );
         expect(messages).toHaveLength(1);
-        expect(messages.join("\n")).toContain("Duplicate key");
+        expect(Arr.join(Arr.map(messages, String), "\n")).toContain(
+          "Duplicate key",
+        );
       }).pipe(Effect.scoped),
   );
 
@@ -1382,8 +1401,12 @@ layer(BundlerLayer)("withBatch", (it) => {
             expect(messages).toEqual([]);
             yield* Bundler.bundle(file("second.ts"));
             expect(messages).toHaveLength(1);
-            expect(messages.join("\n")).toContain("Duplicate key");
-            expect(messages.join("\n")).toContain("warning.ts");
+            expect(Arr.join(Arr.map(messages, String), "\n")).toContain(
+              "Duplicate key",
+            );
+            expect(Arr.join(Arr.map(messages, String), "\n")).toContain(
+              "warning.ts",
+            );
           }),
         ).pipe(
           Effect.provideService(
@@ -1432,8 +1455,10 @@ layer(BundlerLayer)("withBatch", (it) => {
         );
         expect(Exit.isFailure(exit)).toBe(true);
         expect(directories).toHaveLength(1);
-        for (const directory of directories)
-          expect(yield* fs.exists(directory)).toBe(false);
+        for (const directory of directories) {
+          const exists = yield* fs.exists(directory);
+          expect(exists).toBe(false);
+        }
       }).pipe(Effect.scoped),
   );
 

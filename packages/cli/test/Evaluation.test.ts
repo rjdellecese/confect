@@ -1,6 +1,12 @@
+import { pipe } from "effect/Function";
+import * as Option from "effect/Option";
+import * as Str from "effect/String";
+import * as Arr from "effect/Array";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
+// oxlint-disable-next-line effecttsgo/node-builtin-import -- Spy on real fork handles to verify IPC cleanup and joined subprocess termination.
 import { fork } from "node:child_process";
+// oxlint-disable-next-line effecttsgo/node-builtin-import -- The fork spy retains the native module's types for subprocess lifecycle assertions.
 import type * as ChildProcess from "node:child_process";
 import { vi } from "vitest";
 import * as Effect from "effect/Effect";
@@ -107,13 +113,15 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           );
         yield* Deferred.await(closed).pipe(Effect.timeout("10 seconds"));
         expect(Result.isFailure(result)).toBe(reason === "CompileFailure");
-        const text = output.join("");
+        const text = Arr.join(output, "");
         if (level === "Debug") {
           expect(text).toContain("falling back to individual builds");
           expect(text).toContain(reason);
           expect(text).toContain("notes.ts");
           if (reason === "CompileFailure") {
-            expect(text.match(/Shared build failed/g)).toHaveLength(1);
+            expect(
+              Option.getOrNull(pipe(text, Str.match(/Shared build failed/g))),
+            ).toHaveLength(1);
             expect(text).toContain("Unexpected");
           }
         } else {
@@ -133,11 +141,11 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
         const snapshot = yield* project.provide(Evaluation.generateSnapshot);
         yield* project.write(
           "confect/notes.spec.ts",
-          Project.spec.replace('name: "list"', 'name: "latest"'),
+          pipe(Project.spec, Str.replace('name: "list"', 'name: "latest"')),
         );
         yield* project.write(
           "confect/notes.impl.ts",
-          Project.impl.replace('"list"', '"latest"'),
+          pipe(Project.impl, Str.replace('"list"', '"latest"')),
         );
         const next = yield* project.provide(
           Evaluation.updateDeclarations(
@@ -155,7 +163,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           true,
         );
         expect(
-          [...GenerationSnapshot.functionPaths(next)].map((fn) => fn.name),
+          Arr.map([...GenerationSnapshot.functionPaths(next)], (fn) => fn.name),
         ).toEqual(["latest"]);
         expectWorkersExited();
         yield* project.write("confect/notes.spec.ts", "export default {};\n");
@@ -173,7 +181,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
             ),
           )
           .pipe(Effect.result);
-        assert(Result.isFailure(failed));
+        assert(failed._tag === "Failure");
         expect(failed.failure.diagnostic).toContain("GroupSpec");
         expectWorkersExited();
         yield* project.write("confect/notes.spec.ts", Project.spec);
@@ -191,7 +199,10 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           ),
         );
         expect(
-          [...GenerationSnapshot.functionPaths(repaired)].map((fn) => fn.name),
+          Arr.map(
+            [...GenerationSnapshot.functionPaths(repaired)],
+            (fn) => fn.name,
+          ),
         ).toEqual(["list"]);
         expectWorkersExited();
       }).pipe(Effect.scoped),
@@ -254,7 +265,7 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
         const failed = yield* project
           .provide(Evaluation.validate(paths))
           .pipe(Effect.result);
-        assert(Result.isFailure(failed));
+        assert(failed._tag === "Failure");
         expect(failed.failure.diagnostic).toContain(
           "does not implement every function",
         );
@@ -280,7 +291,7 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
         const failed = yield* project
           .provide(Evaluation.validate(paths))
           .pipe(Effect.result);
-        assert(Result.isFailure(failed));
+        assert(failed._tag === "Failure");
         expect(failed.failure.diagnostic).toContain("23");
         expectWorkersExited();
         yield* project.write("confect/notes.impl.ts", Project.impl);
@@ -335,7 +346,7 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
           });
           assert(child.stdout);
           child.stdout.on("data", (data: Buffer) => {
-            if (data.toString().includes("EVALUATION_BLOCKED")) {
+            if (pipe(data.toString(), Str.includes("EVALUATION_BLOCKED"))) {
               Deferred.doneUnsafe(blocked, Effect.void);
             }
           });

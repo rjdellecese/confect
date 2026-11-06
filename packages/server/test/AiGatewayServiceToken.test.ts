@@ -1,3 +1,4 @@
+import * as Result from "effect/Result";
 import { AiGatewayLanguageClient } from "@confect/server";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -19,10 +20,10 @@ describe("AiGatewayServiceToken", () => {
     const isAiGatewayError = Schema.is(AiGatewayLanguageClient.AiGatewayError);
 
     assert.isTrue(
-      isAiGatewayError(new AiGatewayLanguageClient.AiGatewayDisabled()),
+      isAiGatewayError(AiGatewayLanguageClient.AiGatewayDisabled.make()),
     );
     assert.isTrue(
-      isAiGatewayError(new AiGatewayLanguageClient.AiGatewayUnavailable()),
+      isAiGatewayError(AiGatewayLanguageClient.AiGatewayUnavailable.make()),
     );
     assert.isFalse(isAiGatewayError(new Error("unexpected")));
   });
@@ -153,7 +154,7 @@ describe("AiGatewayServiceToken", () => {
       "preserves $name as the HTTP failure cause without sending",
       ({ ErrorType }) =>
         Effect.gen(function* () {
-          const cause = new ErrorType();
+          const cause = ErrorType.make();
           const client = HttpClient.make(() =>
             Effect.die("Unexpected HTTP request"),
           ).pipe(
@@ -204,4 +205,7 @@ const nodeActionCallbackError = (
   prefix: string,
   code: "AiGatewayDisabled" | "AiGatewayUnavailable",
   message: string,
-): Error => new Error(`${prefix}: ${JSON.stringify({ code, message })}`);
+): Error =>
+  new Error(
+    `${prefix}: ${Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))({ code, message }).pipe(Result.getOrThrow)}`,
+  );

@@ -71,10 +71,12 @@ const absolutizeMetafile = (
     absolutize(key),
     {
       ...value,
-      ...(value.entryPoint ? { entryPoint: inputPath(value.entryPoint) } : {}),
+      ...(value.entryPoint !== undefined && value.entryPoint !== ""
+        ? { entryPoint: inputPath(value.entryPoint) }
+        : {}),
       inputs: Record.mapKeys(value.inputs, inputPath),
       imports: Array.map(value.imports, (imported) =>
-        imported.external
+        imported.external === true
           ? imported
           : { ...imported, path: absolutize(imported.path) },
       ),
@@ -89,15 +91,17 @@ const canonicalInputPaths = Effect.fnUntraced(function* (
   metafile: esbuild.Metafile,
   cwd: string,
 ) {
-  return new Map(
-    yield* Effect.forEach(Record.keys(metafile.inputs), (input) => {
+  const inputPaths = yield* Effect.forEach(
+    Record.keys(metafile.inputs),
+    (input) => {
       const absolute = path.resolve(cwd, input);
       return fs.realPath(absolute).pipe(
         Effect.orElseSucceed(() => absolute),
         Effect.map((real) => [absolute, real] as const),
       );
-    }),
+    },
   );
+  return new Map(inputPaths);
 });
 
 const resolveEsm = Option.liftThrowable((specifier: string, importer: string) =>
@@ -133,6 +137,8 @@ export const resolveModule = (
  * (returning `undefined`) leaves third-party externalization untouched.
  * `skipPatterns` leave tsconfig `paths` aliases and package self-references to
  * esbuild's native resolution.
+ *
+ * @internal
  */
 export const bundleWorkspacePlugin = (
   path: Path.Path,
@@ -207,18 +213,18 @@ interface BatchCompilation {
   readonly cwd: string;
 }
 
-class BatchIncompatible extends Schema.TaggedError<BatchIncompatible>()(
-  "BatchIncompatible",
-  {
-    reason: Schema.Literals([
-      "RuntimeConditions",
-      "UnsupportedEntries",
-      "MixedTsconfigs",
-      "UnattributedWarnings",
-    ]),
-    message: Schema.String,
-  },
-) {}
+class BatchIncompatible extends Schema.TaggedError<
+  BatchIncompatible,
+  { readonly brand: unique symbol }
+>()("BatchIncompatible", {
+  reason: Schema.Literals([
+    "RuntimeConditions",
+    "UnsupportedEntries",
+    "MixedTsconfigs",
+    "UnattributedWarnings",
+  ]),
+  message: Schema.String,
+}) {}
 
 class Batch extends Context.Service<
   Batch,
@@ -276,7 +282,7 @@ const batchResolutionPlugin = (
           pathToFileURL(path.resolve(args.resolveDir, args.path)).href,
         );
       }
-      if (args.path.startsWith(".") || path.isAbsolute(args.path))
+      if (String.startsWith(".")(args.path) || path.isAbsolute(args.path))
         return undefined;
 
       const resolved = resolveModule(args.path, args.importer);
@@ -323,7 +329,7 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
     Config.withDefault(""),
   );
   if (/--conditions|-C|--(?:no-)?addons/.test(nodeOptions))
-    return yield* new BatchIncompatible({
+    return yield* BatchIncompatible.make({
       reason: "RuntimeConditions",
       message:
         "NODE_OPTIONS changes Node export conditions; individual builds preserve native resolution.",
@@ -339,27 +345,35 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
         strict: false,
         allowPositionals: true,
       }).values,
-    catch: (cause) => new BundlerError({ cause }),
+    catch: (cause) => BundlerError.make({ cause }),
   });
   const conditions = [
     "node",
     "import",
     ...(process.features.require_module ? ["module-sync"] : []),
-    ...(runtimeOptions["no-addons"] ? [] : ["node-addons"]),
-    ...(runtimeOptions.conditions ?? []).filter(
+    ...(runtimeOptions["no-addons"] === true ||
+    (typeof runtimeOptions["no-addons"] === "string" &&
+      runtimeOptions["no-addons"] !== "")
+      ? []
+      : ["node-addons"]),
+    ...Array.filter(
+      runtimeOptions.conditions ?? [],
       (condition) => typeof condition === "string",
     ),
   ];
-  const entries = Array.dedupe(entryPoints.map((entry) => path.resolve(entry)));
+  const entries = Array.dedupe(
+    Array.map(entryPoints, (entry) => path.resolve(entry)),
+  );
   if (
     !Array.isReadonlyArrayNonEmpty(entries) ||
-    entries.some(
+    !Array.every(
+      entries,
       (entry) =>
-        !BundleRequire.JS_EXT_RE.test(entry) ||
-        /[\\/]node_modules[\\/]/.test(entry),
+        BundleRequire.JS_EXT_RE.test(entry) &&
+        !/[\\/]node_modules[\\/]/.test(entry),
     )
   ) {
-    return yield* new BatchIncompatible({
+    return yield* BatchIncompatible.make({
       reason: "UnsupportedEntries",
       message:
         "Shared builds require JavaScript or TypeScript entries outside node_modules.",
@@ -374,8 +388,10 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   const configPath = (
     selected: Option.Option<TypeScriptConfig.TypeScriptConfig>,
   ) => Option.getOrUndefined(Option.map(selected, (value) => value.path));
-  if (Array.some(configs, (other) => configPath(other) !== configPath(config)))
-    return yield* new BatchIncompatible({
+  if (
+    !Array.every(configs, (other) => configPath(other) === configPath(config))
+  )
+    return yield* BatchIncompatible.make({
       reason: "MixedTsconfigs",
       message: `Entries use different tsconfigs: ${Array.join(Array.dedupe(Array.map(configs, (item) => configPath(item) ?? "(no tsconfig)")), ", ")}`,
     });
@@ -397,16 +413,15 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   const externalImports = yield* Ref.make(
     HashMap.empty<string, ReadonlyArray<ExternalImport>>(),
   );
-  const selfReferences = Array.getSomes(
-    yield* Effect.forEach(
-      Array.dedupe(Array.map(entries, path.dirname)),
-      PackageSelfReference.discover,
-    ),
+  const discoveredSelfReferences = yield* Effect.forEach(
+    Array.dedupe(Array.map(entries, path.dirname)),
+    PackageSelfReference.discover,
   );
+  const selfReferences = Array.getSomes(discoveredSelfReferences);
   const result = yield* Effect.tryPromise({
     try: () =>
       esbuild.build({
-        entryPoints: entries.map((entry, index) => ({
+        entryPoints: Array.map(entries, (entry, index) => ({
           in: entry,
           out: `${index}`,
         })),
@@ -434,22 +449,26 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
           BundleRequire.injectFileScopePlugin(),
         ],
       }),
-    catch: (cause) => new BundlerError({ cause }),
+    catch: (cause) => BundlerError.make({ cause }),
   });
   const inputPaths = HashSet.fromIterable(
-    Object.keys(result.metafile.inputs).map((input) =>
+    Array.map(Record.keys(result.metafile.inputs), (input) =>
       path.resolve(cwd, input),
     ),
   );
-  const unattributedWarnings = result.warnings.filter(
+  const unattributedWarnings = Array.filter(
+    result.warnings,
     (warning) =>
-      !warning.location ||
+      warning.location === null ||
       !HashSet.has(inputPaths, path.resolve(cwd, warning.location.file)),
   );
   if (unattributedWarnings.length > 0)
-    return yield* new BatchIncompatible({
+    return yield* BatchIncompatible.make({
       reason: "UnattributedWarnings",
-      message: `Cannot attribute build warnings to entries: ${unattributedWarnings.map((warning) => warning.text).join("; ")}`,
+      message: `Cannot attribute build warnings to entries: ${Array.join(
+        Array.map(unattributedWarnings, (warning) => warning.text),
+        "; ",
+      )}`,
     });
   yield* Effect.forEach(result.outputFiles, (output) =>
     fs.writeFile(output.path, output.contents),
@@ -461,8 +480,8 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
     result.metafile,
     cwd,
   );
-  const inputs = Object.fromEntries(
-    Object.entries(result.metafile.inputs).map(([input, metadata]) => {
+  const inputs = Record.fromEntries(
+    Array.map(Record.toEntries(result.metafile.inputs), ([input, metadata]) => {
       const originals = Option.getOrElse(
         HashMap.get(capturedExternalImports, path.resolve(cwd, input)),
         () => [],
@@ -471,13 +490,17 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
         input,
         {
           ...metadata,
-          imports: metadata.imports.flatMap((imported) => {
-            const matching = imported.external
-              ? originals.filter((original) => original.path === imported.path)
-              : [];
+          imports: Array.flatMap(metadata.imports, (imported) => {
+            const matching =
+              imported.external === true
+                ? Array.filter(
+                    originals,
+                    (original) => original.path === imported.path,
+                  )
+                : [];
             return matching.length === 0
               ? [imported]
-              : matching.map((original) =>
+              : Array.map(matching, (original) =>
                   Object.assign({}, imported, {
                     original: original.original,
                   }),
@@ -518,7 +541,9 @@ export const withBatch = <A, E, R>(
       const current = yield* Effect.serviceOption(Batch);
       if (
         Option.isSome(current) &&
-        entryPoints.every((entry) => current.value.entryPoints.includes(entry))
+        Array.every(entryPoints, (entry) =>
+          current.value.entryPoints.includes(entry),
+        )
       )
         return yield* effect;
       const compilation = yield* Effect.cached(
@@ -571,7 +596,7 @@ const reachableMetafileEntries = <
   root: string,
   resolveImport: (path: string) => string,
 ): Record<string, Metadata> =>
-  Object.fromEntries(
+  Record.fromEntries(
     pipe(
       Iterable.unfold<
         MetafileTraversal,
@@ -595,7 +620,7 @@ const reachableMetafileEntries = <
                 metadata.imports,
                 remaining,
                 (queue, imported) =>
-                  imported.external
+                  imported.external === true
                     ? queue
                     : Chunk.append(queue, resolveImport(imported.path)),
               ),
@@ -667,8 +692,9 @@ const bundleWith = Effect.fnUntraced(function* (
   const batch = yield* Effect.serviceOption(Batch);
   if (
     Option.isSome(batch) &&
-    !options?.plugins?.length &&
-    batch.value.entryPoints.some(
+    (options?.plugins?.length ?? 0) === 0 &&
+    Array.some(
+      batch.value.entryPoints,
       (entry) => path.resolve(entry) === path.resolve(entryPoint),
     )
   ) {
@@ -693,14 +719,15 @@ const bundleWith = Effect.fnUntraced(function* (
                 loadModule(pathToFileURL(entry.value.output).href, {
                   format: "esm",
                 }),
-              catch: (cause) => new BundlerError({ cause }),
+              catch: (cause) => BundlerError.make({ cause }),
             }),
         }).pipe(
           Effect.ensuring(
             logCoalescedBuildWarnings(
-              compilation.value.warnings.filter(
+              Array.filter(
+                compilation.value.warnings,
                 (warning) =>
-                  warning.location &&
+                  warning.location !== null &&
                   metafile.inputs[
                     compilation.value.inputPaths.get(
                       path.resolve(
@@ -709,7 +736,7 @@ const bundleWith = Effect.fnUntraced(function* (
                       ),
                     ) ??
                       path.resolve(compilation.value.cwd, warning.location.file)
-                  ],
+                  ] !== undefined,
               ),
             ),
           ),
@@ -725,9 +752,8 @@ const bundleWith = Effect.fnUntraced(function* (
   });
 
   const cwd = path.dirname(entryPoint);
-  const selfReferences = Option.toArray(
-    yield* PackageSelfReference.discover(cwd),
-  );
+  const selfReference = yield* PackageSelfReference.discover(cwd);
+  const selfReferences = Option.toArray(selfReference);
   const config = yield* TypeScriptConfig.discover(cwd);
   const skipPatterns = [
     ...TypeScriptConfig.aliasPatterns(config),
@@ -761,7 +787,7 @@ const bundleWith = Effect.fnUntraced(function* (
           logLevel: "silent",
         },
       }),
-    catch: (cause) => new BundlerError({ cause }),
+    catch: (cause) => BundlerError.make({ cause }),
   }).pipe(
     Effect.ensuring(
       Effect.andThen(Ref.get(buildResultRef), (captured) =>
@@ -771,18 +797,14 @@ const bundleWith = Effect.fnUntraced(function* (
   );
 
   const { metafile } = yield* Ref.get(buildResultRef);
-  if (!metafile) {
+  if (metafile === undefined) {
     return yield* Effect.die(new Error("esbuild metafile missing"));
   }
 
+  const inputPaths = yield* canonicalInputPaths(path, fs, metafile, cwd);
   return {
     module: result.mod,
-    metafile: absolutizeMetafile(
-      path,
-      metafile,
-      cwd,
-      yield* canonicalInputPaths(path, fs, metafile, cwd),
-    ),
+    metafile: absolutizeMetafile(path, metafile, cwd, inputPaths),
   };
 });
 
@@ -798,7 +820,7 @@ const findMetafileInputKey = Effect.fnUntraced(function* (
     .realPath(resolved)
     .pipe(Effect.orElseSucceed(() => resolved));
   return Array.findFirst(
-    Object.keys(metafile.inputs),
+    Record.keys(metafile.inputs),
     (key) => path.resolve(key) === real,
   );
 });
@@ -829,7 +851,8 @@ export const directlyImports = Effect.fnUntraced(function* (
       Option.fromNullishOr(bundled.metafile.inputs[sourceKey_]).pipe(
         Option.map((sourceInput) => {
           const targetResolved = path.resolve(targetKey_);
-          return sourceInput.imports.some(
+          return Array.some(
+            sourceInput.imports,
             (importedFile) =>
               path.resolve(importedFile.path) === targetResolved,
           );
@@ -860,15 +883,19 @@ export const importersOfPackage = (
 ): ReadonlyArray<string> => {
   const subpathPrefix = `${packageName}/`;
 
-  return Object.entries(bundled.metafile.inputs)
-    .filter(
+  return Array.map(
+    Array.filter(
+      Record.toEntries(bundled.metafile.inputs),
       ([absolutePath, input]) =>
         where(absolutePath) &&
-        input.imports.some(
+        Array.some(
+          input.imports,
           (imported) =>
             imported.original === packageName ||
-            imported.original?.startsWith(subpathPrefix) === true,
+            (imported.original !== undefined &&
+              String.startsWith(subpathPrefix)(imported.original)),
         ),
-    )
-    .map(([absolutePath]) => absolutePath);
+    ),
+    ([absolutePath]) => absolutePath,
+  );
 };
