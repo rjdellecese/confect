@@ -38,6 +38,7 @@ const evaluate = <A, E, R>(
     }),
     Effect.provideService(ConvexDirectory, {
       get: Effect.succeed(requestContext.convexDirectory),
+      target: requestContext.target,
     }),
     Effect.catchCause((cause) => {
       const failure = Cause.findErrorOption(cause);

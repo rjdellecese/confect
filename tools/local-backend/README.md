@@ -50,6 +50,11 @@ The shared Convex application lives in `fixtures/`. Its own private workspace
 package declares the CLI and backend dependencies. Keeping those dependencies
 separate from the harness avoids a workspace cycle through `@confect/server`.
 
+The authored counter and parent components live under `fixtures/components/`.
+Both global setup and the codegen command generate these components before
+the host application. Component tests use `confect-local-backend/api` for
+native calls and `confect-local-backend/componentBindings` for scoped types.
+
 After changing fixture functions, regenerate the checked-in outputs:
 
 ```sh

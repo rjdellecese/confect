@@ -10,7 +10,7 @@ import * as Table from "./Table";
 
 type IncludedTables<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | DatabaseSchema.Tables<DatabaseSchema_>
-  | Table.SystemTables;
+  | Table.SystemTables<DatabaseSchema.Scope<DatabaseSchema_>>;
 
 type IncludedDataModel<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   DataModel.FromTables<IncludedTables<DatabaseSchema_>>;
@@ -40,14 +40,15 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   convexDatabaseReader: GenericDatabaseReader<
     DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
-): DatabaseReaderService<DatabaseSchema_> =>
-  ({
+): DatabaseReaderService<DatabaseSchema_> => {
+  const systemTables = Table.systemTablesForScope(databaseSchema.target.scope);
+  return {
     table: <
       const TableName extends Table.Name<IncludedTables<DatabaseSchema_>>,
     >(
       tableName: TableName,
     ) => {
-      const isSystem = Record.has(Table.systemTables, tableName);
+      const isSystem = Record.has(systemTables, tableName);
 
       const baseDatabaseReader: BaseDatabaseReader<any> = isSystem
         ? {
@@ -65,9 +66,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
       const table = (
         isSystem
-          ? (Table.systemTables as Record<string, Table.AnyWithProps>)[
-              tableName
-            ]
+          ? (systemTables as Record<string, Table.AnyWithProps>)[tableName]
           : DatabaseSchema.tables(databaseSchema)[tableName]
       ) as Table.WithName<IncludedTables<DatabaseSchema_>, TableName>;
 
@@ -76,7 +75,8 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         table,
       );
     },
-  }) as DatabaseReaderService<DatabaseSchema_>;
+  } as DatabaseReaderService<DatabaseSchema_>;
+};
 
 /**
  * The tag's _Identifier_ (the Effect requirements-channel type) is
