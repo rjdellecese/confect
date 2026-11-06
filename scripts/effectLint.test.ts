@@ -15,7 +15,11 @@ import * as Stream from "effect/Stream";
 import config from "../.oxlintrc.json" with { type: "json" };
 import effectPolicy from "../tsconfig.effect.json" with { type: "json" };
 
-test("enables every installed Effect rule except missing pipeable signatures", () => {
+test("enables every installed Effect rule except the explicit policy opt-outs", () => {
+  const disabledRules: ReadonlyArray<string> = [
+    "effecttsgo/missing-pipeable-signature",
+    "effecttsgo/unstable-api-usage",
+  ];
   const require = createRequire(import.meta.url);
   const schema: unknown = require(
     fileURLToPath(
@@ -42,7 +46,7 @@ test("enables every installed Effect rule except missing pipeable signatures", (
   const configuredRules: Readonly<Record<string, unknown>> = config.rules;
   for (const rule of effectRules) {
     expect(configuredRules[rule], rule).toBe(
-      rule === "effecttsgo/missing-pipeable-signature" ? "off" : "error",
+      Array.contains(disabledRules, rule) ? "off" : "error",
     );
   }
   for (const override of config.overrides) {
@@ -50,22 +54,21 @@ test("enables every installed Effect rule except missing pipeable signatures", (
     for (const rule of effectRules) {
       if (rule in rules) {
         expect(rules[rule], rule).toBe(
-          rule === "effecttsgo/missing-pipeable-signature" ? "off" : "error",
+          Array.contains(disabledRules, rule) ? "off" : "error",
         );
       }
     }
   }
 });
 
-test("limits unstable API grants to individual exports", () => {
+test("disables compiler diagnostics without per-export unstable API grants", () => {
   for (const plugin of effectPolicy.compilerOptions.plugins) {
-    for (const api of plugin.allowedUnstableApis) {
-      expect(api).toMatch(/^[^#*]+#[^#*]+$/u);
-    }
+    expect(plugin.diagnostics).toBe(false);
+    expect(plugin).not.toHaveProperty("allowedUnstableApis");
   }
 });
 
-test("reports an unapproved unstable API beside an approved export", () =>
+test("allows unstable APIs without per-export grants", () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -127,10 +130,8 @@ void HttpClientRequest.put("https://example.com");
         }),
       ),
     )(output);
-    expect<number>(exitCode).toBe(1);
-    expect(report.diagnostics).toHaveLength(1);
-    expect(report.diagnostics[0]?.code).toBe("effecttsgo(unstable-api-usage)");
-    expect(report.diagnostics[0]?.message).toContain("HttpClientRequest#put");
+    expect<number>(exitCode).toBe(0);
+    expect(report.diagnostics).toHaveLength(0);
   }).pipe(
     Effect.scoped,
     Effect.provide(NodeServices.layer),

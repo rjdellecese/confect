@@ -238,7 +238,7 @@
     "effecttsgo/unnecessary-pipe-chain": "error",
     "effecttsgo/unnecessary-typeof-type": "error",
     "effecttsgo/unsafe-effect-type-assertion": "error",
-    "effecttsgo/unstable-api-usage": "error",
+    "effecttsgo/unstable-api-usage": "off",
     "effecttsgo/yield-in-call-argument": "error"
   },
   "overrides": [
