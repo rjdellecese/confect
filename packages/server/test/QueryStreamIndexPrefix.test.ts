@@ -51,7 +51,7 @@ describe("QueryStreamIndexPrefix", () => {
   it("rejects excess values instead of dropping them", () => {
     expect(QueryStreamIndexPrefix.make(["score"], [3, "id"])).toEqual(
       Result.fail(
-        new QueryStreamIndexPrefix.IndexPrefixWidthMismatchError({
+        QueryStreamIndexPrefix.IndexPrefixWidthMismatchError.make({
           width: 1,
           actual: 2,
         }),
@@ -59,7 +59,7 @@ describe("QueryStreamIndexPrefix", () => {
     );
     expect(QueryStreamIndexPrefix.make([], [undefined])).toEqual(
       Result.fail(
-        new QueryStreamIndexPrefix.IndexPrefixWidthMismatchError({
+        QueryStreamIndexPrefix.IndexPrefixWidthMismatchError.make({
           width: 0,
           actual: 1,
         }),
@@ -100,7 +100,7 @@ describe("QueryStreamIndexPrefix", () => {
       QueryStreamIndexPrefix.fromStreamKey(["category"], ["a"], prefix),
     ).toEqual(
       Result.fail(
-        new QueryStreamIndexPrefix.IndexPrefixWidthMismatchError({
+        QueryStreamIndexPrefix.IndexPrefixWidthMismatchError.make({
           width: 1,
           actual: 2,
         }),

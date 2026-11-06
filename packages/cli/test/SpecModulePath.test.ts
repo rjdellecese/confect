@@ -1,3 +1,5 @@
+import { pipe } from "effect/Function";
+import * as Str from "effect/String";
 import * as SpecModulePath from "@confect/cli/SpecModulePath";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
 import { assert, expect, expectTypeOf, it } from "@effect/vitest";
@@ -18,9 +20,11 @@ it.each([
   (input) => {
     const parsed = Schema.decodeOption(SpecModulePath.SpecModulePath)(input);
     expect(parsed).toEqual(Option.some(input));
-    assert(Option.isSome(parsed));
+    assert(parsed._tag === "Some");
     const impl = SpecModulePath.toImpl(parsed.value);
-    expect(impl).toBe(`${input.slice(0, -".spec.ts".length)}.impl.ts`);
+    expect(impl).toBe(
+      `${pipe(input, Str.slice(0, -".spec.ts".length))}.impl.ts`,
+    );
     expect(Schema.is(ImplModulePath)(impl)).toBe(true);
     expect(SpecModulePath.fromImpl(impl)).toBe(input);
     expectTypeOf(parsed).toExtend<

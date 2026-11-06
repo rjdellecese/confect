@@ -16,10 +16,17 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import { pipe } from "effect/Function";
 import { useEffect, useState } from "react";
 import type { Id } from "../confect/_generated/id";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/NotesApi";
+
+const encodeJson = Schema.Unknown.pipe(
+  Schema.fromJsonString,
+  Schema.encodeResult,
+);
 
 const App = () => {
   const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
@@ -81,7 +88,12 @@ const Page = () => {
       <br />
 
       <div>
-        Random number: {randomNumber ? randomNumber : "Loading…"}
+        Random number:{" "}
+        {randomNumber !== null &&
+        randomNumber !== 0 &&
+        !Number.isNaN(randomNumber)
+          ? randomNumber
+          : "Loading…"}
         <br />
         <button type="button" onClick={retrieveRandomNumber}>
           Get new random number
@@ -251,16 +263,17 @@ const WorkpoolDemo = () => {
             </tr>
           </thead>
           <tbody>
-            {jobs
-              .slice(-10)
-              .toReversed()
-              .map((workId, i) => (
+            {pipe(
+              jobs.slice(-10),
+              Array.reverse,
+              Array.map((workId, i) => (
                 <WorkStatusRow
                   key={workId}
                   index={jobs.length - i}
                   workId={workId}
                 />
-              ))}
+              )),
+            )}
           </tbody>
         </table>
       )}
@@ -320,7 +333,7 @@ const NoteList = () => {
       localStore.setQuery(
         refs.public.notes_and_random.notes.list,
         {},
-        Option.some(current.value.filter((note) => note._id !== noteId)),
+        Option.some(Array.filter(current.value, (note) => note._id !== noteId)),
       );
     }
   });
@@ -451,7 +464,6 @@ const ApiClient = HttpApiClient.make(Api, {
 const getFirst = ApiClient.pipe(
   Effect.andThen((client) => client.notes.getFirst()),
   Effect.scoped,
-  Effect.provide(FetchHttpClient.layer),
 );
 
 const HttpEndpoints = () => {
@@ -465,17 +477,17 @@ const HttpEndpoints = () => {
         type="button"
         onClick={() =>
           getFirst
-            .pipe(Effect.runPromiseExit)
+            .pipe(Effect.provide(FetchHttpClient.layer), Effect.runPromiseExit)
             .then((exit) => setGetResponse(exit))
         }
       >
         HTTP GET /path-prefix/get-first
       </button>
       <p>
-        {getResponse
+        {getResponse !== null
           ? Exit.match(getResponse, {
-              onSuccess: (value) => JSON.stringify(value),
-              onFailure: (error) => JSON.stringify(error),
+              onSuccess: (value) => encodeJson(value).pipe(Result.getOrThrow),
+              onFailure: (error) => encodeJson(error).pipe(Result.getOrThrow),
             })
           : "No response yet"}
       </p>

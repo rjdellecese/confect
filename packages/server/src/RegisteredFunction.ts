@@ -1,3 +1,4 @@
+import * as Array from "effect/Array";
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
 import * as IdScope from "@confect/core/IdScope";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
@@ -158,10 +159,11 @@ export const applyMiddleware = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
   invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
-): Effect.Effect<A, any, R> => {
-  return resolvedMiddlewares.reduceRight<Effect.Effect<any, any, any>>(
-    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The erased middleware error remains intact so runHandlerPromise can validate it against the combined error schema.
-    (wrapped, middleware) => {
+): Effect.Effect<A, any, R> =>
+  Array.reduceRight(
+    resolvedMiddlewares,
+    effect,
+    (wrapped: Effect.Effect<any, any, any>, middleware) => {
       const context =
         "options" in middleware.middlewareSpec
           ? { options: middleware.options, invocation }
@@ -169,9 +171,7 @@ export const applyMiddleware = <A, E, R>(
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
       return middleware.middlewareImpl(wrapped, context);
     },
-    effect,
   );
-};
 
 /**
  * The error-schema allowlist for a function with middleware: the function's own
@@ -186,7 +186,7 @@ export const combineErrorSchemas = (
   const schemas = [
     ...(error !== undefined ? [error] : []),
     ...MiddlewareSpec.errorSchemas(
-      resolvedMiddlewares.map(({ middlewareSpec }) => middlewareSpec),
+      Array.map(resolvedMiddlewares, ({ middlewareSpec }) => middlewareSpec),
     ),
   ];
   return schemas.length === 0
@@ -202,13 +202,12 @@ export const combineErrorSchemas = (
  *
  * - With a schema: typed errors are schema-encoded and wrapped in a
  *   `ConvexError`, then thrown so Convex surfaces the data to the client.
- *   `Effect.either` escapes the failure channel before `runPromise` so the
+ *   `Effect.result` escapes the failure channel before `runPromise` so the
  *   thrown `ConvexError` retains its `Symbol.for("ConvexError")` identity
  *   instead of being wrapped in Effect's `FiberFailure`.
- * - Without a schema: every failure is converted to a defect via `Effect.orDie`,
- *   so nothing—not even a `ConvexError` the handler placed in its error
- *   channel—reaches the client as a `ConvexError`. The fiber dies and
- *   `runPromise` rejects with a generic failure.
+ * - Without a schema: failures are converted to defects via `Effect.orDie` rather
+ *   than schema-encoded. Ordinary defects reject with Effect's fiber failure;
+ *   `ConvexError` defects retain the passthrough behavior below.
  *
  * Either way, a `ConvexError` _defect_—thrown imperatively rather than placed
  * in the error channel, e.g. the pagination protocol's `InvalidCursor` signal
@@ -255,9 +254,11 @@ export const runHandlerPromise =
             ),
           );
     return Effect.runPromise(
-      Effect.result(rethrowConvexErrorDefects(withConvexError)).pipe(
-        Effect.provide(ConvexLogger.layer),
+      withConvexError.pipe(
+        rethrowConvexErrorDefects,
+        Effect.result,
         Effect.provideService(Console.Console, globalThis.console),
+        Effect.provide(ConvexLogger.layer),
       ),
       runOptions,
     ).then(
@@ -323,7 +324,10 @@ export const actionFunctionBase = <
           functionVisibility,
           args: decodedArgs,
         },
-      ).pipe(Effect.provide(createLayer(ctx)));
+      ).pipe(
+        // oxlint-disable-next-line effecttsgo/strict-effect-provide -- This Convex entry point provides invocation-local services before runHandlerPromise executes the handler.
+        Effect.provide(createLayer(ctx)),
+      );
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),

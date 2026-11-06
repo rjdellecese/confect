@@ -20,7 +20,6 @@ import type {
 import { v } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import * as Number from "effect/Number";
@@ -55,9 +54,9 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
     Match.tag("Objects", (objectsAst) =>
       Array.isReadonlyArrayEmpty(objectsAst.indexSignatures)
         ? handlePropertySignatures(objectsAst, scope)
-        : Effect.fail(new IndexSignaturesAreNotSupportedError()),
+        : Effect.fail(IndexSignaturesAreNotSupportedError.make()),
     ),
-    Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
+    Match.orElse(() => Effect.fail(TopLevelMustBeObjectError.make())),
     Effect.runSync,
   );
 };
@@ -97,10 +96,10 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
       Array.isReadonlyArrayEmpty(indexSignatures)
         ? // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- The return type is derived from the input schema and cannot be recovered from the runtime AST.
           (compileAst(ast, false, scope) as Effect.Effect<any>)
-        : Effect.fail(new IndexSignaturesAreNotSupportedError()),
+        : Effect.fail(IndexSignaturesAreNotSupportedError.make()),
     ),
     Match.tag("Union", (unionAst) => compileAst(unionAst, false, scope)),
-    Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
+    Match.orElse(() => Effect.fail(TopLevelMustBeObjectOrUnionError.make())),
     Effect.runSync,
   );
 };
@@ -375,7 +374,7 @@ export const compileAst = (
             {
               onSuccess: () => v.bytes(),
               onFailure: () =>
-                new UnsupportedSchemaTypeError({
+                UnsupportedSchemaTypeError.make({
                   schemaType: declaration._tag,
                 }),
             },
@@ -393,7 +392,7 @@ export const compileAst = (
           "ObjectKeyword",
           () =>
             Effect.fail(
-              new UnsupportedSchemaTypeError({
+              UnsupportedSchemaTypeError.make({
                 schemaType: ast._tag,
               }),
             ),
@@ -422,7 +421,7 @@ const handleUnionTypes = Effect.fnUntraced(function* (
     );
 
   if (firstValidator === undefined) {
-    return yield* new EmptyUnionIsNotSupportedError();
+    return yield* EmptyUnionIsNotSupportedError.make();
   } else if (secondValidator === undefined) {
     return firstValidator;
   } else {
@@ -452,7 +451,7 @@ const handleObjects = (objectsAst: SchemaAST.Objects, scope: IdScope.IdScope) =>
               ),
             onSome: () =>
               Effect.fail(
-                new MixedIndexAndPropertySignaturesAreNotSupportedError(),
+                MixedIndexAndPropertySignaturesAreNotSupportedError.make(),
               ),
           }),
         ),
@@ -473,7 +472,7 @@ const handleArrayElements = Effect.fnUntraced(function* (
 
   const elementToValidator = (element: SchemaAST.AST) =>
     SchemaAST.isOptional(element)
-      ? Effect.fail(new OptionalTupleElementsAreNotSupportedError())
+      ? Effect.fail(OptionalTupleElementsAreNotSupportedError.make())
       : compileAst(element, false, scope);
 
   const arrayItemsValidator = yield* f === undefined
@@ -481,7 +480,7 @@ const handleArrayElements = Effect.fnUntraced(function* (
         rest,
         Array.head,
         Option.match({
-          onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
+          onNone: () => Effect.fail(EmptyTupleIsNotSupportedError.make()),
           onSome: (type) => compileAst(type, false, scope),
         }),
       )
@@ -520,14 +519,14 @@ const handlePropertySignatures = (
             }),
           onSome: (number) =>
             Effect.fail(
-              new UnsupportedPropertySignatureKeyTypeError({
+              UnsupportedPropertySignatureKeyTypeError.make({
                 propertyKey: number,
               }),
             ),
         });
       } else {
         return Effect.fail(
-          new UnsupportedPropertySignatureKeyTypeError({ propertyKey: name }),
+          UnsupportedPropertySignatureKeyTypeError.make({ propertyKey: name }),
         );
       }
     }),
@@ -548,9 +547,10 @@ const handlePropertySignatures = (
 
 // Errors
 
-export class TopLevelMustBeObjectError extends Data.TaggedError(
-  "TopLevelMustBeObjectError",
-) {
+export class TopLevelMustBeObjectError extends Schema.TaggedError<
+  TopLevelMustBeObjectError,
+  {}
+>()("TopLevelMustBeObjectError", {}) {
   /* v8 ignore start */
   override get message() {
     return "Top level schema must be an object";
@@ -558,9 +558,10 @@ export class TopLevelMustBeObjectError extends Data.TaggedError(
   /* v8 ignore stop */
 }
 
-export class TopLevelMustBeObjectOrUnionError extends Data.TaggedError(
-  "TopLevelMustBeObjectOrUnionError",
-) {
+export class TopLevelMustBeObjectOrUnionError extends Schema.TaggedError<
+  TopLevelMustBeObjectOrUnionError,
+  {}
+>()("TopLevelMustBeObjectOrUnionError", {}) {
   /* v8 ignore start */
   override get message() {
     return "Top level schema must be an object or a union";
@@ -568,11 +569,15 @@ export class TopLevelMustBeObjectOrUnionError extends Data.TaggedError(
   /* v8 ignore stop */
 }
 
-export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
-  "UnsupportedPropertySignatureKeyTypeError",
-)<{
-  readonly propertyKey: number | symbol;
-}> {
+export class UnsupportedPropertySignatureKeyTypeError extends Schema.TaggedError<
+  UnsupportedPropertySignatureKeyTypeError,
+  {}
+>()("UnsupportedPropertySignatureKeyTypeError", {
+  propertyKey: Schema.declare<number | symbol>(
+    (input): input is number | symbol =>
+      typeof input === "number" || typeof input === "symbol",
+  ),
+}) {
   /* v8 ignore start */
   override get message() {
     return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this.propertyKey}' but only 'string' properties are supported.`;
@@ -580,9 +585,10 @@ export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
   /* v8 ignore stop */
 }
 
-export class EmptyTupleIsNotSupportedError extends Data.TaggedError(
-  "EmptyTupleIsNotSupportedError",
-) {
+export class EmptyTupleIsNotSupportedError extends Schema.TaggedError<
+  EmptyTupleIsNotSupportedError,
+  {}
+>()("EmptyTupleIsNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
     return "Tuple must have at least one element";
@@ -590,9 +596,10 @@ export class EmptyTupleIsNotSupportedError extends Data.TaggedError(
   /* v8 ignore stop */
 }
 
-export class EmptyUnionIsNotSupportedError extends Data.TaggedError(
-  "EmptyUnionIsNotSupportedError",
-) {
+export class EmptyUnionIsNotSupportedError extends Schema.TaggedError<
+  EmptyUnionIsNotSupportedError,
+  {}
+>()("EmptyUnionIsNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
     return "Union must have at least one member that compiles to a validator";
@@ -600,11 +607,34 @@ export class EmptyUnionIsNotSupportedError extends Data.TaggedError(
   /* v8 ignore stop */
 }
 
-export class UnsupportedSchemaTypeError extends Data.TaggedError(
-  "UnsupportedSchemaTypeError",
-)<{
-  readonly schemaType: SchemaAST.AST["_tag"];
-}> {
+export class UnsupportedSchemaTypeError extends Schema.TaggedError<
+  UnsupportedSchemaTypeError,
+  {}
+>()("UnsupportedSchemaTypeError", {
+  schemaType: Schema.Literals([
+    "Declaration",
+    "Null",
+    "Undefined",
+    "Void",
+    "Never",
+    "Unknown",
+    "Any",
+    "String",
+    "Number",
+    "Boolean",
+    "BigInt",
+    "Symbol",
+    "Literal",
+    "UniqueSymbol",
+    "ObjectKeyword",
+    "Enum",
+    "TemplateLiteral",
+    "Arrays",
+    "Objects",
+    "Union",
+    "Suspend",
+  ]),
+}) {
   /* v8 ignore start */
   override get message() {
     return `Unsupported schema type '${this.schemaType}'`;
@@ -612,9 +642,10 @@ export class UnsupportedSchemaTypeError extends Data.TaggedError(
   /* v8 ignore stop */
 }
 
-export class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
-  "IndexSignaturesAreNotSupportedError",
-) {
+export class IndexSignaturesAreNotSupportedError extends Schema.TaggedError<
+  IndexSignaturesAreNotSupportedError,
+  {}
+>()("IndexSignaturesAreNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
     return "Index signatures are not supported";
@@ -622,9 +653,10 @@ export class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
   /* v8 ignore stop */
 }
 
-export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Data.TaggedError(
-  "MixedIndexAndPropertySignaturesAreNotSupportedError",
-) {
+export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Schema.TaggedError<
+  MixedIndexAndPropertySignaturesAreNotSupportedError,
+  {}
+>()("MixedIndexAndPropertySignaturesAreNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
     return "Mixed index and property signatures are not supported";
@@ -632,9 +664,10 @@ export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Data.Ta
   /* v8 ignore stop */
 }
 
-export class OptionalTupleElementsAreNotSupportedError extends Data.TaggedError(
-  "OptionalTupleElementsAreNotSupportedError",
-) {
+export class OptionalTupleElementsAreNotSupportedError extends Schema.TaggedError<
+  OptionalTupleElementsAreNotSupportedError,
+  {}
+>()("OptionalTupleElementsAreNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
     return "Optional tuple elements are not supported";

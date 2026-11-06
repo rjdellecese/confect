@@ -82,9 +82,9 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
   return { runQuery };
 };
 
-export const QueryRunner = Context.Service<ReturnType<typeof make>>(
-  "@confect/server/QueryRunner",
-);
+export const QueryRunner =
+  // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
+  Context.Service<ReturnType<typeof make>>("@confect/server/QueryRunner");
 export type QueryRunner = typeof QueryRunner.Identifier;
 
 export const layer = (runQuery: GenericActionCtx<any>["runQuery"]) =>

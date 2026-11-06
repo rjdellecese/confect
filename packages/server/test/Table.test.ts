@@ -25,7 +25,7 @@ describe("Table.tableDefinition", () => {
               name: Schema.String,
             }),
           ),
-          embedding: Schema.optionalKey(Schema.Array(Schema.Finite)),
+          embedding: Schema.Finite.pipe(Schema.Array, Schema.optionalKey),
         }),
       )
         .index("by_text", ["text"])
@@ -168,8 +168,9 @@ describe("Table.tableDefinition", () => {
           userId: Schema.String,
           sidebar: Schema.Struct({
             badge: Schema.String,
-            rows: Schema.optionalKey(
-              Schema.Array(Schema.Struct({ badge: Schema.String })),
+            rows: Schema.Struct({ badge: Schema.String }).pipe(
+              Schema.Array,
+              Schema.optionalKey,
             ),
           }),
         }),
@@ -230,7 +231,7 @@ describe("Table.tableDefinition", () => {
         Schema.Struct({
           text: Schema.String,
           tag: Schema.optional(Schema.String),
-          embedding: Schema.optional(Schema.Array(Schema.Finite)),
+          embedding: Schema.Finite.pipe(Schema.Array, Schema.optional),
         }),
       )
         .index("by_text", ["text"])

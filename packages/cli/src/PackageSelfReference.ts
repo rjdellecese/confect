@@ -18,6 +18,9 @@ const PackageMetadata = Schema.fromJsonString(
   }),
 );
 
+/**
+ * @internal
+ */
 export const discover = Effect.fnUntraced(
   function* (directory: string) {
     const fs = yield* FileSystem.FileSystem;
@@ -36,9 +39,10 @@ export const discover = Effect.fnUntraced(
       fs.exists(path.join(current, "package.json")),
     );
     if (Option.isNone(nearest)) return Option.none<PackageSelfReference>();
-    const metadata = yield* Schema.decodeEffect(PackageMetadata)(
-      yield* fs.readFileString(path.join(nearest.value, "package.json")),
+    const contents = yield* fs.readFileString(
+      path.join(nearest.value, "package.json"),
     );
+    const metadata = yield* Schema.decodeEffect(PackageMetadata)(contents);
     if (
       metadata.name === undefined ||
       metadata.name.length === 0 ||
@@ -50,5 +54,5 @@ export const discover = Effect.fnUntraced(
       return Option.some(metadata.name);
     }
   },
-  Effect.mapError((cause) => new BuildError.BundlerError({ cause })),
+  Effect.mapError((cause) => BuildError.BundlerError.make({ cause })),
 );

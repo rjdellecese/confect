@@ -14,7 +14,7 @@ const make = (auth: ConvexAuth) => ({
       flow(
         Option.fromNullishOr,
         Option.match({
-          onNone: () => Effect.fail(new NoUserIdentityFoundError()),
+          onNone: () => Effect.fail(NoUserIdentityFoundError.make()),
           onSome: Effect.succeed,
         }),
       ),
@@ -41,10 +41,10 @@ export const layerForTarget = <Target extends DatabaseSchema.Target>(
     Match.exhaustive,
   ) as Layer.Layer<ForTarget<Target>>;
 
-export class NoUserIdentityFoundError extends Schema.TaggedError<NoUserIdentityFoundError>()(
-  "NoUserIdentityFoundError",
-  {},
-) {
+export class NoUserIdentityFoundError extends Schema.TaggedError<
+  NoUserIdentityFoundError,
+  {}
+>()("NoUserIdentityFoundError", {}) {
   override get message(): string {
     return "No user identity found";
   }

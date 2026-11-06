@@ -1,3 +1,4 @@
+import * as RecordEffect from "effect/Record";
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Registry, type RegistryItems } from "@confect/server";
 import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
@@ -57,7 +58,10 @@ describe("FunctionImpl.make", () => {
 
         // No project-wide dot-path nesting: functions live at the top level
         // of their group's isolated registry, keyed by their own name.
-        expect(Object.keys(registry).sort()).toEqual(["insert", "list"]);
+        expect(RecordEffect.keys<string, unknown>(registry).sort()).toEqual([
+          "insert",
+          "list",
+        ]);
         expect((registry as Record<string, unknown>).insert).toBeDefined();
         expect((registry as Record<string, unknown>).list).toBeDefined();
       }),
@@ -79,8 +83,12 @@ describe("FunctionImpl.make", () => {
           FunctionImpl.make(databaseSchema, child, "childFn", handler),
         );
 
-        expect(Object.keys(parentRegistry)).toEqual(["parentFn"]);
-        expect(Object.keys(childRegistry)).toEqual(["childFn"]);
+        expect(RecordEffect.keys<string, unknown>(parentRegistry)).toEqual([
+          "parentFn",
+        ]);
+        expect(RecordEffect.keys<string, unknown>(childRegistry)).toEqual([
+          "childFn",
+        ]);
       }),
   );
 });

@@ -14,6 +14,8 @@ export interface Options {
  *
  * Model identifiers use Convex's `provider/model` format, such as
  * `typesafe/jev-1.13`.
+ *
+ * @stability unstable
  */
 export const model = (
   modelId: string,
@@ -25,6 +27,8 @@ export const model = (
 
 /**
  * Construct a decision-model service backed by the Convex AI gateway.
+ *
+ * @stability unstable
  */
 export const make = ({
   model: modelId,
@@ -36,6 +40,8 @@ export const make = ({
 
 /**
  * Provide a decision-model service backed by the Convex AI gateway.
+ *
+ * @stability unstable
  */
 export const layer = ({
   model: modelId,

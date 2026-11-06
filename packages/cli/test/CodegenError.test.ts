@@ -10,7 +10,7 @@ import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 
 it("recognizes and renders structured snapshot failures without dumping their cause", () => {
-  const error = new SnapshotError({
+  const error = SnapshotError.make({
     reason: "NoncanonicalPath",
     relativePath: "notes.spec.ts",
     pathSegments: ["other"],
@@ -25,7 +25,7 @@ it("recognizes and renders structured snapshot failures without dumping their ca
 });
 
 it("renders malformed snapshot input without inventing a source location", () => {
-  const error = new SnapshotError({
+  const error = SnapshotError.make({
     reason: "InvalidShape",
     relativePath: "",
     pathSegments: [],
@@ -38,7 +38,7 @@ it("renders malformed snapshot input without inventing a source location", () =>
 
 it.effect("recovers only modeled codegen failures", () =>
   Effect.gen(function* () {
-    const codegenError = new SnapshotError({
+    const codegenError = SnapshotError.make({
       reason: "InvalidShape",
       relativePath: "",
       pathSegments: [],
@@ -48,13 +48,15 @@ it.effect("recovers only modeled codegen failures", () =>
       Option.Option<never>,
       typeof otherError
     > = catchAndLog(Effect.fail<SnapshotError | typeof otherError>(otherError));
-    expect(yield* recovered.pipe(Effect.exit)).toEqual(Exit.fail(otherError));
-    expect(yield* catchAndLog(Effect.fail(codegenError))).toEqual(
-      Option.none(),
+    const actual = yield* recovered.pipe(Effect.exit);
+    expect(actual).toEqual(Exit.fail(otherError));
+    const actual2 = yield* codegenError.pipe(Effect.fail, catchAndLog);
+    expect(actual2).toEqual(Option.none());
+    const actual3 = yield* catchAndLog(Effect.succeed(42));
+    expect(actual3).toEqual(Option.some(42));
+    const actual4 = yield* catchAndLog(Effect.die(otherError)).pipe(
+      Effect.exit,
     );
-    expect(yield* catchAndLog(Effect.succeed(42))).toEqual(Option.some(42));
-    expect(
-      yield* catchAndLog(Effect.die(otherError)).pipe(Effect.exit),
-    ).toEqual(Exit.die(otherError));
+    expect(actual4).toEqual(Exit.die(otherError));
   }),
 );

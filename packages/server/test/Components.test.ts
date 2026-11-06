@@ -16,6 +16,7 @@ import {
   type FunctionReference,
 } from "convex/server";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Array from "effect/Array";
 import * as Result from "effect/Result";
 import contract from "../../cli/test/fixtures/authored-component/confect/_generated/component";
@@ -118,15 +119,15 @@ it.effect(
 
 it.effect("registers components with TestConfect", () =>
   Effect.gen(function* () {
-    const t = yield* TestConfect.TestConfect<typeof hostSchema>();
-    yield* t.registerComponent("first", componentSchema, componentModules);
-    yield* t.mutation(first.counter.create, { count: 11 });
-    expect(
-      Array.map(yield* t.query(first.counter.list), (row) => row.count),
-    ).toEqual([11]);
-  }).pipe(
-    Effect.provide(
+    const services = yield* Layer.build(
       TestConfect.layer(hostSchema, hostConvexSchema, hostModules),
-    ),
-  ),
+    );
+    return yield* Effect.gen(function* () {
+      const t = yield* TestConfect.TestConfect<typeof hostSchema>();
+      yield* t.registerComponent("first", componentSchema, componentModules);
+      yield* t.mutation(first.counter.create, { count: 11 });
+      const rows = yield* t.query(first.counter.list);
+      expect(Array.map(rows, (row) => row.count)).toEqual([11]);
+    }).pipe(Effect.provide(services));
+  }).pipe(Effect.scoped),
 );

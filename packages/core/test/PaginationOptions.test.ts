@@ -1,5 +1,6 @@
 import type { PaginationOptions as ConvexPaginationOptions } from "convex/server";
 import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
 import { expect, expectTypeOf, test } from "@effect/vitest";
 import * as PaginationOptions from "@confect/core/PaginationOptions";
 
@@ -10,10 +11,14 @@ test("PaginationOptions' type extends Convex type", () => {
 });
 
 test("decodes the payloads Convex's paginated client sends", () => {
-  const decode = Schema.decodeUnknownSync(PaginationOptions.PaginationOptions);
-
   // `usePaginatedQuery` from `convex/react` always includes `id`.
-  expect(decode({ numItems: 10, cursor: null, id: 1 })).toEqual({
+  expect(
+    Schema.decodeResult(PaginationOptions.PaginationOptions)({
+      numItems: 10,
+      cursor: null,
+      id: 1,
+    }).pipe(Result.getOrThrow),
+  ).toEqual({
     numItems: 10,
     cursor: null,
     id: 1,
@@ -21,14 +26,14 @@ test("decodes the payloads Convex's paginated client sends", () => {
 
   // Page splits include `endCursor`; the budget fields are also protocol-legal.
   expect(
-    decode({
+    Schema.decodeResult(PaginationOptions.PaginationOptions)({
       numItems: 10,
       cursor: "abc",
       endCursor: "def",
       id: 1,
       maximumRowsRead: 100,
       maximumBytesRead: 1000,
-    }),
+    }).pipe(Result.getOrThrow),
   ).toEqual({
     numItems: 10,
     cursor: "abc",

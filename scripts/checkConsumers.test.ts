@@ -69,10 +69,13 @@ test("runs an external node_modules package manager without restoring inherited 
           extendEnv: false,
         }),
       );
-      expect(
-        yield* handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-      ).toBe("isolated-manager");
-      expect(Number(yield* handle.exitCode)).toBe(0);
+      const stdout = yield* handle.stdout.pipe(
+        Stream.decodeText(),
+        Stream.mkString,
+      );
+      expect(stdout).toBe("isolated-manager");
+      const exitCode = yield* handle.exitCode;
+      expect(Number(exitCode)).toBe(0);
       yield* fs.writeFileString(
         path.join(workspaceBin, "pnpm"),
         "#!/bin/sh\nexit 0\n",

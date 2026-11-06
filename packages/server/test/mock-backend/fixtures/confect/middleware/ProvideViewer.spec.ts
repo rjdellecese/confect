@@ -9,7 +9,10 @@ export class Viewer extends Context.Service<
   "@confect/server-mock-backend-fixtures/confect/middleware/ProvideViewer.spec/Viewer",
 ) {}
 
-export class NoViewer extends Schema.TaggedError<NoViewer>()("NoViewer", {}) {}
+export class NoViewer extends Schema.TaggedError<NoViewer, {}>()(
+  "NoViewer",
+  {},
+) {}
 
 /**
  * The flagship middleware shape: provides `Viewer` to downstream handlers,

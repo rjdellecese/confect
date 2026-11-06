@@ -5,7 +5,6 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
-import * as Result from "effect/Result";
 import { generateComponents } from "@confect/cli/confect/codegen";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import {
@@ -128,7 +127,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
         ),
       );
 
-      assert(Result.isFailure(result));
+      assert(result._tag === "Failure");
       expect(result.failure._tag).toBe("ImportFailedError");
     }),
   );
@@ -145,7 +144,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
           ),
         );
 
-        assert(Result.isFailure(result));
+        assert(result._tag === "Failure");
         assert(result.failure._tag === "InvalidConvexConfigError");
         expect(result.failure.reason).toContain('"not a valid name"');
       }),
@@ -163,7 +162,7 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
           ),
         );
 
-        assert(Result.isFailure(result));
+        assert(result._tag === "Failure");
         expect(result.failure._tag).toBe("InvalidConvexConfigError");
       }),
   );
@@ -177,15 +176,14 @@ layer(TestLayer)("generateComponents", (it) => {
       const confectDirectory = yield* fs.makeTempDirectoryScoped();
       yield* fs.makeDirectory(path.join(confectDirectory, "_generated"));
 
-      yield* generateComponents.pipe(
-        Effect.provide(
-          directoriesLayer({
-            confectDirectory,
-            convexDirectory: path.join(fixturesRoot, "bare", "convex"),
-            projectRoot: path.join(fixturesRoot, "bare"),
-          }),
-        ),
+      const services = yield* Layer.build(
+        directoriesLayer({
+          confectDirectory,
+          convexDirectory: path.join(fixturesRoot, "bare", "convex"),
+          projectRoot: path.join(fixturesRoot, "bare"),
+        }),
       );
+      yield* generateComponents.pipe(Effect.provideContext(services));
 
       const contents = yield* fs.readFileString(
         path.join(confectDirectory, "_generated", "components.ts"),
@@ -212,15 +210,14 @@ export const components: Components = componentsGeneric() as any;
       yield* fs.makeDirectory(path.join(confectDirectory, "_generated"));
       const convexDirectory = yield* fs.makeTempDirectoryScoped();
 
-      yield* generateComponents.pipe(
-        Effect.provide(
-          directoriesLayer({
-            confectDirectory,
-            convexDirectory,
-            projectRoot: path.dirname(convexDirectory),
-          }),
-        ),
+      const services2 = yield* Layer.build(
+        directoriesLayer({
+          confectDirectory,
+          convexDirectory,
+          projectRoot: path.dirname(convexDirectory),
+        }),
       );
+      yield* generateComponents.pipe(Effect.provideContext(services2));
 
       const contents = yield* fs.readFileString(
         path.join(confectDirectory, "_generated", "components.ts"),

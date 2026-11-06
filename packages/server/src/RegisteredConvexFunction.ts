@@ -235,29 +235,27 @@ const queryFunction = <
           args: decodedArgs,
         },
       ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            DatabaseReader.layer(databaseSchema, ctx.db),
-            DocumentIds.layer(databaseSchema, ctx.db),
-            Auth.layerForTarget<DatabaseSchema_["target"]>(
-              databaseSchema.target,
-              ctx.auth,
-            ),
-            Storage.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
-              ctx.storage,
-              databaseSchema.target.scope,
-            ),
-            ExecutionMetadata.layer(ctx.meta),
-            TransactionMetadata.layer(ctx.meta),
-            QueryTransactionContext.layer(ctx),
-            QueryRunner.layer(ctx.runQuery),
-            QueryCtx.layer<
-              DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>,
-              DatabaseSchema.Scope<DatabaseSchema_>
-            >(ctx, databaseSchema.target.scope),
-            ConvexConfigProvider.layer,
+        Effect.provide([
+          DatabaseReader.layer(databaseSchema, ctx.db),
+          DocumentIds.layer(databaseSchema, ctx.db),
+          Auth.layerForTarget<DatabaseSchema_["target"]>(
+            databaseSchema.target,
+            ctx.auth,
           ),
-        ),
+          Storage.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
+            ctx.storage,
+            databaseSchema.target.scope,
+          ),
+          ExecutionMetadata.layer(ctx.meta),
+          TransactionMetadata.layer(ctx.meta),
+          QueryTransactionContext.layer(ctx),
+          QueryRunner.layer(ctx.runQuery),
+          QueryCtx.layer<
+            DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>,
+            DatabaseSchema.Scope<DatabaseSchema_>
+          >(ctx, databaseSchema.target.scope),
+          ConvexConfigProvider.layer,
+        ]),
       );
       return yield* pipe(
         decodedReturns,
@@ -268,9 +266,7 @@ const queryFunction = <
       Effect.provideService(Clock.Clock, queryClock),
       RegisteredFunction.runHandlerPromise(
         RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
-        {
-          scheduler: new EffectScheduler.MixedScheduler("sync"),
-        },
+        { scheduler: new EffectScheduler.MixedScheduler("sync") },
       ),
     ),
 });
@@ -365,7 +361,10 @@ const mutationFunction = <
           functionVisibility,
           args: decodedArgs,
         },
-      ).pipe(Effect.provide(mutationLayer(databaseSchema, ctx)));
+      ).pipe(
+        // oxlint-disable-next-line effecttsgo/strict-effect-provide -- This Convex entry point provides invocation-local services before runHandlerPromise executes the handler.
+        Effect.provide(mutationLayer(databaseSchema, ctx)),
+      );
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
@@ -374,9 +373,7 @@ const mutationFunction = <
     }).pipe(
       RegisteredFunction.runHandlerPromise(
         RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
-        {
-          scheduler: new EffectScheduler.MixedScheduler("sync"),
-        },
+        { scheduler: new EffectScheduler.MixedScheduler("sync") },
       ),
     ),
 });

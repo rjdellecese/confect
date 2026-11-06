@@ -21,7 +21,7 @@ const request = (
     Match.tagsExhaustive({
       Scan: (scan) => scan,
       Unchanged: () => {
-        throw new Pagination.EmptyInitialPageError();
+        throw Pagination.EmptyInitialPageError.make();
       },
     }),
   );

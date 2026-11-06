@@ -387,79 +387,84 @@ type LargeSpec = Spec.Spec<{
 // instantiations are not counted in individual benchmarks.
 void ({} as Refs.Refs<any>);
 
-bench("Refs<Spec> (unfiltered)", () => {
-  return {} as Refs.Refs<MediumSpec>;
-}).types([2274, "instantiations"]);
+bench("Refs<Spec> (unfiltered)", () => ({}) as Refs.Refs<MediumSpec>).types([
+  1732,
+  "instantiations",
+]);
 
-bench("Refs<Spec, AnyPublic> (public-filtered)", () => {
-  return {} as Refs.Refs<MediumSpec, Ref.AnyPublic>;
-}).types([2351, "instantiations"]);
+bench("Refs<Spec, AnyPublic> (public-filtered)", () =>
+  ({}) as Refs.Refs<MediumSpec, Ref.AnyPublic>).types([1796, "instantiations"]);
 
-bench("Refs<Spec, AnyInternal> (internal-filtered)", () => {
-  return {} as Refs.Refs<MediumSpec, Ref.AnyInternal>;
-}).types([2335, "instantiations"]);
+bench("Refs<Spec, AnyInternal> (internal-filtered)", () =>
+  ({}) as Refs.Refs<MediumSpec, Ref.AnyInternal>).types([
+  1780,
+  "instantiations",
+]);
 
 // Laziness: accessing one leaf should be cheaper than accessing all leaves.
 // If the type were eagerly evaluated, both benchmarks would have the same
 // instantiation count. The gap between them proves lazy evaluation.
 
-bench("resolve one leaf", () => {
-  return {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["list"];
-}).types([2654, "instantiations"]);
+bench("resolve one leaf", () =>
+  ({}) as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["list"]).types([
+  2090,
+  "instantiations",
+]);
 
-bench("resolve all leaves", () => {
-  return [
-    {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["list"],
-    {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["create"],
-    {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["posts"]["list"],
-    {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["posts"]["getById"],
-    {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["comments"]["list"],
-    {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["comments"]["create"],
-  ];
-}).types([3279, "instantiations"]);
+bench("resolve all leaves", () => [
+  {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["list"],
+  {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["create"],
+  {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["posts"]["list"],
+  {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["posts"]["getById"],
+  {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["comments"]["list"],
+  {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["comments"]["create"],
+]).types([2722, "instantiations"]);
 
 // --- Small spec (1 group, 2 functions) ---
 
-bench("small: Refs (unfiltered)", () => {
-  return {} as Refs.Refs<SmallSpec>;
-}).types([884, "instantiations"]);
+bench("small: Refs (unfiltered)", () => ({}) as Refs.Refs<SmallSpec>).types([
+  308,
+  "instantiations",
+]);
 
-bench("small: Refs (public-filtered)", () => {
-  return {} as Refs.Refs<SmallSpec, Ref.AnyPublic>;
-}).types([909, "instantiations"]);
+bench("small: Refs (public-filtered)", () =>
+  ({}) as Refs.Refs<SmallSpec, Ref.AnyPublic>).types([320, "instantiations"]);
 
-bench("small: Refs (internal-filtered)", () => {
-  return {} as Refs.Refs<SmallSpec, Ref.AnyInternal>;
-}).types([950, "instantiations"]);
+bench("small: Refs (internal-filtered)", () =>
+  ({}) as Refs.Refs<SmallSpec, Ref.AnyInternal>).types([361, "instantiations"]);
 
-bench("small: Refs (resolve one leaf)", () => {
-  return {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"];
-}).types([1095, "instantiations"]);
+bench("small: Refs (resolve one leaf)", () =>
+  ({}) as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"]).types([
+  497,
+  "instantiations",
+]);
 
-bench("small: Refs (resolve all leaves)", () => {
-  return [
-    {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"],
-    {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["logout"],
-  ];
-}).types([1194, "instantiations"]);
+bench("small: Refs (resolve all leaves)", () => [
+  {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"],
+  {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["logout"],
+]).types([599, "instantiations"]);
 
 // --- Large spec (8 groups, 28 functions) ---
 
-bench("large: Refs (unfiltered)", () => {
-  return {} as Refs.Refs<LargeSpec>;
-}).types([3913, "instantiations"]);
+bench("large: Refs (unfiltered)", () => ({}) as Refs.Refs<LargeSpec>).types([
+  3414,
+  "instantiations",
+]);
 
-bench("large: Refs (public-filtered)", () => {
-  return {} as Refs.Refs<LargeSpec, Ref.AnyPublic>;
-}).types([3991, "instantiations"]);
+bench("large: Refs (public-filtered)", () =>
+  ({}) as Refs.Refs<LargeSpec, Ref.AnyPublic>).types([3479, "instantiations"]);
 
-bench("large: Refs (internal-filtered)", () => {
-  return {} as Refs.Refs<LargeSpec, Ref.AnyInternal>;
-}).types([3969, "instantiations"]);
+bench("large: Refs (internal-filtered)", () =>
+  ({}) as Refs.Refs<LargeSpec, Ref.AnyInternal>).types([
+  3457,
+  "instantiations",
+]);
 
-bench("large: Refs (resolve one leaf)", () => {
-  return {} as Refs.Refs<LargeSpec, Ref.AnyPublic>["users"]["list"];
-}).types([4320, "instantiations"]);
+bench("large: Refs (resolve one leaf)", () =>
+  ({}) as Refs.Refs<LargeSpec, Ref.AnyPublic>["users"]["list"]).types([
+  3799,
+  "instantiations",
+]);
 
 bench("large: Refs (resolve all leaves)", () => {
   type PublicRefs = Refs.Refs<LargeSpec, Ref.AnyPublic>;
@@ -481,4 +486,4 @@ bench("large: Refs (resolve all leaves)", () => {
     {} as PublicRefs["settings"]["get"],
     {} as PublicRefs["settings"]["update"],
   ];
-}).types([6280, "instantiations"]);
+}).types([5778, "instantiations"]);

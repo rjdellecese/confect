@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "incremental": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.tsbuildinfo",
+    "tsBuildInfoFile": "node_modules/.cache/tsrs/tsconfig.tsbuildinfo",
     "rootDir": ".",
     "skipLibCheck": true,
     "isolatedDeclarations": false,

@@ -11,7 +11,7 @@ import * as String from "effect/String";
 /**
  * The path to a group in the Confect API.
  */
-export class GroupPath extends Schema.Class<GroupPath>("GroupPath")({
+export class GroupPath extends Schema.Class<GroupPath, {}>("GroupPath")({
   pathSegments: Schema.NonEmptyArray(Schema.NonEmptyString),
 }) {}
 
@@ -30,6 +30,8 @@ export const append = (groupPath: GroupPath, groupName: string): GroupPath =>
 /**
  * Expects a path string of the form `./group1/group2.ts`, relative to the
  * Convex functions directory.
+ *
+ * @internal
  */
 export const fromGroupModulePath = Effect.fnUntraced(function* (
   groupModulePath: string,
@@ -46,7 +48,7 @@ export const fromGroupModulePath = Effect.fnUntraced(function* (
     yield* Effect.logDebug(Array.append(dirSegments, name));
     return make(Array.append(dirSegments, name));
   } else {
-    return yield* new GroupModulePathIsNotATypeScriptFileError({
+    return yield* GroupModulePathIsNotATypeScriptFileError.make({
       path: groupModulePath,
     });
   }
@@ -54,6 +56,8 @@ export const fromGroupModulePath = Effect.fnUntraced(function* (
 
 /**
  * Get the module path for a group, relative to the Convex functions directory.
+ *
+ * @internal
  */
 export const modulePath = Effect.fnUntraced(function* (groupPath: GroupPath) {
   const path = yield* Path.Path;
@@ -104,12 +108,12 @@ const getGroupSpecHelper = (
 export const toString = (groupPath: GroupPath) =>
   Array.join(groupPath.pathSegments, ".");
 
-export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedError<GroupModulePathIsNotATypeScriptFileError>()(
-  "GroupModulePathIsNotATypeScriptFileError",
-  {
-    path: Schema.NonEmptyString,
-  },
-) {
+export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedError<
+  GroupModulePathIsNotATypeScriptFileError,
+  { readonly brand: unique symbol }
+>()("GroupModulePathIsNotATypeScriptFileError", {
+  path: Schema.NonEmptyString,
+}) {
   override get message(): string {
     return `Expected group module path to end with .ts, got ${this.path}`;
   }

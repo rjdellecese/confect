@@ -1,3 +1,6 @@
+import { layer } from "@effect/vitest";
+import * as Layer from "effect/Layer";
+import * as Arr from "effect/Array";
 import { assert, expect, expectTypeOf, it } from "@effect/vitest";
 import * as EntryPoint from "@confect/cli/EntryPoint";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
@@ -32,8 +35,8 @@ it("refines optional entries without including spec, impl, table, or config entr
     }),
     EntryPoint.Kind.Config(),
   ];
-  const optional = entries.filter(EntryPoint.isOptional);
-  expect(optional.map((entry) => entry._tag)).toEqual([
+  const optional = Arr.filter(entries, EntryPoint.isOptional);
+  expect(Arr.map(optional, (entry) => entry._tag)).toEqual([
     "Http",
     "Crons",
     "Auth",
@@ -43,83 +46,90 @@ it("refines optional entries without including spec, impl, table, or config entr
   >();
 });
 
-it.effect("discovers typed entries with logical and canonical paths", () =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const confect = path.resolve("/project/confect");
-    const convex = path.resolve("/project/convex");
-    const files = [
-      "notes.spec.ts",
-      "notes.impl.ts",
-      path.join("tables", "notes.ts"),
-      "helper.ts",
-    ];
-    const existing = HashSet.make(
-      path.join(confect, "http.ts"),
-      path.join(confect, "notes.spec.ts"),
-      path.join(confect, "notes.impl.ts"),
-      path.join(confect, "tables"),
-      path.join(confect, "tables", "notes.ts"),
-      path.join(convex, "convex.config.ts"),
-    );
-    const entries = yield* EntryPoint.discover.pipe(
-      Effect.provideService(ConfectDirectory, { get: Effect.succeed(confect) }),
-      Effect.provideService(ConvexDirectory, { get: Effect.succeed(convex) }),
-      Effect.provide(
-        FileSystem.layerNoop({
-          exists: (file) => Effect.succeed(HashSet.has(existing, file)),
-          readDirectory: (directory) =>
-            Effect.succeed(
-              directory === path.join(confect, "tables") ? ["notes.ts"] : files,
-            ),
-          realPath: (file) =>
-            Effect.succeed(path.resolve("/canonical", path.basename(file))),
-        }),
-      ),
-    );
-    expect(entries.map((entry) => entry._tag)).toEqual([
-      "Http",
-      "Config",
-      "Spec",
-      "Impl",
-      "Table",
-    ]);
-    expect(entries.map((entry) => entry.absolutePath)).toEqual([
-      path.join(confect, "http.ts"),
-      path.join(convex, "convex.config.ts"),
-      path.join(confect, "notes.spec.ts"),
-      path.join(confect, "notes.impl.ts"),
-      path.join(confect, "tables", "notes.ts"),
-    ]);
-    for (const entry of entries)
-      expect(entry.inputPath).toBe(
-        path.resolve("/canonical", path.basename(entry.absolutePath)),
-      );
-    expect(files).toEqual([
-      "notes.spec.ts",
-      "notes.impl.ts",
-      path.join("tables", "notes.ts"),
-      "helper.ts",
-    ]);
-  }).pipe(Effect.provide(NodePath.layer)),
-);
+layer(NodePath.layer)("runtime services", (runtimeIt) => {
+  runtimeIt.effect(
+    "discovers typed entries with logical and canonical paths",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const confect = path.resolve("/project/confect");
+        const convex = path.resolve("/project/convex");
+        const files = [
+          "notes.spec.ts",
+          "notes.impl.ts",
+          path.join("tables", "notes.ts"),
+          "helper.ts",
+        ];
+        const existing = HashSet.make(
+          path.join(confect, "http.ts"),
+          path.join(confect, "notes.spec.ts"),
+          path.join(confect, "notes.impl.ts"),
+          path.join(confect, "tables"),
+          path.join(confect, "tables", "notes.ts"),
+          path.join(convex, "convex.config.ts"),
+        );
+        const services = yield* Layer.build(
+          FileSystem.layerNoop({
+            exists: (file) => Effect.succeed(HashSet.has(existing, file)),
+            readDirectory: (directory) =>
+              Effect.succeed(
+                directory === path.join(confect, "tables")
+                  ? ["notes.ts"]
+                  : files,
+              ),
+            realPath: (file) =>
+              Effect.succeed(path.resolve("/canonical", path.basename(file))),
+          }),
+        );
+        const entries = yield* EntryPoint.discover.pipe(
+          Effect.provideService(ConfectDirectory, {
+            get: Effect.succeed(confect),
+          }),
+          Effect.provideService(ConvexDirectory, {
+            get: Effect.succeed(convex),
+          }),
+          Effect.provideContext(services),
+        );
+        expect(Arr.map(entries, (entry) => entry._tag)).toEqual([
+          "Http",
+          "Config",
+          "Spec",
+          "Impl",
+          "Table",
+        ]);
+        expect(Arr.map(entries, (entry) => entry.absolutePath)).toEqual([
+          path.join(confect, "http.ts"),
+          path.join(convex, "convex.config.ts"),
+          path.join(confect, "notes.spec.ts"),
+          path.join(confect, "notes.impl.ts"),
+          path.join(confect, "tables", "notes.ts"),
+        ]);
+        for (const entry of entries)
+          expect(entry.inputPath).toBe(
+            path.resolve("/canonical", path.basename(entry.absolutePath)),
+          );
+        expect(files).toEqual([
+          "notes.spec.ts",
+          "notes.impl.ts",
+          path.join("tables", "notes.ts"),
+          "helper.ts",
+        ]);
+      }),
+  );
+});
 
-it.effect.each([1, 2, 3])(
-  "restarts discovery when scan %s loses a directory without dropping surviving entries",
-  (failedScan) =>
-    Effect.gen(function* () {
-      const path = yield* Path.Path;
-      const confect = path.resolve("/project/confect");
-      const convex = path.resolve("/project/convex");
-      const tables = path.join(confect, "tables");
-      const scans = yield* Ref.make(0);
-      const removed = yield* Ref.make(false);
-      const entries = yield* EntryPoint.discover.pipe(
-        Effect.provideService(ConfectDirectory, {
-          get: Effect.succeed(confect),
-        }),
-        Effect.provideService(ConvexDirectory, { get: Effect.succeed(convex) }),
-        Effect.provide(
+layer(NodePath.layer)("runtime services", (runtimeIt) => {
+  runtimeIt.effect.each([1, 2, 3])(
+    "restarts discovery when scan %s loses a directory without dropping surviving entries",
+    (failedScan) =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const confect = path.resolve("/project/confect");
+        const convex = path.resolve("/project/convex");
+        const tables = path.join(confect, "tables");
+        const scans = yield* Ref.make(0);
+        const removed = yield* Ref.make(false);
+        const services2 = yield* Layer.build(
           FileSystem.layerNoop({
             exists: (file) =>
               Ref.get(removed).pipe(
@@ -151,41 +161,48 @@ it.effect.each([1, 2, 3])(
               }),
             realPath: Effect.succeed,
           }),
-        ),
-      );
-      expect(entries.map((entry) => entry._tag)).toEqual(["Spec", "Impl"]);
-      expect(entries.map((entry) => entry.absolutePath)).toEqual([
-        path.join(confect, "notes.spec.ts"),
-        path.join(confect, "notes.impl.ts"),
-      ]);
-      expect(yield* Ref.get(scans)).toBe(failedScan + 2);
-    }).pipe(Effect.provide(NodePath.layer)),
-);
+        );
+        const entries = yield* EntryPoint.discover.pipe(
+          Effect.provideService(ConfectDirectory, {
+            get: Effect.succeed(confect),
+          }),
+          Effect.provideService(ConvexDirectory, {
+            get: Effect.succeed(convex),
+          }),
+          Effect.provideContext(services2),
+        );
+        expect(Arr.map(entries, (entry) => entry._tag)).toEqual([
+          "Spec",
+          "Impl",
+        ]);
+        expect(Arr.map(entries, (entry) => entry.absolutePath)).toEqual([
+          path.join(confect, "notes.spec.ts"),
+          path.join(confect, "notes.impl.ts"),
+        ]);
+        const current = yield* Ref.get(scans);
+        expect(current).toBe(failedScan + 2);
+      }),
+  );
+});
 
-it.effect.each([
-  { reason: "NotFound" as const, attempts: 4 },
-  { reason: "PermissionDenied" as const, attempts: 1 },
-])(
-  "preserves $reason discovery errors after $attempts attempts",
-  ({ reason, attempts }) =>
-    Effect.gen(function* () {
-      const path = yield* Path.Path;
-      const confect = path.resolve("/project/confect");
-      const scans = yield* Ref.make(0);
-      const error = PlatformError.systemError({
-        _tag: reason,
-        module: "FileSystem",
-        method: "readDirectory",
-        pathOrDescriptor: confect,
-      });
-      const result = yield* EntryPoint.discover.pipe(
-        Effect.provideService(ConfectDirectory, {
-          get: Effect.succeed(confect),
-        }),
-        Effect.provideService(ConvexDirectory, {
-          get: Effect.succeed(path.resolve("/project/convex")),
-        }),
-        Effect.provide(
+layer(NodePath.layer)("runtime services", (runtimeIt) => {
+  runtimeIt.effect.each([
+    { reason: "NotFound" as const, attempts: 4 },
+    { reason: "PermissionDenied" as const, attempts: 1 },
+  ])(
+    "preserves $reason discovery errors after $attempts attempts",
+    ({ reason, attempts }) =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const confect = path.resolve("/project/confect");
+        const scans = yield* Ref.make(0);
+        const error = PlatformError.systemError({
+          _tag: reason,
+          module: "FileSystem",
+          method: "readDirectory",
+          pathOrDescriptor: confect,
+        });
+        const services3 = yield* Layer.build(
           FileSystem.layerNoop({
             exists: () => Effect.succeed(false),
             readDirectory: () =>
@@ -193,19 +210,29 @@ it.effect.each([
                 Effect.andThen(Effect.fail(error)),
               ),
           }),
-        ),
-        Effect.result,
-      );
-      expect(result).toEqual(Result.fail(error));
-      expect(yield* Ref.get(scans)).toBe(attempts);
-    }).pipe(Effect.provide(NodePath.layer)),
-);
+        );
+        const result = yield* EntryPoint.discover.pipe(
+          Effect.provideService(ConfectDirectory, {
+            get: Effect.succeed(confect),
+          }),
+          Effect.provideService(ConvexDirectory, {
+            get: Effect.succeed(path.resolve("/project/convex")),
+          }),
+          Effect.provideContext(services3),
+          Effect.result,
+        );
+        expect(result).toEqual(Result.fail(error));
+        const current2 = yield* Ref.get(scans);
+        expect(current2).toBe(attempts);
+      }),
+  );
+});
 
 it.each(["notes.impl.ts", "groups/notes.impl.ts", "groups\\notes.impl.ts"])(
   "parses %s into an implementation entry",
   (relativePath) => {
     const parsed = EntryPoint.parse(relativePath);
-    assert(Option.isSome(parsed));
+    assert(parsed._tag === "Some");
     expect(parsed.value).toEqual(
       EntryPoint.Kind.Impl({
         relativePath: ImplModulePath.make(relativePath),
@@ -292,49 +319,59 @@ it("shares declaration brands with entry-point kinds", () => {
   >();
 });
 
-it.effect.each([
+for (const { name, pathLayer, sep } of [
   { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
   { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
-])("plans declarations immutably with $name paths", ({ pathLayer, sep }) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const spec = EntryPoint.Kind.Spec({
-      relativePath: SpecModulePath.make(`groups${sep}notes.spec.ts`),
-    });
-    const table = EntryPoint.Kind.Table({
-      relativePath: TableModulePath.make(`tables${sep}groups${sep}notes.ts`),
-    });
-    const anotherTable = EntryPoint.Kind.Table({
-      relativePath: TableModulePath.make(`tables${sep}users.ts`),
-    });
-    const declarations = [spec, table, spec, anotherTable] as const;
-    const impl = ImplModulePath.make(`groups${sep}notes.impl.ts`);
-    const anotherImpl = ImplModulePath.make("other.impl.ts");
-    const affectedImpls = [impl, anotherImpl, impl] as const;
-    const planned = EntryPoint.planDeclarations(
-      declarations,
-      affectedImpls,
-      path,
+] as const) {
+  layer(pathLayer)("runtime services", (runtimeIt) => {
+    runtimeIt.effect(`plans declarations immutably with ${name} paths`, () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const spec = EntryPoint.Kind.Spec({
+          relativePath: SpecModulePath.make(`groups${sep}notes.spec.ts`),
+        });
+        const table = EntryPoint.Kind.Table({
+          relativePath: TableModulePath.make(
+            `tables${sep}groups${sep}notes.ts`,
+          ),
+        });
+        const anotherTable = EntryPoint.Kind.Table({
+          relativePath: TableModulePath.make(`tables${sep}users.ts`),
+        });
+        const declarations = [spec, table, spec, anotherTable] as const;
+        const impl = ImplModulePath.make(`groups${sep}notes.impl.ts`);
+        const anotherImpl = ImplModulePath.make("other.impl.ts");
+        const affectedImpls = [impl, anotherImpl, impl] as const;
+        const planned = EntryPoint.planDeclarations(
+          declarations,
+          affectedImpls,
+          path,
+        );
+        expect(planned.tables).toEqual([
+          { relativePath: table.relativePath, tableName: "notes" },
+          { relativePath: anotherTable.relativePath, tableName: "users" },
+        ]);
+        expect(planned.paths).toHaveLength(2);
+        expect(planned.paths).toEqual(
+          expect.arrayContaining([impl, anotherImpl]),
+        );
+        expect(
+          EntryPoint.planDeclarations(declarations, affectedImpls, path),
+        ).toEqual(planned);
+        expect(declarations).toEqual([spec, table, spec, anotherTable]);
+        expect(affectedImpls).toEqual([impl, anotherImpl, impl]);
+        expect(EntryPoint.planDeclarations([spec], [], path)).toEqual({
+          tables: [],
+          paths: [impl],
+        });
+        expect(EntryPoint.planDeclarations([table], [], path)).toEqual({
+          tables: [{ relativePath: table.relativePath, tableName: "notes" }],
+          paths: [],
+        });
+        expectTypeOf(planned.paths).toEqualTypeOf<
+          ReadonlyArray<ImplModulePath>
+        >();
+      }),
     );
-    expect(planned.tables).toEqual([
-      { relativePath: table.relativePath, tableName: "notes" },
-      { relativePath: anotherTable.relativePath, tableName: "users" },
-    ]);
-    expect(planned.paths).toHaveLength(2);
-    expect(planned.paths).toEqual(expect.arrayContaining([impl, anotherImpl]));
-    expect(
-      EntryPoint.planDeclarations(declarations, affectedImpls, path),
-    ).toEqual(planned);
-    expect(declarations).toEqual([spec, table, spec, anotherTable]);
-    expect(affectedImpls).toEqual([impl, anotherImpl, impl]);
-    expect(EntryPoint.planDeclarations([spec], [], path)).toEqual({
-      tables: [],
-      paths: [impl],
-    });
-    expect(EntryPoint.planDeclarations([table], [], path)).toEqual({
-      tables: [{ relativePath: table.relativePath, tableName: "notes" }],
-      paths: [],
-    });
-    expectTypeOf(planned.paths).toEqualTypeOf<ReadonlyArray<ImplModulePath>>();
-  }).pipe(Effect.provide(pathLayer)),
-);
+  });
+}

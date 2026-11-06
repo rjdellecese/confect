@@ -11,13 +11,20 @@ import { Plugin } from "effect-oxlint";
 import { preferEffectVitest } from "./preferEffectVitest.ts";
 import { preferTestEach } from "./preferTestEach.ts";
 import { requireQueryStreamExperimental } from "./requireQueryStreamExperimental.ts";
+import { noSchemaCodecWrappers } from "./noSchemaCodecWrappers.ts";
 
-export { preferEffectVitest, preferTestEach, requireQueryStreamExperimental };
+export {
+  preferEffectVitest,
+  preferTestEach,
+  requireQueryStreamExperimental,
+  noSchemaCodecWrappers,
+};
 
 export default Plugin.define({
   name: "confect",
   specifier: "confect-oxlint-rules",
   rules: {
+    "no-schema-codec-wrappers": noSchemaCodecWrappers,
     "prefer-effect-vitest": preferEffectVitest,
     "prefer-test-each": preferTestEach,
     "require-query-stream-experimental": requireQueryStreamExperimental,

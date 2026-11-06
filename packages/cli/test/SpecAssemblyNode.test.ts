@@ -1,3 +1,6 @@
+import { pipe } from "effect/Function";
+import * as Option from "effect/Option";
+import * as Str from "effect/String";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { describe, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
@@ -14,9 +17,9 @@ const leaf = (
 ): LeafModule => ({
   relativePath,
   pathSegments,
-  groupPathDot: pathSegments.join("."),
+  groupPathDot: Array.join(pathSegments, "."),
   exportName: pathSegments[pathSegments.length - 1]!,
-  specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
+  specImportPath: `../${pipe(relativePath, Str.slice(0, -".ts".length))}`,
 });
 
 describe("SpecAssemblyNode", () => {
@@ -46,7 +49,9 @@ describe("SpecAssemblyNode", () => {
       expect(contents).toContain("}> = Spec.fromGroups({");
       expect(contents).not.toContain("as any");
       expect(contents).toContain("const spec: Spec.Spec<");
-      expect(contents.match(/\bas\b/g)).toEqual(["as"]);
+      expect(Option.getOrNull(pipe(contents, Str.match(/\bas\b/g)))).toEqual([
+        "as",
+      ]);
       expect(contents).toContain("}) as typeof spec;");
       // Group paths are resolved impl-side, so the assembled spec no longer
       // emits a `.addPath(...)` registration chain.
@@ -197,11 +202,12 @@ describe("SpecAssemblyNode", () => {
           'import scripts_operational_seedTestUser_queries from "../scripts/operational/seedTestUser/queries.spec";',
         );
 
-        const importLines = contents
-          .split("\n")
-          .filter(
-            (line) => line.startsWith("import ") && line.includes(".spec"),
-          );
+        const importLines = Array.filter(
+          Str.split(contents, "\n"),
+          (line) =>
+            pipe(line, Str.startsWith("import ")) &&
+            pipe(line, Str.includes(".spec")),
+        );
         expect(importLines).toHaveLength(leaves.length);
 
         expect(contents).toContain(

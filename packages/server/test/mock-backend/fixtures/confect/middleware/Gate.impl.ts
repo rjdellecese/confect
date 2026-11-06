@@ -10,6 +10,6 @@ export default MiddlewareImpl.make(
     typeof args === "object" &&
     args !== null &&
     (args as { blocked?: boolean }).blocked === true
-      ? Effect.fail(new GateClosed({ reason: "blocked by gate" }))
+      ? Effect.fail(GateClosed.make({ reason: "blocked by gate" }))
       : effect,
 );

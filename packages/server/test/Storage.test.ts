@@ -40,43 +40,44 @@ describe("Storage", () => {
     const native = makeNativeStorage();
 
     return Effect.gen(function* () {
-      const storage = yield* Storage.Storage.forScope<typeof scope>();
-      const store = storage.store(new Blob(["component"]));
-      expectTypeOf(store).toEqualTypeOf<
-        Effect.Effect<
-          ScopedId<"_storage", typeof scope>,
-          never,
-          ScopedStorageActionWriter<typeof scope>
-        >
-      >();
-      expectTypeOf(storage.getUrl)
-        .parameter(0)
-        .toEqualTypeOf<ScopedId<"_storage", typeof scope>>();
-      expectTypeOf<GenericId<"_storage">>().not.toExtend<
-        Parameters<typeof storage.delete>[0]
-      >();
-      const id = yield* store;
-      expect(id).toBe(storageId);
-      expect((yield* storage.getUrl(id)).href).toBe(blobUrl);
-      const remove = storage.delete(id);
-      expectTypeOf(remove).toEqualTypeOf<
-        Effect.Effect<
-          void,
-          BlobNotFoundError,
-          ScopedStorageWriter<typeof scope>
-        >
-      >();
-      yield* remove;
-      expect(native.delete).toHaveBeenCalledExactlyOnceWith(storageId);
-    }).pipe(
-      Effect.provide(
+      const services = yield* Layer.build(
         Layer.mergeAll(
           Storage.layer(native, scope),
           StorageWriter.layer(native, scope),
           StorageActionWriter.layer(native, scope),
         ),
-      ),
-    );
+      );
+      return yield* Effect.gen(function* () {
+        const storage = yield* Storage.Storage.forScope<typeof scope>();
+        const store = storage.store(new Blob(["component"]));
+        expectTypeOf(store).toEqualTypeOf<
+          Effect.Effect<
+            ScopedId<"_storage", typeof scope>,
+            never,
+            ScopedStorageActionWriter<typeof scope>
+          >
+        >();
+        expectTypeOf(storage.getUrl)
+          .parameter(0)
+          .toEqualTypeOf<ScopedId<"_storage", typeof scope>>();
+        expectTypeOf<GenericId<"_storage">>().not.toExtend<
+          Parameters<typeof storage.delete>[0]
+        >();
+        const id = yield* store;
+        expect(id).toBe(storageId);
+        expect((yield* storage.getUrl(id)).href).toBe(blobUrl);
+        const remove = storage.delete(id);
+        expectTypeOf(remove).toEqualTypeOf<
+          Effect.Effect<
+            void,
+            BlobNotFoundError,
+            ScopedStorageWriter<typeof scope>
+          >
+        >();
+        yield* remove;
+        expect(native.delete).toHaveBeenCalledExactlyOnceWith(storageId);
+      }).pipe(Effect.provide(services));
+    }).pipe(Effect.scoped);
   });
 
   it.effect(
@@ -86,27 +87,30 @@ describe("Storage", () => {
       const original = { ...native };
 
       return Effect.gen(function* () {
-        const storage = yield* Storage.Storage;
-        const legacy = yield* StorageReader;
-        const read = storage.getUrl(storageId);
+        const services = yield* Layer.build(Storage.layer(native));
+        return yield* Effect.gen(function* () {
+          const storage = yield* Storage.Storage;
+          const legacy = yield* StorageReader;
+          const read = storage.getUrl(storageId);
 
-        expectTypeOf(read).toEqualTypeOf<
-          Effect.Effect<URL, BlobNotFoundError>
-        >();
-        expect(native.getUrl).not.toHaveBeenCalled();
-        expect((yield* read).href).toBe(blobUrl);
-        native.getUrl.mockResolvedValueOnce(`${blobUrl}/fresh`);
-        expect((yield* read).href).toBe(`${blobUrl}/fresh`);
-        expect((yield* legacy.getUrl(storageId)).href).toBe(blobUrl);
-        expect(native.getUrl.mock.calls).toEqual([
-          [storageId],
-          [storageId],
-          [storageId],
-        ]);
-        expect(native.getUrl.mock.contexts).toEqual([native, native, native]);
-        expect(native).toEqual(original);
-        expect(native.generateUploadUrl).not.toHaveBeenCalled();
-      }).pipe(Effect.provide(Storage.layer(native)));
+          expectTypeOf(read).toEqualTypeOf<
+            Effect.Effect<URL, BlobNotFoundError>
+          >();
+          expect(native.getUrl).not.toHaveBeenCalled();
+          expect((yield* read).href).toBe(blobUrl);
+          native.getUrl.mockResolvedValueOnce(`${blobUrl}/fresh`);
+          expect((yield* read).href).toBe(`${blobUrl}/fresh`);
+          expect((yield* legacy.getUrl(storageId)).href).toBe(blobUrl);
+          expect(native.getUrl.mock.calls).toEqual([
+            [storageId],
+            [storageId],
+            [storageId],
+          ]);
+          expect(native.getUrl.mock.contexts).toEqual([native, native, native]);
+          expect(native).toEqual(original);
+          expect(native.generateUploadUrl).not.toHaveBeenCalled();
+        }).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped);
     },
   );
 
@@ -117,34 +121,49 @@ describe("Storage", () => {
     second.generateUploadUrl.mockResolvedValue(`${uploadUrl}/second`);
 
     return Effect.gen(function* () {
-      const storage = yield* Storage.Storage;
-      const upload = storage.generateUploadUrl;
-      const remove = storage.delete(storageId);
+      const storageServices = yield* Layer.build(Storage.layer(reader));
+      return yield* Effect.gen(function* () {
+        const storage = yield* Storage.Storage;
+        const upload = storage.generateUploadUrl;
+        const remove = storage.delete(storageId);
 
-      expectTypeOf(upload).toEqualTypeOf<
-        Effect.Effect<URL, never, StorageWriter>
-      >();
-      expectTypeOf(remove).toEqualTypeOf<
-        Effect.Effect<void, BlobNotFoundError, StorageWriter>
-      >();
-      expect(first.generateUploadUrl).not.toHaveBeenCalled();
-      expect(first.delete).not.toHaveBeenCalled();
-      expect(
-        (yield* upload.pipe(Effect.provide(StorageWriter.layer(first)))).href,
-      ).toBe(uploadUrl);
-      expect(
-        (yield* upload.pipe(Effect.provide(StorageWriter.layer(second)))).href,
-      ).toBe(`${uploadUrl}/second`);
-      yield* remove.pipe(Effect.provide(StorageWriter.layer(first)));
-      yield* remove.pipe(Effect.provide(StorageWriter.layer(second)));
-      expect(first.generateUploadUrl.mock.contexts).toEqual([first]);
-      expect(second.generateUploadUrl.mock.contexts).toEqual([second]);
-      expect(first.delete).toHaveBeenCalledExactlyOnceWith(storageId);
-      expect(second.delete).toHaveBeenCalledExactlyOnceWith(storageId);
-      expect(first.delete.mock.contexts).toEqual([first]);
-      expect(reader.generateUploadUrl).not.toHaveBeenCalled();
-      expect(reader.delete).not.toHaveBeenCalled();
-    }).pipe(Effect.provide(Storage.layer(reader)));
+        expectTypeOf(upload).toEqualTypeOf<
+          Effect.Effect<URL, never, StorageWriter>
+        >();
+        expectTypeOf(remove).toEqualTypeOf<
+          Effect.Effect<void, BlobNotFoundError, StorageWriter>
+        >();
+        expect(first.generateUploadUrl).not.toHaveBeenCalled();
+        expect(first.delete).not.toHaveBeenCalled();
+        expect(
+          (yield* Effect.gen(function* () {
+            const services = yield* Layer.build(StorageWriter.layer(first));
+            return yield* upload.pipe(Effect.provideContext(services));
+          }).pipe(Effect.scoped)).href,
+        ).toBe(uploadUrl);
+        expect(
+          (yield* Effect.gen(function* () {
+            const services = yield* Layer.build(StorageWriter.layer(second));
+            return yield* upload.pipe(Effect.provideContext(services));
+          }).pipe(Effect.scoped)).href,
+        ).toBe(`${uploadUrl}/second`);
+        yield* Effect.gen(function* () {
+          const services = yield* Layer.build(StorageWriter.layer(first));
+          return yield* remove.pipe(Effect.provideContext(services));
+        }).pipe(Effect.scoped);
+        yield* Effect.gen(function* () {
+          const services = yield* Layer.build(StorageWriter.layer(second));
+          return yield* remove.pipe(Effect.provideContext(services));
+        }).pipe(Effect.scoped);
+        expect(first.generateUploadUrl.mock.contexts).toEqual([first]);
+        expect(second.generateUploadUrl.mock.contexts).toEqual([second]);
+        expect(first.delete).toHaveBeenCalledExactlyOnceWith(storageId);
+        expect(second.delete).toHaveBeenCalledExactlyOnceWith(storageId);
+        expect(first.delete.mock.contexts).toEqual([first]);
+        expect(reader.generateUploadUrl).not.toHaveBeenCalled();
+        expect(reader.delete).not.toHaveBeenCalled();
+      }).pipe(Effect.provideContext(storageServices));
+    }).pipe(Effect.scoped);
   });
 
   it.effect(
@@ -161,49 +180,74 @@ describe("Storage", () => {
       second.get.mockResolvedValue(secondBlob);
 
       return Effect.gen(function* () {
-        const storage = yield* Storage.Storage;
-        const get = storage.get(storageId);
-        const store = storage.store(blob, options);
-        const storeWithoutOptions = storage.store(blob);
+        const storageServices = yield* Layer.build(Storage.layer(reader));
+        return yield* Effect.gen(function* () {
+          const storage = yield* Storage.Storage;
+          const get = storage.get(storageId);
+          const store = storage.store(blob, options);
+          const storeWithoutOptions = storage.store(blob);
 
-        expectTypeOf(get).toEqualTypeOf<
-          Effect.Effect<Blob, BlobNotFoundError, StorageActionWriter>
-        >();
-        expectTypeOf(store).toEqualTypeOf<
-          Effect.Effect<GenericId<"_storage">, never, StorageActionWriter>
-        >();
-        expect(first.get).not.toHaveBeenCalled();
-        expect(first.store).not.toHaveBeenCalled();
-        expect(
-          yield* get.pipe(Effect.provide(StorageActionWriter.layer(first))),
-        ).toBe(firstBlob);
-        expect(
-          yield* get.pipe(Effect.provide(StorageActionWriter.layer(second))),
-        ).toBe(secondBlob);
-        expect(
-          yield* store.pipe(Effect.provide(StorageActionWriter.layer(first))),
-        ).toBe(storageId);
-        expect(
-          yield* store.pipe(Effect.provide(StorageActionWriter.layer(second))),
-        ).toBe(storageId);
-        yield* storeWithoutOptions.pipe(
-          Effect.provide(StorageActionWriter.layer(first)),
-        );
-        expect(first.store.mock.calls).toEqual([
-          [blob, options],
-          [blob, undefined],
-        ]);
-        expect(first.store.mock.calls[0]?.[0]).toBe(blob);
-        expect(first.store.mock.calls[0]?.[1]).toBe(options);
-        expect(second.store).toHaveBeenCalledExactlyOnceWith(blob, options);
-        expect(first.get.mock.contexts).toEqual([first]);
-        expect(first.store.mock.contexts).toEqual([first, first]);
-        expect(options).toEqual({ sha256: "digest" });
-        expect(yield* Effect.promise(() => blob.text())).toBe("input");
-        expect(blob.type).toBe("text/plain");
-        expect(reader.get).not.toHaveBeenCalled();
-        expect(reader.store).not.toHaveBeenCalled();
-      }).pipe(Effect.provide(Storage.layer(reader)));
+          expectTypeOf(get).toEqualTypeOf<
+            Effect.Effect<Blob, BlobNotFoundError, StorageActionWriter>
+          >();
+          expectTypeOf(store).toEqualTypeOf<
+            Effect.Effect<GenericId<"_storage">, never, StorageActionWriter>
+          >();
+          expect(first.get).not.toHaveBeenCalled();
+          expect(first.store).not.toHaveBeenCalled();
+          const pipeResult = yield* Effect.gen(function* () {
+            const services = yield* Layer.build(
+              StorageActionWriter.layer(first),
+            );
+            return yield* get.pipe(Effect.provideContext(services));
+          }).pipe(Effect.scoped);
+          expect(pipeResult).toBe(firstBlob);
+          const pipeResult2 = yield* Effect.gen(function* () {
+            const services = yield* Layer.build(
+              StorageActionWriter.layer(second),
+            );
+            return yield* get.pipe(Effect.provideContext(services));
+          }).pipe(Effect.scoped);
+          expect(pipeResult2).toBe(secondBlob);
+          const pipeResult3 = yield* Effect.gen(function* () {
+            const services = yield* Layer.build(
+              StorageActionWriter.layer(first),
+            );
+            return yield* store.pipe(Effect.provideContext(services));
+          }).pipe(Effect.scoped);
+          expect(pipeResult3).toBe(storageId);
+          const pipeResult4 = yield* Effect.gen(function* () {
+            const services = yield* Layer.build(
+              StorageActionWriter.layer(second),
+            );
+            return yield* store.pipe(Effect.provideContext(services));
+          }).pipe(Effect.scoped);
+          expect(pipeResult4).toBe(storageId);
+          yield* Effect.gen(function* () {
+            const services = yield* Layer.build(
+              StorageActionWriter.layer(first),
+            );
+            return yield* storeWithoutOptions.pipe(
+              Effect.provideContext(services),
+            );
+          }).pipe(Effect.scoped);
+          expect(first.store.mock.calls).toEqual([
+            [blob, options],
+            [blob, undefined],
+          ]);
+          expect(first.store.mock.calls[0]?.[0]).toBe(blob);
+          expect(first.store.mock.calls[0]?.[1]).toBe(options);
+          expect(second.store).toHaveBeenCalledExactlyOnceWith(blob, options);
+          expect(first.get.mock.contexts).toEqual([first]);
+          expect(first.store.mock.contexts).toEqual([first, first]);
+          expect(options).toEqual({ sha256: "digest" });
+          const promiseResult = yield* Effect.promise(() => blob.text());
+          expect(promiseResult).toBe("input");
+          expect(blob.type).toBe("text/plain");
+          expect(reader.get).not.toHaveBeenCalled();
+          expect(reader.store).not.toHaveBeenCalled();
+        }).pipe(Effect.provideContext(storageServices));
+      }).pipe(Effect.scoped);
     },
   );
 
@@ -234,13 +278,11 @@ describe("Storage", () => {
           expect(error.id).toBe(storageId);
         }
       }).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            Storage.layer(native),
-            StorageWriter.layer(native),
-            StorageActionWriter.layer(native),
-          ),
-        ),
+        Effect.provide([
+          Storage.layer(native),
+          StorageWriter.layer(native),
+          StorageActionWriter.layer(native),
+        ]),
       );
     },
   );
@@ -270,16 +312,15 @@ describe("Storage", () => {
           storage.store(new Blob()),
         ];
         for (const operation of operations) {
-          expect(yield* Effect.exit(operation)).toEqual(Exit.die(failure));
+          const exitResult = yield* Effect.exit(operation);
+          expect(exitResult).toEqual(Exit.die(failure));
         }
       }).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            Storage.layer(native),
-            StorageWriter.layer(native),
-            StorageActionWriter.layer(native),
-          ),
-        ),
+        Effect.provide([
+          Storage.layer(native),
+          StorageWriter.layer(native),
+          StorageActionWriter.layer(native),
+        ]),
       );
     },
   );
@@ -299,9 +340,7 @@ describe("Storage", () => {
         expect(exit).toEqual(Exit.die(expect.any(Schema.SchemaError)));
       }
     }).pipe(
-      Effect.provide(
-        Layer.mergeAll(Storage.layer(native), StorageWriter.layer(native)),
-      ),
+      Effect.provide([Storage.layer(native), StorageWriter.layer(native)]),
     );
   });
 });

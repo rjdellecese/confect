@@ -32,17 +32,17 @@ for (const { name, pathLayer, sep } of SPECIFIER_PLATFORMS) {
 
     it.effect("toModuleImportPath emits a POSIX relative specifier", () =>
       Effect.gen(function* () {
-        expect(
-          yield* toModuleImportPath(p("..", "_generated", "schema.ts")),
-        ).toBe("../_generated/schema");
+        const actual = yield* toModuleImportPath(
+          p("..", "_generated", "schema.ts"),
+        );
+        expect(actual).toBe("../_generated/schema");
       }),
     );
 
     it.effect("toModuleImportPath prefixes a bare sibling path with ./", () =>
       Effect.gen(function* () {
-        expect(yield* toModuleImportPath(p("tables", "notes.ts"))).toBe(
-          "./tables/notes",
-        );
+        const actual2 = yield* toModuleImportPath(p("tables", "notes.ts"));
+        expect(actual2).toBe("./tables/notes");
       }),
     );
   });

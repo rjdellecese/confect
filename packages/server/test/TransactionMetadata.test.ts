@@ -1,3 +1,4 @@
+import * as Layer from "effect/Layer";
 import { TransactionMetadata as BarrelTransactionMetadata } from "@confect/server";
 import * as TransactionMetadata from "@confect/server/TransactionMetadata";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -50,21 +51,26 @@ describe("TransactionMetadata", () => {
       expect(getTransactionMetrics).not.toHaveBeenCalled();
 
       return Effect.gen(function* () {
-        const transaction = yield* TransactionMetadata.TransactionMetadata;
-        const getMetrics = transaction.getMetrics();
+        const services = yield* Layer.build(layer);
+        return yield* Effect.gen(function* () {
+          const transaction = yield* TransactionMetadata.TransactionMetadata;
+          const getMetrics = transaction.getMetrics();
 
-        expectTypeOf(getMetrics).toEqualTypeOf<
-          Effect.Effect<TransactionMetrics>
-        >();
-        expect(getTransactionMetrics).not.toHaveBeenCalled();
-        expect(yield* getMetrics).toBe(before);
-        current = after;
-        expect(yield* getMetrics).toBe(after);
-        expect(before.documentsRead).toEqual({ used: 0, remaining: 100 });
-        expect(getTransactionMetrics).toHaveBeenCalledTimes(2);
-        expect(getTransactionMetrics.mock.contexts[0]).toBe(meta);
-        expect(getTransactionMetrics.mock.contexts[1]).toBe(meta);
-      }).pipe(Effect.provide(layer));
+          expectTypeOf(getMetrics).toEqualTypeOf<
+            Effect.Effect<TransactionMetrics>
+          >();
+          expect(getTransactionMetrics).not.toHaveBeenCalled();
+          const getMetricsResult = yield* getMetrics;
+          expect(getMetricsResult).toBe(before);
+          current = after;
+          const getMetricsResult2 = yield* getMetrics;
+          expect(getMetricsResult2).toBe(after);
+          expect(before.documentsRead).toEqual({ used: 0, remaining: 100 });
+          expect(getTransactionMetrics).toHaveBeenCalledTimes(2);
+          expect(getTransactionMetrics.mock.contexts[0]).toBe(meta);
+          expect(getTransactionMetrics.mock.contexts[1]).toBe(meta);
+        }).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped);
     },
   );
 
@@ -75,12 +81,14 @@ describe("TransactionMetadata", () => {
     } satisfies Pick<QueryMeta, "getTransactionMetrics">;
 
     return Effect.gen(function* () {
-      const transaction = yield* TransactionMetadata.TransactionMetadata;
-      expect(
-        yield* transaction
+      const services = yield* Layer.build(TransactionMetadata.layer(meta));
+      return yield* Effect.gen(function* () {
+        const transaction = yield* TransactionMetadata.TransactionMetadata;
+        const pipeResult = yield* transaction
           .getMetrics()
-          .pipe(Effect.catchDefect(Effect.succeed)),
-      ).toBe(failure);
-    }).pipe(Effect.provide(TransactionMetadata.layer(meta)));
+          .pipe(Effect.catchDefect(Effect.succeed));
+        expect(pipeResult).toBe(failure);
+      }).pipe(Effect.provideContext(services));
+    }).pipe(Effect.scoped);
   });
 });

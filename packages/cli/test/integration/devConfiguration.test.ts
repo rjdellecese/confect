@@ -1,3 +1,6 @@
+import { pipe } from "effect/Function";
+import * as Option from "effect/Option";
+import * as Str from "effect/String";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -31,11 +34,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             "convex",
           ]);
           yield* watching.waitFor(success);
-          expect(
-            yield* fs.readFileString(
-              path.join(project.root, "confect/_generated/id.ts"),
-            ),
-          ).toContain('IdScope.component("counter:convex")');
+          const id = yield* fs.readFileString(
+            path.join(project.root, "confect/_generated/id.ts"),
+          );
+          expect(id).toContain('IdScope.component("counter:convex")');
           yield* project.write(
             "confect/auth.ts",
             "export default { providers: [] };",
@@ -43,18 +45,20 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* watching.waitFor(
             "Components cannot configure application authentication",
           );
-          expect(
-            yield* fs.exists(path.join(project.root, "convex/auth.config.ts")),
-          ).toBe(false);
+          const hasAuth = yield* fs.exists(
+            path.join(project.root, "convex/auth.config.ts"),
+          );
+          expect(hasAuth).toBe(false);
           yield* fs.remove(path.join(project.root, "confect/auth.ts"));
           yield* watching.waitFor(success);
           yield* project.write("confect/notes.spec.ts", `${Project.spec}\n`);
           yield* watching.waitFor(success);
-          expect(
-            yield* fs.readFileString(
-              path.join(project.root, "confect/_generated/services.ts"),
-            ),
-          ).toContain("Storage_.Storage.forScope<typeof scope>()");
+          const services = yield* fs.readFileString(
+            path.join(project.root, "confect/_generated/services.ts"),
+          );
+          expect(services).toContain(
+            "Storage_.Storage.forScope<typeof scope>()",
+          );
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -64,23 +68,32 @@ layer(NodeServices.layer, { excludeTestServices: true })(
       () =>
         Effect.gen(function* () {
           const project = yield* Project.make;
-          const spec = Project.spec.replace(
-            'import { FunctionSpec, GroupSpec } from "@confect/core";',
-            'import * as FunctionSpec from "@confect/core/FunctionSpec"; import * as GroupSpec from "@confect/core/GroupSpec";',
+          const spec = pipe(
+            Project.spec,
+            Str.replace(
+              'import { FunctionSpec, GroupSpec } from "@confect/core";',
+              'import * as FunctionSpec from "@confect/core/FunctionSpec"; import * as GroupSpec from "@confect/core/GroupSpec";',
+            ),
           );
           yield* project.write(
             "confect/tables/notes.ts",
-            Project.table.replace(
-              'import { Table } from "@confect/core";',
-              'import * as Table from "@confect/core/Table";',
+            pipe(
+              Project.table,
+              Str.replace(
+                'import { Table } from "@confect/core";',
+                'import * as Table from "@confect/core/Table";',
+              ),
             ),
           );
           yield* project.write("confect/notes.spec.ts", spec);
           yield* project.write(
             "confect/notes.impl.ts",
-            Project.impl.replace(
-              'import { FunctionImpl, GroupImpl } from "@confect/server";',
-              'import * as FunctionImpl from "@confect/server/FunctionImpl"; import * as GroupImpl from "@confect/server/GroupImpl";',
+            pipe(
+              Project.impl,
+              Str.replace(
+                'import { FunctionImpl, GroupImpl } from "@confect/server";',
+                'import * as FunctionImpl from "@confect/server/FunctionImpl"; import * as GroupImpl from "@confect/server/GroupImpl";',
+              ),
             ),
           );
           yield* project.write(
@@ -90,7 +103,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
           const startup = yield* Ref.get(watching.output);
-          expect(startup.match(/^FULL_GENERATION$/gm), startup).toHaveLength(1);
+          expect(
+            Option.getOrNull(pipe(startup, Str.match(/^FULL_GENERATION$/gm))),
+            startup,
+          ).toHaveLength(1);
           const generated = yield* project.generatedFiles;
           yield* Ref.set(watching.output, "");
           yield* project.write(
@@ -98,10 +114,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             `${spec}\n// declaration-only comment\n`,
           );
           yield* watching.waitFor(success);
-          expect(yield* Ref.get(watching.output)).not.toContain(
-            "FULL_GENERATION",
-          );
-          expect(yield* project.generatedFiles).toEqual(generated);
+          const current = yield* Ref.get(watching.output);
+          expect(current).not.toContain("FULL_GENERATION");
+          const actual = yield* project.generatedFiles;
+          expect(actual).toEqual(generated);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );
@@ -113,29 +129,30 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const project = yield* Project.make;
-          expect(
-            yield* fs.exists(path.join(project.root, "confect/_generated")),
-          ).toBe(false);
+          const actual2 = yield* fs.exists(
+            path.join(project.root, "confect/_generated"),
+          );
+          expect(actual2).toBe(false);
           yield* Effect.gen(function* () {
             const process = yield* project.start("dev");
             yield* process.waitFor(success);
-            expect(
-              yield* fs.exists(path.join(project.root, "convex/notes.ts")),
-            ).toBe(true);
+            const actual3 = yield* fs.exists(
+              path.join(project.root, "convex/notes.ts"),
+            );
+            expect(actual3).toBe(true);
             yield* Effect.sleep("2 seconds");
-            expect(
-              (yield* Ref.get(process.output)).split(success),
-            ).toHaveLength(2);
+            const current2 = yield* Ref.get(process.output);
+            expect(Str.split(current2, success)).toHaveLength(2);
           }).pipe(Effect.scoped);
           const repeated = yield* project.start("codegen");
           yield* repeated.waitFor(success);
-          expect(yield* repeated.handle.exitCode).toBe(0);
+          const actual4 = yield* repeated.handle.exitCode;
+          expect(actual4).toBe(0);
           const restarted = yield* project.start("dev");
           yield* restarted.waitFor(success);
           yield* Effect.sleep("2 seconds");
-          expect(
-            (yield* Ref.get(restarted.output)).split(success),
-          ).toHaveLength(2);
+          const current3 = yield* Ref.get(restarted.output);
+          expect(Str.split(current3, success)).toHaveLength(2);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );

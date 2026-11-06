@@ -31,6 +31,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import * as Router from "effect/http/HttpRouter";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
@@ -169,7 +170,7 @@ describe("component capabilities", () => {
           context,
           MutationCtx.MutationCtx<Model, typeof scope>(),
         );
-        expect(Object.hasOwn(raw, "auth")).toBe(false);
+        expect(Predicate.hasProperty(raw, "auth")).toBe(false);
       }).pipe(Effect.scoped);
     },
   );

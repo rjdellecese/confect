@@ -12,8 +12,8 @@
     "confect-bench-harness": "workspace:*",
     "effect": "4.1.0",
     "tsdown": "0.23.4",
+    "tsrs": "0.21.0-ts7.1.0-beta",
     "tsx": "4.23.15",
-    "typescript": "7.0.2",
     "unrun": "0.3.1",
     "vitest": "5.0.5"
   },
@@ -58,14 +58,14 @@
     "url": "git+https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
-    "bench": "tsx test/Refs.bench.ts && tsx test/Types.bench.ts",
+    "bench": "tsx test/Refs.bench.ts --checker tsrs && tsx test/Types.bench.ts --checker tsrs",
     "clean": "shx rm -rf dist coverage node_modules",
     "dev": "tsdown --watch --no-clean --config-loader unrun",
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",
-    "typecheck": "tsc -b tsconfig.src.json",
-    "typecheck:inexact": "tsc --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
+    "typecheck": "tsrs -b tsconfig.src.json",
+    "typecheck:inexact": "tsrs --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
   },
   "sideEffects": false,
   "type": "module",

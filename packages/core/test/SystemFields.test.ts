@@ -1,3 +1,4 @@
+import * as Result from "effect/Result";
 import { pipe } from "effect/Function";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
@@ -38,7 +39,9 @@ describe("extendWithSystemFields", () => {
       const extended = SystemFields.extendWithSystemFields("ranges", schema);
 
       test("preserves checks when decoding", () => {
-        expect(Schema.decodeUnknownSync(extended)(valid)).toEqual(valid);
+        expect(
+          Result.getOrThrow(Schema.decodeUnknownResult(extended)(valid)),
+        ).toEqual(valid);
         expect(Schema.decodeExit(schema)({ min: 10, max: 1 })._tag).toBe(
           "Failure",
         );
@@ -48,7 +51,9 @@ describe("extendWithSystemFields", () => {
       });
 
       test("preserves checks when encoding", () => {
-        expect(Schema.encodeUnknownSync(extended)(valid)).toEqual(valid);
+        expect(
+          Result.getOrThrow(Schema.encodeUnknownResult(extended)(valid)),
+        ).toEqual(valid);
         expect(Schema.encodeUnknownExit(schema)({ min: 10, max: 1 })._tag).toBe(
           "Failure",
         );
@@ -91,7 +96,9 @@ describe("extendWithSystemFields", () => {
       };
 
       expect(() =>
-        Schema.decodeSync(ExtendedNoteSchema)(extendedNote),
+        Result.getOrThrow(
+          Schema.decodeResult(ExtendedNoteSchema)(extendedNote),
+        ),
       ).not.toThrow();
     });
 
@@ -148,10 +155,14 @@ describe("extendWithSystemFields", () => {
       };
 
       expect(() =>
-        Schema.decodeSync(ExtendedItemSchema)(extendedNote),
+        Result.getOrThrow(
+          Schema.decodeResult(ExtendedItemSchema)(extendedNote),
+        ),
       ).not.toThrow();
       expect(() =>
-        Schema.decodeSync(ExtendedItemSchema)(extendedImage),
+        Result.getOrThrow(
+          Schema.decodeResult(ExtendedItemSchema)(extendedImage),
+        ),
       ).not.toThrow();
     });
 
@@ -215,25 +226,31 @@ describe("extendWithSystemFields", () => {
 
     test("carries the system fields through the transformation when decoding", () => {
       expect(
-        Schema.decodeSync(ExtendedNoteSchema)({
-          content: "Hello",
-          ...systemFields,
-        }),
+        Result.getOrThrow(
+          Schema.decodeResult(ExtendedNoteSchema)({
+            content: "Hello",
+            ...systemFields,
+          }),
+        ),
       ).toStrictEqual({ length: 5, ...systemFields });
     });
 
     test("carries the system fields back through the transformation when encoding", () => {
       expect(
-        Schema.encodeUnknownSync(ExtendedNoteSchema)({
-          length: 3,
-          ...systemFields,
-        }),
+        Result.getOrThrow(
+          Schema.encodeUnknownResult(ExtendedNoteSchema)({
+            length: 3,
+            ...systemFields,
+          }),
+        ),
       ).toStrictEqual({ content: "xxx", ...systemFields });
     });
 
     test("fails to decode a document missing the system fields", () => {
       expect(() =>
-        Schema.decodeUnknownSync(ExtendedNoteSchema)({ content: "Hello" }),
+        Result.getOrThrow(
+          Schema.decodeUnknownResult(ExtendedNoteSchema)({ content: "Hello" }),
+        ),
       ).toThrow();
     });
 
@@ -264,19 +281,23 @@ describe("extendWithSystemFields", () => {
 
     test("decodes from the encoded key, keeping the system fields", () => {
       expect(
-        Schema.decodeSync(ExtendedNoteSchema)({
-          full_name: "Ada",
-          ...systemFields,
-        }),
+        Result.getOrThrow(
+          Schema.decodeResult(ExtendedNoteSchema)({
+            full_name: "Ada",
+            ...systemFields,
+          }),
+        ),
       ).toStrictEqual({ name: "Ada", ...systemFields });
     });
 
     test("encodes to the encoded key, keeping the system fields", () => {
       expect(
-        Schema.encodeUnknownSync(ExtendedNoteSchema)({
-          name: "Ada",
-          ...systemFields,
-        }),
+        Result.getOrThrow(
+          Schema.encodeUnknownResult(ExtendedNoteSchema)({
+            name: "Ada",
+            ...systemFields,
+          }),
+        ),
       ).toStrictEqual({ full_name: "Ada", ...systemFields });
     });
   });
@@ -310,16 +331,20 @@ describe("extendWithSystemFields", () => {
 
     test("decodes a document for each union member", () => {
       expect(
-        Schema.decodeSync(ExtendedItemSchema)({
-          content: "Hello",
-          ...systemFields,
-        }),
+        Result.getOrThrow(
+          Schema.decodeResult(ExtendedItemSchema)({
+            content: "Hello",
+            ...systemFields,
+          }),
+        ),
       ).toStrictEqual({ length: 5, ...systemFields });
       expect(
-        Schema.decodeSync(ExtendedItemSchema)({
-          url: "https://example.com",
-          ...systemFields,
-        }),
+        Result.getOrThrow(
+          Schema.decodeResult(ExtendedItemSchema)({
+            url: "https://example.com",
+            ...systemFields,
+          }),
+        ),
       ).toStrictEqual({ url: "https://example.com", ...systemFields });
     });
   });
@@ -336,11 +361,13 @@ describe("extendWithSystemFields", () => {
 
     test("decodes a document carrying the system fields", () => {
       expect(
-        Schema.decodeUnknownSync(ExtendedNoteSchema)({
-          content: "Hello",
-          _id: "abc123",
-          _creationTime: 1234567890,
-        }),
+        Result.getOrThrow(
+          Schema.decodeUnknownResult(ExtendedNoteSchema)({
+            content: "Hello",
+            _id: "abc123",
+            _creationTime: 1234567890,
+          }),
+        ),
       ).toStrictEqual({
         content: "Hello",
         _id: "abc123",
@@ -361,11 +388,13 @@ describe("extendWithSystemFields", () => {
 
     test("decodes a document carrying the system fields", () => {
       expect(
-        Schema.decodeUnknownSync(ExtendedNoteSchema)({
-          content: "Hello",
-          _id: "abc123",
-          _creationTime: 1234567890,
-        }),
+        Result.getOrThrow(
+          Schema.decodeUnknownResult(ExtendedNoteSchema)({
+            content: "Hello",
+            _id: "abc123",
+            _creationTime: 1234567890,
+          }),
+        ),
       ).toStrictEqual({
         content: "Hello",
         _id: "abc123",
@@ -376,7 +405,7 @@ describe("extendWithSystemFields", () => {
 
   describe("unsupported table schemas", () => {
     test("rejects a Schema.Class with a descriptive error", () => {
-      class Note extends Schema.Class<Note>("Note")({
+      class Note extends Schema.Class<Note, {}>("Note")({
         content: Schema.String,
       }) {}
 

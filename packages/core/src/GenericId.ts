@@ -5,6 +5,7 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
+import * as String from "effect/String";
 import * as IdScope from "./IdScope";
 
 const ConvexId = "~@confect/core/ConvexId";
@@ -212,13 +213,13 @@ export const rebase = <
     const ownScope = scope(ast);
     const scoped =
       Option.isSome(tableName(ast)) &&
-      (ownScope === from || ownScope.startsWith(`${from}/instance:`))
+      (ownScope === from || String.startsWith(`${from}/instance:`)(ownScope))
         ? (Object.create(Object.getPrototypeOf(next), {
             ...Object.getOwnPropertyDescriptors(next),
             annotations: {
               value: {
                 ...next.annotations,
-                [ConvexIdScope]: to + ownScope.slice(from.length),
+                [ConvexIdScope]: to + String.slice(from.length)(ownScope),
               },
               enumerable: true,
               configurable: true,

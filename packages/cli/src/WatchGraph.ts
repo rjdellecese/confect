@@ -1,3 +1,4 @@
+import * as Record from "effect/Record";
 import type * as esbuild from "esbuild";
 import * as HashMap from "effect/HashMap";
 import * as HashSet from "effect/HashSet";
@@ -10,10 +11,10 @@ export const make = (
   resolve: (file: string) => string,
 ): WatchGraph => {
   let importers = HashMap.empty<string, HashSet.HashSet<string>>();
-  for (const [file, input] of Object.entries(metafile.inputs)) {
+  for (const [file, input] of Record.toEntries(metafile.inputs)) {
     const importer = resolve(file);
     for (const dependency of input.imports) {
-      if (dependency.external) continue;
+      if (dependency.external === true) continue;
       const imported = resolve(dependency.path);
       const parents = Option.getOrElse(HashMap.get(importers, imported), () =>
         HashSet.empty<string>(),

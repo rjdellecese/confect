@@ -1,4 +1,5 @@
 {
+  "extends": "../../../../../../tsconfig.effect.json",
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",

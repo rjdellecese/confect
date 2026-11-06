@@ -1,3 +1,4 @@
+import * as Record from "effect/Record";
 import { describe, expect, test } from "@effect/vitest";
 import * as Lazy from "@confect/core/Lazy";
 import * as MutableRef from "effect/MutableRef";
@@ -48,13 +49,13 @@ describe("Lazy.defineProperty", () => {
     // Force materialisation.
     void target.value;
 
-    expect(Object.keys(target)).toContain("value");
+    expect(Record.keys(target)).toContain("value");
   });
 
   test("property is enumerable in the unforced (getter) state too", () => {
     const target = {} as { value: number };
     Lazy.defineProperty(target, "value", () => 7);
 
-    expect(Object.keys(target)).toContain("value");
+    expect(Record.keys(target)).toContain("value");
   });
 });

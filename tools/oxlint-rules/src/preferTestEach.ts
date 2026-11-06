@@ -1,3 +1,8 @@
+import * as Option from "effect/Option";
+import * as Arr from "effect/Array";
+import * as Str from "effect/String";
+import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
 import type {
   ESTree,
   OxlintScope,
@@ -32,11 +37,11 @@ const variableAt = (
 ): Variable | undefined => {
   for (
     let scope: OxlintScope | null = source.getScope(node);
-    scope;
+    scope !== null;
     scope = scope.upper
   ) {
     const variable = scope.set.get(node.name);
-    if (variable) return variable;
+    if (variable !== undefined) return variable;
   }
   return undefined;
 };
@@ -58,14 +63,16 @@ const resolveApi = (
   if (node.type === "Identifier") {
     const variable = variableAt(source, node);
     if (
-      !variable ||
-      variable.references.some(
+      variable === undefined ||
+      Arr.some(
+        variable.references,
         (reference) => reference.isWrite() && !reference.init,
       )
     )
       return undefined;
     const definition = variable.defs[0];
-    if (!definition || variable.defs.length !== 1) return undefined;
+    if (definition === undefined || variable.defs.length !== 1)
+      return undefined;
     const declaration = definition.node;
     if (
       declaration.type === "ImportSpecifier" ||
@@ -90,7 +97,7 @@ const resolveApi = (
     if (
       declaration.type === "VariableDeclarator" &&
       declaration.id.type === "Identifier" &&
-      declaration.init &&
+      declaration.init != null &&
       declaration.parent.type === "VariableDeclaration" &&
       declaration.parent.kind === "const"
     ) {
@@ -143,7 +150,7 @@ const registrationLoop = (
 ): ESTree.ForOfStatement | ESTree.CallExpression | undefined => {
   for (
     let parent: ESTree.Node | null = node.parent;
-    parent;
+    parent !== null;
     parent = parent.parent
   ) {
     if (parent.type === "ForOfStatement") return parent;
@@ -165,7 +172,7 @@ const registrationLoop = (
 const insideTest = (source: OxlintSourceCode, node: ESTree.Node): boolean => {
   for (
     let parent: ESTree.Node | null = node.parent;
-    parent;
+    parent !== null;
     parent = parent.parent
   ) {
     if (!isFunction(parent) || parent.parent?.type !== "CallExpression")
@@ -198,11 +205,13 @@ const isLiteralData = (node: ESTree.Node): boolean => {
       node.value === null
     );
   if (node.type === "ArrayExpression")
-    return node.elements.every(
+    return Arr.every(
+      node.elements,
       (element) => element !== null && isLiteralData(element),
     );
   if (node.type === "ObjectExpression")
-    return node.properties.every(
+    return Arr.every(
+      node.properties,
       (property) =>
         property.type === "Property" &&
         !property.computed &&
@@ -223,13 +232,14 @@ const eachTitle = (
   if (node.type !== "TemplateLiteral" || node.expressions.length !== 1)
     return undefined;
   const [expression] = node.expressions;
-  const parts = node.quasis.map((quasi) => quasi.value.cooked);
-  if (parts.some((part) => part === null || /[%$]/.test(part)))
+  const parts = Arr.map(node.quasis, (quasi) => quasi.value.cooked);
+  if (Arr.some(parts, (part) => part === null || /[%$]/.test(part)))
     return undefined;
   if (
     expression.type === "Identifier" &&
     expression.name === row &&
-    rows.elements.every(
+    Arr.every(
+      rows.elements,
       (element) =>
         element?.type === "Literal" && typeof element.value === "string",
     )
@@ -242,14 +252,17 @@ const eachTitle = (
   ) {
     const name = propertyName(expression);
     if (
-      name &&
+      name !== undefined &&
+      name !== "" &&
       /^[A-Za-z_]\w*$/.test(name) &&
       name !== "__proto__" &&
       !/^[\w.$]/.test(parts[1] ?? "") &&
-      rows.elements.every(
+      Arr.every(
+        rows.elements,
         (element) =>
           element?.type === "ObjectExpression" &&
-          element.properties.filter(
+          Arr.filter(
+            element.properties,
             (property) =>
               property.type === "Property" &&
               ((property.key.type === "Identifier" &&
@@ -257,7 +270,8 @@ const eachTitle = (
                 (property.key.type === "Literal" &&
                   property.key.value === name)),
           ).length === 1 &&
-          element.properties.some(
+          Arr.some(
+            element.properties,
             (property) =>
               property.type === "Property" &&
               property.key.type === "Identifier" &&
@@ -288,7 +302,7 @@ const replacement = (
   )
     return undefined;
   const row = loop.left.declarations[0].id;
-  if (row.type !== "Identifier" || row.typeAnnotation) return undefined;
+  if (row.type !== "Identifier" || row.typeAnnotation != null) return undefined;
   const statements =
     loop.body.type === "BlockStatement" ? loop.body.body : [loop.body];
   if (
@@ -306,19 +320,19 @@ const replacement = (
     return undefined;
   if (
     api !== "effect" &&
-    rows.elements.some((element) => element?.type === "ArrayExpression")
+    Arr.some(rows.elements, (element) => element?.type === "ArrayExpression")
   )
     return undefined;
   const [title, callback, timeout] = call.arguments;
   if (
-    !title ||
-    !callback ||
+    title === undefined ||
+    callback === undefined ||
     callback.type !== "ArrowFunctionExpression" ||
     callback.params.length !== 0 ||
-    callback.typeParameters ||
-    callback.returnType ||
+    callback.typeParameters != null ||
+    callback.returnType != null ||
     call.arguments.length > 3 ||
-    (timeout &&
+    (timeout !== undefined &&
       (timeout.type !== "Literal" || typeof timeout.value !== "number"))
   )
     return undefined;
@@ -327,22 +341,24 @@ const replacement = (
     return undefined;
   const variable = variableAt(source, row);
   if (
-    !variable ||
-    variable.references.some(
+    variable === undefined ||
+    Arr.some(
+      variable.references,
       (reference) => reference.isWrite() && !reference.init,
     )
   )
     return undefined;
-  const comments = source
-    .getAllComments()
-    .filter(
-      (comment) =>
-        comment.range[0] >= loop.range[0] && comment.range[1] <= loop.range[1],
-    );
+  const comments = Arr.filter(
+    source.getAllComments(),
+    (comment) =>
+      comment.range[0] >= loop.range[0] && comment.range[1] <= loop.range[1],
+  );
   if (
-    comments.some(
+    Arr.some(
+      comments,
       (comment) =>
-        ![loop.right, callback].some(
+        !Arr.some(
+          [loop.right, callback],
           (kept) =>
             comment.range[0] >= kept.range[0] &&
             comment.range[1] <= kept.range[1],
@@ -352,17 +368,24 @@ const replacement = (
     return undefined;
   const scope = source.getScope(callback);
   if (
-    scope.through.some((reference) => reference.identifier.name === "arguments")
+    Arr.some(
+      scope.through,
+      (reference) => reference.identifier.name === "arguments",
+    )
   )
     return undefined;
-  const opening = source
-    .getTokens(callback)
-    .find((token) => token.value === "(");
-  if (!opening) return undefined;
+  const opening = Option.getOrUndefined(
+    Arr.findFirst(source.getTokens(callback), (token) => token.value === "("),
+  );
+  if (opening === undefined) return undefined;
   const callbackText = source.getText(callback);
   const offset = opening.range[1] - callback.range[0];
-  const arrow = `${callbackText.slice(0, offset)}${row.name}${callbackText.slice(offset)}`;
-  return `${source.getText(call.callee)}.each(${source.getText(loop.right)})(${JSON.stringify(name)}, ${arrow}${timeout ? `, ${source.getText(timeout)}` : ""});`;
+  const arrow = `${Str.slice(0, offset)(callbackText)}${row.name}${Str.slice(offset)(callbackText)}`;
+  const encodedName = Schema.encodeResult(Schema.fromJsonString(Schema.String))(
+    name,
+  );
+  if (Result.isFailure(encodedName)) return undefined;
+  return `${source.getText(call.callee)}.each(${source.getText(loop.right)})(${encodedName.success}, ${arrow}${timeout !== undefined ? `, ${source.getText(timeout)}` : ""});`;
 };
 
 export const preferTestEach = Rule.define({
@@ -377,7 +400,7 @@ export const preferTestEach = Rule.define({
     return Visitor.on("CallExpression", (node) => {
       const api = resolveApi(ctx.sourceCode, node.callee);
       if (
-        !api ||
+        api === undefined ||
         api === "layer" ||
         api === "effect-namespace" ||
         api === "plain-namespace" ||
@@ -385,7 +408,8 @@ export const preferTestEach = Rule.define({
       )
         return Effect.void;
       const loop = registrationLoop(node);
-      if (!loop || insideTest(ctx.sourceCode, node)) return Effect.void;
+      if (loop === undefined || insideTest(ctx.sourceCode, node))
+        return Effect.void;
       const diagnostic = Diagnostic.make({
         node,
         message:

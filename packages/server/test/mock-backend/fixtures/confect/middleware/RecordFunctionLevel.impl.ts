@@ -13,6 +13,6 @@ export default MiddlewareImpl.make(
     typeof args === "object" &&
     args !== null &&
     (args as { blockedAtFunction?: boolean }).blockedAtFunction === true
-      ? Effect.fail(new FunctionGateClosed())
+      ? Effect.fail(FunctionGateClosed.make())
       : insertMarker("function").pipe(Effect.andThen(effect)),
 );

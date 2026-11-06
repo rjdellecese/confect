@@ -19,7 +19,7 @@ export default MiddlewareImpl.provides(
       .pipe(Effect.orDie);
 
     return yield* Option.match(user, {
-      onNone: () => new NotSignedIn(),
+      onNone: () => NotSignedIn.make(),
       onSome: (user_) => Effect.succeed({ user: user_ }),
     });
   }),

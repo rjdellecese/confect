@@ -34,7 +34,7 @@ const make = (storageWriter: ConvexStorageWriter) => ({
   delete: (storageId: GenericId<"_storage">) =>
     Effect.tryPromise({
       try: () => storageWriter.delete(storageId),
-      catch: () => new BlobNotFoundError({ id: storageId }),
+      catch: () => BlobNotFoundError.make({ id: storageId }),
     }),
 });
 

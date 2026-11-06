@@ -4,6 +4,9 @@ import * as Layer from "effect/Layer";
 import * as AiGatewayServiceToken from "./AiGatewayServiceToken";
 import { AI_GATEWAY_API_URL } from "./constants";
 
+/**
+ * @internal
+ */
 export const make = Effect.gen(function* () {
   const serviceToken = yield* AiGatewayServiceToken.AiGatewayServiceToken;
   yield* serviceToken.get("ai-gateway");
@@ -13,4 +16,7 @@ export const make = Effect.gen(function* () {
   });
 });
 
+/**
+ * @internal
+ */
 export const layer = Layer.effect(OpenAiClient.OpenAiClient, make);

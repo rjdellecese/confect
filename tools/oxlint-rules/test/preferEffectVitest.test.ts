@@ -1,3 +1,4 @@
+import * as Record from "effect/Record";
 import { describe, expect, it } from "@effect/vitest";
 import type { Fixer } from "effect-oxlint";
 import * as Testing from "effect-oxlint/testing";
@@ -92,7 +93,8 @@ describe("prefer-effect-vitest", () => {
 describe("plugin", () => {
   it("registers the rule under the confect namespace", () => {
     expect(confectPlugin.meta.name).toBe("confect");
-    expect(Object.keys(confectPlugin.rules)).toEqual([
+    expect(Record.keys(confectPlugin.rules)).toEqual([
+      "no-schema-codec-wrappers",
       "prefer-effect-vitest",
       "prefer-test-each",
       "require-query-stream-experimental",

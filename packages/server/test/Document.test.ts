@@ -28,14 +28,9 @@ const decodeUncached = (
   tableSchema: typeof NoteSchema,
   convexDocument: typeof convexNote,
 ) =>
-  Schema.decodeSync(
+  Schema.decodeResult(
     SystemFields.extendWithSystemFields(tableName, tableSchema),
-  )(convexDocument);
-
-const encodeUncached = (
-  tableSchema: typeof NoteSchema,
-  document: ReturnType<typeof decodeUncached>,
-) => Schema.encodeSync(tableSchema)(document);
+  )(convexDocument).pipe(Result.getOrThrow);
 
 describe("Document.decode", () => {
   it.effect("uses the decoder installed for the bound table Doc lazily", () =>
@@ -60,8 +55,10 @@ describe("Document.decode", () => {
         },
       });
 
-      expect(yield* decode(convexNote)).toEqual(convexNote);
-      expect(yield* decode(convexNote)).toEqual(convexNote);
+      const decodeResult = yield* decode(convexNote);
+      expect(decodeResult).toEqual(convexNote);
+      const decodeResult2 = yield* decode(convexNote);
+      expect(decodeResult2).toEqual(convexNote);
       expect(calls).toBe(2);
       expect(evaluations).toBe(1);
       expect(table.Doc).toBe(doc);
@@ -156,8 +153,10 @@ describe("Document.encode", () => {
       const encode = Document.encode(table);
 
       expect(evaluations).toBe(0);
-      expect(yield* encode({ amount: 12 })).toEqual({ amount: "12" });
-      expect(yield* encode({ amount: 34 })).toEqual({ amount: "34" });
+      const encodeResult = yield* encode({ amount: 12 });
+      expect(encodeResult).toEqual({ amount: "12" });
+      const encodeResult2 = yield* encode({ amount: 34 });
+      expect(encodeResult2).toEqual({ amount: "34" });
       expect(evaluations).toBe(1);
       expect(Object.getOwnPropertyDescriptor(table, "Doc")).toHaveProperty(
         "get",
@@ -185,7 +184,9 @@ describe("Document.encode", () => {
   it.effect("encodes documents identically to an uncached encoder", () =>
     Effect.gen(function* () {
       const decoded = decodeUncached("notes", NoteSchema, convexNote);
-      const expected = encodeUncached(NoteSchema, decoded);
+      const expected = Schema.encodeResult(NoteSchema)(decoded).pipe(
+        Result.getOrThrow,
+      );
 
       const encoded = yield* Document.encode(decoded, notes);
 

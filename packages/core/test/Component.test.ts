@@ -1,3 +1,4 @@
+import * as Array from "effect/Array";
 import { assert, describe, expect, it } from "@effect/vitest";
 import {
   Component,
@@ -156,7 +157,9 @@ describe("published component contracts", () => {
     expect(GenericId.scope(kind.item.ast)).toBe(
       GenericId.scope(Component.id(bound, "items").ast),
     );
-    expect(Schema.decodeSync(kind.page)(["one"])).toEqual(["one"]);
+    expect(Result.getOrThrow(Schema.decodeResult(kind.page)(["one"]))).toEqual([
+      "one",
+    ]);
   });
 
   it("preserves middleware attachments and lazily rebinds their error schemas", () => {
@@ -203,7 +206,7 @@ describe("published component contracts", () => {
     expect(functionAttachment.options).toBe(functionOptions);
     expect(groupAttachment.spec).toBe(functionAttachment.spec);
     expect(left.items.get.middlewareSpecs).toEqual(
-      attachments.map(({ spec: middleware }) => middleware),
+      Array.map(attachments, ({ spec: middleware }) => middleware),
     );
     expect(MiddlewareAttachment.validateAll(attachments, "bound ref")).toEqual(
       Result.void,
@@ -309,7 +312,8 @@ describe("published component contracts", () => {
             .addFunction(
               FunctionSpec.publicQuery({
                 name: "list",
-                returns: () => Schema.toCodecJson(Schema.ReadonlySet(ItemId)),
+                returns: () =>
+                  ItemId.pipe(Schema.ReadonlySet, Schema.toCodecJson),
               }),
             )
             .addFunction(
@@ -345,14 +349,18 @@ describe("published component contracts", () => {
   });
 
   it("reuses scoped IDs and codecs in host schemas", () => {
-    const id = Schema.decodeUnknownSync(Component.id(first, "items"))("one");
+    const id = Result.getOrThrow(
+      Schema.decodeUnknownResult(Component.id(first, "items"))("one"),
+    );
     const args: Ref.Args<typeof first.items.get> = { id };
     void args;
     expect(
       SchemaToValidator.compileReturnsSchema(Component.id(first, "items")),
     ).toEqual(v.string());
     expect(
-      Schema.decodeUnknownSync(Component.schema(first, ItemId))("one"),
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(Component.schema(first, ItemId))("one"),
+      ),
     ).toBe(id);
     // @ts-expect-error Only declared component table names are accepted.
     Component.id(first, "missing");

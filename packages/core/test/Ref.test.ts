@@ -1,3 +1,4 @@
+import * as Array from "effect/Array";
 import type {
   FunctionReference,
   FunctionVisibility,
@@ -71,12 +72,113 @@ describe("isRef", () => {
   });
 });
 
+describe("make", () => {
+  test("preserves inline client inference for omitted query arguments", () => {
+    const client = {
+      query: <Query extends Ref.AnyPublicQuery>(
+        _ref: Query,
+        ..._args: Ref.OptionalArgs<Query>
+      ): Effect.Effect<
+        Ref.Returns<Query>,
+        Ref.Error<Query> | Schema.SchemaError
+      > => Effect.never,
+      mutation: <Mutation extends Ref.AnyPublicMutation>(
+        _ref: Mutation,
+        ..._args: Ref.OptionalArgs<Mutation>
+      ): Effect.Effect<
+        Ref.Returns<Mutation>,
+        Ref.Error<Mutation> | Schema.SchemaError
+      > => Effect.never,
+      action: <Action extends Ref.AnyPublicAction>(
+        _ref: Action,
+        ..._args: Ref.OptionalArgs<Action>
+      ): Effect.Effect<
+        Ref.Returns<Action>,
+        Ref.Error<Action> | Schema.SchemaError
+      > => Effect.never,
+    };
+    const result = client.query(
+      Ref.make(
+        "clients",
+        FunctionSpec.publicQuery({
+          name: "echoQuery",
+          returns: () => Schema.FiniteFromString,
+        }),
+      ),
+    );
+    expectTypeOf(result).toEqualTypeOf<
+      Effect.Effect<number, Schema.SchemaError>
+    >();
+    const mutation = client.mutation(
+      Ref.make(
+        "clients",
+        FunctionSpec.publicMutation({
+          name: "echoMutation",
+          returns: () => Schema.FiniteFromString,
+        }),
+      ),
+    );
+    const action = client.action(
+      Ref.make(
+        "clients",
+        FunctionSpec.publicAction({
+          name: "echoAction",
+          returns: () => Schema.FiniteFromString,
+        }),
+      ),
+    );
+    expectTypeOf(mutation).toEqualTypeOf<
+      Effect.Effect<number, Schema.SchemaError>
+    >();
+    expectTypeOf(action).toEqualTypeOf<
+      Effect.Effect<number, Schema.SchemaError>
+    >();
+    const requiredArgs = Ref.make(
+      "clients",
+      FunctionSpec.publicQuery({
+        name: "requiredArgs",
+        args: () => ({ value: Schema.FiniteFromString }),
+        returns: () => Schema.FiniteFromString,
+      }),
+    );
+    expectTypeOf<Ref.Error<typeof requiredArgs>>().toEqualTypeOf<never>();
+    expectTypeOf<Ref.OptionalArgs<typeof requiredArgs>>().toEqualTypeOf<
+      [args: { readonly value: number }]
+    >();
+    // @ts-expect-error
+    expectTypeOf(client.query(requiredArgs)).toEqualTypeOf<
+      Effect.Effect<number, Schema.SchemaError>
+    >();
+    // @ts-expect-error
+    expectTypeOf(client.query(requiredArgs, { value: "1" })).toEqualTypeOf<
+      Effect.Effect<number, Schema.SchemaError>
+    >();
+    expectTypeOf(client.query(requiredArgs, { value: 1 })).toEqualTypeOf<
+      Effect.Effect<number, Schema.SchemaError>
+    >();
+  });
+
+  test("constructs references without forcing lazy schemas", () => {
+    const args = vi.fn(() => ({ count: Schema.FiniteFromString }));
+    const returns = vi.fn(() => Schema.FiniteFromString);
+    const spec = FunctionSpec.publicQuery({ name: "count", args, returns });
+    const ref = Ref.make("queries", spec);
+    const refWithAttachments = Ref.make("queries", spec, []);
+
+    expectTypeOf(ref).toEqualTypeOf<Ref.FromFunctionSpec<typeof spec>>();
+    expect(Ref.getConvexFunctionName(ref)).toBe("queries:count");
+    expect(Ref.getConvexFunctionName(refWithAttachments)).toBe("queries:count");
+    expect(args).not.toHaveBeenCalled();
+    expect(returns).not.toHaveBeenCalled();
+  });
+});
+
 describe("runWithCodec", () => {
-  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+  class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
     id: Schema.String,
   }) {}
 
-  class TransportFailure extends Schema.TaggedError<TransportFailure>()(
+  class TransportFailure extends Schema.TaggedError<TransportFailure, {}>()(
     "TransportFailure",
     {
       cause: Schema.Unknown,
@@ -114,10 +216,11 @@ describe("runWithCodec", () => {
         >();
         expect(readCount).not.toHaveBeenCalled();
         expect(invoke).not.toHaveBeenCalled();
-
-        expect(yield* effect).toBe(2);
+        const result1 = yield* effect;
+        expect(result1).toBe(2);
         readCount.mockReturnValue(3);
-        expect(yield* effect).toBe(2);
+        const result2 = yield* effect;
+        expect(result2).toBe(2);
         expect(invoke).toHaveBeenNthCalledWith(
           1,
           Ref.getFunctionReference(ref),
@@ -137,7 +240,7 @@ describe("runWithCodec", () => {
         Promise.reject(new ConvexError({ _tag: "NotFound", id: "abc" })),
       );
       const error = yield* Effect.flip(effect);
-      expect(error).toEqual(new NotFound({ id: "abc" }));
+      expect(error).toEqual(NotFound.make({ id: "abc" }));
     }),
   );
 
@@ -148,13 +251,13 @@ describe("runWithCodec", () => {
         ref,
         { count: 1 },
         () => Promise.reject(rejection),
-        (cause) => new TransportFailure({ cause }),
+        (cause) => TransportFailure.make({ cause }),
       );
       expectTypeOf(effect).toEqualTypeOf<
         Effect.Effect<number, NotFound | TransportFailure | Schema.SchemaError>
       >();
       const error = yield* Effect.flip(effect);
-      expect(error).toEqual(new TransportFailure({ cause: rejection }));
+      expect(error).toEqual(TransportFailure.make({ cause: rejection }));
     }),
   );
 });
@@ -408,7 +511,7 @@ describe("Error type extraction", () => {
   });
 
   test("error schema extracts the error type", () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -423,10 +526,10 @@ describe("Error type extraction", () => {
   });
 
   test("union error schema extracts the union type", () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
       id: Schema.String,
     }) {}
-    class Forbidden extends Schema.TaggedError<Forbidden>()("Forbidden", {
+    class Forbidden extends Schema.TaggedError<Forbidden, {}>()("Forbidden", {
       reason: Schema.String,
     }) {}
 
@@ -461,7 +564,7 @@ describe("isConvexError", () => {
 describe("decodeError", () => {
   it.effect("decodes error data using the error schema", () =>
     Effect.gen(function* () {
-      class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+      class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
         id: Schema.String,
       }) {}
 
@@ -498,7 +601,7 @@ describe("decodeError", () => {
 });
 
 describe("decodeErrorOption", () => {
-  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+  class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
     id: Schema.String,
   }) {}
 
@@ -550,7 +653,7 @@ describe("decodeErrorOption", () => {
 });
 
 describe("decodeErrorOrElse", () => {
-  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+  class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
     id: Schema.String,
   }) {}
 
@@ -603,7 +706,7 @@ describe("decodeErrorOrElse", () => {
 
 describe("hasErrorSchema", () => {
   test("returns true for Confect ref with an error schema", () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -686,7 +789,7 @@ describe("paginated queries", () => {
     });
 
     test("is satisfied by a paginated query ref with an error schema", () => {
-      class PaginationFailed extends Schema.TaggedError<PaginationFailed>()(
+      class PaginationFailed extends Schema.TaggedError<PaginationFailed, {}>()(
         "PaginationFailed",
         {},
       ) {}
@@ -782,8 +885,8 @@ describe("error schema laziness at decode time", () => {
     const specErrorBuilt = MutableRef.make(false);
     const middlewareErrorBuilt = MutableRef.make(false);
 
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {}) {}
-    class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
+    class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {}) {}
+    class Blocked extends Schema.TaggedError<Blocked, {}>()("Blocked", {}) {}
 
     class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("LazyDecodeGate", {
       functionTypes: { query: true, mutation: true, action: true },
@@ -829,7 +932,7 @@ describe("make with middleware options", () => {
   it("derives middleware specs from ordered attachments without forcing schemas", () => {
     const optionsBuilt = MutableRef.make(false);
     const errorBuilt = MutableRef.make(false);
-    class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
+    class Blocked extends Schema.TaggedError<Blocked, {}>()("Blocked", {}) {}
     class Policy extends MiddlewareSpec.MiddlewareSpec<Policy>()("Policy", {
       options: () => {
         MutableRef.set(optionsBuilt, true);
@@ -849,7 +952,7 @@ describe("make with middleware options", () => {
 
     expect(ref.middlewareSpecs).toEqual([Policy, Policy]);
     expect(ref.middlewareSpecs).toEqual(
-      ref.middlewareAttachments.map(({ spec }) => spec),
+      Array.map(ref.middlewareAttachments, ({ spec }) => spec),
     );
     expect(Ref.hasErrorSchema(ref)).toBe(true);
     expect(MutableRef.get(optionsBuilt)).toBe(false);

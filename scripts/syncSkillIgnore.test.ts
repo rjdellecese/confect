@@ -1,3 +1,5 @@
+import * as Arr from "effect/Array";
+import * as Result from "effect/Result";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { expect, test } from "bun:test";
 import * as Effect from "effect/Effect";
@@ -12,30 +14,27 @@ import {
   vendoredSkillDirectories,
 } from "./syncSkillIgnore";
 
-const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+const Json = Schema.fromJsonString(Schema.Unknown);
 
 const runTest = <A, E>(
   effect: Effect.Effect<A, E, BunServices.BunServices>,
 ): Promise<A> =>
-  Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)));
+  effect.pipe(Effect.provide(BunServices.layer), Effect.runPromise);
 
 test("derives sorted installed directories from the lock", () =>
   runTest(
     Effect.gen(function* () {
-      const lock = encodeJson({
+      const lock = Schema.encodeResult(Json)({
         version: 1,
         skills: {
           zed: {},
           "Convex Best Practices": {},
           effect: {},
         },
-      });
+      }).pipe(Result.getOrThrow);
 
-      expect(yield* vendoredSkillDirectories(lock)).toEqual([
-        "convex-best-practices",
-        "effect",
-        "zed",
-      ]);
+      const directories = yield* vendoredSkillDirectories(lock);
+      expect(directories).toEqual(["convex-best-practices", "effect", "zed"]);
       expect(installedDirectoryName("../Unsafe Skill")).toBe("unsafe-skill");
     }),
   ));
@@ -54,10 +53,10 @@ test("rejects malformed, unsupported, and colliding lock entries", () =>
       );
 
       const collision = yield* vendoredSkillDirectories(
-        encodeJson({
+        Schema.encodeResult(Json)({
           version: 1,
           skills: { "same skill": {}, "same-skill": {} },
-        }),
+        }).pipe(Result.getOrThrow),
       ).pipe(Effect.flip);
       expect(collision.message).toMatch(/same installed directory/u);
     }),
@@ -66,63 +65,71 @@ test("rejects malformed, unsupported, and colliding lock entries", () =>
 test("replaces only the managed ignore block", () =>
   runTest(
     Effect.gen(function* () {
-      const current = [
-        "dist/",
-        "# skills-lock:start",
-        ".agents/skills/old/",
-        "# skills-lock:end",
-        "coverage/",
-        "",
-      ].join("\n");
-      const block = [
-        "# skills-lock:start",
-        "# Generated",
-        ".agents/skills/effect/",
-        "# skills-lock:end",
-      ].join("\n");
+      const current = Arr.join(
+        [
+          "dist/",
+          "# skills-lock:start",
+          ".agents/skills/old/",
+          "# skills-lock:end",
+          "coverage/",
+          "",
+        ],
+        "\n",
+      );
+      const block = Arr.join(
+        [
+          "# skills-lock:start",
+          "# Generated",
+          ".agents/skills/effect/",
+          "# skills-lock:end",
+        ],
+        "\n",
+      );
 
-      expect(yield* updateManagedBlock(current, block)).toBe(
-        ["dist/", block, "coverage/", ""].join("\n"),
+      const updatedIgnore = yield* updateManagedBlock(current, block);
+      expect(updatedIgnore).toBe(
+        Arr.join(["dist/", block, "coverage/", ""], "\n"),
       );
     }),
   ));
 
 test("writes generated output and detects later drift", () =>
   runTest(
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const cwd = yield* fs.makeTempDirectoryScoped({
-          prefix: "confect-skill-ignore-",
-        });
-        const lockPath = path.join(cwd, "skills-lock.json");
-        const ignorePath = path.join(cwd, ".ignore");
-        yield* fs.writeFileString(
-          lockPath,
-          encodeJson({ version: 1, skills: { effect: {} } }),
-        );
-        yield* fs.writeFileString(ignorePath, "dist/\n");
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const cwd = yield* fs.makeTempDirectoryScoped({
+        prefix: "confect-skill-ignore-",
+      });
+      const lockPath = path.join(cwd, "skills-lock.json");
+      const ignorePath = path.join(cwd, ".ignore");
+      yield* fs.writeFileString(
+        lockPath,
+        Schema.encodeResult(Json)({ version: 1, skills: { effect: {} } }).pipe(
+          Result.getOrThrow,
+        ),
+      );
+      yield* fs.writeFileString(ignorePath, "dist/\n");
 
-        yield* syncSkillIgnore({ cwd });
-        expect(yield* fs.readFileString(ignorePath)).toMatch(
-          /dist\/\n\n# skills-lock:start\n[\s\S]*\.agents\/skills\/effect\/\n# skills-lock:end\n/u,
-        );
-        yield* syncSkillIgnore({ check: true, cwd });
+      yield* syncSkillIgnore({ cwd });
+      const generatedIgnore = yield* fs.readFileString(ignorePath);
+      expect(generatedIgnore).toMatch(
+        /dist\/\n\n# skills-lock:start\n[\s\S]*\.agents\/skills\/effect\/\n# skills-lock:end\n/u,
+      );
+      yield* syncSkillIgnore({ check: true, cwd });
 
-        yield* fs.writeFileString(
-          lockPath,
-          encodeJson({
-            version: 1,
-            skills: { effect: {}, vitest: {} },
-          }),
-        );
-        const drift = yield* syncSkillIgnore({ check: true, cwd }).pipe(
-          Effect.flip,
-        );
-        expect(drift.message).toMatch(/pnpm skills:sync-ignore/u);
-      }),
-    ),
+      yield* fs.writeFileString(
+        lockPath,
+        Schema.encodeResult(Json)({
+          version: 1,
+          skills: { effect: {}, vitest: {} },
+        }).pipe(Result.getOrThrow),
+      );
+      const drift = yield* syncSkillIgnore({ check: true, cwd }).pipe(
+        Effect.flip,
+      );
+      expect(drift.message).toMatch(/pnpm skills:sync-ignore/u);
+    }).pipe(Effect.scoped),
   ));
 
 test("recognizes every mutating skills command alias", () => {

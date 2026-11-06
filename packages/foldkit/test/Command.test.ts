@@ -1,5 +1,5 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { describe, expect, expectTypeOf, it, test } from "@effect/vitest";
+import { describe, expect, expectTypeOf, layer, test } from "@effect/vitest";
 import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -39,7 +39,10 @@ const sendActionRef = Ref.make(
   }),
 );
 
-class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedError<
+  NotFound,
+  { readonly brand: unique symbol }
+>()("NotFound", {
   id: Schema.String,
 }) {}
 
@@ -70,7 +73,7 @@ const saveNoteConfig = {
   ...saveNoteHandlers,
 };
 
-describe("Command", () => {
+layer(TestClient.layer, { buildPerTest: true })("Command", (it) => {
   describe("definition factories", () => {
     it("carry the Command name and the CommandDefinitionTypeId brand", () => {
       const SaveNote = Command.mutation(
@@ -95,8 +98,9 @@ describe("Command", () => {
         const command = SaveNote({ text: "hello" });
 
         expect(command.name).toBe("SaveNote");
-        expect(yield* testClient.calls()).toEqual([]);
-      }).pipe(Effect.provide(TestClient.layer)),
+        const observed1 = yield* testClient.calls;
+        expect(observed1).toEqual([]);
+      }),
     );
 
     it.effect("mutation success produces the onSuccess Message", () =>
@@ -111,10 +115,11 @@ describe("Command", () => {
         const message = yield* SaveNote({ text: "hello" }).effect;
 
         expect(message).toEqual(SucceededSaveNote({ note: {} }));
-        expect(yield* testClient.calls()).toEqual([
+        const observed2 = yield* testClient.calls;
+        expect(observed2).toEqual([
           { method: "mutation", name: "notes:insert", args: { text: "hello" } },
         ]);
-      }).pipe(Effect.provide(TestClient.layer)),
+      }),
     );
 
     it.effect("no-args query is callable without args", () =>
@@ -129,10 +134,11 @@ describe("Command", () => {
         const message = yield* FetchNotes().effect;
 
         expect(message._tag).toBe("SucceededSaveNote");
-        expect(yield* testClient.calls()).toEqual([
+        const observed3 = yield* testClient.calls;
+        expect(observed3).toEqual([
           { method: "query", name: "notes:list", args: {} },
         ]);
-      }).pipe(Effect.provide(TestClient.layer)),
+      }),
     );
 
     it.effect("action success produces the onSuccess Message", () =>
@@ -147,21 +153,22 @@ describe("Command", () => {
         const message = yield* SendEmail({ to: "user@example.com" }).effect;
 
         expect(message._tag).toBe("SucceededSaveNote");
-        expect(yield* testClient.calls()).toEqual([
+        const observed4 = yield* testClient.calls;
+        expect(observed4).toEqual([
           {
             method: "action",
             name: "email:send",
             args: { to: "user@example.com" },
           },
         ]);
-      }).pipe(Effect.provide(TestClient.layer)),
+      }),
     );
 
     it.effect("typed error is folded into the onError Message", () =>
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
         yield* testClient.setNextResult(
-          Result.fail(new NotFound({ id: "abc" })),
+          Result.fail(NotFound.make({ id: "abc" })),
         );
 
         const DeleteNote = Command.mutation("DeleteNote", deleteMutationRef, {
@@ -176,7 +183,7 @@ describe("Command", () => {
         expect((message as typeof FailedSaveNote.Type).error).toBeInstanceOf(
           NotFound,
         );
-      }).pipe(Effect.provide(TestClient.layer)),
+      }),
     );
 
     it.effect("transport error is folded into the onError Message", () =>
@@ -184,7 +191,7 @@ describe("Command", () => {
         const testClient = yield* TestClient.TestClient;
         yield* testClient.setNextResult(
           Result.fail(
-            new Client.WebSocketClientError({ cause: "network down" }),
+            Client.WebSocketClientError.make({ cause: "network down" }),
           ),
         );
 
@@ -200,7 +207,7 @@ describe("Command", () => {
         expect((message as typeof FailedSaveNote.Type).error).toBeInstanceOf(
           Client.WebSocketClientError,
         );
-      }).pipe(Effect.provide(TestClient.layer)),
+      }),
     );
 
     it("requires messages to be declared", () => {
@@ -259,12 +266,12 @@ describe("Command", () => {
 
         yield* testClient.setNextResult(
           Result.fail(
-            new Client.WebSocketClientError({ cause: "network down" }),
+            Client.WebSocketClientError.make({ cause: "network down" }),
           ),
         );
         const failure = yield* saveNote({ text: "hello" });
         expect(failure._tag).toBe("FailedSaveNote");
-      }).pipe(Effect.provide(TestClient.layer)),
+      }),
     );
 
     it("supports interrupt: true, keyed by the Command name", () => {
@@ -341,7 +348,7 @@ describe("Command", () => {
 
         const secondOutcome = yield* SaveDraft.Interrupt((o) => o).effect;
         expect(secondOutcome._tag).toBe("NotFound");
-      }).pipe(Effect.provide(TestClient.layer)),
+      }),
     );
 
     it("an interruptible Command's error channel is still never", () => {

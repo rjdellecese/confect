@@ -6,6 +6,7 @@ import * as Function from "effect/Function";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
+import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaIssue from "effect/SchemaIssue";
@@ -272,8 +273,6 @@ const firstDescriptor = (): PageDescriptor => ({
   endCursor: Option.none(),
 });
 
-const decodeOptions = Schema.decodeUnknownSync(Options);
-
 const initialState = <Item_, UserArgs_, Error_>(
   generation: number,
   args: UserArgs_,
@@ -282,7 +281,7 @@ const initialState = <Item_, UserArgs_, Error_>(
   State.Active<Item_, UserArgs_, Error_>({
     generation,
     args,
-    options: decodeOptions(options),
+    options: Schema.decodeResult(Options)(options).pipe(Result.getOrThrow),
     paginationId: Option.none(),
     requestId: 1,
     current: firstDescriptor(),
@@ -330,7 +329,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   ref: Query,
 ): PaginatedQuery<Query> => {
   const kind = paginatedKindOrThrow(ref);
-  const hasUserArgs = globalThis.Object.keys(kind.userArgs.fields).length > 0;
+  const hasUserArgs = Record.keys(kind.userArgs.fields).length > 0;
   const functionErrorSchemas = [
     ...("error" in ref && ref.error !== undefined ? [ref.error] : []),
     ...MiddlewareSpec.errorSchemas(ref.middlewareSpecs),

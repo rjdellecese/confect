@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import { Id, scope } from "./_generated/id";
 import counters from "./_generated/tables/counters";
 
-export class Rejected extends Schema.TaggedError<Rejected>()("Rejected", {
+export class Rejected extends Schema.TaggedError<Rejected, {}>()("Rejected", {
   id: Id("counters"),
 }) {}
 

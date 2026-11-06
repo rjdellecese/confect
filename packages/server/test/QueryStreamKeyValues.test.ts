@@ -23,9 +23,15 @@ describe("QueryStreamKeyValues", () => {
     const Json = Schema.fromJsonString(
       QueryStreamKeyValues.QueryStreamKeyValues,
     );
-    const encoded = Schema.encodeSync(Json)(values);
-    expect(Schema.decodeSync(Json)(encoded)).toEqual(values);
-    expect(JSON.parse(encoded)[0]).toEqual({ $undefined: true });
+    const encoded = Schema.encodeResult(Json)(values).pipe(Result.getOrThrow);
+    expect(Schema.decodeResult(Json)(encoded).pipe(Result.getOrThrow)).toEqual(
+      values,
+    );
+    expect(
+      Schema.decodeResult(
+        Schema.Json.pipe(Schema.Array, Schema.fromJsonString),
+      )(encoded).pipe(Result.getOrThrow)[0],
+    ).toEqual({ $undefined: true });
     expectTypeOf<QueryStreamKeyValues.QueryStreamKeyValues>().toEqualTypeOf<
       ReadonlyArray<QueryStreamKeyValues.KeyValue>
     >();

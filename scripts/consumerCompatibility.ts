@@ -1,3 +1,6 @@
+import * as Arr from "effect/Array";
+import * as Str from "effect/String";
+import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 
 export const Manifest = Schema.Struct({
@@ -68,7 +71,8 @@ export const provenanceProblems = (
   resolvedFile: string | undefined,
   manager: Manager,
 ): ReadonlyArray<string> => [
-  ...(resolution?.resolved?.startsWith("file:") &&
+  ...(resolution?.resolved !== undefined &&
+  Str.startsWith("file:")(resolution.resolved) &&
   resolvedFile === candidate.tarball
     ? []
     : ["Candidate was not installed from the intended tarball"]),
@@ -77,10 +81,10 @@ export const provenanceProblems = (
     : []),
 ];
 
-export class ConsumerGateFailure extends Schema.TaggedError<ConsumerGateFailure>()(
-  "ConsumerGateFailure",
-  { phase: Schema.String, details: Schema.Unknown },
-) {}
+export class ConsumerGateFailure extends Schema.TaggedError<
+  ConsumerGateFailure,
+  {}
+>()("ConsumerGateFailure", { phase: Schema.String, details: Schema.Unknown }) {}
 
 export interface GraphProblem {
   readonly _tag:
@@ -101,14 +105,14 @@ export const graphProblems = (
   rootResolutions: Readonly<Record<string, string>>,
   directory: string,
 ): ReadonlyArray<GraphProblem> => {
-  const byPath = new Map(packages.map((entry) => [entry.path, entry]));
+  const byPath = new Map(Arr.map(packages, (entry) => [entry.path, entry]));
   const cohort = new Map(
-    candidates.map((entry) => [entry.manifest.name, entry]),
+    Arr.map(candidates, (entry) => [entry.manifest.name, entry]),
   );
   const problems: Array<GraphProblem> = [];
   for (const entry of packages) {
     const { manifest } = entry;
-    if (!entry.path.startsWith(`${directory}/`)) {
+    if (!Str.startsWith(`${directory}/`)(entry.path)) {
       problems.push({
         _tag: "ExternalPath",
         package: manifest.name,
@@ -117,10 +121,10 @@ export const graphProblems = (
         actual: entry.path,
       });
     }
-    if (manifest.name.startsWith("@confect/")) {
+    if (Str.startsWith("@confect/")(manifest.name)) {
       const candidate = cohort.get(manifest.name);
       if (
-        !candidate ||
+        candidate === undefined ||
         manifest.version !== candidate.manifest.version ||
         entry.path !== rootResolutions[manifest.name]
       ) {
@@ -142,12 +146,19 @@ export const graphProblems = (
         actual: entry.path,
       });
     }
-    for (const [name, range] of Object.entries(
+    for (const [name, range] of Record.toEntries(
       manifest.peerDependencies ?? {},
     )) {
       const peer = byPath.get(entry.resolutions[name] ?? "");
-      if (!peer && manifest.peerDependenciesMeta?.[name]?.optional) continue;
-      if (!peer || !Bun.semver.satisfies(peer.manifest.version, range)) {
+      if (
+        peer === undefined &&
+        manifest.peerDependenciesMeta?.[name]?.optional === true
+      )
+        continue;
+      if (
+        peer === undefined ||
+        !Bun.semver.satisfies(peer.manifest.version, range)
+      ) {
         problems.push({
           _tag: "InvalidPeer",
           package: manifest.name,
@@ -157,8 +168,13 @@ export const graphProblems = (
         });
       }
     }
-    for (const name of Object.keys(manifest.dependencies ?? {})) {
-      if (!entry.resolutions[name] && !manifest.optionalDependencies?.[name]) {
+    for (const name of Record.keys(manifest.dependencies ?? {})) {
+      if (
+        (entry.resolutions[name] === undefined ||
+          entry.resolutions[name] === "") &&
+        (manifest.optionalDependencies?.[name] === undefined ||
+          manifest.optionalDependencies[name] === "")
+      ) {
         problems.push({
           _tag: "MissingDependency",
           package: manifest.name,
@@ -213,17 +229,17 @@ export const packedManifestProblems = (
     "peerDependencies",
     "optionalDependencies",
   ] as const) {
-    for (const [name, range] of Object.entries(source[field] ?? {})) {
+    for (const [name, range] of Record.toEntries(source[field] ?? {})) {
       const expected = range === "workspace:^" ? `^${versions[name]}` : range;
       if (
-        expected.startsWith("workspace:") ||
+        Str.startsWith("workspace:")(expected) ||
         packed[field]?.[name] !== expected
       )
         problems.push(
           `${field}.${name}: expected ${expected}, got ${packed[field]?.[name]}`,
         );
     }
-    for (const name of Object.keys(packed[field] ?? {})) {
+    for (const name of Record.keys(packed[field] ?? {})) {
       if (!(name in (source[field] ?? {})))
         problems.push(`Unexpected ${field}.${name}`);
     }

@@ -19,22 +19,20 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             count: 2,
           }),
         );
-        expect(
-          yield* Effect.promise(() =>
-            client.query(Ref.getFunctionReference(functions.limitedRead), {
-              caseId,
-              limit: 10,
-            }),
+        const promiseResult = yield* Effect.promise(() =>
+          client.query(Ref.getFunctionReference(functions.limitedRead), {
+            caseId,
+            limit: 10,
+          }),
+        );
+        expect(promiseResult).toEqual(["seed-0", "seed-1"]);
+        const promiseResult2 = yield* Effect.promise(() =>
+          client.mutation(
+            Ref.getFunctionReference(functions.limitedReadFromMutation),
+            { caseId, limit: 10 },
           ),
-        ).toEqual(["seed-0", "seed-1"]);
-        expect(
-          yield* Effect.promise(() =>
-            client.mutation(
-              Ref.getFunctionReference(functions.limitedReadFromMutation),
-              { caseId, limit: 10 },
-            ),
-          ),
-        ).toEqual(["seed-0", "seed-1"]);
+        );
+        expect(promiseResult2).toEqual(["seed-0", "seed-1"]);
         yield* Effect.promise(() =>
           expect(
             client.query(Ref.getFunctionReference(functions.limitedRead), {
@@ -74,28 +72,26 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             "Too many writes in a single function execution (limit: 0)",
           ),
         );
-        expect(
-          yield* Effect.promise(() =>
-            client.query(Ref.getFunctionReference(functions.limitedRead), {
-              caseId,
-              limit: 10,
-            }),
-          ),
-        ).toEqual([]);
+        const promiseResult3 = yield* Effect.promise(() =>
+          client.query(Ref.getFunctionReference(functions.limitedRead), {
+            caseId,
+            limit: 10,
+          }),
+        );
+        expect(promiseResult3).toEqual([]);
         yield* Effect.promise(() =>
           client.mutation(Ref.getFunctionReference(functions.limitedWrite), {
             caseId,
             limit: 1,
           }),
         );
-        expect(
-          yield* Effect.promise(() =>
-            client.query(Ref.getFunctionReference(functions.limitedRead), {
-              caseId,
-              limit: 10,
-            }),
-          ),
-        ).toEqual(["child"]);
+        const promiseResult4 = yield* Effect.promise(() =>
+          client.query(Ref.getFunctionReference(functions.limitedRead), {
+            caseId,
+            limit: 10,
+          }),
+        );
+        expect(promiseResult4).toEqual(["child"]);
       }),
     );
 
@@ -111,21 +107,19 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
               count: 0,
             }),
           );
-          expect(
-            yield* Effect.promise(() =>
-              client.mutation(Ref.getFunctionReference(functions.rollback), {
-                caseId,
-              }),
-            ),
-          ).toBe(true);
-          expect(
-            yield* Effect.promise(() =>
-              client.query(Ref.getFunctionReference(functions.limitedRead), {
-                caseId,
-                limit: 10,
-              }),
-            ),
-          ).toEqual(["parent"]);
+          const promiseResult5 = yield* Effect.promise(() =>
+            client.mutation(Ref.getFunctionReference(functions.rollback), {
+              caseId,
+            }),
+          );
+          expect(promiseResult5).toBe(true);
+          const promiseResult6 = yield* Effect.promise(() =>
+            client.query(Ref.getFunctionReference(functions.limitedRead), {
+              caseId,
+              limit: 10,
+            }),
+          );
+          expect(promiseResult6).toEqual(["parent"]);
         }),
     );
 

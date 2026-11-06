@@ -14,15 +14,18 @@ export class ConfectDirectory extends Context.Service<
   static readonly get = ConfectDirectory.use((service) => service.get);
 }
 
-export class ConfectDirectoryNotFoundError extends Schema.TaggedError<ConfectDirectoryNotFoundError>()(
-  "ConfectDirectoryNotFoundError",
-  {},
-) {
+export class ConfectDirectoryNotFoundError extends Schema.TaggedError<
+  ConfectDirectoryNotFoundError,
+  { readonly brand: unique symbol }
+>()("ConfectDirectoryNotFoundError", {}) {
   override get message(): string {
     return "Could not find Confect directory";
   }
 }
 
+/**
+ * @internal
+ */
 export const findConfectDirectory = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -34,10 +37,13 @@ export const findConfectDirectory = Effect.gen(function* () {
   if (yield* fs.exists(confectDirectory)) {
     return confectDirectory;
   } else {
-    return yield* new ConfectDirectoryNotFoundError();
+    return yield* ConfectDirectoryNotFoundError.make();
   }
 });
 
+/**
+ * @internal
+ */
 export const layerFromConvexDirectory = Layer.effect(
   ConfectDirectory,
   Effect.gen(function* () {
@@ -49,6 +55,9 @@ export const layerFromConvexDirectory = Layer.effect(
   }),
 );
 
+/**
+ * @internal
+ */
 export const layer = layerFromConvexDirectory.pipe(
   Layer.provide(ConvexDirectory.layer),
 );

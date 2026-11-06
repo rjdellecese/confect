@@ -8,8 +8,6 @@ import { query } from "../../convex/_generated/server";
  */
 export const control = query({
   args: {},
-  handler: () => {
-    // oxlint-disable-next-line effecttsgo/global-date -- The raw clock read is the positive control for Convex's cache tracker.
-    return Date.now();
-  },
+  // oxlint-disable-next-line effecttsgo/global-date -- The raw clock read is the positive control for Convex's cache tracker.
+  handler: () => Date.now(),
 });

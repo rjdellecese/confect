@@ -1,5 +1,6 @@
 import { ConvexClient } from "convex/browser";
 import * as Context from "effect/Context";
+import { pipe } from "effect/Function";
 import * as Layer from "effect/Layer";
 import * as Ref from "@confect/core/Ref";
 import * as Effect from "effect/Effect";
@@ -8,12 +9,12 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
-export class WebSocketClientError extends Schema.TaggedError<WebSocketClientError>()(
-  "WebSocketClientError",
-  {
-    cause: Schema.Defect(),
-  },
-) {}
+export class WebSocketClientError extends Schema.TaggedError<
+  WebSocketClientError,
+  {}
+>()("WebSocketClientError", {
+  cause: Schema.Defect(),
+}) {}
 
 const runQuery = Effect.fn("WebSocketClient.query")(
   <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
@@ -48,7 +49,7 @@ const make = (
         const runFork = Effect.runForkWith(context);
         convexClient.setAuth(
           (args) => runPromise(Effect.suspend(() => fetchToken(args))),
-          ...(onChange
+          ...(onChange !== undefined
             ? [
                 (isAuthenticated: boolean) => {
                   runFork(Effect.suspend(() => onChange(isAuthenticated)));
@@ -59,7 +60,7 @@ const make = (
       });
 
     const mapUnknownError = (cause: unknown) =>
-      new WebSocketClientError({ cause });
+      WebSocketClientError.make({ cause });
 
     const query = <Query extends Ref.AnyPublicQuery>(
       ref: Query,
@@ -139,7 +140,8 @@ const make = (
 
       return Stream.unwrap(
         Effect.match(Ref.encodeArgs(ref, args), {
-          onFailure: (error) => Stream.succeed<QueryResult>(Result.fail(error)),
+          onFailure: (error) =>
+            pipe(error, Result.fail, Stream.succeed<QueryResult>),
           onSuccess: (encodedArgs) =>
             Stream.callback<Result.Result<unknown, ReactiveQueryError<Query>>>(
               (queue) =>
@@ -165,10 +167,7 @@ const make = (
           Result.match(result, {
             onFailure: (error) => Effect.succeed(Result.fail(error)),
             onSuccess: (encodedReturns) =>
-              Effect.match(Ref.decodeReturns(ref, encodedReturns), {
-                onFailure: Result.fail,
-                onSuccess: Result.succeed,
-              }),
+              Ref.decodeReturns(ref, encodedReturns).pipe(Effect.result),
           }),
         ),
       );
@@ -205,9 +204,11 @@ const make = (
  * Wraps
  * [ConvexClient](https://docs.convex.dev/api/classes/browser.ConvexClient).
  */
-export const WebSocketClient = Context.Service<
-  Effect.Success<ReturnType<typeof make>>
->("@confect/js/WebSocketClient");
+export const WebSocketClient =
+  // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
+  Context.Service<Effect.Success<ReturnType<typeof make>>>(
+    "@confect/js/WebSocketClient",
+  );
 
 export type WebSocketClient = typeof WebSocketClient.Identifier;
 

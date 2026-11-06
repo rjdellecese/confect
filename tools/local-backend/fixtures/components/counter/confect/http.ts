@@ -26,7 +26,8 @@ export default ConfectHttpRouter.forSchema(schema)(
       "/echo",
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest;
-        return HttpServerResponse.text(yield* request.text);
+        const text = yield* request.text;
+        return HttpServerResponse.text(text);
       }),
     ),
   ),

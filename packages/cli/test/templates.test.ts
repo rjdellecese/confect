@@ -1,3 +1,6 @@
+import { pipe } from "effect/Function";
+import * as Option from "effect/Option";
+import * as Str from "effect/String";
 import { fileURLToPath } from "node:url";
 import * as Bundler from "@confect/cli/Bundler";
 import * as Schema from "effect/Schema";
@@ -20,13 +23,13 @@ import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import { queryGeneric } from "convex/server";
 
 const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
-  const relativePath = `${pathSegments.join("/")}.spec.ts`;
+  const relativePath = `${Array.join(pathSegments, "/")}.spec.ts`;
   return {
     relativePath,
     pathSegments,
-    groupPathDot: pathSegments.join("."),
+    groupPathDot: Array.join(pathSegments, "."),
     exportName: pathSegments[pathSegments.length - 1]!,
-    specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
+    specImportPath: `../${pipe(relativePath, Str.slice(0, -".ts".length))}`,
   };
 };
 
@@ -239,10 +242,11 @@ export default implementation;`,
           ChildProcess.make(process.execPath, [
             fileURLToPath(
               new URL(
-                "bin/tsc",
-                import.meta.resolve("typescript/package.json"),
+                "dist/effect-tsgo.cjs",
+                import.meta.resolve("@effect/tsgo/package.json"),
               ),
             ),
+            "tsrs",
             "-p",
             directory,
           ]),
@@ -251,7 +255,8 @@ export default implementation;`,
           Stream.decodeText(),
           Stream.mkString,
         );
-        expect(yield* compiler.exitCode, output).toBe(0);
+        const actual = yield* compiler.exitCode;
+        expect(actual, output).toBe(0);
       }).pipe(Effect.scoped),
     { timeout: 30000 },
   );
@@ -319,7 +324,7 @@ export { reads } from "./reads";
           path.join(directory, "runtime.ts"),
         );
         expect(runtime.module.reads).toEqual({ fields: 0 });
-        expect(Object.keys(runtime.metafile.inputs)).not.toContain(
+        expect(Record.keys(runtime.metafile.inputs)).not.toContain(
           path.join(directory, "convexSchema.ts"),
         );
         assert(Predicate.isFunction(runtime.module.fields));
@@ -331,15 +336,15 @@ export { reads } from "./reads";
           'import { Table as $Table } from "@confect/server";',
         );
         expect(deploy.module.reads).toEqual({ fields: 1 });
-        expect(Object.keys(deploy.metafile.inputs)).toContain(
+        expect(Record.keys(deploy.metafile.inputs)).toContain(
           path.join(directory, "convexSchema.ts"),
         );
-        expect(Object.keys(deploy.metafile.inputs)).not.toContain(
+        expect(Record.keys(deploy.metafile.inputs)).not.toContain(
           path.join(directory, "schema.ts"),
         );
         assert(Predicate.isObject(deploy.module.default));
         assert(Predicate.isObject(deploy.module.default.tables));
-        expect(Object.keys(deploy.module.default.tables)).toEqual(["notes"]);
+        expect(Record.keys(deploy.module.default.tables)).toEqual(["notes"]);
       }).pipe(Effect.scoped),
   );
 });
@@ -369,18 +374,27 @@ import type { SystemTableNames } from "convex/server";
 import { Id } from "./id";
 import type { Id as IdType, TableNames } from "./id";
 
-expectTypeOf<TableNames>().toEqualTypeOf<${tableNames.length === 0 ? "never" : tableNames.map((name) => `"${name}"`).join(" | ")}>();
+expectTypeOf<TableNames>().toEqualTypeOf<${
+            tableNames.length === 0
+              ? "never"
+              : Array.join(
+                  Array.map(tableNames, (name) => `"${name}"`),
+                  " | ",
+                )
+          }>();
 expectTypeOf<Parameters<typeof Id>[0]>().toEqualTypeOf<TableNames | SystemTableNames>();
-${[...tableNames, "_storage", "_scheduled_functions"]
-  .map(
+${Array.join(
+  Array.map(
+    [...tableNames, "_storage", "_scheduled_functions"],
     (
       name,
     ) => `expectTypeOf<Id<"${name}">>().toEqualTypeOf<GenericId<"${name}">>();
 expectTypeOf<IdType<"${name}">>().toEqualTypeOf<GenericId<"${name}">>();
 expectTypeOf(Id("${name}").Type).toEqualTypeOf<Id<"${name}">>();
 expectTypeOf(Id("${name}").Encoded).toEqualTypeOf<Id<"${name}">>();`,
-  )
-  .join("\n")}
+  ),
+  "\n",
+)}
 // @ts-expect-error
 Id("missing");
 // @ts-expect-error
@@ -410,10 +424,11 @@ export const plainString: Id<"_storage"> = "not-an-id";
           ChildProcess.make(process.execPath, [
             fileURLToPath(
               new URL(
-                "bin/tsc",
-                import.meta.resolve("typescript/package.json"),
+                "dist/effect-tsgo.cjs",
+                import.meta.resolve("@effect/tsgo/package.json"),
               ),
             ),
+            "tsrs",
             "-p",
             directory,
           ]),
@@ -422,7 +437,8 @@ export const plainString: Id<"_storage"> = "not-an-id";
           Stream.decodeText(),
           Stream.mkString,
         );
-        expect(yield* compiler.exitCode, output).toBe(0);
+        const actual2 = yield* compiler.exitCode;
+        expect(actual2, output).toBe(0);
       }).pipe(Effect.scoped),
     { timeout: 30000 },
   );
@@ -491,7 +507,8 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
         const names = (prefix: string, count: number) =>
           Array.makeBy(
             count,
-            (index) => `${prefix}${String(index + 1).padStart(3, "0")}`,
+            (index) =>
+              `${prefix}${pipe(String(index + 1), Str.padStart(3, "0"))}`,
           );
         const rootNames = names("g", 600);
         const childNames = names("c", 300);
@@ -500,11 +517,11 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
         const lastChild = childNames[childNames.length - 1]!;
         const lastDeep = deepNames[deepNames.length - 1]!;
         const leaves: LeafModule[] = [
-          ...rootNames.map((name) => leafAt([name])),
+          ...Array.map(rootNames, (name) => leafAt([name])),
           leafAt(["nested"]),
-          ...childNames.map((name) => leafAt(["nested", name])),
+          ...Array.map(childNames, (name) => leafAt(["nested", name])),
           leafAt(["nested", lastChild, "level3"]),
-          ...deepNames.map((name) =>
+          ...Array.map(deepNames, (name) =>
             leafAt(["nested", lastChild, "level3", "level4", name]),
           ),
           leafAt(["jobs"]),
@@ -523,7 +540,7 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
             const schemaReadsImport =
               leaf.pathSegments.length === 1
                 ? "./schemaReads"
-                : `${"../".repeat(leaf.pathSegments.length - 1)}schemaReads`;
+                : `${pipe("../", Str.repeat(leaf.pathSegments.length - 1))}schemaReads`;
             yield* fs.makeDirectory(path.dirname(target), { recursive: true });
             yield* fs.writeFileString(
               target,
@@ -543,11 +560,12 @@ export default GroupSpec.${isNode ? "makeNode" : "make"}().addFunction(
             );
           }),
         );
+        const actual3 = yield* templates.assembledSpec({
+          nodes: assemblyNodesFromLeaves(leaves),
+        });
         yield* fs.writeFileString(
           path.join(directory, "_generated", "spec.ts"),
-          yield* templates.assembledSpec({
-            nodes: assemblyNodesFromLeaves(leaves),
-          }),
+          actual3,
         );
         const consumer = `import { Refs, Spec } from "@confect/core";
 import { expectTypeOf } from "vitest";
@@ -563,8 +581,17 @@ const middle = refs.public.nested.${lastChild}.level3.get;
 const node = refs.internal.jobs.get;
 const rootProto = refs.public.__proto__.get;
 const nestedProto = refs.public.nested.__proto__.get;
-expectTypeOf<keyof typeof refs.public>().toEqualTypeOf<${[...rootNames, "nested", "__proto__"].map((name) => `"${name}"`).join(" | ")}>();
-expectTypeOf<keyof typeof refs.public.nested>().toEqualTypeOf<${[...childNames, "get", "__proto__"].map((name) => `"${name}"`).join(" | ")}>();
+expectTypeOf<keyof typeof refs.public>().toEqualTypeOf<${Array.join(
+          Array.map(
+            [...rootNames, "nested", "__proto__"],
+            (name) => `"${name}"`,
+          ),
+          " | ",
+        )}>();
+expectTypeOf<keyof typeof refs.public.nested>().toEqualTypeOf<${Array.join(
+          Array.map([...childNames, "get", "__proto__"], (name) => `"${name}"`),
+          " | ",
+        )}>();
 expectTypeOf(last["~Args"]).toEqualTypeOf<{ readonly id: string }>();
 expectTypeOf(nested).toEqualTypeOf<typeof last>();
 expectTypeOf(parent).toEqualTypeOf<typeof last>();
@@ -612,10 +639,11 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
           ChildProcess.make(process.execPath, [
             fileURLToPath(
               new URL(
-                "bin/tsc",
-                import.meta.resolve("typescript/package.json"),
+                "dist/effect-tsgo.cjs",
+                import.meta.resolve("@effect/tsgo/package.json"),
               ),
             ),
+            "tsrs",
             "-p",
             directory,
           ]),
@@ -624,7 +652,8 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
           Stream.decodeText(),
           Stream.mkString,
         );
-        expect(yield* compiler.exitCode, output).toBe(0);
+        const actual4 = yield* compiler.exitCode;
+        expect(actual4, output).toBe(0);
         const declaration = yield* fs.readFileString(
           path.join(directory, "declarations", "_generated", "spec.d.ts"),
         );
@@ -635,27 +664,33 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
         expect(declaration).toContain(
           `typeof nested_${lastChild}_level3_level4_${lastDeep}`,
         );
-        expect(declaration.match(/typeof /g)).toHaveLength(leaves.length);
+        expect(
+          Option.getOrNull(pipe(declaration, Str.match(/typeof /g))),
+        ).toHaveLength(leaves.length);
         expect(declaration).not.toContain("effect/Schema");
-        expect(declaration.split("\n").length).toBeLessThan(
+        expect(Str.split(declaration, "\n").length).toBeLessThan(
           leaves.length * 2 + 10,
         );
         expect(declaration.length).toBeLessThan(leaves.length * 240);
         yield* fs.writeFileString(
           path.join(directory, "consumer.ts"),
-          consumer.replace(
-            '"./_generated/spec"',
-            '"./declarations/_generated/spec"',
+          pipe(
+            consumer,
+            Str.replace(
+              '"./_generated/spec"',
+              '"./declarations/_generated/spec"',
+            ),
           ),
         );
         const declarationConsumer = yield* spawner.spawn(
           ChildProcess.make(process.execPath, [
             fileURLToPath(
               new URL(
-                "bin/tsc",
-                import.meta.resolve("typescript/package.json"),
+                "dist/effect-tsgo.cjs",
+                import.meta.resolve("@effect/tsgo/package.json"),
               ),
             ),
+            "tsrs",
             "-p",
             directory,
             "--noEmit",
@@ -667,7 +702,8 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
           Stream.decodeText(),
           Stream.mkString,
         );
-        expect(yield* declarationConsumer.exitCode, declarationOutput).toBe(0);
+        const actual5 = yield* declarationConsumer.exitCode;
+        expect(actual5, declarationOutput).toBe(0);
         const runtimeEntry = path.join(directory, "runtime.ts");
         yield* fs.writeFileString(
           runtimeEntry,
@@ -679,8 +715,8 @@ export { schemaReads } from "./schemaReads";
         const assembled: unknown = bundled.module.default;
         assert(Spec.isSpec(assembled));
         const groups = Spec.groups(assembled);
-        expect(Object.hasOwn(groups, "__proto__")).toBe(true);
-        expect(Object.hasOwn(groups.nested.groups, "__proto__")).toBe(true);
+        expect(Record.has(groups, "__proto__")).toBe(true);
+        expect(Record.has(groups.nested.groups, "__proto__")).toBe(true);
         expect(bundled.module.schemaReads).toEqual({
           args: 0,
           returns: 0,
@@ -727,7 +763,7 @@ export { schemaReads } from "./schemaReads";
             Array.append(leaf.pathSegments, "get"),
           );
           expect(ref.convexFunctionName).toBe(
-            `${leaf.pathSegments.join("/")}:get`,
+            `${Array.join(leaf.pathSegments, "/")}:get`,
           );
           expect(ref._tag).toBe("Confect");
         }

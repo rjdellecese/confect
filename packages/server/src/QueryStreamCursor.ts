@@ -19,10 +19,7 @@ const positionRuntimeLabel = Match.type<QueryStreamKeyLayout.Position>().pipe(
   }),
 );
 
-/**
- * @experimental
- */
-export const QueryStreamCursor = Schema.Struct({
+const Cursor = Schema.Struct({
   runtimeLabels: RuntimeLabels,
   keyValues: QueryStreamKeyValues.QueryStreamKeyValues,
 }).check(
@@ -32,12 +29,17 @@ export const QueryStreamCursor = Schema.Struct({
   ),
 );
 
+type Cursor = typeof Cursor.Type;
+
 /**
  * @experimental
  */
-export interface QueryStreamCursor extends Schema.Schema.Type<
-  typeof QueryStreamCursor
-> {}
+export const QueryStreamCursor = Cursor;
+
+/**
+ * @experimental
+ */
+export interface QueryStreamCursor extends Cursor {}
 
 /**
  * @experimental

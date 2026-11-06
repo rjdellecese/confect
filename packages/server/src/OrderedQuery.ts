@@ -89,10 +89,13 @@ export const make = <Table_ extends Table.AnyWithProps>(
       isDone: paginationResult.isDone,
       continueCursor: paginationResult.continueCursor,
       /* v8 ignore start */
-      ...(paginationResult.splitCursor
+      ...(paginationResult.splitCursor !== undefined &&
+      paginationResult.splitCursor !== null &&
+      paginationResult.splitCursor !== ""
         ? { splitCursor: paginationResult.splitCursor }
         : {}),
-      ...(paginationResult.pageStatus
+      ...(paginationResult.pageStatus !== undefined &&
+      paginationResult.pageStatus !== null
         ? { pageStatus: paginationResult.pageStatus }
         : {}),
       /* v8 ignore stop */

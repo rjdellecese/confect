@@ -40,7 +40,8 @@ layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
     () =>
       Effect.gen(function* () {
         const { client } = yield* LocalBackend.LocalBackend;
-        const run = String(yield* Random.next);
+        const random = yield* Random.next;
+        const run = String(random);
         const native = yield* Effect.promise(() =>
           client.mutation(api.groups.nativeComponents.roundTrip, { run }),
         );
@@ -70,7 +71,8 @@ layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
     () =>
       Effect.gen(function* () {
         const { client } = yield* LocalBackend.LocalBackend;
-        const run = String(yield* Random.next);
+        const random = yield* Random.next;
+        const run = String(random);
         const id = yield* Effect.promise(() =>
           client.mutation(api.groups.components.schedule, { run }),
         );
@@ -119,11 +121,10 @@ layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
     () =>
       Effect.gen(function* () {
         const { client } = yield* LocalBackend.LocalBackend;
-        expect(
-          yield* Effect.promise(() =>
-            client.query(api.groups.components.hasAuth, {}),
-          ),
-        ).toBe(false);
+        const hasAuth = yield* Effect.promise(() =>
+          client.query(api.groups.components.hasAuth, {}),
+        );
+        expect(hasAuth).toBe(false);
         for (const mount of ["first", "second", "left/child", "right/child"]) {
           const body = yield* HttpClient.get(
             `http://127.0.0.1:3211/${mount}/health`,

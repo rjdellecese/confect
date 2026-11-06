@@ -129,9 +129,13 @@ describe("ID scopes", () => {
   it("keeps the wire string while distinguishing tables and component instances", () => {
     const own = GenericId.GenericId("users", definition);
     const bound = GenericId.rebase(own, definition, first);
-    const value = Schema.decodeUnknownSync(bound)("user-id");
+    const value = Result.getOrThrow(
+      Schema.decodeUnknownResult(bound)("user-id"),
+    );
     expect(value).toBe("user-id");
-    expect(Schema.encodeSync(bound)(value)).toBe("user-id");
+    expect(Result.getOrThrow(Schema.encodeResult(bound)(value))).toBe(
+      "user-id",
+    );
 
     const firstId: GenericId.GenericId<"users", typeof first> = value;
     void firstId;
@@ -174,14 +178,16 @@ describe("ID scopes", () => {
       owner: "app-user",
       count: "3",
     };
-    const decoded = Schema.decodeUnknownSync(bound)(wire);
+    const decoded = Result.getOrThrow(Schema.decodeUnknownResult(bound)(wire));
     expect(decoded).toEqual({
       id: "one",
       related: ["two"],
       owner: "app-user",
       count: 3,
     });
-    expect(Schema.encodeSync(bound)(decoded)).toEqual(wire);
+    expect(Result.getOrThrow(Schema.encodeResult(bound)(decoded))).toEqual(
+      wire,
+    );
     const appOwner: ConvexId<"users"> = decoded.owner;
     const [firstRelated] = decoded.related;
     assert(firstRelated !== undefined);
@@ -200,11 +206,13 @@ describe("ID scopes", () => {
       "users",
       definition,
     );
-    const doc = Schema.decodeUnknownSync(users.Doc)({
-      _id: "one",
-      _creationTime: 0,
-      name: "Ada",
-    });
+    const doc = Result.getOrThrow(
+      Schema.decodeUnknownResult(users.Doc)({
+        _id: "one",
+        _creationTime: 0,
+        name: "Ada",
+      }),
+    );
     const id: GenericId.GenericId<"users", typeof definition> = doc._id;
     void id;
     // @ts-expect-error Component document IDs cannot address a host table.
@@ -242,7 +250,8 @@ describe("ID scopes", () => {
         };
         const decoded = yield* Schema.decodeUnknownEffect(bound)(wire);
         expect(decoded).toEqual(wire);
-        expect(yield* Schema.encodeEffect(bound)(decoded)).toEqual(wire);
+        const encoded = yield* Schema.encodeEffect(bound)(decoded);
+        expect(encoded).toEqual(wire);
         expect(evaluations).toBe(1);
         assert(SchemaAST.isSuspend(left.type));
         const reboundNode = left.type.thunk();
@@ -287,7 +296,8 @@ describe("ID scopes", () => {
         expect(decoded).toEqual(
           new Map([["key", new Set([{ own: "own", foreign: "foreign" }])]]),
         );
-        expect(yield* Schema.encodeEffect(bound)(decoded)).toEqual(wire);
+        const encoded = yield* Schema.encodeEffect(bound)(decoded);
+        expect(encoded).toEqual(wire);
         for (const [key, values] of decoded) {
           expectTypeOf(key).toEqualTypeOf<FirstId>();
           expect(decoded.get(key)).toBe(values);
@@ -331,7 +341,8 @@ describe("ID scopes", () => {
       const wire = Option.some({ id: "one", count: "3" });
       const decoded = yield* Schema.decodeUnknownEffect(bound)(wire);
       expect(decoded).toEqual(Option.some({ id: "one", count: 3 }));
-      expect(yield* Schema.encodeEffect(bound)(decoded)).toEqual(wire);
+      const encoded = yield* Schema.encodeEffect(bound)(decoded);
+      expect(encoded).toEqual(wire);
       expect(SchemaAST.resolveIdentifier(bound.ast)).toBe("OptionalUser");
       assert(SchemaAST.isDeclaration(bound.ast));
       const [item] = bound.ast.typeParameters;
@@ -339,10 +350,9 @@ describe("ID scopes", () => {
       const [id] = item.propertySignatures;
       assert(id !== undefined);
       expect(GenericId.scope(id.type)).toBe(first);
-      const invalid = yield* Effect.result(
-        Schema.decodeUnknownEffect(bound)(
-          Option.some({ id: "one", count: "-1" }),
-        ),
+      const invalid = yield* Option.some({ id: "one", count: "-1" }).pipe(
+        Schema.decodeUnknownEffect(bound),
+        Effect.result,
       );
       expect(Result.isFailure(invalid)).toBe(true);
     }),

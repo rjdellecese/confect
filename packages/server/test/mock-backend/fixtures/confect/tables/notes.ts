@@ -13,7 +13,7 @@ export default Table.make(() =>
         name: Schema.String,
       }),
     ),
-    embedding: Schema.optionalKey(Schema.Array(Schema.Finite)),
+    embedding: Schema.Finite.pipe(Schema.Array, Schema.optionalKey),
   }),
 )
   .index("by_text", ["text"])

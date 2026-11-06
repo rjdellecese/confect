@@ -120,6 +120,9 @@ const logFunctionPathDiff = Effect.fnUntraced(function* (
   );
 });
 
+/**
+ * @internal
+ */
 export const dev = Command.make("dev", DirectoryOptions.flags, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
@@ -321,7 +324,8 @@ const syncLoop = Effect.fnUntraced(function* (
       if (SyncState.needsDeploymentNotification(phase))
         yield* touchConvexSchema;
 
-      if (!SyncState.isDirty(yield* watcher.pending)) {
+      const remaining = yield* watcher.pending;
+      if (!SyncState.isDirty(remaining)) {
         yield* logSuccess("Generated files are up-to-date");
       }
     }),

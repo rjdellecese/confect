@@ -1,3 +1,4 @@
+import * as Arr from "effect/Array";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { expect, test } from "bun:test";
 import * as Effect from "effect/Effect";
@@ -43,19 +44,20 @@ test("denies every class of unwanted packed file without changing inputs", () =>
     "dist/tsconfig.src.json",
   ];
   const before = [...files];
-  expect(packProblems(files).map(({ path }) => path)).toEqual(files.slice(1));
+  expect(Arr.map(packProblems(files), ({ path }) => path)).toEqual(
+    files.slice(1),
+  );
   expect(files).toEqual(before);
 });
 
 test("decodes npm output and rejects malformed or empty responses", () =>
   runTest(
     Effect.gen(function* () {
-      expect(
-        yield* decodePackedFiles(
-          "pkg",
-          '[{"files":[{"path":"dist/index.js"}]}]',
-        ),
-      ).toEqual(["dist/index.js"]);
+      const files = yield* decodePackedFiles(
+        "pkg",
+        '[{"files":[{"path":"dist/index.js"}]}]',
+      );
+      expect(files).toEqual(["dist/index.js"]);
       for (const output of ["{", "[]", '[{"files":[{"path":42}]}]']) {
         const error = yield* decodePackedFiles("pkg", output).pipe(Effect.flip);
         expect(error._tag).toBe("InvalidPackOutput");
@@ -87,9 +89,8 @@ test("discovers only published packages with readable valid manifests", () =>
           );
       }
       yield* fs.writeFileString(path.join(root, "not-a-directory"), "ignored");
-      expect(yield* publishedPackages(root)).toEqual([
-        path.join(root, "public"),
-      ]);
+      const packages = yield* publishedPackages(root);
+      expect(packages).toEqual([path.join(root, "public")]);
     }).pipe(Effect.scoped),
   ));
 
@@ -128,17 +129,16 @@ test(
         if (error._tag === "InvalidPackContents") {
           expect(error.packages).toHaveLength(2);
           expect(
-            error.packages
-              .flatMap(({ problems }) =>
-                problems.map((problem) => problem.path),
-              )
-              .sort(),
+            Arr.flatMap(error.packages, ({ problems }) =>
+              Arr.map(problems, (problem) => problem.path),
+            ).sort(),
           ).toEqual(["dist/", "dist/cache.tsbuildinfo"]);
         }
         yield* fs.writeFileString(path.join(root, "one", "package.json"), "{");
-        expect(
-          (yield* packedFiles(path.join(root, "one")).pipe(Effect.flip))._tag,
-        ).toBe("NpmPackError");
+        const packError = yield* packedFiles(path.join(root, "one")).pipe(
+          Effect.flip,
+        );
+        expect(packError._tag).toBe("NpmPackError");
       }).pipe(Effect.scoped),
     ),
   20000,

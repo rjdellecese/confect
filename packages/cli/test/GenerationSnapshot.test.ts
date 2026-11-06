@@ -1,3 +1,7 @@
+import { pipe } from "effect/Function";
+import * as Str from "effect/String";
+import * as Rec from "effect/Record";
+import * as Arr from "effect/Array";
 import { FunctionSpec, GroupSpec, Table } from "@confect/core";
 import * as Bundler from "@confect/cli/Bundler";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -41,9 +45,8 @@ const loadLeaf = Effect.fnUntraced(function* (
     ),
     (spy) => Effect.sync(() => spy.mockRestore()),
   );
-  return yield* LeafModule.loadSpec(
-    yield* LeafModule.toLeafModule(relativePath),
-  );
+  const leaf2 = yield* LeafModule.toLeafModule(relativePath);
+  return yield* LeafModule.loadSpec(leaf2);
 }, Effect.scoped);
 
 const query = (name: string) =>
@@ -65,7 +68,7 @@ const getLeaf = (
   Option.getOrThrow(
     HashMap.get(
       snapshot.leaves,
-      SpecModulePath.make(path.replaceAll("\\", "/")),
+      SpecModulePath.make(pipe(path, Str.replaceAll("\\", "/"))),
     ),
   );
 
@@ -77,9 +80,13 @@ const update = (
 ) => Result.getOrThrow(GenerationSnapshot.update(snapshot, leaves));
 
 const codec = Schema.toCodecJson(GenerationSnapshot.GenerationSnapshot);
+const jsonCodec = Schema.fromJsonString(GenerationSnapshot.GenerationSnapshot);
 const roundtrip = (snapshot: GenerationSnapshot.GenerationSnapshot) =>
-  Schema.decodeUnknownSync(codec)(
-    JSON.parse(JSON.stringify(Schema.encodeSync(codec)(snapshot))),
+  pipe(
+    snapshot,
+    Schema.encodeResult(jsonCodec),
+    Result.flatMap(Schema.decodeResult(jsonCodec)),
+    Result.getOrThrow,
   );
 
 const baseLayer = Layer.merge(
@@ -139,31 +146,34 @@ describe("GenerationSnapshot parsing", () => {
         ],
       ],
     },
-    ...[
-      "",
-      "notes.ts",
-      ".spec.ts",
-      "../notes.spec.ts",
-      "/notes.spec.ts",
-      "notes//child.spec.ts",
-      "notes/./child.spec.ts",
-      "notes/../child.spec.ts",
-      "notes\\child.spec.ts",
-      "C:notes.spec.ts",
-      "C:/notes.spec.ts",
-      "notes\0.spec.ts",
-      "schema.spec.ts",
-      "http.spec.ts",
-      "crons.spec.ts",
-      "default.spec.ts",
-      "bad-dir/notes.spec.ts",
-      "notes/bad-name.spec.ts",
-      "notes/..spec.ts",
-      "notes/...spec.ts",
-    ].map((path) => ({
-      reason: "NoncanonicalPath",
-      entries: [[path, metadataGroup()]],
-    })),
+    ...Arr.map(
+      [
+        "",
+        "notes.ts",
+        ".spec.ts",
+        "../notes.spec.ts",
+        "/notes.spec.ts",
+        "notes//child.spec.ts",
+        "notes/./child.spec.ts",
+        "notes/../child.spec.ts",
+        "notes\\child.spec.ts",
+        "C:notes.spec.ts",
+        "C:/notes.spec.ts",
+        "notes\0.spec.ts",
+        "schema.spec.ts",
+        "http.spec.ts",
+        "crons.spec.ts",
+        "default.spec.ts",
+        "bad-dir/notes.spec.ts",
+        "notes/bad-name.spec.ts",
+        "notes/..spec.ts",
+        "notes/...spec.ts",
+      ],
+      (path) => ({
+        reason: "NoncanonicalPath",
+        entries: [[path, metadataGroup()]],
+      }),
+    ),
     {
       reason: "DuplicateLeaf",
       entries: [
@@ -171,7 +181,7 @@ describe("GenerationSnapshot parsing", () => {
         ["notes.spec.ts", metadataGroup()],
       ],
     },
-    ...["nested/name", "default", "not-an-identifier"].map((name) => ({
+    ...Arr.map(["nested/name", "default", "not-an-identifier"], (name) => ({
       reason: "NoncanonicalFunctionNames",
       entries: [["notes.spec.ts", metadataGroup([name])]],
     })),
@@ -179,19 +189,22 @@ describe("GenerationSnapshot parsing", () => {
       reason: "NoncanonicalFunctionNames",
       entries: [["notes.spec.ts", metadataGroup(["list", "list"])]],
     },
-    ...[
-      "not-an-identifier",
-      "nested/child",
-      "../other",
-      "missing/child",
-      "",
-      "default",
-    ].map((name) => ({
-      reason: "NoncanonicalPath",
-      entries: [
-        ["notes.spec.ts", metadataGroup([], { [name]: metadataGroup() })],
+    ...Arr.map(
+      [
+        "not-an-identifier",
+        "nested/child",
+        "../other",
+        "missing/child",
+        "",
+        "default",
       ],
-    })),
+      (name) => ({
+        reason: "NoncanonicalPath",
+        entries: [
+          ["notes.spec.ts", metadataGroup([], { [name]: metadataGroup() })],
+        ],
+      }),
+    ),
     {
       reason: "NoncanonicalFunctionNames",
       entries: [
@@ -203,7 +216,7 @@ describe("GenerationSnapshot parsing", () => {
     },
   ])("rejects malformed metadata: $reason", ({ reason, entries }) => {
     const result = GenerationSnapshot.parse(entries);
-    assert(Result.isFailure(result));
+    assert(result._tag === "Failure");
     expect(result.failure).toMatchObject({ _tag: "SnapshotError", reason });
     expect(Result.isFailure(Schema.decodeUnknownResult(codec)(entries))).toBe(
       true,
@@ -218,22 +231,31 @@ describe("GenerationSnapshot parsing", () => {
     const snapshot = Result.getOrThrow(
       GenerationSnapshot.parse([["nested/notes.spec.ts", tree]]),
     );
+    const groups = Arr.map(
+      GenerationSnapshot.plan(snapshot, []).changed,
+      (group) => ({
+        path: group.path.pathSegments,
+        names: group.functionNames,
+      }),
+    );
     expect(
-      GenerationSnapshot.plan(snapshot, [])
-        .changed.map((group) => ({
-          path: group.path.pathSegments,
-          names: group.functionNames,
-        }))
-        .toSorted((left, right) =>
-          left.path.join("/").localeCompare(right.path.join("/")),
-        ),
+      Arr.sort(
+        groups,
+        (left: (typeof groups)[number], right: (typeof groups)[number]) => {
+          const compared = pipe(
+            Arr.join(left.path, "/"),
+            Str.localeCompare(Arr.join(right.path, "/")),
+          );
+          return compared < 0 ? -1 : compared > 0 ? 1 : 0;
+        },
+      ),
     ).toEqual([
       { path: ["nested", "notes"], names: ["alpha", "zebra"] },
       { path: ["nested", "notes", "alpha", "child"], names: ["run"] },
       { path: ["nested", "notes", "zebra"], names: ["a", "z"] },
     ]);
     expect(tree.functionNames).toEqual(["zebra", "alpha"]);
-    expect(Object.keys(tree.groups)).toEqual(["zebra", "alpha"]);
+    expect(Rec.keys(tree.groups)).toEqual(["zebra", "alpha"]);
     expect(GenerationSnapshot.diff(snapshot, roundtrip(snapshot))).toEqual({
       removed: [],
       changed: [],
@@ -249,11 +271,12 @@ describe("GenerationSnapshot parsing", () => {
       );
       const decoded = roundtrip(snapshot);
       expect(
-        [...GenerationSnapshot.functionPaths(decoded)].map(
+        Arr.map(
+          [...GenerationSnapshot.functionPaths(decoded)],
           FunctionPath.toString,
         ),
       ).toEqual([`${name}.${name}.run`]);
-      expect(Object.keys(getLeaf(decoded, `${name}.spec.ts`).groups)).toEqual([
+      expect(Rec.keys(getLeaf(decoded, `${name}.spec.ts`).groups)).toEqual([
         name,
       ]);
       expect(Object.getPrototypeOf(tree.groups)).toBe(Object.prototype);
@@ -285,7 +308,7 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           const mismatch = GenerationSnapshot.fromLoadedLeaves([
             { ...leaf, relativePath: "../notes.spec.ts" },
           ]);
-          assert(Result.isFailure(mismatch));
+          assert(mismatch._tag === "Failure");
           expect(mismatch.failure).toMatchObject({
             _tag: "SnapshotError",
             reason: "NoncanonicalPath",
@@ -294,7 +317,7 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           const result = GenerationSnapshot.fromLoadedLeaves([
             { ...leaf, relativePath: "" },
           ]);
-          assert(Result.isFailure(result));
+          assert(result._tag === "Failure");
           expect(result.failure).toMatchObject({
             _tag: "SnapshotError",
             reason: "NoncanonicalPath",
@@ -309,7 +332,7 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           const leaf = yield* loadLeaf("notes.spec.ts");
           const snapshot = fromLoadedLeaves([leaf]);
           const duplicated = GenerationSnapshot.fromLoadedLeaves([leaf, leaf]);
-          assert(Result.isFailure(duplicated));
+          assert(duplicated._tag === "Failure");
           expect(duplicated.failure).toMatchObject({
             _tag: "SnapshotError",
             reason: "DuplicateLeaf",
@@ -389,9 +412,10 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           ]);
           const decoded = roundtrip(snapshot);
           expect(
-            [...GenerationSnapshot.functionPaths(decoded)]
-              .map(FunctionPath.toString)
-              .sort(),
+            Arr.map(
+              [...GenerationSnapshot.functionPaths(decoded)],
+              FunctionPath.toString,
+            ).sort(),
           ).toEqual([
             "nested.notes.alpha",
             "nested.notes.empty.node.run",
@@ -413,7 +437,7 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           expect(leaves).toEqual([leaf]);
           expect(leaf.spec).toBe(spec);
           expect(spec.functions).toBe(functions);
-          expect(Object.keys(functions)).toEqual(["zebra", "alpha"]);
+          expect(Rec.keys(functions)).toEqual(["zebra", "alpha"]);
           expect(spec.groups).toBe(authoredGroups);
           expect(spec.name).toBe("notTheFilesystemName");
           expect(empty.name).toBe("originalEmpty");
@@ -584,41 +608,52 @@ for (const { name, pathLayer, sep } of [
                     ["archived"]: GroupSpec.makeNode(),
                   });
             const parent = yield* loadLeaf(
-              ["nested", "notes.spec.ts"].join(sep),
+              Arr.join(["nested", "notes.spec.ts"], sep),
               parentSpec,
             );
             const childSegments = intermediate
               ? ["nested", "notes", "archived", "deep.spec.ts"]
               : ["nested", "notes", "archived.spec.ts"];
             const child = yield* loadLeaf(
-              childSegments.join(sep),
+              Arr.join(childSegments, sep),
               GroupSpec.makeNode().addFunction(nodeAction("run")),
             );
             const leaves = [child, parent];
-            const expected = new ParentChildNameCollisionError({
+            const expected = ParentChildNameCollisionError.make({
               parentSpecPath: "nested/notes.spec.ts",
-              childSpecPath: childSegments.join("/"),
+              childSpecPath: Arr.join(childSegments, "/"),
               collisionKind: kind,
               collisionName: "archived",
             });
             const actual = GenerationSnapshot.fromLoadedLeaves(leaves);
-            assert(Result.isFailure(actual));
+            assert(actual._tag === "Failure");
             expect(actual.failure).toEqual(expected);
             expect(actual.failure).toMatchObject({
               _tag: "ParentChildNameCollisionError",
               parentSpecPath: "nested/notes.spec.ts",
-              childSpecPath: childSegments.join("/"),
+              childSpecPath: Arr.join(childSegments, "/"),
               collisionKind: kind,
               collisionName: "archived",
             });
-            const entries = [child, parent].flatMap((leaf) =>
-              Schema.encodeSync(codec)(fromLoadedLeaves([leaf])),
-            );
+            const entries = Arr.flatMap([child, parent], (leaf) => {
+              const encoded = pipe(
+                fromLoadedLeaves([leaf]),
+                Schema.encodeResult(codec),
+                Result.getOrThrow,
+              );
+              return pipe(
+                encoded,
+                Schema.decodeUnknownResult(Schema.Array(Schema.Json)),
+                Result.getOrThrow,
+              );
+            });
             expect(GenerationSnapshot.parse(entries)).toEqual(actual);
             const decoded = Schema.decodeResult(codec)(entries);
-            assert(Result.isFailure(decoded));
+            assert(decoded._tag === "Failure");
             expect(decoded.failure.message).toContain("nested/notes.spec.ts");
-            expect(decoded.failure.message).toContain(childSegments.join("/"));
+            expect(decoded.failure.message).toContain(
+              Arr.join(childSegments, "/"),
+            );
           }),
       );
 
@@ -628,7 +663,7 @@ for (const { name, pathLayer, sep } of [
           Effect.gen(function* () {
             const parent = yield* loadLeaf("notes.spec.ts");
             const child = yield* loadLeaf(
-              ["notes", "archived", "deep.spec.ts"].join(sep),
+              Arr.join(["notes", "archived", "deep.spec.ts"], sep),
             );
             const before = fromLoadedLeaves([parent, child]);
             const replacement = yield* loadLeaf(
@@ -636,7 +671,7 @@ for (const { name, pathLayer, sep } of [
               GroupSpec.makeNode().addFunction(nodeAction("archived")),
             );
             const result = GenerationSnapshot.update(before, [replacement]);
-            assert(Result.isFailure(result));
+            assert(result._tag === "Failure");
             assert(result.failure._tag === "ParentChildNameCollisionError");
             expect(result.failure.collisionKind).toBe("function");
             expect(getLeaf(before, "notes.spec.ts").functionNames).toEqual([]);
@@ -666,15 +701,15 @@ for (const { name, pathLayer, sep } of [
               ),
             );
             const child = yield* loadLeaf(
-              ["notes", "archived.spec.ts"].join(sep),
+              Arr.join(["notes", "archived.spec.ts"], sep),
               GroupSpec.makeNode(),
             );
             const orphan = yield* loadLeaf(
-              ["missing", "archived.spec.ts"].join(sep),
+              Arr.join(["missing", "archived.spec.ts"], sep),
             );
             const leaves = [parent, child, orphan];
             const result = GenerationSnapshot.fromLoadedLeaves(leaves);
-            assert(Result.isSuccess(result));
+            assert(result._tag === "Success");
             expect(HashMap.size(roundtrip(result.success).leaves)).toBe(3);
           }),
       );

@@ -13,6 +13,10 @@ import {
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { ConvexError, convexToJson, type Value } from "convex/values";
 import * as Cause from "effect/Cause";
+import * as Array from "effect/Array";
+import * as String from "effect/String";
+import * as Schema from "effect/Schema";
+import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Exit from "effect/Exit";
@@ -24,6 +28,11 @@ import * as OptimisticLocalStore from "./OptimisticLocalStore";
 import * as PaginatedQueryResult from "./PaginatedQueryResult";
 import * as QueryResult from "./QueryResult";
 import * as StreamPagination from "./StreamPagination";
+
+const encodeJson = Schema.Unknown.pipe(
+  Schema.fromJsonString,
+  Schema.encodeResult,
+);
 
 export {
   OptimisticLocalStore,
@@ -180,7 +189,11 @@ const MINIMUM_CONVEX_VERSION = "1.36.0";
  * version is the only reliable signal.
  */
 const supportsErrorsAsValues = ((): boolean => {
-  const [major, minor] = convexVersion.split(".").map(Number);
+  const [major, minor] = pipe(
+    convexVersion,
+    String.split("."),
+    Array.map(Number),
+  );
   if (
     major === undefined ||
     minor === undefined ||
@@ -189,8 +202,10 @@ const supportsErrorsAsValues = ((): boolean => {
   ) {
     return false;
   }
-  const [minimumMajor, minimumMinor] = MINIMUM_CONVEX_VERSION.split(".").map(
-    Number,
+  const [minimumMajor, minimumMinor] = pipe(
+    MINIMUM_CONVEX_VERSION,
+    String.split("."),
+    Array.map(Number),
   ) as [number, number];
   return (
     major > minimumMajor || (major === minimumMajor && minor >= minimumMinor)
@@ -327,7 +342,7 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
  * pagination reset rather than a failure.
  */
 const isInvalidCursorError = (error: Error): boolean =>
-  error.message.includes("InvalidCursor") ||
+  pipe(error.message, String.includes("InvalidCursor")) ||
   (error instanceof ConvexError &&
     typeof error.data === "object" &&
     error.data !== null &&
@@ -398,7 +413,7 @@ export const useStreamPaginatedQuery = <
   const encodedArgsKey =
     rawEncodedArgs === undefined
       ? "skip"
-      : JSON.stringify(convexToJson(rawEncodedArgs));
+      : encodeJson(convexToJson(rawEncodedArgs)).pipe(Result.getOrThrow);
   const encodedArgs = useMemo(
     () => rawEncodedArgs,
     // The serialized form stands in for the freshly allocated object.
@@ -409,13 +424,13 @@ export const useStreamPaginatedQuery = <
   // from scratch.
   const resetKey = useMemo(
     () =>
-      JSON.stringify([
+      encodeJson([
         getFunctionName(functionReference),
         encodedArgsKey,
         options.initialNumItems,
         options.maximumRowsRead ?? null,
         options.maximumBytesRead ?? null,
-      ]),
+      ]).pipe(Result.getOrThrow),
     [
       functionReference,
       encodedArgsKey,
@@ -450,9 +465,8 @@ export const useStreamPaginatedQuery = <
     ) =>
       setTracked((previous) => ({
         resetKey: previous.resetKey,
-        state: transitions.reduce(
-          (state, transition) => transition(state),
-          previous.state,
+        state: Array.reduce(transitions, previous.state, (state, transition) =>
+          transition(state),
         ),
       })),
     [],
@@ -508,7 +522,7 @@ export const useStreamPaginatedQuery = <
   );
   const decodedResults = useMemo(
     () =>
-      encodedItems.map((item): PaginatedQueryItem<Query> => {
+      Array.map(encodedItems, (item): PaginatedQueryItem<Query> => {
         if (typeof item !== "object" || item === null) {
           return Ref.decodePaginationPageSync(ref, [
             item,

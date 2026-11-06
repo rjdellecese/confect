@@ -1,3 +1,5 @@
+import * as Result from "effect/Result";
+import * as Str from "effect/String";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import { GenericId } from "@confect/core/GenericId";
 import * as IdScope from "@confect/core/IdScope";
@@ -64,14 +66,26 @@ describe("make", () => {
     ) as unknown as { exportArgs: () => string; exportReturns: () => string };
     expect(compileArgs).not.toHaveBeenCalled();
     expect(compileReturns).not.toHaveBeenCalled();
-    expect(JSON.parse(registered.exportArgs())).toEqual({
+    expect(
+      Result.getOrThrow(
+        Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+          registered.exportArgs(),
+        ),
+      ),
+    ).toEqual({
       type: "object",
       value: {
         own: { fieldType: { type: "id", tableName: "items" }, optional: false },
         foreign: { fieldType: { type: "string" }, optional: false },
       },
     });
-    expect(JSON.parse(registered.exportReturns())).toEqual({
+    expect(
+      Result.getOrThrow(
+        Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+          registered.exportReturns(),
+        ),
+      ),
+    ).toEqual({
       type: "id",
       tableName: "items",
     });
@@ -127,9 +141,8 @@ describe("make", () => {
       } as unknown as Convex.GenericMutationCtx<
         DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema.AnyWithProps>>
       >;
-      expect(yield* Effect.promise(() => definition.handler(ctx, {}))).toBe(
-        "file-id",
-      );
+      const result = yield* Effect.promise(() => definition.handler(ctx, {}));
+      expect(result).toBe("file-id");
       expect(normalizeId).toHaveBeenCalledExactlyOnceWith(
         "_storage",
         "file-id",
@@ -208,7 +221,7 @@ describe("make", () => {
       registration.mockClear();
       const prepared = RegisteredConvexFunction.prepare(database, item);
       expect(registration).not.toHaveBeenCalled();
-      expect(prepared._tag.toLowerCase()).toBe(
+      expect(Str.toLowerCase(prepared._tag)).toBe(
         `${spec.functionVisibility}${spec.runtimeAndFunctionType.functionType}`,
       );
       const forwardedHandler = () => Promise.resolve("forwarded");
@@ -246,11 +259,19 @@ describe("make", () => {
       expect(exported.exportReturns()).toBe(returnsJson);
       expect(compileArgs).toHaveBeenCalledOnce();
       expect(compileReturns).toHaveBeenCalledOnce();
-      expect(JSON.parse(argsJson)).toEqual({
+      expect(
+        Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+          argsJson,
+        ).pipe(Result.getOrThrow),
+      ).toEqual({
         type: "object",
         value: { value: { fieldType: { type: "string" }, optional: false } },
       });
-      expect(JSON.parse(returnsJson)).toEqual({ type: "string" });
+      expect(
+        Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+          returnsJson,
+        ).pipe(Result.getOrThrow),
+      ).toEqual({ type: "string" });
       registration.mockClear();
       RegisteredConvexFunction.make(database, item);
       expect(registration).toHaveBeenCalledOnce();

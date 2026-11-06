@@ -1,7 +1,7 @@
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Console from "effect/Console";
-import * as Data from "effect/Data";
+import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import * as Runtime from "effect/Runtime";
 import * as ChildProcess from "effect/process/ChildProcess";
@@ -22,9 +22,10 @@ const MUTATING_COMMANDS = new Set([
   "upgrade",
 ]);
 
-class SkillsCommandFailed extends Data.TaggedError("SkillsCommandFailed")<{
-  readonly exitCode: number;
-}> {
+class SkillsCommandFailed extends Schema.TaggedError<
+  SkillsCommandFailed,
+  { readonly brand: unique symbol }
+>()("SkillsCommandFailed", { exitCode: Schema.Finite }) {
   readonly [Runtime.errorExitCode] = this.exitCode;
   readonly [Runtime.errorReported] = false;
 }
@@ -32,6 +33,9 @@ class SkillsCommandFailed extends Data.TaggedError("SkillsCommandFailed")<{
 export const shouldSyncSkillIgnore = (command: string | undefined): boolean =>
   command !== undefined && MUTATING_COMMANDS.has(command);
 
+/**
+ * @internal
+ */
 export const manageSkills = Effect.fn("Skills.manage")(function* (
   args: ReadonlyArray<string>,
 ) {
@@ -45,7 +49,7 @@ export const manageSkills = Effect.fn("Skills.manage")(function* (
   const exitCode = yield* childProcesses.exitCode(command);
 
   if (exitCode !== 0) {
-    return yield* new SkillsCommandFailed({ exitCode });
+    return yield* SkillsCommandFailed.make({ exitCode });
   }
   if (shouldSyncSkillIgnore(args[0])) {
     yield* syncSkillIgnore();

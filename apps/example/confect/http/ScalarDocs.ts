@@ -7,6 +7,8 @@ import { Api } from "./NotesApi";
 /**
  * Serves interactive API documentation for {@link Api}, powered by
  * [Scalar](https://github.com/scalar/scalar).
+ *
+ * @internal
  */
 export const layer = Layer.unwrap(
   Effect.gen(function* () {

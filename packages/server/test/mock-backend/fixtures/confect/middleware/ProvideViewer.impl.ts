@@ -16,7 +16,7 @@ const viewerFromDatabase = Effect.gen(function* () {
     .pipe(Effect.orDie);
 
   if (Option.isNone(user)) {
-    return yield* new NoViewer();
+    return yield* NoViewer.make();
   }
 
   return { username: user.value.username };
@@ -30,7 +30,7 @@ const viewerViaRunQuery = Effect.gen(function* () {
   ).pipe(Effect.orDie);
 
   if (username === null) {
-    return yield* new NoViewer();
+    return yield* NoViewer.make();
   }
 
   return { username };

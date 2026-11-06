@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import ProvideViewer from "../middleware/ProvideViewer.spec";
 import RequireLongName from "../middleware/RequireLongName.spec";
 
-export class NoNotes extends Schema.TaggedError<NoNotes>()("NoNotes", {}) {}
+export class NoNotes extends Schema.TaggedError<NoNotes, {}>()("NoNotes", {}) {}
 
 export default GroupSpec.make()
   .middleware(ProvideViewer)

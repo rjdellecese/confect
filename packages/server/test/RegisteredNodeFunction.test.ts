@@ -1,3 +1,4 @@
+import * as Result from "effect/Result";
 import { RegisteredNodeFunction } from "@confect/server/node";
 import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
 import { FunctionSpec, GroupSpec } from "@confect/core";
@@ -35,14 +36,26 @@ it("preserves component scope in lazy Node validators", () => {
   ) as unknown as { exportArgs: () => string; exportReturns: () => string };
   expect(compileArgs).not.toHaveBeenCalled();
   expect(compileReturns).not.toHaveBeenCalled();
-  expect(JSON.parse(registered.exportArgs())).toEqual({
+  expect(
+    Result.getOrThrow(
+      Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+        registered.exportArgs(),
+      ),
+    ),
+  ).toEqual({
     type: "object",
     value: {
       own: { fieldType: { type: "id", tableName: "items" }, optional: false },
       foreign: { fieldType: { type: "string" }, optional: false },
     },
   });
-  expect(JSON.parse(registered.exportReturns())).toEqual({
+  expect(
+    Result.getOrThrow(
+      Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+        registered.exportReturns(),
+      ),
+    ),
+  ).toEqual({
     type: "id",
     tableName: "items",
   });
@@ -105,10 +118,18 @@ it.each([
     exportArgs: () => string;
     exportReturns: () => string;
   };
-  expect(JSON.parse(exported.exportReturns())).toEqual({ type: "boolean" });
+  expect(
+    Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+      exported.exportReturns(),
+    ).pipe(Result.getOrThrow),
+  ).toEqual({ type: "boolean" });
   expect(compileReturns).toHaveBeenCalledOnce();
   expect(compileArgs).not.toHaveBeenCalled();
-  expect(JSON.parse(exported.exportArgs())).toEqual({
+  expect(
+    Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+      exported.exportArgs(),
+    ).pipe(Result.getOrThrow),
+  ).toEqual({
     type: "object",
     value: {
       flags: {

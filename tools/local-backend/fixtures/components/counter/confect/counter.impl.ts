@@ -37,7 +37,7 @@ const reject = FunctionImpl.make(schema, counter, "reject", ({ run }) =>
       .table("counters")
       .insert({ run, count: 999 })
       .pipe(Effect.orDie);
-    return yield* new Rejected({ id });
+    return yield* Rejected.make({ id });
   }),
 );
 const schedule = FunctionImpl.make(schema, counter, "schedule", (args) =>

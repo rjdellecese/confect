@@ -283,7 +283,10 @@ export const bind = <
                 }),
               ),
               get middlewareSpecs() {
-                return this.middlewareAttachments.map(({ spec }) => spec);
+                return Array.map(
+                  this.middlewareAttachments,
+                  ({ spec }) => spec,
+                );
               },
             };
             Lazy.defineProperty(bound, "args", () =>

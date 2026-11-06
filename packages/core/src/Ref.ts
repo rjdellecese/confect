@@ -1,3 +1,5 @@
+import * as Result from "effect/Result";
+import * as Array from "effect/Array";
 import type * as MiddlewareAttachment from "./MiddlewareAttachment";
 import type {
   DefaultFunctionArgs,
@@ -371,7 +373,10 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
           ...functionSpec.middlewareAttachments,
         ],
         get middlewareSpecs() {
-          return this.middlewareAttachments.map(({ spec }) => spec);
+          return Array.map(
+            this.middlewareAttachments,
+            (attachment) => attachment.spec,
+          );
         },
       };
 
@@ -457,7 +462,8 @@ export const hasErrorSchema = (ref: Any): boolean =>
       "Confect",
       (confectRef) =>
         "error" in confectRef ||
-        confectRef.middlewareSpecs.some(
+        Array.some(
+          confectRef.middlewareSpecs,
           (middlewareSpec) => "error" in middlewareSpec,
         ),
     ),
@@ -495,7 +501,7 @@ export const encodeArgsSync = <Ref_ extends Any>(
 ): unknown =>
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.encodeSync(confectRef.args)(args),
+      Result.getOrThrow(Schema.encodeResult(confectRef.args)(args)),
     ),
     Match.tag("Convex", () => args),
     Match.exhaustive,
@@ -507,7 +513,9 @@ export const decodeArgsSync = <Ref_ extends Any>(
 ): Args<Ref_> =>
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.decodeUnknownSync(confectRef.args)(encodedArgs),
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(confectRef.args)(encodedArgs),
+      ),
     ),
     Match.tag("Convex", () => encodedArgs),
     Match.exhaustive,
@@ -519,7 +527,7 @@ export const encodeReturnsSync = <Ref_ extends Any>(
 ): unknown =>
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.encodeSync(confectRef.returns)(returns),
+      Result.getOrThrow(Schema.encodeResult(confectRef.returns)(returns)),
     ),
     Match.tag("Convex", () => returns),
     Match.exhaustive,
@@ -531,7 +539,9 @@ export const decodeReturnsSync = <Ref_ extends Any>(
 ): Returns<Ref_> =>
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.decodeUnknownSync(confectRef.returns)(encodedReturns),
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(confectRef.returns)(encodedReturns),
+      ),
     ),
     Match.tag("Convex", () => encodedReturns),
     Match.exhaustive,
@@ -669,7 +679,9 @@ export const encodePaginatedQueryArgsSync = <
 ): unknown =>
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.encodeUnknownSync(paginatedKind(confectRef).userArgs)(args),
+      Result.getOrThrow(
+        Schema.encodeUnknownResult(paginatedKind(confectRef).userArgs)(args),
+      ),
     ),
     Match.tag("Convex", () => args),
     Match.exhaustive,
@@ -686,7 +698,9 @@ export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
 ): Returns<Ref_>["page"] =>
   Match.value<Any>(ref).pipe(
     Match.tag("Confect", (confectRef) =>
-      Schema.decodeUnknownSync(paginatedKind(confectRef).page)(encodedPage),
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(paginatedKind(confectRef).page)(encodedPage),
+      ),
     ),
     Match.tag("Convex", () => encodedPage),
     Match.exhaustive,

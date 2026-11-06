@@ -1,4 +1,5 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import schema from "../_generated/schema";
@@ -20,17 +21,17 @@ const exercise = FunctionImpl.make(schema, spec, "exercise", ({ run }) =>
       Effect.catchTag("Rejected", (error) => Effect.succeed(error.id)),
     );
     return {
-      first: (yield* runQuery(first.counter.list, { run })).map(
-        (doc) => doc.count,
+      first: yield* runQuery(first.counter.list, { run }).pipe(
+        Effect.map(Array.map((doc) => doc.count)),
       ),
-      second: (yield* runQuery(second.counter.list, { run })).map(
-        (doc) => doc.count,
+      second: yield* runQuery(second.counter.list, { run }).pipe(
+        Effect.map(Array.map((doc) => doc.count)),
       ),
-      left: (yield* runQuery(left.parent.list, { run })).map(
-        (doc) => doc.count,
+      left: yield* runQuery(left.parent.list, { run }).pipe(
+        Effect.map(Array.map((doc) => doc.count)),
       ),
-      right: (yield* runQuery(right.parent.list, { run })).map(
-        (doc) => doc.count,
+      right: yield* runQuery(right.parent.list, { run }).pipe(
+        Effect.map(Array.map((doc) => doc.count)),
       ),
       rejectedId,
     };
@@ -46,11 +47,11 @@ const list = FunctionImpl.make(schema, spec, "list", (args) =>
   Effect.gen(function* () {
     const { runQuery } = yield* QueryRunner;
     return {
-      first: (yield* runQuery(first.counter.list, args)).map(
-        (doc) => doc.count,
+      first: yield* runQuery(first.counter.list, args).pipe(
+        Effect.map(Array.map((doc) => doc.count)),
       ),
-      second: (yield* runQuery(second.counter.list, args)).map(
-        (doc) => doc.count,
+      second: yield* runQuery(second.counter.list, args).pipe(
+        Effect.map(Array.map((doc) => doc.count)),
       ),
     };
   }).pipe(Effect.orDie),

@@ -72,7 +72,10 @@ const argsActionRef = Ref.make(
   }),
 );
 
-class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedError<
+  NotFound,
+  { readonly brand: unique symbol }
+>()("NotFound", {
   id: Schema.String,
 }) {}
 

@@ -1,3 +1,6 @@
+import { pipe } from "effect/Function";
+import * as Option from "effect/Option";
+import * as Str from "effect/String";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -40,9 +43,11 @@ layer(RemoveGroupsLayer)("removeGroups", (it) => {
       );
       const modulePath = path.join(fixtureConvex, "does/not/exist.ts");
 
-      expect(yield* fs.exists(modulePath)).toBe(false);
+      const actual = yield* fs.exists(modulePath);
+      expect(actual).toBe(false);
       yield* removeGroups(missingGroup);
-      expect(yield* fs.exists(modulePath)).toBe(false);
+      const actual2 = yield* fs.exists(modulePath);
+      expect(actual2).toBe(false);
     }),
   );
 });
@@ -101,12 +106,15 @@ const runGenerateForNodeGroupEffect = Effect.fnUntraced(function* ({
     ),
   );
 
-  yield* generateFunctions(snapshot).pipe(Effect.provide(TempDirsLayer));
+  const services = yield* Layer.build(TempDirsLayer);
+  yield* generateFunctions(snapshot).pipe(Effect.provideContext(services));
 
   const modulePath = path.join(convexDir, moduleRelativePath);
   const contents = yield* fs.readFileString(modulePath);
 
-  const importMatch = contents.match(/from "([^"]+)"/);
+  const importMatch = Option.getOrNull(
+    pipe(contents, Str.match(/from "([^"]+)"/)),
+  );
   assert(importMatch !== null, "expected a registry import in the module");
   const resolved =
     path.resolve(path.dirname(modulePath), importMatch[1]!) + ".ts";

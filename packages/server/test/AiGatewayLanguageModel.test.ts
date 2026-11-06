@@ -1,3 +1,5 @@
+import * as Result from "effect/Result";
+import * as Arr from "effect/Array";
 import {
   AiGatewayLanguageClient,
   AiGatewayLanguageModel,
@@ -109,7 +111,8 @@ describe("AiGatewayLanguageModel", () => {
         const result = yield* LanguageModel.generateText({ prompt: "hello" });
 
         assert.strictEqual(result.text, "Hello from Convex");
-        assert.deepStrictEqual(yield* gateway.serviceTokenCalls, [
+        const serviceTokenCallsResult = yield* gateway.serviceTokenCalls;
+        assert.deepStrictEqual(serviceTokenCallsResult, [
           "ai-gateway",
           "ai-gateway",
         ]);
@@ -130,7 +133,8 @@ describe("AiGatewayLanguageModel", () => {
           request.headers.authorization,
           "Bearer service-token",
         );
-        assert.deepStrictEqual(yield* requestBody(request), {
+        const requestBodyResult = yield* requestBody(request);
+        assert.deepStrictEqual(requestBodyResult, {
           model: "anthropic/claude-sonnet-4.5",
           messages: [{ role: "user", content: "hello" }],
         });
@@ -182,13 +186,17 @@ describe("AiGatewayLanguageModel", () => {
         const parts = globalThis.Array.from(partsChunk);
 
         assert.strictEqual(
-          parts
-            .filter((part) => part.type === "text-delta")
-            .map((part) => part.delta)
-            .join(""),
+          Arr.join(
+            Arr.map(
+              Arr.filter(parts, (part) => part.type === "text-delta"),
+              (part) => part.delta,
+            ),
+            "",
+          ),
           "Hello world",
         );
-        assert.deepStrictEqual(yield* gateway.serviceTokenCalls, [
+        const serviceTokenCallsResult2 = yield* gateway.serviceTokenCalls;
+        assert.deepStrictEqual(serviceTokenCallsResult2, [
           "ai-gateway",
           "ai-gateway",
         ]);
@@ -200,7 +208,7 @@ describe("AiGatewayLanguageModel", () => {
   it.layer(
     testAiGatewayLayer({
       getServiceToken: () =>
-        Effect.fail(new AiGatewayLanguageClient.AiGatewayDisabled()),
+        Effect.fail(AiGatewayLanguageClient.AiGatewayDisabled.make()),
       respond: (request) => jsonResponse(request, {}),
     }),
   )((test) => {
@@ -209,18 +217,20 @@ describe("AiGatewayLanguageModel", () => {
       () =>
         Effect.gen(function* () {
           const gateway = yield* TestAiGateway;
-          const error = yield* LanguageModel.generateText({
-            prompt: "hello",
-          }).pipe(
-            Effect.provide(languageModelLayer("openai/gpt-4o-mini")),
-            Effect.flip,
-          );
+          const error = yield* Effect.gen(function* () {
+            const services = yield* Layer.build(
+              languageModelLayer("openai/gpt-4o-mini"),
+            );
+            return yield* LanguageModel.generateText({
+              prompt: "hello",
+            }).pipe(Effect.provideContext(services));
+          }).pipe(Effect.scoped, Effect.flip);
 
           assert.instanceOf(error, AiGatewayLanguageClient.AiGatewayDisabled);
-          assert.deepStrictEqual(yield* gateway.serviceTokenCalls, [
-            "ai-gateway",
-          ]);
-          assert.deepStrictEqual(yield* gateway.requests, []);
+          const serviceTokenCallsResult3 = yield* gateway.serviceTokenCalls;
+          assert.deepStrictEqual(serviceTokenCallsResult3, ["ai-gateway"]);
+          const requestsResult = yield* gateway.requests;
+          assert.deepStrictEqual(requestsResult, []);
         }),
     );
   });
@@ -232,10 +242,15 @@ const jsonResponse = (
 ): HttpClientResponse.HttpClientResponse =>
   HttpClientResponse.fromWeb(
     request,
-    new Response(JSON.stringify(body), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }),
+    new Response(
+      Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))(body).pipe(
+        Result.getOrThrow,
+      ),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    ),
   );
 
 const sseResponse = (
@@ -245,13 +260,14 @@ const sseResponse = (
   HttpClientResponse.fromWeb(
     request,
     new Response(
-      events
-        .map((event) =>
+      Arr.join(
+        Arr.map(events, (event) =>
           event === "[DONE]"
             ? "data: [DONE]\n\n"
-            : `data: ${JSON.stringify(event)}\n\n`,
-        )
-        .join(""),
+            : `data: ${Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))(event).pipe(Result.getOrThrow)}\n\n`,
+        ),
+        "",
+      ),
       {
         status: 200,
         headers: { "content-type": "text/event-stream" },
