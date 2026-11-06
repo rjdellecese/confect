@@ -1,5 +1,15 @@
 # @confect/server
 
+## 10.6.0
+
+### Patch Changes
+
+- 0b0b789: Back Confect's `first()` and `take(n)` with native Convex `take()` calls rather than consuming the query's `AsyncIterable`. Convex can prefetch a full index page behind the iterator even when only a few documents are requested; native `take()` communicates the limit to the backend and avoids that unnecessary prefetching.
+
+  Fix `take(n)` to use Convex's non-negative-integer validation: fractional, negative, `NaN`, and infinite counts now fail instead of being rounded, returning no documents, or collecting the entire query.
+
+- 4a019bd: Preserve schema validation errors, backend handler isolation, and client query and subscription behavior while updating the Effect integration.
+
 ## 10.5.0
 
 ### Minor Changes
