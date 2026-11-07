@@ -602,8 +602,8 @@ importers:
         specifier: workspace:*
         version: link:../../tools/test-types
       convex-test:
-        specifier: 0.0.60
-        version: 0.0.60(convex@1.49.0(react@19.3.1))
+        specifier: 0.0.67
+        version: 0.0.67(convex@1.49.0(react@19.3.1))
       dotenv:
         specifier: 18.0.9
         version: 18.0.9
@@ -670,7 +670,7 @@ importers:
         version: 1.49.0(react@19.3.1)
       convex-test:
         specifier: '>=0.0.50 <0.1.0'
-        version: 0.0.60(convex@1.49.0(react@19.3.1))
+        version: 0.0.67(convex@1.49.0(react@19.3.1))
     devDependencies:
       '@types/node':
         specifier: 26.6.6
@@ -4394,8 +4394,8 @@ packages:
       zod:
         optional: true
 
-  convex-test@0.0.60:
-    resolution: {integrity: sha512-qCAFx+CO6bmpXNc9s1jZvw8NJPS4yM074ib87PUY675FsiaRRW4ALotEB+RbVCYDRMYxh623KMnYZBlrMJIv1Q==}
+  convex-test@0.0.67:
+    resolution: {integrity: sha512-UCAzL8pwo4akHs6dppAU3Rbo2Gzdp1KZp9kcsLGFBaL7JuXOfUZFxe16ywQjnyDZ+uQhawjTRx2j6Hd8FoBm5Q==}
     peerDependencies:
       convex: 1.49.0
 
@@ -11208,7 +11208,7 @@ snapshots:
       typescript: 5.9.3
       zod: 4.3.6
 
-  convex-test@0.0.60(convex@1.49.0(react@19.3.1)):
+  convex-test@0.0.67(convex@1.49.0(react@19.3.1)):
     dependencies:
       convex: 1.49.0(react@19.3.1)
 
