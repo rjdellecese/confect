@@ -7,7 +7,7 @@ import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
 import { RegisteredNodeFunction } from "@confect/server/node";
 import { convexTest } from "convex-test";
-import { makeFunctionReference } from "convex/server";
+import { defineSchema, makeFunctionReference } from "convex/server";
 import * as Console from "effect/Console";
 import * as TestConsole from "effect/testing/TestConsole";
 import confectSchema from "./fixtures/confect/_generated/schema";
@@ -15,6 +15,8 @@ import convexSchema from "./fixtures/confect/_generated/convexSchema";
 import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -48,8 +50,194 @@ import {
 } from "./fixtures/confect/groups/typedErrors.spec";
 import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
+import * as TestConfect_ from "../../../test/src/TestConfect";
+
+describe("mock search compatibility", () => {
+  const table = Table.make(() =>
+    Schema.Struct({
+      text: Schema.optionalKey(
+        Schema.Union([Schema.String, Schema.Null, Schema.Finite]),
+      ),
+    }),
+  ).searchIndex("text", { searchField: "text" })("entries");
+  const schema = DatabaseSchema.make({ entries: table });
+  const layer = TestConfect_.layer(
+    schema,
+    defineSchema({ entries: Table.tableDefinition(table) }),
+    import.meta.glob("./fixtures/convex/_generated/*.js"),
+  );
+  it.layer(layer, { buildPerTest: true })("non-string fields", (test) => {
+    test.effect.each([undefined, null, 123])(
+      "skips non-string search field %j through Confect readers",
+      (value) =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect_.TestConfect<typeof schema>();
+          yield* c.run(
+            Effect.gen(function* () {
+              const writer =
+                yield* DatabaseWriter_.DatabaseWriter<typeof schema>();
+              const reader =
+                yield* DatabaseReader_.DatabaseReader<typeof schema>();
+              yield* writer
+                .table("entries")
+                .insert(value === undefined ? {} : { text: value });
+              yield* writer
+                .table("entries")
+                .insert({ text: "123 null undefined" });
+              const results = yield* reader
+                .table("entries")
+                .search("text", (q) => q.search("text", String(value)))
+                .collect();
+              expect(Array.map(results, (doc) => doc.text)).toEqual([
+                "123 null undefined",
+              ]);
+            }),
+          );
+        }),
+    );
+  });
+});
+
+it.layer(TestConfect.layer, { buildPerTest: true })(
+  "mock query compatibility",
+  (test) => {
+    test.effect("pins the Effect clock inside TestConfect.run", () =>
+      Effect.gen(function* () {
+        vi.useFakeTimers({ now: 1_750_000_000_000 });
+        const c = yield* TestConfect.TestConfect;
+        yield* c.run(
+          Effect.gen(function* () {
+            const before = yield* Clock.currentTimeMillis;
+            vi.setSystemTime(1_750_000_001_000);
+            const writer = yield* DatabaseWriter;
+            const reader = yield* DatabaseReader;
+            const id = yield* writer.table("notes").insert({ text: "pinned" });
+            const doc = yield* reader.table("notes").get(id);
+            const after = yield* Clock.currentTimeMillis;
+            expect(before).toBe(1_750_000_000_000);
+            expect(after).toBe(before);
+            expect(doc._creationTime).toBeGreaterThanOrEqual(before);
+          }),
+        );
+      }).pipe(Effect.ensuring(Effect.sync(() => vi.useRealTimers()))),
+    );
+
+    test.effect(
+      "enforces search candidate limits without blocking early reads",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              const writer = yield* DatabaseWriter;
+              const reader = yield* DatabaseReader;
+              for (let i = 0; i < 1025; i++) {
+                yield* writer
+                  .table("notes")
+                  .insert({ text: "candidate", tag: "skip" });
+              }
+              const search = () =>
+                reader
+                  .table("notes")
+                  .search("text", (q) => q.search("text", "candidate"));
+              const taken = yield* search().take(2);
+              expect(taken).toHaveLength(2);
+              const page = yield* search().paginate({
+                numItems: 2,
+                cursor: null,
+              });
+              expect(page.page).toHaveLength(2);
+              const collected = yield* Effect.exit(search().collect());
+              assert(collected._tag === "Failure");
+              expect(Cause.pretty(collected.cause)).toContain(
+                "Search query scanned too many documents",
+              );
+              const filtered = yield* Effect.exit(
+                search().paginate({ numItems: 1, cursor: null }, (q) =>
+                  q.eq(q.field("tag"), "keep"),
+                ),
+              );
+              assert(filtered._tag === "Failure");
+              expect(Cause.pretty(filtered.cause)).toContain(
+                "Search query scanned too many documents",
+              );
+            }),
+          );
+        }),
+    );
+
+    test.effect(
+      "allows multiple native pagination pages in TestConfect.run",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              const writer = yield* DatabaseWriter;
+              const reader = yield* DatabaseReader;
+              yield* writer.table("notes").insert({ text: "first" });
+              yield* writer.table("notes").insert({ text: "second" });
+              const first = yield* reader
+                .table("notes")
+                .index("by_text")
+                .paginate({ numItems: 1, cursor: null });
+              const second = yield* reader
+                .table("notes")
+                .index("by_text")
+                .paginate({ numItems: 1, cursor: first.continueCursor });
+              expect(Array.map(first.page, (doc) => doc.text)).toEqual([
+                "first",
+              ]);
+              expect(Array.map(second.page, (doc) => doc.text)).toEqual([
+                "second",
+              ]);
+            }),
+          );
+        }),
+    );
+  },
+);
 
 describe("Generated function registration", () => {
+  it.effect("retains the single-pagination budget in registered queries", () =>
+    Effect.gen(function* () {
+      const item = FunctionRegistryItem.make({
+        functionSpec: FunctionSpec.publicQuery({
+          name: "run",
+          returns: () => Schema.Null,
+        }),
+        groupMiddlewareAttachments: [],
+        handler: () =>
+          Effect.gen(function* () {
+            const reader = yield* DatabaseReader;
+            yield* reader
+              .table("notes")
+              .index("by_text")
+              .paginate({ numItems: 1, cursor: null });
+            yield* reader
+              .table("notes")
+              .index("by_text")
+              .paginate({ numItems: 1, cursor: null });
+            return null;
+          }).pipe(Effect.orDie),
+      });
+      assert(item._tag === "Confect");
+      const registered = RegisteredConvexFunction.make(confectSchema, item);
+      const t = convexTest(convexSchema, {
+        ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+        "./fixtures/convex/paginationBudget.ts": () =>
+          Promise.resolve({ run: registered }),
+      });
+      const result = yield* Effect.exit(
+        Effect.promise(() =>
+          t.query(makeFunctionReference<"query">("paginationBudget:run"), {}),
+        ),
+      );
+      assert(result._tag === "Failure");
+      expect(Cause.pretty(result.cause)).toContain("single paginated query");
+    }),
+  );
+
   it.effect("defers validators across generated handler forwarding", () =>
     Effect.gen(function* () {
       const compileArgs = vi.spyOn(SchemaToValidator, "compileArgsSchema");
