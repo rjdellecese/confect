@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
+import * as Array from "effect/Array";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
@@ -22,8 +23,8 @@ describe("validateAll", () => {
         Schema.Struct({ roles: Schema.Array(Schema.String) }).pipe(
           Schema.overrideToEquivalence(
             () => (left, right) =>
-              left.roles.every((role) => right.roles.includes(role)) &&
-              right.roles.every((role) => left.roles.includes(role)),
+              Array.every(left.roles, (role) => right.roles.includes(role)) &&
+              Array.every(right.roles, (role) => left.roles.includes(role)),
           ),
         ),
       functionTypes: { query: true, mutation: false, action: false },

@@ -5,13 +5,15 @@ export default defineConfig({
     tasks: {
       build: {
         command: "tsdown --config-loader unrun && tsrs -b tsconfig.src.json",
-        input: [
-          { auto: true },
-          "!dist/**",
-          "!**/.unrun/**",
-          "!**/*.tsbuildinfo",
-        ],
-        output: ["dist/**"],
+        cache: {
+          input: [
+            { auto: true },
+            "!dist/**",
+            "!**/.unrun/**",
+            "!**/*.tsbuildinfo",
+          ],
+          output: ["dist/**"],
+        },
       },
     },
   },
