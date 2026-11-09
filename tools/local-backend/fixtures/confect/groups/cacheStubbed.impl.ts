@@ -13,6 +13,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Random from "effect/Random";
 import databaseSchema from "../_generated/schema";
+import { TransactionMetadata } from "../_generated/services";
 import cacheStubbed from "./cacheStubbed.spec";
 
 const confectNoTime = FunctionImpl.make(
@@ -20,6 +21,16 @@ const confectNoTime = FunctionImpl.make(
   cacheStubbed,
   "confectNoTime",
   () => Random.next,
+);
+
+const confectWithSnapshot = FunctionImpl.make(
+  databaseSchema,
+  cacheStubbed,
+  "confectWithSnapshot",
+  () =>
+    Effect.flatMap(TransactionMetadata, (transaction) =>
+      transaction.getSnapshotTs(),
+    ),
 );
 
 const confectWithClock = FunctionImpl.make(
@@ -57,6 +68,7 @@ const confectWithLog = FunctionImpl.make(
 );
 
 export default GroupImpl.make(databaseSchema, cacheStubbed).pipe(
+  Layer.provide(confectWithSnapshot),
   Layer.provide(confectNoTime),
   Layer.provide(confectWithClock),
   Layer.provide(confectWithRawDateNow),

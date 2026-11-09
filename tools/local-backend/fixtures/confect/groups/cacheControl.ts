@@ -11,3 +11,8 @@ export const control = query({
   // oxlint-disable-next-line effecttsgo/global-date -- The raw clock read is the positive control for Convex's cache tracker.
   handler: () => Date.now(),
 });
+
+export const snapshot = query({
+  args: {},
+  handler: (ctx) => ctx.meta.getSnapshotTs(),
+});

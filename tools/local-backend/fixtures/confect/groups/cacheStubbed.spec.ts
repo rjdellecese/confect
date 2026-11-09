@@ -4,6 +4,12 @@ import * as Schema from "effect/Schema";
 export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
+      name: "confectWithSnapshot",
+      returns: () => Schema.BigInt,
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicQuery({
       name: "confectNoTime",
       returns: () => Schema.Finite,
     }),

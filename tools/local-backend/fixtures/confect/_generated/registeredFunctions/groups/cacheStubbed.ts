@@ -7,6 +7,7 @@ const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<
 const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/cacheStubbed.spec")["default"]>(databaseSchema, groupLayer);
 
 export default {
+["confectWithSnapshot"]: RegisteredConvexFunction.register({ ...definitions["confectWithSnapshot"], handler: forward(definitions["confectWithSnapshot"].handler) }),
 ["confectNoTime"]: RegisteredConvexFunction.register({ ...definitions["confectNoTime"], handler: forward(definitions["confectNoTime"].handler) }),
 ["confectWithClock"]: RegisteredConvexFunction.register({ ...definitions["confectWithClock"], handler: forward(definitions["confectWithClock"].handler) }),
 ["confectWithRawDateNow"]: RegisteredConvexFunction.register({ ...definitions["confectWithRawDateNow"], handler: forward(definitions["confectWithRawDateNow"].handler) }),

@@ -114,6 +114,34 @@ layer(LocalBackend.layer, {
     }),
   );
 
+  it.effect.each([
+    { name: "native", ref: refs.public.groups.cacheControl.snapshot },
+    {
+      name: "Confect",
+      ref: refs.public.groups.cacheStubbed.confectWithSnapshot,
+    },
+  ])(
+    "a $name snapshot query expires while a time-independent query stays cached",
+    ({ name, ref }) =>
+      Effect.gen(function* () {
+        const { client } = yield* LocalBackend.LocalBackend;
+        const control = refs.public.groups.cacheStubbed.confectNoTime;
+        const initialControl = yield* queryOnce(client, control);
+        const initial = yield* queryOnce(client, ref);
+        yield* Effect.promise(() =>
+          client.mutation(
+            Ref.getFunctionReference(refs.public.groups.transactions.seed),
+            { caseId: `snapshot-cache-${name}`, count: 1 },
+          ),
+        );
+        yield* Effect.sleep(SLEEP_PAST_CACHE);
+        const after = yield* queryOnce(client, ref);
+        const afterControl = yield* queryOnce(client, control);
+        expect(after).toBeGreaterThan(initial);
+        expect(afterControl).toBe(initialControl);
+      }),
+  );
+
   it.effect("a Confect query that emits a log stays cached", () =>
     Effect.gen(function* () {
       const { initial, afterMaxCacheAge } = yield* captureAcrossEvictionWindow(
