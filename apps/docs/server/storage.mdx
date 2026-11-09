@@ -89,10 +89,6 @@ Effect.gen(function* () {
 
 Store a `Blob` directly and receive its storage ID. Optionally supply a SHA-256 hash in `options` for Convex to verify.
 
-In mutations, file writes commit or roll back with the database transaction. You can read a blob you just stored within the same mutation. Blob reads and writes count toward Convex's transaction file limits; `TransactionMetadata.getMetrics` exposes `filesRead`, `fileReadBytes`, `filesWritten`, and `fileWriteBytes`.
-
-Mutation Blob operations require Convex 1.48.0 or later. Tests using `@confect/test` require `convex-test` 0.0.67 or later.
-
 ```ts
 Effect.gen(function* () {
   const storage = yield* Storage;
