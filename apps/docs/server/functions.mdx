@@ -52,12 +52,6 @@ export default GroupSpec.make({ experimental_reuseContext: true }).addFunction(
 );
 ```
 
-Run `confect codegen` or keep `confect dev` running, then deploy with Convex.
-Confect emits `export const experimental_reuseContext = true` in the group's
-generated `convex/` module. Omit the option or set it to `false` to disable it;
-regenerate and deploy again for the change to take effect. Do not edit the
-generated module by hand.
-
 Reuse can avoid evaluating the module graph and registering functions on every
 query or mutation. It applies to all queries and mutations in that group,
 including plain Convex functions, but does not extend to child groups. Actions

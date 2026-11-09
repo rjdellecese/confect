@@ -9,6 +9,8 @@ import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
+import * as Iterable from "effect/Iterable";
+import { pipe } from "effect/Function";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
@@ -338,8 +340,8 @@ const validateContextReuse = (
   groupPath: string,
 ): Result.Result<ReadonlyArray<string>, InvalidContextReuseError> =>
   Result.gen(function* () {
-    const enabled = group.experimental_reuseContext;
-    if (enabled !== undefined && typeof enabled !== "boolean") {
+    const isEnabled = group.experimental_reuseContext;
+    if (isEnabled !== undefined && typeof isEnabled !== "boolean") {
       return yield* Result.fail(
         InvalidContextReuseError.make({
           specPath,
@@ -348,8 +350,7 @@ const validateContextReuse = (
         }),
       );
     }
-    const warnings: Array<string> = [];
-    if (enabled) {
+    if (isEnabled) {
       if (group.runtime === "Node") {
         return yield* Result.fail(
           InvalidContextReuseError.make({
@@ -368,27 +369,26 @@ const validateContextReuse = (
           }),
         );
       }
-      const functions = Record.values(group.functions);
-      if (
-        functions.length > 0 &&
-        Array.every(
-          functions,
-          (fn) => fn.runtimeAndFunctionType.functionType === "action",
-        )
-      ) {
-        warnings.push(groupPath);
-      }
     }
-    for (const [name, child] of Record.toEntries(group.groups)) {
-      warnings.push(
-        ...(yield* validateContextReuse(
-          child,
-          specPath,
-          `${groupPath}.${name}`,
-        )),
-      );
-    }
-    return warnings;
+    const functions = Record.values(group.functions);
+    const warnings =
+      isEnabled &&
+      functions.length > 0 &&
+      Array.every(
+        functions,
+        (fn) => fn.runtimeAndFunctionType.functionType === "action",
+      )
+        ? [groupPath]
+        : [];
+    const childWarnings = yield* pipe(
+      group.groups,
+      Record.toEntries,
+      Iterable.map(([name, child]) =>
+        validateContextReuse(child, specPath, `${groupPath}.${name}`),
+      ),
+      Result.all,
+    );
+    return [...warnings, ...Array.flatten(childWarnings)];
   });
 
 /**
