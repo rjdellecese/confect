@@ -3,3 +3,4 @@ import registeredFunctions from "../../confect/_generated/registeredFunctions/gr
 export const actionMetadata = registeredFunctions.actionMetadata;
 export const mutationMetadata = registeredFunctions.mutationMetadata;
 export const queryMetadata = registeredFunctions.queryMetadata;
+export const snapshotMutation = registeredFunctions.snapshotMutation;

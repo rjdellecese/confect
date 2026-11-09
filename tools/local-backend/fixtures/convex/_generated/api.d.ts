@@ -50,12 +50,14 @@ export declare const api: {
   groups: {
     cacheControl: {
       control: FunctionReference<"query", "public", {}, any>;
+      snapshot: FunctionReference<"query", "public", {}, any>;
     };
     cacheStubbed: {
       confectNoTime: FunctionReference<"query", "public", {}, number>;
       confectWithClock: FunctionReference<"query", "public", {}, number>;
       confectWithLog: FunctionReference<"query", "public", {}, number>;
       confectWithRawDateNow: FunctionReference<"query", "public", {}, number>;
+      confectWithSnapshot: FunctionReference<"query", "public", {}, bigint>;
       confectWithSpan: FunctionReference<"query", "public", {}, number>;
     };
     contextReuse: {
@@ -147,9 +149,15 @@ export declare const api: {
           functionName: string;
           functionType: string;
           ip: string | null;
+          nestedMutationAfterWriteTs: bigint;
+          nestedMutationTs: bigint;
+          nestedQueryTs: bigint;
           remainingWrites: number;
+          repeatedSnapshotTs: bigint;
           requestId: string;
           scheduledFunctionId: string | null;
+          snapshotTs: bigint;
+          staleQueryTs: bigint;
         }
       >;
       queryMetadata: FunctionReference<
@@ -161,6 +169,8 @@ export declare const api: {
           functionName: string;
           functionType: string;
           remainingReads: number;
+          repeatedSnapshotTs: bigint;
+          snapshotTs: bigint;
         }
       >;
     };
@@ -324,6 +334,14 @@ export declare const api: {
  */
 export declare const internal: {
   groups: {
+    metadata: {
+      snapshotMutation: FunctionReference<
+        "mutation",
+        "internal",
+        {},
+        { after: bigint; before: bigint }
+      >;
+    };
     storage: {
       exerciseFiles: FunctionReference<
         "mutation",

@@ -854,6 +854,39 @@ describe("function logging", () => {
 it.layer(TestConfect.layer, { buildPerTest: true })(
   "TransactionMetadata",
   (test) => {
+    test.effect.each([false, true])(
+      "keeps snapshot timestamps fixed across writes with identity=%s",
+      (authenticated) =>
+        Effect.gen(function* () {
+          const testConfect = yield* TestConfect.TestConfect;
+          const c = authenticated
+            ? testConfect.withIdentity({ subject: "snapshot-owner" })
+            : testConfect;
+          const before = yield* c.run(
+            Effect.gen(function* () {
+              const transaction = yield* TransactionMetadata;
+              const writer = yield* DatabaseWriter;
+              const snapshot = transaction.getSnapshotTs();
+              const timestamp = yield* snapshot;
+              expect(typeof timestamp).toBe("bigint");
+              yield* writer.table("notes").insert({ text: "snapshot" });
+              const repeated = yield* snapshot;
+              expect(repeated).toBe(timestamp);
+              return timestamp;
+            }),
+            Schema.BigInt,
+          );
+          const after = yield* c.run(
+            Effect.gen(function* () {
+              const transaction = yield* TransactionMetadata;
+              return yield* transaction.getSnapshotTs();
+            }),
+            Schema.BigInt,
+          );
+          expect(after).toBeGreaterThan(before);
+        }),
+    );
+
     test.effect("reads updated metrics after database operations", () =>
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;

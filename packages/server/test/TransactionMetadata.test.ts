@@ -42,10 +42,10 @@ describe("TransactionMetadata", () => {
       };
       let current = before;
       const getTransactionMetrics = vi.fn(() => Promise.resolve(current));
-      const meta = { getTransactionMetrics } satisfies Pick<
-        QueryMeta,
-        "getTransactionMetrics"
-      >;
+      const meta = {
+        getTransactionMetrics,
+        getSnapshotTs: () => 1n,
+      } satisfies Pick<QueryMeta, "getTransactionMetrics" | "getSnapshotTs">;
       const layer = TransactionMetadata.layer(meta);
 
       expect(getTransactionMetrics).not.toHaveBeenCalled();
@@ -78,7 +78,8 @@ describe("TransactionMetadata", () => {
     const failure = new Error("Transaction metrics unavailable");
     const meta = {
       getTransactionMetrics: () => Promise.reject(failure),
-    } satisfies Pick<QueryMeta, "getTransactionMetrics">;
+      getSnapshotTs: () => 1n,
+    } satisfies Pick<QueryMeta, "getTransactionMetrics" | "getSnapshotTs">;
 
     return Effect.gen(function* () {
       const services = yield* Layer.build(TransactionMetadata.layer(meta));
@@ -88,6 +89,57 @@ describe("TransactionMetadata", () => {
           .getMetrics()
           .pipe(Effect.catchDefect(Effect.succeed));
         expect(pipeResult).toBe(failure);
+      }).pipe(Effect.provideContext(services));
+    }).pipe(Effect.scoped);
+  });
+
+  it.effect(
+    "reads exact bigint snapshot timestamps lazily on every execution",
+    () => {
+      const first = 1_800_000_000_000_000_001n;
+      const getSnapshotTs = vi.fn(() => first);
+      const getTransactionMetrics = vi.fn<QueryMeta["getTransactionMetrics"]>();
+      const meta = { getTransactionMetrics, getSnapshotTs };
+      const layer = TransactionMetadata.layer(meta);
+      expect(getSnapshotTs).not.toHaveBeenCalled();
+
+      return Effect.gen(function* () {
+        const services = yield* Layer.build(layer);
+        return yield* Effect.gen(function* () {
+          const transaction = yield* TransactionMetadata.TransactionMetadata;
+          const snapshot = transaction.getSnapshotTs();
+          expectTypeOf(snapshot).toEqualTypeOf<Effect.Effect<bigint>>();
+          expect(getSnapshotTs).not.toHaveBeenCalled();
+          const firstSnapshot = yield* snapshot;
+          expect(firstSnapshot).toBe(first);
+          getSnapshotTs.mockReturnValueOnce(first + 1n);
+          const secondSnapshot = yield* snapshot;
+          expect(secondSnapshot).toBe(first + 1n);
+          expect(getSnapshotTs.mock.contexts).toEqual([meta, meta]);
+          expect(getTransactionMetrics).not.toHaveBeenCalled();
+        }).pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped);
+    },
+  );
+
+  it.effect("preserves synchronous snapshot failures as defects", () => {
+    const failure = new Error("Snapshot unavailable");
+    const getSnapshotTs = vi.fn((): bigint => {
+      throw failure;
+    });
+    return Effect.gen(function* () {
+      const services = yield* Layer.build(
+        TransactionMetadata.layer({
+          getSnapshotTs,
+          getTransactionMetrics: vi.fn<QueryMeta["getTransactionMetrics"]>(),
+        }),
+      );
+      return yield* Effect.gen(function* () {
+        const transaction = yield* TransactionMetadata.TransactionMetadata;
+        const snapshot = transaction.getSnapshotTs();
+        expect(getSnapshotTs).not.toHaveBeenCalled();
+        const defect = yield* snapshot.pipe(Effect.catchDefect(Effect.succeed));
+        expect(defect).toBe(failure);
       }).pipe(Effect.provideContext(services));
     }).pipe(Effect.scoped);
   });

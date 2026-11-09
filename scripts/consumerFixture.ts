@@ -82,7 +82,7 @@ import refs from "./confect/_generated/refs";
 import type { NotesDoc } from "./confect/_generated/docs";
 import { Id } from "./confect/_generated/id";
 import type databaseSchema from "./confect/_generated/schema";
-import { DatabaseReader, Storage } from "./confect/_generated/services";
+import { DatabaseReader, Storage, TransactionMetadata } from "./confect/_generated/services";
 
 export const args: Ref.Args<typeof refs.public.notes.count> = { count: 41 };
 export const result: Ref.Returns<typeof refs.public.notes.count> = 42;
@@ -99,6 +99,9 @@ export const copyBlob: (id: Id<"_storage">) => Effect.Effect<Id<"_storage">, nev
     const blob = yield* storage.get(id).pipe(Effect.orDie);
     return yield* storage.store(blob);
   });
+
+export const snapshotTimestamp: Effect.Effect<bigint, never, Handler.QueryServices<typeof databaseSchema>> =
+  Effect.flatMap(TransactionMetadata, (transaction) => transaction.getSnapshotTs());
 
 // @ts-expect-error The consumer passes decoded numbers, not encoded strings.
 export const encodedArgsAreNotDecodedArgs: Ref.Args<typeof refs.public.notes.count> = { count: "41" };

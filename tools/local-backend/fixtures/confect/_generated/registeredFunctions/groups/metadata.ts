@@ -9,5 +9,6 @@ const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../..
 export default {
 ["queryMetadata"]: RegisteredConvexFunction.register({ ...definitions["queryMetadata"], handler: forward(definitions["queryMetadata"].handler) }),
 ["mutationMetadata"]: RegisteredConvexFunction.register({ ...definitions["mutationMetadata"], handler: forward(definitions["mutationMetadata"].handler) }),
+["snapshotMutation"]: RegisteredConvexFunction.register({ ...definitions["snapshotMutation"], handler: forward(definitions["snapshotMutation"].handler) }),
 ["actionMetadata"]: RegisteredConvexFunction.register({ ...definitions["actionMetadata"], handler: forward(definitions["actionMetadata"].handler) }),
 } as RegisteredFunctions.RegisteredFunctionsForGroupSpec<typeof import("../../../groups/metadata.spec")["default"]>;

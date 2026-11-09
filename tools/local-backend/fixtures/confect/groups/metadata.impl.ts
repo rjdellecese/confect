@@ -2,8 +2,12 @@ import { FunctionImpl, GroupImpl, MiddlewareImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
+import refs from "../_generated/refs";
 import {
+  DatabaseWriter,
   ExecutionMetadata,
+  MutationRunner,
+  QueryRunner,
   RequestMetadata,
   TransactionMetadata,
 } from "../_generated/services";
@@ -42,6 +46,8 @@ const queryMetadata = FunctionImpl.make(
       return {
         ...execution,
         remainingReads: metrics.documentsRead.remaining,
+        snapshotTs: yield* transaction.getSnapshotTs(),
+        repeatedSnapshotTs: yield* transaction.getSnapshotTs(),
       };
     }),
 );
@@ -55,13 +61,49 @@ const mutationMetadata = FunctionImpl.make(
       const execution = yield* readExecution;
       const request = yield* readRequest;
       const transaction = yield* TransactionMetadata;
+      const queries = yield* QueryRunner;
+      const mutations = yield* MutationRunner;
+      const snapshotTs = yield* transaction.getSnapshotTs();
+      const nestedQuery = yield* queries.runQuery(
+        refs.public.groups.metadata.queryMetadata,
+      );
+      const staleQuery = yield* queries.runQuery(
+        refs.public.groups.metadata.queryMetadata,
+        {},
+        { useStaleSnapshot: true },
+      );
+      const nestedMutation = yield* mutations.runMutation(
+        refs.internal.groups.metadata.snapshotMutation,
+      );
       const metrics = yield* transaction.getMetrics();
       return {
         ...execution,
         ...request,
         remainingWrites: metrics.documentsWritten.remaining,
+        snapshotTs,
+        repeatedSnapshotTs: yield* transaction.getSnapshotTs(),
+        nestedQueryTs: nestedQuery.snapshotTs,
+        staleQueryTs: staleQuery.snapshotTs,
+        nestedMutationTs: nestedMutation.before,
+        nestedMutationAfterWriteTs: nestedMutation.after,
       };
-    }),
+    }).pipe(Effect.orDie),
+);
+
+const snapshotMutation = FunctionImpl.make(
+  databaseSchema,
+  metadata,
+  "snapshotMutation",
+  () =>
+    Effect.gen(function* () {
+      const transaction = yield* TransactionMetadata;
+      const writer = yield* DatabaseWriter;
+      const before = yield* transaction.getSnapshotTs();
+      yield* writer
+        .table("transactionNotes")
+        .insert({ caseId: "snapshot-metadata", value: "pending" });
+      return { before, after: yield* transaction.getSnapshotTs() };
+    }).pipe(Effect.orDie),
 );
 
 const actionMetadata = FunctionImpl.make(
@@ -88,6 +130,7 @@ const observeExecution = MiddlewareImpl.make(
 export default GroupImpl.make(databaseSchema, metadata).pipe(
   Layer.provide(queryMetadata),
   Layer.provide(mutationMetadata),
+  Layer.provide(snapshotMutation),
   Layer.provide(actionMetadata),
   Layer.provide(observeExecution),
   GroupImpl.finalize,
