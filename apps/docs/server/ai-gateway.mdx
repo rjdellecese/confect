@@ -6,6 +6,8 @@ description: "Use Convex's AI gateway with Effect AI language and decision model
 
 Confect provides Effect AI `LanguageModel` and `DecisionModel` services backed by the [Convex AI gateway](https://docs.convex.dev/ai-gateway/overview). Each client obtains a short-lived credential from the running Convex action before each outgoing request, so you do not need to configure or rotate an upstream model-provider API key.
 
+Construct each client inside an action. It discovers the gateway address from that deployment when constructed, rather than relying on a fixed hostname. If discovery fails, construction fails without falling back to another gateway.
+
 The AI gateway requires a paid Convex plan. See [gateway availability](https://docs.convex.dev/ai-gateway/overview#who-can-use-it) for supported deployment types and local-development requirements.
 
 ## Generate text
