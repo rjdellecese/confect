@@ -3,11 +3,27 @@ import {
   catchAndLog,
   isCodegenError,
   renderCodegenError,
+  InvalidContextReuseError,
 } from "@confect/cli/CodegenError";
 import { SnapshotError } from "@confect/cli/SnapshotError";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
+
+it.each([
+  ["InvalidOption", "must be a boolean"],
+  ["NodeRuntime", "only supported for Convex-runtime groups"],
+  ["ReservedFunctionName", "Rename the function experimental_reuseContext"],
+] as const)("renders context reuse validation: %s", (reason, message) => {
+  const error = InvalidContextReuseError.make({
+    specPath: "notes.spec.ts",
+    groupPath: "notes",
+    reason,
+  });
+  expect(isCodegenError(error)).toBe(true);
+  expect(renderCodegenError(error)).toContain(message);
+  expect(renderCodegenError(error)).toContain("notes");
+});
 
 it("recognizes and renders structured snapshot failures without dumping their cause", () => {
   const error = SnapshotError.make({

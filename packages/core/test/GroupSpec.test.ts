@@ -16,6 +16,60 @@ describe("isGroupSpec", () => {
   });
 });
 
+describe("experimental_reuseContext", () => {
+  it("is opt-in and is not accepted by the Node constructor", () => {
+    expect(GroupSpec.make().experimental_reuseContext).toBe(false);
+    expect(
+      GroupSpec.make({ experimental_reuseContext: false })
+        .experimental_reuseContext,
+    ).toBe(false);
+    expect(
+      GroupSpec.make({ experimental_reuseContext: true })
+        .experimental_reuseContext,
+    ).toBe(true);
+    expectTypeOf(GroupSpec.makeNode).parameters.toEqualTypeOf<[]>();
+    expectTypeOf(GroupSpec.make).parameters.toEqualTypeOf<
+      [
+        options?:
+          | { readonly experimental_reuseContext?: boolean | undefined }
+          | undefined,
+      ]
+    >();
+  });
+
+  it("preserves the option through pure builders without inheriting it or forcing schemas", () => {
+    let evaluated = 0;
+    const original = GroupSpec.make({ experimental_reuseContext: true });
+    const fn = FunctionSpec.publicQuery({
+      name: "list",
+      returns: () => {
+        evaluated++;
+        return Schema.Null;
+      },
+    });
+    const added = original.addFunction(fn);
+    class Observe extends MiddlewareSpec.MiddlewareSpec<Observe>()(
+      "reuseAudit",
+      {
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+    const attached = added.middleware(Observe);
+    const renamed = GroupSpec.withName("notes", attached);
+    const child = GroupSpec.make().addFunction(fn);
+    const combined = GroupSpec.addGroupsAt(renamed, { child });
+    for (const group of [original, added, attached, renamed, combined]) {
+      expect(group.experimental_reuseContext).toBe(true);
+    }
+    expect(combined.groups.child.experimental_reuseContext).toBe(false);
+    expect(original.functions).toEqual({});
+    expect(original.middlewareAttachments).toEqual([]);
+    expect(original.name).toBe("");
+    expect(renamed.groups).toEqual({});
+    expect(evaluated).toBe(0);
+  });
+});
+
 describe("name validation", () => {
   it("disallows invalid JS identifiers as function names", () => {
     expect(() =>

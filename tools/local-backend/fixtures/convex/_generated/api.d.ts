@@ -58,6 +58,31 @@ export declare const api: {
       confectWithRawDateNow: FunctionReference<"query", "public", {}, number>;
       confectWithSpan: FunctionReference<"query", "public", {}, number>;
     };
+    contextReuse: {
+      read: FunctionReference<
+        "query",
+        "public",
+        { caseId: string; nonce: number },
+        {
+          functionType: string;
+          previousInvocation: { nonce: number; subject: string | null } | null;
+          subject: string | null;
+          values: Array<string>;
+        }
+      >;
+      write: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; nonce: number; value: string },
+        {
+          functionType: string;
+          previousInvocation: { nonce: number; subject: string | null } | null;
+          previousValues: Array<string>;
+          subject: string | null;
+          values: Array<string>;
+        }
+      >;
+    };
     documentIds: {
       createAndDelete: FunctionReference<
         "mutation",

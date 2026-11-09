@@ -9,9 +9,12 @@ import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
+import * as Iterable from "effect/Iterable";
+import { pipe } from "effect/Function";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import { fromBundlerError } from "./BuildError";
@@ -25,11 +28,13 @@ import {
   ImplMissingSpecImportError,
   ImplNotFinalizedError,
   InvalidMiddlewareAttachmentError,
+  InvalidContextReuseError,
   SpecImportsServerError,
   SpecMissingDefaultGroupSpecError,
 } from "./CodegenError";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ImplModulePath } from "./ImplModulePath";
+import { logWarn } from "./log";
 import { removePathExtension, toPosixPath } from "./utils";
 
 export interface LeafModule {
@@ -305,6 +310,15 @@ export const loadSpec = Effect.fn("LeafModule.loadSpec")(function* (
 
   yield* validateClientSafety(leaf, bundled);
 
+  const warnings = yield* Effect.fromResult(
+    validateContextReuse(groupSpec, leaf.relativePath, leaf.groupPathDot),
+  );
+  for (const groupPath of warnings) {
+    yield* logWarn(
+      `${leaf.relativePath}, group ${groupPath}: experimental_reuseContext has no effect on actions; this group contains only actions.`,
+    );
+  }
+
   yield* Effect.fromResult(GroupSpec.validateMiddleware(groupSpec)).pipe(
     Effect.mapError((error) =>
       InvalidMiddlewareAttachmentError.make({
@@ -319,6 +333,63 @@ export const loadSpec = Effect.fn("LeafModule.loadSpec")(function* (
     spec: groupSpec,
   });
 });
+
+const validateContextReuse = (
+  group: GroupSpec.AnyWithProps,
+  specPath: string,
+  groupPath: string,
+): Result.Result<ReadonlyArray<string>, InvalidContextReuseError> =>
+  Result.gen(function* () {
+    const isEnabled = group.experimental_reuseContext;
+    if (isEnabled !== undefined && typeof isEnabled !== "boolean") {
+      return yield* Result.fail(
+        InvalidContextReuseError.make({
+          specPath,
+          groupPath,
+          reason: "InvalidOption",
+        }),
+      );
+    }
+    if (isEnabled) {
+      if (group.runtime === "Node") {
+        return yield* Result.fail(
+          InvalidContextReuseError.make({
+            specPath,
+            groupPath,
+            reason: "NodeRuntime",
+          }),
+        );
+      }
+      if (Record.has(group.functions, "experimental_reuseContext")) {
+        return yield* Result.fail(
+          InvalidContextReuseError.make({
+            specPath,
+            groupPath,
+            reason: "ReservedFunctionName",
+          }),
+        );
+      }
+    }
+    const functions = Record.values(group.functions);
+    const warnings =
+      isEnabled &&
+      functions.length > 0 &&
+      Array.every(
+        functions,
+        (fn) => fn.runtimeAndFunctionType.functionType === "action",
+      )
+        ? [groupPath]
+        : [];
+    const childWarnings = yield* pipe(
+      group.groups,
+      Record.toEntries,
+      Iterable.map(([name, child]) =>
+        validateContextReuse(child, specPath, `${groupPath}.${name}`),
+      ),
+      Result.all,
+    );
+    return [...warnings, ...Array.flatten(childWarnings)];
+  });
 
 /**
  * Walk the built `Context` for a `Finalized` `GroupImpl` service value. The

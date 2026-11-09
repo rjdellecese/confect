@@ -28,6 +28,7 @@ export interface GroupSpec<
 > {
   readonly [TypeId]: TypeId;
   readonly runtime: Runtime;
+  readonly experimental_reuseContext: boolean;
   readonly name: Name_;
   readonly functions: {
     [
@@ -168,6 +169,7 @@ const Proto = {
 
     return makeProto({
       runtime: this_.runtime,
+      experimental_reuseContext: this_.experimental_reuseContext,
       name: this_.name,
       functions: Record.set(this_.functions, function_.name, function_),
       groups: this_.groups,
@@ -210,6 +212,7 @@ const Proto = {
 
     return makeProto({
       runtime: this_.runtime,
+      experimental_reuseContext: this_.experimental_reuseContext,
       name: this_.name,
       functions: this_.functions,
       groups: this_.groups,
@@ -230,12 +233,14 @@ const makeProto = <
     ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>,
 >({
   runtime,
+  experimental_reuseContext,
   name,
   functions,
   groups,
   middlewareAttachments,
 }: {
   runtime: Runtime;
+  experimental_reuseContext?: boolean | undefined;
   name: Name_;
   functions: Record.ReadonlyRecord<string, Functions_>;
   groups: Record.ReadonlyRecord<string, Groups_>;
@@ -249,6 +254,10 @@ const makeProto = <
 > =>
   Object.assign(Object.create(Proto), {
     runtime,
+    experimental_reuseContext:
+      experimental_reuseContext === undefined
+        ? false
+        : experimental_reuseContext,
     name,
     functions,
     groups,
@@ -261,9 +270,12 @@ const makeProto = <
     MiddlewareAttachments_[number]["spec"]
   >;
 
-export const make = (): GroupSpec<"Convex", ""> =>
+export const make = (
+  options: { readonly experimental_reuseContext?: boolean | undefined } = {},
+): GroupSpec<"Convex", ""> =>
   makeProto({
     runtime: "Convex",
+    experimental_reuseContext: options.experimental_reuseContext,
     name: "",
     functions: Record.empty(),
     groups: Record.empty(),
@@ -293,6 +305,7 @@ export function withName(name: string, group: Any): AnyWithProps {
 
   return makeProto({
     runtime: group_.runtime,
+    experimental_reuseContext: group_.experimental_reuseContext,
     name,
     functions: group_.functions,
     groups: group_.groups,
@@ -306,6 +319,7 @@ export const addGroupsAt = (
 ): AnyWithProps =>
   makeProto({
     runtime: group.runtime,
+    experimental_reuseContext: group.experimental_reuseContext,
     name: group.name,
     functions: group.functions,
     groups: Record.union(
