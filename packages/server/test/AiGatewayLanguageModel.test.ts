@@ -1,4 +1,6 @@
 import * as Result from "effect/Result";
+import type * as ConvexServer from "convex/server";
+import { vi } from "vitest";
 import * as Arr from "effect/Array";
 import {
   AiGatewayLanguageClient,
@@ -20,6 +22,13 @@ import {
   AiGatewayServiceToken,
   type Service as AiGatewayServiceTokenService,
 } from "../src/internal/AiGatewayServiceToken";
+
+vi.mock("convex/server", (importOriginal) =>
+  importOriginal<typeof ConvexServer>().then((original) => ({
+    ...original,
+    getServiceUrl: () => Promise.resolve("https://ai-gateway.convex.dev"),
+  })),
+);
 
 interface TestAiGatewayService extends AiGatewayServiceTokenService {
   readonly requests: Effect.Effect<

@@ -1,4 +1,6 @@
 import * as Result from "effect/Result";
+import type * as ConvexServer from "convex/server";
+import { vi } from "vitest";
 import * as RecordEffect from "effect/Record";
 import * as Option from "effect/Option";
 import * as Arr from "effect/Array";
@@ -16,6 +18,13 @@ import * as InternalAiGatewayDecisionClient from "../src/internal/AiGatewayDecis
 import { AiGatewayServiceToken } from "../src/internal/AiGatewayServiceToken";
 
 const modelId = "typesafe/jev-1.13";
+
+vi.mock("convex/server", (importOriginal) =>
+  importOriginal<typeof ConvexServer>().then((original) => ({
+    ...original,
+    getServiceUrl: () => Promise.resolve("https://ai-gateway.convex.dev"),
+  })),
+);
 
 const TicketTriage = Decision.make({
   input: Schema.Struct({ message: Schema.String }),
