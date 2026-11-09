@@ -1,7 +1,7 @@
 ---
 icon: "key"
 title: "Authentication"
-description: "Access the current user's identity in your Confect functions."
+description: "Effect services for Convex identity lookup and JWT signing."
 ---
 
 The `Auth` service provides access to the current user's identity. Unlike vanilla Convex (which returns `UserIdentity | null`), the Confect `Auth` service returns an `Effect` that fails with a typed error when no user is authenticated.
@@ -42,3 +42,9 @@ Effect.gen(function* () {
 ## Configuration
 
 Auth provider configuration goes in `confect/auth.ts`, which is passed through to Convex as-is. See the [Convex auth documentation](https://docs.convex.dev/auth) for setup details.
+
+## Signing deployment JWTs
+
+Confect exposes [Convex's `ctx.auth.signJwt()`](https://docs.convex.dev/api/interfaces/server.MutationAuth) through the separate `MutationAuth` service in `confect/_generated/services`; `Auth` remains identity-only. `MutationAuth.signJwt(options)` returns a lazy `Effect<string>` instead of a Promise. Native rejections become defects rather than typed errors.
+
+Confect checks the signing capability at compile time: only mutation handlers and middleware implementations restricted to mutations can require `MutationAuth`.

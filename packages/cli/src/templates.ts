@@ -583,6 +583,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
       yield* cbw.writeLine("DatabaseWriter as DatabaseWriter_,");
       yield* cbw.writeLine("DocumentIds as DocumentIds_,");
       yield* cbw.writeLine("ExecutionMetadata as ExecutionMetadata_,");
+      yield* cbw.writeLine("MutationAuth as MutationAuth_,");
       yield* cbw.writeLine("MutationCtx as MutationCtx_,");
       yield* cbw.writeLine("MutationRunner as MutationRunner_,");
       yield* cbw.writeLine(
@@ -613,6 +614,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
   // Auth
   yield* cbw.writeLine("export const Auth = Auth_.Auth;");
   yield* cbw.writeLine("export type Auth = typeof Auth.Identifier;");
+  yield* cbw.blankLine();
+
+  yield* cbw.writeLine(
+    "export const MutationAuth = MutationAuth_.MutationAuth;",
+  );
+  yield* cbw.writeLine(
+    "export type MutationAuth = typeof MutationAuth.Identifier;",
+  );
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(

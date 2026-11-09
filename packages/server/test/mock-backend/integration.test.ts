@@ -1,4 +1,5 @@
 import * as RecordEffect from "effect/Record";
+import { isDeepStrictEqual } from "node:util";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { FunctionSpec } from "@confect/core";
@@ -7,7 +8,12 @@ import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
 import { RegisteredNodeFunction } from "@confect/server/node";
 import { convexTest, type TestConvex } from "convex-test";
-import { defineSchema, makeFunctionReference } from "convex/server";
+import {
+  defineSchema,
+  makeFunctionReference,
+  type SignJwtOptions,
+} from "convex/server";
+import { createLocalJWKSet, errors, jwtVerify } from "jose";
 import * as Console from "effect/Console";
 import * as TestConsole from "effect/testing/TestConsole";
 import confectSchema from "./fixtures/confect/_generated/schema";
@@ -17,7 +23,9 @@ import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
+import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as SchemaParser from "effect/SchemaParser";
@@ -35,8 +43,10 @@ import * as Storage from "@confect/server/Storage";
 import { StorageReader } from "@confect/server/StorageReader";
 import refs from "./fixtures/confect/_generated/refs";
 import {
+  Auth,
   DatabaseReader,
   DatabaseWriter,
+  MutationAuth,
   MutationCtx,
   Scheduler,
   TransactionMetadata,
@@ -51,6 +61,205 @@ import {
 import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
 import * as TestConfect_ from "../../../test/src/TestConfect";
+
+it.layer(TestConfect.layer, { buildPerTest: true })(
+  "TestConfect JWT signing",
+  (test) => {
+    test.effect.each([false, true])(
+      "signs through run and shares deployment JWKS with identity=%s",
+      (authenticated) =>
+        Effect.gen(function* () {
+          vi.stubEnv("CONVEX_CLOUD_URL", "https://jwt-tests.convex.cloud");
+          const testConfect = yield* TestConfect.TestConfect;
+          const identified = testConfect.withIdentity({ subject: "jwt-owner" });
+          const c = authenticated ? identified : testConfect;
+          const baseJwks = yield* testConfect.jwks();
+          expectTypeOf(baseJwks).toEqualTypeOf<TestConfect_.DeploymentJwks>();
+          expect(baseJwks.keys.length).toBe(1);
+          expect(Array.every(baseJwks.keys, (key) => !("d" in key))).toBe(true);
+          const options = {
+            claims: {
+              aud: ["confect-integration", "another-service"],
+              sub: "token-subject",
+              jti: "caller-token-id",
+              permissions: ["read", "write"],
+              metadata: { enabled: true, count: 2, optional: null },
+            },
+            expiresInSeconds: 60,
+          } satisfies SignJwtOptions;
+          const token = yield* c.run(
+            Effect.gen(function* () {
+              const auth = yield* MutationAuth;
+              const identityAuth = yield* Auth;
+              const identity = yield* Effect.result(
+                identityAuth.getUserIdentity,
+              );
+              if (authenticated) {
+                assert(identity._tag === "Success");
+                expect(identity.success.subject).toBe("jwt-owner");
+              } else {
+                assert(identity._tag === "Failure");
+                expect(identity.failure._tag).toBe("NoUserIdentityFoundError");
+              }
+              return yield* auth.signJwt(options);
+            }),
+            Schema.String,
+          );
+          const identityJwks = yield* identified.jwks();
+          const repeatedJwks = yield* testConfect.jwks();
+          expect(isDeepStrictEqual(identityJwks, baseJwks)).toBe(true);
+          expect(isDeepStrictEqual(repeatedJwks, baseJwks)).toBe(true);
+          for (const jwks of [baseJwks, identityJwks]) {
+            const { payload, protectedHeader } = yield* Effect.promise(() =>
+              jwtVerify(token, createLocalJWKSet(jwks), {
+                issuer: "https://jwt-tests.convex.cloud",
+                audience: "confect-integration",
+                algorithms: ["ES256"],
+              }),
+            );
+            expect(protectedHeader.alg).toBe("ES256");
+            expect(protectedHeader.typ).toBe("JWT");
+            expect(payload.aud).toEqual(options.claims.aud);
+            expect(payload.sub).toBe("token-subject");
+            expect(payload.jti).toBe("caller-token-id");
+            expect(payload.permissions).toEqual(["read", "write"]);
+            expect(payload.metadata).toEqual({
+              enabled: true,
+              count: 2,
+              optional: null,
+            });
+            assert(typeof payload.iat === "number");
+            assert(typeof payload.exp === "number");
+            expect(payload.exp - payload.iat).toBe(60);
+            const expiredAt = DateTime.makeUnsafe(
+              (payload.exp + 1) * 1000,
+            ).pipe(DateTime.toDateUtc);
+            yield* Effect.promise(() =>
+              expect(
+                jwtVerify(token, createLocalJWKSet(jwks), {
+                  audience: "wrong-service",
+                }),
+              ).rejects.toBeInstanceOf(errors.JWTClaimValidationFailed),
+            );
+            yield* Effect.promise(() =>
+              expect(
+                jwtVerify(token, createLocalJWKSet(jwks), {
+                  audience: "confect-integration",
+                  currentDate: expiredAt,
+                }),
+              ).rejects.toBeInstanceOf(errors.JWTExpired),
+            );
+          }
+        }).pipe(Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs()))),
+    );
+
+    test.effect("rejects tokens from another TestConfect instance", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+        const token = yield* c.run(
+          Effect.gen(function* () {
+            const auth = yield* MutationAuth;
+            return yield* auth.signJwt({
+              claims: { aud: "confect-integration" },
+              expiresInSeconds: 60,
+            });
+          }),
+          Schema.String,
+        );
+        const otherContext = yield* TestConfect.layer.pipe(
+          Layer.fresh,
+          Layer.build,
+        );
+        const otherJwks = yield* Effect.gen(function* () {
+          const other = yield* TestConfect.TestConfect;
+          return yield* other.jwks();
+        }).pipe(Effect.provideContext(otherContext));
+        yield* Effect.promise(() =>
+          expect(
+            jwtVerify(token, createLocalJWKSet(otherJwks), {
+              audience: "confect-integration",
+            }),
+          ).rejects.toBeInstanceOf(errors.JWKSNoMatchingKey),
+        );
+      }).pipe(Effect.scoped),
+    );
+
+    test.effect.each([1, 3600.9])(
+      "accepts lifetime %s and truncates fractional seconds",
+      (expiresInSeconds) =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          const token = yield* c.run(
+            Effect.gen(function* () {
+              const auth = yield* MutationAuth;
+              return yield* auth.signJwt({
+                claims: { aud: "confect-integration" },
+                expiresInSeconds,
+              });
+            }),
+            Schema.String,
+          );
+          const jwks = yield* c.jwks();
+          const { payload } = yield* Effect.promise(() =>
+            jwtVerify(token, createLocalJWKSet(jwks), {
+              audience: "confect-integration",
+              clockTolerance: 5,
+            }),
+          );
+          assert(typeof payload.iat === "number");
+          assert(typeof payload.exp === "number");
+          expect(payload.exp - payload.iat).toBe(Math.floor(expiresInSeconds));
+        }),
+    );
+
+    test.effect.each(["iss", "iat", "exp", "nbf", "CvxRole", "CoNvEx_role"])(
+      "keeps reserved claim %s failures as defects",
+      (claim) =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              const auth = yield* MutationAuth;
+              const extraClaims: Record<string, string> = {
+                [claim]: "forbidden",
+              };
+              const options: SignJwtOptions = {
+                claims: { aud: "confect-integration", ...extraClaims },
+                expiresInSeconds: 60,
+              };
+              const result = yield* Effect.exit(auth.signJwt(options));
+              assert(result._tag === "Failure");
+              expect(Cause.hasDies(result.cause)).toBe(true);
+              expect(Cause.pretty(result.cause)).toContain(`'${claim}'`);
+              expect(Cause.pretty(result.cause)).toContain("can't be provided");
+            }),
+          );
+        }),
+    );
+
+    test.effect.each([-1, 0, 0.5, 3601])(
+      "keeps invalid lifetime %s failures as defects",
+      (expiresInSeconds) =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              const auth = yield* MutationAuth;
+              const result = yield* Effect.exit(
+                auth.signJwt({
+                  claims: { aud: "confect-integration" },
+                  expiresInSeconds,
+                }),
+              );
+              assert(result._tag === "Failure");
+              expect(Cause.hasDies(result.cause)).toBe(true);
+              expect(Cause.pretty(result.cause)).toContain("expiresIn");
+            }),
+          );
+        }),
+    );
+  },
+);
 
 describe("mock search compatibility", () => {
   const table = Table.make(() =>

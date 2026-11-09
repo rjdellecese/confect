@@ -48,6 +48,27 @@ export declare const api: {
     >;
   };
   groups: {
+    authentication: {
+      sign: FunctionReference<
+        "mutation",
+        "public",
+        {
+          aud: string | Array<string>;
+          expiresInSeconds: number;
+          extraClaims?: Record<
+            string,
+            | string
+            | number
+            | boolean
+            | null
+            | Array<string>
+            | { count: number; enabled: boolean; optional: null }
+          >;
+        },
+        string
+      >;
+      signInMiddleware: FunctionReference<"mutation", "public", {}, string>;
+    };
     cacheControl: {
       control: FunctionReference<"query", "public", {}, any>;
       snapshot: FunctionReference<"query", "public", {}, any>;
