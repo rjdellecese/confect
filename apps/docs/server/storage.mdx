@@ -26,8 +26,8 @@ The service is available in every context, but each operation retains Convex's c
 | `getUrl(storageId)`     | `URL`      | Queries, mutations, actions, and HTTP actions |
 | `generateUploadUrl`     | `URL`      | Mutations, actions, and HTTP actions          |
 | `delete(storageId)`     | `void`     | Mutations, actions, and HTTP actions          |
-| `get(storageId)`        | `Blob`     | Actions and HTTP actions                      |
-| `store(blob, options?)` | Storage ID | Actions and HTTP actions                      |
+| `get(storageId)`        | `Blob`     | Mutations, actions, and HTTP actions          |
+| `store(blob, options?)` | Storage ID | Mutations, actions, and HTTP actions          |
 
 Every operation returns an Effect. The table lists the value produced when it succeeds.
 
@@ -72,7 +72,7 @@ Effect.gen(function* () {
 
 ## Get a blob
 
-<ContextBadges action http />
+<ContextBadges mutation action http />
 
 Read a stored file directly as a `Blob`. If the blob doesn't exist, the effect fails with `BlobNotFoundError`.
 
@@ -85,9 +85,13 @@ Effect.gen(function* () {
 
 ## Store a blob
 
-<ContextBadges action http />
+<ContextBadges mutation action http />
 
 Store a `Blob` directly and receive its storage ID. Optionally supply a SHA-256 hash in `options` for Convex to verify.
+
+In mutations, file writes commit or roll back with the database transaction. You can read a blob you just stored within the same mutation. Blob reads and writes count toward Convex's transaction file limits; `TransactionMetadata.getMetrics` exposes `filesRead`, `fileReadBytes`, `filesWritten`, and `fileWriteBytes`.
+
+Mutation Blob operations require Convex 1.48.0 or later. Tests using `@confect/test` require `convex-test` 0.0.67 or later.
 
 ```ts
 Effect.gen(function* () {

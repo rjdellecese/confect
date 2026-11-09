@@ -75,12 +75,14 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
 );
 `,
   "consumer.ts": `import type { Ref } from "@confect/core";
+import type { Handler } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import refs from "./confect/_generated/refs";
 import type { NotesDoc } from "./confect/_generated/docs";
 import { Id } from "./confect/_generated/id";
-import { DatabaseReader } from "./confect/_generated/services";
+import type databaseSchema from "./confect/_generated/schema";
+import { DatabaseReader, Storage } from "./confect/_generated/services";
 
 export const args: Ref.Args<typeof refs.public.notes.count> = { count: 41 };
 export const result: Ref.Returns<typeof refs.public.notes.count> = 42;
@@ -89,6 +91,13 @@ export const readNotes: () => Effect.Effect<ReadonlyArray<NotesDoc>, never, Data
   Effect.fn("consumer.readNotes")(function* () {
     const reader = yield* DatabaseReader;
     return yield* reader.table("notes").index("by_creation_time").collect().pipe(Effect.orDie);
+  });
+
+export const copyBlob: (id: Id<"_storage">) => Effect.Effect<Id<"_storage">, never, Handler.MutationServices<typeof databaseSchema>> =
+  Effect.fn("consumer.copyBlob")(function* (id) {
+    const storage = yield* Storage;
+    const blob = yield* storage.get(id).pipe(Effect.orDie);
+    return yield* storage.store(blob);
   });
 
 // @ts-expect-error The consumer passes decoded numbers, not encoded strings.

@@ -6,7 +6,7 @@ import * as SchemaToValidator from "@confect/core/SchemaToValidator";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
 import { RegisteredNodeFunction } from "@confect/server/node";
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { defineSchema, makeFunctionReference } from "convex/server";
 import * as Console from "effect/Console";
 import * as TestConsole from "effect/testing/TestConsole";
@@ -423,6 +423,18 @@ describe("Storage", () => {
         t.mutation(makeFunctionReference<"mutation">("storage:run"), {}),
     },
     {
+      name: "mutation Blob roundtrip",
+      spec: FunctionSpec.publicMutation({
+        name: "run",
+        returns: () => Schema.String,
+      }),
+      handler: roundtrip,
+      expected: "storage roundtrip",
+      register: RegisteredConvexFunction.make,
+      invoke: (t: ReturnType<typeof convexTest>) =>
+        t.mutation(makeFunctionReference<"mutation">("storage:run"), {}),
+    },
+    {
       name: "action",
       spec: FunctionSpec.publicAction({
         name: "run",
@@ -466,6 +478,296 @@ describe("Storage", () => {
         });
         const promiseResult4 = yield* Effect.promise(() => invoke(t));
         expect(promiseResult4).toBe(expected);
+      }),
+  );
+});
+
+it.layer(TestConfect.layer, { buildPerTest: true })(
+  "TestConfect Blob storage",
+  (test) => {
+    test.effect.each([false, true])(
+      "provides Blob storage through run with identity=%s",
+      (authenticated) =>
+        Effect.gen(function* () {
+          const testConfect = yield* TestConfect.TestConfect;
+          const c = authenticated
+            ? testConfect.withIdentity({ subject: "storage-owner" })
+            : testConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              const storage = yield* Storage.Storage;
+              const id = yield* storage.store(
+                new Blob(["TestConfect Blob"], { type: "text/plain" }),
+              );
+              const blob = yield* storage.get(id);
+              const text = yield* Effect.promise(() => blob.text());
+              expect(text).toBe("TestConfect Blob");
+              expect(blob.type).toBe("text/plain");
+              yield* storage.delete(id);
+              expect((yield* Effect.flip(storage.get(id))).id).toBe(id);
+            }),
+          );
+        }),
+    );
+  },
+);
+
+describe("mutation Blob transactions", () => {
+  const modules = import.meta.glob("./fixtures/convex/_generated/*.js");
+  const run = <A, E>(
+    t: TestConvex<typeof convexSchema>,
+    effect: Effect.Effect<
+      A,
+      E,
+      RegisteredConvexFunction.MutationServices<typeof confectSchema>
+    >,
+  ) =>
+    Effect.promise(() =>
+      t.mutation((ctx) =>
+        Effect.runPromise(
+          effect.pipe(
+            Effect.provide(
+              RegisteredConvexFunction.mutationLayer(confectSchema, ctx),
+            ),
+          ),
+        ),
+      ),
+    );
+
+  it.effect.each(["application/octet-stream", ""])(
+    "preserves bytes, SHA256 and MIME type %j",
+    (type) =>
+      Effect.gen(function* () {
+        const t = convexTest(convexSchema, modules);
+        const id = yield* run(
+          t,
+          Effect.gen(function* () {
+            const storage = yield* Storage.Storage;
+            const storageId = yield* storage.store(
+              new Blob([new Uint8Array([12, 0])], { type }),
+              { sha256: "v2DkNJys5rzg1VLo14NCjbZtDWSb2eQwo2J+LuFKyDk=" },
+            );
+            const blob = yield* storage.get(storageId);
+            expect(blob.type).toBe(type);
+            const buffer = yield* Effect.promise(() => blob.arrayBuffer());
+            expect(new Uint8Array(buffer)).toEqual(new Uint8Array([12, 0]));
+            return storageId;
+          }),
+        );
+        yield* run(
+          t,
+          Effect.gen(function* () {
+            const storage = yield* Storage.Storage;
+            const reader = yield* DatabaseReader;
+            const blob = yield* storage.get(id);
+            expect(blob.size).toBe(2);
+            expect(blob.type).toBe(type);
+            const metadata = yield* reader.table("_storage").get(id);
+            expect(metadata.sha256).toBe(
+              "v2DkNJys5rzg1VLo14NCjbZtDWSb2eQwo2J+LuFKyDk=",
+            );
+            expect(metadata.contentType).toBe(type || undefined);
+          }),
+        );
+      }),
+  );
+
+  it.effect("rejects a mismatched SHA256 without persisting a file", () =>
+    Effect.gen(function* () {
+      const t = convexTest(convexSchema, modules);
+      const result = yield* Effect.exit(
+        run(
+          t,
+          Effect.gen(function* () {
+            const storage = yield* Storage.Storage;
+            yield* storage.store(new Blob(["invalid digest"]), {
+              sha256: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            });
+          }),
+        ),
+      );
+      assert(result._tag === "Failure");
+      expect(Cause.pretty(result.cause)).toMatch(/Sha256 mismatch/);
+      yield* run(
+        t,
+        Effect.gen(function* () {
+          const reader = yield* DatabaseReader;
+          const files = yield* reader
+            .table("_storage")
+            .index("by_creation_time")
+            .collect();
+          expect(files).toEqual([]);
+        }),
+      );
+    }),
+  );
+
+  it.effect(
+    "rolls back stored bytes and restores deleted files on failure",
+    () =>
+      Effect.gen(function* () {
+        const t = convexTest(convexSchema, modules);
+        const existingId = yield* run(
+          t,
+          Effect.gen(function* () {
+            const storage = yield* Storage.Storage;
+            return yield* storage.store(new Blob(["existing"]));
+          }),
+        );
+        const createdIds: (typeof existingId)[] = [];
+        const result = yield* Effect.exit(
+          run(
+            t,
+            Effect.gen(function* () {
+              const storage = yield* Storage.Storage;
+              const id = yield* storage.store(new Blob(["rolled back"]));
+              createdIds.push(id);
+              yield* storage.delete(existingId);
+              expect((yield* Effect.flip(storage.get(existingId))).id).toBe(
+                existingId,
+              );
+              return yield* Effect.die("storage rollback");
+            }),
+          ),
+        );
+        assert(result._tag === "Failure");
+        expect(Cause.pretty(result.cause)).toContain("storage rollback");
+        expect(createdIds).toHaveLength(1);
+        yield* run(
+          t,
+          Effect.gen(function* () {
+            const storage = yield* Storage.Storage;
+            const reader = yield* DatabaseReader;
+            const blob = yield* storage.get(existingId);
+            const text = yield* Effect.promise(() => blob.text());
+            expect(text).toBe("existing");
+            for (const id of createdIds) {
+              expect((yield* Effect.flip(storage.get(id))).id).toBe(id);
+              expect((yield* Effect.flip(storage.getUrl(id))).id).toBe(id);
+            }
+            const files = yield* reader
+              .table("_storage")
+              .index("by_creation_time")
+              .collect();
+            expect(Array.map(files, (file) => file._id)).toEqual([existingId]);
+          }),
+        );
+      }),
+  );
+
+  it.effect.each([
+    {
+      limits: { filesWritten: 1 },
+      oversized: 1,
+      error: /Too many files stored/,
+    },
+    {
+      limits: { fileWriteBytes: 4 },
+      oversized: 2,
+      error: /Too large total size of the files stored/,
+    },
+  ])(
+    "preserves write accounting after caught limit failures: $limits",
+    ({ limits, oversized, error }) =>
+      Effect.gen(function* () {
+        const t = convexTest({
+          schema: convexSchema,
+          modules,
+          transactionLimits: limits,
+        });
+        yield* run(
+          t,
+          Effect.gen(function* () {
+            const storage = yield* Storage.Storage;
+            const transaction = yield* TransactionMetadata;
+            const id = yield* storage.store(new Blob([new Uint8Array(3)]));
+            yield* storage.get(id);
+            for (let i = 0; i < 2; i++) {
+              const result = yield* Effect.exit(
+                storage.store(new Blob([new Uint8Array(oversized)])),
+              );
+              assert(result._tag === "Failure");
+              expect(Cause.pretty(result.cause)).toMatch(error);
+            }
+            const beforeDelete = yield* transaction.getMetrics();
+            expect(beforeDelete.filesWritten.used).toBe(1);
+            expect(beforeDelete.fileWriteBytes.used).toBe(3);
+            expect(beforeDelete.filesRead.used).toBe(0);
+            expect(beforeDelete.fileReadBytes.used).toBe(0);
+            yield* storage.delete(id);
+            expect((yield* Effect.flip(storage.get(id))).id).toBe(id);
+            const afterDelete = yield* transaction.getMetrics();
+            expect(afterDelete.filesWritten.used).toBe(0);
+            expect(afterDelete.fileWriteBytes.used).toBe(0);
+            yield* storage.store(new Blob([new Uint8Array(4)]));
+            const after = yield* transaction.getMetrics();
+            expect(after.filesWritten.used).toBe(1);
+            expect(after.fileWriteBytes.used).toBe(4);
+          }),
+        );
+        yield* run(
+          t,
+          Effect.gen(function* () {
+            const reader = yield* DatabaseReader;
+            const files = yield* reader
+              .table("_storage")
+              .index("by_creation_time")
+              .collect();
+            expect(files).toHaveLength(1);
+            expect(files[0]?.size).toBe(4);
+          }),
+        );
+      }),
+  );
+
+  it.effect.each([
+    { limits: { filesRead: 1 }, error: /Too many files read/ },
+    {
+      limits: { fileReadBytes: 4 },
+      error: /Too large total size of the files read/,
+    },
+  ])(
+    "counts distinct reads and excludes caught failures: $limits",
+    ({ limits, error }) =>
+      Effect.gen(function* () {
+        const t = convexTest({
+          schema: convexSchema,
+          modules,
+          transactionLimits: limits,
+        });
+        const ids = yield* run(
+          t,
+          Effect.gen(function* () {
+            const storage = yield* Storage.Storage;
+            const first = yield* storage.store(new Blob([new Uint8Array(4)]));
+            const second = yield* storage.store(new Blob([new Uint8Array(1)]));
+            const missing = yield* storage.store(new Blob(["deleted"]));
+            yield* storage.delete(missing);
+            return { first, second, missing };
+          }),
+        );
+        yield* run(
+          t,
+          Effect.gen(function* () {
+            const storage = yield* Storage.Storage;
+            const transaction = yield* TransactionMetadata;
+            expect((yield* Effect.flip(storage.get(ids.missing))).id).toBe(
+              ids.missing,
+            );
+            yield* storage.get(ids.first);
+            yield* storage.get(ids.first);
+            for (let i = 0; i < 2; i++) {
+              const result = yield* Effect.exit(storage.get(ids.second));
+              assert(result._tag === "Failure");
+              expect(Cause.pretty(result.cause)).toMatch(error);
+            }
+            const metrics = yield* transaction.getMetrics();
+            expect(metrics.filesRead.used).toBe(1);
+            expect(metrics.fileReadBytes.used).toBe(4);
+            expect(metrics.filesWritten.used).toBe(0);
+            expect(metrics.fileWriteBytes.used).toBe(0);
+          }),
+        );
       }),
   );
 });

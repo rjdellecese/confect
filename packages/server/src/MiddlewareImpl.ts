@@ -22,6 +22,7 @@ import type * as QueryRunner from "./QueryRunner";
 import type { QueryTransactionContext } from "./QueryTransactionContext";
 import type * as Scheduler from "./Scheduler";
 import type { Storage } from "./Storage";
+import type { StorageActionWriter } from "./StorageActionWriter";
 import type * as StorageReader from "./StorageReader";
 import type * as StorageWriter from "./StorageWriter";
 import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
@@ -113,6 +114,7 @@ type MutationActionCommonServices =
   | Storage
   | StorageReader.StorageReader
   | StorageWriter.StorageWriter
+  | StorageActionWriter
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner;
 

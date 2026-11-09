@@ -109,6 +109,16 @@ test.each([
   );
 });
 
+test.each(["react", "foldkit"] as const)(
+  "%s consumers require mutation-capable Convex storage",
+  (profile) => {
+    expect(consumerDependencies(profile, "baseline").convex).toBe("1.48.0");
+    const range = consumerDependencies(profile, "fresh").convex;
+    expect(Bun.semver.satisfies("1.47.0", range)).toBe(false);
+    expect(Bun.semver.satisfies("1.48.0", range)).toBe(true);
+  },
+);
+
 test.each([
   ["4.0.7", false],
   ["4.1.0", true],
