@@ -3,23 +3,33 @@ import {
   AiGatewayLanguageClient,
   AiGatewayDecisionClient,
 } from "@confect/server";
-import { assert, describe, it } from "@effect/vitest";
+import { assert, beforeEach, describe, it } from "@effect/vitest";
 import type * as ConvexServer from "convex/server";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import { vi } from "vitest";
 
-const { getServiceToken } = vi.hoisted(() => ({ getServiceToken: vi.fn() }));
+const { getServiceToken, getServiceUrl } = vi.hoisted(() => ({
+  getServiceToken: vi.fn(),
+  getServiceUrl: vi.fn(),
+}));
 
 vi.mock("convex/server", (importOriginal) =>
   importOriginal<typeof ConvexServer>().then((original) => ({
     ...original,
     getServiceToken,
+    getServiceUrl,
   })),
 );
 
 describe("AiGatewayDecisionClient", () => {
+  beforeEach(() => {
+    getServiceUrl
+      .mockReset()
+      .mockResolvedValue("https://ai-gateway.convex.dev");
+  });
   describe.each([
     ["make", AiGatewayDecisionClient.make],
     [
@@ -32,6 +42,81 @@ describe("AiGatewayDecisionClient", () => {
       }).pipe(Effect.scoped),
     ],
   ] as const)("%s", (_name, make) => {
+    it.effect(
+      "discovers each client's origin while retaining decision routes",
+      () =>
+        Effect.gen(function* () {
+          getServiceToken.mockReset().mockResolvedValue("test-token");
+          getServiceUrl
+            .mockResolvedValueOnce("https://first.gateway.test")
+            .mockResolvedValueOnce("https://second.gateway.test");
+          const urls: Array<string> = [];
+          const construct = make.pipe(
+            Effect.provideService(
+              HttpClient.HttpClient,
+              HttpClient.make((request) =>
+                Effect.sync(() => {
+                  urls.push(request.url);
+                  assert.strictEqual(
+                    request.headers.authorization,
+                    "Bearer test-token",
+                  );
+                  return HttpClientResponse.fromWeb(
+                    request,
+                    Response.json({
+                      model: "typesafe/jev-1.13",
+                      answers: { urgent: { type: "noul", noul: 0.9 } },
+                      usage: { input_tokens: 10, output_tokens: 1 },
+                    }),
+                  );
+                }),
+              ),
+            ),
+          );
+          const payload = {
+            model: "typesafe/jev-1.13",
+            state: "Help",
+            questions: {
+              urgent: { type: "noul" as const, instructions: "Is it urgent?" },
+            },
+          };
+          assert.strictEqual(getServiceUrl.mock.calls.length, 0);
+          const first = yield* construct;
+          yield* first.createDecisions(payload);
+          yield* first.createDecisions(payload);
+          const second = yield* construct;
+          yield* second.createDecisions(payload);
+          assert.deepStrictEqual(urls, [
+            "https://first.gateway.test/alpha/decisions",
+            "https://first.gateway.test/alpha/decisions",
+            "https://second.gateway.test/alpha/decisions",
+          ]);
+          assert.deepStrictEqual(getServiceUrl.mock.calls, [
+            ["ai-gateway"],
+            ["ai-gateway"],
+          ]);
+          assert.strictEqual(getServiceToken.mock.calls.length, 5);
+        }),
+    );
+
+    it.effect("preserves discovery failures without a fallback request", () =>
+      Effect.gen(function* () {
+        const failure = { reason: "Service discovery unavailable" };
+        getServiceToken.mockReset().mockResolvedValue("test-token");
+        getServiceUrl.mockRejectedValue(failure);
+        const result = yield* make.pipe(
+          Effect.provideService(
+            HttpClient.HttpClient,
+            HttpClient.make(() => Effect.die("Unexpected HTTP request")),
+          ),
+          Effect.exit,
+        );
+        assert.deepStrictEqual(result, Exit.die(failure));
+        assert.deepStrictEqual(getServiceUrl.mock.calls, [["ai-gateway"]]);
+        assert.strictEqual(getServiceToken.mock.calls.length, 1);
+      }),
+    );
+
     it.effect("acquires a token once and authenticates decisions", () =>
       Effect.gen(function* () {
         getServiceToken.mockReset().mockResolvedValue("test-token");
