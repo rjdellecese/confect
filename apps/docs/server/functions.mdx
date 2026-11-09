@@ -41,6 +41,48 @@ export default GroupSpec.make().addFunction(list);
 
 Run `confect codegen` after adding or changing specs.
 
+### Experimental context reuse
+
+To opt a group into Convex's experimental V8 context reuse, pass
+`experimental_reuseContext: true` to `GroupSpec.make`:
+
+```ts
+export default GroupSpec.make({ experimental_reuseContext: true }).addFunction(
+  list,
+);
+```
+
+Run `confect codegen` or keep `confect dev` running, then deploy with Convex.
+Confect emits `export const experimental_reuseContext = true` in the group's
+generated `convex/` module. Omit the option or set it to `false` to disable it;
+regenerate and deploy again for the change to take effect. Do not edit the
+generated module by hand.
+
+Reuse can avoid evaluating the module graph and registering functions on every
+query or mutation. It applies to all queries and mutations in that group,
+including plain Convex functions, but does not extend to child groups. Actions
+are unaffected, even in a mixed group. `GroupSpec.makeNode` does not accept this
+option, and codegen warns if an opted-in group contains only actions. A function
+in an opted-in group cannot be named `experimental_reuseContext`, because that
+name is reserved for the generated flag.
+
+<Warning>
+  This is an experimental upstream feature, not a guarantee of lower latency or
+  persistent state. Audit the group's implementation and its dependencies before
+  enabling it: module-level state and values captured by handlers can survive
+  across calls and across users. Never retain authentication data, database
+  contexts, or other request-specific values in globals or shared closures.
+  Unbounded retained state can also exhaust the runtime's memory.
+</Warning>
+
+Confect still constructs its request services for each invocation; the flag
+does not cache an Effect `Context`, a transaction, or a function result. Context
+reuse is opportunistic, so handlers must behave correctly with a fresh context
+on any call. A failed execution, including a typed error returned as a
+`ConvexError`, prevents that context from being saved for reuse. Cold starts,
+deployments, and calls routed to other isolates can still pay module startup
+costs.
+
 ### Typed errors
 
 A spec can also declare an optional `error` schema. When it does, the corresponding handler's `Effect` error channel is typed as that schema, and the failure is decoded for callers at every call site (React hooks, JS clients, and tests). See [Error Handling](/server/error-handling) for the full walkthrough.

@@ -366,6 +366,60 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
     );
 
     it.effect(
+      "updates context reuse alone with fresh-generation parity",
+      () =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          let { snapshot } = yield* project.provide(generateWithSnapshot);
+          const baseline = yield* project.generatedFiles;
+          for (const enabled of [true, false]) {
+            yield* project.write(
+              "confect/notes.spec.ts",
+              pipe(
+                Project.spec,
+                String.replace(
+                  "GroupSpec.make()",
+                  `GroupSpec.make({ experimental_reuseContext: ${enabled} })`,
+                ),
+              ),
+            );
+            snapshot = yield* project.provide(
+              updateDeclarations(
+                snapshot,
+                [
+                  {
+                    _tag: "Spec",
+                    relativePath: SpecModulePath.make("notes.spec.ts"),
+                  },
+                ],
+                [],
+              ),
+            );
+            const generated = yield* project.generatedFiles;
+            const entryPoint = generated[path.join("convex", "notes.ts")];
+            assert(entryPoint !== undefined);
+            expect(
+              pipe(
+                entryPoint,
+                String.includes(
+                  "export const experimental_reuseContext = true;",
+                ),
+              ),
+            ).toBe(enabled);
+            const writes = yield* Project.writtenFiles(
+              project.provide(codegenHandler),
+            );
+            expect(writes).toEqual([]);
+            const fresh = yield* project.generatedFiles;
+            expect(fresh).toEqual(generated);
+            if (!enabled) expect(generated).toEqual(baseline);
+          }
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+
+    it.effect(
       "updates runtime and removes the last function with fresh-generation parity",
       () =>
         Effect.gen(function* () {
