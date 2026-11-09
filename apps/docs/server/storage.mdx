@@ -21,13 +21,13 @@ Effect.gen(function* () {
 
 The service is available in every context, but each operation retains Convex's context restrictions. Confect checks these requirements when you implement a function or middleware.
 
-| Operation               | Returns    | Available in                                  |
-| ----------------------- | ---------- | --------------------------------------------- |
-| `getUrl(storageId)`     | `URL`      | Queries, mutations, actions, and HTTP actions |
-| `generateUploadUrl`     | `URL`      | Mutations, actions, and HTTP actions          |
-| `delete(storageId)`     | `void`     | Mutations, actions, and HTTP actions          |
-| `get(storageId)`        | `Blob`     | Mutations, actions, and HTTP actions          |
-| `store(blob, options?)` | Storage ID | Mutations, actions, and HTTP actions          |
+| Operation               | Returns          | Available in                                  |
+| ----------------------- | ---------------- | --------------------------------------------- |
+| `getUrl(storageId)`     | `URL`            | Queries, mutations, actions, and HTTP actions |
+| `generateUploadUrl`     | `URL`            | Mutations, actions, and HTTP actions          |
+| `delete(storageId)`     | `void`           | Mutations, actions, and HTTP actions          |
+| `get(storageId)`        | `Blob`           | Mutations, actions, and HTTP actions          |
+| `store(blob, options?)` | `Id<"_storage">` | Mutations, actions, and HTTP actions          |
 
 Every operation returns an Effect. The table lists the value produced when it succeeds.
 
