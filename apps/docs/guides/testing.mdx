@@ -81,6 +81,18 @@ describe("notes", () => {
 });
 ```
 
+## Deployment signing keys
+
+`TestConfect.jwks()` wraps [`convex-test`](https://docs.convex.dev/testing/convex-test)'s `t.jwks()` in a lazy `Effect<DeploymentJwks>` instead of a Promise. Native rejections become defects. The `DeploymentJwk` and `DeploymentJwks` types are re-exported from `@confect/test/TestConfect`.
+
+```ts
+Effect.gen(function* () {
+  const c = yield* TestConfect.TestConfect;
+  const jwks = yield* c.jwks();
+  return jwks;
+});
+```
+
 ## Calling functions
 
 `TestConfect` provides `query`, `mutation`, and `action` methods that accept a ref and args, returning an `Effect` with the decoded result.

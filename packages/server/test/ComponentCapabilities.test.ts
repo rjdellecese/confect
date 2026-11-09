@@ -7,6 +7,7 @@ import {
 } from "@confect/core";
 import {
   Auth,
+  MutationAuth,
   DatabaseReader,
   DatabaseSchema,
   DatabaseWriter,
@@ -57,6 +58,11 @@ const group = GroupSpec.make().addFunction(
 );
 
 describe("component capabilities", () => {
+  it("excludes JWT signing from component mutation handlers", () => {
+    expectTypeOf<MutationAuth.MutationAuth>().not.toExtend<
+      Handler.MutationServices<Database>
+    >();
+  });
   it("allows scoped Blob storage in mutations without admitting application IDs", () => {
     expectTypeOf<StorageActionWriter.ForScope<typeof scope>>().toExtend<
       Handler.MutationServices<Database>
@@ -188,6 +194,9 @@ describe("component capabilities", () => {
           RegisteredConvexFunction.mutationLayer(databaseSchema, ctx),
         );
         expect(Option.isNone(Context.getOption(context, Auth.Auth))).toBe(true);
+        expect(
+          Option.isNone(Context.getOption(context, MutationAuth.MutationAuth)),
+        ).toBe(true);
         const raw = Context.get(
           context,
           MutationCtx.MutationCtx<Model, typeof scope>(),

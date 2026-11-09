@@ -33,6 +33,21 @@ const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
   };
 };
 
+it.effect(
+  "exports the mutation-only signing service in generated services",
+  () =>
+    Effect.gen(function* () {
+      const code = yield* templates.services({ schemaImportPath: "./schema" });
+      expect(code).toContain("MutationAuth as MutationAuth_");
+      expect(code).toContain(
+        "export const MutationAuth = MutationAuth_.MutationAuth;",
+      );
+      expect(code).toContain(
+        "export type MutationAuth = typeof MutationAuth.Identifier;",
+      );
+    }),
+);
+
 it.effect.each([false, true])(
   "keeps handler forwarding local only for isolate groups (useNode=%s)",
   (useNode) =>

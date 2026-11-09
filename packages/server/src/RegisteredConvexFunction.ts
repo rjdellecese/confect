@@ -35,6 +35,7 @@ import * as ExecutionMetadata from "./ExecutionMetadata";
 import * as RequestMetadata from "./RequestMetadata";
 import * as TransactionMetadata from "./TransactionMetadata";
 import * as MutationCtx from "./MutationCtx";
+import * as MutationAuth from "./MutationAuth";
 import * as MutationRunner from "./MutationRunner";
 import * as MutationTransactionContext from "./MutationTransactionContext";
 import * as QueryCtx from "./QueryCtx";
@@ -280,6 +281,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
     DatabaseReader.layer(schema, ctx.db),
     DocumentIds.layer(schema, ctx.db),
     DatabaseWriter.layer(schema, ctx.db),
+    MutationAuth.layerForTarget<Schema["target"]>(schema.target, ctx.auth),
     Auth.layerForTarget<Schema["target"]>(schema.target, ctx.auth),
     Scheduler.layer<DatabaseSchema.Scope<Schema>>(
       ctx.scheduler,

@@ -43,6 +43,7 @@ export * as Handler from "./Handler";
 export * as HttpRouter from "./HttpRouter";
 export * as MiddlewareImpl from "./MiddlewareImpl";
 export * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
+export * as MutationAuth from "./MutationAuth";
 export * as MutationCtx from "./MutationCtx";
 export * as MutationRunner from "./MutationRunner";
 export * as MutationTransactionContext from "./MutationTransactionContext";
