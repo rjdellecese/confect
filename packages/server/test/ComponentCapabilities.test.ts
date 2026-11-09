@@ -23,8 +23,9 @@ import type {
   Document,
   QueryInitializer,
   BlobNotFoundError,
+  StorageActionWriter,
 } from "@confect/server";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { GenericMutationCtx } from "convex/server";
 import { makeFunctionReference } from "convex/server";
 import * as Context from "effect/Context";
@@ -56,6 +57,27 @@ const group = GroupSpec.make().addFunction(
 );
 
 describe("component capabilities", () => {
+  it("allows scoped Blob storage in mutations without admitting application IDs", () => {
+    expectTypeOf<StorageActionWriter.ForScope<typeof scope>>().toExtend<
+      Handler.MutationServices<Database>
+    >();
+    expectTypeOf<StorageActionWriter.StorageActionWriter>().not.toExtend<
+      Handler.MutationServices<Database>
+    >();
+    expectTypeOf<StorageActionWriter.ForScope<typeof scope>>().not.toExtend<
+      Handler.QueryServices<Database>
+    >();
+    type Raw = Context.Service.Shape<
+      MutationCtx.MutationCtxTag<Model, typeof scope>
+    >;
+    expectTypeOf<Awaited<ReturnType<Raw["storage"]["store"]>>>().toEqualTypeOf<
+      GenericId.GenericId<"_storage", typeof scope>
+    >();
+    expectTypeOf<Parameters<Raw["storage"]["get"]>[0]>().toEqualTypeOf<
+      GenericId.GenericId<"_storage", typeof scope>
+    >();
+  });
+
   it("keeps the implementation builder while rejecting app authentication", () => {
     const auth = Effect.gen(function* () {
       yield* Auth.Auth;

@@ -49,7 +49,7 @@ include core, server, and CLI; React adds `@confect/react`, while Foldkit adds
 whole applications, not independently installable client and backend snippets.
 
 - **Baseline** selects Effect 4.1.0, platform-node 4.1.0 **and node-shared 4.1.0**,
-  plus Convex 1.45.0. It is a coherent minimum-Effect baseline with a selected
+  plus Convex 1.48.0. It is a coherent minimum-Effect baseline with a selected
   React 19.3.0 host or Foldkit 0.170.0 and platform-browser 4.1.0, not a claim
   that every package is at its absolute minimum.
   Unrelated transitive dependencies still resolve normally; this is not a frozen

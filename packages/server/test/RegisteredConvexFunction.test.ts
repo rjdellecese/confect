@@ -9,6 +9,10 @@ import type * as DataModel from "@confect/server/DataModel";
 import * as DocumentIds from "@confect/server/DocumentIds";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
+import * as Storage from "@confect/server/Storage";
+import type * as StorageActionWriter from "@confect/server/StorageActionWriter";
+import type { BlobNotFoundError } from "@confect/server/BlobNotFoundError";
+import * as Layer from "effect/Layer";
 import {
   afterEach,
   assert,
@@ -38,6 +42,50 @@ vi.mock("convex/server", (importOriginal) =>
 );
 
 describe("make", () => {
+  it.effect(
+    "provides component-scoped Blob storage to mutation handlers",
+    () => {
+      const scope = IdScope.component("mutation-storage");
+      const schema = DatabaseSchema.make({}, { kind: "component", scope });
+      const blob = new Blob(["component mutation"]);
+      const store = vi.fn(() => Promise.resolve("storage-id"));
+      const get = vi.fn(() => Promise.resolve(blob));
+      const ctx = {
+        auth: {},
+        db: {},
+        scheduler: {},
+        storage: { store, get },
+        runQuery: () => Promise.resolve(null),
+        runMutation: () => Promise.resolve(null),
+      } as unknown as Convex.GenericMutationCtx<
+        DataModel.ToConvex<DataModel.FromSchema<typeof schema>>
+      >;
+      return Effect.gen(function* () {
+        const services = yield* Layer.build(
+          RegisteredConvexFunction.mutationLayer(schema, ctx),
+        );
+        const program = Effect.gen(function* () {
+          const storage = yield* Storage.Storage.forScope<typeof scope>();
+          const id = yield* storage.store(blob);
+          expectTypeOf(id).toEqualTypeOf<GenericId<"_storage", typeof scope>>();
+          const stored = yield* storage.get(id);
+          expect(stored).toBe(blob);
+          expect(store).toHaveBeenCalledExactlyOnceWith(blob, undefined);
+          expect(get).toHaveBeenCalledExactlyOnceWith("storage-id");
+        });
+        expectTypeOf(program).toEqualTypeOf<
+          Effect.Effect<
+            void,
+            BlobNotFoundError,
+            | Storage.ForScope<typeof scope>
+            | StorageActionWriter.ForScope<typeof scope>
+          >
+        >();
+        yield* program.pipe(Effect.provideContext(services));
+      }).pipe(Effect.scoped);
+    },
+  );
+
   const componentScope = IdScope.component("counter");
   const own = GenericId("items", componentScope);
   const foreign = GenericId("items");

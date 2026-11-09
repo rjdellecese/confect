@@ -103,6 +103,7 @@ export type MutationServices<
   | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | StorageWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageActionWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | QueryTransactionContext

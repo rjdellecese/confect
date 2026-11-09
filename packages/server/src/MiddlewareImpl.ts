@@ -21,7 +21,8 @@ import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import type { QueryTransactionContext } from "./QueryTransactionContext";
 import type * as Scheduler from "./Scheduler";
-import type { Storage } from "./Storage";
+import type * as Storage from "./Storage";
+import type * as StorageActionWriter from "./StorageActionWriter";
 import type * as StorageReader from "./StorageReader";
 import type * as StorageWriter from "./StorageWriter";
 import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
@@ -89,38 +90,43 @@ export type CommonServices<
       : [FunctionTypes] extends ["query" | "mutation"]
         ? QueryMutationCommonServices<DatabaseSchema_>
         : [FunctionTypes] extends ["mutation" | "action"]
-          ? MutationActionCommonServices
-          : AllFunctionTypesCommonServices;
+          ? MutationActionCommonServices<DatabaseSchema_>
+          : AllFunctionTypesCommonServices<DatabaseSchema_>;
 
 type QueryMutationCommonServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | DocumentIds.DocumentIds<DatabaseSchema_>
-  | Auth.Auth
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | ExecutionMetadata
   | TransactionMetadata
   | QueryTransactionContext
-  | Storage
-  | StorageReader.StorageReader
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | QueryRunner.QueryRunner;
 
-type MutationActionCommonServices =
-  | Auth.Auth
+type MutationActionCommonServices<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> =
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | ExecutionMetadata
   | RequestMetadata
-  | Scheduler.Scheduler
-  | Storage
-  | StorageReader.StorageReader
-  | StorageWriter.StorageWriter
+  | Scheduler.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageActionWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner;
 
-type AllFunctionTypesCommonServices =
-  | Auth.Auth
+type AllFunctionTypesCommonServices<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> =
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | ExecutionMetadata
-  | Storage
-  | StorageReader.StorageReader
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | QueryRunner.QueryRunner;
 
 const layerFromImpls = <

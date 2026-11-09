@@ -168,7 +168,7 @@ export type Mutation<
   "auth" | "db" | "storage" | "scheduler"
 > & {
   readonly db: DatabaseWriter<DataModel, Scope>;
-  readonly storage: StorageWriter<Scope>;
+  readonly storage: StorageActionWriter<Scope>;
   readonly scheduler: Scheduler<Scope>;
 };
 

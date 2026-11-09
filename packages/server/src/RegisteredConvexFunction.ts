@@ -45,6 +45,7 @@ import type * as FunctionRegistryItem from "./FunctionRegistryItem";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
 import * as Storage from "./Storage";
+import { StorageActionWriter } from "./StorageActionWriter";
 import { StorageWriter } from "./StorageWriter";
 import type * as Handler from "./Handler";
 
@@ -289,6 +290,10 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
       schema.target.scope,
     ),
     StorageWriter.layer<DatabaseSchema.Scope<Schema>>(
+      ctx.storage,
+      schema.target.scope,
+    ),
+    StorageActionWriter.layer<DatabaseSchema.Scope<Schema>>(
       ctx.storage,
       schema.target.scope,
     ),
