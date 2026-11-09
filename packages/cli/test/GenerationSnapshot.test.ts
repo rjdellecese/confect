@@ -106,6 +106,71 @@ const metadataGroup = (
 });
 
 describe("GenerationSnapshot parsing", () => {
+  test("roundtrips context reuse and detects flag-only changes without inheriting them", () => {
+    const makeSnapshot = (enabled?: boolean) =>
+      Result.getOrThrow(
+        GenerationSnapshot.parse([
+          [
+            "notes.spec.ts",
+            {
+              runtime: "Convex",
+              functionNames: ["list"],
+              groups: { child: metadataGroup(["list"]) },
+              ...(enabled === undefined
+                ? {}
+                : { experimental_reuseContext: enabled }),
+            },
+          ],
+        ]),
+      );
+    const before = makeSnapshot();
+    const after = roundtrip(makeSnapshot(true));
+    expect(getLeaf(after, "notes.spec.ts").experimental_reuseContext).toBe(
+      true,
+    );
+    expect(GenerationSnapshot.diff(before, after)).toEqual({
+      removed: [],
+      changed: [
+        {
+          path: GroupPath.make(["notes"]),
+          runtime: "Convex",
+          functionNames: ["list"],
+          experimental_reuseContext: true,
+        },
+      ],
+    });
+    expect(GenerationSnapshot.diff(after, before).changed).toEqual([
+      {
+        path: GroupPath.make(["notes"]),
+        runtime: "Convex",
+        functionNames: ["list"],
+      },
+    ]);
+    expect(GenerationSnapshot.diff(before, makeSnapshot(false))).toEqual({
+      removed: [],
+      changed: [],
+    });
+  });
+
+  test.each([
+    {
+      runtime: "Node",
+      functionNames: ["run"],
+      groups: {},
+      experimental_reuseContext: true,
+    },
+    {
+      runtime: "Convex",
+      functionNames: ["experimental_reuseContext"],
+      groups: {},
+      experimental_reuseContext: true,
+    },
+  ])("rejects invalid reuse metadata: %j", (tree) => {
+    const result = GenerationSnapshot.parse([["notes.spec.ts", tree]]);
+    assert(result._tag === "Failure");
+    expect(result.failure).toMatchObject({ reason: "InvalidContextReuse" });
+  });
+
   test.each([
     { reason: "InvalidShape", entries: {} },
     {
@@ -300,6 +365,27 @@ describe("GenerationSnapshot parsing", () => {
 layer(Layer.merge(baseLayer, NodePath.layerPosix))(
   "GenerationSnapshot",
   (it) => {
+    it.effect(
+      "summarizes an opted-in group without propagating the flag to children",
+      () =>
+        Effect.gen(function* () {
+          const spec = GroupSpec.addGroupsAt(
+            GroupSpec.make({ experimental_reuseContext: true }).addFunction(
+              query("list"),
+            ),
+            { child: GroupSpec.make().addFunction(query("list")) },
+          );
+          const leaf = yield* loadLeaf("notes.spec.ts", spec);
+          const snapshot = roundtrip(fromLoadedLeaves([leaf]));
+          expect(
+            getLeaf(snapshot, leaf.relativePath).experimental_reuseContext,
+          ).toBe(true);
+          expect(
+            getLeaf(snapshot, leaf.relativePath).groups.child
+              ?.experimental_reuseContext,
+          ).toBeUndefined();
+        }),
+    );
     it.effect(
       "reports malformed loaded metadata as failures rather than throwing",
       () =>

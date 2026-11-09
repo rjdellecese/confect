@@ -87,6 +87,31 @@ export declare const api: {
       storageUrl: FunctionReference<"query", "public", { id: string }, string>;
       uploadUrl: FunctionReference<"mutation", "public", {}, string>;
     };
+    contextReuse: {
+      read: FunctionReference<
+        "query",
+        "public",
+        { caseId: string; nonce: number },
+        {
+          functionType: string;
+          previousInvocation: { nonce: number; subject: string | null } | null;
+          subject: string | null;
+          values: Array<string>;
+        }
+      >;
+      write: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string; nonce: number; value: string },
+        {
+          functionType: string;
+          previousInvocation: { nonce: number; subject: string | null } | null;
+          previousValues: Array<string>;
+          subject: string | null;
+          values: Array<string>;
+        }
+      >;
+    };
     documentIds: {
       createAndDelete: FunctionReference<
         "mutation",

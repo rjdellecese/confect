@@ -18,17 +18,25 @@ export const render = ({
   functionNames,
   registeredFunctionsImportPath,
   useNode = false,
+  experimental_reuseContext = false,
 }: Parameters<typeof renderEffect>[0]) =>
-  renderEffect({ functionNames, registeredFunctionsImportPath, useNode });
+  renderEffect({
+    functionNames,
+    registeredFunctionsImportPath,
+    useNode,
+    experimental_reuseContext,
+  });
 
 const renderEffect = Effect.fnUntraced(function* ({
   functionNames,
   registeredFunctionsImportPath,
   useNode = false,
+  experimental_reuseContext = false,
 }: {
   functionNames: ReadonlyArray<string>;
   registeredFunctionsImportPath: string;
   useNode?: boolean;
+  experimental_reuseContext?: boolean;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
@@ -41,6 +49,10 @@ const renderEffect = Effect.fnUntraced(function* ({
     `import registeredFunctions from "${registeredFunctionsImportPath}";`,
   );
   yield* cbw.newLine();
+  if (experimental_reuseContext) {
+    yield* cbw.writeLine("export const experimental_reuseContext = true;");
+    yield* cbw.newLine();
+  }
   yield* Effect.forEach(functionNames, (name) =>
     cbw.writeLine(`export const ${name} = registeredFunctions.${name};`),
   );
@@ -56,12 +68,14 @@ export const generateGroupModule = ({
   functionNames,
   registeredFunctionsImportPath,
   useNode = false,
+  experimental_reuseContext = false,
 }: Parameters<typeof generateGroupModuleEffect>[0]) =>
   generateGroupModuleEffect({
     groupPath,
     functionNames,
     registeredFunctionsImportPath,
     useNode,
+    experimental_reuseContext,
   });
 
 const generateGroupModuleEffect = Effect.fnUntraced(function* ({
@@ -69,11 +83,13 @@ const generateGroupModuleEffect = Effect.fnUntraced(function* ({
   functionNames,
   registeredFunctionsImportPath,
   useNode = false,
+  experimental_reuseContext = false,
 }: {
   groupPath: GroupPath.GroupPath;
   functionNames: ReadonlyArray<string>;
   registeredFunctionsImportPath: string;
   useNode?: boolean;
+  experimental_reuseContext?: boolean;
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -91,6 +107,7 @@ const generateGroupModuleEffect = Effect.fnUntraced(function* ({
     functionNames,
     registeredFunctionsImportPath,
     useNode,
+    experimental_reuseContext,
   });
 
   if (!(yield* fs.exists(modulePath))) {
@@ -250,6 +267,7 @@ export const writeGroups = (
         functionNames: group.functionNames,
         registeredFunctionsImportPath,
         useNode: group.runtime === "Node",
+        experimental_reuseContext: group.experimental_reuseContext === true,
       });
       yield* Match.value(change).pipe(
         Match.when("Added", () => logFileAdded(modulePath)),

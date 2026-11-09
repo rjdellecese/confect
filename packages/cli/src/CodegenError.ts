@@ -52,6 +52,19 @@ export class InvalidMiddlewareAttachmentError extends Schema.TaggedError<
   message: Schema.String,
 }) {}
 
+export class InvalidContextReuseError extends Schema.TaggedError<
+  InvalidContextReuseError,
+  { readonly brand: unique symbol }
+>()("InvalidContextReuseError", {
+  specPath: Schema.String,
+  groupPath: Schema.String,
+  reason: Schema.Literals([
+    "InvalidOption",
+    "NodeRuntime",
+    "ReservedFunctionName",
+  ]),
+}) {}
+
 export class ImplMissingSpecImportError extends Schema.TaggedError<
   ImplMissingSpecImportError,
   { readonly brand: unique symbol }
@@ -168,6 +181,7 @@ export const CodegenError = Schema.Union([
   SpecMissingDefaultGroupSpecError,
   SpecImportsServerError,
   InvalidMiddlewareAttachmentError,
+  InvalidContextReuseError,
   ImplMissingSpecImportError,
   ImplMissingDefaultLayerError,
   ImplNotFinalizedError,
@@ -403,6 +417,30 @@ export const renderCodegenError = (error: CodegenError): string => {
       ),
     ),
     Match.tag("ImplMissingSpecImportError", renderImplMissingSpecImportError),
+    Match.tag("InvalidContextReuseError", ({ specPath, groupPath, reason }) =>
+      singleLine(
+        "Spec ",
+        formatPath(specPath),
+        `, group ${groupPath}: `,
+        Match.value(reason).pipe(
+          Match.when(
+            "InvalidOption",
+            () => "experimental_reuseContext must be a boolean.",
+          ),
+          Match.when(
+            "NodeRuntime",
+            () =>
+              "experimental_reuseContext is only supported for Convex-runtime groups.",
+          ),
+          Match.when(
+            "ReservedFunctionName",
+            () =>
+              "Rename the function experimental_reuseContext before enabling context reuse; its name conflicts with Convex's module flag.",
+          ),
+          Match.exhaustive,
+        ),
+      ),
+    ),
     Match.tag(
       "ImplMissingDefaultLayerError",
       renderImplMissingDefaultLayerError,

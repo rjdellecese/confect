@@ -25,6 +25,7 @@ import * as Option from "effect/Option";
 import * as String from "effect/String";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import * as Log from "@confect/cli/log";
 import {
   ParentChildNameCollisionError,
   type CodegenError,
@@ -213,6 +214,94 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
 }
 
 layer(LeafModuleLayer)("loadSpec", (it) => {
+  it.effect.each([
+    { option: "yes", runtime: "Convex", name: "list", reason: "InvalidOption" },
+    { option: true, runtime: "Node", name: "list", reason: "NodeRuntime" },
+    {
+      option: true,
+      runtime: "Convex",
+      name: "experimental_reuseContext",
+      reason: "ReservedFunctionName",
+    },
+  ])(
+    "rejects invalid context reuse: $reason",
+    ({ option, runtime, name, reason }) =>
+      Effect.gen(function* () {
+        const child = Object.assign(
+          GroupSpec.make().addFunction(
+            FunctionSpec.publicQuery({ name, returns: () => Schema.Null }),
+          ),
+          {
+            experimental_reuseContext: option,
+            runtime,
+          },
+        );
+        const spec = GroupSpec.addGroupsAt(GroupSpec.make(), { child });
+        yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            vi.spyOn(Bundler, "bundle").mockReturnValue(
+              Effect.succeed({
+                module: { default: spec },
+                metafile: { inputs: {}, outputs: {} },
+              }),
+            ),
+          ),
+          (spy) => Effect.sync(() => spy.mockRestore()),
+        );
+        const leaf = yield* toLeafModule("groups/reuse.spec.ts");
+        const result = yield* Effect.result(loadSpec(leaf));
+        assert(result._tag === "Failure");
+        expect(result.failure).toMatchObject({
+          _tag: "InvalidContextReuseError",
+          reason,
+          specPath: leaf.relativePath,
+          groupPath: "groups.reuse.child",
+        });
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "warns only for opted-in action-only groups without evaluating schemas",
+    () =>
+      Effect.gen(function* () {
+        const returns = vi.fn(() => Schema.Null);
+        const action = FunctionSpec.publicAction({ name: "run", returns });
+        const query = FunctionSpec.publicQuery({ name: "list", returns });
+        const actions = GroupSpec.make({
+          experimental_reuseContext: true,
+        }).addFunction(action);
+        const spec = GroupSpec.addGroupsAt(GroupSpec.make(), {
+          actions,
+          mixed: actions.addFunction(query),
+          disabled: GroupSpec.make().addFunction(action),
+          empty: GroupSpec.make({ experimental_reuseContext: true }),
+        });
+        const warn = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            vi.spyOn(Log, "logWarn").mockReturnValue(Effect.void),
+          ),
+          (spy) => Effect.sync(() => spy.mockRestore()),
+        );
+        yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            vi.spyOn(Bundler, "bundle").mockReturnValue(
+              Effect.succeed({
+                module: { default: spec },
+                metafile: { inputs: {}, outputs: {} },
+              }),
+            ),
+          ),
+          (spy) => Effect.sync(() => spy.mockRestore()),
+        );
+        const leaf = yield* toLeafModule("groups/reuse.spec.ts");
+        expect((yield* loadSpec(leaf)).spec).toBe(spec);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("groups.reuse.actions"),
+        );
+        expect(returns).not.toHaveBeenCalled();
+      }).pipe(Effect.scoped),
+  );
   it.effect(
     "pairs the validated spec with its leaf without forcing schemas or mutating inputs",
     () =>

@@ -24,18 +24,21 @@ export { SnapshotError } from "./SnapshotError";
 export const GroupSummary = Schema.Struct({
   path: GroupPath.GroupPath,
   runtime: Schema.Literals(["Convex", "Node"]),
+  experimental_reuseContext: Schema.optionalKey(Schema.Boolean),
   functionNames: Schema.Array(Schema.NonEmptyString),
 });
 export type GroupSummary = typeof GroupSummary.Type;
 
 export interface GroupTree {
   readonly runtime: "Convex" | "Node";
+  readonly experimental_reuseContext?: boolean;
   readonly functionNames: ReadonlyArray<string>;
   readonly groups: { readonly [name: string]: GroupTree };
 }
 
 export const GroupTree: Schema.Codec<GroupTree> = Schema.Struct({
   runtime: GroupSummary.fields.runtime,
+  experimental_reuseContext: GroupSummary.fields.experimental_reuseContext,
   functionNames: GroupSummary.fields.functionNames,
   groups: Schema.Record(
     Schema.String,
@@ -81,6 +84,19 @@ const parseTree = (
   tree: GroupTree,
 ): Result.Result<GroupTree, SnapshotError> =>
   Result.gen(function* () {
+    if (
+      tree.experimental_reuseContext === true &&
+      (tree.runtime === "Node" ||
+        tree.functionNames.includes("experimental_reuseContext"))
+    ) {
+      return yield* Result.fail(
+        SnapshotError.make({
+          reason: "InvalidContextReuse",
+          relativePath,
+          pathSegments: path.pathSegments,
+        }),
+      );
+    }
     yield* Result.try({
       try: () => {
         for (const name of tree.functionNames)
@@ -220,6 +236,9 @@ export const GenerationSnapshot = Entries.pipe(
 
 const summarize = (group: GroupSpec.AnyWithProps): GroupTree => ({
   runtime: group.runtime,
+  ...(group.experimental_reuseContext
+    ? { experimental_reuseContext: true }
+    : {}),
   functionNames: Record.keys(group.functions),
   groups: Record.map(group.groups, summarize),
 });
@@ -264,6 +283,9 @@ const groups = (snapshot: GenerationSnapshot): ReadonlyArray<GroupSummary> => {
     {
       path,
       runtime: tree.runtime,
+      ...(tree.experimental_reuseContext === true
+        ? { experimental_reuseContext: true }
+        : {}),
       functionNames: Array.sort(tree.functionNames, String.Order),
     },
     ...Array.flatMap(
