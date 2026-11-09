@@ -45,6 +45,7 @@ import type * as FunctionRegistryItem from "./FunctionRegistryItem";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
 import * as Storage from "./Storage";
+import { StorageActionWriter } from "./StorageActionWriter";
 import type { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 
@@ -297,6 +298,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
     Scheduler.layer(ctx.scheduler),
     Storage.layer(ctx.storage),
     StorageWriter.layer(ctx.storage),
+    StorageActionWriter.layer(ctx.storage),
     QueryRunner.layer(ctx.runQuery),
     MutationRunner.layer(ctx.runMutation),
     QueryTransactionContext.layer(ctx),
@@ -322,6 +324,7 @@ export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
   | Storage.Storage
   | StorageReader
   | StorageWriter
+  | StorageActionWriter
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | QueryTransactionContext.QueryTransactionContext

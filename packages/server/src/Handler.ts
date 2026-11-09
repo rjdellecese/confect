@@ -104,6 +104,7 @@ export type MutationServices<
   | Storage
   | StorageReader
   | StorageWriter
+  | StorageActionWriter
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | QueryTransactionContext

@@ -122,7 +122,7 @@ describe("Handler", () => {
       >().toEqualTypeOf<Storage.Storage | StorageReader>();
       expectTypeOf<
         Extract<Handler.MutationServices<typeof schema>, StorageServices>
-      >().toEqualTypeOf<Storage.Storage | StorageReader | StorageWriter>();
+      >().toEqualTypeOf<StorageServices>();
       expectTypeOf<
         Extract<Handler.ActionServices<typeof schema>, StorageServices>
       >().toEqualTypeOf<StorageServices>();
@@ -207,10 +207,10 @@ describe("Handler", () => {
       expectTypeOf<Effect.Services<typeof upload | typeof remove>>().toExtend<
         Handler.MutationServices<typeof schema>
       >();
-      expectTypeOf<Effect.Services<typeof get>>().not.toExtend<
+      expectTypeOf<Effect.Services<typeof get>>().toExtend<
         Handler.MutationServices<typeof schema>
       >();
-      expectTypeOf<Effect.Services<typeof store>>().not.toExtend<
+      expectTypeOf<Effect.Services<typeof store>>().toExtend<
         Handler.MutationServices<typeof schema>
       >();
       expectTypeOf<

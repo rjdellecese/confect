@@ -669,7 +669,7 @@ importers:
         specifier: 1.49.0
         version: 1.49.0(react@19.3.1)
       convex-test:
-        specifier: '>=0.0.50 <0.1.0'
+        specifier: '>=0.0.67 <0.1.0'
         version: 0.0.67(convex@1.49.0(react@19.3.1))
     devDependencies:
       '@types/node':

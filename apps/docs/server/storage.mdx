@@ -21,13 +21,13 @@ Effect.gen(function* () {
 
 The service is available in every context, but each operation retains Convex's context restrictions. Confect checks these requirements when you implement a function or middleware.
 
-| Operation               | Returns    | Available in                                  |
-| ----------------------- | ---------- | --------------------------------------------- |
-| `getUrl(storageId)`     | `URL`      | Queries, mutations, actions, and HTTP actions |
-| `generateUploadUrl`     | `URL`      | Mutations, actions, and HTTP actions          |
-| `delete(storageId)`     | `void`     | Mutations, actions, and HTTP actions          |
-| `get(storageId)`        | `Blob`     | Actions and HTTP actions                      |
-| `store(blob, options?)` | Storage ID | Actions and HTTP actions                      |
+| Operation               | Returns          | Available in                                  |
+| ----------------------- | ---------------- | --------------------------------------------- |
+| `getUrl(storageId)`     | `URL`            | Queries, mutations, actions, and HTTP actions |
+| `generateUploadUrl`     | `URL`            | Mutations, actions, and HTTP actions          |
+| `delete(storageId)`     | `void`           | Mutations, actions, and HTTP actions          |
+| `get(storageId)`        | `Blob`           | Mutations, actions, and HTTP actions          |
+| `store(blob, options?)` | `Id<"_storage">` | Mutations, actions, and HTTP actions          |
 
 Every operation returns an Effect. The table lists the value produced when it succeeds.
 
@@ -72,7 +72,7 @@ Effect.gen(function* () {
 
 ## Get a blob
 
-<ContextBadges action http />
+<ContextBadges mutation action http />
 
 Read a stored file directly as a `Blob`. If the blob doesn't exist, the effect fails with `BlobNotFoundError`.
 
@@ -85,7 +85,7 @@ Effect.gen(function* () {
 
 ## Store a blob
 
-<ContextBadges action http />
+<ContextBadges mutation action http />
 
 Store a `Blob` directly and receive its storage ID. Optionally supply a SHA-256 hash in `options` for Convex to verify.
 

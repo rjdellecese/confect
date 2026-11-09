@@ -381,7 +381,7 @@ An implementation provided with `MiddlewareImpl.make` uses one strategy for ever
 | Mutations and actions                      | `Auth`, `Scheduler`, `Storage`, `QueryRunner`, `MutationRunner`, `ExecutionMetadata`, `RequestMetadata`       |
 | Any set including both queries and actions | `Auth`, `Storage`, `QueryRunner`, `ExecutionMetadata`                                                         |
 
-`Storage` is available in every function type, but an implementation can only use operations supported by every type it covers. For example, middleware covering mutations and actions can generate upload URLs and delete blobs; middleware that also covers queries can only call `getUrl`. Reading or storing blobs directly requires actions-only middleware. See [Storage](/server/storage) for method availability.
+`Storage` is available in every function type, but an implementation can only use operations supported by every type it covers. Middleware covering mutations and actions can generate upload URLs, delete blobs, and read or store blob contents. Middleware that also covers queries can only call `getUrl`. See [Storage](/server/storage) for method availability.
 
 ### Per-function-type implementations
 

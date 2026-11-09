@@ -489,6 +489,31 @@ describe("implementation service bounds", () => {
     );
   });
 
+  it("allows blob operations in mutation/action middleware but not query intersections", () => {
+    class WriteBlobs extends MiddlewareSpec.MiddlewareSpec<WriteBlobs>()(
+      "WriteBlobs",
+      {
+        functionTypes: { query: false, mutation: true, action: true },
+      },
+    ) {}
+    type MutationAction = MiddlewareImpl.CommonServices<
+      typeof databaseSchema,
+      "mutation" | "action"
+    >;
+    expectTypeOf<StorageActionWriter>().toExtend<MutationAction>();
+    expectTypeOf<StorageActionWriter>().not.toExtend<QueryMutation>();
+
+    MiddlewareImpl.make(databaseSchema, WriteBlobs, (effect) =>
+      Effect.gen(function* () {
+        const storage = yield* Storage.Storage;
+        const id = yield* storage.store(new Blob(["middleware"]));
+        yield* storage.get(id).pipe(Effect.orDie);
+        yield* storage.delete(id).pipe(Effect.orDie);
+        return yield* effect;
+      }),
+    );
+  });
+
   type MetadataServices =
     | ExecutionMetadata
     | RequestMetadata

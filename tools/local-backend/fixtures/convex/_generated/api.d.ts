@@ -169,6 +169,12 @@ export declare const api: {
       manyOpsQuery: FunctionReference<"query", "public", {}, number>;
     };
     storage: {
+      deleteAndGet: FunctionReference<
+        "mutation",
+        "public",
+        { storageId: Id<"_storage"> },
+        { id: string; tag: "BlobNotFoundError" }
+      >;
       deleteBlob: FunctionReference<
         "mutation",
         "public",
@@ -182,17 +188,74 @@ export declare const api: {
         { storageId: Id<"_storage"> },
         string
       >;
+      getMutation: FunctionReference<
+        "mutation",
+        "public",
+        { storageId: Id<"_storage"> },
+        { size: number; storageId: Id<"_storage">; text: string; type: string }
+      >;
       getUrl: FunctionReference<
         "query",
         "public",
         { storageId: Id<"_storage"> },
         string
       >;
+      limitedFiles: FunctionReference<
+        "mutation",
+        "public",
+        {
+          limits: {
+            fileReadBytes: number;
+            fileWriteBytes: number;
+            filesRead: number;
+            filesWritten: number;
+          };
+          sizes: Array<number>;
+          storageIds: Array<Id<"_storage">>;
+        },
+        {
+          failures: Array<string>;
+          metrics: {
+            fileReadBytes: number;
+            fileWriteBytes: number;
+            filesRead: number;
+            filesWritten: number;
+          };
+          storageIds: Array<Id<"_storage">>;
+        }
+      >;
+      rollback: FunctionReference<
+        "mutation",
+        "public",
+        { readId: Id<"_storage"> },
+        {
+          metrics: {
+            fileReadBytes: number;
+            fileWriteBytes: number;
+            filesRead: number;
+            filesWritten: number;
+          };
+          parentId: Id<"_storage">;
+          rolledBackId: Id<"_storage">;
+        }
+      >;
+      staleRead: FunctionReference<
+        "mutation",
+        "public",
+        { stale: boolean },
+        { storageId: Id<"_storage">; text: string; url: string | null }
+      >;
       store: FunctionReference<
         "action",
         "public",
         { text: string },
         Id<"_storage">
+      >;
+      storeMutation: FunctionReference<
+        "mutation",
+        "public",
+        { sha256?: string; text: string; type: string },
+        { size: number; storageId: Id<"_storage">; text: string; type: string }
       >;
     };
     transactions: {
@@ -261,6 +324,35 @@ export declare const api: {
  */
 export declare const internal: {
   groups: {
+    storage: {
+      exerciseFiles: FunctionReference<
+        "mutation",
+        "internal",
+        { sizes: Array<number>; storageIds: Array<Id<"_storage">> },
+        {
+          failures: Array<string>;
+          metrics: {
+            fileReadBytes: number;
+            fileWriteBytes: number;
+            filesRead: number;
+            filesWritten: number;
+          };
+          storageIds: Array<Id<"_storage">>;
+        }
+      >;
+      pendingUrl: FunctionReference<
+        "query",
+        "internal",
+        { storageId: Id<"_storage"> },
+        string | null
+      >;
+      replaceThenFail: FunctionReference<
+        "mutation",
+        "internal",
+        { parentId: Id<"_storage">; readId: Id<"_storage"> },
+        Id<"_storage">
+      >;
+    };
     transactions: {
       read: FunctionReference<
         "query",
