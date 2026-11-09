@@ -25,11 +25,13 @@ export default databaseSchema;
 `;
 
 exports[`declaration emit > services.d.ts prints public types by name 1`] = `
-"import { ActionCtx as ActionCtx_, Auth as Auth_, type DataModel, DatabaseReader as DatabaseReader_, DatabaseWriter as DatabaseWriter_, DocumentIds as DocumentIds_, ExecutionMetadata as ExecutionMetadata_, MutationCtx as MutationCtx_, MutationRunner as MutationRunner_, MutationTransactionContext as MutationTransactionContext_, QueryCtx as QueryCtx_, QueryRunner as QueryRunner_, QueryTransactionContext as QueryTransactionContext_, RequestMetadata as RequestMetadata_, Storage as Storage_, StorageActionWriter as StorageActionWriter_, StorageReader as StorageReader_, StorageWriter as StorageWriter_, TransactionMetadata as TransactionMetadata_, VectorSearch as VectorSearch_ } from "@confect/server";
+"import { ActionCtx as ActionCtx_, Auth as Auth_, type DataModel, DatabaseReader as DatabaseReader_, DatabaseWriter as DatabaseWriter_, DocumentIds as DocumentIds_, ExecutionMetadata as ExecutionMetadata_, MutationAuth as MutationAuth_, MutationCtx as MutationCtx_, MutationRunner as MutationRunner_, MutationTransactionContext as MutationTransactionContext_, QueryCtx as QueryCtx_, QueryRunner as QueryRunner_, QueryTransactionContext as QueryTransactionContext_, RequestMetadata as RequestMetadata_, Storage as Storage_, StorageActionWriter as StorageActionWriter_, StorageReader as StorageReader_, StorageWriter as StorageWriter_, TransactionMetadata as TransactionMetadata_, VectorSearch as VectorSearch_ } from "@confect/server";
 import type schemaDefinition from "./schema";
 import type { Docs } from "./docs";
 export declare const Auth: typeof Auth_.Auth;
 export type Auth = typeof Auth.Identifier;
+export declare const MutationAuth: typeof MutationAuth_.MutationAuth;
+export type MutationAuth = typeof MutationAuth.Identifier;
 export declare const ExecutionMetadata: typeof ExecutionMetadata_.ExecutionMetadata;
 export type ExecutionMetadata = typeof ExecutionMetadata.Identifier;
 export declare const RequestMetadata: typeof RequestMetadata_.RequestMetadata;

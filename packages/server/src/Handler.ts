@@ -14,6 +14,7 @@ import type { ExecutionMetadata } from "./ExecutionMetadata";
 import type { RequestMetadata } from "./RequestMetadata";
 import type { TransactionMetadata } from "./TransactionMetadata";
 import type * as MutationCtx from "./MutationCtx";
+import type * as MutationAuth from "./MutationAuth";
 import type * as MutationRunner from "./MutationRunner";
 import type { MutationTransactionContext } from "./MutationTransactionContext";
 import type * as QueryCtx from "./QueryCtx";
@@ -95,6 +96,7 @@ export type MutationServices<
 > =
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | DatabaseWriter.DatabaseWriter<DatabaseSchema_>
+  | MutationAuth.MutationAuth
   | DocumentIds.DocumentIds<DatabaseSchema_>
   | Auth.Auth
   | ExecutionMetadata

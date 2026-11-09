@@ -1,7 +1,7 @@
 ---
 icon: "key"
 title: "Authentication"
-description: "Access the current user's identity in your Confect functions."
+description: "Access the current user's identity and sign deployment JWTs in mutations."
 ---
 
 The `Auth` service provides access to the current user's identity. Unlike vanilla Convex (which returns `UserIdentity | null`), the Confect `Auth` service returns an `Effect` that fails with a typed error when no user is authenticated.
@@ -42,3 +42,27 @@ Effect.gen(function* () {
 ## Configuration
 
 Auth provider configuration goes in `confect/auth.ts`, which is passed through to Convex as-is. See the [Convex auth documentation](https://docs.convex.dev/auth) for setup details.
+
+## Signing deployment JWTs
+
+`MutationAuth.signJwt()` signs an ES256 JWT with your deployment's managed key. The service is available only in mutations and mutation-only middleware; `Auth` continues to provide identity lookup in every supported context.
+
+```ts
+import * as Effect from "effect/Effect";
+import { Auth, MutationAuth } from "./confect/_generated/services";
+
+const issueToken = Effect.gen(function* () {
+  const auth = yield* Auth;
+  const identity = yield* auth.getUserIdentity;
+  const signer = yield* MutationAuth;
+
+  return yield* signer.signJwt({
+    claims: { sub: identity.subject, aud: "my-service" },
+    expiresInSeconds: 60,
+  });
+});
+```
+
+The options use Convex's `SignJwtOptions` type. Convex enforces lifetime and reserved-claim rules; rejected signing operations become defects rather than typed errors.
+
+Tokens are signed, not encrypted, and cannot be revoked individually. Use a short lifetime (at most one hour), authorize the caller before signing, and have the receiving service verify the signature, issuer, audience, and expiration against your deployment's `/.well-known/jwks.json` endpoint. See [Convex's signing API](https://docs.convex.dev/api/interfaces/server.MutationAuth).

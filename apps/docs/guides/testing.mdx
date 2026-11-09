@@ -81,6 +81,20 @@ describe("notes", () => {
 });
 ```
 
+## Deployment signing keys
+
+`TestConfect.jwks()` returns an Effect containing the test deployment's public JSON Web Key Set. Use it to verify tokens signed by `MutationAuth.signJwt()` in your tests. Identity-derived services share the same keys; separately constructed test layers have different keys.
+
+```ts
+Effect.gen(function* () {
+  const c = yield* TestConfect.TestConfect;
+  const jwks = yield* c.jwks();
+  return jwks;
+});
+```
+
+Pass the result to a JWT verifier such as `jose`'s `createLocalJWKSet`, and verify the expected issuer, audience, and expiration. These are test-instance keys, not your deployed application's keys.
+
 ## Calling functions
 
 `TestConfect` provides `query`, `mutation`, and `action` methods that accept a ref and args, returning an `Effect` with the decoded result.

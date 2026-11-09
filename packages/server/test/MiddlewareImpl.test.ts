@@ -7,6 +7,7 @@ import {
 import type * as DatabaseReaderModule from "@confect/server/DatabaseReader";
 import type * as DatabaseWriterModule from "@confect/server/DatabaseWriter";
 import type * as Handler from "@confect/server/Handler";
+import * as MutationAuth from "@confect/server/MutationAuth";
 import * as DocumentIds from "@confect/server/DocumentIds";
 import type { ExecutionMetadata } from "@confect/server/ExecutionMetadata";
 import type { RequestMetadata } from "@confect/server/RequestMetadata";
@@ -511,6 +512,32 @@ describe("implementation service bounds", () => {
         yield* storage.delete(id).pipe(Effect.orDie);
         return yield* effect;
       }),
+    );
+  });
+
+  it("provides JWT signing only to mutation-only middleware", () => {
+    type Signing = MutationAuth.MutationAuth;
+    expectTypeOf<Signing>().toExtend<MutationOnly>();
+    expectTypeOf<Signing>().not.toExtend<QueryMutation>();
+    expectTypeOf<Signing>().not.toExtend<AllFunctionTypes>();
+    expectTypeOf<Signing>().not.toExtend<
+      MiddlewareImpl.CommonServices<
+        typeof databaseSchema,
+        "mutation" | "action"
+      >
+    >();
+    expectTypeOf<Signing>().not.toExtend<
+      MiddlewareImpl.CommonServices<typeof databaseSchema, "query" | "action">
+    >();
+    class Sign extends MiddlewareSpec.MiddlewareSpec<Sign>()("Sign", {
+      functionTypes: { query: false, mutation: true, action: false },
+    }) {}
+    MiddlewareImpl.make(databaseSchema, Sign, (effect) =>
+      Effect.flatMap(MutationAuth.MutationAuth, (auth) =>
+        auth
+          .signJwt({ claims: { aud: "service" }, expiresInSeconds: 60 })
+          .pipe(Effect.andThen(effect)),
+      ),
     );
   });
 

@@ -11,6 +11,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { ExecutionMetadata } from "@confect/server/ExecutionMetadata";
 import type * as Handler from "@confect/server/Handler";
+import type * as MutationAuth from "@confect/server/MutationAuth";
 import type * as DocumentIds from "@confect/server/DocumentIds";
 import type * as HttpRouter from "@confect/server/HttpRouter";
 import type { RequestMetadata } from "@confect/server/RequestMetadata";
@@ -40,6 +41,26 @@ type ExtractActionReturns<F> =
   F extends RegisteredAction<any, any, infer R> ? R : never;
 
 describe("Handler", () => {
+  it("provides JWT signing only in mutation handlers", () => {
+    type Signing = MutationAuth.MutationAuth;
+    expectTypeOf<Signing>().toExtend<Handler.MutationServices<typeof schema>>();
+    expectTypeOf<Signing>().not.toExtend<
+      Handler.QueryServices<typeof schema>
+    >();
+    expectTypeOf<Signing>().not.toExtend<
+      Handler.ActionServices<typeof schema>
+    >();
+    expectTypeOf<Signing>().not.toExtend<HttpRouter.Services>();
+    const nodeAction = FunctionSpec.publicNodeAction({
+      name: "sign",
+      returns: () => Schema.String,
+    });
+    type NodeServices = Effect.Services<
+      ReturnType<Handler.Handler<typeof schema, typeof nodeAction>>
+    >;
+    expectTypeOf<Signing>().not.toExtend<NodeServices>();
+  });
+
   it("provides DocumentIds only in query and mutation contexts", () => {
     type Ids = DocumentIds.DocumentIds<typeof schema>;
     expectTypeOf<Ids>().toExtend<Handler.QueryServices<typeof schema>>();

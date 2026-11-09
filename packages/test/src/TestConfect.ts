@@ -2,6 +2,7 @@ import { Ref } from "@confect/core";
 import type { DatabaseSchema, DataModel } from "@confect/server";
 import { RegisteredConvexFunction } from "@confect/server";
 import type {
+  DeploymentJwks,
   TestConvexForDataModel,
   TestConvexForDataModelAndIdentity,
 } from "convex-test";
@@ -18,9 +19,12 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+export type { DeploymentJwk, DeploymentJwks } from "convex-test";
+
 export type TestConfectWithoutIdentity<
   ConfectSchema extends DatabaseSchema.AnyWithProps,
 > = {
+  jwks: () => Effect.Effect<DeploymentJwks>;
   query: <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,
     ...args: Ref.OptionalArgs<QueryRef>
@@ -88,6 +92,10 @@ class TestConfectImplWithoutIdentity<
       DataModel.ToConvex<DataModel.FromSchema<ConfectSchema>>
     >,
   ) {}
+
+  readonly jwks = Effect.fn("TestConfect.jwks")(() =>
+    Effect.promise(() => this.testConvex.jwks()),
+  );
 
   readonly query = <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,
@@ -214,6 +222,8 @@ class TestConfectImpl<
       this.confectSchema,
       this.testConvex.withIdentity(userIdentity),
     );
+
+  readonly jwks = () => this.testConfectImplWithoutIdentity.jwks();
 
   readonly query = <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,

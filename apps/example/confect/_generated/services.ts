@@ -7,6 +7,7 @@ import {
   DatabaseWriter as DatabaseWriter_,
   DocumentIds as DocumentIds_,
   ExecutionMetadata as ExecutionMetadata_,
+  MutationAuth as MutationAuth_,
   MutationCtx as MutationCtx_,
   MutationRunner as MutationRunner_,
   MutationTransactionContext as MutationTransactionContext_,
@@ -27,6 +28,9 @@ import type { Docs } from "./docs";
 
 export const Auth = Auth_.Auth;
 export type Auth = typeof Auth.Identifier;
+
+export const MutationAuth = MutationAuth_.MutationAuth;
+export type MutationAuth = typeof MutationAuth.Identifier;
 
 export const ExecutionMetadata = ExecutionMetadata_.ExecutionMetadata;
 export type ExecutionMetadata = typeof ExecutionMetadata.Identifier;
