@@ -29,6 +29,8 @@ export default GroupSpec.make()
         Schema.Struct({
           ...executionFields(),
           remainingReads: Schema.Finite,
+          snapshotTs: Schema.BigInt,
+          repeatedSnapshotTs: Schema.BigInt,
         }),
     }),
   )
@@ -40,7 +42,20 @@ export default GroupSpec.make()
           ...executionFields(),
           ...requestFields(),
           remainingWrites: Schema.Finite,
+          snapshotTs: Schema.BigInt,
+          repeatedSnapshotTs: Schema.BigInt,
+          nestedQueryTs: Schema.BigInt,
+          staleQueryTs: Schema.BigInt,
+          nestedMutationTs: Schema.BigInt,
+          nestedMutationAfterWriteTs: Schema.BigInt,
         }),
+    }),
+  )
+  .addFunction(
+    FunctionSpec.internalMutation({
+      name: "snapshotMutation",
+      returns: () =>
+        Schema.Struct({ before: Schema.BigInt, after: Schema.BigInt }),
     }),
   )
   .addFunction(

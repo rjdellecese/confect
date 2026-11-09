@@ -134,6 +134,9 @@ layer(contextMetadataLayer, { timeout: "120 seconds" })(
         expect(metadata.functionType).toBe("query");
         expect(metadata.deploymentName).not.toBe("");
         expect(metadata.remainingReads).toBeGreaterThan(0);
+        expect(typeof metadata.snapshotTs).toBe("bigint");
+        expect(metadata.snapshotTs).toBeGreaterThan(0n);
+        expect(metadata.repeatedSnapshotTs).toBe(metadata.snapshotTs);
       }),
     );
 
@@ -151,6 +154,13 @@ layer(contextMetadataLayer, { timeout: "120 seconds" })(
         expect(metadata.deploymentName).not.toBe("");
         expect(metadata.requestId).not.toBe("");
         expect(metadata.remainingWrites).toBeGreaterThan(0);
+        expect(typeof metadata.snapshotTs).toBe("bigint");
+        expect(metadata.snapshotTs).toBeGreaterThan(0n);
+        expect(metadata.repeatedSnapshotTs).toBe(metadata.snapshotTs);
+        expect(metadata.nestedQueryTs).toBe(metadata.snapshotTs);
+        expect(metadata.nestedMutationTs).toBe(metadata.snapshotTs);
+        expect(metadata.nestedMutationAfterWriteTs).toBe(metadata.snapshotTs);
+        expect(metadata.staleQueryTs).toBeLessThanOrEqual(metadata.snapshotTs);
       }),
     );
 

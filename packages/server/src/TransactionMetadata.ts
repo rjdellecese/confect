@@ -5,9 +5,14 @@ import * as Layer from "effect/Layer";
 
 export type { TransactionMetric, TransactionMetrics } from "convex/server";
 
-const make = (meta: Pick<QueryMeta, "getTransactionMetrics">) => ({
+const make = (
+  meta: Pick<QueryMeta, "getTransactionMetrics" | "getSnapshotTs">,
+) => ({
   getMetrics: Effect.fn("TransactionMetadata.getMetrics")(() =>
     Effect.promise(() => meta.getTransactionMetrics()),
+  ),
+  getSnapshotTs: Effect.fn("TransactionMetadata.getSnapshotTs")(() =>
+    Effect.sync(() => meta.getSnapshotTs()),
   ),
 });
 
@@ -16,5 +21,6 @@ export class TransactionMetadata extends Context.Service<
   ReturnType<typeof make>
 >()("@confect/server/TransactionMetadata") {}
 
-export const layer = (meta: Pick<QueryMeta, "getTransactionMetrics">) =>
-  Layer.succeed(TransactionMetadata, make(meta));
+export const layer = (
+  meta: Pick<QueryMeta, "getTransactionMetrics" | "getSnapshotTs">,
+) => Layer.succeed(TransactionMetadata, make(meta));
