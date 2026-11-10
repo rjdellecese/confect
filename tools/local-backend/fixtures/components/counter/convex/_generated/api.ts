@@ -40,6 +40,33 @@ export const api: {
         run: string;
       }>
     >;
+    paginate: FunctionReference<
+      "query",
+      "public",
+      {
+        paginationOpts: {
+          cursor: string | null;
+          endCursor?: string | null;
+          id?: number;
+          maximumBytesRead?: number;
+          maximumRowsRead?: number;
+          numItems: number;
+        };
+        run: string;
+      },
+      {
+        continueCursor: string;
+        isDone: boolean;
+        page: Array<{
+          _creationTime: number;
+          _id: Id<"counters">;
+          count: string;
+          run: string;
+        }>;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+        splitCursor?: string | null;
+      }
+    >;
     reject: FunctionReference<"mutation", "public", { run: string }, null>;
     schedule: FunctionReference<
       "mutation",

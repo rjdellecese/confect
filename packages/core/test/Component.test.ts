@@ -1,5 +1,5 @@
 import * as Array from "effect/Array";
-import { assert, describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import {
   Component,
   FunctionSpec,
@@ -13,9 +13,10 @@ import {
   Spec,
 } from "@confect/core";
 import { componentsGeneric, getFunctionAddress } from "convex/server";
-import type { RegisteredQuery } from "convex/server";
+import type { FunctionReference, RegisteredQuery } from "convex/server";
 import { v } from "convex/values";
 import * as Schema from "effect/Schema";
+import * as Effect from "effect/Effect";
 import * as Record from "effect/Record";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
@@ -66,6 +67,69 @@ const first = Component.bind(contract, native.first);
 const second = Component.bind(contract, native.second);
 
 describe("published component contracts", () => {
+  it.effect(
+    "adds a hand-written codec contract to an existing native component",
+    () => {
+      const nativeScope = IdScope.component("@example/native-counter");
+      const group = GroupSpec.make().addFunction(
+        FunctionSpec.publicMutation({
+          name: "create",
+          args: () => ({ count: Schema.FiniteFromString }),
+          returns: () =>
+            Schema.Struct({
+              id: GenericId.GenericId("counters", nativeScope),
+              count: Schema.FiniteFromString,
+            }),
+        }),
+      );
+      const nativeContract = Component.make(
+        { [Spec.TypeId]: { counter: GroupSpec.withName("counter", group) } },
+        nativeScope,
+        ["counters"],
+      );
+      const registry = componentsGeneric() as unknown as {
+        counter: {
+          counter: {
+            create: FunctionReference<
+              "mutation",
+              "internal",
+              { count: string },
+              { id: string; count: string },
+              "counter"
+            >;
+          };
+        };
+      };
+      const bound = Component.bind(nativeContract, registry.counter);
+      expectTypeOf<Ref.Args<typeof bound.counter.create>>().toEqualTypeOf<{
+        readonly count: number;
+      }>();
+      expectTypeOf<
+        Ref.Returns<typeof bound.counter.create>["id"]
+      >().toEqualTypeOf<
+        GenericId.GenericId<
+          "counters",
+          Component.MountScope<IdScope.App, "counter">
+        >
+      >();
+      return Effect.gen(function* () {
+        const result = yield* Ref.runWithCodec(
+          bound.counter.create,
+          { count: 3 },
+          (reference, args) => {
+            expect(reference).toBe(bound.counter.create.functionReference);
+            expect(getFunctionAddress(reference)).toEqual(
+              getFunctionAddress(registry.counter.counter.create),
+            );
+            expect(args).toEqual({ count: "3" });
+            return Promise.resolve({ id: "counter-id", count: "3" });
+          },
+        );
+        expect(result).toEqual({ id: "counter-id", count: 3 });
+      });
+    },
+  );
+
   it("keeps bound function schemas lazy and memoized across installations", () => {
     const args = vi.fn(() => ({ id: GenericId.GenericId("items", scope) }));
     const returns = vi.fn(() => GenericId.GenericId("items", scope));

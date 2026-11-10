@@ -26,6 +26,13 @@ export default GroupSpec.make()
     }),
   )
   .addFunction(
+    FunctionSpec.publicPaginatedQuery({
+      name: "paginate",
+      args: () => ({ run: Schema.String }),
+      item: () => counters.Doc,
+    }),
+  )
+  .addFunction(
     FunctionSpec.publicMutation({
       name: "reject",
       args: () => ({ run: Schema.String }),

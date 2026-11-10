@@ -1,6 +1,7 @@
 import type { Ref } from "@confect/core";
 import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import { expect, expectTypeOf, layer } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Random from "effect/Random";
@@ -29,12 +30,109 @@ expectTypeOf<Ref.Returns<typeof left.parent.create>>().not.toExtend<
 expectTypeOf<Ref.Returns<typeof first.counter.create>>().not.toExtend<
   Ref.Returns<typeof left.parent.create>
 >();
+expectTypeOf<
+  Ref.Returns<typeof first.counter.paginate>["page"][number]["_id"]
+>().toEqualTypeOf<Ref.Returns<typeof first.counter.create>>();
+expectTypeOf<
+  Ref.Returns<typeof first.counter.paginate>["page"][number]["_id"]
+>().not.toExtend<Ref.Returns<typeof second.counter.create>>();
+expectTypeOf<
+  Ref.Returns<typeof first.counter.paginate>["page"][number]["count"]
+>().toEqualTypeOf<number>();
 
 layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
   timeout: "120 seconds",
   // Scheduled functions run on the real backend's clock.
   excludeTestServices: true,
 })("Confect-authored components on a real backend", (it) => {
+  it.effect(
+    "paginates component tables through native and decoded calls with isolated mounts",
+    () =>
+      Effect.gen(function* () {
+        const { client } = yield* LocalBackend.LocalBackend;
+        const random = yield* Random.next;
+        const run = String(random);
+        const ids = yield* Effect.promise(() =>
+          client.mutation(api.groups.components.seedPagination, { run }),
+        );
+        const firstPage = yield* Effect.promise(() =>
+          client.query(api.groups.components.paginate, {
+            run,
+            paginationOpts: { numItems: 2, cursor: null },
+          }),
+        );
+        expect(firstPage.page).toEqual([
+          { id: ids.first[0], count: 2 },
+          { id: ids.first[1], count: 3 },
+        ]);
+        expect(firstPage.isDone).toBe(false);
+        expect(firstPage.continueCursor).toEqual(expect.any(String));
+        const lastPage = yield* Effect.promise(() =>
+          client.query(api.groups.components.paginate, {
+            run,
+            paginationOpts: { numItems: 2, cursor: firstPage.continueCursor },
+          }),
+        );
+        expect(lastPage.page).toEqual([{ id: ids.first[2], count: 5 }]);
+        expect(lastPage.isDone).toBe(true);
+
+        const nativeFirst = yield* Effect.promise(() =>
+          client.query(api.groups.nativeComponents.paginate, {
+            run,
+            second: false,
+            paginationOpts: { numItems: 2, cursor: null },
+          }),
+        );
+        expect(
+          Array.map(nativeFirst.page, (doc) => [doc._id, doc.count]),
+        ).toEqual([
+          [ids.first[0], "2"],
+          [ids.first[1], "3"],
+        ]);
+        expect(nativeFirst.isDone).toBe(false);
+        const nativeLast = yield* Effect.promise(() =>
+          client.query(api.groups.nativeComponents.paginate, {
+            run,
+            second: false,
+            paginationOpts: { numItems: 2, cursor: nativeFirst.continueCursor },
+          }),
+        );
+        expect(
+          Array.map(nativeLast.page, (doc) => [doc._id, doc.count]),
+        ).toEqual([[ids.first[2], "5"]]);
+        expect(nativeLast.isDone).toBe(true);
+        const otherMount = yield* Effect.promise(() =>
+          client.query(api.groups.nativeComponents.paginate, {
+            run,
+            second: true,
+            paginationOpts: { numItems: 2, cursor: null },
+          }),
+        );
+        expect(Array.map(otherMount.page, (doc) => doc.count)).toEqual(["99"]);
+        expect(otherMount.isDone).toBe(true);
+      }),
+  );
+
+  it.effect(
+    "enforces one native pagination call across component runQuery calls",
+    () =>
+      Effect.gen(function* () {
+        const { client } = yield* LocalBackend.LocalBackend;
+        const random = yield* Random.next;
+        const run = String(random);
+        yield* Effect.promise(() =>
+          expect(
+            client.query(api.groups.nativeComponents.paginateTwice, {
+              run,
+              paginationOpts: { numItems: 2, cursor: null },
+            }),
+          ).rejects.toThrow(
+            "This query function ran multiple paginated queries",
+          ),
+        );
+      }),
+  );
+
   it.effect(
     "supports vanilla wire calls, decoded Confect calls, nested isolation, and typed-error rollback",
     () =>

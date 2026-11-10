@@ -30,6 +30,19 @@ const list = FunctionImpl.make(schema, counter, "list", ({ run }) =>
       .collect();
   }).pipe(Effect.orDie),
 );
+const paginate = FunctionImpl.make(
+  schema,
+  counter,
+  "paginate",
+  ({ run, paginationOpts }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      return yield* reader
+        .table("counters")
+        .index("by_run", (range) => range.eq("run", run))
+        .paginate(paginationOpts);
+    }).pipe(Effect.orDie),
+);
 const reject = FunctionImpl.make(schema, counter, "reject", ({ run }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
@@ -70,6 +83,7 @@ export default GroupImpl.make(schema, counter).pipe(
   Layer.provide([
     create,
     list,
+    paginate,
     reject,
     schedule,
     uploadUrl,

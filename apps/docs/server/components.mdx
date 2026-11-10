@@ -53,22 +53,24 @@ See the [Convex components documentation](https://docs.convex.dev/components) fo
 
 ## Use a published Confect component
 
-A Confect component is a normal Convex component with an additional contract containing its public function codecs. Install its Convex definition with `app.use`, then bind the contract to the generated registry entry:
+A Confect component is a normal Convex component with an additional contract containing its public function codecs. Install its Convex definition with `app.use`, then bind the contract to the generated registry entry. Keep one binding per file under `confect/components/` and default-export it:
 
-```ts confect/counter.ts
+```ts confect/components/counter.ts
 import { Component } from "@confect/core";
 import contract from "@example/counter/confect";
-import { components } from "./_generated/components";
+import { components } from "../_generated/components";
 
-export const counter = Component.bind(contract, components.counter);
+export default Component.bind(contract, components.counter);
 ```
+
+This directory is an organizational convention, not a codegen requirement. Use ordinary `.ts` filenames: these files bind existing functions rather than define new `.spec.ts`/`.impl.ts` function groups. `app.use` installs the instance; `Component.bind` attaches codecs to its references without creating another instance.
 
 Call bound references with `QueryRunner`, `MutationRunner`, `ActionRunner`, or `Scheduler`, just like your application's references. Arguments and returns use the component's decoded Effect types; declared errors enter the Effect error channel. Bound references are backend-only: expose your own application functions for frontend access.
 
 ```ts
 import * as Effect from "effect/Effect";
 import { MutationRunner } from "./_generated/services";
-import { counter } from "./counter";
+import counter from "./components/counter";
 
 const create = Effect.gen(function* () {
   const { runMutation } = yield* MutationRunner;
@@ -80,19 +82,38 @@ The extra `counter` segment in this example is the component's `counter.spec.ts`
 
 ### Store component IDs in application tables
 
-Each installation has its own ID type. An application ID, a component ID, and an ID from a second installation are different types even when their table names match.
+Each installed component instance has its own ID type. An application ID, a component ID, and another component ID from a second instance of the same component are different types even when their table names match. For example, `app.use(counter, { name: "first" })` and `app.use(counter, { name: "second" })` create separate instances, each with its own database.
 
 ```ts confect/tables/links.ts
 import { Component, Table } from "@confect/core";
 import * as Schema from "effect/Schema";
-import { counter } from "../counter";
+import counter from "../components/counter";
 
 export default Table.make(() =>
   Schema.Struct({ counterId: Component.id(counter, "counters") }),
 );
 ```
 
-`Component.id` also supports `_storage` and `_scheduled_functions` for generated contracts. Use `Component.schema(counter, exportedCodec)` to rebind IDs inside a codec exported by the component, including nested objects and arrays.
+`Component.id` also supports `_storage` and `_scheduled_functions` for generated contracts.
+
+### Reuse a component's exported schema
+
+Suppose the component exports a `Counter` codec with `{ id: Id("counters"), count: Schema.FiniteFromString }`. Its `id` type belongs to the component definition, not yet to any particular instance in your app. Use `Component.schema` to make a version of that codec whose IDs belong to the instance you bound:
+
+```ts confect/tables/savedCounters.ts
+import { Component, Table } from "@confect/core";
+import * as Schema from "effect/Schema";
+import { Counter } from "@example/counter/schemas";
+import counter from "../components/counter";
+
+const InstalledCounter = Component.schema(counter, Counter);
+
+export default Table.make(() =>
+  Schema.Struct({ snapshots: Schema.Array(InstalledCounter) }),
+);
+```
+
+Here, every `snapshots[i].id` has the same type as `Component.id(counter, "counters").Type`. The `count` codec still decodes strings to numbers; rebinding doesn't change that transformation or the ID strings. Binding the same exported codec to a second instance produces a different ID type. This also works when the component's IDs appear inside nested objects or arrays.
 
 Scopes change TypeScript identity and validator selection, not ID strings. IDs owned by the current database compile to `v.id(tableName)`; IDs from another database compile to `v.string()`. A foreign ID field therefore does not validate ownership at runtime. Validate untrusted references through the owning component and perform authorization in your application.
 
@@ -102,16 +123,77 @@ Scopes change TypeScript identity and validator selection, not ID strings. IDs o
   Scopes are not an authorization mechanism.
 </Warning>
 
-### Wrap a vanilla component reference
+## Use an existing Convex component
 
-For a component without a Confect contract, `Ref.fromFunctionReference` adapts a native function reference for Confect's runners and scheduler. Its types and values remain the native wire types; it does not add codecs, scoped IDs, or declared Effect errors.
+You don't need to rewrite a component's handlers in Confect to call it from Effect. Choose between using its existing argument and return types or writing a codec contract for it.
+
+### Call its native API through Confect runners
+
+`QueryRunner`, `MutationRunner`, `ActionRunner`, and `Scheduler` accept Confect references. `Ref.fromFunctionReference` converts a native reference into that shape, so you can use those services without manually obtaining Convex's `ctx` object or wrapping its promise-returning methods in `Effect.promise`.
+
+```ts confect/components/counter.ts
+import { Ref } from "@confect/core";
+import { components } from "../_generated/components";
+
+export default {
+  create: Ref.fromFunctionReference(components.counter.counter.create),
+};
+```
+
+For a native `create` mutation that accepts `{ count: string }`, the call still uses a string:
 
 ```ts
-import { Ref } from "@confect/core";
-import { components } from "./_generated/components";
+import * as Effect from "effect/Effect";
+import { MutationRunner } from "./_generated/services";
+import counter from "./components/counter";
 
-const create = Ref.fromFunctionReference(components.counter.counter.create);
+const create = Effect.gen(function* () {
+  const { runMutation } = yield* MutationRunner;
+  return yield* runMutation(counter.create, { count: "3" });
+});
 ```
+
+This adapter preserves the native reference and its types. It doesn't infer codecs, add scoped ID types, or turn the component's errors into declared Effect failures. It adapts individual function references, not a component package's higher-level JavaScript client class.
+
+### Add codecs without rewriting the component
+
+You can write a contract with `Component.make` and bind it to an existing component. Describe the functions you want to wrap, using the component's actual module and function names. The schemas' **encoded** types must match its native arguments and results.
+
+For example, suppose a vanilla counter component exposes `counter.create`, accepting `{ count: string }` and returning `{ id: string, count: string }`. This binding lets Confect callers pass and receive numbers while giving the returned ID an instance-specific type:
+
+```ts confect/components/counter.ts
+import {
+  Component,
+  FunctionSpec,
+  GenericId,
+  GroupSpec,
+  IdScope,
+  Spec,
+} from "@confect/core";
+import * as Schema from "effect/Schema";
+import { components } from "../_generated/components";
+
+const scope = IdScope.component("@example/native-counter");
+const counter = GroupSpec.make().addFunction(
+  FunctionSpec.publicMutation({
+    name: "create",
+    args: () => ({ count: Schema.FiniteFromString }),
+    returns: () =>
+      Schema.Struct({
+        id: GenericId.GenericId("counters", scope),
+        count: Schema.FiniteFromString,
+      }),
+  }),
+);
+const spec = {
+  [Spec.TypeId]: { counter: GroupSpec.withName("counter", counter) },
+};
+const contract = Component.make(spec, scope, ["counters"]);
+
+export default Component.bind(contract, components.counter);
+```
+
+Call `runMutation(counter.counter.create, { count: 3 })` with this binding. The runner sends `{ count: "3" }` to the unchanged component and decodes the result's `count` back to a number. You maintain this contract alongside the component version you depend on; Confect doesn't generate it from an arbitrary native API. Only declare an `error` schema when the component throws a `ConvexError` whose `data` matches that schema's encoded type. Ordinary exceptions don't become typed failures just because you add a contract.
 
 ## Author a component
 
@@ -155,31 +237,55 @@ Keep using `FunctionImpl.make(databaseSchema, group, name, handler)` with the ge
 
 - Database operations address the component's database, with scoped document IDs.
 - Storage and scheduling services return IDs in that same component scope.
-- Generated raw contexts preserve scoped ID types and omit `auth`.
-- Application `Auth` is unavailable. Pass the identity information your component needs explicitly in function arguments.
+- The generated `QueryCtx`, `MutationCtx`, and `ActionCtx` services expose the underlying Convex handler argument—the `ctx` in `(ctx, args) => ...`. Their database, storage, and scheduler methods use component-scoped IDs, and they omit `ctx.auth`.
+- Application `Auth` and `MutationAuth` are unavailable, including JWT signing. Pass the identity information your component needs explicitly in function arguments.
 
 Component codegen rejects `confect/auth.ts`. Configuration reads still use Convex's environment provider; declare component environment variables through the native component configuration API.
 
 For Effect HTTP routes, use `HttpRouter.forSchema(databaseSchema)(routes)` so route capabilities follow the component schema too. Mount the component's routes using Convex's component HTTP routing API. The schema-free `HttpRouter.make(routes)` remains the application API.
 
-Convex's built-in database pagination is not supported inside components. Use [stream queries](/server/database/streams) for component pagination instead of the native `.paginate()` path. Plain Convex functions retain their native contexts and runtime restrictions; Confect does not rewrite their handlers.
+Plain Convex functions keep the `ctx` argument supplied by Convex and its runtime restrictions; Confect does not rewrite their handlers.
+
+### Paginate a component table
+
+Convex [supports native database pagination inside components](https://docs.convex.dev/components/authoring#pagination). Declare the function with `FunctionSpec.publicPaginatedQuery`, using the component table's `Doc` schema for `item`, as described in [paginated functions](/server/functions). Its handler can use the generated `DatabaseReader`:
+
+```ts
+const paginate = FunctionImpl.make(
+  databaseSchema,
+  counter,
+  "paginate",
+  ({ run, paginationOpts }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      return yield* reader
+        .table("counters")
+        .index("by_run", (q) => q.eq("run", run))
+        .paginate(paginationOpts);
+    }).pipe(Effect.orDie),
+);
+```
+
+The enclosing application calls the bound query through `QueryRunner.runQuery`, passing `paginationOpts` unchanged. Pages returned through the bound reference contain decoded documents with IDs belonging to that component instance; vanilla Convex callers receive encoded documents. Pass the returned `continueCursor` as the next request's `cursor`.
+
+A query can make only **one native paginated database call**, including calls made through `runQuery` into components. Use [stream queries](/server/database/streams) if you need multiple paginated database reads in a single query.
 
 ### Install a child component
 
 Use `defineComponent(...).use(...)` in the component configuration. Bind the child's contract with the enclosing component's generated scope:
 
-```ts src/confect/child.ts
+```ts src/confect/components/child.ts
 import { Component } from "@confect/core";
 import childContract from "@example/child/confect";
-import { components } from "./_generated/components";
-import { scope } from "./_generated/id";
+import { components } from "../_generated/components";
+import { scope } from "../_generated/id";
 
-export const child = Component.bind(childContract, components.child, {
+export default Component.bind(childContract, components.child, {
   parentScope: scope,
 });
 ```
 
-The `parentScope` keeps child IDs associated with the enclosing installation when a parent contract returns them. Omit it when binding in the root application.
+The `parentScope` keeps child IDs associated with the enclosing instance when a parent contract returns them. Omit it when binding in the root application.
 
 ## Publish the package
 

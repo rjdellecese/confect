@@ -7,6 +7,34 @@ import { MutationRunner, QueryRunner } from "../_generated/services";
 import { first, second, left, right } from "../componentBindings";
 import spec from "./components.spec";
 
+const seedPagination = FunctionImpl.make(
+  schema,
+  spec,
+  "seedPagination",
+  ({ run }) =>
+    Effect.gen(function* () {
+      const { runMutation } = yield* MutationRunner;
+      const ids = yield* Effect.forEach([2, 3, 5], (count) =>
+        runMutation(first.counter.create, { run, count }),
+      );
+      yield* runMutation(second.counter.create, { run, count: 99 });
+      return { first: ids };
+    }).pipe(Effect.orDie),
+);
+const paginate = FunctionImpl.make(schema, spec, "paginate", (args) =>
+  Effect.gen(function* () {
+    const { runQuery } = yield* QueryRunner;
+    const result = yield* runQuery(first.counter.paginate, args);
+    return {
+      ...result,
+      page: Array.map(result.page, (doc) => ({
+        id: doc._id,
+        count: doc.count,
+      })),
+    };
+  }).pipe(Effect.orDie),
+);
+
 const exercise = FunctionImpl.make(schema, spec, "exercise", ({ run }) =>
   Effect.gen(function* () {
     const { runMutation } = yield* MutationRunner;
@@ -76,6 +104,15 @@ const hasAuth = FunctionImpl.make(schema, spec, "hasAuth", () =>
 );
 
 export default GroupImpl.make(schema, spec).pipe(
-  Layer.provide([exercise, schedule, list, uploadUrl, storageUrl, hasAuth]),
+  Layer.provide([
+    seedPagination,
+    paginate,
+    exercise,
+    schedule,
+    list,
+    uploadUrl,
+    storageUrl,
+    hasAuth,
+  ]),
   GroupImpl.finalize,
 );

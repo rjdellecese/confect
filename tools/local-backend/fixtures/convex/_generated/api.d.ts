@@ -101,11 +101,39 @@ export declare const api: {
         { run: string },
         { first: Array<number>; second: Array<number> }
       >;
+      paginate: FunctionReference<
+        "query",
+        "public",
+        {
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+          run: string;
+        },
+        {
+          continueCursor: string;
+          isDone: boolean;
+          page: Array<{ count: number; id: string }>;
+          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+          splitCursor?: string | null;
+        }
+      >;
       schedule: FunctionReference<
         "mutation",
         "public",
         { run: string },
         string
+      >;
+      seedPagination: FunctionReference<
+        "mutation",
+        "public",
+        { run: string },
+        { first: Array<string> }
       >;
       storageUrl: FunctionReference<"query", "public", { id: string }, string>;
       uploadUrl: FunctionReference<"mutation", "public", {}, string>;
@@ -225,6 +253,50 @@ export declare const api: {
       >;
     };
     nativeComponents: {
+      paginate: FunctionReference<
+        "query",
+        "public",
+        {
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+          run: string;
+          second: boolean;
+        },
+        {
+          continueCursor: string;
+          isDone: boolean;
+          page: Array<{
+            _creationTime: number;
+            _id: string;
+            count: string;
+            run: string;
+          }>;
+          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+          splitCursor?: string | null;
+        }
+      >;
+      paginateTwice: FunctionReference<
+        "query",
+        "public",
+        {
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+          run: string;
+        },
+        any
+      >;
       roundTrip: FunctionReference<"mutation", "public", { run: string }, any>;
     };
     scheduling: {

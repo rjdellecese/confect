@@ -7,6 +7,8 @@ const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<
 const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/components.spec")["default"]>(databaseSchema, groupLayer);
 
 export default {
+["seedPagination"]: RegisteredConvexFunction.register({ ...definitions["seedPagination"], handler: forward(definitions["seedPagination"].handler) }),
+["paginate"]: RegisteredConvexFunction.register({ ...definitions["paginate"], handler: forward(definitions["paginate"].handler) }),
 ["exercise"]: RegisteredConvexFunction.register({ ...definitions["exercise"], handler: forward(definitions["exercise"].handler) }),
 ["schedule"]: RegisteredConvexFunction.register({ ...definitions["schedule"], handler: forward(definitions["schedule"].handler) }),
 ["list"]: RegisteredConvexFunction.register({ ...definitions["list"], handler: forward(definitions["list"].handler) }),

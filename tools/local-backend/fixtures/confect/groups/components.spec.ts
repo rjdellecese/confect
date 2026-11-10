@@ -5,6 +5,27 @@ import { first } from "../componentBindings";
 export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
+      name: "seedPagination",
+      args: () => ({ run: Schema.String }),
+      returns: () =>
+        Schema.Struct({
+          first: Schema.Array(Component.id(first, "counters")),
+        }),
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicPaginatedQuery({
+      name: "paginate",
+      args: () => ({ run: Schema.String }),
+      item: () =>
+        Schema.Struct({
+          id: Component.id(first, "counters"),
+          count: Schema.Finite,
+        }),
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicMutation({
       name: "exercise",
       args: () => ({ run: Schema.String }),
       returns: () =>
