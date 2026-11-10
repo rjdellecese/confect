@@ -60,10 +60,24 @@
       "dependencyTypes": ["dev"]
     },
     {
-      "label": "CLI, server, and Foldkit Effect integrations stay within the verified minor release",
-      "packages": ["@confect/cli", "@confect/server", "@confect/foldkit"],
+      "label": "CLI runtime dependencies require the verified Effect patch",
+      "packages": ["@confect/cli"],
       "dependencies": ["effect", "@effect/platform-node"],
       "dependencyTypes": ["prod", "peer"],
+      "pinVersion": "~4.1.3"
+    },
+    {
+      "label": "Server AI dependencies require the verified Effect patch",
+      "packages": ["@confect/server"],
+      "dependencies": ["effect"],
+      "dependencyTypes": ["peer"],
+      "pinVersion": "~4.1.3"
+    },
+    {
+      "label": "Other unstable peers retain their verified minor and minimum",
+      "packages": ["@confect/server", "@confect/foldkit"],
+      "dependencies": ["effect", "@effect/platform-node"],
+      "dependencyTypes": ["peer"],
       "pinVersion": "~4.1.0"
     },
     {

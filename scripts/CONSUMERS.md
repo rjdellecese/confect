@@ -48,7 +48,7 @@ include core, server, and CLI; React adds `@confect/react`, while Foldkit adds
 `@confect/js`, `@confect/foldkit`, and Foldkit's browser platform peer. These are
 whole applications, not independently installable client and backend snippets.
 
-- **Baseline** selects Effect 4.1.0, platform-node 4.1.0 **and node-shared 4.1.0**,
+- **Baseline** selects Effect 4.1.3, platform-node 4.1.3 **and node-shared 4.1.3**,
   plus Convex 1.48.0. It is a coherent minimum-Effect baseline with a selected
   React 19.3.0 host or Foldkit 0.170.0 and platform-browser 4.1.0, not a claim
   that every package is at its absolute minimum.
@@ -63,10 +63,12 @@ whole applications, not independently installable client and backend snippets.
 ### Supported Foldkit graph
 
 The Foldkit profile selects `foldkit: ^0.170.0` and
-`@effect/platform-browser: ~4.1.0` in the fresh lane, alongside Effect `~4.1.0`.
+`@effect/platform-browser: ~4.1.0` in the fresh lane, alongside Effect `~4.1.3`.
 These ranges admit patch releases within the verified minor versions. The
 adapter, Foldkit, server, and CLI can share one Effect installation without
-overrides.
+overrides. The full application requires Effect 4.1.3 for the server's AI
+dependencies and the CLI's Node platform; the adapter alone retains its
+`~4.1.0` peer range.
 
 The Packages workflow requires all eight rows: two profiles × two managers ×
 two lanes. Neither profile is an expected failure, and neither uses

@@ -1,5 +1,6 @@
 import * as Arr from "effect/Array";
 import { expect, test } from "bun:test";
+import foldkitManifest from "../packages/foldkit/package.json";
 import {
   consumerDependencies,
   graphProblems,
@@ -88,12 +89,12 @@ test("both advertised profiles include the whole backend and CLI graph", () => {
   ]);
   expect(consumerDependencies("foldkit", "baseline")).toMatchObject({
     foldkit: "0.170.0",
-    effect: "4.1.0",
+    effect: "4.1.3",
     "@effect/platform-browser": "4.1.0",
   });
   expect(consumerDependencies("foldkit", "fresh")).toMatchObject({
     foldkit: "^0.170.0",
-    effect: "~4.1.0",
+    effect: "~4.1.3",
     "@effect/platform-browser": "~4.1.0",
   });
 });
@@ -125,8 +126,9 @@ test.each([
   ["4.1.1", true],
   ["4.2.0", false],
 ] as const)("Foldkit Effect peers admit %s: %s", (version, supported) => {
-  const dependencies = consumerDependencies("foldkit", "fresh");
-  expect(Bun.semver.satisfies(version, dependencies.effect)).toBe(supported);
+  expect(
+    Bun.semver.satisfies(version, foldkitManifest.peerDependencies.effect),
+  ).toBe(supported);
   expect(
     Bun.semver.satisfies(
       version,
@@ -137,13 +139,13 @@ test.each([
 
 test("the coherent baseline selects both moving Node companions; fresh resolution does not", () => {
   expect(consumerDependencies("react", "baseline")).toMatchObject({
-    effect: "4.1.0",
-    "@effect/platform-node": "4.1.0",
-    "@effect/platform-node-shared": "4.1.0",
+    effect: "4.1.3",
+    "@effect/platform-node": "4.1.3",
+    "@effect/platform-node-shared": "4.1.3",
   });
   expect(consumerDependencies("react", "fresh")).toMatchObject({
-    effect: "~4.1.0",
-    "@effect/platform-node": "~4.1.0",
+    effect: "~4.1.3",
+    "@effect/platform-node": "~4.1.3",
   });
   expect(consumerDependencies("react", "fresh")).not.toHaveProperty(
     "@effect/platform-node-shared",
@@ -152,8 +154,11 @@ test("the coherent baseline selects both moving Node companions; fresh resolutio
 
 test.each([
   ["4.0.7", false],
-  ["4.1.0", true],
-  ["4.1.1", true],
+  ["4.1.0", false],
+  ["4.1.1", false],
+  ["4.1.2", false],
+  ["4.1.3", true],
+  ["4.1.4", true],
   ["4.2.0", false],
 ] as const)("fresh Effect ranges admit %s: %s", (version, supported) => {
   const dependencies = consumerDependencies("react", "fresh");
