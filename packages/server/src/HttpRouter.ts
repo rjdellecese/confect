@@ -18,6 +18,8 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServer from "effect/http/HttpServer";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
+import type * as DatabaseSchema from "./DatabaseSchema";
+import type * as DataModel from "./DataModel";
 import type { ExecutionMetadata } from "./ExecutionMetadata";
 import type { RequestMetadata } from "./RequestMetadata";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
@@ -30,12 +32,13 @@ import type { Storage } from "./Storage";
 import type { StorageActionWriter } from "./StorageActionWriter";
 import type { StorageReader } from "./StorageReader";
 import type { StorageWriter } from "./StorageWriter";
+import * as VectorSearch from "./VectorSearch";
 
 /**
  * The Confect services available to HTTP route handlers and middleware,
  * supplied per request from the Convex action context.
  */
-export type Services =
+export type Services<Schema extends DatabaseSchema.AnyWithProps = never> =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
@@ -46,7 +49,10 @@ export type Services =
   | Storage
   | StorageReader
   | StorageWriter
-  | StorageActionWriter;
+  | StorageActionWriter
+  | ([Schema] extends [never]
+      ? never
+      : VectorSearch.VectorSearch<DataModel.FromSchema<Schema>>);
 
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
@@ -71,22 +77,24 @@ export type Services =
  *
  * @stability unstable
  */
-export type Routes = Layer.Layer<
-  never,
-  never,
-  | HttpRouter.HttpRouter
-  | Etag.Generator
-  | FileSystem.FileSystem
-  | HttpPlatform.HttpPlatform
-  | Path.Path
-  | HttpRouter.Request<"Requires", Services>
-  | HttpRouter.Request<"GlobalRequires", Services>
-  | HttpRouter.Request<"Error", any>
-  | HttpRouter.Request<"GlobalError", any>
->;
+export type Routes<Schema extends DatabaseSchema.AnyWithProps = never> =
+  Layer.Layer<
+    never,
+    never,
+    | HttpRouter.HttpRouter
+    | Etag.Generator
+    | FileSystem.FileSystem
+    | HttpPlatform.HttpPlatform
+    | Path.Path
+    | HttpRouter.Request<"Requires", Services<Schema>>
+    | HttpRouter.Request<"GlobalRequires", Services<Schema>>
+    | HttpRouter.Request<"Error", any>
+    | HttpRouter.Request<"GlobalError", any>
+  >;
 
 /**
- * Create a Convex HTTP router serving the given routes.
+ * Create a Convex HTTP router serving the given routes. Pass a runtime database
+ * schema first to allow schema-typed vector search in handlers and middleware.
  *
  * A single catch-all `httpAction` is registered for every routable method under
  * the path prefix `"/"`, making the Effect router the single source of truth
@@ -99,8 +107,11 @@ export type Routes = Layer.Layer<
  *
  * @stability unstable
  */
-export const make = (routes: Routes): ConvexHttpRouter => {
+export const make = <Schema extends DatabaseSchema.AnyWithProps>(
+  ...args: [routes: Routes] | [schema: Schema, routes: Routes<NoInfer<Schema>>]
+): ConvexHttpRouter => {
   applyMonkeyPatches();
+  const routes: Routes<Schema> = args.length === 1 ? args[0] : args[1];
 
   // Provided (not just merged) so that route layers' own construction—e.g.
   // a `Layer.unwrap` reading `Config`—resolves configuration through the
@@ -122,11 +133,12 @@ export const make = (routes: Routes): ConvexHttpRouter => {
   const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
-    const services = RegisteredFunction.baseActionLayer(ctx).pipe(
-      Layer.build,
-      Effect.scoped,
-      Effect.runSync,
-    );
+    const services = Layer.mergeAll(
+      RegisteredFunction.baseActionLayer(ctx),
+      VectorSearch.layer<DataModel.FromSchema<Schema>>(
+        ctx.vectorSearch.bind(ctx),
+      ),
+    ).pipe(Layer.build, Effect.scoped, Effect.runSync);
     return handler(
       request,
       Context.add(services, Console.Console, globalThis.console),

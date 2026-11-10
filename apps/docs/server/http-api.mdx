@@ -91,7 +91,7 @@ export const layer = Layer.unwrap(
 
 ## Creating the router
 
-Create the Convex HTTP router in `confect/http.ts` with `HttpRouter.make` from `@confect/server`. It takes a single `Layer` that registers your routes—merge your API and docs layers with any other building blocks from Effect's `effect/http`:
+Create the Convex HTTP router in `confect/http.ts` with `HttpRouter.make` from `@confect/server`. Pass a `Layer` that registers your routes—merge your API and docs layers with any other building blocks from Effect's `effect/http`:
 
 - `HttpRouter.add(method, path, handler)` registers a plain route.
 - `HttpRouter.middleware(fn, { global: true })` applies middleware to every route.
@@ -119,6 +119,36 @@ export default ConfectHttpRouter.make(
   ),
 );
 ```
+
+## Vector search
+
+To use the generated `VectorSearch` service in HTTP handlers or middleware, pass your generated runtime database schema before the routes: `ConfectHttpRouter.make(databaseSchema, routes)`. The schema types the available tables, vector indexes, and filter fields. Existing `ConfectHttpRouter.make(routes)` calls are unchanged.
+
+```ts confect/http.ts
+import { HttpRouter as ConfectHttpRouter } from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import databaseSchema from "./_generated/schema";
+import { VectorSearch } from "./_generated/services";
+
+const routes = HttpRouter.add(
+  "POST",
+  "/search",
+  Effect.gen(function* () {
+    const vectorSearch = yield* VectorSearch;
+    const results = yield* vectorSearch("documents", "by_embedding", {
+      vector: [1, 0, 0],
+      filter: (q) => q.eq("category", "public"),
+    });
+    return yield* HttpServerResponse.json(results);
+  }),
+);
+
+export default ConfectHttpRouter.make(databaseSchema, routes);
+```
+
+This example assumes a `documents` table with a three-dimensional `by_embedding` vector index and `category` as a filter field. Instead of calling `ctx.vectorSearch`, yield the generated service and then its returned Effect; the search runs when the Effect is executed. Native failures become defects. The same service is available in `HttpApi` handlers and global middleware. For search options and result semantics, see [Convex vector search](https://docs.convex.dev/search/vector-search).
 
 ## Routing semantics
 

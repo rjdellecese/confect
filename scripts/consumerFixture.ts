@@ -39,6 +39,43 @@ export default Table.make(() => {
   });
 });
 `,
+  "confect/tables/vectors.ts": `import { Table } from "@confect/core";
+import * as Schema from "effect/Schema";
+
+export default Table.make(() => Schema.Struct({
+  embedding: Schema.Array(Schema.Finite),
+  category: Schema.String,
+})).vectorIndex("embedding", {
+  vectorField: "embedding",
+  filterFields: ["category"],
+  dimensions: 3,
+});
+`,
+  "confect/http.ts": `import * as ConfectHttpRouter from "@confect/server/HttpRouter";
+import * as Effect from "effect/Effect";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import databaseSchema from "./_generated/schema";
+import type { Id } from "./_generated/id";
+import { VectorSearch } from "./_generated/services";
+
+export const legacy = ConfectHttpRouter.make(
+  HttpRouter.add("GET", "/health", HttpServerResponse.text("ok")),
+);
+
+const routes: ConfectHttpRouter.Routes<typeof databaseSchema> = HttpRouter.add(
+  "GET", "/search", Effect.gen(function* () {
+    const search = yield* VectorSearch;
+    const matches: Array<{ _id: Id<"vectors">; _score: number }> = yield* search("vectors", "embedding", {
+      vector: [1, 0, 0],
+      filter: (q) => q.eq("category", "public"),
+    });
+    return yield* HttpServerResponse.json(matches);
+  }),
+);
+
+export default ConfectHttpRouter.make(databaseSchema, routes);
+`,
   "confect/notes.spec.ts": `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 import { schemaBuilds } from "./probes";

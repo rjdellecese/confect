@@ -4,18 +4,211 @@ import { HttpRouter as ConfectHttpRouter } from "@confect/server";
 import * as Storage from "@confect/server/Storage";
 import { StorageReader } from "@confect/server/StorageReader";
 import { convexTest } from "convex-test";
+import type { GenericActionCtx, GenericDataModel } from "convex/server";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as HttpApi from "effect/http-api/HttpApi";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import { vi } from "vitest";
-import { DatabaseWriter } from "./fixtures/confect/_generated/services";
+import {
+  DatabaseWriter,
+  VectorSearch,
+} from "./fixtures/confect/_generated/services";
+import databaseSchema from "./fixtures/confect/_generated/schema";
 import { Id } from "./fixtures/confect/_generated/id";
 import { NotesApi } from "./fixtures/confect/http";
 import * as TestConfect from "./TestConfect";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
 
 it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
+  test.effect("binds vector search to each request's native context", () =>
+    Effect.gen(function* () {
+      const http = ConfectHttpRouter.make(
+        databaseSchema,
+        HttpRouter.add(
+          "GET",
+          "/search",
+          Effect.gen(function* () {
+            const search = yield* VectorSearch;
+            const matches = yield* search("notes", "embedding", {
+              vector: [1, ...Array<number>(1535).fill(0)],
+            });
+            return yield* HttpServerResponse.json(matches);
+          }),
+        ),
+      );
+      const endpoint = http.lookup("/search", "GET");
+      expect(endpoint).not.toBeNull();
+      if (endpoint === null) return;
+      const action = endpoint[0] as (typeof endpoint)[0] & {
+        _handler: <Model extends GenericDataModel>(
+          ctx: GenericActionCtx<Model>,
+          request: Request,
+        ) => Promise<Response>;
+      };
+      const t = convexTest(
+        convexSchema,
+        import.meta.glob("./fixtures/convex/_generated/*.js"),
+      );
+      const calls: number[] = [];
+      const services = yield* Effect.context<never>();
+      yield* Effect.forEach(
+        [1, 2],
+        (requestId) =>
+          Effect.promise(() =>
+            t.action((ctx) =>
+              Effect.gen(function* () {
+                const actionCtx: typeof ctx = {
+                  ...ctx,
+                  vectorSearch(table, index, query) {
+                    expect(this).toBe(actionCtx);
+                    calls.push(requestId);
+                    return ctx.vectorSearch(table, index, query);
+                  },
+                };
+                const response = yield* Effect.promise(() =>
+                  action._handler(
+                    actionCtx,
+                    new Request("https://example.test/search"),
+                  ),
+                );
+                expect(response.status).toBe(200);
+                const matches = yield* Effect.promise(() => response.json());
+                expect(matches).toEqual([]);
+              }).pipe(Effect.runPromiseWith(services)),
+            ),
+          ),
+        { concurrency: "unbounded" },
+      );
+      expect(calls).toHaveLength(2);
+      expect(calls).toEqual(expect.arrayContaining([1, 2]));
+    }),
+  );
+
+  test.effect(
+    "provides filtered vector search to plain routes, HttpApi handlers, and middleware",
+    () =>
+      Effect.gen(function* () {
+        const vector = [1, ...Array<number>(1535).fill(0)];
+        const resultsSchema = Schema.Array(
+          Schema.Struct({ _id: Id("notes"), _score: Schema.Finite }),
+        );
+        const querySchema = Schema.Struct({ tag: Schema.String });
+        const search = Effect.fn("http.searchNotes")(function* (tag: string) {
+          const vectorSearch = yield* VectorSearch;
+          return yield* vectorSearch("notes", "embedding", {
+            vector,
+            limit: 10,
+            filter: (q) => q.eq("tag", tag),
+          });
+        });
+        class SearchApi extends HttpApi.make("SearchApi").add(
+          HttpApiGroup.make("search").add(
+            HttpApiEndpoint.get("notes", "/api/vector-search", {
+              query: querySchema,
+              success: resultsSchema,
+            }),
+          ),
+        ) {}
+        const handlers = HttpApiBuilder.group(SearchApi, "search", (group) =>
+          group.handle("notes", ({ query }) => search(query.tag)),
+        );
+        const http = ConfectHttpRouter.make(
+          databaseSchema,
+          Layer.mergeAll(
+            HttpRouter.add(
+              "GET",
+              "/vector-search",
+              Effect.gen(function* () {
+                const { tag } =
+                  yield* HttpServerRequest.schemaSearchParams(querySchema);
+                const matches = yield* search(tag);
+                return yield* HttpServerResponse.json(matches);
+              }),
+            ),
+            HttpApiBuilder.layer(SearchApi).pipe(Layer.provide(handlers)),
+            HttpRouter.middleware(
+              (app) =>
+                Effect.gen(function* () {
+                  const request = yield* HttpServerRequest.HttpServerRequest;
+                  const tag =
+                    new URL(request.url, "http://localhost").searchParams.get(
+                      "tag",
+                    ) ?? "";
+                  const matches = yield* search(tag);
+                  const response = yield* app;
+                  return HttpServerResponse.setHeader(
+                    response,
+                    "x-vector-matches",
+                    String(matches.length),
+                  );
+                }),
+              { global: true },
+            ),
+          ),
+        );
+        const t = convexTest(convexSchema, {
+          ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+          "./fixtures/convex/http.ts": () => Promise.resolve({ default: http }),
+        });
+        for (const path of ["/vector-search", "/api/vector-search"]) {
+          const response = yield* Effect.promise(() =>
+            t.fetch(`${path}?tag=alpha`),
+          );
+          expect(response.status).toBe(200);
+          expect(response.headers.get("x-vector-matches")).toBe("0");
+          const matches = yield* Effect.promise(() => response.json());
+          expect(matches).toEqual([]);
+        }
+        const alpha = yield* Effect.promise(() =>
+          t.run((ctx) =>
+            ctx.db.insert("notes", {
+              text: "alpha",
+              tag: "alpha",
+              embedding: vector,
+            }),
+          ),
+        );
+        const beta = yield* Effect.promise(() =>
+          t.run((ctx) =>
+            ctx.db.insert("notes", {
+              text: "beta",
+              tag: "beta",
+              embedding: vector,
+            }),
+          ),
+        );
+        const ids = { alpha, beta };
+        for (const path of ["/vector-search", "/api/vector-search"]) {
+          for (const tag of ["alpha", "beta", "missing", "alpha"] as const) {
+            const response = yield* Effect.promise(() =>
+              t.fetch(`${path}?tag=${tag}`),
+            );
+            expect(response.status).toBe(200);
+            const matches = yield* Effect.promise(() => response.json()).pipe(
+              Effect.flatMap(Schema.decodeUnknownEffect(resultsSchema)),
+            );
+            expect(response.headers.get("x-vector-matches")).toBe(
+              String(matches.length),
+            );
+            if (tag === "missing") {
+              expect(matches).toEqual([]);
+            } else {
+              expect(matches).toHaveLength(1);
+              expect(matches[0]?._id).toBe(ids[tag]);
+              expect(matches[0]?._score).toBeCloseTo(1);
+            }
+          }
+        }
+      }),
+  );
+
   test.effect(
     "provides unified storage and both writer capabilities to HTTP handlers",
     () =>
