@@ -1,33 +1,40 @@
 ---
 icon: "component"
 title: "Components"
-description: "Install Convex components, bind published Confect contracts, and author components with scoped IDs and Effect handlers."
+description: "Use native and wrapped Confect components, define local or published components, and wrap existing Convex APIs with codecs."
 ---
 
-Convex [components](https://docs.convex.dev/components) are configured in `convex/convex.config.ts`, which is one of the files in the `convex/` directory that Confect does not manage. Configure components using the vanilla Convex API.
+Confect-native components are authored with Confect. Confect-wrapped components keep an existing Convex implementation and add a Confect contract for callers. Both are installed with Convex's `app.use` and called through bound Confect references.
+
+## Use a Confect-native component
+
+A Confect-native component is authored with Confect's specs, schemas, and Effect handlers. Its package includes a generated contract containing its public function codecs.
+
+Install the package, then register its Convex definition in `convex/convex.config.ts`. Confect does not manage this file.
 
 ```ts convex/convex.config.ts
 import { defineApp } from "convex/server";
-import workpool from "@convex-dev/workpool/convex.config";
+import counter from "@example/counter/convex.config.js";
 
 const app = defineApp();
-app.use(workpool, { name: "workpool" });
+app.use(counter, { name: "counter" });
 
 export default app;
 ```
 
-## Referencing components
+### Referencing components
 
-Component clients (like `Workpool`) take a component reference. Import the typed `components` registry that Confect generates at `confect/_generated/components.ts`:
+Bind the package's contract to the typed `components` registry that Confect generates at `confect/_generated/components.ts`. Keep one binding per file under `confect/components/` and default-export it:
 
-```ts confect/workpool.ts
-import { Workpool } from "@convex-dev/workpool";
-import { components } from "./_generated/components";
+```ts confect/components/counter.ts
+import { Component } from "@confect/core";
+import contract from "@example/counter/confect";
+import { components } from "../_generated/components";
 
-const pool = new Workpool(components.workpool, {
-  maxParallelism: 3,
-});
+export default Component.bind(contract, components.counter);
 ```
+
+This directory is an organizational convention, not a codegen requirement. Use ordinary `.ts` filenames: these files bind existing functions rather than define new `.spec.ts`/`.impl.ts` function groups. `app.use` installs the instance; `Component.bind` attaches codecs to its references without creating another instance.
 
 <Note>
   Use this registry rather than the `components` export of
@@ -45,25 +52,7 @@ const pool = new Workpool(components.workpool, {
   that predates it will still work at runtime but won't get precise types.
 </Note>
 
-## Defining functions for components
-
-Some components (such as [Workflow](https://www.convex.dev/components/workflow), [Migrations](https://www.convex.dev/components/migrations), and [Workpool](https://www.convex.dev/components/workpool)) expect you to define Convex functions in your project that they can reference. You can integrate these into your Confect spec and impl using [plain Convex functions](/server/plain-convex-functions).
-
-See the [Convex components documentation](https://docs.convex.dev/components) for details on installing and using components.
-
-## Use a published Confect component
-
-A Confect component is a normal Convex component with an additional contract containing its public function codecs. Install its Convex definition with `app.use`, then bind the contract to the generated registry entry. Keep one binding per file under `confect/components/` and default-export it:
-
-```ts confect/components/counter.ts
-import { Component } from "@confect/core";
-import contract from "@example/counter/confect";
-import { components } from "../_generated/components";
-
-export default Component.bind(contract, components.counter);
-```
-
-This directory is an organizational convention, not a codegen requirement. Use ordinary `.ts` filenames: these files bind existing functions rather than define new `.spec.ts`/`.impl.ts` function groups. `app.use` installs the instance; `Component.bind` attaches codecs to its references without creating another instance.
+### Call the component
 
 Call bound references with `QueryRunner`, `MutationRunner`, `ActionRunner`, or `Scheduler`, just like your application's references. Arguments and returns use the component's decoded Effect types; declared errors enter the Effect error channel. Bound references are backend-only: expose your own application functions for frontend access.
 
@@ -123,24 +112,33 @@ Scopes change TypeScript identity and validator selection, not ID strings. IDs o
   Scopes are not an authorization mechanism.
 </Warning>
 
-## Use an existing Convex component
+## Use a Confect-wrapped Convex component
 
-You don't need to rewrite a component's handlers in Confect to call it from Effect. Choose between using its existing argument and return types or writing a codec contract for it.
+A wrapped component still runs its original Convex implementation. A wrapper supplies a Confect contract describing that implementation's arguments, results, and any declared errors. You consume the contract just like a native component's generated contract; you don't need to write the wrapper yourself.
 
-### Call its native API through Confect runners
+For example, suppose `@example/native-counter` is the original component and `@example/native-counter-confect` supplies its contract. Install both packages, but register only the original component:
 
-`QueryRunner`, `MutationRunner`, `ActionRunner`, and `Scheduler` accept Confect references. `Ref.fromFunctionReference` converts a native reference into that shape, so you can use those services without manually obtaining Convex's `ctx` object or wrapping its promise-returning methods in `Effect.promise`.
+```ts convex/convex.config.ts
+import { defineApp } from "convex/server";
+import counter from "@example/native-counter/convex.config.js";
 
-```ts confect/components/counter.ts
-import { Ref } from "@confect/core";
-import { components } from "../_generated/components";
+const app = defineApp();
+app.use(counter, { name: "counter" });
 
-export default {
-  create: Ref.fromFunctionReference(components.counter.counter.create),
-};
+export default app;
 ```
 
-For a native `create` mutation that accepts `{ count: string }`, the call still uses a string:
+Bind the wrapper's contract to that instance:
+
+```ts confect/components/counter.ts
+import { Component } from "@confect/core";
+import contract from "@example/native-counter-confect";
+import { components } from "../_generated/components";
+
+export default Component.bind(contract, components.counter);
+```
+
+Use the bound references through Confect's runners and scheduler:
 
 ```ts
 import * as Effect from "effect/Effect";
@@ -149,55 +147,21 @@ import counter from "./components/counter";
 
 const create = Effect.gen(function* () {
   const { runMutation } = yield* MutationRunner;
-  return yield* runMutation(counter.create, { count: "3" });
+  return yield* runMutation(counter.counter.create, { count: 3 });
 });
 ```
 
-This adapter preserves the native reference and its types. It doesn't infer codecs, add scoped ID types, or turn the component's errors into declared Effect failures. It adapts individual function references, not a component package's higher-level JavaScript client class.
+The wrapper determines which functions are exposed and which values are decoded. In this example, a wrapper can encode `count: 3` as the string expected by the original component. The same [instance-specific IDs](#store-component-ids-in-application-tables) and [schema reuse](#reuse-a-components-exported-schema) rules apply when the wrapper declares scoped IDs.
 
-### Add codecs without rewriting the component
+Follow the wrapper's compatibility requirements for the underlying component version. A contract does not change the deployed component, its authorization, or its wire format. If no wrapper exists, [write one](#wrap-a-vanilla-convex-component) or use the native-reference adapter described there.
 
-You can write a contract with `Component.make` and bind it to an existing component. Describe the functions you want to wrap, using the component's actual module and function names. The schemas' **encoded** types must match its native arguments and results.
+## Define a Confect-native component
 
-For example, suppose a vanilla counter component exposes `counter.create`, accepting `{ count: string }` and returning `{ id: string, count: string }`. This binding lets Confect callers pass and receive numbers while giving the returned ID an instance-specific type:
+Use the same table, spec, and implementation APIs as an application. For a local component, put the following package tree under `components/counter/` in your project. For a separately published component, use it as the package root.
 
-```ts confect/components/counter.ts
-import {
-  Component,
-  FunctionSpec,
-  GenericId,
-  GroupSpec,
-  IdScope,
-  Spec,
-} from "@confect/core";
-import * as Schema from "effect/Schema";
-import { components } from "../_generated/components";
+### Set up the component package
 
-const scope = IdScope.component("@example/native-counter");
-const counter = GroupSpec.make().addFunction(
-  FunctionSpec.publicMutation({
-    name: "create",
-    args: () => ({ count: Schema.FiniteFromString }),
-    returns: () =>
-      Schema.Struct({
-        id: GenericId.GenericId("counters", scope),
-        count: Schema.FiniteFromString,
-      }),
-  }),
-);
-const spec = {
-  [Spec.TypeId]: { counter: GroupSpec.withName("counter", counter) },
-};
-const contract = Component.make(spec, scope, ["counters"]);
-
-export default Component.bind(contract, components.counter);
-```
-
-Call `runMutation(counter.counter.create, { count: 3 })` with this binding. The runner sends `{ count: "3" }` to the unchanged component and decodes the result's `count` back to a number. You maintain this contract alongside the component version you depend on; Confect doesn't generate it from an arbitrary native API. Only declare an `error` schema when the component throws a `ConvexError` whose `data` matches that schema's encoded type. Ordinary exceptions don't become typed failures just because you add a contract.
-
-## Author a component
-
-Use the same table, spec, and implementation APIs as an application. Put `confect/` next to the component's Convex directory, inside a package with a `name` in `package.json`:
+Put `confect/` next to the component's Convex directory, inside a package with a `name` in `package.json`:
 
 ```text
 package.json
@@ -216,7 +180,7 @@ import { defineComponent } from "convex/server";
 export default defineComponent("counter");
 ```
 
-Run Confect codegen before Convex's component codegen:
+From the component package directory, run Confect codegen before Convex's component codegen:
 
 ```sh
 confect codegen --component-dir src/convex
@@ -230,6 +194,32 @@ Confect generates the usual IDs, tables, schema, services, references, and regis
 The generated definition scope derives from the nearest package's name and the component directory's package-relative path. Keep that identity stable and import `Id` from `_generated/id` when declaring the component's own IDs. Existing application IDs remain compatible with Convex's `GenericId` type.
 
 Scope parameters accept the branded `IdScope.IdScope` type, not raw strings. Prefer the generated `scope` from `_generated/id`. For hand-authored schemas, import `IdScope` from `@confect/core` and use `IdScope.app`, `IdScope.component(name)`, or `IdScope.instance(parentScope, name)`. These helpers preserve scope identity in the types without changing the runtime strings or checking ownership.
+
+### Use the component locally
+
+After generating the component's files, install its local Convex definition in the enclosing application:
+
+```ts convex/convex.config.ts
+import { defineApp } from "convex/server";
+import counter from "../components/counter/src/convex/convex.config";
+
+const app = defineApp();
+app.use(counter, { name: "counter" });
+
+export default app;
+```
+
+Bind its generated contract using a relative import rather than an npm package export:
+
+```ts confect/components/counter.ts
+import { Component } from "@confect/core";
+import contract from "../../components/counter/src/confect/_generated/component";
+import { components } from "../_generated/components";
+
+export default Component.bind(contract, components.counter);
+```
+
+Run the application's Confect codegen separately, then use this binding as in [Use a Confect-native component](#use-a-confect-native-component). The component does not need to be published to npm first.
 
 ### Handler capabilities
 
@@ -287,7 +277,7 @@ export default Component.bind(childContract, components.child, {
 
 The `parentScope` keeps child IDs associated with the enclosing instance when a parent contract returns them. Omit it when binding in the root application.
 
-## Publish the package
+### Publish the component
 
 Build the Convex and Confect trees to JavaScript and emit their TypeScript declarations. Preserve relative imports and the generated files they reference, or bundle the corresponding entry points. A package whose output mirrors `src/` under `dist/` can expose:
 
@@ -316,7 +306,7 @@ Vanilla Convex consumers install `@example/counter/convex.config.js` and call it
 
 Confect does not run Convex's component codegen, build your npm package, or publish it for you. Before publishing, inspect `npm pack --dry-run` and test the packed artifact from a separate consumer project using both interfaces.
 
-## Test a component
+### Test the component
 
 Register the component's generated Convex schema and module loaders with `TestConfect` before calling bound references:
 
@@ -327,3 +317,103 @@ yield * t.mutation(counter.counter.create, { count: 3 });
 ```
 
 The registration path must match the installed component path. The module map follows `convex-test` conventions and includes the component's Convex `_generated` files. Register the same definition at two paths to test instance isolation. A published package can provide its own `/test` helper that supplies this schema and module map.
+
+## Wrap a vanilla Convex component
+
+To give an existing Convex component Confect's decoded arguments, results, and scoped IDs, write a contract with `Component.make` and bind it to an existing component. Describe the functions you want to wrap, using the component's actual module and function names. The schemas' **encoded** types must match its native arguments and results.
+
+For example, suppose a vanilla counter component exposes `counter.create`, accepting `{ count: string }` and returning `{ id: string, count: string }`. This contract lets Confect callers pass and receive numbers, and gives IDs an instance-specific type when bound:
+
+```ts confect/components/counter.contract.ts
+import {
+  Component,
+  FunctionSpec,
+  GenericId,
+  GroupSpec,
+  IdScope,
+  Spec,
+} from "@confect/core";
+import * as Schema from "effect/Schema";
+
+const scope = IdScope.component("@example/native-counter");
+const counter = GroupSpec.make().addFunction(
+  FunctionSpec.publicMutation({
+    name: "create",
+    args: () => ({ count: Schema.FiniteFromString }),
+    returns: () =>
+      Schema.Struct({
+        id: GenericId.GenericId("counters", scope),
+        count: Schema.FiniteFromString,
+      }),
+  }),
+);
+const spec = {
+  [Spec.TypeId]: { counter: GroupSpec.withName("counter", counter) },
+};
+export default Component.make(spec, scope, ["counters"]);
+```
+
+### Bind and verify the wrapper
+
+Bind the contract to the installed original component:
+
+```ts confect/components/counter.ts
+import { Component } from "@confect/core";
+import contract from "./counter.contract";
+import { components } from "../_generated/components";
+
+export default Component.bind(contract, components.counter);
+```
+
+Call `runMutation(counter.counter.create, { count: 3 })` with this binding. The runner sends `{ count: "3" }` to the unchanged component and decodes the result's `count` back to a number. You maintain this contract alongside the component version you depend on; Confect doesn't generate it from an arbitrary native API. Only declare an `error` schema when the component throws a `ConvexError` whose `data` matches that schema's encoded type. Ordinary exceptions don't become typed failures just because you add a contract.
+
+Test the contract against the actual component: verify encoded arguments, decoded results, error payloads, and two separately named instances. You can use `TestConfect.registerComponent` with the original component's schema and module loaders, as in [Test the component](#test-the-component).
+
+### Share the wrapper
+
+For a reusable wrapper package, export the contract from your package's entry point instead of binding it there. The consuming application supplies its own `components.counter` reference, as in [Use a Confect-wrapped Convex component](#use-a-confect-wrapped-convex-component). Keep the contract's dependencies limited to specs and codecs, and document which versions of the original component it describes. You don't need to copy or republish the original component's handlers.
+
+### Adapt native references without codecs
+
+`QueryRunner`, `MutationRunner`, `ActionRunner`, and `Scheduler` accept Confect references. `Ref.fromFunctionReference` converts a native reference into that shape, so you can use those services without manually obtaining Convex's `ctx` object or wrapping its promise-returning methods in `Effect.promise`.
+
+```ts confect/components/counter.ts
+import { Ref } from "@confect/core";
+import { components } from "../_generated/components";
+
+export default {
+  create: Ref.fromFunctionReference(components.counter.counter.create),
+};
+```
+
+For a native `create` mutation that accepts `{ count: string }`, the call still uses a string:
+
+```ts
+import * as Effect from "effect/Effect";
+import { MutationRunner } from "./_generated/services";
+import counter from "./components/counter";
+
+const create = Effect.gen(function* () {
+  const { runMutation } = yield* MutationRunner;
+  return yield* runMutation(counter.create, { count: "3" });
+});
+```
+
+This adapter preserves the native reference and its types. It doesn't infer codecs, add scoped ID types, or turn the component's errors into declared Effect failures. It adapts individual function references, not a component package's higher-level JavaScript client class.
+
+### Use the component's original JavaScript client
+
+Component clients (like `Workpool`) take a component reference. If you use the original JavaScript client rather than a Confect wrapper, pass it the same generated registry entry:
+
+```ts confect/workpool.ts
+import { Workpool } from "@convex-dev/workpool";
+import { components } from "./_generated/components";
+
+const pool = new Workpool(components.workpool, {
+  maxParallelism: 3,
+});
+```
+
+Some components (such as [Workflow](https://www.convex.dev/components/workflow), [Migrations](https://www.convex.dev/components/migrations), and [Workpool](https://www.convex.dev/components/workpool)) expect you to define Convex functions in your project that they can reference. You can integrate these into your Confect spec and impl using [plain Convex functions](/server/plain-convex-functions).
+
+See the [Convex components documentation](https://docs.convex.dev/components) for details on installing and using components.
