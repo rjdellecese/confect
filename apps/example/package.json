@@ -12,16 +12,16 @@
     "effect": "4.1.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "vite": "8.3.5"
+    "vite": "8.3.6"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@vitejs/plugin-react": "6.1.2",
-    "concurrently": "10.0.6",
-    "tsrs": "0.21.0-ts7.1.0-beta",
-    "vite-plus": "0.3.1"
+    "@vitejs/plugin-react": "6.2.1",
+    "concurrently": "10.0.7",
+    "tsrs": "0.23.0-ts7.1.0-beta",
+    "vite-plus": "1.5.0"
   },
   "private": true,
   "scripts": {

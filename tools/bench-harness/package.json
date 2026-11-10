@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "devDependencies": {
     "@ark/attest": "0.58.0",
-    "tsrs": "0.21.0-ts7.1.0-beta",
+    "tsrs": "0.23.0-ts7.1.0-beta",
     "typescript": "7.1.0-beta"
   },
   "exports": {

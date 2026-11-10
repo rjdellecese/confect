@@ -8,8 +8,8 @@
     "convex": "1.49.0",
     "cross-env": "10.1.0",
     "effect": "4.1.0",
-    "tsrs": "0.21.0-ts7.1.0-beta",
-    "vitest": "5.0.5"
+    "tsrs": "0.23.0-ts7.1.0-beta",
+    "vitest": "5.1.0"
   },
   "exports": {
     "./api": "./fixtures/convex/_generated/api.js",
