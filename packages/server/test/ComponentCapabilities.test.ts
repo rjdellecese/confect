@@ -48,7 +48,9 @@ const databaseSchema = DatabaseSchema.make(
   { kind: "component", scope },
 );
 type Database = typeof databaseSchema;
-type Model = DataModel.ToConvex<DataModel.FromSchema<Database>>;
+type Model = DataModel.ToConvexDataModel<
+  DataModel.FromDatabaseSchema<Database>
+>;
 const group = GroupSpec.make().addFunction(
   FunctionSpec.publicMutation({
     name: "create",

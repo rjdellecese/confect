@@ -81,8 +81,8 @@ const notes = Table.make(() =>
   Schema.Struct({ value: Schema.FiniteFromString }),
 )("notes");
 const databaseSchema = DatabaseSchema.make({ notes });
-type ConvexDataModel = DataModel.ToConvex<
-  DataModel.FromSchema<typeof databaseSchema>
+type ConvexDataModel = DataModel.ToConvexDataModel<
+  DataModel.FromDatabaseSchema<typeof databaseSchema>
 >;
 const noteId = "note-id" as GenericId<"notes">;
 

@@ -44,19 +44,19 @@ import type * as VectorSearch from "./VectorSearch";
  * The Confect services available to HTTP route handlers and middleware,
  * supplied per request from the Convex action context.
  */
-export type Services<Schema extends DatabaseSchema.AnyWithProps> =
+export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
-  | Scheduler.ForScope<DatabaseSchema.Scope<Schema>>
-  | Auth.ForTarget<Schema["target"]>
+  | Scheduler.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | ExecutionMetadata
   | RequestMetadata
-  | Storage.ForScope<DatabaseSchema.Scope<Schema>>
-  | StorageReader.ForScope<DatabaseSchema.Scope<Schema>>
-  | StorageWriter.ForScope<DatabaseSchema.Scope<Schema>>
-  | StorageActionWriter.ForScope<DatabaseSchema.Scope<Schema>>
-  | VectorSearch.VectorSearch<DataModel.FromSchema<Schema>>;
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageActionWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>;
 
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
@@ -81,8 +81,8 @@ export type Services<Schema extends DatabaseSchema.AnyWithProps> =
  *
  * @stability unstable
  */
-export type Routes<Schema extends DatabaseSchema.AnyWithProps> =
-  RoutesWithServices<Services<Schema>>;
+export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
+  RoutesWithServices<Services<DatabaseSchema_>>;
 
 type RoutesWithServices<Services_> = Layer.Layer<
   never,
@@ -113,9 +113,9 @@ type RoutesWithServices<Services_> = Layer.Layer<
  *
  * @stability unstable
  */
-export const make = <Schema extends DatabaseSchema.AnyWithProps>(
-  databaseSchema: Schema,
-  routes: Routes<NoInfer<Schema>>,
+export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+  databaseSchema: DatabaseSchema_,
+  routes: Routes<NoInfer<DatabaseSchema_>>,
 ): ConvexHttpRouter => forSchema(databaseSchema)(routes);
 
 /**
@@ -133,7 +133,7 @@ export const forSchema =
   ): ConvexHttpRouter =>
     makeWithLayer<
       Handler.ActionServices<DatabaseSchema_>,
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >(
       Match.value(schema.target.kind).pipe(
         Match.when("app", () => routes),

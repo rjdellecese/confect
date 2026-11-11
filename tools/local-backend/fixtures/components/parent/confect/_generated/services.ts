@@ -51,8 +51,8 @@ export const StorageActionWriter = StorageActionWriter_.StorageActionWriter.forS
 export type StorageActionWriter = typeof StorageActionWriter.Identifier;
 
 export const VectorSearch: VectorSearch_.VectorSearchTag<
-  DataModel.FromSchema<typeof schemaDefinition>
-> = VectorSearch_.VectorSearch<DataModel.FromSchema<typeof schemaDefinition>>();
+  DataModel.FromDatabaseSchema<typeof schemaDefinition>
+> = VectorSearch_.VectorSearch<DataModel.FromDatabaseSchema<typeof schemaDefinition>>();
 export type VectorSearch = typeof VectorSearch.Identifier;
 
 export const DocumentIds: DocumentIds_.DocumentIdsTag<typeof schemaDefinition> = DocumentIds_.DocumentIds<typeof schemaDefinition>();
@@ -86,22 +86,22 @@ export const ActionRunner = ActionRunner_.ActionRunner;
 export type ActionRunner = typeof ActionRunner.Identifier;
 
 export const QueryCtx: QueryCtx_.QueryCtxTag<
-  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>, typeof scope
+  DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>, typeof scope
 > = QueryCtx_.QueryCtx<
-  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>, typeof scope
+  DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>, typeof scope
 >();
 export type QueryCtx = typeof QueryCtx.Identifier;
 
 export const MutationCtx: MutationCtx_.MutationCtxTag<
-  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>, typeof scope
+  DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>, typeof scope
 > = MutationCtx_.MutationCtx<
-  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>, typeof scope
+  DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>, typeof scope
 >();
 export type MutationCtx = typeof MutationCtx.Identifier;
 
 export const ActionCtx: ActionCtx_.ActionCtxTag<
-  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>, typeof scope
+  DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>, typeof scope
 > = ActionCtx_.ActionCtx<
-  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>, typeof scope
+  DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>, typeof scope
 >();
 export type ActionCtx = typeof ActionCtx.Identifier;

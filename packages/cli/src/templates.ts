@@ -758,10 +758,10 @@ const servicesEffect = Effect.fnUntraced(function* ({
     "export const VectorSearch: VectorSearch_.VectorSearchTag<",
   );
   yield* cbw.indent(
-    cbw.writeLine("DataModel.FromSchema<typeof schemaDefinition>"),
+    cbw.writeLine("DataModel.FromDatabaseSchema<typeof schemaDefinition>"),
   );
   yield* cbw.writeLine(
-    "> = VectorSearch_.VectorSearch<DataModel.FromSchema<typeof schemaDefinition>>();",
+    "> = VectorSearch_.VectorSearch<DataModel.FromDatabaseSchema<typeof schemaDefinition>>();",
   );
   yield* cbw.writeLine(
     "export type VectorSearch = typeof VectorSearch.Identifier;",
@@ -856,13 +856,13 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine("export const QueryCtx: QueryCtx_.QueryCtxTag<");
   yield* cbw.indent(
     cbw.writeLine(
-      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
+      `DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine("> = QueryCtx_.QueryCtx<");
   yield* cbw.indent(
     cbw.writeLine(
-      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
+      `DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine(">();");
@@ -875,13 +875,13 @@ const servicesEffect = Effect.fnUntraced(function* ({
   );
   yield* cbw.indent(
     cbw.writeLine(
-      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
+      `DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine("> = MutationCtx_.MutationCtx<");
   yield* cbw.indent(
     cbw.writeLine(
-      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
+      `DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine(">();");
@@ -894,13 +894,13 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine("export const ActionCtx: ActionCtx_.ActionCtxTag<");
   yield* cbw.indent(
     cbw.writeLine(
-      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
+      `DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine("> = ActionCtx_.ActionCtx<");
   yield* cbw.indent(
     cbw.writeLine(
-      `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
+      `DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
     ),
   );
   yield* cbw.writeLine(">();");

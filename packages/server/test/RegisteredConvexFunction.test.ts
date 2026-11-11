@@ -58,7 +58,7 @@ describe("make", () => {
         runQuery: () => Promise.resolve(null),
         runMutation: () => Promise.resolve(null),
       } as unknown as Convex.GenericMutationCtx<
-        DataModel.ToConvex<DataModel.FromSchema<typeof schema>>
+        DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schema>>
       >;
       return Effect.gen(function* () {
         const services = yield* Layer.build(
@@ -187,7 +187,9 @@ describe("make", () => {
         storage: {},
         scheduler: {},
       } as unknown as Convex.GenericMutationCtx<
-        DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema.AnyWithProps>>
+        DataModel.ToConvexDataModel<
+          DataModel.FromDatabaseSchema<DatabaseSchema.AnyWithProps>
+        >
       >;
       const result = yield* Effect.promise(() => definition.handler(ctx, {}));
       expect(result).toBe("file-id");

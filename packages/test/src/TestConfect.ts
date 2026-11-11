@@ -22,7 +22,7 @@ import * as Schema from "effect/Schema";
 export type { DeploymentJwk, DeploymentJwks } from "convex-test";
 
 export type TestConfectWithoutIdentity<
-  ConfectSchema extends DatabaseSchema.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = {
   jwks: () => Effect.Effect<DeploymentJwks>;
   query: <QueryRef extends Ref.AnyQuery>(
@@ -51,14 +51,14 @@ export type TestConfectWithoutIdentity<
       handler: Effect.Effect<
         void,
         E,
-        RegisteredConvexFunction.MutationServices<ConfectSchema>
+        RegisteredConvexFunction.MutationServices<DatabaseSchema_>
       >,
     ): Effect.Effect<void>;
     <A, B extends Value, E>(
       handler: Effect.Effect<
         A,
         E,
-        RegisteredConvexFunction.MutationServices<ConfectSchema>
+        RegisteredConvexFunction.MutationServices<DatabaseSchema_>
       >,
       returns: Schema.Codec<A, B>,
     ): Effect.Effect<A, Schema.SchemaError>;
@@ -73,7 +73,7 @@ export type TestConfectWithoutIdentity<
   ) => Effect.Effect<void>;
 };
 
-export type TestConfect<ConfectSchema extends DatabaseSchema.AnyWithProps> = {
+export type TestConfect<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> = {
   registerComponent: (
     componentPath: string,
     schema: SchemaDefinition<GenericSchema, boolean>,
@@ -81,20 +81,21 @@ export type TestConfect<ConfectSchema extends DatabaseSchema.AnyWithProps> = {
   ) => Effect.Effect<void>;
   withIdentity: (
     userIdentity: Partial<UserIdentity>,
-  ) => TestConfectWithoutIdentity<ConfectSchema>;
-} & TestConfectWithoutIdentity<ConfectSchema>;
+  ) => TestConfectWithoutIdentity<DatabaseSchema_>;
+} & TestConfectWithoutIdentity<DatabaseSchema_>;
 
 export const TestConfect = <
-  ConfectSchema extends DatabaseSchema.AnyWithProps,
->() => Context.Service<TestConfect<ConfectSchema>>("@confect/test/TestConfect");
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+>() =>
+  Context.Service<TestConfect<DatabaseSchema_>>("@confect/test/TestConfect");
 
 class TestConfectImplWithoutIdentity<
-  ConfectSchema extends DatabaseSchema.AnyWithProps,
-> implements TestConfectWithoutIdentity<ConfectSchema> {
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> implements TestConfectWithoutIdentity<DatabaseSchema_> {
   constructor(
-    private confectSchema: ConfectSchema,
+    private confectSchema: DatabaseSchema_,
     private testConvex: TestConvexForDataModel<
-      DataModel.ToConvex<DataModel.FromSchema<ConfectSchema>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
   ) {}
 
@@ -144,7 +145,7 @@ class TestConfectImplWithoutIdentity<
         this.testConvex.action(functionReference as any, encodedArgs),
     );
 
-  readonly run: TestConfectWithoutIdentity<ConfectSchema>["run"] = (<
+  readonly run: TestConfectWithoutIdentity<DatabaseSchema_>["run"] = (<
     A,
     B extends Value,
     E,
@@ -152,20 +153,24 @@ class TestConfectImplWithoutIdentity<
     handler: Effect.Effect<
       A,
       E,
-      RegisteredConvexFunction.MutationServices<ConfectSchema>
+      RegisteredConvexFunction.MutationServices<DatabaseSchema_>
     >,
     returns?: Schema.Codec<A, B>,
   ): Effect.Effect<void> | Effect.Effect<A, Schema.SchemaError> => {
     const makeMutationLayer = (
       mutationCtx: GenericMutationCtx<
-        DataModel.ToConvex<DataModel.FromSchema<ConfectSchema>>
+        DataModel.ToConvexDataModel<
+          DataModel.FromDatabaseSchema<DatabaseSchema_>
+        >
       >,
-    ): Layer.Layer<RegisteredConvexFunction.MutationServices<ConfectSchema>> =>
+    ): Layer.Layer<
+      RegisteredConvexFunction.MutationServices<DatabaseSchema_>
+    > =>
       RegisteredConvexFunction.mutationLayer(
         this.confectSchema,
         mutationCtx,
       ) as Layer.Layer<
-        RegisteredConvexFunction.MutationServices<ConfectSchema>
+        RegisteredConvexFunction.MutationServices<DatabaseSchema_>
       >;
 
     return returns === undefined
@@ -189,7 +194,7 @@ class TestConfectImplWithoutIdentity<
             ),
           ),
         ).pipe(Effect.andThen(Schema.decodeEffect(returns)));
-  }) as TestConfectWithoutIdentity<ConfectSchema>["run"];
+  }) as TestConfectWithoutIdentity<DatabaseSchema_>["run"];
 
   readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
@@ -206,14 +211,14 @@ class TestConfectImplWithoutIdentity<
 }
 
 class TestConfectImpl<
-  ConfectSchema extends DatabaseSchema.AnyWithProps,
-> implements TestConfect<ConfectSchema> {
-  private readonly testConfectImplWithoutIdentity: TestConfectImplWithoutIdentity<ConfectSchema>;
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> implements TestConfect<DatabaseSchema_> {
+  private readonly testConfectImplWithoutIdentity: TestConfectImplWithoutIdentity<DatabaseSchema_>;
 
   constructor(
-    private confectSchema: ConfectSchema,
+    private confectSchema: DatabaseSchema_,
     private testConvex: TestConvexForDataModelAndIdentity<
-      DataModel.ToConvex<DataModel.FromSchema<ConfectSchema>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
   ) {
     this.testConfectImplWithoutIdentity = new TestConfectImplWithoutIdentity(
@@ -228,7 +233,7 @@ class TestConfectImpl<
       this.testConvex.withIdentity(userIdentity),
     );
 
-  readonly registerComponent: TestConfect<ConfectSchema>["registerComponent"] =
+  readonly registerComponent: TestConfect<DatabaseSchema_>["registerComponent"] =
     Effect.fn("TestConfect.registerComponent")(
       (componentPath, schema, modules) =>
         Effect.sync(() =>
@@ -252,14 +257,14 @@ class TestConfectImpl<
     ...args: Ref.OptionalArgs<ActionRef>
   ) => this.testConfectImplWithoutIdentity.action(actionRef, ...args);
 
-  readonly run: TestConfect<ConfectSchema>["run"] = ((
+  readonly run: TestConfect<DatabaseSchema_>["run"] = ((
     handler: any,
     returns?: any,
   ) =>
     this.testConfectImplWithoutIdentity.run(
       handler,
       returns,
-    )) as TestConfect<ConfectSchema>["run"];
+    )) as TestConfect<DatabaseSchema_>["run"];
 
   readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,

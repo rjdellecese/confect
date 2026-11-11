@@ -216,7 +216,7 @@ const queryFunction = <
   returns: () => compileReturnsSchema(returns, databaseSchema.target.scope),
   handler: (
     ctx: GenericQueryCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
@@ -253,7 +253,9 @@ const queryFunction = <
           QueryTransactionContext.layer(ctx),
           QueryRunner.layer(ctx.runQuery),
           QueryCtx.layer<
-            DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>,
+            DataModel.ToConvexDataModel<
+              DataModel.FromDatabaseSchema<DatabaseSchema_>
+            >,
             DatabaseSchema.Scope<DatabaseSchema_>
           >(ctx, databaseSchema.target.scope),
           ConvexConfigProvider.layer,
@@ -273,29 +275,36 @@ const queryFunction = <
     ),
 });
 
-export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
-  schema: Schema,
-  ctx: GenericMutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
+export const mutationLayer = <
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+>(
+  schema: DatabaseSchema_,
+  ctx: GenericMutationCtx<
+    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
+  >,
 ) =>
   Layer.mergeAll(
     DatabaseReader.layer(schema, ctx.db),
     DocumentIds.layer(schema, ctx.db),
     DatabaseWriter.layer(schema, ctx.db),
-    MutationAuth.layerForTarget<Schema["target"]>(schema.target, ctx.auth),
-    Auth.layerForTarget<Schema["target"]>(schema.target, ctx.auth),
-    Scheduler.layer<DatabaseSchema.Scope<Schema>>(
+    MutationAuth.layerForTarget<DatabaseSchema_["target"]>(
+      schema.target,
+      ctx.auth,
+    ),
+    Auth.layerForTarget<DatabaseSchema_["target"]>(schema.target, ctx.auth),
+    Scheduler.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
       ctx.scheduler,
       schema.target.scope,
     ),
-    Storage.layer<DatabaseSchema.Scope<Schema>>(
+    Storage.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
       ctx.storage,
       schema.target.scope,
     ),
-    StorageWriter.layer<DatabaseSchema.Scope<Schema>>(
+    StorageWriter.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
       ctx.storage,
       schema.target.scope,
     ),
-    StorageActionWriter.layer<DatabaseSchema.Scope<Schema>>(
+    StorageActionWriter.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
       ctx.storage,
       schema.target.scope,
     ),
@@ -307,14 +316,17 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
     QueryRunner.layer(ctx.runQuery),
     MutationRunner.layer(ctx.runMutation),
     MutationCtx.layer<
-      DataModel.ToConvex<DataModel.FromSchema<Schema>>,
-      DatabaseSchema.Scope<Schema>
+      DataModel.ToConvexDataModel<
+        DataModel.FromDatabaseSchema<DatabaseSchema_>
+      >,
+      DatabaseSchema.Scope<DatabaseSchema_>
     >(ctx, schema.target.scope),
     ConvexConfigProvider.layer,
   );
 
-export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
-  Handler.MutationServices<Schema>;
+export type MutationServices<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> = Handler.MutationServices<DatabaseSchema_>;
 
 const mutationFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -348,7 +360,7 @@ const mutationFunction = <
   returns: () => compileReturnsSchema(returns, databaseSchema.target.scope),
   handler: (
     ctx: GenericMutationCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>

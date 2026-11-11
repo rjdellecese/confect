@@ -38,7 +38,7 @@ export interface DatabaseReaderService<
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,
   convexDatabaseReader: GenericDatabaseReader<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
 ): DatabaseReaderService<DatabaseSchema_> => {
   const systemTables = Table.systemTablesForScope(databaseSchema.target.scope);
@@ -109,7 +109,7 @@ export type DatabaseReader<
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,
   convexDatabaseReader: GenericDatabaseReader<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
 ) =>
   Layer.succeed(

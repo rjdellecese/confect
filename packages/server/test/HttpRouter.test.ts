@@ -43,7 +43,7 @@ describe("HttpRouter", () => {
       "documents",
     ),
   });
-  type Model = DataModel.FromSchema<typeof schema>;
+  type Model = DataModel.FromDatabaseSchema<typeof schema>;
   const Search = VectorSearch.VectorSearch<Model>();
 
   it("requires a matching schema for vector-search route requirements", () => {
@@ -126,7 +126,7 @@ describe("HttpRouter", () => {
       },
       { kind: "component", scope },
     );
-    type ComponentModel = DataModel.FromSchema<typeof componentSchema>;
+    type ComponentModel = DataModel.FromDatabaseSchema<typeof componentSchema>;
     type Services = ConfectHttpRouter.Services<typeof componentSchema>;
     expectTypeOf<Auth.Auth>().not.toExtend<Services>();
     expectTypeOf<StorageReader.StorageReader>().not.toExtend<Services>();
@@ -175,7 +175,7 @@ describe("HttpRouter", () => {
     expectTypeOf<MutationAuth.MutationAuth>().not.toExtend<Services>();
     expectTypeOf<TransactionMetadata.TransactionMetadata>().not.toExtend<Services>();
     expectTypeOf<
-      ActionCtx.ActionCtx<DataModel.ToConvex<Model>>
+      ActionCtx.ActionCtx<DataModel.ToConvexDataModel<Model>>
     >().not.toExtend<Services>();
   });
 

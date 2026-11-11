@@ -12,28 +12,28 @@ it("derives the same data model from a schema record and its table union", () =>
     "users",
   );
   const schema = DatabaseSchema.make({ notes, users });
-  type FromSchema = DataModel.FromSchema<typeof schema>;
+  type FromDatabaseSchema = DataModel.FromDatabaseSchema<typeof schema>;
   type FromTables = DataModel.FromTables<typeof notes | typeof users>;
-  expectTypeOf<DataModel.Tables<FromSchema>>().toEqualTypeOf<
+  expectTypeOf<DataModel.Tables<FromDatabaseSchema>>().toEqualTypeOf<
     typeof notes | typeof users
   >();
   expectTypeOf<DataModel.Tables<FromTables>>().toEqualTypeOf<
-    DataModel.Tables<FromSchema>
-  >();
-  expectTypeOf<keyof DataModel.ToConvex<FromSchema>>().toEqualTypeOf<
-    "notes" | "users"
-  >();
-  expectTypeOf<DataModel.ToConvex<FromSchema>>().toEqualTypeOf<
-    DataModel.ToConvex<FromTables>
+    DataModel.Tables<FromDatabaseSchema>
   >();
   expectTypeOf<
-    DataModel.DocumentWithName<FromSchema, "notes">["text"]
+    keyof DataModel.ToConvexDataModel<FromDatabaseSchema>
+  >().toEqualTypeOf<"notes" | "users">();
+  expectTypeOf<DataModel.ToConvexDataModel<FromDatabaseSchema>>().toEqualTypeOf<
+    DataModel.ToConvexDataModel<FromTables>
+  >();
+  expectTypeOf<
+    DataModel.DocumentWithName<FromDatabaseSchema, "notes">["text"]
   >().toEqualTypeOf<string>();
-  expectTypeOf<"~Tables">().not.toExtend<keyof FromSchema>();
+  expectTypeOf<"~Tables">().not.toExtend<keyof FromDatabaseSchema>();
 });
 
 it("derives no tables from an empty record", () => {
   type Empty = DataModel.DataModel<{}>;
   expectTypeOf<DataModel.Tables<Empty>>().toBeNever();
-  expectTypeOf<keyof DataModel.ToConvex<Empty>>().toBeNever();
+  expectTypeOf<keyof DataModel.ToConvexDataModel<Empty>>().toBeNever();
 });

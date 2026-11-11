@@ -11,7 +11,7 @@ import * as Layer from "effect/Layer";
 import type * as DataModel from "./DataModel";
 
 type ConvexVectorSearch<DataModel_ extends DataModel.AnyWithProps> =
-  GenericActionCtx<DataModel.ToConvex<DataModel_>>["vectorSearch"];
+  GenericActionCtx<DataModel.ToConvexDataModel<DataModel_>>["vectorSearch"];
 
 /**
  * The service shape backing the `VectorSearch` tag. Named so declaration emit
@@ -23,14 +23,14 @@ export interface VectorSearchService<
   <
     TableName extends DataModel.TableNames<DataModel_>,
     IndexName extends VectorIndexNames<
-      NamedTableInfo<DataModel.ToConvex<DataModel_>, TableName>
+      NamedTableInfo<DataModel.ToConvexDataModel<DataModel_>, TableName>
     >,
   >(
     tableName: TableName,
     indexName: IndexName,
     query: Expand<
       VectorSearchQuery<
-        NamedTableInfo<DataModel.ToConvex<DataModel_>, TableName>,
+        NamedTableInfo<DataModel.ToConvexDataModel<DataModel_>, TableName>,
         IndexName
       >
     >,
