@@ -32,6 +32,21 @@ bumping, confirm the new versions actually resolved (e.g. `pnpm why <dep>`).
 
 ## Rules
 
+- Trust Effect's patch-version compatibility within the supported minor.
+  Existing compatible ranges already admit newer patches; supporting them
+  does not require a Confect release or manual certification of each patch.
+  Do not create routine upgrades of `effect` or its in-scope runtime companions,
+  refresh their development pins or overrides, or raise their minimums solely
+  because a newer patch exists. Existing regression and consumer checks may
+  continue; they are not a per-patch support gate.
+- Apply an Effect patch upgrade only for a concrete correctness or security
+  fix Confect needs. Cite the upstream fix and explain the affected Confect
+  behavior before selecting versions. A newly selected companion's higher
+  Effect peer floor is not itself a reason to upgrade: retain the existing
+  compatible dependency requirements when no such fix is needed. Do not
+  override or ignore upstream peers to force an incompatible combination.
+  When no fix is needed, report that no upgrade is needed rather than listing
+  routine patches as migrations awaiting verification.
 - Read the release notes/changelogs for each pending update before applying
   it. Treat minor bumps of `0.x` packages as potentially breaking, not routine.
 - **Never attempt a major of a peer ecosystem** (effect, convex, react).
@@ -71,9 +86,12 @@ bumping, confirm the new versions actually resolved (e.g. `pnpm why <dep>`).
   the effective minimum Effect version even when Confect needs no code edits.
 - Leave a published peer range alone unless Confect's code or required
   dependencies demand a higher minimum. When they do, make that minimum
-  explicit in the affected package's peer range. For example, a CLI dependency
-  requiring `effect: ^4.0.1` warrants raising the CLI's Effect peer floor from
-  `^4.0.0` to `^4.0.1`. Do not raise unrelated packages' floors just to match
+  explicit in the affected package's peer range. For Effect patches, first
+  establish the correctness or security need under the rules above; choosing
+  an optional upgrade must not manufacture that need. For example, if a fix
+  Confect needs requires a CLI dependency with an `effect: ^4.1.3` peer, raise
+  the CLI's Effect floor to `~4.1.3` and explain why older patches cannot meet
+  that requirement. Do not raise unrelated packages' floors just to match
   development pins, and do not require every Effect package to have the same
   version number. Document a raised peer floor in a **minor changeset**, per
   the create-changeset skill, with the version consumers must install.
