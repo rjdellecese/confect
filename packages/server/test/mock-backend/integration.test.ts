@@ -2,13 +2,23 @@ import * as RecordEffect from "effect/Record";
 import { isDeepStrictEqual } from "node:util";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
-import { FunctionSpec } from "@confect/core";
+import {
+  Component,
+  FunctionSpec,
+  GenericId,
+  GroupSpec,
+  IdScope,
+  Ref,
+  Spec,
+} from "@confect/core";
 import * as SchemaToValidator from "@confect/core/SchemaToValidator";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
+import type * as RegisteredFunction from "@confect/server/RegisteredFunction";
 import { RegisteredNodeFunction } from "@confect/server/node";
 import { convexTest, type TestConvex } from "convex-test";
 import {
+  componentsGeneric,
   defineSchema,
   makeFunctionReference,
   type SignJwtOptions,
@@ -21,6 +31,7 @@ import convexSchema from "./fixtures/confect/_generated/convexSchema";
 import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
@@ -34,6 +45,7 @@ import * as Stream from "effect/Stream";
 import * as Option from "effect/Option";
 import { vi } from "vitest";
 import * as DatabaseReader_ from "@confect/server/DatabaseReader";
+import * as ActionRunner_ from "@confect/server/ActionRunner";
 import * as DocumentIds from "@confect/server/DocumentIds";
 import * as DatabaseWriter_ from "@confect/server/DatabaseWriter";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
@@ -48,6 +60,7 @@ import {
   DatabaseWriter,
   MutationAuth,
   MutationCtx,
+  MutationRunner,
   Scheduler,
   TransactionMetadata,
 } from "./fixtures/confect/_generated/services";
@@ -720,6 +733,795 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
     );
   },
 );
+
+describe("action storage transaction isolation", () => {
+  const actionSpec = FunctionSpec.publicAction({
+    name: "run",
+    returns: () => Id("_storage"),
+  });
+  const actionRef = Ref.make("storageIsolation", actionSpec);
+  const nestedSpec = FunctionSpec.publicMutation({
+    name: "replace",
+    args: () => ({ id: Id("_storage") }),
+    returns: () => Id("_storage"),
+  });
+  const nestedRef = Ref.make("storageIsolation", nestedSpec);
+  const makeTest = <E>(
+    action: Effect.Effect<
+      Id<"_storage">,
+      E,
+      RegisteredFunction.ActionServices<typeof confectSchema>
+    >,
+  ) => {
+    const run = FunctionRegistryItem.make({
+      functionSpec: actionSpec,
+      groupMiddlewareAttachments: [],
+      handler: () => action,
+    });
+    const replace = FunctionRegistryItem.make({
+      functionSpec: nestedSpec,
+      groupMiddlewareAttachments: [],
+      handler: ({ id }) =>
+        Effect.gen(function* () {
+          const storage = yield* Storage.Storage;
+          yield* storage.delete(id);
+          return yield* storage.store(new Blob(["nested"]));
+        }),
+    });
+    assert(run._tag === "Confect");
+    assert(replace._tag === "Confect");
+    const modules = {
+      ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+      "./fixtures/convex/storageIsolation.ts": () =>
+        Promise.resolve({
+          run: RegisteredConvexFunction.make(confectSchema, run),
+          replace: RegisteredConvexFunction.make(confectSchema, replace),
+        }),
+    };
+    return Effect.runSync(
+      TestConfect.TestConfect.pipe(
+        Effect.provide(
+          TestConfect_.layer(confectSchema, convexSchema, modules),
+        ),
+      ),
+    );
+  };
+  class PausedBlob extends Blob {
+    readonly reading = Promise.withResolvers<void>();
+    readonly release = Promise.withResolvers<void>();
+
+    override arrayBuffer() {
+      this.reading.resolve();
+      return this.release.promise.then(() => super.arrayBuffer());
+    }
+  }
+  const start = <A, E>(effect: Effect.Effect<A, E>) =>
+    Effect.runPromise(effect);
+  const checkpoint = (signal: Promise<void>, operation: Promise<unknown>) =>
+    Effect.promise(() =>
+      Promise.race([
+        signal,
+        operation.then(() =>
+          assert.fail("Operation finished before checkpoint"),
+        ),
+      ]),
+    );
+  const wait = <A>(promise: Promise<A>) => Effect.promise(() => promise);
+  const request = <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+    requested: ReturnType<typeof Promise.withResolvers<void>>,
+  ) =>
+    Effect.gen(function* () {
+      const fiber = yield* Effect.forkChild(effect, { startImmediately: true });
+      requested.resolve();
+      return yield* Fiber.join(fiber);
+    });
+  const store = (blob: Blob) =>
+    Effect.flatMap(Storage.Storage, (storage) => storage.store(blob));
+  const text = (id: Id<"_storage">) =>
+    Effect.gen(function* () {
+      const storage = yield* Storage.Storage;
+      const blob = yield* storage.get(id);
+      return yield* Effect.promise(() => blob.text());
+    });
+  const files = Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    return yield* reader.table("_storage").index("by_creation_time").collect();
+  });
+
+  const componentScope = IdScope.component("@test/storage-isolation");
+  const componentSchema = DatabaseSchema.make(
+    {},
+    { kind: "component", scope: componentScope },
+  );
+  const ComponentStorage = Storage.Storage.forScope<typeof componentScope>();
+  const ComponentStorageId = GenericId.GenericId("_storage", componentScope);
+  const componentActionSpec = FunctionSpec.publicAction({
+    name: "run",
+    returns: () => ComponentStorageId,
+  });
+  const componentReplaceSpec = FunctionSpec.publicMutation({
+    name: "replace",
+    args: () => ({ id: ComponentStorageId }),
+    returns: () => ComponentStorageId,
+  });
+  const componentInventorySpec = FunctionSpec.publicMutation({
+    name: "inventory",
+    returns: () =>
+      Schema.Array(
+        Schema.Struct({ id: ComponentStorageId, text: Schema.String }),
+      ),
+  });
+  const componentSpec = {
+    [Spec.TypeId]: {
+      files: GroupSpec.withName(
+        "files",
+        GroupSpec.make()
+          .addFunction(componentActionSpec)
+          .addFunction(componentReplaceSpec)
+          .addFunction(componentInventorySpec),
+      ),
+    },
+  };
+  const componentContract = Component.make(componentSpec, componentScope, []);
+  const parentScope = IdScope.component("@test/storage-parent");
+  const parentSchema = DatabaseSchema.make(
+    {},
+    { kind: "component", scope: parentScope },
+  );
+  const nativeChild = componentsGeneric() as unknown as {
+    child: Component.Api<typeof componentSpec, "child">;
+  };
+  const child = Component.bind(componentContract, nativeChild.child, {
+    parentScope,
+  });
+  const parentActionSpec = FunctionSpec.publicAction({
+    name: "run",
+    returns: () => Component.schema(child, ComponentStorageId),
+  });
+  const parentReplaceSpec = FunctionSpec.publicMutation({
+    name: "replace",
+    args: () => ({ id: Component.schema(child, ComponentStorageId) }),
+    returns: () => Component.schema(child, ComponentStorageId),
+  });
+  const parentInventorySpec = FunctionSpec.publicMutation({
+    name: "inventory",
+    returns: () =>
+      Component.schema(
+        child,
+        componentInventorySpec.functionProvenance.returns,
+      ),
+  });
+  const parentSpec = {
+    [Spec.TypeId]: {
+      files: GroupSpec.withName(
+        "files",
+        GroupSpec.make()
+          .addFunction(parentActionSpec)
+          .addFunction(parentReplaceSpec)
+          .addFunction(parentInventorySpec),
+      ),
+    },
+  };
+  const parentContract = Component.make(parentSpec, parentScope, []);
+  const nativeComponents = componentsGeneric() as unknown as {
+    first: Component.Api<typeof componentSpec, "first">;
+    parent: Component.Api<typeof parentSpec, "parent">;
+  };
+  const firstComponent = Component.bind(
+    componentContract,
+    nativeComponents.first,
+  );
+  const nestedComponent = Component.bind(
+    parentContract,
+    nativeComponents.parent,
+  );
+  const makeComponentTest = <E>(
+    action: Effect.Effect<
+      GenericId.GenericId<"_storage", typeof componentScope>,
+      E,
+      RegisteredFunction.ActionServices<typeof componentSchema>
+    >,
+  ) =>
+    Effect.gen(function* () {
+      const run = FunctionRegistryItem.make({
+        functionSpec: componentActionSpec,
+        groupMiddlewareAttachments: [],
+        handler: () => action,
+      });
+      const replace = FunctionRegistryItem.make({
+        functionSpec: componentReplaceSpec,
+        groupMiddlewareAttachments: [],
+        handler: ({ id }) =>
+          Effect.gen(function* () {
+            const storage = yield* ComponentStorage;
+            yield* storage.delete(id);
+            return yield* storage.store(new Blob(["replacement"]));
+          }),
+      });
+      const inventory = FunctionRegistryItem.make({
+        functionSpec: componentInventorySpec,
+        groupMiddlewareAttachments: [],
+        handler: () =>
+          Effect.gen(function* () {
+            const reader =
+              yield* DatabaseReader_.DatabaseReader<typeof componentSchema>();
+            const storage = yield* ComponentStorage;
+            const rows = yield* reader
+              .table("_storage")
+              .index("by_creation_time")
+              .collect();
+            return yield* Effect.forEach(rows, (row) =>
+              Effect.gen(function* () {
+                const blob = yield* storage.get(row._id);
+                return {
+                  id: row._id,
+                  text: yield* Effect.promise(() => blob.text()),
+                };
+              }),
+            );
+          }),
+      });
+      assert(run._tag === "Confect");
+      assert(replace._tag === "Confect");
+      assert(inventory._tag === "Confect");
+      const modules = {
+        "_generated/server.ts": () => Promise.resolve({}),
+        "files.ts": () =>
+          Promise.resolve({
+            run: RegisteredConvexFunction.make(componentSchema, run),
+            replace: RegisteredConvexFunction.make(componentSchema, replace),
+            inventory: RegisteredConvexFunction.make(
+              componentSchema,
+              inventory,
+            ),
+          }),
+      };
+      const t = makeTest(store(new Blob(["host"])));
+      const parentRun = FunctionRegistryItem.make({
+        functionSpec: parentActionSpec,
+        groupMiddlewareAttachments: [],
+        handler: () =>
+          Effect.flatMap(ActionRunner_.ActionRunner, (runner) =>
+            runner.runAction(child.files.run),
+          ),
+      });
+      const parentReplace = FunctionRegistryItem.make({
+        functionSpec: parentReplaceSpec,
+        groupMiddlewareAttachments: [],
+        handler: ({ id }) =>
+          Effect.flatMap(MutationRunner, (runner) =>
+            runner.runMutation(child.files.replace, { id }),
+          ),
+      });
+      const parentInventory = FunctionRegistryItem.make({
+        functionSpec: parentInventorySpec,
+        groupMiddlewareAttachments: [],
+        handler: () =>
+          Effect.flatMap(MutationRunner, (runner) =>
+            runner.runMutation(child.files.inventory),
+          ),
+      });
+      assert(parentRun._tag === "Confect");
+      assert(parentReplace._tag === "Confect");
+      assert(parentInventory._tag === "Confect");
+      yield* t.registerComponent("parent", defineSchema({}), {
+        "_generated/server.ts": () => Promise.resolve({}),
+        "files.ts": () =>
+          Promise.resolve({
+            run: RegisteredConvexFunction.make(parentSchema, parentRun),
+            replace: RegisteredConvexFunction.make(parentSchema, parentReplace),
+            inventory: RegisteredConvexFunction.make(
+              parentSchema,
+              parentInventory,
+            ),
+          }),
+      });
+      for (const path of ["first", "parent/child"])
+        yield* t.registerComponent(path, defineSchema({}), modules);
+      return t;
+    });
+
+  it.effect.each([
+    { name: "direct", component: firstComponent },
+    { name: "nested", component: nestedComponent },
+  ])(
+    "$name component action storage survives an unrelated host rollback",
+    ({ component }) =>
+      Effect.gen(function* () {
+        const mutating = Promise.withResolvers<void>();
+        const rollback = Promise.withResolvers<void>();
+        const requested = Promise.withResolvers<void>();
+        const blob = new PausedBlob(["component"]);
+        const t = yield* makeComponentTest(
+          request(
+            Effect.flatMap(ComponentStorage, (storage) => storage.store(blob)),
+            requested,
+          ),
+        );
+        const mutation = start(
+          t.run(
+            Effect.gen(function* () {
+              yield* store(new Blob(["rolled back"]));
+              mutating.resolve();
+              yield* Effect.promise(() => rollback.promise);
+              return yield* Effect.die("host rollback");
+            }),
+          ),
+        );
+        const rejected = expect(mutation).rejects.toThrow("host rollback");
+        let action: Promise<unknown> | undefined;
+        yield* Effect.gen(function* () {
+          yield* checkpoint(mutating.promise, mutation);
+          const pending = start(t.action(component.files.run));
+          action = pending;
+          yield* checkpoint(requested.promise, pending);
+          rollback.resolve();
+          yield* Effect.promise(() => rejected);
+          blob.release.resolve();
+          const id = yield* wait(pending);
+          const rows = yield* t.mutation(component.files.inventory);
+          expect(rows).toEqual([{ id, text: "component" }]);
+          const other =
+            component === firstComponent ? nestedComponent : firstComponent;
+          const otherRows = yield* t.mutation(other.files.inventory);
+          expect(otherRows).toEqual([]);
+          yield* t.run(
+            Effect.gen(function* () {
+              const hostFiles = yield* files;
+              expect(hostFiles).toEqual([]);
+            }),
+          );
+        }).pipe(
+          Effect.ensuring(
+            Effect.gen(function* () {
+              rollback.resolve();
+              blob.release.resolve();
+              yield* Effect.promise(() =>
+                Promise.allSettled([mutation, rejected, action]),
+              );
+            }),
+          ),
+        );
+      }),
+  );
+
+  it.effect(
+    "component storage mutations roll back across nested mounts without touching sibling blobs",
+    () =>
+      Effect.gen(function* () {
+        const t = yield* makeComponentTest(
+          Effect.flatMap(ComponentStorage, (storage) =>
+            storage.store(new Blob(["original"])),
+          ),
+        );
+        const firstId = yield* t.action(firstComponent.files.run);
+        const nestedId = yield* t.action(nestedComponent.files.run);
+        expectTypeOf(firstId).not.toEqualTypeOf<typeof nestedId>();
+        yield* Effect.promise(() =>
+          expect(
+            start(
+              t.run(
+                Effect.gen(function* () {
+                  const runner = yield* MutationRunner;
+                  const replacement = yield* runner.runMutation(
+                    nestedComponent.files.replace,
+                    { id: nestedId },
+                  );
+                  const nestedRows = yield* runner.runMutation(
+                    nestedComponent.files.inventory,
+                  );
+                  expect(nestedRows).toEqual([
+                    { id: replacement, text: "replacement" },
+                  ]);
+                  const firstRows = yield* runner.runMutation(
+                    firstComponent.files.inventory,
+                  );
+                  expect(firstRows).toEqual([
+                    { id: firstId, text: "original" },
+                  ]);
+                  return yield* Effect.die("parent rollback");
+                }),
+              ),
+            ),
+          ).rejects.toThrow("parent rollback"),
+        );
+        const firstRows = yield* t.mutation(firstComponent.files.inventory);
+        const nestedRows = yield* t.mutation(nestedComponent.files.inventory);
+        expect(firstRows).toEqual([{ id: firstId, text: "original" }]);
+        expect(nestedRows).toEqual([{ id: nestedId, text: "original" }]);
+      }),
+  );
+
+  it.effect.each(["direct", "scheduled"])(
+    "%s action stores wait for an unrelated mutation to commit",
+    (invocation) =>
+      Effect.gen(function* () {
+        const started = Promise.withResolvers<void>();
+        const allowStore = Promise.withResolvers<void>();
+        const requested = Promise.withResolvers<void>();
+        const mutating = Promise.withResolvers<void>();
+        const commit = Promise.withResolvers<void>();
+        const blob = new PausedBlob(["action"]);
+        const t = makeTest(
+          Effect.gen(function* () {
+            started.resolve();
+            yield* Effect.promise(() => allowStore.promise);
+            return yield* request(store(blob), requested);
+          }),
+        );
+        let action: Promise<unknown> | undefined;
+        let mutation: Promise<unknown> | undefined;
+        yield* Effect.gen(function* () {
+          if (invocation === "scheduled") {
+            vi.useFakeTimers();
+            const job = yield* t.run(
+              Effect.gen(function* () {
+                const scheduler = yield* Scheduler;
+                return yield* scheduler.runAfter(Duration.zero, actionRef);
+              }),
+              Id("_scheduled_functions"),
+            );
+            vi.runAllTimers();
+            action = start(t.finishInProgressScheduledFunctions()).then(() =>
+              start(
+                t.run(
+                  Effect.gen(function* () {
+                    const reader = yield* DatabaseReader;
+                    expect(
+                      (yield* reader.table("_scheduled_functions").get(job))
+                        .state.kind,
+                    ).toBe("success");
+                  }),
+                ),
+              ),
+            );
+          } else {
+            action = start(t.action(actionRef));
+          }
+          yield* checkpoint(started.promise, action);
+          mutation = start(
+            t.run(
+              Effect.gen(function* () {
+                mutating.resolve();
+                yield* Effect.promise(() => commit.promise);
+              }),
+            ),
+          );
+          yield* checkpoint(mutating.promise, mutation);
+          allowStore.resolve();
+          yield* checkpoint(requested.promise, action);
+          commit.resolve();
+          if (mutation !== undefined) yield* wait(mutation);
+          blob.release.resolve();
+          yield* wait(action);
+          yield* t.run(
+            Effect.gen(function* () {
+              const stored = yield* files;
+              expect(stored).toHaveLength(1);
+              const file = stored[0];
+              assert(file !== undefined);
+              const content = yield* text(file._id);
+              expect(content).toBe("action");
+            }),
+          );
+        }).pipe(
+          Effect.ensuring(
+            Effect.gen(function* () {
+              allowStore.resolve();
+              commit.resolve();
+              blob.release.resolve();
+              yield* Effect.promise(() =>
+                Promise.allSettled([action, mutation]),
+              );
+              vi.useRealTimers();
+            }),
+          ),
+        );
+      }),
+  );
+
+  it.effect("concurrent actions store blobs in separate transactions", () =>
+    Effect.gen(function* () {
+      const firstBlob = new PausedBlob(["first"]);
+      const secondBlob = new PausedBlob(["second"]);
+      const requested = Promise.withResolvers<void>();
+      let calls = 0;
+      const t = makeTest(
+        Effect.suspend(() =>
+          calls++ === 0
+            ? store(firstBlob)
+            : request(store(secondBlob), requested),
+        ),
+      );
+      const first = start(t.action(actionRef));
+      let second: Promise<Id<"_storage">> | undefined;
+      yield* Effect.gen(function* () {
+        yield* checkpoint(firstBlob.reading.promise, first);
+        second = start(t.action(actionRef));
+        yield* checkpoint(requested.promise, second);
+        firstBlob.release.resolve();
+        const firstId = yield* wait(first);
+        secondBlob.release.resolve();
+        const secondId = yield* wait(second);
+        yield* t.run(
+          Effect.gen(function* () {
+            const firstText = yield* text(firstId);
+            expect(firstText).toBe("first");
+            const secondText = yield* text(secondId);
+            expect(secondText).toBe("second");
+            const stored = yield* files;
+            expect(stored).toHaveLength(2);
+          }),
+        );
+      }).pipe(
+        Effect.ensuring(
+          Effect.gen(function* () {
+            firstBlob.release.resolve();
+            secondBlob.release.resolve();
+            yield* Effect.promise(() => Promise.allSettled([first, second]));
+          }),
+        ),
+      );
+    }),
+  );
+
+  it.effect("action deletion survives an unrelated mutation rollback", () =>
+    Effect.gen(function* () {
+      const mutating = Promise.withResolvers<void>();
+      const rollback = Promise.withResolvers<void>();
+      const requested = Promise.withResolvers<void>();
+      const id = Promise.withResolvers<Id<"_storage">>();
+      const t = makeTest(
+        Effect.gen(function* () {
+          const storage = yield* Storage.Storage;
+          const existing = yield* Effect.promise(() => id.promise);
+          yield* request(storage.delete(existing), requested);
+          return existing;
+        }),
+      );
+      const existing = yield* t.run(
+        store(new Blob(["existing"])),
+        Id("_storage"),
+      );
+      id.resolve(existing);
+      const mutation = start(
+        t.run(
+          Effect.gen(function* () {
+            yield* store(new Blob(["rolled back"]));
+            mutating.resolve();
+            yield* Effect.promise(() => rollback.promise);
+            return yield* Effect.die("unrelated rollback");
+          }),
+        ),
+      );
+      const rejected = expect(mutation).rejects.toThrow("unrelated rollback");
+      let action: Promise<unknown> | undefined;
+      yield* Effect.gen(function* () {
+        yield* checkpoint(mutating.promise, mutation);
+        action = start(t.action(actionRef));
+        yield* checkpoint(requested.promise, action);
+        rollback.resolve();
+        yield* Effect.promise(() => rejected);
+        yield* wait(action);
+        yield* t.run(
+          Effect.gen(function* () {
+            const storage = yield* Storage.Storage;
+            expect((yield* Effect.flip(storage.get(existing))).id).toBe(
+              existing,
+            );
+            expect((yield* Effect.flip(storage.getUrl(existing))).id).toBe(
+              existing,
+            );
+            const stored = yield* files;
+            expect(stored).toEqual([]);
+          }),
+        );
+      }).pipe(
+        Effect.ensuring(
+          Effect.gen(function* () {
+            rollback.resolve();
+            yield* Effect.promise(() =>
+              Promise.allSettled([mutation, rejected, action]),
+            );
+          }),
+        ),
+      );
+    }),
+  );
+
+  it.effect("nested mutation storage rolls back with its parent", () =>
+    Effect.gen(function* () {
+      const t = makeTest(store(new Blob(["existing"])));
+      const existing = yield* t.action(actionRef);
+      const created: Id<"_storage">[] = [];
+      yield* Effect.promise(() =>
+        expect(
+          start(
+            t.run(
+              Effect.gen(function* () {
+                const runner = yield* MutationRunner;
+                const storage = yield* Storage.Storage;
+                const id = yield* runner.runMutation(nestedRef, {
+                  id: existing,
+                });
+                created.push(id);
+                const nestedText = yield* text(id);
+                expect(nestedText).toBe("nested");
+                expect((yield* Effect.flip(storage.get(existing))).id).toBe(
+                  existing,
+                );
+                return yield* Effect.die("parent rollback");
+              }),
+            ),
+          ),
+        ).rejects.toThrow("parent rollback"),
+      );
+      yield* t.run(
+        Effect.gen(function* () {
+          const storage = yield* Storage.Storage;
+          const restoredText = yield* text(existing);
+          expect(restoredText).toBe("existing");
+          expect(created).toHaveLength(1);
+          for (const id of created) {
+            expect((yield* Effect.flip(storage.get(id))).id).toBe(id);
+            expect((yield* Effect.flip(storage.getUrl(id))).id).toBe(id);
+          }
+          const stored = yield* files;
+          expect(Array.map(stored, (file) => file._id)).toEqual([existing]);
+        }),
+      );
+    }),
+  );
+
+  it.effect(
+    "storage uses its own test instance, not the caller's transaction",
+    () =>
+      Effect.gen(function* () {
+        const inner = makeTest(store(new Blob(["inner"])));
+        const outer = makeTest(store(new Blob(["outer"])));
+        const id = yield* outer.run(inner.action(actionRef), Id("_storage"));
+        yield* inner.run(
+          Effect.gen(function* () {
+            const content = yield* text(id);
+            expect(content).toBe("inner");
+          }),
+        );
+        yield* outer.run(
+          Effect.gen(function* () {
+            const stored = yield* files;
+            expect(stored).toEqual([]);
+          }),
+        );
+      }),
+  );
+
+  it.effect(
+    "storage reenters a live ancestor transaction and rolls back with it",
+    () =>
+      Effect.gen(function* () {
+        const outer = makeTest(store(new Blob(["ancestor"])));
+        const inner = makeTest(store(new Blob(["inner"])));
+        const created: Id<"_storage">[] = [];
+        yield* Effect.promise(() =>
+          expect(
+            start(
+              outer.run(
+                Effect.gen(function* () {
+                  const id = yield* inner.run(
+                    outer.action(actionRef),
+                    Id("_storage"),
+                  );
+                  created.push(id);
+                  const content = yield* text(id);
+                  expect(content).toBe("ancestor");
+                  return yield* Effect.die("ancestor rollback");
+                }),
+              ),
+            ),
+          ).rejects.toThrow("ancestor rollback"),
+        );
+        for (const t of [outer, inner]) {
+          yield* t.run(
+            Effect.gen(function* () {
+              const stored = yield* files;
+              expect(stored).toEqual([]);
+            }),
+          );
+        }
+        expect(created).toHaveLength(1);
+        yield* outer.run(
+          Effect.gen(function* () {
+            const storage = yield* Storage.Storage;
+            for (const id of created)
+              expect((yield* Effect.flip(storage.get(id))).id).toBe(id);
+          }),
+        );
+      }),
+  );
+
+  it.effect.each(["foreign", "expired idle", "expired busy"])(
+    "%s markers cannot join an unrelated transaction",
+    (state) =>
+      Effect.gen(function* () {
+        const started = Promise.withResolvers<void>();
+        const allowStore = Promise.withResolvers<void>();
+        const requested = Promise.withResolvers<void>();
+        const mutating = Promise.withResolvers<void>();
+        const commit = Promise.withResolvers<void>();
+        const blob = new PausedBlob(["isolated"]);
+        const t = makeTest(
+          Effect.gen(function* () {
+            started.resolve();
+            yield* Effect.promise(() => allowStore.promise);
+            return yield* request(store(blob), requested);
+          }),
+        );
+        const outer = makeTest(store(new Blob(["outer"])));
+        const pending: Promise<Id<"_storage">>[] = [];
+        let mutation: Promise<unknown> | undefined;
+        yield* Effect.gen(function* () {
+          if (state !== "foreign") {
+            yield* t.run(
+              Effect.gen(function* () {
+                const action = start(t.action(actionRef));
+                pending.push(action);
+                yield* checkpoint(started.promise, action);
+              }),
+            );
+          }
+          if (state !== "expired idle") {
+            mutation = start(
+              t.run(
+                Effect.gen(function* () {
+                  mutating.resolve();
+                  yield* Effect.promise(() => commit.promise);
+                }),
+              ),
+            );
+            yield* checkpoint(mutating.promise, mutation);
+          }
+          if (state === "foreign") {
+            pending.push(start(outer.run(t.action(actionRef), Id("_storage"))));
+          }
+          const action = pending[0];
+          assert(action !== undefined);
+          yield* checkpoint(started.promise, action);
+          allowStore.resolve();
+          yield* checkpoint(requested.promise, action);
+          commit.resolve();
+          if (mutation !== undefined) yield* wait(mutation);
+          blob.release.resolve();
+          const id = yield* wait(action);
+          yield* t.run(
+            Effect.gen(function* () {
+              const content = yield* text(id);
+              expect(content).toBe("isolated");
+              const stored = yield* files;
+              expect(Array.map(stored, (file) => file._id)).toEqual([id]);
+            }),
+          );
+          yield* outer.run(
+            Effect.gen(function* () {
+              const stored = yield* files;
+              expect(stored).toEqual([]);
+            }),
+          );
+        }).pipe(
+          Effect.ensuring(
+            Effect.gen(function* () {
+              allowStore.resolve();
+              commit.resolve();
+              blob.release.resolve();
+              yield* Effect.promise(() =>
+                Promise.allSettled([mutation, ...pending]),
+              );
+            }),
+          ),
+        );
+      }),
+  );
+});
 
 describe("mutation Blob transactions", () => {
   const modules = import.meta.glob("./fixtures/convex/_generated/*.js");
