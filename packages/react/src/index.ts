@@ -623,8 +623,11 @@ export type OptimisticUpdate<Mutation extends Ref.AnyPublicMutation> = (
  */
 export interface ReactMutation<Mutation extends Ref.AnyPublicMutation> {
   (...args: Ref.OptionalArgs<Mutation>): InvokeReturn<Mutation>;
-  withOptimisticUpdate(
-    optimisticUpdate: OptimisticUpdate<Mutation>,
+  withOptimisticUpdate<T extends OptimisticUpdate<Mutation>>(
+    optimisticUpdate: T &
+      (ReturnType<T> extends Promise<unknown>
+        ? "Optimistic update handlers must be synchronous"
+        : {}),
   ): ReactMutation<Mutation>;
 }
 

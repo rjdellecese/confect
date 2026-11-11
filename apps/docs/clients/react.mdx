@@ -304,6 +304,19 @@ const DeleteNote = ({ noteId }: { noteId: string }) => {
 };
 ```
 
+### Optimistic updates
+
+Attach an optimistic callback with `useMutation(ref).withOptimisticUpdate(...)`.
+The callback receives decoded mutation arguments and a Confect local store whose
+query methods use decoded values. The returned handle remains callable with the
+same arguments and return type as the original mutation.
+
+Optimistic callbacks must run synchronously. Callbacks whose return type is a
+`Promise` are rejected by TypeScript, including `async` functions. Complete any
+asynchronous preparation before invoking the mutation instead. This check cannot
+detect a promise return that you have already hidden behind a `void` callback
+type; it does not add runtime validation.
+
 ## `useAction`
 
 Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` schema, and `Promise<Result<A, E>>` when it does.
