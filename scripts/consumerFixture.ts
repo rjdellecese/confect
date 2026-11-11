@@ -59,7 +59,8 @@ import databaseSchema from "./_generated/schema";
 import type { Id } from "./_generated/id";
 import { VectorSearch } from "./_generated/services";
 
-export const legacy = ConfectHttpRouter.make(
+export const health = ConfectHttpRouter.make(
+  databaseSchema,
   HttpRouter.add("GET", "/health", HttpServerResponse.text("ok")),
 );
 

@@ -73,7 +73,9 @@ describe("HttpRouter", () => {
     expectTypeOf<typeof routes>().toExtend<
       ConfectHttpRouter.Routes<typeof schema>
     >();
-    expectTypeOf<typeof routes>().not.toExtend<ConfectHttpRouter.Routes>();
+    expectTypeOf<[typeof routes]>().not.toExtend<
+      Parameters<typeof ConfectHttpRouter.make<typeof schema>>
+    >();
     expectTypeOf<typeof routes>().not.toExtend<
       ConfectHttpRouter.Routes<typeof otherSchema>
     >();
@@ -86,26 +88,31 @@ describe("HttpRouter", () => {
     ConfectHttpRouter.make(schema, routes);
   });
 
-  it("accepts existing routes with either constructor form", () => {
+  it("requires a schema even when routes do not use vector search", () => {
     const routes = HttpRouter.add(
       "GET",
       "/health",
       HttpServerResponse.text("ok"),
     );
-    expectTypeOf<typeof routes>().toExtend<ConfectHttpRouter.Routes>();
+    expectTypeOf<[typeof routes]>().not.toExtend<
+      Parameters<typeof ConfectHttpRouter.make<typeof schema>>
+    >();
+    expectTypeOf<
+      Parameters<typeof ConfectHttpRouter.make>["length"]
+    >().toEqualTypeOf<2>();
     expectTypeOf<typeof routes>().toExtend<
       ConfectHttpRouter.Routes<typeof schema>
     >();
-    ConfectHttpRouter.make(routes);
+    ConfectHttpRouter.make(otherSchema, routes);
     ConfectHttpRouter.make(schema, routes);
   });
 
   it("keeps non-HTTP capabilities unavailable with a schema", () => {
     type Services = ConfectHttpRouter.Services<typeof schema>;
     expectTypeOf<VectorSearch.VectorSearch<Model>>().toExtend<Services>();
-    expectTypeOf<
-      VectorSearch.VectorSearch<Model>
-    >().not.toExtend<ConfectHttpRouter.Services>();
+    expectTypeOf<VectorSearch.VectorSearch<Model>>().not.toExtend<
+      ConfectHttpRouter.Services<typeof otherSchema>
+    >();
     expectTypeOf<
       DatabaseWriter.DatabaseWriter<typeof schema>
     >().not.toExtend<Services>();

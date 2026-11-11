@@ -50,7 +50,7 @@ describe("Handler", () => {
     expectTypeOf<Signing>().not.toExtend<
       Handler.ActionServices<typeof schema>
     >();
-    expectTypeOf<Signing>().not.toExtend<HttpRouter.Services>();
+    expectTypeOf<Signing>().not.toExtend<HttpRouter.Services<typeof schema>>();
     const nodeAction = FunctionSpec.publicNodeAction({
       name: "sign",
       returns: () => Schema.String,
@@ -66,7 +66,7 @@ describe("Handler", () => {
     expectTypeOf<Ids>().toExtend<Handler.QueryServices<typeof schema>>();
     expectTypeOf<Ids>().toExtend<Handler.MutationServices<typeof schema>>();
     expectTypeOf<Ids>().not.toExtend<Handler.ActionServices<typeof schema>>();
-    expectTypeOf<Ids>().not.toExtend<HttpRouter.Services>();
+    expectTypeOf<Ids>().not.toExtend<HttpRouter.Services<typeof schema>>();
     const nodeAction = FunctionSpec.publicNodeAction({
       name: "ids",
       returns: () => Schema.Null,
@@ -117,7 +117,9 @@ describe("Handler", () => {
       >;
       expectTypeOf<Extract<ActionEnvironment, Controls>>().toBeNever();
       expectTypeOf<Extract<NodeActionEnvironment, Controls>>().toBeNever();
-      expectTypeOf<Extract<HttpRouter.Services, Controls>>().toBeNever();
+      expectTypeOf<
+        Extract<HttpRouter.Services<typeof schema>, Controls>
+      >().toBeNever();
       expectTypeOf<
         Effect.Effect<null, never, QueryTransactionContext>
       >().not.toExtend<Effect.Effect<null, never, ActionEnvironment>>();
@@ -125,7 +127,7 @@ describe("Handler", () => {
         Effect.Effect<null, never, MutationTransactionContext>
       >().not.toExtend<Effect.Effect<null, never, NodeActionEnvironment>>();
       expectTypeOf<Effect.Effect<null, never, Controls>>().not.toExtend<
-        Effect.Effect<null, never, HttpRouter.Services>
+        Effect.Effect<null, never, HttpRouter.Services<typeof schema>>
       >();
     });
   });
@@ -148,7 +150,7 @@ describe("Handler", () => {
         Extract<Handler.ActionServices<typeof schema>, StorageServices>
       >().toEqualTypeOf<StorageServices>();
       expectTypeOf<
-        Extract<HttpRouter.Services, StorageServices>
+        Extract<HttpRouter.Services<typeof schema>, StorageServices>
       >().toEqualTypeOf<StorageServices>();
 
       const nodeAction = FunctionSpec.publicNodeAction({
@@ -295,9 +297,11 @@ describe("Handler", () => {
 
     it("allows execution and request metadata but not transactions in HTTP handlers", () => {
       expectTypeOf<
-        Extract<HttpRouter.Services, MetadataServices>
+        Extract<HttpRouter.Services<typeof schema>, MetadataServices>
       >().toEqualTypeOf<ExecutionMetadata | RequestMetadata>();
-      expectTypeOf<TransactionMetadata>().not.toExtend<HttpRouter.Services>();
+      expectTypeOf<TransactionMetadata>().not.toExtend<
+        HttpRouter.Services<typeof schema>
+      >();
     });
   });
 

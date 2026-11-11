@@ -38,7 +38,7 @@ import * as VectorSearch from "./VectorSearch";
  * The Confect services available to HTTP route handlers and middleware,
  * supplied per request from the Convex action context.
  */
-export type Services<Schema extends DatabaseSchema.AnyWithProps = never> =
+export type Services<Schema extends DatabaseSchema.AnyWithProps> =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
@@ -50,9 +50,7 @@ export type Services<Schema extends DatabaseSchema.AnyWithProps = never> =
   | StorageReader
   | StorageWriter
   | StorageActionWriter
-  | ([Schema] extends [never]
-      ? never
-      : VectorSearch.VectorSearch<DataModel.FromSchema<Schema>>);
+  | VectorSearch.VectorSearch<DataModel.FromSchema<Schema>>;
 
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
@@ -77,24 +75,23 @@ export type Services<Schema extends DatabaseSchema.AnyWithProps = never> =
  *
  * @stability unstable
  */
-export type Routes<Schema extends DatabaseSchema.AnyWithProps = never> =
-  Layer.Layer<
-    never,
-    never,
-    | HttpRouter.HttpRouter
-    | Etag.Generator
-    | FileSystem.FileSystem
-    | HttpPlatform.HttpPlatform
-    | Path.Path
-    | HttpRouter.Request<"Requires", Services<Schema>>
-    | HttpRouter.Request<"GlobalRequires", Services<Schema>>
-    | HttpRouter.Request<"Error", any>
-    | HttpRouter.Request<"GlobalError", any>
-  >;
+export type Routes<Schema extends DatabaseSchema.AnyWithProps> = Layer.Layer<
+  never,
+  never,
+  | HttpRouter.HttpRouter
+  | Etag.Generator
+  | FileSystem.FileSystem
+  | HttpPlatform.HttpPlatform
+  | Path.Path
+  | HttpRouter.Request<"Requires", Services<Schema>>
+  | HttpRouter.Request<"GlobalRequires", Services<Schema>>
+  | HttpRouter.Request<"Error", any>
+  | HttpRouter.Request<"GlobalError", any>
+>;
 
 /**
- * Create a Convex HTTP router serving the given routes. Pass a runtime database
- * schema first to allow schema-typed vector search in handlers and middleware.
+ * Create a Convex HTTP router from a runtime database schema and routes, with
+ * schema-typed vector search in handlers and middleware.
  *
  * A single catch-all `httpAction` is registered for every routable method under
  * the path prefix `"/"`, making the Effect router the single source of truth
@@ -108,10 +105,10 @@ export type Routes<Schema extends DatabaseSchema.AnyWithProps = never> =
  * @stability unstable
  */
 export const make = <Schema extends DatabaseSchema.AnyWithProps>(
-  ...args: [routes: Routes] | [schema: Schema, routes: Routes<NoInfer<Schema>>]
+  databaseSchema: Schema,
+  routes: Routes<NoInfer<Schema>>,
 ): ConvexHttpRouter => {
   applyMonkeyPatches();
-  const routes: Routes<Schema> = args.length === 1 ? args[0] : args[1];
 
   // Provided (not just merged) so that route layers' own construction—e.g.
   // a `Layer.unwrap` reading `Config`—resolves configuration through the

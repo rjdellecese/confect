@@ -91,7 +91,7 @@ export const layer = Layer.unwrap(
 
 ## Creating the router
 
-Create the Convex HTTP router in `confect/http.ts` with `HttpRouter.make` from `@confect/server`. Pass a `Layer` that registers your routes—merge your API and docs layers with any other building blocks from Effect's `effect/http`:
+Create the Convex HTTP router in `confect/http.ts` with `HttpRouter.make` from `@confect/server`. Pass your generated runtime database schema and a `Layer` that registers your routes. The schema is required even when your routes do not use vector search. Merge your API and docs layers with any other building blocks from Effect's `effect/http`:
 
 - `HttpRouter.add(method, path, handler)` registers a plain route.
 - `HttpRouter.middleware(fn, { global: true })` applies middleware to every route.
@@ -107,8 +107,10 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as NotesApi from "./http/NotesApi";
 import * as ScalarDocs from "./http/ScalarDocs";
+import databaseSchema from "./_generated/schema";
 
 export default ConfectHttpRouter.make(
+  databaseSchema,
   Layer.mergeAll(
     NotesApi.layer,
     ScalarDocs.layer,
@@ -122,7 +124,7 @@ export default ConfectHttpRouter.make(
 
 ## Vector search
 
-To use the generated `VectorSearch` service in HTTP handlers or middleware, pass your generated runtime database schema before the routes: `ConfectHttpRouter.make(databaseSchema, routes)`. The schema types the available tables, vector indexes, and filter fields. Existing `ConfectHttpRouter.make(routes)` calls are unchanged.
+The generated `VectorSearch` service is available in HTTP handlers and middleware. The schema passed to `ConfectHttpRouter.make(databaseSchema, routes)` types the available tables, vector indexes, and filter fields. For explicit type annotations, use `ConfectHttpRouter.Routes<typeof databaseSchema>` and `ConfectHttpRouter.Services<typeof databaseSchema>`.
 
 ```ts confect/http.ts
 import { HttpRouter as ConfectHttpRouter } from "@confect/server";
@@ -161,7 +163,7 @@ This example assumes a `documents` table with a three-dimensional `by_embedding`
 ```ts confect/http.ts (continued)
 import { httpActionGeneric } from "convex/server";
 
-const http = ConfectHttpRouter.make(/* ... */);
+const http = ConfectHttpRouter.make(databaseSchema, routes);
 
 http.route({
   path: "/plain-convex",
