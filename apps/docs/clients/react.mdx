@@ -306,16 +306,10 @@ const DeleteNote = ({ noteId }: { noteId: string }) => {
 
 ### Optimistic updates
 
-Attach an optimistic callback with `useMutation(ref).withOptimisticUpdate(...)`.
-The callback receives decoded mutation arguments and a Confect local store whose
-query methods use decoded values. The returned handle remains callable with the
-same arguments and return type as the original mutation.
-
-Optimistic callbacks must run synchronously. Callbacks whose return type is a
-`Promise` are rejected by TypeScript, including `async` functions. Complete any
-asynchronous preparation before invoking the mutation instead. This check cannot
-detect a promise return that you have already hidden behind a `void` callback
-type; it does not add runtime validation.
+The callback passed to `useMutation(ref).withOptimisticUpdate(...)` receives
+decoded mutation arguments, rather than Convex's encoded values. Its local store
+accepts Confect query refs and decoded arguments/results; query values use
+`Option`, with `Option.none()` representing a query missing from the store.
 
 ## `useAction`
 
