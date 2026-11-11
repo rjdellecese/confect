@@ -1,5 +1,9 @@
 # @confect/react
 
+## 10.6.0
+
+No changes in this release.
+
 ## 10.5.0
 
 No changes in this release.
