@@ -1,68 +1,75 @@
-# Convex compatibility and feature tracker
+# Convex audit issue and reference records
 
-Use these three sections in the canonical issue body. Replace placeholders with
-verified facts; do not copy this guidance into the issue. Keep detailed designs
-and execution logs in linked issues, PRs, or archival comments, not in the live
-inventory. Preserve human decisions when reorganizing existing content.
+Use only the fields relevant to the record. Replace placeholders with verified
+facts; do not paste this guidance into an issue or create a new umbrella tracker.
+Capy Issues own actionable work and its lifecycle. The Captain maintains concise
+Drive references and `DIGEST.md` links, not another issue-status inventory.
+GitHub #800 remains historical evidence only.
+Keep detailed designs and execution logs in linked issues, PRs, or archival
+comments rather than expanding these concise records.
 
-## Audit coverage
+## Actionable issue
 
-- **Confect revision:** inspected branch, commit, and date.
-- **Historical baseline:** source audit, original upstream/repository versions,
-  reconciliation date, and coverage limits. Preserve the CONF-85 inventory.
-- **Parity policy:** Confect-specific equivalents count; raw escape hatches do
-  not. Record explicit exceptions with their decision source.
+Search existing issues and owner threads first. Create one issue per bounded
+outcome, or update the existing issue without taking over another owner's work.
+Use the organization's issue state and assignee fields, not a status in the title
+or a second lifecycle vocabulary in its description.
 
-| Source                  | Successfully reviewed version or dated entry | Evidence                         | Coverage limit or next action            |
-| ----------------------- | -------------------------------------------- | -------------------------------- | ---------------------------------------- |
-| Package or product feed | Exact checkpoint                             | Versioned source or announcement | Unread source, deferred release, or none |
+- **Outcome:** consumer-visible gap or dependency-adoption blocker, affected
+  modules, remaining subfeatures, and what would prove the work done.
+- **Upstream contract:** API, package version or dated announcement, source link,
+  context restrictions, and experimental/deprecated status where relevant.
+- **Assessment:** Confect-specific equivalent and remaining gap, with permalinks
+  at the inspected revision. Raw client/context access is interoperability, not
+  parity. Mark imported claims `unassessed` until checked against current code or
+  the upstream contract, and name the missing check; this is an evidence limit,
+  not a second issue state.
+- **Provenance:** source-qualified historical aliases and immutable evidence
+  locators. CONF-85's `C1` and the 2026-10-16 audit's `C1` are different features.
+  Deduplicate the work, not its source aliases; new findings use their issue code.
+- **Scope or decision:** bounded next step, or the specific API, scope, or
+  migration decision needed with prior discussion. Do not repeat an unchanged
+  question. Link recorded decisions and preserve human notes.
+- **Evidence and delivery:** linked owner thread and PR, implementation/test
+  evidence, remaining verification, and publication evidence when relevant.
+  Distinguish inspected test source from tests actually run.
 
-Source checkpoints advance only after review. They do not resolve feature gaps.
-Do not change the inspection date merely because a scheduled run found no change.
+For a compatibility blocker, include current/candidate package versions, the
+failing check or constraint, a concrete prerequisite without weakening tests,
+and an observable retry or resolution condition. Link related feature issues;
+a successful upgrade does not establish feature parity. Preserve resolved
+evidence in links rather than repeated logs.
 
-## Feature inventory
+An open PR is not support on `main`. Close a gap only after inspecting its merged
+implementation and feature-specific evidence for every remaining subfeature.
+A closed, unmerged PR neither resolves nor excludes the gap and must not be
+recreated without a new user request. Record that constraint on the issue.
+Verify the release tag or package contents before naming a published version;
+otherwise say publication is unverified or, when established, not yet released.
 
-Group rows by surface when useful. Keep an implemented row for traceability.
-Use one canonical row for duplicate findings and preserve all original IDs as
-aliases. CONF-85's `C1` and the 2026-10-16 audit's `C1` describe different features;
-qualify inherited IDs with their source. Give new findings unique stable IDs.
-Experimental/deprecated status and partial coverage belong in the feature text,
-not in a second lifecycle-status vocabulary.
+## Captain reference
 
-| ID / aliases               | Upstream API and source   | Confect equivalent or remaining gap             | Status           | Owner / issue / PR and next action               | Implementation / test evidence                                     | Released in                                       |
-| -------------------------- | ------------------------- | ----------------------------------------------- | ---------------- | ------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------- |
-| Source-qualified stable ID | API, version, source link | Consumer capability and any missing subfeatures | One status below | Existing owner and bounded next step or decision | Permalinks at the inspected revision; identify historical evidence | Verified version, not yet released, or unverified |
+Keep only non-actionable checkpoints, decisions, and historical evidence here;
+link issue codes for work instead of copying states, owners, or next-action lists.
+Preserve evidence links before shortening a record, and re-read it before writing
+to avoid overwriting another writer. The Captain owns these shared references.
 
-Use exactly one of these statuses:
+- **Source checkpoint:** package/feed, exact successfully reviewed version or
+  dated entry, versioned source link, inspected Confect branch/commit/date, and
+  coverage limits. Advance only after review, never for unavailable sources.
+  Do not change the inspection date just because a scheduled run found no change.
+- **Historical crosswalk:** source audit and original upstream/repository
+  versions, source-qualified aliases, immutable evidence locator, reconciliation
+  date and limits, and destination issue or reference. Preserve the CONF-85
+  inventory without copying stale implementation claims or daily status rows.
+- **Decision or supported/excluded reference:** capability and context limits,
+  Confect equivalent with implementation/test evidence on `main`, or explicit
+  user decision or internal/non-API evidence and rationale for exclusion. Keep
+  legacy document ID conversion and other approved exceptions visible even when
+  native access remains available. Link remaining work rather than claiming
+  partial support is complete.
 
-- `unassessed`: imported evidence has not been checked against the relevant
-  current code or upstream contract. State the missing check.
-- `backlog`: a verified gap remains, without an implementation owner or unresolved
-  scope decision. Partial support remains a gap.
-- `needs decision`: identify the specific API, scope, or migration decision and
-  its prior discussion. Do not repeatedly ask an unchanged question.
-- `in progress`: link active implementation work and its owner. An open PR is not
-  implementation on `main`; do not take over another thread's work.
-- `implemented`: cite verified implementation and feature-specific evidence on
-  `main`, accounting for every subfeature in the row. Keep npm release status
-  separate and do not claim tests were run when only their source was inspected.
-- `excluded with rationale`: cite the explicit user decision or evidence that
-  the item is internal/non-API. A closed, unmerged PR does not itself authorize
-  exclusion or recreation; retain the gap and record that a new request is needed.
-
-For published support, verify the release tag or package contents before naming
-a version. Use `unverified` when publication has not been checked. Keep explicit
-user-approved exceptions visible even if native access remains available.
-
-## Compatibility blockers
-
-Keep dependency-adoption failures separate from missing Confect APIs. Link a
-feature ID when related, but do not let a successful upgrade close that feature.
-
-| ID        | Upgrade / affected versions            | Blocker and evidence                       | Prerequisite / owner / linked work   | Retry or resolution condition                         |
-| --------- | -------------------------------------- | ------------------------------------------ | ------------------------------------ | ----------------------------------------------------- |
-| Stable ID | Package and current/candidate versions | Failing check or constraint, with evidence | Concrete fix without weakening tests | Observable condition, not a daily repeat notification |
-
-Retain resolved blocker references without repeating their logs. Preserve prior
-evidence in links before shortening the body, and re-read the issue before
-writing to avoid overwriting another writer's changes.
+Source review, an open PR, merged implementation, and verified publication are
+different facts. Keep publication evidence separate from implementation evidence.
+The digest links these records and actionable issues as a concise front door;
+it does not reproduce the historical inventory or the reusable audit procedure.
