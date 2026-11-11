@@ -3,7 +3,8 @@
 Use only the fields relevant to the record. Replace placeholders with verified
 facts; do not paste this guidance into an issue or create a new umbrella tracker.
 Capy Issues own actionable work and its lifecycle. The Captain maintains concise
-Drive references and `DIGEST.md` links, not another issue-status inventory.
+Drive references, not another issue-status inventory. The Captain's Issues view
+and concise conversation summaries are the front door.
 GitHub #800 remains historical evidence only.
 Keep detailed designs and execution logs in linked issues, PRs, or archival
 comments rather than expanding these concise records.
@@ -71,5 +72,5 @@ to avoid overwriting another writer. The Captain owns these shared references.
 
 Source review, an open PR, merged implementation, and verified publication are
 different facts. Keep publication evidence separate from implementation evidence.
-The digest links these records and actionable issues as a concise front door;
-it does not reproduce the historical inventory or the reusable audit procedure.
+Conversation summaries link these records and actionable issues; they do not
+reproduce the historical inventory or the reusable audit procedure.

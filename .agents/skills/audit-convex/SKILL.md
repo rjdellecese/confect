@@ -39,9 +39,10 @@ umbrella tracker. Read the `issues` skill and use the organization's current
 issue states and assignments rather than maintaining a parallel status table.
 
 The Captain's Drive holds concise source checkpoints, recorded decisions, and
-historical evidence references. Its `DIGEST.md` is the user-facing front door,
-linking issues and evidence rather than duplicating their statuses. Keep reusable
-technical procedures in this repository, not in Captain files. Use
+historical evidence references. The Captain's Issues view and concise conversation
+summaries are the user-facing front door, linking issues and evidence rather than
+maintaining a separate status inventory. Keep reusable technical procedures in
+this repository, not in Captain files. Use
 [tracker-template.md](tracker-template.md) for concise issue and reference
 records, preserving human notes and decisions.
 
@@ -56,8 +57,8 @@ and keep at most two implementation threads active without overlapping writers.
 
 ## Discover releases and resume unfinished work
 
-1. Read the Captain's digest, migration references, relevant issues, and crew
-   assignments first. Fetch fresh `main` and inspect existing open PRs and active
+1. Read the Captain's Issues view, relevant issues, migration references, and
+   crew assignments first. Fetch fresh `main` and inspect existing open PRs and active
    audit runs before starting work. Reuse an appropriate open Convex PR; do not
    race its active author, mutate an unrelated dependency PR, or push to a merged or closed PR.
    If another run owns the same work, leave it to that run rather than duplicate
@@ -149,8 +150,8 @@ upgrade does not close a feature gap.
   compatibility PR.
 - Update the assigned issues when actionable findings, blockers, or delivery
   state change. Report evidence and source coverage to the Captain, who maintains
-  checkpoints, decisions, and the digest. Keep source review, an open PR, merged
-  implementation on `main`, and verified npm publication distinct. Do not copy
+  checkpoints, decisions, and concise conversation summaries. Keep source review,
+  an open PR, merged implementation on `main`, and verified npm publication distinct. Do not copy
   issue statuses into Drive, add daily heartbeat comments, or repeat unchanged
   blockers.
 - Report a new PR, newly discovered gap, changed blocker, or decision needed.
