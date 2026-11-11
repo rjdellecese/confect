@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Project from "./integration/Project";
 import * as Bundler from "@confect/cli/Bundler";
 import * as CodegenError from "@confect/cli/CodegenError";
@@ -49,7 +49,7 @@ const makeProject = Effect.fnUntraced(function* () {
   );
   yield* fs.writeFileString(
     path.join(confect, "notes.impl.ts"),
-    Arr.join(
+    Array.join(
       [
         'import { GroupImpl } from "@confect/server";',
         'import databaseSchema from "./_generated/schema";',
@@ -136,7 +136,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           expect(first).not.toEqual([]);
           expect(second).toEqual([]);
 
-          const passes = Arr.filter(
+          const passes = Array.filter(
             spans,
             (span) => span.name === "Cli.codegen",
           );
@@ -147,13 +147,16 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             "LeafModule.validateImpl",
             "ConvexConfig.discoverInstalledComponents",
           ]) {
-            const operations = Arr.filter(spans, (span) => span.name === name);
+            const operations = Array.filter(
+              spans,
+              (span) => span.name === name,
+            );
             expect(operations).toHaveLength(2);
             for (const operation of operations) {
               expect(passes).toContain(Option.getOrUndefined(operation.parent));
             }
           }
-          const bundles = Arr.filter(
+          const bundles = Array.filter(
             spans,
             (span) => span.name === "Bundler.bundle",
           );
@@ -203,7 +206,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           expect(Option.isNone(result)).toBe(true);
           for (const operationName of ["Cli.codegen", name]) {
             const span = Option.getOrUndefined(
-              Arr.findFirst(
+              Array.findFirst(
                 spans,
                 (candidate) => candidate.name === operationName,
               ),

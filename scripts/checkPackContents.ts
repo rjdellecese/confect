@@ -1,6 +1,6 @@
 import * as Str from "effect/String";
 import * as Option from "effect/Option";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Console from "effect/Console";
@@ -42,12 +42,12 @@ export class InvalidPackContents extends Schema.TaggedError<
 }) {
   override get message() {
     return (
-      Arr.join(
-        Arr.map(
+      Array.join(
+        Array.map(
           this.packages,
           ({ directory, problems }) =>
-            `FAIL ${directory}\n${Arr.join(
-              Arr.map(
+            `FAIL ${directory}\n${Array.join(
+              Array.map(
                 problems,
                 ({ path, reason }) => `       ${path}—${reason}`,
               ),
@@ -83,14 +83,14 @@ export const packProblems = (
   files: ReadonlyArray<string>,
 ): ReadonlyArray<typeof PackProblem.Type> => {
   const problems: Array<typeof PackProblem.Type> = [];
-  if (!Arr.some(files, (path) => Str.startsWith("dist/")(path)))
+  if (!Array.some(files, (path) => Str.startsWith("dist/")(path)))
     problems.push({
       path: "dist/",
       reason: "no build output packed—did this run before `pnpm build`?",
     });
   for (const path of files) {
     const denial = Option.getOrUndefined(
-      Arr.findFirst(DENIED, ([pattern]) => pattern.test(path)),
+      Array.findFirst(DENIED, ([pattern]) => pattern.test(path)),
     );
     if (denial !== undefined) problems.push({ path, reason: denial[1] });
   }
@@ -140,7 +140,7 @@ export const decodePackedFiles = Effect.fn("PackContents.decodePackedFiles")(
     )(stdout).pipe(
       Effect.mapError((cause) => InvalidPackOutput.make({ directory, cause })),
     );
-    return Arr.map(output[0].files, (file) => file.path);
+    return Array.map(output[0].files, (file) => file.path);
   },
 );
 

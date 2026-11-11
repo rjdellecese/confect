@@ -2,7 +2,7 @@ import * as Option from "effect/Option";
 import { pipe } from "effect/Function";
 import * as Str from "effect/String";
 import * as Rec from "effect/Record";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { pathToFileURL } from "node:url";
 import * as FileSystem from "effect/FileSystem";
 import * as Console from "effect/Console";
@@ -373,7 +373,7 @@ layer(BundlerLayer)("check", (it) => {
           _tag: "Failure",
           failure: {
             _tag: "BundlerError",
-            cause: { errors: expect.any(Array) },
+            cause: { errors: expect.any(globalThis.Array) },
           },
         });
         const actual3 = yield* fs.readDirectory(directory);
@@ -445,7 +445,7 @@ layer(BundlerLayer)("withBatch", (it) => {
           [first, second],
           Effect.all([Bundler.bundle(first), Bundler.bundle(second)]),
         );
-        expect(Arr.map(bundled, (result) => result.module.value)).toEqual([
+        expect(Array.map(bundled, (result) => result.module.value)).toEqual([
           "assigned",
           "defined",
         ]);
@@ -552,7 +552,7 @@ layer(BundlerLayer)("withBatch", (it) => {
           ).toEqual([file("shared.ts")]);
           expect(bundled.metafile.inputs[file("leaf.ts")]).toBeDefined();
           expect(
-            Arr.some(Rec.keys(bundled.metafile.inputs), (input) =>
+            Array.some(Rec.keys(bundled.metafile.inputs), (input) =>
               pipe(input, Str.includes("node_modules")),
             ),
           ).toBe(false);
@@ -724,7 +724,7 @@ layer(BundlerLayer)("withBatch", (it) => {
               Bundler.importersOfPackage(first, "dependency", () => true),
             ).toEqual([yield* fs.realPath(file("source/shared.ts"))]);
             expect(messages).toHaveLength(1);
-            expect(Arr.join(Arr.map(messages, String), "\n")).toContain(
+            expect(Array.join(Array.map(messages, String), "\n")).toContain(
               "warning.ts",
             );
             const artifacts = Rec.keys(second.metafile.outputs);
@@ -880,7 +880,7 @@ layer(BundlerLayer)("withBatch", (it) => {
               yield* fs.realPath(file("unrelated.ts")),
             ]);
             expect(
-              Arr.map(Rec.values(first.metafile.outputs), (output) =>
+              Array.map(Rec.values(first.metafile.outputs), (output) =>
                 output.entryPoint !== undefined && output.entryPoint !== ""
                   ? path.basename(output.entryPoint)
                   : "shared",
@@ -888,7 +888,7 @@ layer(BundlerLayer)("withBatch", (it) => {
             ).toEqual(["first.ts", "left.ts", "right.ts", "shared"]);
             expect(Rec.keys(unrelated.metafile.outputs)).toHaveLength(1);
             expect(
-              Arr.some(
+              Array.some(
                 Rec.keys(first.metafile.outputs),
                 (key) => key in unrelated.metafile.outputs,
               ),
@@ -903,7 +903,7 @@ layer(BundlerLayer)("withBatch", (it) => {
             }
             expect(
               Option.getOrUndefined(
-                Arr.findFirst(
+                Array.findFirst(
                   Rec.values(first.metafile.outputs),
                   (output) =>
                     output.entryPoint === undefined || output.entryPoint === "",
@@ -959,7 +959,7 @@ layer(BundlerLayer)("withBatch", (it) => {
             const first = yield* Bundler.bundle(file("first.ts"));
             const outputs = Rec.keys(first.metafile.outputs);
             expect(
-              Arr.some(outputs, (output) =>
+              Array.some(outputs, (output) =>
                 pipe(path.basename(output), Str.startsWith("chunk-")),
               ),
             ).toBe(true);
@@ -1059,10 +1059,10 @@ layer(BundlerLayer)("withBatch", (it) => {
             Bundler.bundle(file("nested/second.ts")),
           ]),
         );
-        expect(Arr.map(batch, (entry) => entry.module.default)).toEqual(
-          Arr.map(originals, (entry) => entry.module.default),
+        expect(Array.map(batch, (entry) => entry.module.default)).toEqual(
+          Array.map(originals, (entry) => entry.module.default),
         );
-        expect(Arr.map(batch, (entry) => entry.module.default)).toEqual([
+        expect(Array.map(batch, (entry) => entry.module.default)).toEqual([
           "root",
           "nested",
         ]);
@@ -1180,7 +1180,7 @@ layer(BundlerLayer)("withBatch", (it) => {
             Bundler.bundle(file("nested/second.ts")),
           ]),
         );
-        expect(Arr.map(entries, (entry) => entry.module.value)).toEqual([
+        expect(Array.map(entries, (entry) => entry.module.value)).toEqual([
           "root",
           "nested",
         ]);
@@ -1245,13 +1245,13 @@ layer(BundlerLayer)("withBatch", (it) => {
           ],
         });
         expect(
-          Arr.join(
-            Arr.map(events, (event) => Cause.pretty(event.cause)),
+          Array.join(
+            Array.map(events, (event) => Cause.pretty(event.cause)),
             "\n",
           ),
         ).toContain("broken.ts");
         expect(
-          Arr.map(events, (event) => Cause.findErrorOption(event.cause)),
+          Array.map(events, (event) => Cause.findErrorOption(event.cause)),
         ).toEqual([
           expect.objectContaining({
             value: expect.objectContaining({
@@ -1377,7 +1377,7 @@ layer(BundlerLayer)("withBatch", (it) => {
           expect.objectContaining({ path: file("canonical/shared.ts") }),
         );
         expect(messages).toHaveLength(1);
-        expect(Arr.join(Arr.map(messages, String), "\n")).toContain(
+        expect(Array.join(Array.map(messages, String), "\n")).toContain(
           "Duplicate key",
         );
       }).pipe(Effect.scoped),
@@ -1401,10 +1401,10 @@ layer(BundlerLayer)("withBatch", (it) => {
             expect(messages).toEqual([]);
             yield* Bundler.bundle(file("second.ts"));
             expect(messages).toHaveLength(1);
-            expect(Arr.join(Arr.map(messages, String), "\n")).toContain(
+            expect(Array.join(Array.map(messages, String), "\n")).toContain(
               "Duplicate key",
             );
-            expect(Arr.join(Arr.map(messages, String), "\n")).toContain(
+            expect(Array.join(Array.map(messages, String), "\n")).toContain(
               "warning.ts",
             );
           }),

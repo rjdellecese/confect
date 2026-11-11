@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -23,7 +23,7 @@ const read = FunctionImpl.make(
         .table("transactionNotes")
         .index("by_caseId", (q) => q.eq("caseId", caseId))
         .collect();
-      return Arr.map(notes, (note) => note.value);
+      return Array.map(notes, (note) => note.value);
     }).pipe(Effect.orDie),
 );
 

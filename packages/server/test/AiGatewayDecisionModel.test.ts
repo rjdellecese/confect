@@ -3,7 +3,7 @@ import type * as ConvexServer from "convex/server";
 import { vi } from "vitest";
 import * as RecordEffect from "effect/Record";
 import * as Option from "effect/Option";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { AiGatewayDecisionModel } from "@confect/server";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -277,7 +277,7 @@ describe("AiGatewayDecisionModel", () => {
           number
         >(probabilities)) {
           const expectedProbability = Option.getOrUndefined(
-            Arr.findFirst(
+            Array.findFirst(
               RecordEffect.toEntries<string, number>(expected),
               ([key]) => key === label,
             ),
@@ -287,7 +287,7 @@ describe("AiGatewayDecisionModel", () => {
         }
         assert(
           Math.abs(
-            Arr.reduce(
+            Array.reduce(
               RecordEffect.values<string, number>(probabilities),
               0,
               (total, value) => total + value,

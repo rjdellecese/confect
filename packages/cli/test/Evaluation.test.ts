@@ -1,7 +1,7 @@
 import { pipe } from "effect/Function";
 import * as Option from "effect/Option";
 import * as Str from "effect/String";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 // oxlint-disable-next-line effecttsgo/node-builtin-import -- Spy on real fork handles to verify IPC cleanup and joined subprocess termination.
@@ -113,7 +113,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           );
         yield* Deferred.await(closed).pipe(Effect.timeout("10 seconds"));
         expect(Result.isFailure(result)).toBe(reason === "CompileFailure");
-        const text = Arr.join(output, "");
+        const text = Array.join(output, "");
         if (level === "Debug") {
           expect(text).toContain("falling back to individual builds");
           expect(text).toContain(reason);
@@ -163,7 +163,10 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           true,
         );
         expect(
-          Arr.map([...GenerationSnapshot.functionPaths(next)], (fn) => fn.name),
+          Array.map(
+            [...GenerationSnapshot.functionPaths(next)],
+            (fn) => fn.name,
+          ),
         ).toEqual(["latest"]);
         expectWorkersExited();
         yield* project.write("confect/notes.spec.ts", "export default {};\n");
@@ -199,7 +202,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           ),
         );
         expect(
-          Arr.map(
+          Array.map(
             [...GenerationSnapshot.functionPaths(repaired)],
             (fn) => fn.name,
           ),

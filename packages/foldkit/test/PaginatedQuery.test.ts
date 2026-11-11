@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { FunctionSpec, PaginationError, Ref } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type * as Data from "effect/Data";
@@ -560,9 +560,10 @@ describe("PaginatedQuery", () => {
 
     it("exposes state predicates as refinements", () => {
       const state: State = loadedPageOne();
-      const successful = Arr.findFirst([state], PaginatedQuery.isSuccess).pipe(
-        Option.getOrThrow,
-      );
+      const successful = Array.findFirst(
+        [state],
+        PaginatedQuery.isSuccess,
+      ).pipe(Option.getOrThrow);
       expectTypeOf(successful.phase.data).toEqualTypeOf<
         PaginatedQuery.Page<Item>
       >();

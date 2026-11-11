@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import { identity } from "effect/Function";
@@ -106,7 +106,7 @@ describe("QueryStream.merge", () => {
             direction,
             Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
             Stream.fromIterable(
-              Arr.map(
+              Array.map(
                 ranks,
                 (rank) =>
                   new QueryStream.Element({
@@ -358,7 +358,7 @@ describe.each(["asc", "desc"] as const)(
             order,
             Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
             Stream.fromIterable(
-              Arr.map(
+              Array.map(
                 values,
                 (value) =>
                   new QueryStream.Element({
@@ -466,7 +466,7 @@ describe.each(["asc", "desc"] as const)(
             identity,
           ),
           Stream.fromIterable(
-            Arr.map(
+            Array.map(
               ids,
               (id) =>
                 new QueryStream.Element({

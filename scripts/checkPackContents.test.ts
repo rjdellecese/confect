@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { expect, test } from "bun:test";
 import * as Effect from "effect/Effect";
@@ -44,7 +44,7 @@ test("denies every class of unwanted packed file without changing inputs", () =>
     "dist/tsconfig.src.json",
   ];
   const before = [...files];
-  expect(Arr.map(packProblems(files), ({ path }) => path)).toEqual(
+  expect(Array.map(packProblems(files), ({ path }) => path)).toEqual(
     files.slice(1),
   );
   expect(files).toEqual(before);
@@ -129,8 +129,8 @@ test(
         if (error._tag === "InvalidPackContents") {
           expect(error.packages).toHaveLength(2);
           expect(
-            Arr.flatMap(error.packages, ({ problems }) =>
-              Arr.map(problems, (problem) => problem.path),
+            Array.flatMap(error.packages, ({ problems }) =>
+              Array.map(problems, (problem) => problem.path),
             ).sort(),
           ).toEqual(["dist/", "dist/cache.tsbuildinfo"]);
         }

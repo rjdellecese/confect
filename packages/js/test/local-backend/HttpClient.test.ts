@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { FunctionSpec, Ref } from "@confect/core";
 import * as HttpClient from "@confect/js/HttpClient";
 import { assert, expect, expectTypeOf, layer } from "@effect/vitest";
@@ -102,13 +102,13 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             );
             expect(observed1).toEqual([42, 42]);
             expect(
-              Arr.map(span.mock.calls, ([options]) => options.name),
+              Array.map(span.mock.calls, ([options]) => options.name),
             ).toEqual([
               "caller",
               `HttpClient.${operation.name}`,
               `HttpClient.${operation.name}`,
             ]);
-            const [parent, ...children] = Arr.map(
+            const [parent, ...children] = Array.map(
               span.mock.results,
               (result) => result.value,
             );
@@ -132,7 +132,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
               .run(client, "typed")
               .pipe(Effect.result, Effect.withTracer(Tracer.make({ span })));
             expect(
-              Arr.map(span.mock.calls, ([options]) => options.name),
+              Array.map(span.mock.calls, ([options]) => options.name),
             ).toEqual([`HttpClient.${operation.name}`]);
             const child = span.mock.results[0]?.value;
             assert(child !== undefined);

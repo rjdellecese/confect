@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { describe, expect, layer } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
@@ -202,9 +202,9 @@ export * as QueryStream from "./QueryStream";
           ),
         )(result.stdout);
         expect(
-          Arr.map(output.diagnostics, (diagnostic) => diagnostic.code),
+          Array.map(output.diagnostics, (diagnostic) => diagnostic.code),
         ).toEqual(
-          Array.from(
+          globalThis.Array.from(
             { length: missing },
             () => "confect(require-query-stream-experimental)",
           ),

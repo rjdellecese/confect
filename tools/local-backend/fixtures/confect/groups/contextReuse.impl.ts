@@ -1,5 +1,5 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
@@ -43,7 +43,7 @@ const read = FunctionImpl.make(
         .table("transactionNotes")
         .index("by_caseId", (q) => q.eq("caseId", caseId))
         .collect();
-      return { ...observation, values: Arr.map(notes, (note) => note.value) };
+      return { ...observation, values: Array.map(notes, (note) => note.value) };
     }).pipe(Effect.orDie),
 );
 
@@ -70,8 +70,8 @@ const write = FunctionImpl.make(
         .collect();
       return {
         ...observation,
-        previousValues: Arr.map(notes, (note) => note.value),
-        values: Arr.map(after, (note) => note.value),
+        previousValues: Array.map(notes, (note) => note.value),
+        values: Array.map(after, (note) => note.value),
       };
     }).pipe(Effect.orDie),
 );

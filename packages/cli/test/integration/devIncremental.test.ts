@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { pipe } from "effect/Function";
 import * as Option from "effect/Option";
 import * as Str from "effect/String";
@@ -271,7 +271,7 @@ if (existsSync(block)) {
             yield* project.write(`confect/${name}.spec.ts`, Project.spec);
             yield* project.write(
               `confect/${name}.impl.ts`,
-              Arr.join(
+              Array.join(
                 [
                   name === "unrelated"
                     ? "const version = 0;"
@@ -323,7 +323,10 @@ if (existsSync(block)) {
           const observedImpl = `${Project.impl}\nprocess.stdout.write("${changedMarker}\\n");\n`;
           yield* project.write("confect/notes.impl.ts", observedImpl);
           yield* Effect.forEach(
-            Array.from({ length: unrelatedGroups }, (_, i) => `other${i}`),
+            globalThis.Array.from(
+              { length: unrelatedGroups },
+              (_, i) => `other${i}`,
+            ),
             (name) =>
               Effect.all([
                 project.write(`confect/${name}.spec.ts`, Project.spec),

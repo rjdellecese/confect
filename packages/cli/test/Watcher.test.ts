@@ -1,7 +1,7 @@
 import { pipe } from "effect/Function";
 import * as Str from "effect/String";
 import * as Schema from "effect/Schema";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { assert, expect, it, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as esbuild from "esbuild";
@@ -209,8 +209,8 @@ layer(NodeServices.layer)("entry configuration", (test) => {
                       if (table) {
                         yield* Ref.set(
                           earlierOutput,
-                          Arr.join(
-                            Arr.map(
+                          Array.join(
+                            Array.map(
                               result.outputFiles ?? [],
                               (output) => output.text,
                             ),
@@ -303,7 +303,7 @@ layer(NodeServices.layer)("entry configuration", (test) => {
                 runSync(
                   Ref.update(outputs, (current) => [
                     ...current,
-                    ...Arr.map(result.outputFiles ?? [], (file) => file.text),
+                    ...Array.map(result.outputFiles ?? [], (file) => file.text),
                   ]),
                 ),
               );
@@ -315,9 +315,9 @@ layer(NodeServices.layer)("entry configuration", (test) => {
       expect(Watcher.isRefreshSuccessful(actual10)).toBe(true);
       expect((yield* watcher.diagnostics).errors).toEqual([]);
       const current4 = yield* Ref.get(outputs);
-      expect(Arr.join(current4, "\n")).toContain("chosen-spec");
+      expect(Array.join(current4, "\n")).toContain("chosen-spec");
       const current5 = yield* Ref.get(outputs);
-      expect(Arr.join(current5, "\n")).toContain("chosen-table");
+      expect(Array.join(current5, "\n")).toContain("chosen-table");
       yield* watcher.next;
       yield* project.write("table-value.ts", 'export const value = "changed";');
       const actual11 = yield* watcher.refresh;
@@ -417,7 +417,7 @@ layer(NodeServices.layer)("package self-reference resolution", (test) => {
         });
         const first = yield* watcher.refresh;
         expect(
-          Arr.map((yield* watcher.diagnostics).errors, (error) => error.text),
+          Array.map((yield* watcher.diagnostics).errors, (error) => error.text),
         ).toEqual([]);
         expect(first).toMatchObject({
           _tag: "Observed",
