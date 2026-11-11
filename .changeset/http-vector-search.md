@@ -7,7 +7,6 @@ Require a database schema when constructing an HTTP router, enabling the generat
 ### Breaking Changes
 
 - `HttpRouter.make(routes)` is removed. Pass the generated runtime database schema as the first argument, even when routes do not use vector search.
-- `HttpRouter.Routes` and `HttpRouter.Services` require a schema type argument: use `HttpRouter.Routes<typeof databaseSchema>` and `HttpRouter.Services<typeof databaseSchema>`.
 
 To migrate, import the runtime schema from `./_generated/schema` in `confect/http.ts` and pass it before your existing routes.
 

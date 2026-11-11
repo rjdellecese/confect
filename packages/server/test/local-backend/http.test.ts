@@ -1,7 +1,7 @@
 import * as Layer from "effect/Layer";
 import { GenericId, Ref } from "@confect/core";
 import { expect, layer } from "@effect/vitest";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -45,7 +45,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })("HttpRouter", (it) => {
               if (filter !== caseId) {
                 expect(matches).toEqual([]);
               } else {
-                expect(Arr.map(matches, (match) => match._id)).toEqual(ids);
+                expect(Array.map(matches, (match) => match._id)).toEqual(ids);
                 expect(matches[0]?._score).toBeCloseTo(1);
                 expect(matches[1]?._score).toBeCloseTo(0);
               }
