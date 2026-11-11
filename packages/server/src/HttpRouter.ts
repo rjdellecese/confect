@@ -1,4 +1,5 @@
 import {
+  type GenericActionCtx,
   type HttpRouter as ConvexHttpRouter,
   httpActionGeneric,
   httpRouter,
@@ -32,7 +33,7 @@ import type { Storage } from "./Storage";
 import type { StorageActionWriter } from "./StorageActionWriter";
 import type { StorageReader } from "./StorageReader";
 import type { StorageWriter } from "./StorageWriter";
-import * as VectorSearch from "./VectorSearch";
+import type * as VectorSearch from "./VectorSearch";
 
 /**
  * The Confect services available to HTTP route handlers and middleware,
@@ -130,11 +131,11 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
   const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
-    const services = Layer.mergeAll(
-      RegisteredFunction.baseActionLayer(ctx),
-      VectorSearch.layer<DataModel.FromSchema<Schema>>(
-        ctx.vectorSearch.bind(ctx),
-      ),
+    const services = RegisteredFunction.actionLayer(
+      databaseSchema,
+      ctx as unknown as GenericActionCtx<
+        DataModel.ToConvex<DataModel.FromSchema<Schema>>
+      >,
     ).pipe(Layer.build, Effect.scoped, Effect.runSync);
     return handler(
       request,

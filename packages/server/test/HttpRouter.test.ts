@@ -1,5 +1,6 @@
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import type * as DataModel from "@confect/server/DataModel";
+import type * as ActionCtx from "@confect/server/ActionCtx";
 import * as ConfectHttpRouter from "@confect/server/HttpRouter";
 import * as Table from "@confect/server/Table";
 import * as VectorSearch from "@confect/server/VectorSearch";
@@ -118,6 +119,9 @@ describe("HttpRouter", () => {
     >().not.toExtend<Services>();
     expectTypeOf<MutationAuth.MutationAuth>().not.toExtend<Services>();
     expectTypeOf<TransactionMetadata.TransactionMetadata>().not.toExtend<Services>();
+    expectTypeOf<
+      ActionCtx.ActionCtx<DataModel.ToConvex<Model>>
+    >().not.toExtend<Services>();
   });
 
   it("does not evaluate or alter table schemas when constructing a router", () => {
