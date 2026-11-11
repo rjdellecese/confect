@@ -45,7 +45,7 @@ export const DocumentIds = <
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   schema: DatabaseSchema_,
   reader: GenericDatabaseReader<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
 ): DocumentIds<DatabaseSchema_> => {
   const normalize = <
@@ -98,6 +98,6 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   schema: DatabaseSchema_,
   reader: GenericDatabaseReader<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
 ) => Layer.succeed(DocumentIds<DatabaseSchema_>(), make(schema, reader));

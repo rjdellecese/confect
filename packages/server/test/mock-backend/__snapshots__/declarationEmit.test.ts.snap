@@ -56,7 +56,7 @@ export declare const StorageWriter: typeof StorageWriter_.StorageWriter;
 export type StorageWriter = typeof StorageWriter.Identifier;
 export declare const StorageActionWriter: typeof StorageActionWriter_.StorageActionWriter;
 export type StorageActionWriter = typeof StorageActionWriter.Identifier;
-export declare const VectorSearch: VectorSearch_.VectorSearchTag<DataModel.FromSchema<typeof schemaDefinition>>;
+export declare const VectorSearch: VectorSearch_.VectorSearchTag<DataModel.FromDatabaseSchema<typeof schemaDefinition>>;
 export type VectorSearch = typeof VectorSearch.Identifier;
 export declare const DocumentIds: DocumentIds_.DocumentIdsTag<typeof schemaDefinition>;
 export type DocumentIds = typeof DocumentIds.Identifier;
@@ -110,11 +110,11 @@ export declare const ActionRunner: import("effect/Context").Service<{
     runAction: <Action extends import("@confect/core/Ref").AnyAction>(action: Action, ...args: import("@confect/core/Ref").OptionalArgs<Action>) => import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Action>, import("@confect/core/Ref").Error<Action> | import("effect/Schema").SchemaError>;
 }>;
 export type ActionRunner = typeof ActionRunner.Identifier;
-export declare const QueryCtx: QueryCtx_.QueryCtxTag<DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>>;
+export declare const QueryCtx: QueryCtx_.QueryCtxTag<DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>>;
 export type QueryCtx = typeof QueryCtx.Identifier;
-export declare const MutationCtx: MutationCtx_.MutationCtxTag<DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>>;
+export declare const MutationCtx: MutationCtx_.MutationCtxTag<DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>>;
 export type MutationCtx = typeof MutationCtx.Identifier;
-export declare const ActionCtx: ActionCtx_.ActionCtxTag<DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>>;
+export declare const ActionCtx: ActionCtx_.ActionCtxTag<DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>>;
 export type ActionCtx = typeof ActionCtx.Identifier;
 "
 `;

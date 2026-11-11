@@ -297,7 +297,7 @@ export const actionFunctionBase = <
   resolvedMiddlewares?: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
   createLayer: (
     ctx: GenericActionCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
   ) => Layer.Layer<R>;
 }) => ({
@@ -305,7 +305,7 @@ export const actionFunctionBase = <
   returns: () => compileReturnsSchema(returns),
   handler: (
     ctx: GenericActionCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
@@ -351,9 +351,9 @@ export type ActionServices<
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
-  | VectorSearch.VectorSearch<DataModel.FromSchema<DatabaseSchema_>>
+  | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   | ActionCtx.ActionCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >;
 
 /**
@@ -383,7 +383,7 @@ export const actionLayer = <
 >(
   databaseSchema: DatabaseSchema_,
   ctx: GenericActionCtx<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
 ) =>
   Layer.mergeAll(

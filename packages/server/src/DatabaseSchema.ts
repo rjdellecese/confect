@@ -34,9 +34,9 @@ export type Tables<DatabaseSchema_ extends AnyWithProps> =
 /**
  * The bound table record, without evaluating any table schemas.
  */
-export const tables = <Schema extends AnyWithProps>(
-  self: Schema,
-): Schema[TypeId] => self[TypeId];
+export const tables = <DatabaseSchema_ extends AnyWithProps>(
+  self: DatabaseSchema_,
+): DatabaseSchema_[TypeId] => self[TypeId];
 
 export type TableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
   Tables<DatabaseSchema_>

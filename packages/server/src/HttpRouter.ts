@@ -50,7 +50,7 @@ export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | StorageReader
   | StorageWriter
   | StorageActionWriter
-  | VectorSearch.VectorSearch<DataModel.FromSchema<DatabaseSchema_>>;
+  | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>;
 
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
@@ -133,7 +133,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     // so the scope can close as soon as the context is built.
     const services = Layer.mergeAll(
       RegisteredFunction.baseActionLayer(ctx),
-      VectorSearch.layer<DataModel.FromSchema<DatabaseSchema_>>(
+      VectorSearch.layer<DataModel.FromDatabaseSchema<DatabaseSchema_>>(
         ctx.vectorSearch.bind(ctx),
       ),
     ).pipe(Layer.build, Effect.scoped, Effect.runSync);

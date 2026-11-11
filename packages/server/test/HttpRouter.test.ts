@@ -37,7 +37,7 @@ describe("HttpRouter", () => {
       "documents",
     ),
   });
-  type Model = DataModel.FromSchema<typeof schema>;
+  type Model = DataModel.FromDatabaseSchema<typeof schema>;
   const Search = VectorSearch.VectorSearch<Model>();
 
   it("requires a matching schema for vector-search route requirements", () => {

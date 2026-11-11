@@ -12,7 +12,10 @@ import type * as Table from "./Table";
 export type Document<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   TableName extends DatabaseSchema.TableNames<DatabaseSchema_>,
-> = DataModel.DocumentByName<DataModel.FromSchema<DatabaseSchema_>, TableName>;
+> = DataModel.DocumentByName<
+  DataModel.FromDatabaseSchema<DatabaseSchema_>,
+  TableName
+>;
 
 export type WithoutSystemFields<Doc> = Doc extends unknown
   ? Omit<Doc, "_creationTime" | "_id">

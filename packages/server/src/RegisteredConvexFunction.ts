@@ -222,7 +222,9 @@ const queryFunction = <
     | QueryRunner.QueryRunner
     | QueryTransactionContext.QueryTransactionContext
     | QueryCtx.QueryCtx<
-        DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+        DataModel.ToConvexDataModel<
+          DataModel.FromDatabaseSchema<DatabaseSchema_>
+        >
       >
   >;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
@@ -231,7 +233,7 @@ const queryFunction = <
   returns: () => compileReturnsSchema(returns),
   handler: (
     ctx: GenericQueryCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
@@ -263,7 +265,9 @@ const queryFunction = <
           QueryTransactionContext.layer(ctx),
           Layer.succeed(
             QueryCtx.QueryCtx<
-              DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+              DataModel.ToConvexDataModel<
+                DataModel.FromDatabaseSchema<DatabaseSchema_>
+              >
             >(),
             ctx,
           ),
@@ -289,7 +293,7 @@ export const mutationLayer = <
 >(
   schema: DatabaseSchema_,
   ctx: GenericMutationCtx<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
 ) =>
   Layer.mergeAll(
@@ -311,7 +315,9 @@ export const mutationLayer = <
     MutationTransactionContext.layer(ctx),
     Layer.succeed(
       MutationCtx.MutationCtx<
-        DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+        DataModel.ToConvexDataModel<
+          DataModel.FromDatabaseSchema<DatabaseSchema_>
+        >
       >(),
       ctx,
     ),
@@ -339,7 +345,7 @@ export type MutationServices<
   | QueryTransactionContext.QueryTransactionContext
   | MutationTransactionContext.MutationTransactionContext
   | MutationCtx.MutationCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >;
 
 const mutationFunction = <
@@ -374,7 +380,7 @@ const mutationFunction = <
   returns: () => compileReturnsSchema(returns),
   handler: (
     ctx: GenericMutationCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
