@@ -232,7 +232,7 @@ Keep using `FunctionImpl.make(databaseSchema, group, name, handler)` with the ge
 
 Component codegen rejects `confect/auth.ts`. Configuration reads still use Convex's environment provider; declare component environment variables through the native component configuration API.
 
-For Effect HTTP routes, use `HttpRouter.forSchema(databaseSchema)(routes)` so route capabilities follow the component schema too. Mount the component's routes using Convex's component HTTP routing API. The schema-free `HttpRouter.make(routes)` remains the application API.
+For Effect HTTP routes, use `HttpRouter.forSchema(databaseSchema)(routes)` so route capabilities follow the component schema too. Mount the component's routes using Convex's component HTTP routing API. Applications use `HttpRouter.make(databaseSchema, routes)`; both APIs provide schema-typed vector search.
 
 Plain Convex functions keep the `ctx` argument supplied by Convex and its runtime restrictions; Confect does not rewrite their handlers.
 

@@ -6,8 +6,10 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as NotesApi from "./http/NotesApi";
 import * as ScalarDocs from "./http/ScalarDocs";
+import databaseSchema from "./_generated/schema";
 
 export default ConfectHttpRouter.make(
+  databaseSchema,
   Layer.mergeAll(
     NotesApi.layer,
     ScalarDocs.layer,

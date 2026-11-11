@@ -12,7 +12,6 @@ import {
   type DefaultFunctionArgs,
   type FunctionVisibility,
   type GenericActionCtx,
-  type GenericDataModel,
   type RegisteredAction,
   type RegisteredMutation,
   type RegisteredQuery,
@@ -340,28 +339,6 @@ export type ActionServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = Handler.ActionServices<DatabaseSchema_>;
 
-/**
- * The ctx-backed action services that don't depend on a Confect database
- * schema. {@link actionLayer} adds the schema-typed `VectorSearch` on top; the
- * HTTP API handler uses this base directly.
- */
-export const baseActionLayer = <ConvexDataModel extends GenericDataModel>(
-  ctx: GenericActionCtx<ConvexDataModel>,
-) =>
-  Layer.mergeAll(
-    Scheduler.layer(ctx.scheduler),
-    Auth.layer(ctx.auth),
-    ExecutionMetadata.layer(ctx.meta),
-    RequestMetadata.layer(ctx.meta),
-    Storage.layer(ctx.storage),
-    StorageWriter.StorageWriter.layer(ctx.storage),
-    StorageActionWriter.StorageActionWriter.layer(ctx.storage),
-    QueryRunner.layer(ctx.runQuery.bind(ctx)),
-    MutationRunner.layer(ctx.runMutation.bind(ctx)),
-    ActionRunner.layer(ctx.runAction.bind(ctx)),
-    Layer.succeed(ActionCtx.ActionCtx<ConvexDataModel>(), ctx),
-  );
-
 export const actionLayer = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(
@@ -399,5 +376,7 @@ export const actionLayer = <
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>,
       DatabaseSchema.Scope<DatabaseSchema_>
     >(ctx, databaseSchema.target.scope),
-    VectorSearch.layer(ctx.vectorSearch.bind(ctx)),
+    VectorSearch.layer<DataModel.FromSchema<DatabaseSchema_>>(
+      ctx.vectorSearch.bind(ctx),
+    ),
   );

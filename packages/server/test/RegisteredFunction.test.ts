@@ -2,17 +2,29 @@ import * as RecordEffect from "effect/Record";
 import { UnsupportedSchemaTypeError } from "@confect/core/SchemaToValidator";
 import { ConvexError, v } from "convex/values";
 import * as RegisteredFunction from "@confect/server/RegisteredFunction";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Console from "effect/Console";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Logger from "effect/Logger";
+import type * as Layer from "effect/Layer";
 import * as References from "effect/References";
 import * as Schema from "effect/Schema";
 import * as Scheduler from "effect/Scheduler";
 import * as TestConsole from "effect/testing/TestConsole";
 import { vi } from "vitest";
+import type databaseSchema from "./mock-backend/fixtures/confect/_generated/schema";
+
+describe("actionLayer", () => {
+  it("provides the complete schema-typed action service set", () => {
+    expectTypeOf<
+      ReturnType<typeof RegisteredFunction.actionLayer<typeof databaseSchema>>
+    >().toEqualTypeOf<
+      Layer.Layer<RegisteredFunction.ActionServices<typeof databaseSchema>>
+    >();
+  });
+});
 
 describe("runHandlerPromise", () => {
   it.effect("encodes declared errors without wrapping the ConvexError", () =>

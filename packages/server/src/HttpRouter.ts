@@ -34,27 +34,29 @@ import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as Scheduler from "./Scheduler";
-import type { Storage } from "./Storage";
-import type { StorageActionWriter } from "./StorageActionWriter";
-import type { StorageReader } from "./StorageReader";
-import type { StorageWriter } from "./StorageWriter";
+import type * as Storage from "./Storage";
+import type * as StorageActionWriter from "./StorageActionWriter";
+import type * as StorageReader from "./StorageReader";
+import type * as StorageWriter from "./StorageWriter";
+import type * as VectorSearch from "./VectorSearch";
 
 /**
  * The Confect services available to HTTP route handlers and middleware,
  * supplied per request from the Convex action context.
  */
-export type Services =
+export type Services<Schema extends DatabaseSchema.AnyWithProps> =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
-  | Scheduler.Scheduler
-  | Auth.Auth
+  | Scheduler.ForScope<DatabaseSchema.Scope<Schema>>
+  | Auth.ForTarget<Schema["target"]>
   | ExecutionMetadata
   | RequestMetadata
-  | Storage
-  | StorageReader
-  | StorageWriter
-  | StorageActionWriter;
+  | Storage.ForScope<DatabaseSchema.Scope<Schema>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<Schema>>
+  | StorageWriter.ForScope<DatabaseSchema.Scope<Schema>>
+  | StorageActionWriter.ForScope<DatabaseSchema.Scope<Schema>>
+  | VectorSearch.VectorSearch<DataModel.FromSchema<Schema>>;
 
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
@@ -79,7 +81,10 @@ export type Services =
  *
  * @stability unstable
  */
-export type Routes<Services_ = Services> = Layer.Layer<
+export type Routes<Schema extends DatabaseSchema.AnyWithProps> =
+  RoutesWithServices<Services<Schema>>;
+
+type RoutesWithServices<Services_> = Layer.Layer<
   never,
   never,
   | HttpRouter.HttpRouter
@@ -94,7 +99,8 @@ export type Routes<Services_ = Services> = Layer.Layer<
 >;
 
 /**
- * Create a Convex HTTP router serving the given routes.
+ * Create a Convex HTTP router from a runtime database schema and routes, with
+ * schema-typed vector search in handlers and middleware.
  *
  * A single catch-all `httpAction` is registered for every routable method under
  * the path prefix `"/"`, making the Effect router the single source of truth
@@ -107,18 +113,24 @@ export type Routes<Services_ = Services> = Layer.Layer<
  *
  * @stability unstable
  */
-export const make = (routes: Routes): ConvexHttpRouter =>
-  makeWithLayer(routes, RegisteredFunction.baseActionLayer);
+export const make = <Schema extends DatabaseSchema.AnyWithProps>(
+  databaseSchema: Schema,
+  routes: Routes<NoInfer<Schema>>,
+): ConvexHttpRouter => forSchema(databaseSchema)(routes);
 
 /**
  * Derive HTTP capabilities and ID scopes from the generated database schema.
  * Component routes are relative to their installation's HTTP mount prefix.
+ *
+ * @stability unstable
  */
 export const forSchema =
   <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     schema: DatabaseSchema_,
   ) =>
-  (routes: Routes<Handler.ActionServices<DatabaseSchema_>>): ConvexHttpRouter =>
+  (
+    routes: RoutesWithServices<Handler.ActionServices<DatabaseSchema_>>,
+  ): ConvexHttpRouter =>
     makeWithLayer<
       Handler.ActionServices<DatabaseSchema_>,
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
@@ -150,7 +162,7 @@ const componentRouter = Layer.effect(
 );
 
 const makeWithLayer = <Services_, DataModel_ extends GenericDataModel>(
-  routes: Routes<Services_>,
+  routes: RoutesWithServices<Services_>,
   layer: (ctx: GenericActionCtx<DataModel_>) => Layer.Layer<Services_>,
 ): ConvexHttpRouter => {
   applyMonkeyPatches();

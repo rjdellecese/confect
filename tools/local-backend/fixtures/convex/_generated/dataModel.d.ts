@@ -27,6 +27,27 @@ import type { GenericId } from "convex/values";
  */
 
 export type DataModel = {
+  httpVectors: {
+    document: {
+      caseId: string;
+      embedding: Array<number>;
+      _id: Id<"httpVectors">;
+      _creationTime: number;
+    };
+    fieldPaths: "_creationTime" | "_id" | "caseId" | "embedding";
+    indexes: {
+      by_id: ["_id"];
+      by_creation_time: ["_creationTime"];
+    };
+    searchIndexes: {};
+    vectorIndexes: {
+      embedding: {
+        vectorField: "embedding";
+        dimensions: number;
+        filterFields: "caseId";
+      };
+    };
+  };
   transactionNotes: {
     document: {
       caseId: string;
