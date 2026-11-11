@@ -127,7 +127,7 @@ it.effect(
 
 it.effect("keeps internal helpers within their caller's span", () =>
   Effect.gen(function* () {
-    const spans: globalThis.Array<Tracer.Span> = [];
+    const spans: Array<Tracer.Span> = [];
     const tracer = Tracer.make({
       span(options) {
         const span = new Tracer.NativeSpan(options);

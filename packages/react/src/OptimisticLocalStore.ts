@@ -19,7 +19,7 @@ export interface OptimisticLocalStore {
 
   getAllQueries<Query extends Ref.AnyPublicQuery>(
     queryRef: Query,
-  ): globalThis.Array<{
+  ): Array<{
     args: Ref.Args<Query>;
     value: Option.Option<Ref.Returns<Query>>;
   }>;

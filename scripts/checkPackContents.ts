@@ -82,7 +82,7 @@ export class InvalidPackOutput extends Schema.TaggedError<
 export const packProblems = (
   files: ReadonlyArray<string>,
 ): ReadonlyArray<typeof PackProblem.Type> => {
-  const problems: globalThis.Array<typeof PackProblem.Type> = [];
+  const problems: Array<typeof PackProblem.Type> = [];
   if (!Array.some(files, (path) => Str.startsWith("dist/")(path)))
     problems.push({
       path: "dist/",
@@ -104,7 +104,7 @@ export const publishedPackages = Effect.fn("PackContents.publishedPackages")(
   function* (packagesDirectory = "packages") {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const directories: globalThis.Array<string> = [];
+    const directories: Array<string> = [];
     for (const name of yield* fs.readDirectory(packagesDirectory)) {
       const directory = path.join(packagesDirectory, name);
       if ((yield* fs.stat(directory)).type !== "Directory") continue;
@@ -180,7 +180,7 @@ export const packedFiles = Effect.fn("PackContents.packedFiles")(function* (
 export const checkPackContents = Effect.fn("PackContents.check")(function* (
   packagesDirectory = "packages",
 ) {
-  const failures: globalThis.Array<
+  const failures: Array<
     (typeof InvalidPackContents.prototype.packages)[number]
   > = [];
   for (const directory of yield* publishedPackages(packagesDirectory)) {

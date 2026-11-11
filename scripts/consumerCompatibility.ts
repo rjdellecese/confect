@@ -109,7 +109,7 @@ export const graphProblems = (
   const cohort = new Map(
     Array.map(candidates, (entry) => [entry.manifest.name, entry]),
   );
-  const problems: globalThis.Array<GraphProblem> = [];
+  const problems: Array<GraphProblem> = [];
   for (const entry of packages) {
     const { manifest } = entry;
     if (!Str.startsWith(`${directory}/`)(entry.path)) {
@@ -221,7 +221,7 @@ export const packedManifestProblems = (
   packed: Manifest,
   versions: Readonly<Record<string, string>>,
 ): ReadonlyArray<string> => {
-  const problems: globalThis.Array<string> = [];
+  const problems: Array<string> = [];
   if (source.name !== packed.name || source.version !== packed.version)
     problems.push("Packed identity differs from source");
   for (const field of [

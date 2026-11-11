@@ -209,7 +209,7 @@ const candidatesFor = Effect.fn("Consumer.candidatesFor")(function* (
       ? path.resolve(artifacts)
       : path.join(directory, "artifacts");
   yield* fs.makeDirectory(output, { recursive: true });
-  const candidates: globalThis.Array<Candidate> = [];
+  const candidates: Array<Candidate> = [];
   for (const source of sources) {
     const tarball = path.join(
       output,

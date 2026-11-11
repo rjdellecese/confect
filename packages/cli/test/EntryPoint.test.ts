@@ -20,7 +20,7 @@ import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 
 it("refines optional entries without including spec, impl, table, or config entries", () => {
-  const entries: globalThis.Array<EntryPoint.Kind> = [
+  const entries: Array<EntryPoint.Kind> = [
     EntryPoint.Kind.Http({ relativePath: "http.ts" }),
     EntryPoint.Kind.Crons({ relativePath: "crons.ts" }),
     EntryPoint.Kind.Auth({ relativePath: "auth.ts" }),
@@ -42,9 +42,7 @@ it("refines optional entries without including spec, impl, table, or config entr
     "Auth",
   ]);
   expectTypeOf(optional).toEqualTypeOf<
-    globalThis.Array<
-      Extract<EntryPoint.Kind, { readonly _tag: EntryPoint.OptionalFile }>
-    >
+    Array<Extract<EntryPoint.Kind, { readonly _tag: EntryPoint.OptionalFile }>>
   >();
 });
 

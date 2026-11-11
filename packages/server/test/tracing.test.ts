@@ -66,7 +66,7 @@ const actionRef = Ref.make(
 
 const makeRecorder = Effect.gen(function* () {
   const baseTracer = yield* Effect.service(Tracer.Tracer);
-  const spans: globalThis.Array<Tracer.Span> = [];
+  const spans: Array<Tracer.Span> = [];
   const tracer = Tracer.make({
     span(options) {
       const span = baseTracer.span(options);

@@ -20,7 +20,7 @@ import * as Path from "effect/Path";
 import * as Tracer from "effect/Tracer";
 
 const makeRecordingTracer = () => {
-  const spans: globalThis.Array<Tracer.Span> = [];
+  const spans: Array<Tracer.Span> = [];
   const tracer = Tracer.make({
     span(options) {
       const span = new Tracer.NativeSpan(options);

@@ -578,7 +578,7 @@ describe("QueryStream", () => {
     "preserves filtered elements through effectful transformations",
     () =>
       Effect.gen(function* () {
-        const visited: globalThis.Array<number> = [];
+        const visited: Array<number> = [];
         const transformed = source.pipe(
           QueryStream.mapEffect((doc) =>
             Effect.sync(() => {
@@ -614,7 +614,7 @@ describe("QueryStream.narrow", () => {
   it("checks layout compatibility before invoking a narrowing recipe", () => {
     const layout = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["score"]));
     const other = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["rank"]));
-    const received: globalThis.Array<QueryStreamKeyBounds.ParsedBounds> = [];
+    const received: Array<QueryStreamKeyBounds.ParsedBounds> = [];
     const source = new QueryStream.QueryStream<
       number,
       QueryStreamKeyLabels.QueryStreamKeyLabels<["score"]>,
@@ -654,7 +654,7 @@ describe("QueryStream.narrow", () => {
       const layout = Result.getOrThrow(
         QueryStreamKeyLayout.fromIndex(["score"]),
       );
-      const received: globalThis.Array<QueryStreamKeyBounds.ParsedBounds> = [];
+      const received: Array<QueryStreamKeyBounds.ParsedBounds> = [];
       const source = () =>
         new QueryStream.QueryStream<
           number,
@@ -702,7 +702,7 @@ describe("QueryStream.narrow", () => {
 
   it("rebinds renamed bounds to the underlying stream's layout", () => {
     const layout = Result.getOrThrow(QueryStreamKeyLayout.fromIndex(["score"]));
-    const received: globalThis.Array<QueryStreamKeyBounds.ParsedBounds> = [];
+    const received: Array<QueryStreamKeyBounds.ParsedBounds> = [];
     const source = new QueryStream.QueryStream<
       number,
       QueryStreamKeyLabels.QueryStreamKeyLabels<["score"]>,

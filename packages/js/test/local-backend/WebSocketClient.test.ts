@@ -390,12 +390,9 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
       it.effect("closes the real WebSocket when the layer's scope ends", () =>
         Effect.gen(function* () {
           const { client: backend } = yield* LocalBackend.LocalBackend;
-          const sockets: globalThis.Array<WebSocket> = [];
+          const sockets: Array<WebSocket> = [];
           class ObservedWebSocket extends WebSocket {
-            constructor(
-              url: string | URL,
-              protocols?: string | globalThis.Array<string>,
-            ) {
+            constructor(url: string | URL, protocols?: string | Array<string>) {
               super(url, protocols);
               sockets.push(this);
             }

@@ -93,7 +93,7 @@ const pageTags = Effect.fnUntraced(function* <
   >,
   numItems = 1,
 ) {
-  const pages: globalThis.Array<globalThis.Array<string | undefined>> = [];
+  const pages: Array<Array<string | undefined>> = [];
   let cursor: string | null = null;
   for (let index = 0; index < 20; index++) {
     const result: QueryStream.PaginationResult<Doc> =

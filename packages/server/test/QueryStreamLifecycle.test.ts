@@ -52,12 +52,12 @@ interface PendingRead {
 }
 
 const makeReader = (pending?: PendingRead) => {
-  const runs: globalThis.Array<ReaderRun> = [];
-  const events: globalThis.Array<string> = [];
+  const runs: Array<ReaderRun> = [];
+  const events: Array<string> = [];
   const reader: QueryStream.ReflectionReader = {
     query: () => ({
       withIndex: (_indexName, indexRange) => {
-        const operations: globalThis.Array<RecordedConstraint> = [];
+        const operations: Array<RecordedConstraint> = [];
         const record =
           (_tag: RecordedConstraint["_tag"]) =>
           (field: string, value: RecordedConstraint["value"]) => {
@@ -554,7 +554,7 @@ describe("QueryStream iterator lifecycle", () => {
         const settled = yield* Deferred.make<void>();
         const iterator = stage === "representative probe" ? 1 : 0;
         const reader = makeReader({ iterator, entered, release, settled });
-        const examined: globalThis.Array<string> = [];
+        const examined: Array<string> = [];
         let processed = 0;
         const observed = reader.stream.pipe(
           QueryStream.filterEffect((document) =>
