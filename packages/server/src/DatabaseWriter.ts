@@ -66,16 +66,19 @@ export interface DatabaseWriterService<
 > {
   readonly table: <
     const TableName extends DataModel.TableNames<
-      DataModel.FromSchema<DatabaseSchema_>
+      DataModel.FromDatabaseSchema<DatabaseSchema_>
     >,
   >(
     tableName: TableName,
   ) => DatabaseWriterTableAccessor<
-    DataModel.FromSchema<DatabaseSchema_>,
+    DataModel.FromDatabaseSchema<DatabaseSchema_>,
     TableName,
     TableName extends keyof Docs
       ? Docs[TableName]
-      : DocumentByName_<DataModel.FromSchema<DatabaseSchema_>, TableName>
+      : DocumentByName_<
+          DataModel.FromDatabaseSchema<DatabaseSchema_>,
+          TableName
+        >
   >;
 }
 
@@ -95,10 +98,10 @@ export type DatabaseWriterTag<
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,
   convexDatabaseWriter: GenericDatabaseWriter<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
 ): DatabaseWriterService<DatabaseSchema_> => {
-  type DataModel_ = DataModel.FromSchema<DatabaseSchema_>;
+  type DataModel_ = DataModel.FromDatabaseSchema<DatabaseSchema_>;
 
   const table = <const TableName extends DataModel.TableNames<DataModel_>>(
     tableName: TableName,
@@ -116,7 +119,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         convexDatabaseWriter.insert(
           tableName,
           encodedDocument as WithoutSystemFields<
-            DocumentByName<DataModel.ToConvex<DataModel_>, TableName>
+            DocumentByName<DataModel.ToConvexDataModel<DataModel_>, TableName>
           >,
         ),
       );
@@ -151,7 +154,10 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
           id,
           updatedEncodedDoc as Expand<
             BetterOmit<
-              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
+              DocumentByName<
+                DataModel.ToConvexDataModel<DataModel_>,
+                TableName
+              >,
               "_creationTime" | "_id"
             >
           >,
@@ -172,7 +178,10 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
           id,
           updatedEncodedDoc as Expand<
             BetterOmit<
-              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
+              DocumentByName<
+                DataModel.ToConvexDataModel<DataModel_>,
+                TableName
+              >,
               "_creationTime" | "_id"
             >
           >,
@@ -212,7 +221,7 @@ export type DatabaseWriter<
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,
   convexDatabaseWriter: GenericDatabaseWriter<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
 ) =>
   Layer.succeed(

@@ -88,7 +88,7 @@ export type QueryServices<
   | QueryRunner.QueryRunner
   | QueryTransactionContext
   | QueryCtx.QueryCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >;
 
 export type MutationServices<
@@ -112,7 +112,7 @@ export type MutationServices<
   | QueryTransactionContext
   | MutationTransactionContext
   | MutationCtx.MutationCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >;
 
 /**
@@ -132,9 +132,9 @@ export type ActionServices<
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
-  | VectorSearch.VectorSearch<DataModel.FromSchema<DatabaseSchema_>>
+  | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   | ActionCtx.ActionCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >;
 
 export type ConfectProvenanceQuery<

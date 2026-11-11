@@ -78,8 +78,8 @@ it("derives exact definitions for every kind and nested group", () => {
     GroupSpec.NamedAt<typeof group, "nested">
   >;
   type Definitions = ConvexFunctionDefinitions.ForGroup<Nested>["nested"];
-  type ConvexDataModel = DataModel.ToConvex<
-    DataModel.FromSchema<DatabaseSchema.AnyWithProps>
+  type ConvexDataModel = DataModel.ToConvexDataModel<
+    DataModel.FromDatabaseSchema<DatabaseSchema.AnyWithProps>
   >;
   expectTypeOf<
     Definitions["publicQuery"]["_tag"]

@@ -19,15 +19,15 @@ export interface AnyWithProps extends DataModel<
   Readonly<Record<string, Table.AnyWithProps>>
 > {}
 
-export type FromSchema<Schema extends DatabaseSchema.AnyWithProps> = DataModel<
-  Schema[DatabaseSchema.TypeId]
->;
+export type FromDatabaseSchema<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> = DataModel<DatabaseSchema_[DatabaseSchema.TypeId]>;
 
 export type FromTables<Tables_ extends Table.AnyWithProps> = DataModel<
   Table.TablesRecord<Tables_>
 >;
 
-export type ToConvex<DataModel_ extends AnyWithProps> = {
+export type ToConvexDataModel<DataModel_ extends AnyWithProps> = {
   [TableName_ in TableNames<DataModel_>]: TableInfoWithName<
     DataModel_,
     TableName_

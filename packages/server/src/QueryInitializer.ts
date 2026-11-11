@@ -62,7 +62,7 @@ export interface QueryInitializer<
     >(
       indexName: IndexName,
       ...indexFieldValues: IndexFieldTypesForEq<
-        DataModel.ToConvex<DataModel_>,
+        DataModel.ToConvexDataModel<DataModel_>,
         TableName,
         Indexes<ConvexTableInfoFor<DataModel_, TableName>>[IndexName]
       >
@@ -215,13 +215,13 @@ export const make = <
   TableName extends Table.Name<Tables>,
 >(
   convexDatabaseReader: BaseDatabaseReader<
-    DataModel.ToConvex<DataModel.FromTables<Tables>>
+    DataModel.ToConvexDataModel<DataModel.FromTables<Tables>>
   >,
   table: Table.WithName<Tables, TableName>,
 ): QueryInitializer<DataModel.FromTables<Tables>, TableName> => {
   const tableName = table.tableName;
   type DataModel_ = DataModel.FromTables<Tables>;
-  type ConvexDataModel_ = DataModel.ToConvex<DataModel_>;
+  type ConvexDataModel_ = DataModel.ToConvexDataModel<DataModel_>;
   type ThisQueryInitializer = QueryInitializer<DataModel_, TableName>;
   type QueryInitializerFunction<
     FunctionName extends keyof ThisQueryInitializer,
@@ -234,7 +234,7 @@ export const make = <
   >(
     indexName: IndexName,
     indexFieldValues: IndexFieldTypesForEq<
-      DataModel.ToConvex<DataModel_>,
+      DataModel.ToConvexDataModel<DataModel_>,
       TableName,
       Indexes<DataModel.TableInfoWithName<DataModel_, TableName>>[IndexName]
     >,
@@ -434,7 +434,7 @@ export const make = <
 export const getById =
   <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
     convexDatabaseReader: BaseDatabaseReader<
-      DataModel.ToConvex<DataModel.FromTables<Tables>>
+      DataModel.ToConvexDataModel<DataModel.FromTables<Tables>>
     >,
     table: Table.WithName<Tables, TableName>,
   ) =>

@@ -39,7 +39,7 @@ import type * as VectorSearch from "./VectorSearch";
  * The Confect services available to HTTP route handlers and middleware,
  * supplied per request from the Convex action context.
  */
-export type Services<Schema extends DatabaseSchema.AnyWithProps> =
+export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
@@ -51,7 +51,7 @@ export type Services<Schema extends DatabaseSchema.AnyWithProps> =
   | StorageReader
   | StorageWriter
   | StorageActionWriter
-  | VectorSearch.VectorSearch<DataModel.FromSchema<Schema>>;
+  | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>;
 
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
@@ -76,19 +76,20 @@ export type Services<Schema extends DatabaseSchema.AnyWithProps> =
  *
  * @stability unstable
  */
-export type Routes<Schema extends DatabaseSchema.AnyWithProps> = Layer.Layer<
-  never,
-  never,
-  | HttpRouter.HttpRouter
-  | Etag.Generator
-  | FileSystem.FileSystem
-  | HttpPlatform.HttpPlatform
-  | Path.Path
-  | HttpRouter.Request<"Requires", Services<Schema>>
-  | HttpRouter.Request<"GlobalRequires", Services<Schema>>
-  | HttpRouter.Request<"Error", any>
-  | HttpRouter.Request<"GlobalError", any>
->;
+export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
+  Layer.Layer<
+    never,
+    never,
+    | HttpRouter.HttpRouter
+    | Etag.Generator
+    | FileSystem.FileSystem
+    | HttpPlatform.HttpPlatform
+    | Path.Path
+    | HttpRouter.Request<"Requires", Services<DatabaseSchema_>>
+    | HttpRouter.Request<"GlobalRequires", Services<DatabaseSchema_>>
+    | HttpRouter.Request<"Error", any>
+    | HttpRouter.Request<"GlobalError", any>
+  >;
 
 /**
  * Create a Convex HTTP router from a runtime database schema and routes, with
@@ -105,9 +106,9 @@ export type Routes<Schema extends DatabaseSchema.AnyWithProps> = Layer.Layer<
  *
  * @stability unstable
  */
-export const make = <Schema extends DatabaseSchema.AnyWithProps>(
-  databaseSchema: Schema,
-  routes: Routes<NoInfer<Schema>>,
+export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+  databaseSchema: DatabaseSchema_,
+  routes: Routes<NoInfer<DatabaseSchema_>>,
 ): ConvexHttpRouter => {
   applyMonkeyPatches();
 
@@ -134,7 +135,9 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
     const services = RegisteredFunction.actionLayer(
       databaseSchema,
       ctx as unknown as GenericActionCtx<
-        DataModel.ToConvex<DataModel.FromSchema<Schema>>
+        DataModel.ToConvexDataModel<
+          DataModel.FromDatabaseSchema<DatabaseSchema_>
+        >
       >,
     ).pipe(Layer.build, Effect.scoped, Effect.runSync);
     return handler(

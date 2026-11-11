@@ -270,7 +270,7 @@ export const runHandlerPromise =
   };
 
 export const actionFunctionBase = <
-  Schema extends DatabaseSchema.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
   ConvexArgs extends DefaultFunctionArgs,
   Returns,
@@ -295,13 +295,17 @@ export const actionFunctionBase = <
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
   resolvedMiddlewares?: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
   createLayer: (
-    ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
+    ctx: GenericActionCtx<
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
+    >,
   ) => Layer.Layer<R>;
 }) => ({
   args: () => compileArgsSchema(args),
   returns: () => compileReturnsSchema(returns),
   handler: (
-    ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
+    ctx: GenericActionCtx<
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
+    >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     Effect.gen(function* () {
@@ -346,9 +350,9 @@ export type ActionServices<
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
-  | VectorSearch.VectorSearch<DataModel.FromSchema<DatabaseSchema_>>
+  | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   | ActionCtx.ActionCtx<
-      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >;
 
 export const actionLayer = <
@@ -356,7 +360,7 @@ export const actionLayer = <
 >(
   databaseSchema: DatabaseSchema_,
   ctx: GenericActionCtx<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
 ) =>
   Layer.mergeAll(
@@ -372,11 +376,13 @@ export const actionLayer = <
     ActionRunner.layer(ctx.runAction.bind(ctx)),
     Layer.succeed(
       ActionCtx.ActionCtx<
-        DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+        DataModel.ToConvexDataModel<
+          DataModel.FromDatabaseSchema<DatabaseSchema_>
+        >
       >(),
       ctx,
     ),
-    VectorSearch.layer<DataModel.FromSchema<DatabaseSchema_>>(
+    VectorSearch.layer<DataModel.FromDatabaseSchema<DatabaseSchema_>>(
       ctx.vectorSearch.bind(ctx),
     ),
   );
