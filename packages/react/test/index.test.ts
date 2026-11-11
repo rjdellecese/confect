@@ -3,6 +3,7 @@ import { it } from "@effect/vitest";
 import { renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import {
@@ -14,7 +15,14 @@ import {
   test,
 } from "@effect/vitest";
 import { vi } from "vitest";
-import type { InvokeReturn, UsePaginatedQueryArgs } from "@confect/react";
+import type {
+  InvokeReturn,
+  OptimisticLocalStore,
+  OptimisticUpdate,
+  ReactMutation,
+  UsePaginatedQueryArgs,
+} from "@confect/react";
+import type { OptimisticUpdate as ConvexOptimisticUpdate } from "convex/browser";
 import {
   PaginatedQueryResult,
   QueryResult,
@@ -264,6 +272,140 @@ describe("useQuery", () => {
 });
 
 describe("useMutation", () => {
+  test("rejects inferred and explicitly typed promise-returning optimistic callbacks", () => {
+    const check = (mutation: ReactMutation<typeof mutationNoError>) => {
+      // @ts-expect-error Optimistic callbacks must be synchronous.
+      // oxlint-disable-next-line effecttsgo/async-function -- Regression coverage must exercise an async callback.
+      mutation.withOptimisticUpdate(async () => {});
+      // @ts-expect-error Returning a promise without async is also invalid.
+      mutation.withOptimisticUpdate(() => Promise.resolve("note-1"));
+
+      const promiseUpdate: (
+        store: OptimisticLocalStore.OptimisticLocalStore,
+        args: Ref.Args<typeof mutationNoError>,
+      ) => Promise<void> = () => Promise.resolve();
+      // @ts-expect-error Explicit promise return types must also be rejected.
+      mutation.withOptimisticUpdate(promiseUpdate);
+
+      const configured = mutation.withOptimisticUpdate(() => {});
+      // @ts-expect-error Configured handles retain the synchronous constraint.
+      configured.withOptimisticUpdate(promiseUpdate);
+    };
+
+    expect(check).toBeDefined();
+  });
+
+  test("preserves synchronous callback forms and callable handle types", () => {
+    const check = (mutation: ReactMutation<typeof mutationNoError>) => {
+      const update: OptimisticUpdate<typeof mutationNoError> = (
+        store,
+        args,
+      ) => {
+        expectTypeOf(
+          store,
+        ).toEqualTypeOf<OptimisticLocalStore.OptimisticLocalStore>();
+        expectTypeOf(args).toEqualTypeOf<{ readonly text: string }>();
+      };
+      const configured = mutation.withOptimisticUpdate(update);
+      expectTypeOf(configured).toEqualTypeOf<
+        ReactMutation<typeof mutationNoError>
+      >();
+      expectTypeOf(configured({ text: "hi" })).toEqualTypeOf<Promise<string>>();
+      mutation.withOptimisticUpdate(() => undefined);
+      mutation.withOptimisticUpdate((_store, args) => args.text.length);
+    };
+
+    expect(check).toBeDefined();
+  });
+
+  it.effect(
+    "attaches a synchronous update with decoded args and store values",
+    () =>
+      Effect.gen(function* () {
+        const mutation = Ref.make(
+          "counts",
+          FunctionSpec.publicMutation({
+            name: "increment",
+            args: () => ({ count: Schema.FiniteFromString }),
+            returns: () => Schema.FiniteFromString,
+          }),
+        );
+        const query = Ref.make(
+          "counts",
+          FunctionSpec.publicQuery({
+            name: "get",
+            args: () => ({ count: Schema.FiniteFromString }),
+            returns: () => Schema.FiniteFromString,
+          }),
+        );
+        const encodedArgs = { count: "41" };
+        const args = { count: 41 };
+        const store = {
+          getQuery: vi.fn().mockReturnValue("41"),
+          getAllQueries: vi.fn(),
+          setQuery: vi.fn(),
+        };
+        const next = Object.assign(vi.fn().mockResolvedValue("42"), {
+          withOptimisticUpdate: vi.fn(),
+        });
+        const attach = vi
+          .fn<
+            (update: ConvexOptimisticUpdate<{ count: string }>) => typeof next
+          >()
+          .mockReturnValue(next);
+        const original = Object.assign(vi.fn(), {
+          withOptimisticUpdate: attach,
+        });
+        useConvexMutationMock.mockReturnValue(original);
+        const { result } = renderHook(() => useMutation(mutation));
+        const update = vi.fn(
+          (
+            localStore: OptimisticLocalStore.OptimisticLocalStore,
+            decodedArgs: Ref.Args<typeof mutation>,
+          ) => {
+            expect(decodedArgs).toEqual(args);
+            const value = localStore.getQuery(query, decodedArgs);
+            expect(value).toEqual(Option.some(41));
+            localStore.setQuery(
+              query,
+              decodedArgs,
+              Option.map(value, (count) => count + 1),
+            );
+          },
+        );
+        const configured = result.current.withOptimisticUpdate(
+          (localStore, decodedArgs) => {
+            expectTypeOf(decodedArgs).toEqualTypeOf<{
+              readonly count: number;
+            }>();
+            update(localStore, decodedArgs);
+          },
+        );
+        expect(configured).not.toBe(result.current);
+        expect("withOptimisticUpdate" in configured).toBe(true);
+        expect(update).not.toHaveBeenCalled();
+        const wrappedUpdate = attach.mock.calls[0]?.[0];
+        assert(wrappedUpdate !== undefined);
+        wrappedUpdate(store, encodedArgs);
+        expect(update).toHaveBeenCalledOnce();
+        expect(store.getQuery).toHaveBeenCalledWith(
+          Ref.getFunctionReference(query),
+          encodedArgs,
+        );
+        expect(store.setQuery).toHaveBeenCalledWith(
+          Ref.getFunctionReference(query),
+          encodedArgs,
+          "42",
+        );
+        const value = yield* Effect.promise(() => configured(args));
+        expect(value).toBe(42);
+        expect(next).toHaveBeenCalledWith(encodedArgs);
+        expect(original).not.toHaveBeenCalled();
+        expect(args).toEqual({ count: 41 });
+        expect(encodedArgs).toEqual({ count: "41" });
+      }),
+  );
+
   test("InvokeReturn is Promise<A> without an error schema", () => {
     expectTypeOf<InvokeReturn<typeof mutationNoError>>().toEqualTypeOf<
       Promise<string>
