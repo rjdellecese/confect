@@ -10,9 +10,9 @@ Confect provides three services for reading Convex metadata. Import them from `c
 | --------------------- | ---------------------------------- | ---------------------------------------------- |
 | `ExecutionMetadata`   | `getFunction()`, `getDeployment()` | Queries, mutations, actions, and HTTP handlers |
 | `RequestMetadata`     | `get()`                            | Mutations, actions, and HTTP handlers          |
-| `TransactionMetadata` | `getMetrics()`                     | Queries and mutations                          |
+| `TransactionMetadata` | `getMetrics()`, `getSnapshotTs()`  | Queries and mutations                          |
 
-Actions include [Node actions](/server/node-actions). Each method returns an Effect containing the native Convex metadata value, without transforming its fields. If the underlying Convex call rejects, the Effect fails with a defect rather than a typed error.
+Actions include [Node actions](/server/node-actions). Each method returns an Effect containing the native Convex metadata value, without transforming its fields. If the underlying Convex call throws or rejects, the Effect fails with a defect rather than a typed error.
 
 ## Function and deployment metadata
 
@@ -70,3 +70,19 @@ const remainingReads = Effect.gen(function* () {
 ```
 
 Every execution of `getMetrics()` reads fresh values; the service does not cache them. It only reads metrics and does not start a transaction or change its limits. See [Convex's transaction limits](https://docs.convex.dev/production/state/limits) for the limits these metrics describe.
+
+## Snapshot timestamp
+
+`TransactionMetadata.getSnapshotTs()` returns the database snapshot timestamp as a `bigint` in nanoseconds. The timestamp stays fixed within a transaction and its nested mutations and non-stale queries.
+
+```ts
+import * as Effect from "effect/Effect";
+import { TransactionMetadata } from "./_generated/services";
+
+const snapshotTimestamp = Effect.gen(function* () {
+  const transaction = yield* TransactionMetadata;
+  return yield* transaction.getSnapshotTs();
+});
+```
+
+Executing this Effect in a query limits result caching like `Date.now()`. The timestamp uses the database clock, not wall-clock time; don't compare it to `_creationTime` or `Date.now()`. See [Convex's snapshot timestamp semantics](https://docs.convex.dev/database/advanced/commit-timestamp#snapshot-timestamp).
