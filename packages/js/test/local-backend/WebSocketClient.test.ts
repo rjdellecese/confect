@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { FunctionSpec, Ref } from "@confect/core";
 import * as WebSocketClient from "@confect/js/WebSocketClient";
 import { assert, expect, expectTypeOf, layer } from "@effect/vitest";
@@ -147,7 +147,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             );
             expect(observed1).toEqual([42, 42]);
             expect(
-              Arr.map(span.mock.calls, ([options]) => options.name),
+              Array.map(span.mock.calls, ([options]) => options.name),
             ).toEqual([
               "caller",
               `WebSocketClient.${operation.name}`,
@@ -390,9 +390,12 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
       it.effect("closes the real WebSocket when the layer's scope ends", () =>
         Effect.gen(function* () {
           const { client: backend } = yield* LocalBackend.LocalBackend;
-          const sockets: Array<WebSocket> = [];
+          const sockets: globalThis.Array<WebSocket> = [];
           class ObservedWebSocket extends WebSocket {
-            constructor(url: string | URL, protocols?: string | Array<string>) {
+            constructor(
+              url: string | URL,
+              protocols?: string | globalThis.Array<string>,
+            ) {
               super(url, protocols);
               sockets.push(this);
             }
@@ -414,7 +417,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             expect(sockets.at(-1)?.readyState).toBe(WebSocket.OPEN);
           }).pipe(Effect.scoped);
           expect(
-            Arr.every(
+            Array.every(
               sockets,
               (socket) => socket.readyState === WebSocket.CLOSED,
             ),

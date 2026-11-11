@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { describe, expect, it as baseIt, layer } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
@@ -84,7 +84,7 @@ const lint = (code: string, fix = false) =>
       ),
     )(result.stdout);
     expect(
-      Arr.every(
+      Array.every(
         output.diagnostics,
         (diagnostic) => diagnostic.code === "confect(prefer-test-each)",
       ),

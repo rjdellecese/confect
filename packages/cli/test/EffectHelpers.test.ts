@@ -1,5 +1,5 @@
 import * as Rec from "effect/Record";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { CodeBlockWriter } from "@confect/cli/CodeBlockWriter";
 import * as FunctionModule from "@confect/cli/FunctionModule";
 import * as templates from "@confect/cli/templates";
@@ -127,7 +127,7 @@ it.effect(
 
 it.effect("keeps internal helpers within their caller's span", () =>
   Effect.gen(function* () {
-    const spans: Array<Tracer.Span> = [];
+    const spans: globalThis.Array<Tracer.Span> = [];
     const tracer = Tracer.make({
       span(options) {
         const span = new Tracer.NativeSpan(options);
@@ -149,6 +149,6 @@ it.effect("keeps internal helpers within their caller's span", () =>
         Effect.provideService(Tracer.Tracer, tracer),
       );
     expect(parentName).toBe("caller");
-    expect(Arr.map(spans, (span) => span.name)).toEqual(["caller"]);
+    expect(Array.map(spans, (span) => span.name)).toEqual(["caller"]);
   }),
 );

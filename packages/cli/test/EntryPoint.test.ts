@@ -1,6 +1,6 @@
 import { layer } from "@effect/vitest";
 import * as Layer from "effect/Layer";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { assert, expect, expectTypeOf, it } from "@effect/vitest";
 import * as EntryPoint from "@confect/cli/EntryPoint";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
@@ -20,7 +20,7 @@ import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 
 it("refines optional entries without including spec, impl, table, or config entries", () => {
-  const entries: Array<EntryPoint.Kind> = [
+  const entries: globalThis.Array<EntryPoint.Kind> = [
     EntryPoint.Kind.Http({ relativePath: "http.ts" }),
     EntryPoint.Kind.Crons({ relativePath: "crons.ts" }),
     EntryPoint.Kind.Auth({ relativePath: "auth.ts" }),
@@ -35,14 +35,16 @@ it("refines optional entries without including spec, impl, table, or config entr
     }),
     EntryPoint.Kind.Config(),
   ];
-  const optional = Arr.filter(entries, EntryPoint.isOptional);
-  expect(Arr.map(optional, (entry) => entry._tag)).toEqual([
+  const optional = Array.filter(entries, EntryPoint.isOptional);
+  expect(Array.map(optional, (entry) => entry._tag)).toEqual([
     "Http",
     "Crons",
     "Auth",
   ]);
   expectTypeOf(optional).toEqualTypeOf<
-    Array<Extract<EntryPoint.Kind, { readonly _tag: EntryPoint.OptionalFile }>>
+    globalThis.Array<
+      Extract<EntryPoint.Kind, { readonly _tag: EntryPoint.OptionalFile }>
+    >
   >();
 });
 
@@ -90,14 +92,14 @@ layer(NodePath.layer)("runtime services", (runtimeIt) => {
           }),
           Effect.provideContext(services),
         );
-        expect(Arr.map(entries, (entry) => entry._tag)).toEqual([
+        expect(Array.map(entries, (entry) => entry._tag)).toEqual([
           "Http",
           "Config",
           "Spec",
           "Impl",
           "Table",
         ]);
-        expect(Arr.map(entries, (entry) => entry.absolutePath)).toEqual([
+        expect(Array.map(entries, (entry) => entry.absolutePath)).toEqual([
           path.join(confect, "http.ts"),
           path.join(convex, "convex.config.ts"),
           path.join(confect, "notes.spec.ts"),
@@ -171,11 +173,11 @@ layer(NodePath.layer)("runtime services", (runtimeIt) => {
           }),
           Effect.provideContext(services2),
         );
-        expect(Arr.map(entries, (entry) => entry._tag)).toEqual([
+        expect(Array.map(entries, (entry) => entry._tag)).toEqual([
           "Spec",
           "Impl",
         ]);
-        expect(Arr.map(entries, (entry) => entry.absolutePath)).toEqual([
+        expect(Array.map(entries, (entry) => entry.absolutePath)).toEqual([
           path.join(confect, "notes.spec.ts"),
           path.join(confect, "notes.impl.ts"),
         ]);

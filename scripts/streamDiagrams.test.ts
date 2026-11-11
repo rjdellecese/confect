@@ -1,5 +1,5 @@
 import * as Option from "effect/Option";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Record from "effect/Record";
 import * as Str from "effect/String";
 import { expect, test } from "bun:test";
@@ -56,7 +56,7 @@ test("renders every marked block and leaves the rest of the page alone", () =>
   runTest(
     Effect.gen(function* () {
       const full = yield* renderedOrMessage(
-        `intro\n${Arr.join(Arr.map(Record.keys(diagrams), block), "\n\n")}\noutro`,
+        `intro\n${Array.join(Array.map(Record.keys(diagrams), block), "\n\n")}\noutro`,
       );
       expect(Str.startsWith("intro\n")(full)).toBe(true);
       expect(Str.endsWith("\noutro")(full)).toBe(true);

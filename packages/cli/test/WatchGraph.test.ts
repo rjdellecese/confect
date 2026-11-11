@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { expect, it } from "@effect/vitest";
 import * as WatchGraph from "@confect/cli/WatchGraph";
 import type * as esbuild from "esbuild";
@@ -7,7 +7,7 @@ const input = (
   ...imports: ReadonlyArray<string>
 ): esbuild.Metafile["inputs"][string] => ({
   bytes: 0,
-  imports: Arr.map(imports, (path) => ({ path, kind: "import-statement" })),
+  imports: Array.map(imports, (path) => ({ path, kind: "import-statement" })),
 });
 
 it("finds transitive importers without including unrelated entry points", () => {

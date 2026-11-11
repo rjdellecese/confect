@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as QueryStreamIndexPrefix from "@confect/server/QueryStreamIndexPrefix";
 import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
 import * as QueryStreamKeyBounds from "@confect/server/QueryStreamKeyBounds";
@@ -317,11 +317,11 @@ describe("QueryStreamIndexRange.fromBounds", () => {
       expectTypeOf(ranges).toEqualTypeOf<
         ReadonlyArray<QueryStreamIndexRange.QueryStreamIndexRange>
       >();
-      expect(Arr.map(ranges, QueryStreamIndexRange.toBounds)).toEqual(
-        order === "asc" ? expected : Arr.reverse(expected),
+      expect(Array.map(ranges, QueryStreamIndexRange.toBounds)).toEqual(
+        order === "asc" ? expected : Array.reverse(expected),
       );
       expect(
-        Arr.map(ranges, QueryStreamIndexRange.equalityPrefixLength),
+        Array.map(ranges, QueryStreamIndexRange.equalityPrefixLength),
       ).toEqual([2, 1, 2]);
     },
   );
@@ -338,9 +338,11 @@ describe("QueryStreamIndexRange.fromBounds", () => {
     ]) {
       const bounds = QueryStreamIndexRange.toBounds(range);
       const ranges = fromBounds(["category", "score", "_id"], "asc", bounds);
-      expect(Arr.map(ranges, QueryStreamIndexRange.toBounds)).toEqual([bounds]);
+      expect(Array.map(ranges, QueryStreamIndexRange.toBounds)).toEqual([
+        bounds,
+      ]);
       expect(
-        Arr.map(ranges, QueryStreamIndexRange.equalityPrefixLength),
+        Array.map(ranges, QueryStreamIndexRange.equalityPrefixLength),
       ).toEqual([QueryStreamIndexRange.equalityPrefixLength(range)]);
     }
   });
@@ -354,9 +356,9 @@ describe("QueryStreamIndexRange.fromBounds", () => {
         [1, 0],
         [1, 1],
       ];
-      const ordered = order === "asc" ? keys : Arr.reverse(keys);
-      const endpoints = Arr.flatMap([[], [0], [1], ...keys], (keyValues) =>
-        Arr.map([true, false], (inclusive) => ({ keyValues, inclusive })),
+      const ordered = order === "asc" ? keys : Array.reverse(keys);
+      const endpoints = Array.flatMap([[], [0], [1], ...keys], (keyValues) =>
+        Array.map([true, false], (inclusive) => ({ keyValues, inclusive })),
       );
       const layout = Result.getOrThrow(Layout.fromIndex(["a", "_id"]));
       const admits = (bounds: QueryStreamKeyBounds.IndexBounds) => {
@@ -381,13 +383,13 @@ describe("QueryStreamIndexRange.fromBounds", () => {
           const bounds = { lower, upper };
           const ranges = fromBounds(["a", "b"], order, bounds);
           expect(
-            Arr.flatMap(ranges, (range) =>
-              Arr.filter(
+            Array.flatMap(ranges, (range) =>
+              Array.filter(
                 ordered,
                 admits(QueryStreamIndexRange.toBounds(range)),
               ),
             ),
-          ).toEqual(Arr.filter(ordered, admits(bounds)));
+          ).toEqual(Array.filter(ordered, admits(bounds)));
         }
     },
   );

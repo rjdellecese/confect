@@ -1,7 +1,7 @@
 import * as Result from "effect/Result";
 import type * as ConvexServer from "convex/server";
 import { vi } from "vitest";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import {
   AiGatewayLanguageClient,
   AiGatewayLanguageModel,
@@ -195,9 +195,9 @@ describe("AiGatewayLanguageModel", () => {
         const parts = globalThis.Array.from(partsChunk);
 
         assert.strictEqual(
-          Arr.join(
-            Arr.map(
-              Arr.filter(parts, (part) => part.type === "text-delta"),
+          Array.join(
+            Array.map(
+              Array.filter(parts, (part) => part.type === "text-delta"),
               (part) => part.delta,
             ),
             "",
@@ -269,8 +269,8 @@ const sseResponse = (
   HttpClientResponse.fromWeb(
     request,
     new Response(
-      Arr.join(
-        Arr.map(events, (event) =>
+      Array.join(
+        Array.map(events, (event) =>
           event === "[DONE]"
             ? "data: [DONE]\n\n"
             : `data: ${Schema.encodeResult(Schema.fromJsonString(Schema.Unknown))(event).pipe(Result.getOrThrow)}\n\n`,

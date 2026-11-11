@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { identity } from "effect/Function";
 import * as QueryStreamKey from "@confect/server/QueryStreamKey";
 import * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
@@ -132,7 +132,7 @@ describe("QueryStreamCursor serialization", () => {
       ["nested"],
       { nested: "value" },
     ];
-    const fieldPaths = Arr.map(keyValues, (_, index) =>
+    const fieldPaths = Array.map(keyValues, (_, index) =>
       index === keyValues.length - 1 ? "_id" : `field${index}`,
     );
     const layout = Result.getOrThrowWith(

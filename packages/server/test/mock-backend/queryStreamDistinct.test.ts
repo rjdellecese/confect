@@ -1,5 +1,5 @@
 import * as Option from "effect/Option";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import { identity } from "effect/Function";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
@@ -54,7 +54,7 @@ const fixture = Effect.gen(function* () {
 
 const tags = <E, R>(stream: Stream.Stream<{ tag?: string }, E, R>) =>
   Stream.runCollect(stream).pipe(
-    Effect.map((rows) => Arr.map(rows, (row) => row.tag)),
+    Effect.map((rows) => Array.map(rows, (row) => row.tag)),
   );
 
 const observeUpstreamEnd = <
@@ -93,13 +93,13 @@ const pageTags = Effect.fnUntraced(function* <
   >,
   numItems = 1,
 ) {
-  const pages: Array<Array<string | undefined>> = [];
+  const pages: globalThis.Array<globalThis.Array<string | undefined>> = [];
   let cursor: string | null = null;
   for (let index = 0; index < 20; index++) {
     const result: QueryStream.PaginationResult<Doc> =
       yield* QueryStream.paginate(stream, { numItems, cursor });
     if (result.page.length > 0) {
-      pages.push(Arr.map(result.page, (row) => row.tag));
+      pages.push(Array.map(result.page, (row) => row.tag));
     }
     if (result.isDone) return pages;
     expect(result.continueCursor).not.toBe(cursor);
@@ -138,7 +138,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             expect(pageTagsResult2).toEqual([["a1"]]);
 
             const a2 = Option.getOrUndefined(
-              Arr.findFirst(rows, (row) => row.tag === "a2"),
+              Array.findFirst(rows, (row) => row.tag === "a2"),
             );
             assert(a2 !== undefined);
             const keyValues = [a2.text, a2._creationTime, a2._id];
@@ -182,18 +182,18 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               distinct.pipe(QueryStream.reverse, QueryStream.reverse),
             );
 
-            expect(Arr.map(forward, (row) => row.tag)).toEqual([
+            expect(Array.map(forward, (row) => row.tag)).toEqual([
               "a1",
               "b1",
               "c1",
             ]);
-            expect(Arr.map(backward, (row) => row.tag)).toEqual([
+            expect(Array.map(backward, (row) => row.tag)).toEqual([
               "c1",
               "b1",
               "a1",
             ]);
-            expect(Arr.map(backward, (row) => row._id)).toEqual(
-              Arr.reverse(Arr.map(forward, (row) => row._id)),
+            expect(Array.map(backward, (row) => row._id)).toEqual(
+              Array.reverse(Array.map(forward, (row) => row._id)),
             );
             expect(twice).toEqual(forward);
           }),
@@ -267,10 +267,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const { source, rows } = yield* fixture;
             const a2 = Option.getOrUndefined(
-              Arr.findFirst(rows, (row) => row.tag === "a2"),
+              Array.findFirst(rows, (row) => row.tag === "a2"),
             );
             const a3 = Option.getOrUndefined(
-              Arr.findFirst(rows, (row) => row.tag === "a3"),
+              Array.findFirst(rows, (row) => row.tag === "a3"),
             );
             assert(a2 !== undefined && a3 !== undefined);
             const key2 = [a2.text, a2._creationTime, a2._id];
@@ -316,7 +316,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const { source, rows } = yield* fixture;
             const a1 = Option.getOrUndefined(
-              Arr.findFirst(rows, (row) => row.tag === "a1"),
+              Array.findFirst(rows, (row) => row.tag === "a1"),
             );
             assert(a1 !== undefined);
             const keyValues = [a1.text, a1._creationTime, a1._id];
@@ -357,7 +357,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const { reader, rows } = yield* fixture;
             const a2 = Option.getOrUndefined(
-              Arr.findFirst(rows, (row) => row.tag === "a2"),
+              Array.findFirst(rows, (row) => row.tag === "a2"),
             );
             assert(a2 !== undefined);
             const distinct = reader
@@ -547,7 +547,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               cursor: first.continueCursor,
             });
             const a1 = Option.getOrUndefined(
-              Arr.findFirst(rows, (row) => row.tag === "a1"),
+              Array.findFirst(rows, (row) => row.tag === "a1"),
             );
             assert(a1 !== undefined);
             yield* writer.table("notes").delete(a1._id);
@@ -562,8 +562,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               cursor: first.continueCursor,
               endCursor: second.continueCursor,
             });
-            expect(Arr.map(firstReplay.page, (row) => row.tag)).toEqual([]);
-            expect(Arr.map(secondReplay.page, (row) => row.tag)).toEqual([
+            expect(Array.map(firstReplay.page, (row) => row.tag)).toEqual([]);
+            expect(Array.map(secondReplay.page, (row) => row.tag)).toEqual([
               "a2",
               "b1",
             ]);
@@ -607,10 +607,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               cursor: first.continueCursor,
               endCursor: second.continueCursor,
             });
-            expect(Arr.map(firstReplay.page, (row) => row.tag)).toEqual([
+            expect(Array.map(firstReplay.page, (row) => row.tag)).toEqual([
               "earlier",
             ]);
-            expect(Arr.map(secondReplay.page, (row) => row.tag)).toEqual([
+            expect(Array.map(secondReplay.page, (row) => row.tag)).toEqual([
               "b1",
             ]);
             expect(firstReplay.continueCursor).toBe(first.continueCursor);
@@ -638,8 +638,11 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               numItems: 1,
               cursor: first.continueCursor,
             });
-            expect(Arr.map(first.page, (row) => row.tag)).toEqual(["c1", "b2"]);
-            expect(Arr.map(second.page, (row) => row.tag)).toEqual(["a3"]);
+            expect(Array.map(first.page, (row) => row.tag)).toEqual([
+              "c1",
+              "b2",
+            ]);
+            expect(Array.map(second.page, (row) => row.tag)).toEqual(["a3"]);
             yield* writer.table("notes").insert({ text: "b", tag: "b3" });
 
             const firstReplay = yield* QueryStream.paginate(distinct, {
@@ -652,11 +655,11 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               cursor: first.continueCursor,
               endCursor: second.continueCursor,
             });
-            expect(Arr.map(firstReplay.page, (row) => row.tag)).toEqual([
+            expect(Array.map(firstReplay.page, (row) => row.tag)).toEqual([
               "c1",
               "b3",
             ]);
-            expect(Arr.map(secondReplay.page, (row) => row.tag)).toEqual([
+            expect(Array.map(secondReplay.page, (row) => row.tag)).toEqual([
               "a3",
             ]);
             expect(firstReplay.continueCursor).toBe(first.continueCursor);
@@ -684,7 +687,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               numItems: 1,
               cursor: null,
             });
-            expect(Arr.map(first.page, (row) => row.tag)).toEqual(["c1"]);
+            expect(Array.map(first.page, (row) => row.tag)).toEqual(["c1"]);
 
             const exhausted = yield* QueryStream.paginate(distinct, {
               numItems: 1,
@@ -706,7 +709,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               endCursor: first.continueCursor,
               maximumRowsRead: 3,
             });
-            expect(Arr.map(enough.page, (row) => row.tag)).toEqual(["c1"]);
+            expect(Array.map(enough.page, (row) => row.tag)).toEqual(["c1"]);
             expect(enough.continueCursor).toBe(first.continueCursor);
             expect(enough.isDone).toBe(false);
             expect(enough.pageStatus).not.toBe("SplitRequired");
@@ -783,7 +786,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
                     "source-limit",
                     "mapped-complete",
                   ]);
-                  expect(Arr.map(result.page, (row) => row.tag)).toEqual([
+                  expect(Array.map(result.page, (row) => row.tag)).toEqual([
                     "a1",
                   ]);
                   expect(result.isDone).toBe(false);
@@ -845,7 +848,9 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
                 const result = yield* Fiber.join(pagination);
                 const getResult4 = yield* Ref.get(observations);
                 expect(getResult4).toEqual(["source-limit", "mapped-complete"]);
-                expect(Arr.map(result.page, (row) => row.tag)).toEqual(["c1"]);
+                expect(Array.map(result.page, (row) => row.tag)).toEqual([
+                  "c1",
+                ]);
                 expect(result.isDone).toBe(false);
                 expect(result.pageStatus).toBe("SplitRequired");
               }).pipe(Effect.scoped),
@@ -890,7 +895,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const { source, rows } = yield* fixture;
             const c1 = Option.getOrUndefined(
-              Arr.findFirst(rows, (row) => row.tag === "c1"),
+              Array.findFirst(rows, (row) => row.tag === "c1"),
             );
             assert(c1 !== undefined && c1.tag !== undefined);
             const result = yield* QueryStream.paginate(
@@ -948,7 +953,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               cursor: null,
               maximumRowsRead: 4,
             });
-            expect(Arr.map(enough.page, (row) => row.tag)).toEqual(["a3"]);
+            expect(Array.map(enough.page, (row) => row.tag)).toEqual(["a3"]);
           }),
         ),
     );
@@ -968,7 +973,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               cursor: null,
               maximumRowsRead: 3,
             });
-            expect(Arr.map(partial.page, (row) => row.tag)).toEqual(["c1"]);
+            expect(Array.map(partial.page, (row) => row.tag)).toEqual(["c1"]);
             expect(partial.isDone).toBe(false);
             expect(partial.pageStatus).toBe("SplitRequired");
             expect(partial.splitCursor).toBeDefined();
@@ -976,7 +981,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               numItems: 3,
               cursor: partial.continueCursor,
             });
-            expect(Arr.map(rest.page, (row) => row.tag)).toEqual(["b1", "a1"]);
+            expect(Array.map(rest.page, (row) => row.tag)).toEqual([
+              "b1",
+              "a1",
+            ]);
             expect(rest.isDone).toBe(true);
           }),
         ),
@@ -1060,7 +1068,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               cursor: null,
               maximumRowsRead: 2,
             });
-            expect(Arr.map(enough.page, (row) => row.tag)).toEqual(["a1"]);
+            expect(Array.map(enough.page, (row) => row.tag)).toEqual(["a1"]);
           }),
         ),
     );

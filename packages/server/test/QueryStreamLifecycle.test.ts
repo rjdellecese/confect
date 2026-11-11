@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Table from "@confect/server/Table";
 import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
 import type * as QueryStreamKeyValues from "@confect/server/QueryStreamKeyValues";
@@ -52,12 +52,12 @@ interface PendingRead {
 }
 
 const makeReader = (pending?: PendingRead) => {
-  const runs: Array<ReaderRun> = [];
-  const events: Array<string> = [];
+  const runs: globalThis.Array<ReaderRun> = [];
+  const events: globalThis.Array<string> = [];
   const reader: QueryStream.ReflectionReader = {
     query: () => ({
       withIndex: (_indexName, indexRange) => {
-        const operations: Array<RecordedConstraint> = [];
+        const operations: globalThis.Array<RecordedConstraint> = [];
         const record =
           (_tag: RecordedConstraint["_tag"]) =>
           (field: string, value: RecordedConstraint["value"]) => {
@@ -84,8 +84,8 @@ const makeReader = (pending?: PendingRead) => {
               };
               runs.push(run);
               events.push(`${id}:open:${order}`);
-              const matching = Arr.filter(documents, (document) =>
-                Arr.every(operations, ({ _tag, field, value }) => {
+              const matching = Array.filter(documents, (document) =>
+                Array.every(operations, ({ _tag, field, value }) => {
                   if (
                     field !== "group" &&
                     field !== "_creationTime" &&
@@ -285,7 +285,7 @@ describe("QueryStream iterator lifecycle", () => {
         }).pipe(Effect.flip);
         expect(error).toBeInstanceOf(QueryStream.ReadBudgetExceededError);
         expect(error).toMatchObject({ rowsRead: 0, bytesRead: 0 });
-        expect(Arr.every(reader.runs, (run) => run.next === 0)).toBe(true);
+        expect(Array.every(reader.runs, (run) => run.next === 0)).toBe(true);
       }),
   );
 
@@ -554,7 +554,7 @@ describe("QueryStream iterator lifecycle", () => {
         const settled = yield* Deferred.make<void>();
         const iterator = stage === "representative probe" ? 1 : 0;
         const reader = makeReader({ iterator, entered, release, settled });
-        const examined: Array<string> = [];
+        const examined: globalThis.Array<string> = [];
         let processed = 0;
         const observed = reader.stream.pipe(
           QueryStream.filterEffect((document) =>

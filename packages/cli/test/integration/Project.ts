@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { pipe } from "effect/Function";
 import * as Str from "effect/String";
 import * as Rec from "effect/Record";
@@ -159,8 +159,10 @@ export const make = Effect.gen(function* () {
       (directory) =>
         fs.readDirectory(path.join(root, directory), { recursive: true }).pipe(
           Effect.map((entries) =>
-            Arr.map(
-              Arr.filter(entries, (entry) => pipe(entry, Str.endsWith(".ts"))),
+            Array.map(
+              Array.filter(entries, (entry) =>
+                pipe(entry, Str.endsWith(".ts")),
+              ),
               (entry) => path.join(directory, entry),
             ),
           ),

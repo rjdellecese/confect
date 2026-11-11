@@ -1,7 +1,7 @@
 import { pipe } from "effect/Function";
 import * as Str from "effect/String";
 import * as Rec from "effect/Record";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
@@ -90,7 +90,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               vi
                 .spyOn(Console, "log")
                 .mockImplementation((...args) =>
-                  Arr.some(
+                  Array.some(
                     args,
                     (arg) =>
                       typeof arg === "string" &&
@@ -109,7 +109,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             Effect.sync(() =>
               vi.spyOn(Console, "error").mockImplementation((...args) =>
                 Effect.forEach(
-                  Arr.filter(
+                  Array.filter(
                     args,
                     (arg): arg is string =>
                       typeof arg === "string" &&
@@ -161,7 +161,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               vi.spyOn(Console, "log").mockImplementation((...args) =>
                 Effect.sync(() => {
                   if (
-                    Arr.some(
+                    Array.some(
                       args,
                       (arg) =>
                         typeof arg === "string" &&
@@ -188,7 +188,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                       ? "watcher service unavailable"
                       : "esbuild completed without metafile";
                   if (
-                    Arr.some(
+                    Array.some(
                       args,
                       (arg) =>
                         typeof arg === "string" &&
@@ -300,7 +300,7 @@ export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionI
               vi.spyOn(Console, "log").mockImplementation((...args) =>
                 Effect.sync(() => {
                   if (
-                    Arr.some(
+                    Array.some(
                       args,
                       (arg) =>
                         typeof arg === "string" &&
@@ -380,7 +380,10 @@ export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionI
           const project = yield* Project.make;
           const names = [
             "notes",
-            ...Array.from({ length: groups - 1 }, (_, i) => `other${i}`),
+            ...globalThis.Array.from(
+              { length: groups - 1 },
+              (_, i) => `other${i}`,
+            ),
           ];
           yield* Effect.forEach(names.slice(1), (name) =>
             Effect.all([
@@ -395,7 +398,7 @@ export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionI
             ]),
           );
           const unseen = new Set([
-            ...Arr.flatMap(names, (name) => [
+            ...Array.flatMap(names, (name) => [
               `${name}.spec.ts`,
               `${name}.impl.ts`,
             ]),

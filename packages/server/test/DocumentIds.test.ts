@@ -1,5 +1,5 @@
 import * as Layer from "effect/Layer";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as DocumentIds from "@confect/server/DocumentIds";
 import * as Table from "@confect/server/Table";
@@ -77,13 +77,13 @@ describe("DocumentIds", () => {
             Option.some({ table: "_storage", id: "_storage:id" }),
           );
           expect(
-            Arr.every(
+            Array.every(
               vi.mocked(native.normalizeId).mock.contexts,
               (ctx) => ctx === native,
             ),
           ).toBe(true);
           expect(
-            Arr.every(
+            Array.every(
               vi.mocked(native.system.normalizeId).mock.contexts,
               (ctx) => ctx === native.system,
             ),

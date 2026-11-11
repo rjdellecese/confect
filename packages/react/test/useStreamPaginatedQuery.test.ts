@@ -2,7 +2,7 @@ import { FunctionSpec, Ref } from "@confect/core";
 import { act, renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
 import * as Schema from "effect/Schema";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Rec from "effect/Record";
 import * as Result from "effect/Result";
 import * as MutableRef from "effect/MutableRef";
@@ -78,7 +78,7 @@ const respond = (paginationOpts: object, result: unknown) => {
 };
 
 const subscribedOpts = () =>
-  Arr.map(
+  Array.map(
     Rec.values(
       useQueriesMock.mock.lastCall![0] as Record<
         string,

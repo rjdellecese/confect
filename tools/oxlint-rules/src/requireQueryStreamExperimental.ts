@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Str from "effect/String";
 import { Diagnostic, Rule, RuleContext, Visitor } from "effect-oxlint";
 import type { ESTree } from "effect-oxlint";
@@ -43,7 +43,7 @@ export const requireQueryStreamExperimental = Rule.define({
       if (
         declaration?.type === "FunctionDeclaration" &&
         declaration.body != null &&
-        Arr.some(
+        Array.some(
           ctx.sourceCode.ast.body,
           (statement) =>
             (statement.type === "ExportNamedDeclaration" ||
@@ -62,7 +62,7 @@ export const requireQueryStreamExperimental = Rule.define({
         Str.trim(
           Str.slice(comment.range[1], node.range[0])(ctx.sourceCode.text),
         ) === "" &&
-        Arr.some(
+        Array.some(
           Str.split("\n")(comment.value),
           (line) =>
             Str.trim(Str.replace(/^\s*\*\s?/, "")(line)) === "@experimental",

@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { identity } from "effect/Function";
 import * as Result from "effect/Result";
 import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
@@ -66,7 +66,7 @@ const actionRef = Ref.make(
 
 const makeRecorder = Effect.gen(function* () {
   const baseTracer = yield* Effect.service(Tracer.Tracer);
-  const spans: Array<Tracer.Span> = [];
+  const spans: globalThis.Array<Tracer.Span> = [];
   const tracer = Tracer.make({
     span(options) {
       const span = baseTracer.span(options);
@@ -151,7 +151,7 @@ describe("server operation tracing", () => {
           page,
         ]);
         expect(reads).toBe(6);
-        expect(Arr.map(recorder.spans, (span) => span.name)).toEqual([
+        expect(Array.map(recorder.spans, (span) => span.name)).toEqual([
           "caller",
           "QueryStream.unique",
           "QueryStream.paginate",
@@ -281,13 +281,13 @@ describe("server operation tracing", () => {
           ]),
         );
 
-        expect(Arr.map(invoke.mock.calls, ([, args]) => args)).toEqual([
+        expect(Array.map(invoke.mock.calls, ([, args]) => args)).toEqual([
           { value: "2" },
           { value: "3" },
           { value: "4" },
           { value: "2" },
         ]);
-        expect(Arr.map(recorder.spans, (span) => span.name)).toEqual([
+        expect(Array.map(recorder.spans, (span) => span.name)).toEqual([
           "caller",
           "QueryRunner.runQuery",
           "MutationRunner.runMutation",
@@ -378,7 +378,7 @@ describe("server operation tracing", () => {
           [noteId, { value: "3" }],
           [noteId, { value: "4" }],
         ]);
-        expect(Arr.map(recorder.spans, (span) => span.name)).toEqual([
+        expect(Array.map(recorder.spans, (span) => span.name)).toEqual([
           "DatabaseWriter.insert",
           "DatabaseWriter.patch",
           "DatabaseWriter.replace",
@@ -447,7 +447,7 @@ describe("server operation tracing", () => {
         expect(results[1]).toEqual(results[0]);
         expect(filter.mock.calls).toEqual([[predicate], [predicate]]);
         expect(paginate.mock.calls).toEqual([[options], [options]]);
-        expect(Arr.map(recorder.spans, (span) => span.name)).toEqual([
+        expect(Array.map(recorder.spans, (span) => span.name)).toEqual([
           "OrderedQuery.paginate",
           "OrderedQuery.paginate",
         ]);

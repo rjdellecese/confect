@@ -1,5 +1,5 @@
 import * as Option from "effect/Option";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Str from "effect/String";
 import * as Schema from "effect/Schema";
 import * as Result from "effect/Result";
@@ -64,7 +64,7 @@ const resolveApi = (
     const variable = variableAt(source, node);
     if (
       variable === undefined ||
-      Arr.some(
+      Array.some(
         variable.references,
         (reference) => reference.isWrite() && !reference.init,
       )
@@ -205,12 +205,12 @@ const isLiteralData = (node: ESTree.Node): boolean => {
       node.value === null
     );
   if (node.type === "ArrayExpression")
-    return Arr.every(
+    return Array.every(
       node.elements,
       (element) => element !== null && isLiteralData(element),
     );
   if (node.type === "ObjectExpression")
-    return Arr.every(
+    return Array.every(
       node.properties,
       (property) =>
         property.type === "Property" &&
@@ -232,13 +232,13 @@ const eachTitle = (
   if (node.type !== "TemplateLiteral" || node.expressions.length !== 1)
     return undefined;
   const [expression] = node.expressions;
-  const parts = Arr.map(node.quasis, (quasi) => quasi.value.cooked);
-  if (Arr.some(parts, (part) => part === null || /[%$]/.test(part)))
+  const parts = Array.map(node.quasis, (quasi) => quasi.value.cooked);
+  if (Array.some(parts, (part) => part === null || /[%$]/.test(part)))
     return undefined;
   if (
     expression.type === "Identifier" &&
     expression.name === row &&
-    Arr.every(
+    Array.every(
       rows.elements,
       (element) =>
         element?.type === "Literal" && typeof element.value === "string",
@@ -257,11 +257,11 @@ const eachTitle = (
       /^[A-Za-z_]\w*$/.test(name) &&
       name !== "__proto__" &&
       !/^[\w.$]/.test(parts[1] ?? "") &&
-      Arr.every(
+      Array.every(
         rows.elements,
         (element) =>
           element?.type === "ObjectExpression" &&
-          Arr.filter(
+          Array.filter(
             element.properties,
             (property) =>
               property.type === "Property" &&
@@ -270,7 +270,7 @@ const eachTitle = (
                 (property.key.type === "Literal" &&
                   property.key.value === name)),
           ).length === 1 &&
-          Arr.some(
+          Array.some(
             element.properties,
             (property) =>
               property.type === "Property" &&
@@ -320,7 +320,7 @@ const replacement = (
     return undefined;
   if (
     api !== "effect" &&
-    Arr.some(rows.elements, (element) => element?.type === "ArrayExpression")
+    Array.some(rows.elements, (element) => element?.type === "ArrayExpression")
   )
     return undefined;
   const [title, callback, timeout] = call.arguments;
@@ -342,22 +342,22 @@ const replacement = (
   const variable = variableAt(source, row);
   if (
     variable === undefined ||
-    Arr.some(
+    Array.some(
       variable.references,
       (reference) => reference.isWrite() && !reference.init,
     )
   )
     return undefined;
-  const comments = Arr.filter(
+  const comments = Array.filter(
     source.getAllComments(),
     (comment) =>
       comment.range[0] >= loop.range[0] && comment.range[1] <= loop.range[1],
   );
   if (
-    Arr.some(
+    Array.some(
       comments,
       (comment) =>
-        !Arr.some(
+        !Array.some(
           [loop.right, callback],
           (kept) =>
             comment.range[0] >= kept.range[0] &&
@@ -368,14 +368,14 @@ const replacement = (
     return undefined;
   const scope = source.getScope(callback);
   if (
-    Arr.some(
+    Array.some(
       scope.through,
       (reference) => reference.identifier.name === "arguments",
     )
   )
     return undefined;
   const opening = Option.getOrUndefined(
-    Arr.findFirst(source.getTokens(callback), (token) => token.value === "("),
+    Array.findFirst(source.getTokens(callback), (token) => token.value === "("),
   );
   if (opening === undefined) return undefined;
   const callbackText = source.getText(callback);
