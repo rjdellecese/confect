@@ -109,7 +109,7 @@ import * as NotesApi from "./http/NotesApi";
 import * as ScalarDocs from "./http/ScalarDocs";
 import databaseSchema from "./_generated/schema";
 
-export default ConfectHttpRouter.make(
+const http = ConfectHttpRouter.make(
   databaseSchema,
   Layer.mergeAll(
     NotesApi.layer,
@@ -120,37 +120,9 @@ export default ConfectHttpRouter.make(
     }),
   ),
 );
+
+export default http;
 ```
-
-## Vector search
-
-The generated `VectorSearch` service is available in HTTP handlers and middleware. The schema passed to `ConfectHttpRouter.make(databaseSchema, routes)` types the available tables, vector indexes, and filter fields. For explicit type annotations, use `ConfectHttpRouter.Routes<typeof databaseSchema>` and `ConfectHttpRouter.Services<typeof databaseSchema>`.
-
-```ts confect/http.ts
-import { HttpRouter as ConfectHttpRouter } from "@confect/server";
-import * as Effect from "effect/Effect";
-import * as HttpRouter from "effect/http/HttpRouter";
-import * as HttpServerResponse from "effect/http/HttpServerResponse";
-import databaseSchema from "./_generated/schema";
-import { VectorSearch } from "./_generated/services";
-
-const routes = HttpRouter.add(
-  "POST",
-  "/search",
-  Effect.gen(function* () {
-    const vectorSearch = yield* VectorSearch;
-    const results = yield* vectorSearch("documents", "by_embedding", {
-      vector: [1, 0, 0],
-      filter: (q) => q.eq("category", "public"),
-    });
-    return yield* HttpServerResponse.json(results);
-  }),
-);
-
-export default ConfectHttpRouter.make(databaseSchema, routes);
-```
-
-This example assumes a `documents` table with a three-dimensional `by_embedding` vector index and `category` as a filter field. Instead of calling `ctx.vectorSearch`, yield the generated service and then its returned Effect; the search runs when the Effect is executed. Native failures become defects. The same service is available in `HttpApi` handlers and global middleware. For search options and result semantics, see [Convex vector search](https://docs.convex.dev/search/vector-search).
 
 ## Routing semantics
 
@@ -163,13 +135,9 @@ This example assumes a `documents` table with a three-dimensional `by_embedding`
 ```ts confect/http.ts (continued)
 import { httpActionGeneric } from "convex/server";
 
-const http = ConfectHttpRouter.make(databaseSchema, routes);
-
 http.route({
   path: "/plain-convex",
   method: "GET",
   handler: httpActionGeneric(() => Promise.resolve(new Response("ok"))),
 });
-
-export default http;
 ```
