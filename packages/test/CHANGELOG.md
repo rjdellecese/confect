@@ -1,5 +1,12 @@
 # @confect/test
 
+## 10.6.0
+
+### Minor Changes
+
+- 49cbbfc: Support `Storage.get` and `Storage.store` in mutations and mutation/action middleware, with file writes committed or rolled back alongside the database transaction. Upgrade `convex` to 1.48.0 or later and, when using `@confect/test`, `convex-test` to 0.0.67 or later.
+- d087214: Add `MutationAuth.signJwt()` for signing deployment JWTs in mutations and mutation-only middleware, and export `MutationAuth` from generated services. Add `TestConfect.jwks()` to verify test-issued tokens with the same test instance's public keys.
+
 ## 10.5.0
 
 No changes in this release.
