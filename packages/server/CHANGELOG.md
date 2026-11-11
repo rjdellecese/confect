@@ -1,5 +1,20 @@
 # @confect/server
 
+## 10.6.0
+
+### Minor Changes
+
+- 49cbbfc: Support `Storage.get` and `Storage.store` in mutations and mutation/action middleware, with file writes committed or rolled back alongside the database transaction. Upgrade `convex` to 1.48.0 or later and, when using `@confect/test`, `convex-test` to 0.0.67 or later.
+- d087214: Add `MutationAuth.signJwt()` for signing deployment JWTs in mutations and mutation-only middleware, and export `MutationAuth` from generated services. Add `TestConfect.jwks()` to verify test-issued tokens with the same test instance's public keys.
+- 2cc60e3: Add `TransactionMetadata.getSnapshotTs()` to read the current database snapshot timestamp as a `bigint` in queries, mutations, and compatible middleware.
+
+### Patch Changes
+
+- 7588737: Use the deployment's AI gateway address for language and decision requests instead of a fixed hostname.
+- 0b0b789: Back Confect's `first()` and `take(n)` with native Convex `take()` calls rather than consuming the query's `AsyncIterable`. Convex can prefetch a full index page behind the iterator even when only a few documents are requested; native `take()` communicates the limit to the backend and avoids that unnecessary prefetching.
+
+  Fix `take(n)` to use Convex's non-negative-integer validation: fractional, negative, `NaN`, and infinite counts now fail instead of being rounded, returning no documents, or collecting the entire query.
+
 ## 10.5.0
 
 ### Minor Changes

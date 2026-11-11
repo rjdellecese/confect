@@ -1,5 +1,16 @@
 # @confect/cli
 
+## 10.6.0
+
+### Minor Changes
+
+- d685126: Add `GroupSpec.make({ experimental_reuseContext: true })` to opt a group's queries and mutations into Convex's experimental V8 context reuse through `confect codegen` and `confect dev`. Reuse is disabled by default, does not apply to actions or child groups, and requires auditing module-level state for safety across calls and users.
+- d087214: Add `MutationAuth.signJwt()` for signing deployment JWTs in mutations and mutation-only middleware, and export `MutationAuth` from generated services. Add `TestConfect.jwks()` to verify test-issued tokens with the same test instance's public keys.
+
+### Patch Changes
+
+- f8d47d9: Allow `@confect/cli` to use `bundle-require` 5.0.0 and `code-block-writer` 13.0.2 without changing its upper compatibility bounds.
+
 ## 10.5.0
 
 ### Minor Changes
