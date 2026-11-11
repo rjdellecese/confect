@@ -1,5 +1,11 @@
 # @confect/core
 
+## 10.6.0
+
+### Minor Changes
+
+- d685126: Add `GroupSpec.make({ experimental_reuseContext: true })` to opt a group's queries and mutations into Convex's experimental V8 context reuse through `confect codegen` and `confect dev`. Reuse is disabled by default, does not apply to actions or child groups, and requires auditing module-level state for safety across calls and users.
+
 ## 10.5.0
 
 No changes in this release.
