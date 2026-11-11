@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { FunctionSpec, Ref } from "@confect/core";
 import * as WebSocketClient from "@confect/js/WebSocketClient";
 import { assert, expect, expectTypeOf, layer } from "@effect/vitest";
@@ -147,7 +147,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             );
             expect(observed1).toEqual([42, 42]);
             expect(
-              Arr.map(span.mock.calls, ([options]) => options.name),
+              Array.map(span.mock.calls, ([options]) => options.name),
             ).toEqual([
               "caller",
               `WebSocketClient.${operation.name}`,
@@ -414,7 +414,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             expect(sockets.at(-1)?.readyState).toBe(WebSocket.OPEN);
           }).pipe(Effect.scoped);
           expect(
-            Arr.every(
+            Array.every(
               sockets,
               (socket) => socket.readyState === WebSocket.CLOSED,
             ),

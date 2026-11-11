@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Result from "effect/Result";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { expect, test } from "bun:test";
@@ -65,7 +65,7 @@ test("rejects malformed, unsupported, and colliding lock entries", () =>
 test("replaces only the managed ignore block", () =>
   runTest(
     Effect.gen(function* () {
-      const current = Arr.join(
+      const current = Array.join(
         [
           "dist/",
           "# skills-lock:start",
@@ -76,7 +76,7 @@ test("replaces only the managed ignore block", () =>
         ],
         "\n",
       );
-      const block = Arr.join(
+      const block = Array.join(
         [
           "# skills-lock:start",
           "# Generated",
@@ -88,7 +88,7 @@ test("replaces only the managed ignore block", () =>
 
       const updatedIgnore = yield* updateManagedBlock(current, block);
       expect(updatedIgnore).toBe(
-        Arr.join(["dist/", block, "coverage/", ""], "\n"),
+        Array.join(["dist/", block, "coverage/", ""], "\n"),
       );
     }),
   ));

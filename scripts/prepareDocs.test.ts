@@ -1,5 +1,5 @@
 import * as Str from "effect/String";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import { afterEach, expect, test } from "bun:test";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Effect from "effect/Effect";
@@ -123,14 +123,14 @@ test("rejects the source checkout, non-root destinations, and dirty release chec
 test("redirects legacy versioned navigation pages only to existing current pages", () =>
   Effect.runPromise(
     Effect.gen(function* () {
-      const pages = Arr.flatMap(docsConfig.navigation.groups, (group) =>
-        Arr.flatMap(group.pages, (page) =>
+      const pages = Array.flatMap(docsConfig.navigation.groups, (group) =>
+        Array.flatMap(group.pages, (page) =>
           typeof page === "string" ? [page] : page.pages,
         ),
       );
       expect(docsConfig.redirects).toEqual(
-        Arr.flatMap(["v9", "v10"], (version) =>
-          Arr.map(pages, (page) => ({
+        Array.flatMap(["v9", "v10"], (version) =>
+          Array.map(pages, (page) => ({
             source: `/${version}/${page}`,
             destination: `/${page}`,
           })),

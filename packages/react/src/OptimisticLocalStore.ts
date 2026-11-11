@@ -1,7 +1,7 @@
 import { Ref } from "@confect/core";
 import type { OptimisticLocalStore as ConvexOptimisticLocalStore } from "convex/browser";
 import * as Option from "effect/Option";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 
 /**
  * The Confect counterpart to Convex's `OptimisticLocalStore`.
@@ -49,7 +49,7 @@ export const make = (
   },
   getAllQueries: (queryRef) => {
     const functionReference = Ref.getFunctionReference(queryRef);
-    return Arr.map(
+    return Array.map(
       convexLocalStore.getAllQueries(functionReference),
       ({ args, value }) => ({
         args: Ref.decodeArgsSync(queryRef, args),

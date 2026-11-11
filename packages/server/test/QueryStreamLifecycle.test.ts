@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Table from "@confect/server/Table";
 import * as QueryStreamIndexRange from "@confect/server/QueryStreamIndexRange";
 import type * as QueryStreamKeyValues from "@confect/server/QueryStreamKeyValues";
@@ -84,8 +84,8 @@ const makeReader = (pending?: PendingRead) => {
               };
               runs.push(run);
               events.push(`${id}:open:${order}`);
-              const matching = Arr.filter(documents, (document) =>
-                Arr.every(operations, ({ _tag, field, value }) => {
+              const matching = Array.filter(documents, (document) =>
+                Array.every(operations, ({ _tag, field, value }) => {
                   if (
                     field !== "group" &&
                     field !== "_creationTime" &&
@@ -285,7 +285,7 @@ describe("QueryStream iterator lifecycle", () => {
         }).pipe(Effect.flip);
         expect(error).toBeInstanceOf(QueryStream.ReadBudgetExceededError);
         expect(error).toMatchObject({ rowsRead: 0, bytesRead: 0 });
-        expect(Arr.every(reader.runs, (run) => run.next === 0)).toBe(true);
+        expect(Array.every(reader.runs, (run) => run.next === 0)).toBe(true);
       }),
   );
 

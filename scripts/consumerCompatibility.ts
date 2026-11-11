@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Str from "effect/String";
 import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
@@ -105,9 +105,9 @@ export const graphProblems = (
   rootResolutions: Readonly<Record<string, string>>,
   directory: string,
 ): ReadonlyArray<GraphProblem> => {
-  const byPath = new Map(Arr.map(packages, (entry) => [entry.path, entry]));
+  const byPath = new Map(Array.map(packages, (entry) => [entry.path, entry]));
   const cohort = new Map(
-    Arr.map(candidates, (entry) => [entry.manifest.name, entry]),
+    Array.map(candidates, (entry) => [entry.manifest.name, entry]),
   );
   const problems: Array<GraphProblem> = [];
   for (const entry of packages) {

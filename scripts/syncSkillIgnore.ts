@@ -1,7 +1,7 @@
 import * as Record from "effect/Record";
 import * as Str from "effect/String";
 import * as Option from "effect/Option";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Console from "effect/Console";
@@ -99,11 +99,11 @@ export const vendoredSkillDirectories = Effect.fnUntraced(function* (
 export const renderManagedBlock = (
   directories: ReadonlyArray<string>,
 ): string =>
-  Arr.join(
+  Array.join(
     [
       START_MARKER,
       GENERATED_COMMENT,
-      ...Arr.map(directories, (directory) => `.agents/skills/${directory}/`),
+      ...Array.map(directories, (directory) => `.agents/skills/${directory}/`),
       END_MARKER,
     ],
     "\n",
@@ -116,10 +116,10 @@ export const updateManagedBlock = Effect.fnUntraced(function* (
   const lines = Str.split("\n")(Str.replaceAll("\r\n", "\n")(ignoreText));
   if (lines.at(-1) === "") lines.pop();
 
-  const startIndexes = Arr.flatMap(lines, (line, index) =>
+  const startIndexes = Array.flatMap(lines, (line, index) =>
     line === START_MARKER ? [index] : [],
   );
-  const endIndexes = Arr.flatMap(lines, (line, index) =>
+  const endIndexes = Array.flatMap(lines, (line, index) =>
     line === END_MARKER ? [index] : [],
   );
 
@@ -149,7 +149,7 @@ export const updateManagedBlock = Effect.fnUntraced(function* (
     lines.splice(start, end - start + 1, ...managedLines);
   }
 
-  return `${Arr.join(lines, "\n")}\n`;
+  return `${Array.join(lines, "\n")}\n`;
 });
 
 const readIgnoreFile = Effect.fnUntraced(function* (path: string) {
@@ -200,7 +200,7 @@ export const syncSkillIgnoreMain = Effect.fn("SkillIgnore.main")(function* (
   args: ReadonlyArray<string>,
 ) {
   const unknownArgument = Option.getOrUndefined(
-    Arr.findFirst(args, (argument) => argument !== "--check"),
+    Array.findFirst(args, (argument) => argument !== "--check"),
   );
   if (unknownArgument !== undefined) {
     return yield* SkillIgnoreError.make({

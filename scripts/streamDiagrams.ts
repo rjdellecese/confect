@@ -1,7 +1,7 @@
 import * as Str from "effect/String";
 import * as Record from "effect/Record";
 import * as Option from "effect/Option";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Console from "effect/Console";
@@ -77,8 +77,8 @@ export const track = (
     "\n" +
     indent +
     CORNER +
-    Arr.join(
-      Arr.map(cells, (label) => (label === undefined ? gap : cell(label))),
+    Array.join(
+      Array.map(cells, (label) => (label === undefined ? gap : cell(label))),
       "",
     ) +
     end
@@ -90,8 +90,8 @@ export const track = (
  */
 export const keys = (values: ReadonlyArray<Cell>): string =>
   " " +
-  Arr.join(
-    Arr.map(values, (key) =>
+  Array.join(
+    Array.map(values, (key) =>
       key === undefined ? Str.repeat(COLUMN_WIDTH)(" ") : keyCell(key),
     ),
     "",
@@ -103,8 +103,8 @@ export const keys = (values: ReadonlyArray<Cell>): string =>
 const op = (text: string): string => `╞═ ${text} ═╡`;
 
 const lines = (...rows: ReadonlyArray<string>): string =>
-  Arr.join(
-    Arr.map(rows, (row) => Str.trimEnd(row)),
+  Array.join(
+    Array.map(rows, (row) => Str.trimEnd(row)),
     "\n",
   );
 
@@ -348,10 +348,10 @@ export const renderDiagrams = Effect.fnUntraced(function* (
       reason: `${PAGE} references an unknown diagram: ${unknown}`,
     });
   }
-  const unused = Arr.filter(Record.keys(diagrams), (name) => !seen.has(name));
+  const unused = Array.filter(Record.keys(diagrams), (name) => !seen.has(name));
   if (unused.length > 0) {
     return yield* StreamDiagramsError.make({
-      reason: `${PAGE} has no block for: ${Arr.join(unused, ", ")}`,
+      reason: `${PAGE} has no block for: ${Array.join(unused, ", ")}`,
     });
   }
   return rendered;
@@ -396,7 +396,7 @@ export const streamDiagramsMain = Effect.fn("StreamDiagrams.main")(function* (
   args: ReadonlyArray<string>,
 ) {
   const unknownArgument = Option.getOrUndefined(
-    Arr.findFirst(args, (argument) => argument !== "--check"),
+    Array.findFirst(args, (argument) => argument !== "--check"),
   );
   if (unknownArgument !== undefined) {
     return yield* StreamDiagramsError.make({

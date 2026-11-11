@@ -1,4 +1,4 @@
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Str from "effect/String";
 import * as Record from "effect/Record";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
@@ -50,8 +50,8 @@ export const cleanEnvironment = (
   delimiter: string,
   repository: string,
 ): Record<string, string> => ({
-  PATH: Arr.join(
-    Arr.filter(
+  PATH: Array.join(
+    Array.filter(
       Str.split(delimiter)(executablePath),
       (part) =>
         !Str.includes("node_modules")(part) &&
@@ -202,7 +202,7 @@ const candidatesFor = Effect.fn("Consumer.candidatesFor")(function* (
     manifestAt(path.join(repository, "packages", name)),
   );
   const versions = Record.fromEntries(
-    Arr.map(sources, (manifest) => [manifest.name, manifest.version]),
+    Array.map(sources, (manifest) => [manifest.name, manifest.version]),
   );
   const output =
     artifacts !== undefined && artifacts !== ""
@@ -409,7 +409,7 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
     const dependencies = {
       ...consumerDependencies(profile, lane),
       ...Record.fromEntries(
-        Arr.map(candidates, ({ manifest, tarball }) => [
+        Array.map(candidates, ({ manifest, tarball }) => [
           manifest.name,
           `file:${tarball}`,
         ]),
