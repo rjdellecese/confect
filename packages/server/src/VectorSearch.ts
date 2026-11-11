@@ -19,7 +19,7 @@ type ConvexVectorSearch<DataModel_ extends DataModel.AnyWithProps> =
  * references it instead of expanding the call signature at every usage.
  */
 export interface VectorSearchService<
-  DataModel_ extends DataModel.AnyWithProps,
+  in out DataModel_ extends DataModel.AnyWithProps,
 > {
   <
     TableName extends DataModel.TableNames<DataModel_>,

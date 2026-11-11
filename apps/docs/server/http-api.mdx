@@ -91,7 +91,7 @@ export const layer = Layer.unwrap(
 
 ## Creating the router
 
-Create the Convex HTTP router in `confect/http.ts` with `HttpRouter.make` from `@confect/server`. It takes a single `Layer` that registers your routes—merge your API and docs layers with any other building blocks from Effect's `effect/http`:
+Create the Convex HTTP router in `confect/http.ts` with `HttpRouter.make` from `@confect/server`. Pass your generated runtime database schema and a `Layer` that registers your routes. The schema is required even when your routes do not use vector search. Merge your API and docs layers with any other building blocks from Effect's `effect/http`:
 
 - `HttpRouter.add(method, path, handler)` registers a plain route.
 - `HttpRouter.middleware(fn, { global: true })` applies middleware to every route.
@@ -107,8 +107,10 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as NotesApi from "./http/NotesApi";
 import * as ScalarDocs from "./http/ScalarDocs";
+import databaseSchema from "./_generated/schema";
 
-export default ConfectHttpRouter.make(
+const http = ConfectHttpRouter.make(
+  databaseSchema,
   Layer.mergeAll(
     NotesApi.layer,
     ScalarDocs.layer,
@@ -118,6 +120,8 @@ export default ConfectHttpRouter.make(
     }),
   ),
 );
+
+export default http;
 ```
 
 ## Routing semantics
@@ -131,13 +135,9 @@ export default ConfectHttpRouter.make(
 ```ts confect/http.ts (continued)
 import { httpActionGeneric } from "convex/server";
 
-const http = ConfectHttpRouter.make(/* ... */);
-
 http.route({
   path: "/plain-convex",
   method: "GET",
   handler: httpActionGeneric(() => Promise.resolve(new Response("ok"))),
 });
-
-export default http;
 ```

@@ -147,6 +147,14 @@ export declare const api: {
         string | null
       >;
     };
+    httpVectors: {
+      seed: FunctionReference<
+        "mutation",
+        "public",
+        { caseId: string },
+        Array<Id<"httpVectors">>
+      >;
+    };
     metadata: {
       actionMetadata: FunctionReference<
         "action",

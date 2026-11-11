@@ -1,4 +1,5 @@
 import {
+  type GenericActionCtx,
   type HttpRouter as ConvexHttpRouter,
   httpActionGeneric,
   httpRouter,
@@ -18,6 +19,8 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServer from "effect/http/HttpServer";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
+import type * as DatabaseSchema from "./DatabaseSchema";
+import type * as DataModel from "./DataModel";
 import type { ExecutionMetadata } from "./ExecutionMetadata";
 import type { RequestMetadata } from "./RequestMetadata";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
@@ -30,12 +33,13 @@ import type { Storage } from "./Storage";
 import type { StorageActionWriter } from "./StorageActionWriter";
 import type { StorageReader } from "./StorageReader";
 import type { StorageWriter } from "./StorageWriter";
+import type * as VectorSearch from "./VectorSearch";
 
 /**
  * The Confect services available to HTTP route handlers and middleware,
  * supplied per request from the Convex action context.
  */
-export type Services =
+export type Services<Schema extends DatabaseSchema.AnyWithProps> =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
@@ -46,7 +50,8 @@ export type Services =
   | Storage
   | StorageReader
   | StorageWriter
-  | StorageActionWriter;
+  | StorageActionWriter
+  | VectorSearch.VectorSearch<DataModel.FromSchema<Schema>>;
 
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
@@ -71,7 +76,7 @@ export type Services =
  *
  * @stability unstable
  */
-export type Routes = Layer.Layer<
+export type Routes<Schema extends DatabaseSchema.AnyWithProps> = Layer.Layer<
   never,
   never,
   | HttpRouter.HttpRouter
@@ -79,14 +84,15 @@ export type Routes = Layer.Layer<
   | FileSystem.FileSystem
   | HttpPlatform.HttpPlatform
   | Path.Path
-  | HttpRouter.Request<"Requires", Services>
-  | HttpRouter.Request<"GlobalRequires", Services>
+  | HttpRouter.Request<"Requires", Services<Schema>>
+  | HttpRouter.Request<"GlobalRequires", Services<Schema>>
   | HttpRouter.Request<"Error", any>
   | HttpRouter.Request<"GlobalError", any>
 >;
 
 /**
- * Create a Convex HTTP router serving the given routes.
+ * Create a Convex HTTP router from a runtime database schema and routes, with
+ * schema-typed vector search in handlers and middleware.
  *
  * A single catch-all `httpAction` is registered for every routable method under
  * the path prefix `"/"`, making the Effect router the single source of truth
@@ -99,7 +105,10 @@ export type Routes = Layer.Layer<
  *
  * @stability unstable
  */
-export const make = (routes: Routes): ConvexHttpRouter => {
+export const make = <Schema extends DatabaseSchema.AnyWithProps>(
+  databaseSchema: Schema,
+  routes: Routes<NoInfer<Schema>>,
+): ConvexHttpRouter => {
   applyMonkeyPatches();
 
   // Provided (not just merged) so that route layers' own construction—e.g.
@@ -122,11 +131,12 @@ export const make = (routes: Routes): ConvexHttpRouter => {
   const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
-    const services = RegisteredFunction.baseActionLayer(ctx).pipe(
-      Layer.build,
-      Effect.scoped,
-      Effect.runSync,
-    );
+    const services = RegisteredFunction.actionLayer(
+      databaseSchema,
+      ctx as unknown as GenericActionCtx<
+        DataModel.ToConvex<DataModel.FromSchema<Schema>>
+      >,
+    ).pipe(Layer.build, Effect.scoped, Effect.runSync);
     return handler(
       request,
       Context.add(services, Console.Console, globalThis.console),
