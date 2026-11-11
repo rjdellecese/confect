@@ -17,33 +17,40 @@ type IdentifiedId<TableName extends string> = {
   };
 }[TableName];
 
-export interface DocumentIds<Schema extends DatabaseSchema.AnyWithProps> {
-  readonly parse: <const Name extends DatabaseSchema.AllTableNames<Schema>>(
+export interface DocumentIds<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> {
+  readonly parse: <
+    const Name extends DatabaseSchema.AllTableNames<DatabaseSchema_>,
+  >(
     table: Name,
     input: string,
   ) => Effect.Effect<Option.Option<GenericId<Name>>>;
   readonly identify: (
     input: string,
   ) => Effect.Effect<
-    Option.Option<IdentifiedId<DatabaseSchema.AllTableNames<Schema>>>
+    Option.Option<IdentifiedId<DatabaseSchema.AllTableNames<DatabaseSchema_>>>
   >;
 }
 
-export type DocumentIdsTag<Schema extends DatabaseSchema.AnyWithProps> =
-  Context.Service<DocumentIds<Schema>, DocumentIds<Schema>>;
+export type DocumentIdsTag<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> = Context.Service<DocumentIds<DatabaseSchema_>, DocumentIds<DatabaseSchema_>>;
 
 export const DocumentIds = <
-  Schema extends DatabaseSchema.AnyWithProps,
->(): DocumentIdsTag<Schema> =>
-  Context.Service<DocumentIds<Schema>>("@confect/server/DocumentIds");
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+>(): DocumentIdsTag<DatabaseSchema_> =>
+  Context.Service<DocumentIds<DatabaseSchema_>>("@confect/server/DocumentIds");
 
-export const make = <Schema extends DatabaseSchema.AnyWithProps>(
-  schema: Schema,
+export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+  schema: DatabaseSchema_,
   reader: GenericDatabaseReader<
-    DataModel.ToConvex<DataModel.FromSchema<Schema>>
+    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
-): DocumentIds<Schema> => {
-  const normalize = <Name extends DatabaseSchema.AllTableNames<Schema>>(
+): DocumentIds<DatabaseSchema_> => {
+  const normalize = <
+    Name extends DatabaseSchema.AllTableNames<DatabaseSchema_>,
+  >(
     table: Name,
     input: string,
   ): GenericId<Name> | null =>
@@ -53,13 +60,13 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
           input,
         )
       : reader.normalizeId(
-          table as DatabaseSchema.TableNames<Schema>,
+          table as DatabaseSchema.TableNames<DatabaseSchema_>,
           input,
         )) as GenericId<Name> | null;
 
   return {
     parse: Effect.fn("DocumentIds.parse")(
-      <const Name extends DatabaseSchema.AllTableNames<Schema>>(
+      <const Name extends DatabaseSchema.AllTableNames<DatabaseSchema_>>(
         table: Name,
         input: string,
       ) =>
@@ -73,12 +80,12 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
         const tables = [
           ...Struct.keys(DatabaseSchema.tables(schema)),
           ...Struct.keys(Table.systemTables),
-        ] as ReadonlyArray<DatabaseSchema.AllTableNames<Schema>>;
+        ] as ReadonlyArray<DatabaseSchema.AllTableNames<DatabaseSchema_>>;
         for (const table of tables) {
           const id = normalize(table, input);
           if (id === input) {
             return Option.some({ table, id } as IdentifiedId<
-              DatabaseSchema.AllTableNames<Schema>
+              DatabaseSchema.AllTableNames<DatabaseSchema_>
             >);
           }
         }
@@ -88,9 +95,9 @@ export const make = <Schema extends DatabaseSchema.AnyWithProps>(
   };
 };
 
-export const layer = <Schema extends DatabaseSchema.AnyWithProps>(
-  schema: Schema,
+export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+  schema: DatabaseSchema_,
   reader: GenericDatabaseReader<
-    DataModel.ToConvex<DataModel.FromSchema<Schema>>
+    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
-) => Layer.succeed(DocumentIds<Schema>(), make(schema, reader));
+) => Layer.succeed(DocumentIds<DatabaseSchema_>(), make(schema, reader));

@@ -284,9 +284,13 @@ const queryFunction = <
     ),
 });
 
-export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
-  schema: Schema,
-  ctx: GenericMutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
+export const mutationLayer = <
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+>(
+  schema: DatabaseSchema_,
+  ctx: GenericMutationCtx<
+    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+  >,
 ) =>
   Layer.mergeAll(
     DatabaseReader.layer(schema, ctx.db),
@@ -307,17 +311,19 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
     MutationTransactionContext.layer(ctx),
     Layer.succeed(
       MutationCtx.MutationCtx<
-        DataModel.ToConvex<DataModel.FromSchema<Schema>>
+        DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
       >(),
       ctx,
     ),
     ConvexConfigProvider.layer,
   );
 
-export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
-  | DatabaseReader.DatabaseReader<Schema>
-  | DocumentIds.DocumentIds<Schema>
-  | DatabaseWriter.DatabaseWriter<Schema>
+export type MutationServices<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> =
+  | DatabaseReader.DatabaseReader<DatabaseSchema_>
+  | DocumentIds.DocumentIds<DatabaseSchema_>
+  | DatabaseWriter.DatabaseWriter<DatabaseSchema_>
   | MutationAuth.MutationAuth
   | Auth.Auth
   | ExecutionMetadata.ExecutionMetadata
@@ -332,7 +338,9 @@ export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
   | MutationRunner.MutationRunner
   | QueryTransactionContext.QueryTransactionContext
   | MutationTransactionContext.MutationTransactionContext
-  | MutationCtx.MutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>;
+  | MutationCtx.MutationCtx<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >;
 
 const mutationFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

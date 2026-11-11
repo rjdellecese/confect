@@ -19,9 +19,8 @@ export interface AnyWithProps extends DataModel<
   Readonly<Record<string, Table.AnyWithProps>>
 > {}
 
-export type FromSchema<Schema extends DatabaseSchema.AnyWithProps> = DataModel<
-  Schema[DatabaseSchema.TypeId]
->;
+export type FromSchema<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
+  DataModel<DatabaseSchema_[DatabaseSchema.TypeId]>;
 
 export type FromTables<Tables_ extends Table.AnyWithProps> = DataModel<
   Table.TablesRecord<Tables_>
