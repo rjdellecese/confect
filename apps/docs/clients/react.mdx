@@ -304,6 +304,13 @@ const DeleteNote = ({ noteId }: { noteId: string }) => {
 };
 ```
 
+### Optimistic updates
+
+The callback passed to `useMutation(ref).withOptimisticUpdate(...)` receives
+decoded mutation arguments, rather than Convex's encoded values. Its local store
+accepts Confect query refs and decoded arguments/results; query values use
+`Option`, with `Option.none()` representing a query missing from the store.
+
 ## `useAction`
 
 Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` schema, and `Promise<Result<A, E>>` when it does.

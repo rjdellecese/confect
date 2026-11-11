@@ -1,4 +1,5 @@
 import { Ref } from "@confect/core";
+import type { TypeError } from "@confect/core/Types";
 import { version as convexVersion } from "convex";
 import type { OptimisticUpdate as ConvexOptimisticUpdate } from "convex/browser";
 import * as ConvexReact from "convex/react";
@@ -623,8 +624,11 @@ export type OptimisticUpdate<Mutation extends Ref.AnyPublicMutation> = (
  */
 export interface ReactMutation<Mutation extends Ref.AnyPublicMutation> {
   (...args: Ref.OptionalArgs<Mutation>): InvokeReturn<Mutation>;
-  withOptimisticUpdate(
-    optimisticUpdate: OptimisticUpdate<Mutation>,
+  withOptimisticUpdate<T extends OptimisticUpdate<Mutation>>(
+    optimisticUpdate: T &
+      (ReturnType<T> extends Promise<unknown>
+        ? TypeError<"Optimistic update handlers must be synchronous">
+        : {}),
   ): ReactMutation<Mutation>;
 }
 
