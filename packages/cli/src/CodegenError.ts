@@ -8,6 +8,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { BuildError, isBuildError } from "./BuildError";
 import { SnapshotError } from "./SnapshotError";
+import * as Spec from "@confect/core/Spec";
 import * as Ansi from "./Ansi";
 import { formatPath, renderBuildError } from "./log";
 
@@ -182,6 +183,7 @@ export const CodegenError = Schema.Union([
   SpecImportsServerError,
   InvalidMiddlewareAttachmentError,
   InvalidContextReuseError,
+  Spec.InvalidRootGroups,
   ImplMissingSpecImportError,
   ImplMissingDefaultLayerError,
   ImplNotFinalizedError,
@@ -392,6 +394,9 @@ const renderParentChildNameCollisionError = (
  */
 export const renderCodegenError = (error: CodegenError): string => {
   if (isBuildError(error)) return renderBuildError(error);
+  if (error._tag === "InvalidRootGroups") {
+    return singleLine(Spec.formatRootGroupsError(error.issue));
+  }
   return Match.value(error).pipe(
     Match.tag("SnapshotError", ({ reason, relativePath, pathSegments }) =>
       singleLine(

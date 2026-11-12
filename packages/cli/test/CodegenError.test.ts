@@ -9,6 +9,25 @@ import { SnapshotError } from "@confect/cli/SnapshotError";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
+import { InvalidRootGroups } from "@confect/core/Spec";
+
+it.each([
+  { _tag: "NestedRoot", path: ["nested", "app"] },
+  { _tag: "MultipleRoots", paths: [["app"], ["other"]] },
+  { _tag: "RootNameCollision", name: "notes", paths: [["app"], ["notes"]] },
+] as const)("roundtrips and renders root group failures: $_tag", (issue) => {
+  const error = InvalidRootGroups.make({ issue });
+  const codec = Schema.fromJsonString(InvalidRootGroups);
+  const roundtripped = Schema.encodeResult(codec)(error).pipe(
+    Result.flatMap(Schema.decodeResult(codec)),
+    Result.getOrThrow,
+  );
+  expect(isCodegenError(roundtripped)).toBe(true);
+  expect(roundtripped.issue).toEqual(issue);
+  expect(renderCodegenError(roundtripped)).toContain("app");
+});
 
 it.each([
   ["InvalidOption", "must be a boolean"],

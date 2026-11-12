@@ -12,7 +12,9 @@ A spec defines the interface of your Confect API. It is made up of group specs a
 
 Specs are built using `@confect/core`, which means they can be shared between the server and client. This separation is what enables end-to-end schema decoding and encoding: the client knows the exact shape of every function's arguments and return value without importing any server code.
 
-Each group spec is the default export of a `*.spec.ts` file. The group's name comes from the file's path—its stem for top-level groups, or the dot-joined directory path for nested groups:
+Each group spec is the default export of a `*.spec.ts` file. By default, the group's name comes from the file's path—its stem for top-level groups, or the dot-joined directory path for nested groups. One top-level group can opt into `GroupSpec.make({ root: true })` to expose its functions without a group prefix in refs; see [Unnamed root group](/concepts/file-naming-conventions#unnamed-root-group).
+
+For a named group:
 
 ```ts confect/notes_and_random/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";

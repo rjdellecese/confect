@@ -16,6 +16,137 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
     it.effect(
+      "updates refs when the root flag toggles without moving physical modules",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          yield* project.write("confect/other.spec.ts", Project.spec);
+          yield* project.write(
+            "confect/other.impl.ts",
+            pipe(Project.impl, Str.replace('"./notes.spec"', '"./other.spec"')),
+          );
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const initial = yield* project.generatedFiles;
+          for (const root of [true, false]) {
+            yield* project.write(
+              "confect/notes.spec.ts",
+              `${pipe(Project.spec, Str.replace("GroupSpec.make()", root ? "GroupSpec.make({ root: true })" : "GroupSpec.make()"))}\nconsole.log("ROOT_FLAG:${root}");\n`,
+            );
+            yield* watching.waitFor(`ROOT_FLAG:${root}`);
+            yield* watching.waitFor(success);
+            yield* project.runConsumer(`import assert from "node:assert/strict";
+import refs from "./confect/_generated/refs.ts";
+assert.deepEqual(Object.keys(refs.public).sort(), ["${root ? "list" : "notes"}", "other"]);
+assert.equal(refs.public.${root ? "list" : "notes.list"}.convexFunctionName, "notes:list");
+assert.equal(refs.public.other.list.convexFunctionName, "other:list");
+`);
+            const incremental = yield* project.generatedFiles;
+            expect(incremental).toEqual(initial);
+            const fresh = yield* project.start("codegen");
+            yield* fresh.waitFor(success);
+            const exitCode = yield* fresh.handle.exitCode;
+            expect(exitCode).toBe(0);
+            const regenerated = yield* project.generatedFiles;
+            expect(regenerated).toEqual(incremental);
+          }
+        }).pipe(Effect.scoped),
+      { timeout: 45000 },
+    );
+
+    it.effect(
+      "adds, renames, and removes a root module while keeping flattened refs current",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const initial = yield* project.generatedFiles;
+          yield* project.write(
+            "confect/root.spec.ts",
+            pipe(
+              Project.spec,
+              Str.replace("GroupSpec.make()", "GroupSpec.make({ root: true })"),
+            ),
+          );
+          yield* project.write(
+            "confect/root.impl.ts",
+            pipe(Project.impl, Str.replace('"./notes.spec"', '"./root.spec"')),
+          );
+          yield* watching.waitFor(success);
+          for (const name of ["root", "renamed"]) {
+            if (name === "renamed") {
+              yield* project.write(
+                "confect/renamed.impl.ts",
+                pipe(
+                  Project.impl,
+                  Str.replace('"./notes.spec"', '"./renamed.spec"'),
+                ),
+              );
+              yield* fs.rename(
+                path.join(project.root, "confect/root.spec.ts"),
+                path.join(project.root, "confect/renamed.spec.ts"),
+              );
+              yield* fs.remove(path.join(project.root, "confect/root.impl.ts"));
+              yield* watching.waitFor(success);
+            }
+            yield* project.runConsumer(`import assert from "node:assert/strict";
+import refs from "./confect/_generated/refs.ts";
+assert.deepEqual(Object.keys(refs.public).sort(), ["list", "notes"]);
+assert.equal(refs.public.list.convexFunctionName, "${name}:list");
+assert.equal(refs.public.notes.list.convexFunctionName, "notes:list");
+`);
+            const files = yield* project.generatedFiles;
+            expect(files[path.join("convex", `${name}.ts`)]).toContain(
+              "export const list",
+            );
+            expect(
+              files[
+                path.join(
+                  "confect",
+                  "_generated",
+                  "registeredFunctions",
+                  `${name}.ts`,
+                )
+              ],
+            ).toContain(`${name}.impl`);
+            if (name === "renamed") {
+              expect(files[path.join("convex", "root.ts")]).toBeUndefined();
+              expect(
+                files[
+                  path.join(
+                    "confect",
+                    "_generated",
+                    "registeredFunctions",
+                    "root.ts",
+                  )
+                ],
+              ).toBeUndefined();
+            }
+            const fresh = yield* project.start("codegen");
+            yield* fresh.waitFor(success);
+            const exitCode = yield* fresh.handle.exitCode;
+            expect(exitCode).toBe(0);
+            const regenerated = yield* project.generatedFiles;
+            expect(regenerated).toEqual(files);
+          }
+          yield* fs.remove(path.join(project.root, "confect/renamed.impl.ts"));
+          yield* fs.remove(path.join(project.root, "confect/renamed.spec.ts"));
+          yield* watching.waitFor(success);
+          const afterRemoval = yield* project.generatedFiles;
+          expect(afterRemoval).toEqual(initial);
+          yield* project.runConsumer(`import assert from "node:assert/strict";
+import refs from "./confect/_generated/refs.ts";
+assert.deepEqual(Object.keys(refs.public), ["notes"]);
+assert.equal(refs.public.notes.list.convexFunctionName, "notes:list");
+`);
+        }).pipe(Effect.scoped),
+      { timeout: 60000 },
+    );
+
+    it.effect(
       "stabilizes a newly discovered external helper without another edit",
       () =>
         Effect.gen(function* () {

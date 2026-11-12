@@ -1,4 +1,4 @@
-import { type GroupSpec, Identifier } from "@confect/core";
+import { type GroupSpec, Identifier, Spec } from "@confect/core";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as HashMap from "effect/HashMap";
@@ -31,6 +31,7 @@ export type GroupSummary = typeof GroupSummary.Type;
 
 export interface GroupTree {
   readonly runtime: "Convex" | "Node";
+  readonly root?: boolean;
   readonly experimental_reuseContext?: boolean;
   readonly functionNames: ReadonlyArray<string>;
   readonly groups: { readonly [name: string]: GroupTree };
@@ -38,6 +39,7 @@ export interface GroupTree {
 
 export const GroupTree: Schema.Codec<GroupTree> = Schema.Struct({
   runtime: GroupSummary.fields.runtime,
+  root: Schema.optionalKey(Schema.Boolean),
   experimental_reuseContext: GroupSummary.fields.experimental_reuseContext,
   functionNames: GroupSummary.fields.functionNames,
   groups: Schema.Record(
@@ -57,11 +59,31 @@ class Snapshot {
 
   static parseLeaves(
     leaves: HashMap.HashMap<SpecModulePath.SpecModulePath, GroupTree>,
-  ): Result.Result<GenerationSnapshot, ParentChildNameCollisionError> {
-    return Result.map(
-      parseNoParentChildNameCollisions(leaves),
-      (parsed) => new Snapshot(parsed),
-    );
+  ): Result.Result<
+    GenerationSnapshot,
+    ParentChildNameCollisionError | Spec.InvalidRootGroups
+  > {
+    return Result.gen(function* () {
+      yield* parseNoParentChildNameCollisions(leaves);
+      const entries: Array<Spec.RootGroupEntry> = [];
+      const visit = (path: ReadonlyArray<string>, tree: GroupTree): void => {
+        entries.push({
+          path,
+          root: tree.root === true,
+          functionNames: tree.functionNames,
+        });
+        for (const [name, child] of Record.toEntries(tree.groups)) {
+          visit([...path, name], child);
+        }
+      };
+      for (const [path, tree] of leaves) {
+        visit(rootPath(path).pathSegments, tree);
+      }
+      yield* Spec.validateRootGroups(entries).pipe(
+        Result.mapError((issue) => Spec.InvalidRootGroups.make({ issue })),
+      );
+      return new Snapshot(leaves);
+    });
   }
 
   get leaves(): HashMap.HashMap<SpecModulePath.SpecModulePath, GroupTree> {
@@ -140,7 +162,7 @@ const fromEntries = (
   entries: ReadonlyArray<readonly [string, GroupTree]>,
 ): Result.Result<
   GenerationSnapshot,
-  SnapshotError | ParentChildNameCollisionError
+  SnapshotError | ParentChildNameCollisionError | Spec.InvalidRootGroups
 > =>
   Result.gen(function* () {
     let leaves = HashMap.empty<SpecModulePath.SpecModulePath, GroupTree>();
@@ -189,7 +211,7 @@ export const parse = (
   input: unknown,
 ): Result.Result<
   GenerationSnapshot,
-  SnapshotError | ParentChildNameCollisionError
+  SnapshotError | ParentChildNameCollisionError | Spec.InvalidRootGroups
 > =>
   Schema.decodeUnknownResult(Entries)(input).pipe(
     Result.mapError((cause) =>
@@ -216,6 +238,8 @@ export const GenerationSnapshot = Entries.pipe(
                   message: Match.value(error).pipe(
                     Match.tagsExhaustive({
                       SnapshotError: (failure) => failure.message,
+                      InvalidRootGroups: ({ issue }) =>
+                        Spec.formatRootGroupsError(issue),
                       ParentChildNameCollisionError: (failure) =>
                         `${failure.parentSpecPath} declares a ${failure.collisionKind} named ${failure.collisionName} that collides with ${failure.childSpecPath}`,
                     }),
@@ -236,6 +260,7 @@ export const GenerationSnapshot = Entries.pipe(
 
 const summarize = (group: GroupSpec.AnyWithProps): GroupTree => ({
   runtime: group.runtime,
+  ...(group.root ? { root: true } : {}),
   ...(group.experimental_reuseContext
     ? { experimental_reuseContext: true }
     : {}),
@@ -248,7 +273,7 @@ export const update = (
   leaves: ReadonlyArray<LoadedLeafModule>,
 ): Result.Result<
   GenerationSnapshot,
-  SnapshotError | ParentChildNameCollisionError
+  SnapshotError | ParentChildNameCollisionError | Spec.InvalidRootGroups
 > =>
   Result.gen(function* () {
     if (leaves.length === 0) return snapshot;
@@ -262,7 +287,7 @@ export const fromLoadedLeaves = (
   leaves: ReadonlyArray<LoadedLeafModule>,
 ): Result.Result<
   GenerationSnapshot,
-  SnapshotError | ParentChildNameCollisionError
+  SnapshotError | ParentChildNameCollisionError | Spec.InvalidRootGroups
 > =>
   parse(
     Array.map(

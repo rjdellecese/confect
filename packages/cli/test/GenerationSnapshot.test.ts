@@ -2,7 +2,7 @@ import { pipe } from "effect/Function";
 import * as Str from "effect/String";
 import * as Rec from "effect/Record";
 import * as Array from "effect/Array";
-import { FunctionSpec, GroupSpec, Table } from "@confect/core";
+import { FunctionSpec, GroupSpec, Spec, Table } from "@confect/core";
 import * as Bundler from "@confect/cli/Bundler";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ParentChildNameCollisionError } from "@confect/cli/CodegenError";
@@ -99,13 +99,119 @@ const baseLayer = Layer.merge(
 const metadataGroup = (
   functionNames: ReadonlyArray<string> = [],
   groups: GenerationSnapshot.GroupTree["groups"] = {},
+  root?: boolean,
 ): GenerationSnapshot.GroupTree => ({
   runtime: "Convex",
+  ...(root === undefined ? {} : { root }),
   functionNames,
   groups,
 });
 
 describe("GenerationSnapshot parsing", () => {
+  test("roundtrips root metadata without changing physical module paths", () => {
+    const before = Result.getOrThrow(
+      GenerationSnapshot.parse([["app.spec.ts", metadataGroup(["greet"])]]),
+    );
+    const after = GenerationSnapshot.parse([
+      ["app.spec.ts", metadataGroup(["greet"], {}, true)],
+    ]).pipe(Result.getOrThrow, roundtrip);
+    expect(getLeaf(after, "app.spec.ts").root).toBe(true);
+    expect(GenerationSnapshot.diff(before, after)).toEqual({
+      removed: [],
+      changed: [],
+    });
+    expect(Array.fromIterable(GenerationSnapshot.functionPaths(after))).toEqual(
+      [
+        FunctionPath.FunctionPath.make({
+          groupPath: GroupPath.make(["app"]),
+          name: "greet",
+        }),
+      ],
+    );
+  });
+
+  test.each([
+    {
+      label: "a root in a nested file",
+      entries: [["nested/app.spec.ts", metadataGroup([], {}, true)]],
+      tag: "NestedRoot",
+    },
+    {
+      label: "a root in a nested in-memory group",
+      entries: [
+        [
+          "app.spec.ts",
+          metadataGroup([], { nested: metadataGroup([], {}, true) }),
+        ],
+      ],
+      tag: "NestedRoot",
+    },
+    {
+      label: "two empty roots",
+      entries: [
+        ["app.spec.ts", metadataGroup([], {}, true)],
+        ["other.spec.ts", metadataGroup([], {}, true)],
+      ],
+      tag: "MultipleRoots",
+    },
+    {
+      label: "a function colliding with a sibling group",
+      entries: [
+        ["app.spec.ts", metadataGroup(["notes"], {}, true)],
+        ["notes.spec.ts", metadataGroup()],
+      ],
+      tag: "RootNameCollision",
+    },
+    {
+      label: "a function colliding with an implicit sibling directory",
+      entries: [
+        ["app.spec.ts", metadataGroup(["notes"], {}, true)],
+        ["notes/archive.spec.ts", metadataGroup(["list"])],
+      ],
+      tag: "RootNameCollision",
+    },
+    {
+      label: "a flattened child colliding with a sibling directory",
+      entries: [
+        ["app.spec.ts", metadataGroup([], {}, true)],
+        ["app/notes/archive.spec.ts", metadataGroup(["list"])],
+        ["notes/current.spec.ts", metadataGroup(["list"])],
+      ],
+      tag: "RootNameCollision",
+    },
+  ])("rejects $label", ({ entries, tag }) => {
+    const result = GenerationSnapshot.parse(entries);
+    assert(result._tag === "Failure");
+    expect(result.failure).toBeInstanceOf(Spec.InvalidRootGroups);
+    expect(result.failure).toMatchObject({ issue: { _tag: tag } });
+  });
+
+  test("rejects malformed root metadata", () => {
+    const result = GenerationSnapshot.parse([
+      [
+        "app.spec.ts",
+        { runtime: "Convex", functionNames: [], groups: {}, root: "true" },
+      ],
+    ]);
+    assert(result._tag === "Failure");
+    expect(result.failure).toMatchObject({ reason: "InvalidShape" });
+  });
+
+  test("preserves named descendants and siblings beside a root", () => {
+    const snapshot = GenerationSnapshot.parse([
+      ["app.spec.ts", metadataGroup(["greet"], {}, true)],
+      ["app/children.spec.ts", metadataGroup(["list"])],
+      ["notes.spec.ts", metadataGroup(["list"])],
+    ]).pipe(Result.getOrThrow, roundtrip);
+    expect(
+      pipe(
+        GenerationSnapshot.plan(snapshot, []).changed,
+        Array.map(({ path }) => GroupPath.toString(path)),
+        Array.sort(Str.Order),
+      ),
+    ).toEqual(["app", "app.children", "notes"]);
+  });
+
   test("roundtrips context reuse and detects flag-only changes without inheriting them", () => {
     const makeSnapshot = (enabled?: boolean) =>
       Result.getOrThrow(
@@ -365,6 +471,51 @@ describe("GenerationSnapshot parsing", () => {
 layer(Layer.merge(baseLayer, NodePath.layerPosix))(
   "GenerationSnapshot",
   (it) => {
+    it.effect(
+      "validates root changes against unchanged leaves without mutating the snapshot",
+      () =>
+        Effect.gen(function* () {
+          const app = yield* loadLeaf(
+            "app.spec.ts",
+            GroupSpec.make().addFunction(query("notes")),
+          );
+          const notes = yield* loadLeaf(
+            "notes.spec.ts",
+            GroupSpec.make().addFunction(query("list")),
+          );
+          const before = fromLoadedLeaves([app, notes]);
+          const root = yield* loadLeaf(
+            "app.spec.ts",
+            GroupSpec.make({ root: true }).addFunction(query("notes")),
+          );
+          const collision = GenerationSnapshot.update(before, [root]);
+          assert(collision._tag === "Failure");
+          expect(collision.failure).toMatchObject({
+            _tag: "InvalidRootGroups",
+            issue: { _tag: "RootNameCollision", name: "notes" },
+          });
+          expect(getLeaf(before, "app.spec.ts").root).toBeUndefined();
+          const valid = yield* loadLeaf(
+            "app.spec.ts",
+            GroupSpec.make({ root: true }).addFunction(query("greet")),
+          );
+          const after = roundtrip(update(before, [valid]));
+          expect(getLeaf(after, "app.spec.ts").root).toBe(true);
+          expect(getLeaf(after, "notes.spec.ts").root).toBeUndefined();
+          const second = yield* loadLeaf(
+            "notes.spec.ts",
+            GroupSpec.make({ root: true }).addFunction(query("list")),
+          );
+          const duplicate = GenerationSnapshot.update(after, [second]);
+          assert(duplicate._tag === "Failure");
+          expect(duplicate.failure).toMatchObject({
+            _tag: "InvalidRootGroups",
+            issue: { _tag: "MultipleRoots" },
+          });
+          expect(getLeaf(after, "notes.spec.ts").root).toBeUndefined();
+        }),
+    );
+
     it.effect(
       "summarizes an opted-in group without propagating the flag to children",
       () =>

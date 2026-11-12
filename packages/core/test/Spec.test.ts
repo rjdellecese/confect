@@ -1,9 +1,147 @@
 import * as Record from "effect/Record";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as GroupSpec from "@confect/core/GroupSpec";
 import * as Spec from "@confect/core/Spec";
+
+describe("root groups", () => {
+  it("preserves physical group names without forcing schemas or mutating inputs", () => {
+    let evaluations = 0;
+    const root = GroupSpec.make({ root: true }).addFunction(
+      FunctionSpec.publicQuery({
+        name: "greet",
+        args: () => {
+          evaluations++;
+          return { name: Schema.String };
+        },
+        returns: () => {
+          evaluations++;
+          return Schema.String;
+        },
+        error: () => {
+          evaluations++;
+          return Schema.String;
+        },
+      }),
+    );
+    const record = { app: root };
+    const spec = Spec.fromGroups(record);
+    expect(Spec.groups(spec).app.name).toBe("app");
+    expect(Spec.groups(spec).app.root).toBe(true);
+    expect(Spec.groups(spec).app.functions).toBe(root.functions);
+    expect(root.name).toBe("");
+    expect(record.app).toBe(root);
+    expect(evaluations).toBe(0);
+  });
+
+  it("rejects nested roots and multiple top-level roots at assembly", () => {
+    const root = GroupSpec.make({ root: true });
+    expect(() =>
+      Spec.fromGroups({ app: root, other: GroupSpec.makeNode({ root: true }) }),
+    ).toThrow("Only one root group");
+    expect(() =>
+      Spec.fromGroups({
+        parent: GroupSpec.addGroupsAt(GroupSpec.make(), { nested: root }),
+      }),
+    ).toThrow('Root group "parent/nested" must be at the top level');
+    expect(root.name).toBe("");
+  });
+
+  it("rejects flattened function and namespace collisions across visibility", () => {
+    const root = GroupSpec.make({ root: true }).addFunction(
+      FunctionSpec.internalQuery({ name: "notes", returns: () => Schema.Null }),
+    );
+    const notes = GroupSpec.make().addFunction(
+      FunctionSpec.publicQuery({ name: "list", returns: () => Schema.Null }),
+    );
+    expect(() => Spec.fromGroups({ app: root, notes })).toThrow(
+      'Root ref name "notes" collides',
+    );
+    expect(() =>
+      Spec.fromGroups({ app: GroupSpec.addGroupsAt(root, { notes }) }),
+    ).toThrow('Root ref name "notes" collides');
+    expect(() =>
+      Spec.fromGroups({
+        app: GroupSpec.addGroupsAt(GroupSpec.make({ root: true }), { notes }),
+        notes,
+      }),
+    ).toThrow('Root ref name "notes" collides');
+    expect(root.groups).toEqual({});
+    expect(notes.name).toBe("");
+  });
+});
+
+describe("validateRootGroups", () => {
+  it("returns tagged structured errors for invalid root placement", () => {
+    expect(
+      Spec.validateRootGroups([
+        { path: ["parent", "app"], root: true, functionNames: [] },
+      ]),
+    ).toEqual(
+      Result.fail(Spec.RootGroupsError.NestedRoot({ path: ["parent", "app"] })),
+    );
+    expect(
+      Spec.validateRootGroups([
+        { path: ["app"], root: true, functionNames: [] },
+        { path: ["other"], root: true, functionNames: [] },
+      ]),
+    ).toEqual(
+      Result.fail(
+        Spec.RootGroupsError.MultipleRoots({ paths: [["app"], ["other"]] }),
+      ),
+    );
+  });
+
+  it("derives implicit namespaces from physical paths", () => {
+    const entries = [
+      { path: ["app"], root: true, functionNames: ["notes"] },
+      { path: ["notes", "nested", "leaf"], functionNames: [] },
+    ];
+    expect(Spec.validateRootGroups(entries)).toEqual(
+      Result.fail(
+        Spec.RootGroupsError.RootNameCollision({
+          name: "notes",
+          paths: [["app"], ["notes"]],
+        }),
+      ),
+    );
+    expect(entries).toEqual([
+      { path: ["app"], root: true, functionNames: ["notes"] },
+      { path: ["notes", "nested", "leaf"], functionNames: [] },
+    ]);
+    expect(
+      Spec.validateRootGroups([
+        { path: ["app"], root: true, functionNames: [] },
+        { path: ["app", "notes", "leaf"], functionNames: [] },
+        { path: ["notes", "nested"], functionNames: [] },
+      ]),
+    ).toEqual(
+      Result.fail(
+        Spec.RootGroupsError.RootNameCollision({
+          name: "notes",
+          paths: [["app", "notes"], ["notes"]],
+        }),
+      ),
+    );
+  });
+
+  it("allows unchanged layouts and sibling descendants of a root", () => {
+    for (const entries of [
+      [],
+      [{ path: ["notes", "nested"], functionNames: ["get"] }],
+      [
+        { path: ["app"], root: true, functionNames: ["app", "greet"] },
+        { path: ["app", "notes", "one"], functionNames: ["get"] },
+        { path: ["app", "notes", "two"], functionNames: ["get"] },
+        { path: ["other"], root: false, functionNames: ["greet"] },
+      ],
+    ]) {
+      expect(Spec.validateRootGroups(entries)).toEqual(Result.void);
+    }
+  });
+});
 
 describe("isSpec", () => {
   it("checks whether a value is a spec", () => {

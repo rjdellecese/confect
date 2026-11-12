@@ -103,6 +103,49 @@ confect/
   email.impl.ts
 ```
 
+## Unnamed root group
+
+Pass `root: true` to `GroupSpec.make` to expose a group's functions directly on
+`refs.public` or `refs.internal`, without a group-name prefix:
+
+```ts confect/app.spec.ts
+import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+
+export default GroupSpec.make({ root: true }).addFunction(
+  FunctionSpec.publicQuery({
+    name: "greet",
+    args: () => ({ name: Schema.String }),
+    returns: () => Schema.String,
+  }),
+);
+```
+
+Implement the group in `confect/app.impl.ts` using the usual `FunctionImpl.make`,
+`GroupImpl.make`, and `GroupImpl.finalize` calls. After codegen, call the function
+through `refs.public.greet`. A named sibling such as `confect/notes.spec.ts` still
+appears at `refs.public.notes`.
+
+The flag changes only the Confect ref namespace. This example still generates
+`convex/app.ts`, and the function's Convex address remains `app:greet`. Neither
+`app.spec.ts` nor `index.spec.ts` has special meaning without the flag. Keeping the
+filename unchanged when enabling or disabling `root` preserves deployed function
+addresses, but consumers must update their Confect ref access paths.
+
+Only one group can be the root, and its spec must be directly inside `confect/`.
+Do not pass `name` together with `root: true`. For a Node-only root group, use
+`GroupSpec.makeNode({ root: true })`; functions within a group must still use the
+same runtime. Middleware attached to the root applies only to its own functions,
+not to sibling groups or descendants.
+
+Descendants of a root group also lose the root's prefix in refs:
+`confect/app/accounts.spec.ts` appears at `refs.public.accounts`, while retaining
+the Convex namespace `app/accounts`. Root functions and these child namespaces
+must not collide with another top-level group. For example, a root function named
+`notes` cannot coexist with `confect/notes.spec.ts`, even when their functions have
+different visibility. Codegen reports these conflicts rather than overwriting a
+ref.
+
 ## Nested groups
 
 When a group contains subgroups, place each subgroup's `.spec.ts`/`.impl.ts` pair inside a subdirectory named after the parent group. The parent group itself does not need a spec or impl file—it is composed from its subgroups by their paths.

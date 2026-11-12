@@ -27,14 +27,12 @@ describe("experimental_reuseContext", () => {
       GroupSpec.make({ experimental_reuseContext: true })
         .experimental_reuseContext,
     ).toBe(true);
-    expectTypeOf(GroupSpec.makeNode).parameters.toEqualTypeOf<[]>();
-    expectTypeOf(GroupSpec.make).parameters.toEqualTypeOf<
-      [
-        options?:
-          | { readonly experimental_reuseContext?: boolean | undefined }
-          | undefined,
-      ]
-    >();
+    expectTypeOf<
+      keyof NonNullable<Parameters<typeof GroupSpec.makeNode>[0]>
+    >().toEqualTypeOf<"root" | "name">();
+    expectTypeOf<
+      keyof NonNullable<Parameters<typeof GroupSpec.make>[0]>
+    >().toEqualTypeOf<"root" | "name" | "experimental_reuseContext">();
   });
 
   it("preserves the option through pure builders without inheriting it or forcing schemas", () => {
@@ -235,6 +233,141 @@ describe("addGroupsAt", () => {
     expectTypeOf<{ bad: GroupSpec.Any }>().not.toExtend<
       Parameters<typeof GroupSpec.addGroupsAt>[1]
     >();
+  });
+});
+
+describe("root", () => {
+  it("defaults to false and infers literal options in both runtimes", () => {
+    expectTypeOf(GroupSpec.make().root).toEqualTypeOf<false>();
+    expectTypeOf(GroupSpec.makeNode().root).toEqualTypeOf<false>();
+    expectTypeOf(GroupSpec.make({ root: false }).root).toEqualTypeOf<false>();
+    expectTypeOf(GroupSpec.make({ root: true }).root).toEqualTypeOf<true>();
+    expectTypeOf(GroupSpec.makeNode({ root: true }).root).toEqualTypeOf<true>();
+    expectTypeOf<GroupSpec.AnyWithProps["root"]>().toEqualTypeOf<boolean>();
+    expect(GroupSpec.make().root).toBe(false);
+    expect(GroupSpec.makeNode().root).toBe(false);
+    expect(GroupSpec.make({ root: true }).root).toBe(true);
+    expect(GroupSpec.makeNode({ root: true }).root).toBe(true);
+    expect(GroupSpec.make({ root: undefined }).root).toBe(false);
+  });
+
+  it("requires literal root options for a statically known ref layout", () => {
+    const fromDynamicOption = (root: boolean) =>
+      // @ts-expect-error Root declarations must use a literal option, not a dynamic boolean.
+      GroupSpec.make({ root });
+    const fromDynamicNodeOption = (root: boolean) =>
+      // @ts-expect-error Node root declarations also determine a static ref layout.
+      GroupSpec.makeNode({ root });
+    expect(fromDynamicOption(true)).toHaveProperty("root", true);
+    expect(fromDynamicNodeOption(false)).toHaveProperty("root", false);
+    // @ts-expect-error A generic cannot claim root: true without supplying the option.
+    expect(GroupSpec.make<true>().root).toBe(false);
+    // @ts-expect-error A generic cannot claim a Node root without supplying the option.
+    expect(GroupSpec.makeNode<true>().root).toBe(false);
+  });
+
+  it("rejects name options at runtime and in non-fresh option types", () => {
+    const options = { root: true, name: "root" } as const;
+    expect(() =>
+      // @ts-expect-error Constructor names are unsupported, even for non-fresh options.
+      GroupSpec.make(options),
+    ).toThrow("do not support name");
+    expect(() =>
+      // @ts-expect-error Constructor names are unsupported for Node groups too.
+      GroupSpec.makeNode(options),
+    ).toThrow("do not support name");
+    expect(() =>
+      // @ts-expect-error A fresh options object also cannot supply a name.
+      GroupSpec.make({ root: true, name: "root" }),
+    ).toThrow("do not support name");
+    expect(() =>
+      // @ts-expect-error The option does not introduce named constructors.
+      GroupSpec.make({ name: "notes" }),
+    ).toThrow("do not support name");
+    expect(GroupSpec.validateOptions(options)).toEqual(
+      Result.fail(GroupSpec.OptionsValidationError.UnsupportedName(options)),
+    );
+    expect(GroupSpec.validateOptions({ name: undefined, root: true })).toEqual(
+      Result.fail(
+        GroupSpec.OptionsValidationError.UnsupportedName({
+          name: undefined,
+          root: true,
+        }),
+      ),
+    );
+    expect(GroupSpec.validateOptions({ root: "yes" })).toEqual(
+      Result.fail(
+        GroupSpec.OptionsValidationError.InvalidRoot({ root: "yes" }),
+      ),
+    );
+    expect(() =>
+      // @ts-expect-error JavaScript callers also receive runtime root validation.
+      GroupSpec.makeNode({ root: "yes" }),
+    ).toThrow("must be a boolean");
+  });
+
+  it("preserves root inference and inputs through every builder", () => {
+    let evaluations = 0;
+    class Observe extends MiddlewareSpec.MiddlewareSpec<Observe>()(
+      "rootObserve",
+      {
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+    const fn = FunctionSpec.publicQuery({
+      name: "get",
+      returns: () => {
+        evaluations++;
+        return Schema.String;
+      },
+    });
+    const original = GroupSpec.make({
+      root: true,
+      experimental_reuseContext: true,
+    });
+    const added = original.addFunction(fn);
+    const attached = added.middleware(Observe);
+    const renamed = GroupSpec.withName("app", attached);
+    const child = GroupSpec.makeNode();
+    const assembled = GroupSpec.addGroupsAt(renamed, { child });
+    type Assembled = GroupSpec.AddGroups<
+      typeof renamed,
+      GroupSpec.NamedAt<typeof child, "child">
+    >;
+    expectTypeOf(added.root).toEqualTypeOf<true>();
+    expectTypeOf(attached.root).toEqualTypeOf<true>();
+    expectTypeOf(renamed.root).toEqualTypeOf<true>();
+    expectTypeOf<Assembled["root"]>().toEqualTypeOf<true>();
+    expectTypeOf<Assembled["groups"]["child"]["root"]>().toEqualTypeOf<false>();
+    expectTypeOf<Assembled["name"]>().toEqualTypeOf<"app">();
+    expectTypeOf<GroupSpec.Functions<Assembled>>().toEqualTypeOf<typeof fn>();
+    expectTypeOf<GroupSpec.MiddlewareSpecs<Assembled>>().toEqualTypeOf<
+      typeof Observe
+    >();
+    expectTypeOf<
+      Assembled["groups"]["child"]["runtime"]
+    >().toEqualTypeOf<"Node">();
+    const node = GroupSpec.makeNode({ root: true })
+      .middleware(Observe)
+      .addFunction(
+        FunctionSpec.publicNodeAction({
+          name: "send",
+          returns: () => Schema.Null,
+        }),
+      );
+    expectTypeOf<
+      GroupSpec.AddGroups<typeof node, never>["root"]
+    >().toEqualTypeOf<true>();
+    for (const group of [original, added, attached, renamed, assembled, node]) {
+      expect(group.root).toBe(true);
+    }
+    expect(assembled.experimental_reuseContext).toBe(true);
+    expect(original.name).toBe("");
+    expect(original.functions).toEqual({});
+    expect(original.middlewareAttachments).toEqual([]);
+    expect(renamed.groups).toEqual({});
+    expect(child.name).toBe("");
+    expect(evaluations).toBe(0);
   });
 });
 

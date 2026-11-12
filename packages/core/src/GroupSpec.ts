@@ -1,9 +1,11 @@
 import * as Option from "effect/Option";
+import * as Data from "effect/Data";
 import * as Array from "effect/Array";
 import * as MiddlewareAttachment from "./MiddlewareAttachment";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
@@ -25,9 +27,11 @@ export interface GroupSpec<
   // Node actions)—`addFunction` keeps the `<Runtime>` bound below.
   Groups_ extends AnyWithProps = never,
   MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec = never,
+  Root extends boolean = false,
 > {
   readonly [TypeId]: TypeId;
   readonly runtime: Runtime;
+  readonly root: Root;
   readonly experimental_reuseContext: boolean;
   readonly name: Name_;
   readonly functions: {
@@ -55,7 +59,8 @@ export interface GroupSpec<
     Name_,
     Functions_ | Function,
     Groups_,
-    MiddlewareSpecs_
+    MiddlewareSpecs_,
+    Root
   >;
 
   middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
@@ -71,7 +76,8 @@ export interface GroupSpec<
     Name_,
     Functions_,
     Groups_,
-    MiddlewareSpecs_ | MiddlewareSpec_
+    MiddlewareSpecs_ | MiddlewareSpec_,
+    Root
   >;
 }
 
@@ -84,7 +90,8 @@ export interface AnyWithProps extends GroupSpec<
   string,
   FunctionSpec.AnyWithProps,
   AnyWithProps,
-  MiddlewareSpec.AnyMiddlewareSpec
+  MiddlewareSpec.AnyMiddlewareSpec,
+  boolean
 > {}
 
 export type Name<Group extends AnyWithProps> = Group["name"];
@@ -127,14 +134,16 @@ export type AddGroups<
     string,
     infer Functions_,
     infer Groups_,
-    infer MiddlewareSpecs_
+    infer MiddlewareSpecs_,
+    infer Root
   >
     ? GroupSpec<
         Runtime,
         Group["name"],
         Functions_,
         Exclude<Groups_, { readonly name: Name<ExtraGroups> }> | ExtraGroups,
-        MiddlewareSpecs_
+        MiddlewareSpecs_,
+        Root
       >
     : never;
 
@@ -169,6 +178,7 @@ const Proto = {
 
     return makeProto({
       runtime: this_.runtime,
+      root: this_.root,
       experimental_reuseContext: this_.experimental_reuseContext,
       name: this_.name,
       functions: Record.set(this_.functions, function_.name, function_),
@@ -212,6 +222,7 @@ const Proto = {
 
     return makeProto({
       runtime: this_.runtime,
+      root: this_.root,
       experimental_reuseContext: this_.experimental_reuseContext,
       name: this_.name,
       functions: this_.functions,
@@ -231,8 +242,10 @@ const makeProto = <
   Groups_ extends AnyWithProps,
   MiddlewareAttachments_ extends
     ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>,
+  Root extends boolean,
 >({
   runtime,
+  root,
   experimental_reuseContext,
   name,
   functions,
@@ -240,6 +253,7 @@ const makeProto = <
   middlewareAttachments,
 }: {
   runtime: Runtime;
+  root: Root;
   experimental_reuseContext?: boolean | undefined;
   name: Name_;
   functions: Record.ReadonlyRecord<string, Functions_>;
@@ -250,10 +264,12 @@ const makeProto = <
   Name_,
   Functions_,
   Groups_,
-  MiddlewareAttachments_[number]["spec"]
+  MiddlewareAttachments_[number]["spec"],
+  Root
 > =>
   Object.assign(Object.create(Proto), {
     runtime,
+    root,
     experimental_reuseContext:
       experimental_reuseContext === undefined
         ? false
@@ -267,29 +283,110 @@ const makeProto = <
     Name_,
     Functions_,
     Groups_,
-    MiddlewareAttachments_[number]["spec"]
+    MiddlewareAttachments_[number]["spec"],
+    Root
   >;
 
-export const make = (
-  options: { readonly experimental_reuseContext?: boolean | undefined } = {},
-): GroupSpec<"Convex", ""> =>
-  makeProto({
+const OptionsIssue = Schema.TaggedUnion({
+  UnsupportedName: { name: Schema.Unknown, root: Schema.Unknown },
+  InvalidRoot: { root: Schema.Unknown },
+});
+
+export type OptionsValidationError = typeof OptionsIssue.Type;
+
+export const OptionsValidationError = Data.taggedEnum<OptionsValidationError>();
+
+export const validateOptions = (options: {
+  readonly name?: unknown;
+  readonly root?: unknown;
+}): Result.Result<void, OptionsValidationError> => {
+  if ("name" in options) {
+    return Result.fail(
+      OptionsValidationError.UnsupportedName({
+        name: options.name,
+        root: options.root,
+      }),
+    );
+  }
+  if (options.root !== undefined && typeof options.root !== "boolean") {
+    return Result.fail(
+      OptionsValidationError.InvalidRoot({ root: options.root }),
+    );
+  }
+  return Result.void;
+};
+
+export const formatOptionsValidationError = OptionsValidationError.$match({
+  UnsupportedName: () =>
+    "Group constructor options do not support name, including with root: true; names are assigned from filesystem paths",
+  InvalidRoot: () => "Group root must be a boolean",
+});
+
+export class InvalidGroupOptions extends Schema.TaggedError<
+  InvalidGroupOptions,
+  { readonly brand: unique symbol }
+>()("InvalidGroupOptions", { issue: OptionsIssue }) {
+  override get message(): string {
+    return formatOptionsValidationError(this.issue);
+  }
+}
+
+export function make(options: {
+  readonly root: true;
+  readonly name?: never;
+  readonly experimental_reuseContext?: boolean | undefined;
+}): GroupSpec<"Convex", "", never, never, never, true>;
+export function make(options?: {
+  readonly root?: false | undefined;
+  readonly name?: never;
+  readonly experimental_reuseContext?: boolean | undefined;
+}): GroupSpec<"Convex", "">;
+export function make(
+  options: {
+    readonly root?: boolean | undefined;
+    readonly name?: never;
+    readonly experimental_reuseContext?: boolean | undefined;
+  } = {},
+): GroupSpec<"Convex", "", never, never, never, boolean> {
+  const validation = validateOptions(options);
+  if (Result.isFailure(validation)) {
+    throw InvalidGroupOptions.make({ issue: validation.failure });
+  }
+  return makeProto({
     runtime: "Convex",
+    root: options.root ?? false,
     experimental_reuseContext: options.experimental_reuseContext,
     name: "",
     functions: Record.empty(),
     groups: Record.empty(),
     middlewareAttachments: [],
   });
+}
 
-export const makeNode = (): GroupSpec<"Node", ""> =>
-  makeProto({
+export function makeNode(options: {
+  readonly root: true;
+  readonly name?: never;
+}): GroupSpec<"Node", "", never, never, never, true>;
+export function makeNode(options?: {
+  readonly root?: false | undefined;
+  readonly name?: never;
+}): GroupSpec<"Node", "">;
+export function makeNode(
+  options: { readonly root?: boolean | undefined; readonly name?: never } = {},
+): GroupSpec<"Node", "", never, never, never, boolean> {
+  const validation = validateOptions(options);
+  if (Result.isFailure(validation)) {
+    throw InvalidGroupOptions.make({ issue: validation.failure });
+  }
+  return makeProto({
     runtime: "Node",
+    root: options.root ?? false,
     name: "",
     functions: Record.empty(),
     groups: Record.empty(),
     middlewareAttachments: [],
   });
+}
 
 export function withName<const Name_ extends string, Group extends Any>(
   name: Name_,
@@ -305,6 +402,7 @@ export function withName(name: string, group: Any): AnyWithProps {
 
   return makeProto({
     runtime: group_.runtime,
+    root: group_.root,
     experimental_reuseContext: group_.experimental_reuseContext,
     name,
     functions: group_.functions,
@@ -319,6 +417,7 @@ export const addGroupsAt = (
 ): AnyWithProps =>
   makeProto({
     runtime: group.runtime,
+    root: group.root,
     experimental_reuseContext: group.experimental_reuseContext,
     name: group.name,
     functions: group.functions,

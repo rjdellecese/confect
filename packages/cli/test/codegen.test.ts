@@ -5,6 +5,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import { vi } from "vitest";
 import * as esbuild from "esbuild";
@@ -1016,3 +1017,132 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       }).pipe(Effect.scoped),
   );
 });
+
+layer(NodeServices.layer, { excludeTestServices: true })(
+  "built confect codegen",
+  (it) => {
+    it.effect.each([false, true])(
+      "flattens root refs without changing physical modules or runtime isolation (useNode=%s)",
+      (useNode) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const project = yield* Project.make;
+          yield* project.write(
+            "confect/root.spec.ts",
+            `import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+export default GroupSpec.${useNode ? "makeNode" : "make"}({ root: true })
+  .addFunction(FunctionSpec.${useNode ? "publicNodeAction" : "publicQuery"}({ name: "echo", args: () => ({ value: Schema.String }), returns: () => Schema.String }))
+  .addFunction(FunctionSpec.${useNode ? "internalNodeAction" : "internalQuery"}({ name: "hidden", returns: () => Schema.String }));
+`,
+          );
+          yield* project.write(
+            "confect/root.impl.ts",
+            `import { FunctionImpl, GroupImpl } from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import databaseSchema from "./_generated/schema";
+import spec from "./root.spec";
+${useNode ? 'import { basename } from "node:path";' : ""}
+const echo = FunctionImpl.make(databaseSchema, spec, "echo", ({ value }) => Effect.succeed(${useNode ? "basename(value)" : "value"}));
+const hidden = FunctionImpl.make(databaseSchema, spec, "hidden", () => Effect.succeed("private"));
+export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(echo), Layer.provide(hidden), GroupImpl.finalize);
+`,
+          );
+          yield* fs.makeDirectory(path.join(project.root, "confect/root"));
+          yield* project.write(
+            "confect/root/child.spec.ts",
+            `import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }));
+`,
+          );
+          yield* project.write(
+            "confect/root/child.impl.ts",
+            `import { FunctionImpl, GroupImpl } from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import databaseSchema from "../_generated/schema";
+import spec from "./child.spec";
+const get = FunctionImpl.make(databaseSchema, spec, "get", () => Effect.succeed("child"));
+export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(get), GroupImpl.finalize);
+`,
+          );
+          const generated = yield* project.start("codegen");
+          yield* generated.waitFor("Generated files are up-to-date");
+          const exitCode = yield* generated.handle.exitCode;
+          expect(exitCode).toBe(0);
+          const files = yield* project.generatedFiles;
+          expect(files[path.join("convex", "root.ts")]).toContain(
+            "registeredFunctions/root",
+          );
+          expect(
+            pipe(
+              files[path.join("convex", "root.ts")] ?? "",
+              String.includes('"use node"'),
+            ),
+          ).toBe(useNode);
+          expect(files[path.join("convex", "root", "child.ts")]).not.toContain(
+            '"use node"',
+          );
+          expect(files[path.join("convex", "echo.ts")]).toBeUndefined();
+          yield* project.checkTypes(`import { expectTypeOf } from "vitest";
+import refs from "./confect/_generated/refs";
+expectTypeOf<keyof typeof refs.public>().toEqualTypeOf<"echo" | "child" | "notes">();
+expectTypeOf<keyof typeof refs.internal>().toEqualTypeOf<"hidden">();
+expectTypeOf(refs.public.echo["~Args"]).toEqualTypeOf<{ readonly value: string }>();
+expectTypeOf(refs.public.echo["~Returns"]).toEqualTypeOf<string>();
+expectTypeOf(refs.public.echo["~RuntimeAndFunctionType"]).toEqualTypeOf<{ readonly runtime: "${useNode ? "Node" : "Convex"}"; readonly functionType: "${useNode ? "action" : "query"}" }>();
+expectTypeOf(refs.internal.hidden["~FunctionVisibility"]).toEqualTypeOf<"internal">();
+expectTypeOf(refs.public.child.get["~Returns"]).toEqualTypeOf<string>();
+expectTypeOf(refs.public.notes.list["~FunctionVisibility"]).toEqualTypeOf<"public">();
+// @ts-expect-error The physical root namespace is not part of the ref API.
+refs.public.root;
+// @ts-expect-error Internal functions remain private after flattening.
+refs.public.hidden;
+// @ts-expect-error Flattening preserves argument types.
+const wrong: typeof refs.public.echo["~Args"] = { value: 1 };
+`);
+          yield* project.runConsumer(`import assert from "node:assert/strict";
+import refs from "./confect/_generated/refs.ts";
+import { echo, hidden } from "./convex/root.ts";
+assert.equal("root" in refs.public, false);
+assert.equal("root" in refs.internal, false);
+assert.equal(refs.public.echo.convexFunctionName, "root:echo");
+assert.equal(refs.internal.hidden.convexFunctionName, "root:hidden");
+assert.equal(refs.public.child.get.convexFunctionName, "root/child:get");
+assert.equal(refs.public.notes.list.convexFunctionName, "notes:list");
+assert.equal(echo.isPublic, true);
+assert.equal(hidden.isInternal, true);
+assert.equal(echo.${useNode ? "isAction" : "isQuery"}, true);
+assert.equal(hidden.${useNode ? "isAction" : "isQuery"}, true);
+`);
+          for (const module of ["root", "root/child", "notes"]) {
+            const bundle = yield* Effect.promise(() =>
+              esbuild.build({
+                absWorkingDir: project.root,
+                entryPoints: [`convex/${module}.ts`],
+                bundle: true,
+                write: false,
+                metafile: true,
+                packages: "external",
+                format: "esm",
+                platform: module === "root" && useNode ? "node" : "browser",
+              }),
+            );
+            expect(
+              Array.filter(
+                Rec.keys(bundle.metafile.inputs),
+                String.endsWith(".impl.ts"),
+              ),
+            ).toEqual([`confect/${module}.impl.ts`]);
+            expect(Rec.keys(bundle.metafile.inputs)).not.toContain(
+              "confect/_generated/convexSchema.ts",
+            );
+          }
+        }).pipe(Effect.scoped),
+      { timeout: 60000 },
+    );
+  },
+);

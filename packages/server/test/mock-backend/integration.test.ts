@@ -2,7 +2,8 @@ import * as RecordEffect from "effect/Record";
 import { isDeepStrictEqual } from "node:util";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
-import { FunctionSpec, Ref } from "@confect/core";
+import { FunctionSpec, GroupSpec, Ref, Refs, Spec } from "@confect/core";
+import { FunctionImpl, GroupImpl, RegisteredFunctions } from "@confect/server";
 import * as SchemaToValidator from "@confect/core/SchemaToValidator";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
@@ -411,6 +412,140 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
 );
 
 describe("Generated function registration", () => {
+  it.effect(
+    "invokes flat root refs through their unchanged Convex module addresses",
+    () =>
+      Effect.gen(function* () {
+        const root = GroupSpec.make({ root: true })
+          .addFunction(
+            FunctionSpec.publicQuery({
+              name: "increment",
+              args: () => ({ value: Schema.FiniteFromString }),
+              returns: () => Schema.FiniteFromString,
+            }),
+          )
+          .addFunction(
+            FunctionSpec.internalQuery({
+              name: "secret",
+              returns: () => Schema.String,
+            }),
+          );
+        const named = GroupSpec.make().addFunction(
+          FunctionSpec.publicQuery({
+            name: "increment",
+            returns: () => Schema.String,
+          }),
+        );
+        const spec: Spec.Spec<{
+          app: GroupSpec.NamedAt<typeof root, "app">;
+          notes: GroupSpec.NamedAt<typeof named, "notes">;
+        }> = Spec.fromGroups({ app: root, notes: named }) as typeof spec;
+        const rootRefs = Refs.make(spec);
+        const rootImpl = GroupImpl.make(confectSchema, root).pipe(
+          Layer.provide(
+            FunctionImpl.make(confectSchema, root, "increment", ({ value }) =>
+              Effect.succeed(value + 1),
+            ),
+          ),
+          Layer.provide(
+            FunctionImpl.make(confectSchema, root, "secret", () =>
+              Effect.succeed("private"),
+            ),
+          ),
+          GroupImpl.finalize,
+        );
+        const namedImpl = GroupImpl.make(confectSchema, named).pipe(
+          Layer.provide(
+            FunctionImpl.make(confectSchema, named, "increment", () =>
+              Effect.succeed("named"),
+            ),
+          ),
+          GroupImpl.finalize,
+        );
+        const t = convexTest(convexSchema, {
+          ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+          "./fixtures/convex/app.ts": () =>
+            Promise.resolve(
+              RegisteredFunctions.buildForGroup<typeof root>(
+                confectSchema,
+                rootImpl,
+              ),
+            ),
+          "./fixtures/convex/notes.ts": () =>
+            Promise.resolve(
+              RegisteredFunctions.buildForGroup<typeof named>(
+                confectSchema,
+                namedImpl,
+              ),
+            ),
+        });
+        const value = yield* Ref.runWithCodec(
+          rootRefs.public.increment,
+          { value: 41 },
+          (reference, args) => t.query(reference, args),
+        );
+        expectTypeOf(value).toEqualTypeOf<number>();
+        expect(value).toBe(42);
+        expect(Ref.getConvexFunctionName(rootRefs.public.increment)).toBe(
+          "app:increment",
+        );
+        const secret = yield* Ref.runWithCodec(
+          rootRefs.internal.secret,
+          {},
+          (reference, args) => t.query(reference, args),
+        );
+        expect(secret).toBe("private");
+        const namedValue = yield* Ref.runWithCodec(
+          rootRefs.public.notes.increment,
+          {},
+          (reference, args) => t.query(reference, args),
+        );
+        expect(namedValue).toBe("named");
+      }),
+  );
+
+  it.effect("invokes an unnamed Node root action", () =>
+    Effect.gen(function* () {
+      const root = GroupSpec.makeNode({ root: true }).addFunction(
+        FunctionSpec.publicNodeAction({
+          name: "greet",
+          args: () => ({ name: Schema.String }),
+          returns: () => Schema.String,
+        }),
+      );
+      const spec: Spec.Spec<{ app: GroupSpec.NamedAt<typeof root, "app"> }> =
+        Spec.fromGroups({ app: root }) as typeof spec;
+      const rootRefs = Refs.make(spec);
+      const rootImpl = GroupImpl.make(confectSchema, root).pipe(
+        Layer.provide(
+          FunctionImpl.make(confectSchema, root, "greet", ({ name }) =>
+            Effect.succeed(`Hello, ${name}!`),
+          ),
+        ),
+        GroupImpl.finalize,
+      );
+      const t = convexTest(convexSchema, {
+        ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+        "./fixtures/convex/app.ts": () =>
+          Promise.resolve(
+            RegisteredNodeFunction.buildForGroup<typeof root>(
+              confectSchema,
+              rootImpl,
+            ),
+          ),
+      });
+      expect(Ref.getConvexFunctionName(rootRefs.public.greet)).toBe(
+        "app:greet",
+      );
+      const greeting = yield* Ref.runWithCodec(
+        rootRefs.public.greet,
+        { name: "Ada" },
+        (reference, args) => t.action(reference, args),
+      );
+      expect(greeting).toBe("Hello, Ada!");
+    }),
+  );
+
   it.effect("retains the single-pagination budget in registered queries", () =>
     Effect.gen(function* () {
       const item = FunctionRegistryItem.make({

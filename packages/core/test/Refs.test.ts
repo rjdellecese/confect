@@ -12,6 +12,202 @@ import * as Refs from "@confect/core/Refs";
 import type * as RuntimeAndFunctionType from "@confect/core/RuntimeAndFunctionType";
 import * as Spec from "@confect/core/Spec";
 
+describe("root groups", () => {
+  it("flattens own functions and children while preserving physical paths, types, and middleware scope", () => {
+    let evaluations = 0;
+    class Denied extends Schema.TaggedError<Denied, {}>()("Denied", {}) {}
+    class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("rootGate", {
+      functionTypes: { query: true, mutation: true, action: true },
+      error: () => {
+        evaluations++;
+        return Denied;
+      },
+      options: () => {
+        evaluations++;
+        return Schema.Struct({ enabled: Schema.Boolean });
+      },
+    }) {}
+    const greet = FunctionSpec.publicQuery({
+      name: "greet",
+      args: () => {
+        evaluations++;
+        return { name: Schema.String };
+      },
+      returns: () => {
+        evaluations++;
+        return Schema.String;
+      },
+    });
+    const hidden = FunctionSpec.internalMutation({
+      name: "hidden",
+      returns: () => Schema.Null,
+    });
+    const send = FunctionSpec.publicNodeAction({
+      name: "send",
+      returns: () => Schema.String,
+    });
+    const options = { enabled: true };
+    const leaf = GroupSpec.make({ root: true })
+      .middleware(Gate, options)
+      .addFunction(greet)
+      .addFunction(hidden);
+    const children = {
+      nested: GroupSpec.makeNode().addFunction(send),
+      privateOnly: GroupSpec.make().addFunction(hidden),
+    };
+    const root = GroupSpec.addGroupsAt(leaf, children);
+    const named = GroupSpec.make().addFunction(greet);
+    type Fixture = Spec.Spec<{
+      app: GroupSpec.NamedAt<
+        GroupSpec.AddGroups<
+          typeof leaf,
+          | GroupSpec.NamedAt<typeof children.nested, "nested">
+          | GroupSpec.NamedAt<typeof children.privateOnly, "privateOnly">
+        >,
+        "app"
+      >;
+      named: GroupSpec.NamedAt<typeof named, "named">;
+    }>;
+    const spec = {
+      [Spec.TypeId]: {
+        app: GroupSpec.withName("app", root),
+        named: GroupSpec.withName("named", named),
+      },
+    } as Fixture;
+    const refs = Refs.make(spec);
+    const assembled = Refs.make(Spec.fromGroups({ app: root, named }));
+    expect(assembled.public).toHaveProperty(
+      "greet.convexFunctionName",
+      "app:greet",
+    );
+    expect(Ref.getConvexFunctionName(refs.public.greet)).toBe("app:greet");
+    expect(Ref.getConvexFunctionName(refs.internal.hidden)).toBe("app:hidden");
+    expect(Ref.getConvexFunctionName(refs.public.nested.send)).toBe(
+      "app/nested:send",
+    );
+    expect(Ref.getConvexFunctionName(refs.public.named.greet)).toBe(
+      "named:greet",
+    );
+    expectTypeOf<keyof typeof refs.public>().toEqualTypeOf<
+      "greet" | "nested" | "named"
+    >();
+    expectTypeOf<keyof typeof refs.internal>().toEqualTypeOf<
+      "hidden" | "privateOnly"
+    >();
+    expectTypeOf(refs.public.greet).toEqualTypeOf<
+      Ref.FromFunctionSpec<typeof greet, Denied>
+    >();
+    expectTypeOf(refs.internal.hidden).toEqualTypeOf<
+      Ref.FromFunctionSpec<typeof hidden, Denied>
+    >();
+    expectTypeOf(refs.public.nested.send).toEqualTypeOf<
+      Ref.FromFunctionSpec<typeof send>
+    >();
+    expectTypeOf<Ref.Error<typeof refs.public.named.greet>>().toBeNever();
+    expect(refs.public.greet.middlewareAttachments[0]?.options).toBe(options);
+    expect(refs.public.nested.send.middlewareAttachments).toEqual([]);
+    expect(refs.public.named.greet.middlewareAttachments).toEqual([]);
+    expect(refs.public).not.toHaveProperty("app");
+    expect(root.name).toBe("");
+    expect(evaluations).toBe(0);
+  });
+
+  it("supports Node roots and plain Convex function refs", () => {
+    const send = FunctionSpec.publicNodeAction({
+      name: "send",
+      returns: () => Schema.Null,
+    });
+    const query =
+      FunctionSpec.convexPublicQuery<
+        RegisteredQuery<"public", { id: string }, Promise<string>>
+      >()("get");
+    const leaf = GroupSpec.makeNode({ root: true }).addFunction(send);
+    const nested = GroupSpec.make().addFunction(query);
+    const node = GroupSpec.addGroupsAt(leaf, { nested });
+    type Fixture = Spec.Spec<{
+      node: GroupSpec.NamedAt<
+        GroupSpec.AddGroups<
+          typeof leaf,
+          GroupSpec.NamedAt<typeof nested, "nested">
+        >,
+        "node"
+      >;
+    }>;
+    const refs = Refs.make({
+      [Spec.TypeId]: { node: GroupSpec.withName("node", node) },
+    } as Fixture);
+    expect(Ref.getConvexFunctionName(refs.public.send)).toBe("node:send");
+    expect(Ref.getConvexFunctionName(refs.public.nested.get)).toBe(
+      "node/nested:get",
+    );
+    expectTypeOf(refs.public.send).toEqualTypeOf<
+      Ref.FromFunctionSpec<typeof send>
+    >();
+    expectTypeOf(refs.public.nested.get).toEqualTypeOf<
+      Ref.FromFunctionSpec<typeof query>
+    >();
+    const convex = GroupSpec.make({ root: true }).addFunction(query);
+    const convexRefs = Refs.make({
+      [Spec.TypeId]: { root: GroupSpec.withName("root", convex) },
+    });
+    expect(Ref.getConvexFunctionName(convexRefs.public.get)).toBe("root:get");
+    expectTypeOf(convexRefs.public.get).toEqualTypeOf<
+      Ref.FromFunctionSpec<typeof query>
+    >();
+  });
+
+  it("handles empty roots and special names without prototype writes", () => {
+    const empty = GroupSpec.make({ root: true });
+    const emptyRefs = Refs.make({
+      [Spec.TypeId]: { root: GroupSpec.withName("root", empty) },
+    });
+    expect(emptyRefs.public).toEqual({});
+    expectTypeOf<keyof typeof emptyRefs.public>().toBeNever();
+    const fn = FunctionSpec.publicQuery({
+      name: "__proto__",
+      returns: () => Schema.Null,
+    });
+    const group = GroupSpec.addGroupsAt(empty.addFunction(fn), {
+      constructor: GroupSpec.make().addFunction(fn),
+    });
+    const refs = Refs.make({
+      [Spec.TypeId]: { root: GroupSpec.withName("root", group) },
+    });
+    const publicRefs: Record.ReadonlyRecord<string, unknown> = refs.public;
+    expect(Record.has(publicRefs, "__proto__")).toBe(true);
+    expect(Object.getPrototypeOf(refs.public)).toBe(Object.prototype);
+    expect(publicRefs.__proto__).toHaveProperty(
+      "convexFunctionName",
+      "root:__proto__",
+    );
+    expect(publicRefs.constructor).toMatchObject({
+      ["__proto__"]: { convexFunctionName: "root/constructor:__proto__" },
+    });
+  });
+
+  it("validates hand-assembled specs before creating refs", () => {
+    const root = GroupSpec.make({ root: true });
+    expect(() =>
+      Refs.make({ [Spec.TypeId]: { app: root, other: root } }),
+    ).toThrow("Only one root group");
+    expect(() =>
+      Refs.make({
+        [Spec.TypeId]: {
+          parent: GroupSpec.addGroupsAt(GroupSpec.make(), { nested: root }),
+        },
+      }),
+    ).toThrow("must be at the top level");
+    const conflicting = root.addFunction(
+      FunctionSpec.internalQuery({ name: "notes", returns: () => Schema.Null }),
+    );
+    expect(() =>
+      Refs.make({
+        [Spec.TypeId]: { app: conflicting, notes: GroupSpec.make() },
+      }),
+    ).toThrow('Root ref name "notes" collides');
+  });
+});
+
 describe("make", () => {
   it("turns a spec into refs", () => {
     const FnReturns = Schema.Array(Schema.String);

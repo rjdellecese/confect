@@ -1,4 +1,6 @@
 import * as Array from "effect/Array";
+import { fileURLToPath } from "node:url";
+import * as esbuild from "esbuild";
 import { pipe } from "effect/Function";
 import * as Str from "effect/String";
 import * as Rec from "effect/Record";
@@ -35,7 +37,7 @@ import { DatabaseReader } from "./_generated/services";
 import notes from "./notes.spec";
 const list = FunctionImpl.make(databaseSchema, notes, "list", () => Effect.gen(function* () {
   const reader = yield* DatabaseReader;
-  return yield* reader.table("notes").collect();
+  return yield* reader.table("notes").index("by_creation_time").collect();
 }).pipe(Effect.orDie));
 export default GroupImpl.make(databaseSchema, notes).pipe(Layer.provide(list), GroupImpl.finalize);
 `;
@@ -175,6 +177,61 @@ export const make = Effect.gen(function* () {
     );
     return Rec.fromEntries(actual);
   });
+  const runNode = Effect.fnUntraced(function* (args: ReadonlyArray<string>) {
+    const spawner = yield* ChildProcessSpawner;
+    const child = yield* spawner.spawn(
+      ChildProcess.make(process.execPath, args, { cwd: root }),
+    );
+    const output = yield* child.all.pipe(Stream.decodeText(), Stream.mkString);
+    const exitCode = yield* child.exitCode;
+    expect(exitCode, output).toBe(0);
+    return output;
+  });
+  const checkTypes = Effect.fnUntraced(function* (contents: string) {
+    yield* write("consumer.ts", contents);
+    yield* write(
+      "tsconfig.consumer.json",
+      `{
+        "compilerOptions": {
+          "strict": true,
+          "noEmit": true,
+          "skipLibCheck": true,
+          "exactOptionalPropertyTypes": true,
+          "module": "ESNext",
+          "moduleResolution": "Bundler",
+          "target": "ESNext",
+          "types": ["node"]
+        },
+        "include": ["consumer.ts", "confect/**/*.ts", "convex/**/*.ts"]
+      }`,
+    );
+    yield* runNode([
+      fileURLToPath(
+        new URL(
+          "dist/effect-tsgo.cjs",
+          import.meta.resolve("@effect/tsgo/package.json"),
+        ),
+      ),
+      "tsrs",
+      "-p",
+      "tsconfig.consumer.json",
+    ]);
+  });
+  const runConsumer = Effect.fnUntraced(function* (contents: string) {
+    yield* write("consumer.mjs", contents);
+    yield* Effect.promise(() =>
+      esbuild.build({
+        absWorkingDir: root,
+        entryPoints: ["consumer.mjs"],
+        outfile: "consumer.bundle.mjs",
+        bundle: true,
+        packages: "external",
+        platform: "node",
+        format: "esm",
+      }),
+    );
+    return yield* runNode(["consumer.bundle.mjs"]);
+  });
   const provide = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(ProjectRoot, { get: Effect.succeed(root) }),
@@ -185,5 +242,13 @@ export const make = Effect.gen(function* () {
         get: Effect.succeed(path.join(root, "convex")),
       }),
     );
-  return { root, write, start, generatedFiles, provide };
+  return {
+    root,
+    write,
+    start,
+    generatedFiles,
+    provide,
+    checkTypes,
+    runConsumer,
+  };
 });

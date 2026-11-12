@@ -1,7 +1,8 @@
 import type { Types } from "effect";
-import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
+import * as Result from "effect/Result";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as GroupSpec from "./GroupSpec";
 import type * as MiddlewareSpec from "./MiddlewareSpec";
@@ -11,7 +12,7 @@ import * as Spec from "./Spec";
 export type Refs<
   Spec_ extends Spec.AnyWithProps,
   Predicate extends Ref.Any = Ref.Any,
-> = Types.Simplify<OmitEmpty<Helper<Spec.Groups<Spec_>, Predicate>>>;
+> = Types.Simplify<OmitEmpty<RootHelper<Spec.Groups<Spec_>, Predicate>>>;
 
 export interface FromSpec<Spec_ extends Spec.AnyWithProps> {
   public: Refs<Spec_, Ref.AnyPublic>;
@@ -77,6 +78,14 @@ type FilteredFunctions<
     : never;
 };
 
+type RootHelper<
+  Groups extends GroupSpec.AnyWithProps,
+  Predicate extends Ref.Any,
+> = Helper<Exclude<Groups, { readonly root: true }>, Predicate> &
+  ([Extract<Groups, { readonly root: true }>] extends [never]
+    ? {}
+    : GroupRefs<Extract<Groups, { readonly root: true }>, Predicate>);
+
 type Helper<
   Groups extends GroupSpec.AnyWithProps,
   Predicate extends Ref.Any,
@@ -98,6 +107,10 @@ type Any =
 export const make = <Spec_ extends Spec.AnyWithProps>(
   spec: Spec_,
 ): FromSpec<Spec_> => {
+  const validation = Spec.validateGroups(Spec.groups(spec));
+  if (Result.isFailure(validation)) {
+    throw Spec.InvalidRootGroups.make({ issue: validation.failure });
+  }
   const refs = makeHelper(Spec.groups(spec));
   return {
     public: refs as Refs<Spec_, Ref.AnyPublic>,
@@ -106,34 +119,37 @@ export const make = <Spec_ extends Spec.AnyWithProps>(
 };
 
 const makeHelper = (
-  groups: Record.ReadonlyRecord<string, GroupSpec.Any>,
+  groups: Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
   convexFunctionNamespace: Option.Option<string> = Option.none(),
 ): Any =>
-  pipe(
-    groups as Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
-    Record.map((group, name) => {
-      const currentConvexFunctionNamespace = Option.match(
-        convexFunctionNamespace,
-        {
-          onNone: () => name,
-          onSome: (parentNamespace) => `${parentNamespace}/${name}`,
-        },
-      );
+  Record.fromEntries(
+    Array.flatMap(
+      Record.toEntries(groups),
+      ([name, group]): ReadonlyArray<readonly [string, Any]> => {
+        const currentConvexFunctionNamespace = Option.match(
+          convexFunctionNamespace,
+          {
+            onNone: () => name,
+            onSome: (parentNamespace) => `${parentNamespace}/${name}`,
+          },
+        );
 
-      return Record.union(
-        makeHelper(group.groups, Option.some(currentConvexFunctionNamespace)),
-        Record.map(group.functions, (function_) =>
-          Ref.make(
-            currentConvexFunctionNamespace,
-            function_,
-            group.middlewareAttachments,
+        const refs = Record.union(
+          makeHelper(group.groups, Option.some(currentConvexFunctionNamespace)),
+          Record.map(group.functions, (function_) =>
+            Ref.make(
+              currentConvexFunctionNamespace,
+              function_,
+              group.middlewareAttachments,
+            ),
           ),
-        ),
-        (_subGroup, _function) => {
-          throw new Error(
-            `Group and function at same level have same name ('${Ref.getConvexFunctionName(_function)}')`,
-          );
-        },
-      );
-    }),
+          (_subGroup, _function) => {
+            throw new Error(
+              `Group and function at same level have same name ('${Ref.getConvexFunctionName(_function)}')`,
+            );
+          },
+        );
+        return group.root ? Record.toEntries(refs) : [[name, refs] as const];
+      },
+    ),
   );
