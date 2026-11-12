@@ -6,7 +6,7 @@ import * as Array from "effect/Array";
 import * as Schema from "effect/Schema";
 import * as Result from "effect/Result";
 import * as Record from "effect/Record";
-import * as Order from "effect/Order";
+import type * as Order from "effect/Order";
 import { pipe } from "effect/Function";
 import type { PaginatedQueryArgs, PaginatedQueryItem } from "./index";
 
@@ -278,9 +278,10 @@ export const insertAtBottomIfLoaded = <
     ),
   );
 
-const convexOrder = Order.make<Value>((left, right) =>
-  Order.Number(compareValues(left, right), 0),
-);
+const convexOrder: Order.Order<Value> = (left, right) => {
+  const ordering = compareValues(left, right);
+  return ordering < 0 ? -1 : ordering > 0 ? 1 : 0;
+};
 
 const insertInPages = <Query extends Ref.AnyPublicPaginatedQuery>(
   pages: ReadonlyArray<LoadedPage<Query>>,
@@ -297,14 +298,12 @@ const insertInPages = <Query extends Ref.AnyPublicPaginatedQuery>(
       ),
       Array.getSomes,
       Array.sort(
-        Order.mapInput(
-          order,
-          (
-            entry: LoadedPage<Query> & {
-              readonly firstItem: PaginatedQueryItem<Query>;
-            },
-          ) => entry.firstItem,
-        ),
+        (
+          left: LoadedPage<Query> & {
+            readonly firstItem: PaginatedQueryItem<Query>;
+          },
+          right,
+        ) => order(left.firstItem, right.firstItem),
       ),
     );
     const first = yield* Array.head(sorted);
@@ -389,13 +388,10 @@ export const insertAtPosition = <Query extends Ref.AnyPublicPaginatedQuery>({
           ),
           Record.values,
           Array.map((group) =>
-            insertInPages(
-              group,
-              item,
-              Order.mapInput(
-                sortOrder === "asc" ? convexOrder : Order.flip(convexOrder),
-                sortKeyFromItem,
-              ),
+            insertInPages(group, item, (left, right) =>
+              sortOrder === "asc"
+                ? convexOrder(sortKeyFromItem(left), sortKeyFromItem(right))
+                : convexOrder(sortKeyFromItem(right), sortKeyFromItem(left)),
             ),
           ),
           Array.getSomes,

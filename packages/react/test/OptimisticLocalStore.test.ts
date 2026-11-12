@@ -411,6 +411,74 @@ describe("boundary insertion", () => {
 });
 
 describe("insertAtPosition", () => {
+  test.each(["asc", "desc"] as const)(
+    "preserves Convex signed-zero ordering and boundaries in %s order",
+    (sortOrder) => {
+      const signedQuery = Ref.make(
+        "numbers",
+        FunctionSpec.publicPaginatedQuery({
+          name: "signedZero",
+          item: () =>
+            Schema.Union([
+              Schema.Finite,
+              Schema.Struct({ key: Schema.Finite }),
+            ]),
+        }),
+      );
+      Array.forEach(["scalar", "object"] as const, (shape) => {
+        const asItem = (key: number) => (shape === "scalar" ? key : { key });
+        const first = sortOrder === "asc" ? -0 : 0;
+        const inserted = asItem(sortOrder === "asc" ? 0 : -0);
+        const next = sortOrder === "asc" ? 1 : -1;
+        Array.forEach(
+          [
+            { page: [first, next], cursor: null, isDone: true },
+            { page: [first, next], cursor: "next", isDone: true },
+            { page: [first], cursor: null, isDone: false },
+          ],
+          ({ page, cursor, isDone }) => {
+            const entries = [
+              {
+                name: Ref.getConvexFunctionName(signedQuery),
+                args: { paginationOpts: { cursor, numItems: 2 } },
+                value: {
+                  page: Array.map(page, asItem),
+                  isDone,
+                  continueCursor: "end",
+                },
+              },
+            ];
+            const before = structuredClone(entries);
+            const { store, wire } = harness(entries);
+            const native = harness(entries);
+            const sortKeyFromItem = (
+              item: PaginatedQueryItem<typeof signedQuery>,
+            ) => (typeof item === "number" ? item : item.key);
+            insertAtPosition({
+              paginatedQuery: signedQuery,
+              localQueryStore: store,
+              item: inserted,
+              sortOrder,
+              sortKeyFromItem,
+            });
+            nativeInsertAtPosition({
+              paginatedQuery: Ref.getFunctionReference(signedQuery),
+              localQueryStore: native.wire,
+              item: inserted,
+              sortOrder,
+              sortKeyFromItem,
+            });
+            expect(wire.setQuery.mock.calls).toEqual(
+              native.wire.setQuery.mock.calls,
+            );
+            expect(wire.setQuery).toHaveBeenCalledTimes(isDone ? 1 : 0);
+            expect(entries).toEqual(before);
+          },
+        );
+      });
+    },
+  );
+
   test("groups Convex bigint arguments without JSON loss and keeps different lists separate", () => {
     const bigintQuery = Ref.make(
       "bigints",
