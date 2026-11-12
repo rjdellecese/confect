@@ -180,6 +180,24 @@ reader
 
 The following methods are available for queries using both database indexes and search indexes.
 
+#### Filter
+
+Use `.filter` after `index` or `search` to apply a [native Convex expression](https://docs.convex.dev/api/interfaces/server.FilterBuilder) before `first`, `take`, `collect`, `stream`, or `paginate`.
+
+```ts
+reader
+  .table("notes")
+  .index("by_creation_time")
+  .filter((q) => q.eq(q.field("tag"), "colors"))
+  .take(10);
+```
+
+The predicate uses stored **encoded** fields; returned documents are decoded through your table schema. For example, compare a `Schema.FiniteFromString` field to a string here, even though returned documents contain a number. Chained filters and the optional second predicate argument to `paginate` all apply together.
+
+Builders returned by `index` and `search` are reusable: adding a filter leaves the original builder unchanged, and running a terminal effect or stream again executes a fresh query. Query creation and filter callbacks are deferred until execution; keep those callbacks pure. Native filters still scan nonmatching documents; they do not reduce backend reads like an index range. See Convex's [filter guidance](https://docs.convex.dev/database/reading-data/filters).
+
+For predicates over **decoded** documents, use [`QueryStream.filter` or `QueryStream.filterEffect`](/server/database/streams#filter-and-map) instead. Those retain query-stream pagination metadata; `.stream()` above returns a plain Effect `Stream`.
+
 #### Collect
 
 Collect all documents matching the query.

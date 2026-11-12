@@ -40,6 +40,7 @@ import * as DocumentIds from "@confect/server/DocumentIds";
 import * as DatabaseWriter_ from "@confect/server/DatabaseWriter";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as QueryStream from "@confect/server/QueryStream";
+import * as OrderedQuery from "@confect/server/OrderedQuery";
 import * as Table from "@confect/server/Table";
 import * as Storage from "@confect/server/Storage";
 import { StorageReader } from "@confect/server/StorageReader";
@@ -2033,6 +2034,141 @@ describe("DatabaseReader table isolation", () => {
 it.layer(TestConfect.layer, { buildPerTest: true })(
   "DatabaseReader",
   (test) => {
+    test.effect(
+      "composes reusable native filters before decoding every terminal",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              const ctx = yield* MutationCtx;
+              for (const text of ["1", "2", "3", "invalid"]) {
+                yield* Effect.promise(() => ctx.db.insert("notes", { text }));
+              }
+              const table = Table.make(() =>
+                Schema.Struct({ text: Schema.FiniteFromString }),
+              ).index("by_text", ["text"])("notes");
+              const schema = DatabaseSchema.make({ notes: table });
+              const reader = DatabaseReader_.make(schema, ctx.db).table(
+                "notes",
+              );
+              const base = reader.index("by_text", (q) => q.gte("text", "1"));
+              const numeric = base.filter((q) =>
+                q.neq(q.field("text"), "invalid"),
+              );
+              const selected = numeric.filter((q) =>
+                q.gte(q.field("text"), "2"),
+              );
+              const collect = selected.collect();
+              const stream = selected.stream();
+              const take = selected.take(1);
+              const first = selected.first();
+              const collected = yield* collect;
+              expect(Array.map(collected, (doc) => doc.text)).toEqual([2, 3]);
+              const collectedAgain = yield* collect;
+              expect(Array.map(collectedAgain, (doc) => doc.text)).toEqual([
+                2, 3,
+              ]);
+              const streamed = yield* Stream.runCollect(stream);
+              expect(Array.map(streamed, (doc) => doc.text)).toEqual([2, 3]);
+              const streamedAgain = yield* Stream.runCollect(stream);
+              expect(Array.map(streamedAgain, (doc) => doc.text)).toEqual([
+                2, 3,
+              ]);
+              const taken = yield* take;
+              expect(Array.map(taken, (doc) => doc.text)).toEqual([2]);
+              const takenAgain = yield* take;
+              expect(Array.map(takenAgain, (doc) => doc.text)).toEqual([2]);
+              const head = yield* first;
+              expect(Option.map(head, (doc) => doc.text)).toEqual(
+                Option.some(2),
+              );
+              const headAgain = yield* first;
+              expect(Option.map(headAgain, (doc) => doc.text)).toEqual(
+                Option.some(2),
+              );
+              const unfiltered = yield* numeric.collect();
+              expect(Array.map(unfiltered, (doc) => doc.text)).toEqual([
+                1, 2, 3,
+              ]);
+              const options = { numItems: 1, cursor: null };
+              const page = yield* selected.paginate(options);
+              expect(Array.map(page.page, (doc) => doc.text)).toEqual([2]);
+              expect(options).toEqual({ numItems: 1, cursor: null });
+              const next = yield* selected.paginate({
+                numItems: 1,
+                cursor: page.continueCursor,
+              });
+              expect(Array.map(next.page, (doc) => doc.text)).toEqual([3]);
+              const combined = yield* selected.paginate(options, (q) =>
+                q.eq(q.field("text"), "3"),
+              );
+              expect(Array.map(combined.page, (doc) => doc.text)).toEqual([3]);
+              const none = numeric.filter(() => false);
+              const emptyHead = yield* none.first();
+              expect(emptyHead).toEqual(Option.none());
+              const emptyTake = yield* none.take(2);
+              expect(emptyTake).toEqual([]);
+              const emptyCollect = yield* none.collect();
+              expect(emptyCollect).toEqual([]);
+              const emptyStream = yield* Stream.runCollect(none.stream());
+              expect(emptyStream).toEqual([]);
+              const emptyPage = yield* none.paginate(options);
+              expect(emptyPage.page).toEqual([]);
+              const invalid = yield* Effect.exit(base.collect());
+              assert(invalid._tag === "Failure");
+              expect(Cause.hasFails(invalid.cause)).toBe(true);
+              const direct = OrderedQuery.make(
+                ctx.db.query("notes").withIndex("by_text"),
+                table,
+              ).filter((q) => q.eq(q.field("text"), "2"));
+              const directResult = yield* direct.first();
+              expect(Option.map(directResult, (doc) => doc.text)).toEqual(
+                Option.some(2),
+              );
+              const consumed = yield* Effect.exit(direct.first());
+              assert(consumed._tag === "Failure");
+              expect(Cause.hasDies(consumed.cause)).toBe(true);
+              const decoded = reader
+                .stream("by_text", (q) => q.lt("text", "invalid"))
+                .pipe(QueryStream.filter((doc) => doc.text > 1));
+              const decodedDocs = yield* Stream.runCollect(decoded);
+              expect(Array.map(decodedDocs, (doc) => doc.text)).toEqual([2, 3]);
+            }),
+          );
+        }),
+    );
+
+    test.effect(
+      "branches native search filters without consuming the base",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              const writer = yield* DatabaseWriter;
+              const reader = yield* DatabaseReader;
+              for (const tag of ["keep", "skip"]) {
+                yield* writer.table("notes").insert({ text: "hello", tag });
+              }
+              const base = reader
+                .table("notes")
+                .search("text", (q) => q.search("text", "hello"));
+              const keep = base.filter((q) => q.eq(q.field("tag"), "keep"));
+              const skip = base.filter((q) => q.eq(q.field("tag"), "skip"));
+              const kept = yield* keep.collect();
+              expect(Array.map(kept, (doc) => doc.tag)).toEqual(["keep"]);
+              const skipped = yield* skip.collect();
+              expect(Array.map(skipped, (doc) => doc.tag)).toEqual(["skip"]);
+              const keptAgain = yield* keep.collect();
+              expect(Array.map(keptAgain, (doc) => doc.tag)).toEqual(["keep"]);
+              const allMatches = yield* base.collect();
+              expect(allMatches).toHaveLength(2);
+            }),
+          );
+        }),
+    );
+
     test.effect(
       "uses the canonical Doc decoder across database read paths",
       () =>

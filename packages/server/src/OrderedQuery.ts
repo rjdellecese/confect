@@ -18,6 +18,16 @@ export type OrderedQuery<
   TableInfo_ extends TableInfo.AnyWithProps,
   Doc = TableInfo_["document"],
 > = {
+  /**
+   * Apply a native Convex expression to stored (encoded) fields before decoding
+   * results. This is not an index optimization or a decoded QueryStream
+   * predicate.
+   */
+  readonly filter: (
+    predicate: Parameters<
+      ConvexOrderedQuery<TableInfo.ConvexTableInfo<TableInfo_>>["filter"]
+    >[0],
+  ) => OrderedQuery<TableInfo_, Doc>;
   readonly first: () => Effect.Effect<
     Option.Option<Doc>,
     Document.DocumentDecodeError
@@ -38,10 +48,16 @@ export type OrderedQuery<
   ) => Effect.Effect<PaginationResult<Doc>, Document.DocumentDecodeError>;
 };
 
+/**
+ * Wrap a native query or a factory that creates a fresh query for each run. A
+ * directly supplied native query retains Convex's single-use lifecycle.
+ */
 export const make = <Table_ extends Table.AnyWithProps>(
-  query: ConvexOrderedQuery<
-    TableInfo.ConvexTableInfo<TableInfo.TableInfo<Table_>>
-  >,
+  query:
+    | ConvexOrderedQuery<TableInfo.ConvexTableInfo<TableInfo.TableInfo<Table_>>>
+    | (() => ConvexOrderedQuery<
+        TableInfo.ConvexTableInfo<TableInfo.TableInfo<Table_>>
+      >),
   table: Table_,
 ): OrderedQuery<TableInfo.TableInfo<Table_>> => {
   type TableInfo_ = TableInfo.TableInfo<Table_>;
@@ -49,8 +65,13 @@ export const make = <Table_ extends Table.AnyWithProps>(
     FunctionName extends keyof OrderedQuery<TableInfo_>,
   > = OrderedQuery<TableInfo_>[FunctionName];
 
-  const streamEncoded = Stream.fromAsyncIterable(query, identity).pipe(
-    Stream.orDie,
+  const makeQuery = typeof query === "function" ? query : () => query;
+
+  const filter: OrderedQueryFunction<"filter"> = (predicate) =>
+    make(() => makeQuery().filter(predicate), table);
+
+  const streamEncoded = Stream.suspend(() =>
+    Stream.fromAsyncIterable(makeQuery(), identity).pipe(Stream.orDie),
   );
 
   const stream: OrderedQueryFunction<"stream"> = () =>
@@ -61,7 +82,7 @@ export const make = <Table_ extends Table.AnyWithProps>(
 
   const take: OrderedQueryFunction<"take"> = (n: number) =>
     pipe(
-      Effect.promise(() => query.take(n)),
+      Effect.promise(() => makeQuery().take(n)),
       Effect.flatMap((encoded) =>
         Effect.forEach(encoded, Document.decode(table)),
       ),
@@ -72,8 +93,10 @@ export const make = <Table_ extends Table.AnyWithProps>(
 
   const paginate: OrderedQueryFunction<"paginate"> = Effect.fn(
     "OrderedQuery.paginate",
-  )(function* (options, filter) {
-    const filteredQuery = filter !== undefined ? query.filter(filter) : query;
+  )(function* (options, predicate) {
+    const nativeQuery = makeQuery();
+    const filteredQuery =
+      predicate !== undefined ? nativeQuery.filter(predicate) : nativeQuery;
 
     const paginationResult = yield* Effect.promise(() =>
       filteredQuery.paginate(options),
@@ -103,6 +126,7 @@ export const make = <Table_ extends Table.AnyWithProps>(
   });
 
   return {
+    filter,
     first,
     take,
     collect,

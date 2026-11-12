@@ -350,13 +350,11 @@ export const make = <
               applyOrder: (q) => q.order(indexRangeOrOrder),
             };
 
-    const orderedQuery = pipe(
-      convexDatabaseReader.query(tableName),
-      applyWithIndex,
-      applyOrder,
+    return OrderedQuery.make(
+      () =>
+        pipe(convexDatabaseReader.query(tableName), applyWithIndex, applyOrder),
+      table,
     );
-
-    return OrderedQuery.make(orderedQuery, table);
   };
 
   const stream: QueryInitializerFunction<"stream"> = ((
@@ -417,9 +415,10 @@ export const make = <
     searchFilter,
   ) =>
     OrderedQuery.make(
-      convexDatabaseReader
-        .query(tableName)
-        .withSearchIndex(indexName, searchFilter),
+      () =>
+        convexDatabaseReader
+          .query(tableName)
+          .withSearchIndex(indexName, searchFilter),
       table,
     );
 

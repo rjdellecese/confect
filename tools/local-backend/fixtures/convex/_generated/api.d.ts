@@ -203,6 +203,36 @@ export declare const api: {
         }
       >;
     };
+    orderedQueries: {
+      page: FunctionReference<
+        "query",
+        "public",
+        {
+          extra: boolean;
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+        },
+        {
+          continueCursor: string;
+          isDone: boolean;
+          reads: number;
+          values: Array<number>;
+        }
+      >;
+      read: FunctionReference<
+        "query",
+        "public",
+        { empty: boolean; terminal: "first" | "take" | "collect" | "stream" },
+        { reads: number; repeated: Array<number>; values: Array<number> }
+      >;
+      seed: FunctionReference<"mutation", "public", {}, null>;
+    };
     scheduling: {
       manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;
       manyOpsQuery: FunctionReference<"query", "public", {}, number>;
