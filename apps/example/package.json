@@ -6,7 +6,7 @@
     "@confect/core": "workspace:*",
     "@confect/react": "workspace:*",
     "@confect/server": "workspace:*",
-    "@convex-dev/workpool": "0.4.14",
+    "@convex-dev/workpool": "0.4.16",
     "convex": "1.49.0",
     "convex-helpers": "0.1.135",
     "effect": "4.1.0",
