@@ -17,6 +17,7 @@ import effectPolicy from "../tsconfig.effect.json" with { type: "json" };
 
 test("enables every installed Effect rule except the explicit policy opt-outs", () => {
   const disabledRules: ReadonlyArray<string> = [
+    "effecttsgo/api-stability-leak",
     "effecttsgo/missing-pipeable-signature",
     "effecttsgo/unstable-api-usage",
   ];
