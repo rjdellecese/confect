@@ -29,6 +29,15 @@ import * as OptimisticLocalStore from "./OptimisticLocalStore";
 import * as PaginatedQueryResult from "./PaginatedQueryResult";
 import * as QueryResult from "./QueryResult";
 import * as StreamPagination from "./StreamPagination";
+import type {
+  PaginatedQueryArgs,
+  PaginatedQueryItem,
+} from "./PaginatedQueryTypes";
+
+export type {
+  PaginatedQueryArgs,
+  PaginatedQueryItem,
+} from "./PaginatedQueryTypes";
 
 const encodeJson = Schema.Unknown.pipe(
   Schema.fromJsonString,
@@ -108,35 +117,6 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
     [ref, skipped, Result.merge(encodedReturnsOrError)],
   );
 };
-
-/**
- * Like `Omit`, but implemented with key remapping so that optional modifiers
- * are preserved and index signatures don't reintroduce the omitted key's
- * literal type. Mirrors `BetterOmit` from `convex/server`.
- */
-type OmitKey<T, K extends PropertyKey> = {
-  [P in keyof T as P extends K ? never : P]: T[P];
-};
-
-/**
- * The args accepted by {@link usePaginatedQuery}: the ref's args without
- * `paginationOpts`, which the underlying Convex hook manages itself. When no
- * args remain, resolves to `Record<string, never>` (only the empty object is
- * accepted) rather than `{}`, which would accept any non-nullish value.
- */
-export type PaginatedQueryArgs<Query extends Ref.AnyPublicPaginatedQuery> =
-  OmitKey<Ref.Args<Query>, "paginationOpts"> extends infer Args_
-    ? keyof Args_ extends never
-      ? Record<string, never>
-      : Args_
-    : never;
-
-/**
- * The item type for a paginated query: the element type of the `page` field of
- * the ref's returns.
- */
-export type PaginatedQueryItem<Query extends Ref.AnyPublicPaginatedQuery> =
-  Ref.Returns<Query>["page"][number];
 
 /**
  * The args parameter of {@link usePaginatedQuery}: the ref's args without

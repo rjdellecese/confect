@@ -8,7 +8,10 @@ import * as Result from "effect/Result";
 import * as Record from "effect/Record";
 import type * as Order from "effect/Order";
 import { pipe } from "effect/Function";
-import type { PaginatedQueryArgs, PaginatedQueryItem } from "./index";
+import type {
+  PaginatedQueryArgs,
+  PaginatedQueryItem,
+} from "./PaginatedQueryTypes";
 
 /**
  * The Confect counterpart to Convex's `OptimisticLocalStore`.
