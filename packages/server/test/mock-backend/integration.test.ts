@@ -61,11 +61,13 @@ import {
   MutationAuth,
   MutationCtx,
   MutationRunner,
+  QueryRunner,
   Scheduler,
   TransactionMetadata,
 } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
 import type notes from "./fixtures/confect/_generated/tables/notes";
+import notesTable from "./fixtures/confect/tables/notes";
 import { PaginationDenied } from "./fixtures/confect/databaseReader.spec";
 import {
   Forbidden,
@@ -419,6 +421,133 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
     );
   },
 );
+
+describe("mock transaction clocks", () => {
+  const now = 1_750_000_000_000;
+  const clockReading = Schema.Struct({
+    time: Schema.Finite,
+    snapshot: Schema.BigInt,
+  });
+  const readSpec = FunctionSpec.publicQuery({
+    name: "read",
+    returns: () => clockReading,
+  });
+  const insertSpec = FunctionSpec.publicMutation({
+    name: "insert",
+    returns: () =>
+      Schema.Struct({
+        time: Schema.Finite,
+        snapshot: Schema.BigInt,
+        creationTime: Schema.Finite,
+      }),
+  });
+  const readRef = Ref.make("clocks", readSpec);
+  const insertRef = Ref.make("clocks", insertSpec);
+  const read = FunctionRegistryItem.make({
+    functionSpec: readSpec,
+    groupMiddlewareAttachments: [],
+    handler: () =>
+      Effect.gen(function* () {
+        const metadata = yield* TransactionMetadata;
+        return {
+          time: yield* Clock.currentTimeMillis,
+          snapshot: yield* metadata.getSnapshotTs(),
+        };
+      }),
+  });
+  const insert = FunctionRegistryItem.make({
+    functionSpec: insertSpec,
+    groupMiddlewareAttachments: [],
+    handler: () =>
+      Effect.gen(function* () {
+        const runner = yield* QueryRunner;
+        const writer = yield* DatabaseWriter;
+        const reader = yield* DatabaseReader;
+        const clock = yield* runner.runQuery(readRef);
+        const id = yield* writer.table("notes").insert({ text: "clock" });
+        const doc = yield* reader.table("notes").get(id);
+        const time = yield* Clock.currentTimeMillis;
+        expect(time).toBe(clock.time);
+        return { ...clock, creationTime: doc._creationTime };
+      }),
+  });
+  assert(read._tag === "Confect");
+  assert(insert._tag === "Confect");
+  const layer = TestConfect_.layer(confectSchema, convexSchema, {
+    ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+    "./fixtures/convex/clocks.ts": () =>
+      Promise.resolve({
+        read: RegisteredConvexFunction.make(confectSchema, read),
+        insert: RegisteredConvexFunction.make(confectSchema, insert),
+      }),
+  });
+
+  it.layer(layer, { buildPerTest: true })("Confect runners", (test) => {
+    test.effect.each([1000, -1000])(
+      "inherits the parent clock through nested queries and mutations with wall delta %i",
+      (delta) =>
+        Effect.gen(function* () {
+          vi.useFakeTimers({ now });
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(Effect.void);
+          yield* c.run(Effect.void);
+          yield* c.run(
+            Effect.gen(function* () {
+              const queries = yield* QueryRunner;
+              const mutations = yield* MutationRunner;
+              const metadata = yield* TransactionMetadata;
+              const time = yield* Clock.currentTimeMillis;
+              const snapshot = yield* metadata.getSnapshotTs();
+              expect(time).toBe(now + 1);
+              expect(BigInt(time) * 1_000_000n).toBeGreaterThanOrEqual(
+                snapshot,
+              );
+              vi.setSystemTime(now + delta);
+              const nestedQuery = yield* queries.runQuery(readRef);
+              expect(nestedQuery).toEqual({
+                time,
+                snapshot,
+              });
+              const nestedMutation = yield* mutations.runMutation(insertRef);
+              expect(nestedMutation).toEqual({
+                time,
+                snapshot,
+                creationTime: time,
+              });
+              const after = yield* Clock.currentTimeMillis;
+              expect(after).toBe(time);
+            }),
+          );
+        }).pipe(Effect.ensuring(Effect.sync(() => vi.useRealTimers()))),
+    );
+
+    test.effect(
+      "bounds top-level handler clocks across frozen and moving wall time",
+      () =>
+        Effect.gen(function* () {
+          vi.useFakeTimers({ now });
+          const c = yield* TestConfect.TestConfect;
+          let previous = now;
+          for (const delta of [0, 0, -1000, 1000]) {
+            vi.setSystemTime(now + delta);
+            const query = yield* c.query(readRef);
+            expect(query.time).toBeGreaterThanOrEqual(previous);
+            expect(query.time).toBeGreaterThanOrEqual(now + delta);
+            expect(BigInt(query.time) * 1_000_000n).toBeGreaterThanOrEqual(
+              query.snapshot,
+            );
+            const mutation = yield* c.mutation(insertRef);
+            expect(mutation.time).toBeGreaterThanOrEqual(query.time);
+            expect(BigInt(mutation.time) * 1_000_000n).toBeGreaterThanOrEqual(
+              mutation.snapshot,
+            );
+            expect(mutation.creationTime).toBeGreaterThanOrEqual(mutation.time);
+            previous = mutation.time;
+          }
+        }).pipe(Effect.ensuring(Effect.sync(() => vi.useRealTimers()))),
+    );
+  });
+});
 
 describe("Generated function registration", () => {
   it.effect("retains the single-pagination budget in registered queries", () =>
@@ -1927,6 +2056,57 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
 );
 
 it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
+  test.effect.each(["runAfter", "runAt"] as const)(
+    "%s executes an already-due job using wall time rather than pinned transaction time",
+    (method) =>
+      Effect.gen(function* () {
+        const now = 1_750_000_000_000;
+        vi.useFakeTimers({ now });
+        const c = yield* TestConfect.TestConfect;
+        const job = yield* c.run(
+          Effect.gen(function* () {
+            const scheduler = yield* Scheduler;
+            const reader = yield* DatabaseReader;
+            const time = yield* Clock.currentTimeMillis;
+            vi.setSystemTime(now + 1000);
+            const id = yield* method === "runAfter"
+              ? scheduler.runAfter(
+                  Duration.millis(500),
+                  refs.public.groups.notes.insert,
+                  { text: "already due" },
+                )
+              : scheduler.runAt(
+                  DateTime.makeUnsafe(time + 500),
+                  refs.public.groups.notes.insert,
+                  { text: "already due" },
+                );
+            const scheduled = yield* reader
+              .table("_scheduled_functions")
+              .get(id);
+            expect(time).toBe(now);
+            const after = yield* Clock.currentTimeMillis;
+            expect(after).toBe(time);
+            expect(scheduled.scheduledTime).toBe(now + 500);
+            expect(scheduled.state.kind).toBe("pending");
+            return id;
+          }),
+          Id("_scheduled_functions"),
+        );
+        vi.advanceTimersByTime(0);
+        yield* c.finishInProgressScheduledFunctions();
+        const notes = yield* c.query(refs.public.groups.notes.list);
+        expect(Array.map(notes, (note) => note.text)).toEqual(["already due"]);
+        yield* c.run(
+          Effect.gen(function* () {
+            const reader = yield* DatabaseReader;
+            expect(
+              (yield* reader.table("_scheduled_functions").get(job)).state.kind,
+            ).toBe("success");
+          }),
+        );
+      }).pipe(Effect.ensuring(Effect.sync(() => vi.useRealTimers()))),
+  );
+
   test.effect("cancels a pending function without executing it", () =>
     Effect.gen(function* () {
       vi.useFakeTimers();
@@ -1955,6 +2135,213 @@ it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
       expect(queryResult2).toEqual([]);
     }).pipe(Effect.ensuring(Effect.sync(() => vi.useRealTimers()))),
   );
+});
+
+describe("DatabaseReader table isolation", () => {
+  const otherNotes = notesTable("otherNotes");
+  const schema = DatabaseSchema.make({
+    ...DatabaseSchema.tables(confectSchema),
+    otherNotes,
+  });
+  const layer = TestConfect_.layer(
+    schema,
+    defineSchema({
+      ...convexSchema.tables,
+      otherNotes: Table.tableDefinition(otherNotes),
+    }),
+    import.meta.glob("./fixtures/convex/_generated/*.js"),
+  );
+  const Reader = DatabaseReader_.DatabaseReader<typeof schema>();
+  const Writer = DatabaseWriter_.DatabaseWriter<typeof schema>();
+
+  it.layer(layer, { buildPerTest: true })("table reads", (test) => {
+    const readTables = Effect.gen(function* () {
+      const reader = yield* Reader;
+      const notes = reader.table("notes");
+      const ascending = yield* notes.index("by_creation_time").collect();
+      const descending = yield* notes
+        .index("by_creation_time", "desc")
+        .collect();
+      const indexed = yield* notes
+        .index("by_text", (q) => q.eq("text", "hello match"))
+        .collect();
+      const searched = yield* notes
+        .search("text", (q) => q.search("text", "hello").eq("tag", "keep"))
+        .collect();
+      const users = yield* reader
+        .table("users")
+        .index("by_creation_time")
+        .collect();
+      const events = yield* reader
+        .table("events")
+        .index("by_creation_time")
+        .collect();
+      const other = yield* reader
+        .table("otherNotes")
+        .index("by_creation_time")
+        .collect();
+      return {
+        ascending: Array.map(ascending, (doc) => doc._id),
+        descending: Array.map(descending, (doc) => doc._id),
+        indexed: Array.map(indexed, (doc) => doc._id),
+        searched: Array.map(searched, (doc) => doc._id),
+        users: Array.map(users, (doc) => doc.username),
+        events: Array.map(events, (doc) => doc._id),
+        otherNotes: Array.map(other, (doc) => doc.text),
+        tags: yield* reader.table("tags").index("by_creation_time").collect(),
+      };
+    });
+
+    test.effect.each(["commit", "rollback"] as const)(
+      "isolates ordered, indexed and search reads across pending writes and %s",
+      (outcome) =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect_.TestConfect<typeof schema>();
+          const ids = yield* c.run(
+            Effect.gen(function* () {
+              const writer = yield* Writer;
+              const kept = yield* writer
+                .table("notes")
+                .insert({ text: "hello match", tag: "keep" });
+              const user = yield* writer
+                .table("users")
+                .insert({ username: "hello match" });
+              const other = yield* writer
+                .table("otherNotes")
+                .insert({ text: "hello match", tag: "keep" });
+              const deleted = yield* writer
+                .table("notes")
+                .insert({ text: "hello match", tag: "keep" });
+              const event = yield* writer
+                .table("events")
+                .insert({ kind: "a", a: "hello match" });
+              const patched = yield* writer
+                .table("notes")
+                .insert({ text: "hello match", tag: "keep" });
+              return { kept, deleted, patched, user, event, other };
+            }),
+            Schema.Struct({
+              kept: Id("notes"),
+              deleted: Id("notes"),
+              patched: Id("notes"),
+              user: Id("users"),
+              event: Id("events"),
+              other: GenericId.GenericId("otherNotes"),
+            }),
+          );
+          const original = {
+            ascending: [ids.kept, ids.deleted, ids.patched],
+            descending: [ids.patched, ids.deleted, ids.kept],
+            indexed: [ids.kept, ids.deleted, ids.patched],
+            searched: [ids.kept, ids.deleted, ids.patched],
+            users: ["hello match"],
+            events: [ids.event],
+            otherNotes: ["hello match"],
+            tags: [],
+          };
+          yield* c.run(
+            Effect.gen(function* () {
+              const actual = yield* readTables;
+              expect(actual).toEqual(original);
+            }),
+          );
+          const changed = (inserted: Id<"notes">) => ({
+            ascending: [ids.kept, ids.patched, inserted],
+            descending: [inserted, ids.patched, ids.kept],
+            indexed: [ids.kept, inserted],
+            searched: [ids.kept, inserted],
+            users: ["replacement"],
+            events: [],
+            otherNotes: ["hello match"],
+            tags: [],
+          });
+          const result = yield* Effect.exit(
+            c.run(
+              Effect.gen(function* () {
+                const writer = yield* Writer;
+                const notes = writer.table("notes");
+                const inserted = yield* notes.insert({ text: "unmatched" });
+                const temporary = yield* notes.insert({
+                  text: "hello match",
+                  tag: "keep",
+                });
+                yield* writer
+                  .table("otherNotes")
+                  .patch(ids.other, { text: "hello foreign" });
+                yield* writer
+                  .table("otherNotes")
+                  .insert({ text: "hello match", tag: "keep" });
+                yield* writer
+                  .table("users")
+                  .patch(ids.user, { username: "pending" });
+                const pending = yield* readTables;
+                expect(pending.ascending).toEqual([
+                  ...original.ascending,
+                  inserted,
+                  temporary,
+                ]);
+                expect(pending.descending).toEqual([
+                  temporary,
+                  inserted,
+                  ...original.descending,
+                ]);
+                expect(pending.indexed).toEqual([
+                  ...original.indexed,
+                  temporary,
+                ]);
+                expect(pending.searched).toEqual([
+                  ...original.searched,
+                  temporary,
+                ]);
+                expect(pending.users).toEqual(["pending"]);
+                expect(pending.events).toEqual([ids.event]);
+                expect(pending.otherNotes).toEqual([
+                  "hello foreign",
+                  "hello match",
+                ]);
+                expect(pending.tags).toEqual([]);
+                yield* notes.delete(temporary);
+                yield* notes.delete(ids.deleted);
+                yield* notes.patch(ids.patched, {
+                  text: "goodbye",
+                  tag: "skip",
+                });
+                yield* notes.patch(inserted, {
+                  text: "hello match",
+                  tag: "keep",
+                });
+                yield* writer.table("users").delete(ids.user);
+                yield* writer
+                  .table("users")
+                  .insert({ username: "replacement" });
+                yield* writer.table("events").delete(ids.event);
+                yield* writer.table("otherNotes").delete(ids.other);
+                const pendingChanges = yield* readTables;
+                expect(pendingChanges).toEqual(changed(inserted));
+                if (outcome === "rollback")
+                  return yield* Effect.die("table-read rollback");
+                return inserted;
+              }),
+              Id("notes"),
+            ),
+          );
+          if (outcome === "rollback") {
+            assert(result._tag === "Failure");
+            expect(Cause.pretty(result.cause)).toContain("table-read rollback");
+          } else {
+            assert(result._tag === "Success");
+          }
+          yield* c.run(
+            Effect.gen(function* () {
+              const after = yield* readTables;
+              expect(after).toEqual(
+                result._tag === "Success" ? changed(result.value) : original,
+              );
+            }),
+          );
+        }),
+    );
+  });
 });
 
 it.layer(TestConfect.layer, { buildPerTest: true })(
