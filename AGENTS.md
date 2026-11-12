@@ -52,15 +52,15 @@ The workspace uses the Rust TypeScript compiler, `tsrs`. The root `prepare` scri
 
 Lint runs through `effect-tsgo --tsrs-lint vp lint` (or `vp check`) so type-aware rules also use Rust. `pnpm oxlint` wraps the standalone linter with the same integration; bare `pnpm exec oxlint` and `pnpm exec vp lint` bypass it. The Zed Oxlint server uses the same wrapper. Keep `@effect/tsgo`, `tsrs`, and Oxlint on versions listed together in Effect's supported-component table. These integrations support Linux glibc x64/ARM64, macOS x64/ARM64, and Windows x64, not Linux musl or Windows ARM64.
 
-Every Effect lint rule except `missing-pipeable-signature` and `unstable-api-usage` is explicitly enabled
+Every Effect lint rule except `missing-pipeable-signature`, `unstable-api-usage`, and `api-stability-leak` is explicitly enabled
 as an error, including rules disabled by upstream presets. Do not change API
 shapes to satisfy the disabled pipeability rule. `scripts/effectLint.test.ts` checks coverage
 against the installed plugin's schema so upgrades cannot silently omit new
 rules. Fix findings rather than disabling additional rules. Unstable API usage
-is permitted globally: the platform, HTTP, AI, and test integrations deliberately
-depend on these APIs, so do not maintain per-export `allowedUnstableApis` grants.
-Keep public API stability annotations accurate; disabling the diagnostic does
-not make an unstable API stable.
+and exposure through public exports are permitted globally: the platform, HTTP,
+AI, and test integrations deliberately depend on these APIs, so do not maintain
+per-export `allowedUnstableApis` grants or `@stability unstable` tags solely for
+these diagnostics. This policy does not make upstream unstable APIs stable.
 Keep compatibility exceptions local and documented: existing structural service
 identifiers retain their public requirement types, and Convex handler entry
 points provide invocation-local layers before the terminal runner executes them.
