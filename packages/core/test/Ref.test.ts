@@ -735,6 +735,25 @@ describe("paginated queries", () => {
   );
 
   describe("AnyPublicPaginatedQuery", () => {
+    test("constructs visibility through the shared Ref parameter", () => {
+      expectTypeOf<
+        Ref.GetFunctionVisibility<Ref.AnyPaginatedQuery>
+      >().toEqualTypeOf<FunctionVisibility>();
+      expectTypeOf<
+        Ref.GetFunctionVisibility<Ref.AnyPublicPaginatedQuery>
+      >().toEqualTypeOf<"public">();
+      expectTypeOf<
+        Ref.GetFunctionVisibility<Ref.AnyConfectPublicPaginatedQuery>
+      >().toEqualTypeOf<"public">();
+      expectTypeOf<Ref.AnyPublicPaginatedQuery>().toExtend<Ref.AnyPublicQuery>();
+      expectTypeOf<Ref.AnyPublicPaginatedQuery>().not.toExtend<Ref.AnyInternal>();
+      expectTypeOf<Ref.AnyConfectPublicPaginatedQuery>().toExtend<Ref.AnyConfect>();
+      expectTypeOf<Ref.AnyConfectPublicPaginatedQuery>().not.toExtend<Ref.AnyInternal>();
+      expectTypeOf<
+        Ref.AnyConfectPublicPaginatedQuery["_tag"]
+      >().toEqualTypeOf<"Confect">();
+    });
+
     test("retains pagination constraints instead of erasing them with any", () => {
       expectTypeOf<Ref.Args<Ref.AnyPaginatedQuery>>().not.toBeAny();
       expectTypeOf<Ref.Returns<Ref.AnyPaginatedQuery>>().not.toBeAny();

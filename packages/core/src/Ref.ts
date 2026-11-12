@@ -144,9 +144,11 @@ export type AnyQuery = Ref<
   any
 >;
 
-export type AnyPaginatedQuery = Ref<
+type PaginatedQueryWithVisibility<
+  FunctionVisibility_ extends FunctionVisibility,
+> = Ref<
   RuntimeAndFunctionType.AnyQuery,
-  FunctionVisibility,
+  FunctionVisibility_,
   {
     [key: string]: any;
     paginationOpts: typeof PaginationOptions.PaginationOptions.Type;
@@ -154,6 +156,9 @@ export type AnyPaginatedQuery = Ref<
   PaginationResult<unknown>,
   any
 >;
+
+export type AnyPaginatedQuery =
+  PaginatedQueryWithVisibility<FunctionVisibility>;
 
 export type AnyMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
@@ -181,9 +186,7 @@ export type AnyPublicQuery = Ref<
 
 export type AnyConfectPublicQuery = Extract<AnyPublicQuery, AnyConfect>;
 
-export type AnyPublicPaginatedQuery = AnyPaginatedQuery & {
-  readonly "~FunctionVisibility": "public";
-};
+export type AnyPublicPaginatedQuery = PaginatedQueryWithVisibility<"public">;
 
 export type AnyConfectPublicPaginatedQuery = Extract<
   AnyPublicPaginatedQuery,
