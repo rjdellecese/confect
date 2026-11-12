@@ -96,7 +96,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
       }),
     );
 
-    it.effect.each([1, 3600.9])(
+    it.effect.each([1, 3600, 3600.9])(
       "accepts lifetime %s and truncates fractional seconds",
       (expiresInSeconds) =>
         Effect.gen(function* () {

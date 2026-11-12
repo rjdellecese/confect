@@ -189,7 +189,118 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
       }).pipe(Effect.scoped),
     );
 
-    test.effect.each([1, 3600.9])(
+    test.effect.each([
+      "confect-integration",
+      ["confect-integration", "another-service"],
+    ])("generates distinct token IDs for audience %j", (aud) =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+        const options = { claims: { aud }, expiresInSeconds: 60 };
+        const sign = c.run(
+          Effect.gen(function* () {
+            const auth = yield* MutationAuth;
+            return yield* auth.signJwt(options);
+          }),
+          Schema.String,
+        );
+        const first = yield* sign;
+        const second = yield* sign;
+        const jwks = yield* c.jwks();
+        const ids: string[] = [];
+        for (const token of [first, second]) {
+          const { payload, protectedHeader } = yield* Effect.promise(() =>
+            jwtVerify(token, createLocalJWKSet(jwks), {
+              audience: "confect-integration",
+              algorithms: ["ES256"],
+            }),
+          );
+          expect(payload.aud).toEqual(aud);
+          assert(typeof payload.jti === "string");
+          expect(payload.jti.length).toBeGreaterThan(0);
+          expect(
+            Array.some(jwks.keys, (key) => key.kid === protectedHeader.kid),
+          ).toBe(true);
+          ids.push(payload.jti);
+        }
+        expect(ids[0]).not.toBe(ids[1]);
+        expect(options).toEqual({ claims: { aud }, expiresInSeconds: 60 });
+      }),
+    );
+
+    test.effect.each<SignJwtOptions>([
+      { expiresInSeconds: 60 },
+      { claims: {}, expiresInSeconds: 60 },
+    ])("keeps missing audience failures as defects for %j", (options) =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+        yield* c.run(
+          Effect.gen(function* () {
+            const auth = yield* MutationAuth;
+            const result = yield* Effect.exit(auth.signJwt(options));
+            assert(result._tag === "Failure");
+            expect(Cause.hasDies(result.cause)).toBe(true);
+            expect(Cause.pretty(result.cause)).toContain(
+              "The 'aud' claim is required",
+            );
+          }),
+        );
+      }),
+    );
+
+    test.effect.each([
+      "",
+      [],
+      [""],
+      ["confect-integration", ""],
+      ["confect-integration", 123],
+      123,
+      false,
+      null,
+      { service: "confect-integration" },
+    ])("keeps malformed audience %j failures as defects", (aud) =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+        yield* c.run(
+          Effect.gen(function* () {
+            const auth = yield* MutationAuth;
+            const result = yield* Effect.exit(
+              auth.signJwt({ claims: { aud }, expiresInSeconds: 60 }),
+            );
+            assert(result._tag === "Failure");
+            expect(Cause.hasDies(result.cause)).toBe(true);
+            expect(Cause.pretty(result.cause)).toContain(
+              "The 'aud' claim must be a non-empty string or a non-empty array of non-empty strings",
+            );
+          }),
+        );
+      }),
+    );
+
+    test.effect.each(["", 123, false, null, [], {}])(
+      "keeps malformed token ID %j failures as defects",
+      (jti) =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              const auth = yield* MutationAuth;
+              const result = yield* Effect.exit(
+                auth.signJwt({
+                  claims: { aud: "confect-integration", jti },
+                  expiresInSeconds: 60,
+                }),
+              );
+              assert(result._tag === "Failure");
+              expect(Cause.hasDies(result.cause)).toBe(true);
+              expect(Cause.pretty(result.cause)).toContain(
+                "The 'jti' claim must be a non-empty string",
+              );
+            }),
+          );
+        }),
+    );
+
+    test.effect.each([1, 3600, 3600.9])(
       "accepts lifetime %s and truncates fractional seconds",
       (expiresInSeconds) =>
         Effect.gen(function* () {
@@ -242,7 +353,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
         }),
     );
 
-    test.effect.each([-1, 0, 0.5, 3601])(
+    test.effect.each([-1, 0, 0.5, 3601, NaN, Infinity, -Infinity])(
       "keeps invalid lifetime %s failures as defects",
       (expiresInSeconds) =>
         Effect.gen(function* () {
@@ -258,7 +369,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               );
               assert(result._tag === "Failure");
               expect(Cause.hasDies(result.cause)).toBe(true);
-              expect(Cause.pretty(result.cause)).toContain("expiresIn");
+              expect(Cause.pretty(result.cause)).toContain("expiresInSeconds");
             }),
           );
         }),
