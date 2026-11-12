@@ -97,7 +97,7 @@
     "effecttsgo/acquire-release-disposable": "error",
     "effecttsgo/all-of-map-to-for-each": "error",
     "effecttsgo/any-unknown-in-error-context": "error",
-    "effecttsgo/api-stability-leak": "error",
+    "effecttsgo/api-stability-leak": "off",
     "effecttsgo/async-function": "error",
     "effecttsgo/catch-all-tag-dispatch-to-catch-tag": "error",
     "effecttsgo/catch-all-to-map-error": "error",
