@@ -123,6 +123,45 @@ const writtenRanks = (wire: ReturnType<typeof harness>["wire"]) =>
   );
 
 describe("optimisticallyUpdateValueInPaginatedQuery", () => {
+  test("keeps codec failures synchronous at the store boundary without writing pages", () => {
+    const { store, wire } = harness([makeEntry([1, 3], null, true)]);
+    const invalidArgs = { ...args, channel: Number.NaN };
+    const options = {
+      paginatedQuery: query,
+      localQueryStore: store,
+      argsToMatch: invalidArgs,
+      item: makeItem(2),
+    };
+    const operations = [
+      () =>
+        optimisticallyUpdateValueInPaginatedQuery(
+          store,
+          query,
+          invalidArgs,
+          (item) => item,
+        ),
+      () => insertAtTop(options),
+      () => insertAtBottomIfLoaded(options),
+      () =>
+        insertAtPosition({
+          ...options,
+          sortOrder: "asc",
+          sortKeyFromItem: (item) => item.rank,
+        }),
+    ];
+    Array.forEach(operations, (operation) => {
+      const result = Result.try(operation);
+      result.pipe(
+        Result.match({
+          onFailure: (failure) =>
+            expect(failure).toBeInstanceOf(Schema.SchemaError),
+          onSuccess: () => assert.fail("Expected a schema encoding error"),
+        }),
+      );
+    });
+    expect(wire.setQuery).not.toHaveBeenCalled();
+  });
+
   test("matches omitted and explicitly undefined optional fields on the wire for all helpers", () => {
     const optionalQuery = Ref.make(
       "optional",

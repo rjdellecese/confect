@@ -5,7 +5,6 @@ import type {
   DefaultFunctionArgs,
   FunctionReference as ConvexFunctionReference,
   FunctionVisibility,
-  PaginationOptions,
   PaginationResult,
 } from "convex/server";
 import { makeFunctionReference } from "convex/server";
@@ -17,6 +16,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
+import type * as PaginationOptions from "./PaginationOptions";
 import * as Lazy from "./Lazy";
 import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
@@ -144,17 +144,16 @@ export type AnyQuery = Ref<
   any
 >;
 
-export type AnyPaginatedQuery = AnyQuery &
-  Base<
-    RuntimeAndFunctionType.AnyQuery,
-    FunctionVisibility,
-    {
-      [key: string]: any;
-      paginationOpts: PaginationOptions;
-    },
-    PaginationResult<any>,
-    any
-  >;
+export type AnyPaginatedQuery = Ref<
+  RuntimeAndFunctionType.AnyQuery,
+  FunctionVisibility,
+  {
+    [key: string]: any;
+    paginationOpts: typeof PaginationOptions.PaginationOptions.Type;
+  },
+  PaginationResult<unknown>,
+  any
+>;
 
 export type AnyMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
@@ -182,10 +181,14 @@ export type AnyPublicQuery = Ref<
 
 export type AnyConfectPublicQuery = Extract<AnyPublicQuery, AnyConfect>;
 
-export type AnyPublicPaginatedQuery = AnyPublicQuery & AnyPaginatedQuery;
+export type AnyPublicPaginatedQuery = AnyPaginatedQuery & {
+  readonly "~FunctionVisibility": "public";
+};
 
-export type AnyConfectPublicPaginatedQuery = AnyConfectPublicQuery &
-  AnyPublicPaginatedQuery;
+export type AnyConfectPublicPaginatedQuery = Extract<
+  AnyPublicPaginatedQuery,
+  AnyConfect
+>;
 
 export type AnyPublicMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,

@@ -1,11 +1,13 @@
 import { Ref } from "@confect/core";
-import type { RuntimeAndFunctionType } from "@confect/core";
 import type { OptimisticLocalStore as ConvexOptimisticLocalStore } from "convex/browser";
-import type { PaginationOptions, PaginationResult } from "convex/server";
 import { compareValues, convexToJson, type Value } from "convex/values";
 import * as Option from "effect/Option";
 import * as Array from "effect/Array";
 import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
+import * as Record from "effect/Record";
+import * as Order from "effect/Order";
+import { pipe } from "effect/Function";
 import type { PaginatedQueryArgs, PaginatedQueryItem } from "./index";
 
 /**
@@ -24,10 +26,7 @@ export interface OptimisticLocalStore {
 
   getAllQueries<Query extends Ref.AnyPublicQuery>(
     queryRef: Query,
-  ): Array<{
-    args: Ref.Args<Query>;
-    value: Option.Option<Ref.Returns<Query>>;
-  }>;
+  ): Array<QueryEntry<Query>>;
 
   setQuery<Query extends Ref.AnyPublicQuery>(
     queryRef: Query,
@@ -76,30 +75,109 @@ export const make = (
   },
 });
 
-type PaginatedQuery = Ref.Ref<
-  RuntimeAndFunctionType.AnyQuery,
-  "public",
-  { paginationOpts: PaginationOptions & { id?: number } },
-  PaginationResult<unknown>,
-  unknown
->;
+interface QueryEntry<Query extends Ref.AnyPublicQuery> {
+  args: Ref.Args<Query>;
+  value: Option.Option<Ref.Returns<Query>>;
+}
 
-const encodeJson = Schema.Unknown.pipe(
-  Schema.fromJsonString,
-  Schema.encodeSync,
-);
+interface LoadedPage<Query extends Ref.AnyPublicPaginatedQuery> {
+  readonly args: Ref.Args<Query>;
+  readonly value: Ref.Returns<Query>;
+}
 
-const serializedUserArgs = <Query extends PaginatedQuery>(
+interface InsertOptions<Query extends Ref.AnyPublicPaginatedQuery> {
+  paginatedQuery: Query;
+  argsToMatch?: Partial<PaginatedQueryArgs<Query>>;
+  localQueryStore: OptimisticLocalStore;
+  item: PaginatedQueryItem<Query>;
+}
+
+class QueryArgsEncodingError extends Schema.TaggedError<
+  QueryArgsEncodingError,
+  { readonly brand: unique symbol }
+>()("QueryArgsEncodingError", {
+  queryName: Schema.String,
+  args: Schema.Unknown,
+  cause: Schema.Defect(),
+}) {}
+
+const Json = Schema.fromJsonString(Schema.Unknown);
+
+const serializedUserArgs = <Query extends Ref.AnyPublicPaginatedQuery>(
   query: Query,
   args: unknown,
-): string =>
-  encodeJson(
+): Result.Result<string, QueryArgsEncodingError> =>
+  Result.try(() =>
     convexToJson(
       Ref.encodePaginatedQueryArgsSync(
         query,
         args as Omit<Ref.Args<Query>, "paginationOpts">,
       ) as Value,
     ),
+  ).pipe(
+    Result.flatMap(Schema.encodeResult(Json)),
+    Result.mapError((cause) =>
+      QueryArgsEncodingError.make({
+        queryName: Ref.getConvexFunctionName(query),
+        args,
+        cause,
+      }),
+    ),
+  );
+
+const loadedPage = <Query extends Ref.AnyPublicPaginatedQuery>(
+  entry: QueryEntry<Query>,
+): Option.Option<LoadedPage<Query>> =>
+  Option.map(entry.value, (value) => ({ args: entry.args, value }));
+
+const keyedPages = <Query extends Ref.AnyPublicPaginatedQuery>(
+  query: Query,
+  entries: ReadonlyArray<QueryEntry<Query>>,
+) =>
+  Result.all(
+    Array.map(
+      Array.getSomes(Array.map(entries, loadedPage<Query>)),
+      (entry) => {
+        const { paginationOpts: _, ...args } = entry.args;
+        return serializedUserArgs(query, args).pipe(
+          Result.map((key) => ({ ...entry, key })),
+        );
+      },
+    ),
+  );
+
+const matchingPages = <Query extends Ref.AnyPublicPaginatedQuery>(
+  query: Query,
+  entries: ReadonlyArray<QueryEntry<Query>>,
+  argsToMatch: Partial<PaginatedQueryArgs<Query>> | undefined,
+): Result.Result<ReadonlyArray<QueryEntry<Query>>, QueryArgsEncodingError> =>
+  argsToMatch === undefined
+    ? Result.succeed(entries)
+    : Result.all(
+        Array.map(entries, (entry) =>
+          Result.gen(function* () {
+            const { paginationOpts: _, ...args } = entry.args;
+            const actual = yield* serializedUserArgs(query, args);
+            const expected = yield* serializedUserArgs(query, {
+              ...args,
+              ...argsToMatch,
+            });
+            return actual === expected ? Option.some(entry) : Option.none();
+          }),
+        ),
+      ).pipe(Result.map(Array.getSomes));
+
+const writePages = <Query extends Ref.AnyPublicPaginatedQuery>(
+  store: OptimisticLocalStore,
+  query: Query,
+  updates: Result.Result<
+    ReadonlyArray<LoadedPage<Query>>,
+    QueryArgsEncodingError
+  >,
+): void =>
+  Array.forEach(
+    Result.getOrThrowWith(updates, (error) => error.cause),
+    ({ args, value }) => store.setQuery(query, args, Option.some(value)),
   );
 
 /**
@@ -107,7 +185,7 @@ const serializedUserArgs = <Query extends PaginatedQuery>(
  * The callback receives and returns decoded items, not Convex wire values.
  */
 export const optimisticallyUpdateValueInPaginatedQuery = <
-  Query extends PaginatedQuery,
+  Query extends Ref.AnyPublicPaginatedQuery,
 >(
   localStore: OptimisticLocalStore,
   query: Query,
@@ -115,91 +193,157 @@ export const optimisticallyUpdateValueInPaginatedQuery = <
   updateValue: (
     currentValue: PaginatedQueryItem<Query>,
   ) => PaginatedQueryItem<Query>,
-): void => {
-  const expectedArgs = serializedUserArgs(query, args);
-  for (const entry of localStore.getAllQueries(query)) {
-    if (Option.isNone(entry.value)) continue;
-    const { paginationOpts: _, ...userArgs } = entry.args;
-    if (serializedUserArgs(query, userArgs) !== expectedArgs) continue;
-    localStore.setQuery(
-      query,
-      entry.args,
-      Option.some({
-        ...entry.value.value,
-        page: Array.map(entry.value.value.page, updateValue),
-      }),
-    );
-  }
-};
-
-interface InsertOptions<Query extends PaginatedQuery> {
-  paginatedQuery: Query;
-  argsToMatch?: Partial<PaginatedQueryArgs<Query>>;
-  localQueryStore: OptimisticLocalStore;
-  item: PaginatedQueryItem<Query>;
-}
-
-const matchingPages = <Query extends PaginatedQuery>({
-  paginatedQuery,
-  argsToMatch,
-  localQueryStore,
-}: InsertOptions<Query>) =>
-  Array.filter(localQueryStore.getAllQueries(paginatedQuery), ({ args }) => {
-    if (argsToMatch === undefined) return true;
-    const { paginationOpts: _, ...userArgs } = args;
-    return (
-      serializedUserArgs(paginatedQuery, userArgs) ===
-      serializedUserArgs(paginatedQuery, { ...userArgs, ...argsToMatch })
-    );
-  });
+): void =>
+  writePages(
+    localStore,
+    query,
+    Result.gen(function* () {
+      const expected = yield* serializedUserArgs(query, args);
+      const pages = yield* keyedPages(query, localStore.getAllQueries(query));
+      return Array.map(
+        Array.filter(pages, ({ key }) => key === expected),
+        ({ args: pageArgs, value }) => ({
+          args: pageArgs,
+          value: { ...value, page: Array.map(value.page, updateValue) },
+        }),
+      );
+    }),
+  );
 
 /**
  * Prepends a decoded item to the first matching initial page, if loaded.
  * `argsToMatch` contains decoded user arguments and may omit fields.
  */
-export const insertAtTop = <Query extends PaginatedQuery>(
-  options: InsertOptions<Query>,
-): void => {
-  const first = Option.getOrUndefined(
-    Array.findFirst(
-      matchingPages(options),
-      ({ args }) => args.paginationOpts.cursor === null,
+export const insertAtTop = <Query extends Ref.AnyPublicPaginatedQuery>({
+  paginatedQuery,
+  argsToMatch,
+  localQueryStore,
+  item,
+}: InsertOptions<Query>): void =>
+  writePages(
+    localQueryStore,
+    paginatedQuery,
+    matchingPages(
+      paginatedQuery,
+      localQueryStore.getAllQueries(paginatedQuery),
+      argsToMatch,
+    ).pipe(
+      Result.map((pages) =>
+        Array.findFirst(
+          pages,
+          ({ args }) => args.paginationOpts.cursor === null,
+        ).pipe(
+          Option.flatMap(loadedPage<Query>),
+          Option.map(({ args, value }) => ({
+            args,
+            value: { ...value, page: Array.prepend(value.page, item) },
+          })),
+          Option.toArray,
+        ),
+      ),
     ),
   );
-  if (first === undefined || Option.isNone(first.value)) return;
-  options.localQueryStore.setQuery(
-    options.paginatedQuery,
-    first.args,
-    Option.some({
-      ...first.value.value,
-      page: [options.item, ...first.value.value.page],
-    }),
-  );
-};
 
 /**
  * Appends a decoded item to the first matching completed page, if loaded.
  * `argsToMatch` contains decoded user arguments and may omit fields.
  */
-export const insertAtBottomIfLoaded = <Query extends PaginatedQuery>(
-  options: InsertOptions<Query>,
-): void => {
-  const last = Option.getOrUndefined(
-    Array.findFirst(
-      matchingPages(options),
-      ({ value }) => Option.isSome(value) && value.value.isDone,
+export const insertAtBottomIfLoaded = <
+  Query extends Ref.AnyPublicPaginatedQuery,
+>({
+  paginatedQuery,
+  argsToMatch,
+  localQueryStore,
+  item,
+}: InsertOptions<Query>): void =>
+  writePages(
+    localQueryStore,
+    paginatedQuery,
+    matchingPages(
+      paginatedQuery,
+      localQueryStore.getAllQueries(paginatedQuery),
+      argsToMatch,
+    ).pipe(
+      Result.map((pages) =>
+        pipe(
+          Array.getSomes(Array.map(pages, loadedPage<Query>)),
+          Array.findFirst(({ value }) => value.isDone),
+          Option.map(({ args, value }) => ({
+            args,
+            value: { ...value, page: Array.append(value.page, item) },
+          })),
+          Option.toArray,
+        ),
+      ),
     ),
   );
-  if (last === undefined || Option.isNone(last.value)) return;
-  options.localQueryStore.setQuery(
-    options.paginatedQuery,
-    last.args,
-    Option.some({
-      ...last.value.value,
-      page: [...last.value.value.page, options.item],
-    }),
-  );
-};
+
+const convexOrder = Order.make<Value>((left, right) =>
+  Order.Number(compareValues(left, right), 0),
+);
+
+const insertInPages = <Query extends Ref.AnyPublicPaginatedQuery>(
+  pages: ReadonlyArray<LoadedPage<Query>>,
+  item: PaginatedQueryItem<Query>,
+  order: Order.Order<PaginatedQueryItem<Query>>,
+): Option.Option<LoadedPage<Query>> =>
+  Option.gen(function* () {
+    const sorted = pipe(
+      Array.map(pages, (entry) =>
+        Option.map(Array.head(entry.value.page), (firstItem) => ({
+          ...entry,
+          firstItem,
+        })),
+      ),
+      Array.getSomes,
+      Array.sort(
+        Order.mapInput(
+          order,
+          (
+            entry: LoadedPage<Query> & {
+              readonly firstItem: PaginatedQueryItem<Query>;
+            },
+          ) => entry.firstItem,
+        ),
+      ),
+    );
+    const first = yield* Array.head(sorted);
+    if (order(item, first.firstItem) <= 0) {
+      return yield* Option.some(first).pipe(
+        Option.filter(({ args }) => args.paginationOpts.cursor === null),
+        Option.map(({ args, value }) => ({
+          args,
+          value: { ...value, page: Array.prepend(value.page, item) },
+        })),
+      );
+    }
+    const last = yield* Array.last(sorted);
+    const lastItem = yield* Array.last(last.value.page);
+    if (order(item, lastItem) >= 0) {
+      return yield* Option.some(last).pipe(
+        Option.filter(({ value }) => value.isDone),
+        Option.map(({ args, value }) => ({
+          args,
+          value: { ...value, page: Array.append(value.page, item) },
+        })),
+      );
+    }
+    const target = yield* Array.findFirstIndex(
+      sorted,
+      (entry) => order(entry.firstItem, item) > 0,
+    ).pipe(
+      Option.match({
+        onNone: () => Option.some(last),
+        onSome: (index) => Array.get(sorted, index - 1),
+      }),
+    );
+    const index = Array.findFirstIndex(
+      target.value.page,
+      (current) => order(current, item) >= 0,
+    ).pipe(Option.getOrElse(() => target.value.page.length));
+    const page = yield* Array.insertAt(target.value.page, index, item);
+    return { args: target.args, value: { ...target.value, page } };
+  });
 
 /**
  * Inserts a decoded item into each matching pagination instance using Convex's
@@ -208,96 +352,54 @@ export const insertAtBottomIfLoaded = <Query extends PaginatedQuery>(
  * pages are skipped; insertion beyond a loaded boundary requires the first or
  * completed last page respectively.
  */
-export const insertAtPosition = <Query extends PaginatedQuery>(
-  options: InsertOptions<Query> & {
-    sortOrder: "asc" | "desc";
-    sortKeyFromItem: (item: PaginatedQueryItem<Query>) => Value | Value[];
-  },
-): void => {
-  const { paginatedQuery, localQueryStore, item, sortKeyFromItem, sortOrder } =
-    options;
-  const groups = new Map<
-    string,
-    Array<{ args: Ref.Args<Query>; value: Ref.Returns<Query> }>
-  >();
-  for (const entry of matchingPages(options)) {
-    if (Option.isNone(entry.value) || entry.value.value.page.length === 0)
-      continue;
-    const { paginationOpts, ...userArgs } = entry.args;
-    const key = encodeJson({
-      args: serializedUserArgs(paginatedQuery, userArgs),
-      id: paginationOpts.id ?? null,
-    });
-    const group = groups.get(key) ?? [];
-    group.push({ args: entry.args, value: entry.value.value });
-    groups.set(key, group);
-  }
-  const compare = (
-    a: PaginatedQueryItem<Query>,
-    b: PaginatedQueryItem<Query>,
-  ): -1 | 0 | 1 => {
-    const order =
-      sortOrder === "asc"
-        ? compareValues(sortKeyFromItem(a), sortKeyFromItem(b))
-        : compareValues(sortKeyFromItem(b), sortKeyFromItem(a));
-    return order < 0 ? -1 : order > 0 ? 1 : 0;
-  };
-  for (const group of groups.values()) {
-    const pages = Array.sort(
-      group,
-      (a: { args: Ref.Args<Query>; value: Ref.Returns<Query> }, b) =>
-        compare(a.value.page[0], b.value.page[0]),
-    );
-    const first = pages[0];
-    const last = pages[pages.length - 1];
-    if (first === undefined || last === undefined) continue;
-    if (compare(item, first.value.page[0]) <= 0) {
-      if (first.args.paginationOpts.cursor === null) {
-        localQueryStore.setQuery(
-          paginatedQuery,
-          first.args,
-          Option.some({
-            ...first.value,
-            page: [item, ...first.value.page],
-          }),
-        );
-      }
-      continue;
-    }
-    if (compare(item, last.value.page[last.value.page.length - 1]) >= 0) {
-      if (last.value.isDone) {
-        localQueryStore.setQuery(
-          paginatedQuery,
-          last.args,
-          Option.some({
-            ...last.value,
-            page: [...last.value.page, item],
-          }),
-        );
-      }
-      continue;
-    }
-    const successor = Array.findFirstIndex(
-      pages,
-      ({ value }) => compare(value.page[0], item) > 0,
-    );
-    const target = Option.isNone(successor) ? last : pages[successor.value - 1];
-    if (target === undefined) continue;
-    const index = Array.findFirstIndex(
-      target.value.page,
-      (current: PaginatedQueryItem<Query>) => compare(current, item) >= 0,
-    );
-    const page = Option.isNone(index)
-      ? [...target.value.page, item]
-      : [
-          ...target.value.page.slice(0, index.value),
-          item,
-          ...target.value.page.slice(index.value),
-        ];
-    localQueryStore.setQuery(
+export const insertAtPosition = <Query extends Ref.AnyPublicPaginatedQuery>({
+  paginatedQuery,
+  argsToMatch,
+  localQueryStore,
+  item,
+  sortKeyFromItem,
+  sortOrder,
+}: InsertOptions<Query> & {
+  sortOrder: "asc" | "desc";
+  sortKeyFromItem: (item: PaginatedQueryItem<Query>) => Value | Value[];
+}): void =>
+  writePages(
+    localQueryStore,
+    paginatedQuery,
+    matchingPages(
       paginatedQuery,
-      target.args,
-      Option.some({ ...target.value, page }),
-    );
-  }
-};
+      localQueryStore.getAllQueries(paginatedQuery),
+      argsToMatch,
+    ).pipe(
+      Result.flatMap((entries) =>
+        keyedPages(
+          paginatedQuery,
+          Array.filter(entries, (entry) =>
+            Option.exists(entry.value, (value) =>
+              Array.isArrayNonEmpty(value.page),
+            ),
+          ),
+        ),
+      ),
+      Result.map((pages) =>
+        pipe(
+          pages,
+          Array.groupBy(
+            ({ args, key }) => `${key}:${args.paginationOpts.id ?? ""}`,
+          ),
+          Record.values,
+          Array.map((group) =>
+            insertInPages(
+              group,
+              item,
+              Order.mapInput(
+                sortOrder === "asc" ? convexOrder : Order.flip(convexOrder),
+                sortKeyFromItem,
+              ),
+            ),
+          ),
+          Array.getSomes,
+        ),
+      ),
+    ),
+  );

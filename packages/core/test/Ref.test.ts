@@ -735,6 +735,130 @@ describe("paginated queries", () => {
   );
 
   describe("AnyPublicPaginatedQuery", () => {
+    test("retains pagination constraints instead of erasing them with any", () => {
+      expectTypeOf<Ref.Args<Ref.AnyPaginatedQuery>>().not.toBeAny();
+      expectTypeOf<Ref.Returns<Ref.AnyPaginatedQuery>>().not.toBeAny();
+      expectTypeOf<Ref.Args<Ref.AnyPublicPaginatedQuery>>().not.toBeAny();
+      expectTypeOf<Ref.Returns<Ref.AnyPublicPaginatedQuery>>().not.toBeAny();
+      expectTypeOf<
+        Ref.Args<Ref.AnyConfectPublicPaginatedQuery>
+      >().not.toBeAny();
+      expectTypeOf<
+        Ref.Returns<Ref.AnyConfectPublicPaginatedQuery>
+      >().not.toBeAny();
+      expectTypeOf<
+        Ref.Args<Ref.AnyPublicPaginatedQuery>["paginationOpts"]["id"]
+      >().toEqualTypeOf<number | undefined>();
+    });
+
+    test("accepts internal pagination without widening public visibility", () => {
+      const internal = Ref.make(
+        "notes",
+        FunctionSpec.internalPaginatedQuery({
+          name: "internalPage",
+          args: () => ({ count: Schema.FiniteFromString }),
+          item: () => paginatedDoc,
+        }),
+      );
+      const nativeInternal = Ref.make(
+        "notes",
+        FunctionSpec.convexInternalQuery<
+          RegisteredQuery<
+            "internal",
+            { paginationOpts: ConvexPaginationOptions },
+            ConvexPaginationResult<number>
+          >
+        >()("nativeInternalPage"),
+      );
+      expectTypeOf(internal).toExtend<Ref.AnyPaginatedQuery>();
+      expectTypeOf(nativeInternal).toExtend<Ref.AnyPaginatedQuery>();
+      expectTypeOf(internal).not.toExtend<Ref.AnyPublicPaginatedQuery>();
+      expectTypeOf(internal).not.toExtend<Ref.AnyConfectPublicPaginatedQuery>();
+      expectTypeOf(nativeInternal).not.toExtend<Ref.AnyPublicPaginatedQuery>();
+      expectTypeOf(
+        convexPaginatedRef,
+      ).not.toExtend<Ref.AnyConfectPublicPaginatedQuery>();
+    });
+
+    test("rejects ordinary queries and malformed pagination args or results", () => {
+      const ordinary = Ref.make(
+        "notes",
+        FunctionSpec.publicQuery({
+          name: "count",
+          returns: () => Schema.Finite,
+        }),
+      );
+      expectTypeOf(ordinary).not.toExtend<Ref.AnyPaginatedQuery>();
+      expectTypeOf(ordinary).not.toExtend<Ref.AnyPublicPaginatedQuery>();
+      expectTypeOf(ordinary).not.toExtend<Ref.AnyConfectPublicPaginatedQuery>();
+      type ValidArgs = { paginationOpts: ConvexPaginationOptions };
+      type ValidReturns = ConvexPaginationResult<number>;
+      type NativeQuery<
+        Args extends Record<string, unknown>,
+        Returns,
+      > = Ref.ConvexRef<
+        RuntimeAndFunctionType.AnyQuery,
+        "public",
+        Args,
+        Returns
+      >;
+      expectTypeOf<
+        NativeQuery<{}, ValidReturns>
+      >().not.toExtend<Ref.AnyPaginatedQuery>();
+      expectTypeOf<
+        NativeQuery<{ paginationOpts?: ConvexPaginationOptions }, ValidReturns>
+      >().not.toExtend<Ref.AnyPublicPaginatedQuery>();
+      expectTypeOf<
+        NativeQuery<
+          { paginationOpts: { numItems: string; cursor: null } },
+          ValidReturns
+        >
+      >().not.toExtend<Ref.AnyPaginatedQuery>();
+      expectTypeOf<
+        NativeQuery<
+          { paginationOpts: { numItems: number; cursor: number } },
+          ValidReturns
+        >
+      >().not.toExtend<Ref.AnyPaginatedQuery>();
+      expectTypeOf<
+        NativeQuery<ValidArgs, number>
+      >().not.toExtend<Ref.AnyPaginatedQuery>();
+      expectTypeOf<
+        NativeQuery<
+          ValidArgs,
+          { page: number; isDone: boolean; continueCursor: string }
+        >
+      >().not.toExtend<Ref.AnyPublicPaginatedQuery>();
+      expectTypeOf<
+        NativeQuery<ValidArgs, { page: number[]; continueCursor: string }>
+      >().not.toExtend<Ref.AnyPaginatedQuery>();
+      expectTypeOf<
+        NativeQuery<
+          ValidArgs,
+          { page: number[]; isDone: boolean; continueCursor: number }
+        >
+      >().not.toExtend<Ref.AnyPaginatedQuery>();
+    });
+
+    test("preserves decoded generic arguments and items through the canonical constraint", () => {
+      const check = <Query extends Ref.AnyPublicPaginatedQuery>(ref: Query) =>
+        ref;
+      const inferred = check(paginatedRef);
+      expectTypeOf(inferred).toEqualTypeOf<typeof paginatedRef>();
+      expectTypeOf<
+        Ref.Args<typeof inferred>["count"]
+      >().toEqualTypeOf<number>();
+      expectTypeOf<
+        Ref.Returns<typeof inferred>["page"][number]
+      >().toEqualTypeOf<{ readonly value: number }>();
+      expectTypeOf(check(convexPaginatedRef)).toEqualTypeOf<
+        typeof convexPaginatedRef
+      >();
+      expectTypeOf(
+        handRolledRef,
+      ).toExtend<Ref.AnyConfectPublicPaginatedQuery>();
+    });
+
     test("is satisfied by a constructor-built paginated query ref", () => {
       expectTypeOf(paginatedRef).toExtend<Ref.AnyPublicPaginatedQuery>();
     });
