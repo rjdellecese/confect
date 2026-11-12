@@ -42,6 +42,13 @@ export {
   StreamPagination,
 };
 
+export {
+  optimisticallyUpdateValueInPaginatedQuery,
+  insertAtTop,
+  insertAtBottomIfLoaded,
+  insertAtPosition,
+} from "./OptimisticLocalStore";
+
 export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
   never,
 ]
