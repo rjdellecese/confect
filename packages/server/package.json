@@ -20,7 +20,7 @@
     "confect-bench-harness": "workspace:*",
     "confect-local-backend": "workspace:*",
     "confect-test-types": "workspace:*",
-    "convex-test": "0.0.69",
+    "convex-test": "0.0.70",
     "dotenv": "18.0.9",
     "effect": "4.1.0",
     "jose": "6.2.16",
