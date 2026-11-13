@@ -12,7 +12,29 @@ import type {
   IsUnion,
   IsValueLiteral,
   UnionToTuple,
+  OmitKey,
 } from "@confect/core/Types";
+
+describe("OmitKey", () => {
+  test("preserves readonly and optional fields", () => {
+    expectTypeOf<
+      OmitKey<{ readonly kept?: number; removed: string }, "removed">
+    >().toEqualTypeOf<{ readonly kept?: number }>();
+    expectTypeOf<
+      OmitKey<{ readonly kept: number; removed?: string }, "removed">
+    >().toEqualTypeOf<{ readonly kept: number }>();
+  });
+
+  test("retains named fields beside an index signature", () => {
+    type Remaining = OmitKey<
+      { [key: string]: unknown; required: string; removed: number },
+      "removed"
+    >;
+    expectTypeOf<Remaining["required"]>().toEqualTypeOf<string>();
+    expectTypeOf<Remaining["removed"]>().toBeUnknown();
+    expectTypeOf<{}>().not.toExtend<Remaining>();
+  });
+});
 
 describe("IsOptional", () => {
   test("{ foo?: any } = true", () => {

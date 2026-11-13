@@ -311,6 +311,20 @@ decoded mutation arguments, rather than Convex's encoded values. Its local store
 accepts Confect query refs and decoded arguments/results; query values use
 `Option`, with `Option.none()` representing a query missing from the store.
 
+Import `optimisticallyUpdateValueInPaginatedQuery`, `insertAtTop`,
+`insertAtBottomIfLoaded`, and `insertAtPosition` from `@confect/react` for
+paginated updates. They take Confect query refs and the callback's Confect
+local store. Pass decoded arguments and items; update and sort-key callbacks
+also receive decoded items. The helpers handle `Option` values and encode
+updated pages for Convex's cache.
+
+Argument matching uses encoded values, so separately constructed decoded
+objects can match the same query. For `insertAtPosition`, return Convex values
+from `sortKeyFromItem` whose ordering matches your server query; a decoded
+`Date`, for example, is not itself a Convex sort key. See the
+[Convex helper reference](https://docs.convex.dev/api/modules/react#optimisticallyupdatevalueinpaginatedquery)
+for insertion and loaded-page boundary semantics.
+
 ## `useAction`
 
 Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` schema, and `Promise<Result<A, E>>` when it does.
