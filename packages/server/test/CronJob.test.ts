@@ -4,6 +4,7 @@ import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
 import { describe, expect, test } from "@effect/vitest";
 import * as CronJob from "@confect/server/CronJob";
+import * as CronWindow from "@confect/server/CronWindow";
 
 const makeMutationRef = (functionNamespace: string, name: string) =>
   Ref.make(
@@ -25,6 +26,36 @@ const makeMutationRefWithArgs = (functionNamespace: string, name: string) =>
   );
 
 describe("CronJob.make", () => {
+  test("keeps window, ref and args identities without evaluating schemas", () => {
+    const builds = { args: 0, returns: 0, error: 0 };
+    const ref = Ref.make(
+      "tasks",
+      FunctionSpec.internalMutation({
+        name: "count",
+        args: () => {
+          builds.args++;
+          return { count: Schema.FiniteFromString };
+        },
+        returns: () => {
+          builds.returns++;
+          return Schema.Void;
+        },
+        error: () => {
+          builds.error++;
+          return Schema.String;
+        },
+      }),
+    );
+    const schedule = CronWindow.daily({ hourUtc: 17 });
+    const args = { count: 42 };
+    const job = CronJob.make("count", schedule, ref, args);
+
+    expect(job.schedule).toBe(schedule);
+    expect(job.ref).toBe(ref);
+    expect(job.args).toBe(args);
+    expect(builds).toEqual({ args: 0, returns: 0, error: 0 });
+  });
+
   test("creates a CronJob with a Cron schedule", () => {
     const ref = makeMutationRef("tasks", "cleanup");
     const cron = Cron.make({

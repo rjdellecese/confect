@@ -26,6 +26,37 @@ export default defineApp();
 `,
   "confect/probes.ts": `export const schemaBuilds = { table: 0, args: 0, returns: 0 };
 `,
+  "confect/tasks.spec.ts": `import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+
+export default GroupSpec.make().addFunction(FunctionSpec.internalMutation({
+  name: "count",
+  args: () => ({ count: Schema.FiniteFromString }),
+  returns: () => Schema.Void,
+}));
+`,
+  "confect/tasks.impl.ts": `import { FunctionImpl, GroupImpl } from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import databaseSchema from "./_generated/schema";
+import tasks from "./tasks.spec";
+
+export default GroupImpl.make(databaseSchema, tasks).pipe(
+  Layer.provide(FunctionImpl.make(databaseSchema, tasks, "count", () => Effect.void)),
+  GroupImpl.finalize,
+);
+`,
+  "confect/crons.ts": `import { CronJob, CronJobs, CronWindow } from "@confect/server";
+import * as Window from "@confect/server/CronWindow";
+import refs from "./_generated/refs";
+
+const args = { count: 42 };
+export default CronJobs.make()
+  .add(CronJob.make("hourly", Window.hourly(), refs.internal.tasks.count, args))
+  .add(CronJob.make("daily", CronWindow.daily({ hourUtc: 17 }), refs.internal.tasks.count, args))
+  .add(CronJob.make("weekly", CronWindow.weekly({ dayOfWeek: "monday", hourUtc: 9 }), refs.internal.tasks.count, args))
+  .add(CronJob.make("monthly", CronWindow.monthly({ day: 1, hourUtc: 0 }), refs.internal.tasks.count, args));
+`,
   "confect/tables/notes.ts": `import { Table } from "@confect/core";
 import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
@@ -217,6 +248,19 @@ const message = await Effect.runPromise(command.pipe(
 assert.deepEqual(message, Message.SucceededCount({ count: 42 }));
 `
     : ""
+}
+const { default: generatedCrons } = await import("./convex/crons");
+const { default: confectCrons } = await import("./confect/crons");
+assert.equal(generatedCrons, confectCrons.convexCronJobs);
+for (const [identifier, schedule] of Object.entries({
+  hourly: { type: "hourly" },
+  daily: { type: "daily", hourUTC: 17 },
+  weekly: { type: "weekly", dayOfWeek: "monday", hourUTC: 9 },
+  monthly: { type: "monthly", day: 1, hourUTC: 0 },
+})) {
+  const job = generatedCrons.crons[identifier]!;
+  assert.deepEqual(job, { name: "tasks:count", args: [{ count: "42" }], schedule });
+  assert.equal(Object.hasOwn(job.schedule, "minuteUTC"), false);
 }
 console.log("Installed consumer smoke passed");
 `,

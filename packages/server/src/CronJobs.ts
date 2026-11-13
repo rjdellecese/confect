@@ -12,6 +12,7 @@ import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import type * as CronJob from "./CronJob";
+import * as CronWindow from "./CronWindow";
 
 export const TypeId = "~@confect/server/CronJobs";
 export type TypeId = typeof TypeId;
@@ -54,6 +55,42 @@ const Proto = {
           functionReference,
           encodedArgs,
         );
+      }),
+      Match.when(CronWindow.isCronWindow, (window) => {
+        switch (window.type) {
+          case "hourly":
+            newConvexCrons.hourly(
+              cronJob.identifier,
+              {},
+              functionReference,
+              encodedArgs,
+            );
+            break;
+          case "daily":
+            newConvexCrons.daily(
+              cronJob.identifier,
+              { hourUTC: window.hourUtc },
+              functionReference,
+              encodedArgs,
+            );
+            break;
+          case "weekly":
+            newConvexCrons.weekly(
+              cronJob.identifier,
+              { dayOfWeek: window.dayOfWeek, hourUTC: window.hourUtc },
+              functionReference,
+              encodedArgs,
+            );
+            break;
+          case "monthly":
+            newConvexCrons.monthly(
+              cronJob.identifier,
+              { day: window.day, hourUTC: window.hourUtc },
+              functionReference,
+              encodedArgs,
+            );
+            break;
+        }
       }),
       Match.exhaustive,
     );
