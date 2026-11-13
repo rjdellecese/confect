@@ -5,7 +5,6 @@ import type {
   DefaultFunctionArgs,
   FunctionReference as ConvexFunctionReference,
   FunctionVisibility,
-  PaginationOptions,
   PaginationResult,
 } from "convex/server";
 import { getFunctionAddress, makeFunctionReference } from "convex/server";
@@ -18,6 +17,8 @@ import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
+import type * as PaginationOptions from "./PaginationOptions";
+import type { OmitKey } from "./Types";
 import * as Lazy from "./Lazy";
 import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
@@ -160,17 +161,21 @@ export type AnyQuery = Ref<
   any
 >;
 
-export type AnyPaginatedQuery = AnyQuery &
-  Base<
-    RuntimeAndFunctionType.AnyQuery,
-    FunctionVisibility,
-    {
-      [key: string]: any;
-      paginationOpts: PaginationOptions;
-    },
-    PaginationResult<any>,
-    any
-  >;
+type PaginatedQueryWithVisibility<
+  FunctionVisibility_ extends FunctionVisibility,
+> = Ref<
+  RuntimeAndFunctionType.AnyQuery,
+  FunctionVisibility_,
+  {
+    [key: string]: any;
+    paginationOpts: typeof PaginationOptions.PaginationOptions.Type;
+  },
+  PaginationResult<unknown>,
+  any
+>;
+
+export type AnyPaginatedQuery =
+  PaginatedQueryWithVisibility<FunctionVisibility>;
 
 export type AnyMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
@@ -198,10 +203,12 @@ export type AnyPublicQuery = Ref<
 
 export type AnyConfectPublicQuery = Extract<AnyPublicQuery, AnyConfect>;
 
-export type AnyPublicPaginatedQuery = AnyPublicQuery & AnyPaginatedQuery;
+export type AnyPublicPaginatedQuery = PaginatedQueryWithVisibility<"public">;
 
-export type AnyConfectPublicPaginatedQuery = AnyConfectPublicQuery &
-  AnyPublicPaginatedQuery;
+export type AnyConfectPublicPaginatedQuery = Extract<
+  AnyPublicPaginatedQuery,
+  AnyConfect
+>;
 
 export type AnyPublicMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
@@ -277,6 +284,23 @@ export type OptionalArgs<Ref_ extends Any> = keyof Args<Ref_> extends never
 export type Returns<Ref_> = Ref_ extends { readonly "~Returns": infer Returns_ }
   ? Returns_
   : never;
+
+/**
+ * The decoded user arguments of a paginated query, excluding `paginationOpts`.
+ * When no user arguments remain, only an empty object is accepted.
+ */
+export type PaginatedArgs<Query extends AnyPublicPaginatedQuery> =
+  OmitKey<Args<Query>, "paginationOpts"> extends infer Args_
+    ? keyof Args_ extends never
+      ? Record<string, never>
+      : Args_
+    : never;
+
+/**
+ * The decoded item type of a paginated query's `page` field.
+ */
+export type PaginatedItem<Query extends AnyPublicPaginatedQuery> =
+  Returns<Query>["page"][number];
 
 export type Error<Ref_> = Ref_ extends { readonly "~Error": infer Error_ }
   ? Error_

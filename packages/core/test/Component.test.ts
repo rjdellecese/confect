@@ -206,6 +206,15 @@ describe("published component contracts", () => {
       Component.make(paginatedSpec, scope, ["items"]),
       registry.first,
     );
+    expectTypeOf<typeof bound.items.list>().toExtend<Ref.AnyPaginatedQuery>();
+    expectTypeOf<
+      typeof bound.items.list
+    >().not.toExtend<Ref.AnyPublicPaginatedQuery>();
+    expectTypeOf<
+      Ref.Returns<typeof bound.items.list>["page"][number]
+    >().toEqualTypeOf<
+      GenericId.GenericId<"items", Component.MountScope<IdScope.App, "first">>
+    >();
     assert(bound.items.list._tag === "Confect");
     const kind = bound.items.list.kind;
     assert(kind._tag === "Paginated");
