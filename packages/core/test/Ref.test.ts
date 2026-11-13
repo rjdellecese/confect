@@ -735,6 +735,33 @@ describe("paginated queries", () => {
   );
 
   describe("AnyPublicPaginatedQuery", () => {
+    test("projects decoded pagination arguments and items", () => {
+      const optional = Ref.make(
+        "notes",
+        FunctionSpec.publicPaginatedQuery({
+          name: "optionalPage",
+          args: () => ({
+            count: Schema.FiniteFromString,
+            label: Schema.optionalKey(Schema.String),
+          }),
+          item: () => paginatedDoc,
+        }),
+      );
+      expectTypeOf<Ref.PaginatedArgs<typeof optional>>().toEqualTypeOf<{
+        readonly count: number;
+        readonly label?: string;
+      }>();
+      expectTypeOf<Ref.PaginatedItem<typeof optional>>().toEqualTypeOf<{
+        readonly value: number;
+      }>();
+      expectTypeOf<
+        Ref.PaginatedArgs<typeof convexPaginatedRef>
+      >().toEqualTypeOf<Record<string, never>>();
+      expectTypeOf<
+        Ref.PaginatedItem<typeof convexPaginatedRef>
+      >().toEqualTypeOf<{ value: number }>();
+    });
+
     test("constructs visibility through the shared Ref parameter", () => {
       expectTypeOf<
         Ref.GetFunctionVisibility<Ref.AnyPaginatedQuery>

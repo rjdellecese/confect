@@ -30,14 +30,14 @@ import * as PaginatedQueryResult from "./PaginatedQueryResult";
 import * as QueryResult from "./QueryResult";
 import * as StreamPagination from "./StreamPagination";
 import type {
-  PaginatedQueryArgs,
-  PaginatedQueryItem,
-} from "./PaginatedQueryTypes";
+  PaginatedArgs as PaginatedQueryArgs,
+  PaginatedItem as PaginatedQueryItem,
+} from "@confect/core/Ref";
 
 export type {
-  PaginatedQueryArgs,
-  PaginatedQueryItem,
-} from "./PaginatedQueryTypes";
+  PaginatedArgs as PaginatedQueryArgs,
+  PaginatedItem as PaginatedQueryItem,
+} from "@confect/core/Ref";
 
 const encodeJson = Schema.Unknown.pipe(
   Schema.fromJsonString,

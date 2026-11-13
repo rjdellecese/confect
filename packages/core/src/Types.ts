@@ -8,6 +8,15 @@ import type {
 import type { GenericId } from "convex/values";
 import type { Brand } from "effect";
 
+/**
+ * Like `Omit`, but implemented with key remapping so that optional modifiers
+ * are preserved and index signatures don't reintroduce the omitted key's
+ * literal type. Mirrors `BetterOmit` from `convex/server`.
+ */
+export type OmitKey<T, K extends PropertyKey> = {
+  [P in keyof T as P extends K ? never : P]: T[P];
+};
+
 export type IsOptional<T, K extends keyof T> =
   {} extends Pick<T, K> ? true : false;
 
