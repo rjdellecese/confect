@@ -23,7 +23,7 @@
     "@effect/vitest": "4.1.0",
     "@types/node": "26.6.6",
     "@vitest/coverage-v8": "5.1.0",
-    "convex": "1.49.0",
+    "convex": "1.50.0",
     "effect": "4.1.0",
     "tsdown": "0.23.7",
     "tsrs": "0.23.0-ts7.1.0-beta",

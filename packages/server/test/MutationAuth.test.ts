@@ -16,8 +16,8 @@ describe("MutationAuth", () => {
     expectTypeOf<MutationAuth.SignJwtOptions>().toEqualTypeOf<SignJwtOptions>();
     expectTypeOf<MutationAuth.SignJwtClaims>().toEqualTypeOf<SignJwtClaims>();
     expectTypeOf<{ aud: string; sub: string }>().toExtend<SignJwtClaims>();
-    expectTypeOf<{ sub: string }>().toExtend<SignJwtClaims>();
-    expectTypeOf<{ expiresInSeconds: number }>().toExtend<SignJwtOptions>();
+    expectTypeOf<{ sub: string }>().not.toExtend<SignJwtClaims>();
+    expectTypeOf<{ expiresInSeconds: number }>().not.toExtend<SignJwtOptions>();
     expectTypeOf<{ aud: string; iss: string }>().not.toExtend<SignJwtClaims>();
     expectTypeOf<{ aud: string; exp: number }>().not.toExtend<SignJwtClaims>();
     expectTypeOf<{ aud: string; iat: number }>().not.toExtend<SignJwtClaims>();
@@ -61,19 +61,22 @@ describe("MutationAuth", () => {
           expect(signJwt).not.toHaveBeenCalled();
           const first = yield* signed;
           const second = yield* signed;
-          const withoutClaims = { expiresInSeconds: 1 };
-          const third = yield* auth.signJwt(withoutClaims);
+          const otherOptions = {
+            claims: { aud: "service-c" },
+            expiresInSeconds: 1,
+          };
+          const third = yield* auth.signJwt(otherOptions);
           expect(first).toBe("first");
           expect(second).toBe("second");
           expect(third).toBe("third");
           expect(signJwt.mock.calls).toEqual([
             [options],
             [options],
-            [withoutClaims],
+            [otherOptions],
           ]);
           expect(signJwt.mock.calls[0]?.[0]).toBe(options);
           expect(signJwt.mock.calls[1]?.[0].claims).toBe(options.claims);
-          expect(signJwt.mock.calls[2]?.[0]).toBe(withoutClaims);
+          expect(signJwt.mock.calls[2]?.[0]).toBe(otherOptions);
           expect(signJwt.mock.contexts).toEqual([native, native, native]);
           expect(options).toEqual({
             claims: {
