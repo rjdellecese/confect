@@ -352,7 +352,7 @@ import * as Schema from "effect/Schema";
 
 import { Note } from "./note";
 
-export const Notes = QueryResult.Schema(Schema.Array(Note), Schema.String);
+export const Notes = QueryResult.QueryResult(Schema.Array(Note), Schema.String);
 
 export const Model = Schema.Struct({ notes: Notes });
 export type Model = typeof Model.Type;
@@ -402,17 +402,16 @@ QueryResult.match(model.notes, {
 });
 ```
 
+Results also support `.pipe(...)` and Effect's `Equal` and `Hash` protocols.
+Equality compares the variant and its payload using Effect's equality rules.
+The `QueryResult.QueryResult` schema restores these capabilities when decoding
+a saved Model.
+
 `QueryResult` does not track whether a subscription is enabled. Keep that
 decision in the Model fields used by the subscription's `args` extractor.
 Returning `None` closes the subscription without changing its stored result.
 When switching arguments, set the result to `QueryResult.load()` if the UI
 should wait for the new query rather than retain the previous result.
-
-Ordinary reactive updates do not enter a refreshing state: Convex pushes new
-results and handles retryable infrastructure failures itself. Use Foldkit's
-[`AsyncData`](https://foldkit.dev/core/async-data) or an application-specific
-state type instead when you explicitly need to retain old data alongside a
-pending request or a later error.
 
 ## Paginated queries
 
