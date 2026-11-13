@@ -4,7 +4,7 @@ import * as Hash from "effect/Hash";
 import * as Match from "effect/Match";
 import * as Pipeable from "effect/Pipeable";
 import * as Predicate from "effect/Predicate";
-import * as EffectSchema from "effect/Schema";
+import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 
 const TypeId = "~@confect/foldkit/QueryResult";
@@ -124,20 +124,20 @@ export const fail = <E>(error: E): Failure<E> =>
  * Encodes tagged records and restores piping, equality, and hashing on decode.
  */
 export const QueryResult = <A, AI, E, EI, RD, RE, ERD, ERE>(
-  valueSchema: EffectSchema.Codec<A, AI, RD, RE>,
-  errorSchema: EffectSchema.Codec<E, EI, ERD, ERE>,
+  valueSchema: Schema.Codec<A, AI, RD, RE>,
+  errorSchema: Schema.Codec<E, EI, ERD, ERE>,
 ) => {
-  const encoded = EffectSchema.TaggedUnion({
+  const encoded = Schema.TaggedUnion({
     Loading: {},
     Success: { value: valueSchema },
     Failure: { error: errorSchema },
   });
-  const decoded = EffectSchema.toType(encoded);
+  const decoded = Schema.toType(encoded);
   return encoded.pipe(
-    EffectSchema.decodeTo(
-      EffectSchema.declare<QueryResult<A, E>>(
+    Schema.decodeTo(
+      Schema.declare<QueryResult<A, E>>(
         (input): input is QueryResult<A, E> =>
-          isQueryResult(input) && EffectSchema.is(decoded)(input),
+          isQueryResult(input) && Schema.is(decoded)(input),
       ),
       {
         decode: SchemaGetter.transform((input) =>
