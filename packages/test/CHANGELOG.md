@@ -1,5 +1,16 @@
 # @confect/test
 
+## 11.0.0
+
+### Patch Changes
+
+- Updated dependencies [ca4afea]
+- Updated dependencies [4aa2d12]
+- Updated dependencies [c3ee2b3]
+- Updated dependencies [bf77257]
+  - @confect/server@11.0.0
+  - @confect/core@11.0.0
+
 ## 10.6.0
 
 ### Minor Changes
