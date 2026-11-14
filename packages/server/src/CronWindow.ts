@@ -7,14 +7,14 @@ export type TypeId = typeof TypeId;
 type DayOfWeek = Parameters<Crons["weekly"]>[1]["dayOfWeek"];
 
 export type CronWindow = { readonly [TypeId]: TypeId } & (
-  | { readonly type: "hourly" }
-  | { readonly type: "daily"; readonly hourUtc: number }
+  | { readonly _tag: "Hourly" }
+  | { readonly _tag: "Daily"; readonly hourUtc: number }
   | {
-      readonly type: "weekly";
+      readonly _tag: "Weekly";
       readonly dayOfWeek: DayOfWeek;
       readonly hourUtc: number;
     }
-  | { readonly type: "monthly"; readonly day: number; readonly hourUtc: number }
+  | { readonly _tag: "Monthly"; readonly day: number; readonly hourUtc: number }
 );
 
 export const isCronWindow = (u: unknown): u is CronWindow =>
@@ -25,11 +25,11 @@ const Proto = {
 };
 
 export const hourly = (): CronWindow =>
-  Object.assign(Object.create(Proto), { type: "hourly" });
+  Object.assign(Object.create(Proto), { _tag: "Hourly" });
 
 export const daily = (options: { readonly hourUtc: number }): CronWindow =>
   Object.assign(Object.create(Proto), {
-    type: "daily",
+    _tag: "Daily",
     hourUtc: options.hourUtc,
   });
 
@@ -38,7 +38,7 @@ export const weekly = (options: {
   readonly hourUtc: number;
 }): CronWindow =>
   Object.assign(Object.create(Proto), {
-    type: "weekly",
+    _tag: "Weekly",
     dayOfWeek: options.dayOfWeek,
     hourUtc: options.hourUtc,
   });
@@ -48,7 +48,7 @@ export const monthly = (options: {
   readonly hourUtc: number;
 }): CronWindow =>
   Object.assign(Object.create(Proto), {
-    type: "monthly",
+    _tag: "Monthly",
     day: options.day,
     hourUtc: options.hourUtc,
   });

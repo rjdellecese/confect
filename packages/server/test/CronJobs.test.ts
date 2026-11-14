@@ -381,6 +381,7 @@ describe("CronJobs.add", () => {
       });
       expect(exported.schedule).not.toHaveProperty("minuteUTC");
       expect(exported.schedule).not.toHaveProperty("hourUtc");
+      expect(exported.schedule).not.toHaveProperty("_tag");
     }
     assert(Predicate.hasProperty(jobs.convexCronJobs, "export"));
     assert(Predicate.isFunction(jobs.convexCronJobs.export));
@@ -395,7 +396,7 @@ describe("CronJobs.add", () => {
     expect(RecordEffect.keys(hourly.cronJobs)).toEqual(["hourly"]);
     expect(RecordEffect.keys(hourly.convexCronJobs.crons)).toEqual(["hourly"]);
     expect(jobs.cronJobs.weekly!.schedule).toBe(weekly);
-    expect(weekly).toEqual({ type: "weekly", dayOfWeek: "monday", hourUtc: 9 });
+    expect(weekly).toEqual({ _tag: "Weekly", dayOfWeek: "monday", hourUtc: 9 });
     expect(options).toEqual({ dayOfWeek: "monday", hourUtc: 9 });
     expect(args).toEqual({ count: 42 });
   });

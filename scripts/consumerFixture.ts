@@ -180,7 +180,7 @@ export const encodedArgsAreNotDecodedArgs: Ref.Args<typeof refs.public.notes.cou
 `,
   "smoke.ts": `import assert from "node:assert/strict";
 import { Ref } from "@confect/core";
-import { FunctionRegistryItem, GroupImpl, Registry, type RegistryItems } from "@confect/server";
+import { CronWindow, FunctionRegistryItem, GroupImpl, Registry, type RegistryItems } from "@confect/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -261,6 +261,11 @@ for (const [identifier, schedule] of Object.entries({
   const job = generatedCrons.crons[identifier]!;
   assert.deepEqual(job, { name: "tasks:count", args: [{ count: "42" }], schedule });
   assert.equal(Object.hasOwn(job.schedule, "minuteUTC"), false);
+  assert.equal(Object.hasOwn(job.schedule, "_tag"), false);
+  const window = confectCrons.cronJobs[identifier]!.schedule;
+  assert(CronWindow.isCronWindow(window));
+  assert.equal(window._tag.toLowerCase(), identifier);
+  assert.equal(Object.hasOwn(window, "type"), false);
 }
 console.log("Installed consumer smoke passed");
 `,

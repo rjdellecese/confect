@@ -94,6 +94,11 @@ The constructors are `CronWindow.hourly()`, `CronWindow.daily({ hourUtc })`,
 lowercase weekdays such as `"monday"`, and days of the month from 1 to 31.
 Confect uses **`hourUtc`**, not Convex's `hourUTC`.
 
+`CronWindow` is an Effect-style tagged union with `_tag` values `"Hourly"`,
+`"Daily"`, `"Weekly"`, and `"Monthly"`. Use `Match.tag` from `effect/Match`
+to distinguish variants; lowercase native schedule types appear only in the
+Convex export.
+
 These constructors omit the minute rather than choosing one in your application.
 For example, `daily({ hourUtc: 17 })` delegates placement within 17:00–18:00 UTC.
 An Effect Cron with an unrestricted minute runs every minute instead; a Duration

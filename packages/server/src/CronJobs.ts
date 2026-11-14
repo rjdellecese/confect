@@ -57,40 +57,41 @@ const Proto = {
         );
       }),
       Match.when(CronWindow.isCronWindow, (window) => {
-        switch (window.type) {
-          case "hourly":
+        Match.value(window).pipe(
+          Match.tag("Hourly", () => {
             newConvexCrons.hourly(
               cronJob.identifier,
               {},
               functionReference,
               encodedArgs,
             );
-            break;
-          case "daily":
+          }),
+          Match.tag("Daily", ({ hourUtc }) => {
             newConvexCrons.daily(
               cronJob.identifier,
-              { hourUTC: window.hourUtc },
+              { hourUTC: hourUtc },
               functionReference,
               encodedArgs,
             );
-            break;
-          case "weekly":
+          }),
+          Match.tag("Weekly", ({ dayOfWeek, hourUtc }) => {
             newConvexCrons.weekly(
               cronJob.identifier,
-              { dayOfWeek: window.dayOfWeek, hourUTC: window.hourUtc },
+              { dayOfWeek, hourUTC: hourUtc },
               functionReference,
               encodedArgs,
             );
-            break;
-          case "monthly":
+          }),
+          Match.tag("Monthly", ({ day, hourUtc }) => {
             newConvexCrons.monthly(
               cronJob.identifier,
-              { day: window.day, hourUTC: window.hourUtc },
+              { day, hourUTC: hourUtc },
               functionReference,
               encodedArgs,
             );
-            break;
-        }
+          }),
+          Match.exhaustive,
+        );
       }),
       Match.exhaustive,
     );
