@@ -5,9 +5,11 @@ import * as Cron from "effect/Cron";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
-import { describe, expect, test } from "@effect/vitest";
+import * as Predicate from "effect/Predicate";
+import { assert, describe, expect, test } from "@effect/vitest";
 import * as CronJob from "@confect/server/CronJob";
 import * as CronJobs from "@confect/server/CronJobs";
+import * as CronWindow from "@confect/server/CronWindow";
 
 const makeMutationRef = (functionNamespace: string, name: string) =>
   Ref.make(
@@ -320,6 +322,85 @@ describe("CronJobs.make", () => {
 });
 
 describe("CronJobs.add", () => {
+  test("exports all four windows without minute keys alongside explicit schedules", () => {
+    const builds = { args: 0, returns: 0, error: 0 };
+    const ref = Ref.make(
+      "tasks/nested",
+      FunctionSpec.internalAction({
+        name: "count",
+        args: () => {
+          builds.args++;
+          return { count: Schema.FiniteFromString };
+        },
+        returns: () => {
+          builds.returns++;
+          return Schema.Void;
+        },
+        error: () => {
+          builds.error++;
+          return Schema.String;
+        },
+      }),
+    );
+    const args = { count: 42 };
+    const options = { dayOfWeek: "monday", hourUtc: 9 } as const;
+    const weekly = CronWindow.weekly(options);
+    const empty = CronJobs.make();
+    const hourly = empty.add(
+      CronJob.make("hourly", CronWindow.hourly(), ref, args),
+    );
+    const jobs = hourly
+      .add(CronJob.make("daily", CronWindow.daily({ hourUtc: 17 }), ref, args))
+      .add(CronJob.make("weekly", weekly, ref, args))
+      .add(
+        CronJob.make(
+          "monthly",
+          CronWindow.monthly({ day: 1, hourUtc: 0 }),
+          ref,
+          args,
+        ),
+      )
+      .add(CronJob.make("explicit", Cron.parseUnsafe("23 17 * * *"), ref, args))
+      .add(CronJob.make("interval", Duration.hours(1), ref, args));
+    const expectedSchedules = {
+      hourly: { type: "hourly" },
+      daily: { type: "daily", hourUTC: 17 },
+      weekly: { type: "weekly", dayOfWeek: "monday", hourUTC: 9 },
+      monthly: { type: "monthly", day: 1, hourUTC: 0 },
+      explicit: { type: "cron", cron: "23 17 * * *" },
+      interval: { type: "interval", hours: 1 },
+    };
+    for (const [identifier, schedule] of RecordEffect.toEntries(
+      expectedSchedules,
+    )) {
+      const exported = jobs.convexCronJobs.crons[identifier]!;
+      expect(exported).toEqual({
+        name: "tasks/nested:count",
+        args: [{ count: "42" }],
+        schedule,
+      });
+      expect(exported.schedule).not.toHaveProperty("minuteUTC");
+      expect(exported.schedule).not.toHaveProperty("hourUtc");
+      expect(exported.schedule).not.toHaveProperty("_tag");
+    }
+    assert(Predicate.hasProperty(jobs.convexCronJobs, "export"));
+    assert(Predicate.isFunction(jobs.convexCronJobs.export));
+    expect(
+      Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(
+        jobs.convexCronJobs.export(),
+      ).pipe(Result.getOrThrow),
+    ).toEqual(jobs.convexCronJobs.crons);
+    expect(builds).toEqual({ args: 1, returns: 0, error: 0 });
+    expect(empty.cronJobs).toEqual({});
+    expect(empty.convexCronJobs.crons).toEqual({});
+    expect(RecordEffect.keys(hourly.cronJobs)).toEqual(["hourly"]);
+    expect(RecordEffect.keys(hourly.convexCronJobs.crons)).toEqual(["hourly"]);
+    expect(jobs.cronJobs.weekly!.schedule).toBe(weekly);
+    expect(weekly).toEqual({ _tag: "Weekly", dayOfWeek: "monday", hourUtc: 9 });
+    expect(options).toEqual({ dayOfWeek: "monday", hourUtc: 9 });
+    expect(args).toEqual({ count: 42 });
+  });
+
   test("adds a cron job and populates convexCronJobs", () => {
     const ref = makeMutationRef("sessions", "clearStale");
     const cron = Cron.make({

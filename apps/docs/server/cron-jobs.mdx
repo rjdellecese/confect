@@ -6,7 +6,7 @@ description: "Schedule recurring tasks with cron jobs."
 
 Define cron jobs in `confect/crons.ts` using `CronJob` and `CronJobs` from `@confect/server`. Each job has a unique identifier, a schedule, and a ref to an internal mutation or action.
 
-Schedules are either an Effect [`Cron`](https://effect.website/docs/scheduling/cron) (cron expression) or a [`Duration`](https://effect.website/docs/data-types/duration/) (fixed interval). The Confect CLI re-exports the result into `convex/crons.ts`.
+Schedules can be an Effect [`Cron`](https://effect.website/docs/scheduling/cron) (cron expression), a [`Duration`](https://effect.website/docs/data-types/duration/) (fixed interval), or a `CronWindow` (a recurring hour in which Convex chooses the minute). The Confect CLI re-exports the result into `convex/crons.ts`.
 
 <Note>
   `Cron` schedules must not use a custom `seconds` field—Convex cron expressions
@@ -68,6 +68,43 @@ export default CronJobs.make()
   );
 ```
 
-`CronJob.make` accepts a unique identifier, a schedule (`Cron` or `Duration`), a ref to an internal mutation or action, and an optional args object matching the ref's args schema. `CronJobs.make()` creates an empty collection; each `.add()` call returns a new `CronJobs` object, so calls can be chained.
+`CronJob.make` accepts a unique identifier, a schedule (`Cron`, `Duration`, or `CronWindow`), a ref to an internal mutation or action, and an optional args object matching the ref's args schema. `CronJobs.make()` creates an empty collection; each `.add()` call returns a new `CronJobs` object, so calls can be chained.
+
+## Let Convex choose the minute
+
+Maintenance work such as clearing stale sessions often needs to run regularly,
+but not at an exact minute. Convex chooses a minute within the hour to spread
+scheduled runs, rather than concentrating them at busy boundaries such as `:00`.
+This makes recurring work less likely to compete with your app's traffic and
+webhooks.
+
+Use `CronWindow` when any minute within a recurring UTC hour is acceptable.
+Use Effect `Cron` when you need a specific minute instead. For example, a reminder
+that can run anytime during the 17:00 UTC hour can use:
+
+```ts confect/crons.ts
+import { CronJob, CronJobs, CronWindow } from "@confect/server";
+import refs from "./_generated/refs";
+
+export default CronJobs.make().add(
+  CronJob.make(
+    "payment reminder",
+    CronWindow.daily({ hourUtc: 17 }),
+    refs.internal.payments.sendPaymentEmail,
+    { email: "billing@example.com" },
+  ),
+);
+```
+
+The constructors are `CronWindow.hourly()`, `CronWindow.daily({ hourUtc })`,
+`CronWindow.weekly({ dayOfWeek, hourUtc })`, and
+`CronWindow.monthly({ day, hourUtc })`. Use UTC hours from 0 to 23,
+lowercase weekdays such as `"monday"`, and days of the month from 1 to 31.
+Confect uses **`hourUtc`**, not Convex's `hourUTC`.
+
+Convex validates calendar fields when you add the job. See the
+[native supported schedules](https://docs.convex.dev/scheduling/cron-jobs#supported-schedules)
+for placement, cadence, and missing-day semantics. Confect does not guarantee
+that a deleted and recreated job retains its previously selected minute.
 
 For the full scheduling APIs, see the [Effect `Cron` documentation](https://effect.website/docs/scheduling/cron), the [Effect `Duration` documentation](https://effect.website/docs/data-types/duration/), and the [Convex cron jobs documentation](https://docs.convex.dev/scheduling/cron-jobs).

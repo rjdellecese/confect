@@ -12,6 +12,7 @@ import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import type * as CronJob from "./CronJob";
+import * as CronWindow from "./CronWindow";
 
 export const TypeId = "~@confect/server/CronJobs";
 export type TypeId = typeof TypeId;
@@ -53,6 +54,43 @@ const Proto = {
           durationToConvexIntervalSchedule(duration),
           functionReference,
           encodedArgs,
+        );
+      }),
+      Match.when(CronWindow.isCronWindow, (window) => {
+        Match.value(window).pipe(
+          Match.tag("Hourly", () => {
+            newConvexCrons.hourly(
+              cronJob.identifier,
+              {},
+              functionReference,
+              encodedArgs,
+            );
+          }),
+          Match.tag("Daily", ({ hourUtc }) => {
+            newConvexCrons.daily(
+              cronJob.identifier,
+              { hourUTC: hourUtc },
+              functionReference,
+              encodedArgs,
+            );
+          }),
+          Match.tag("Weekly", ({ dayOfWeek, hourUtc }) => {
+            newConvexCrons.weekly(
+              cronJob.identifier,
+              { dayOfWeek, hourUTC: hourUtc },
+              functionReference,
+              encodedArgs,
+            );
+          }),
+          Match.tag("Monthly", ({ day, hourUtc }) => {
+            newConvexCrons.monthly(
+              cronJob.identifier,
+              { day, hourUTC: hourUtc },
+              functionReference,
+              encodedArgs,
+            );
+          }),
+          Match.exhaustive,
         );
       }),
       Match.exhaustive,
