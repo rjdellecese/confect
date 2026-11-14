@@ -335,23 +335,28 @@ export const SaveDraft = FoldkitCommand.define("SaveDraft", {
 
 ## Query state in the Model
 
-Foldkit's [`AsyncData`](https://foldkit.dev/core/async-data) is the idiomatic
-Model representation for query state. Map errors to a view-ready schema type
-in your `onError` handler, then handle the result Messages with `Message.match`
-in `update`. This example replaces the earlier Model with a list-only Model:
+Use `Confect.QueryResult` to store a reactive query's current result in your
+Model. It has three states: `Loading`, `Success` with a `value`, and `Failure`
+with an `error`. Initialize an active query with `QueryResult.load()`, then
+replace its state as result Messages arrive. A later success can replace a
+failure without restarting the subscription.
+
+Map errors to a view-ready schema type in your `onError` handler, then handle
+the result Messages with `Message.match` in `update`. This example replaces the
+earlier Model with a list-only Model:
 
 ```ts src/model.ts
-import { AsyncData } from "foldkit";
+import { QueryResult } from "@confect/foldkit";
 import { defineMessageUnion } from "foldkit/message";
 import * as Schema from "effect/Schema";
 
 import { Note } from "./note";
 
-export const Notes = AsyncData.Schema(Schema.Array(Note), Schema.String);
+export const Notes = QueryResult.QueryResult(Schema.Array(Note), Schema.String);
 
-export const Model = Schema.Struct({ notes: Notes.schema });
+export const Model = Schema.Struct({ notes: Notes });
 export type Model = typeof Model.Type;
-export const initialModel = Model.make({ notes: Notes.Idle() });
+export const initialModel = Model.make({ notes: QueryResult.load() });
 
 export const Message = defineMessageUnion({
   SucceededGetNotes: { notes: Schema.Array(Note) },
@@ -361,10 +366,11 @@ export type Message = typeof Message.Type;
 ```
 
 ```ts src/update.ts
+import { QueryResult } from "@confect/foldkit";
 import type * as Update from "foldkit/update";
 import { modifyFields } from "foldkit/struct";
 
-import { Message, Model, Notes, initialModel } from "./model";
+import { Message, Model, initialModel } from "./model";
 
 export const init = (): Update.Return<Model, Message> => ({
   model: initialModel,
@@ -374,16 +380,43 @@ export const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
     SucceededGetNotes: ({ notes }) => ({
       model: modifyFields(model, {
-        notes: () => Notes.Success({ data: notes }),
+        notes: () => QueryResult.succeed(notes),
       }),
     }),
     FailedGetNotes: ({ message: errorMessage }) => ({
       model: modifyFields(model, {
-        notes: () => Notes.Failure({ error: errorMessage }),
+        notes: () => QueryResult.fail(errorMessage),
       }),
     }),
   });
 ```
+
+Use `QueryResult.match` to handle each state, or narrow with
+`QueryResult.isLoading`, `QueryResult.isSuccess`, and `QueryResult.isFailure`:
+
+```ts
+QueryResult.match(model.notes, {
+  onLoading: () => "Loading notes…",
+  onSuccess: (notes) => `${notes.length} notes`,
+  onFailure: (error) => error,
+});
+```
+
+Results also support `.pipe(...)` and Effect's `Equal` and `Hash` protocols.
+Equality compares the variant and its payload using Effect's equality rules.
+The `QueryResult.QueryResult` schema restores these capabilities when decoding
+a saved Model.
+
+The error schema is optional and defaults to `Schema.Never`:
+`QueryResult.QueryResult(Schema.Array(Note))` models results whose failures
+are handled outside this Model field. Supply an error schema when storing
+`onError` Messages, as in the example above.
+
+`QueryResult` does not track whether a subscription is enabled. Keep that
+decision in the Model fields used by the subscription's `args` extractor.
+Returning `None` closes the subscription without changing its stored result.
+When switching arguments, set the result to `QueryResult.load()` if the UI
+should wait for the new query rather than retain the previous result.
 
 ## Paginated queries
 
