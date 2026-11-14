@@ -48,5 +48,5 @@ export const api: {
 export const internal: {} = anyApi as any;
 
 export const components = componentsGeneric() as unknown as {
-  child: import("../../components/counter/convex/_generated/component.js").ComponentApi<"child">;
+  child: import("../../../counter/convex/_generated/component.js").ComponentApi<"child">;
 };
