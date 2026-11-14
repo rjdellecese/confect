@@ -38,7 +38,7 @@ minimumReleaseAgeExclude:
   - tsrs@0.21.0-ts7.1.0-beta
 
 overrides:
-  convex: 1.49.0
+  convex: 1.50.0
   effect: 4.1.0
   react: 19.3.1
   react-dom: 19.3.1
