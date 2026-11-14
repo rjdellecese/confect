@@ -72,7 +72,15 @@ export default CronJobs.make()
 
 ## Let Convex choose the minute
 
-Use `CronWindow` when a job can run at any minute within a recurring UTC hour:
+Maintenance work such as clearing stale sessions often needs to run regularly,
+but not at an exact minute. Scheduling every job on familiar boundaries such as
+the top of the hour or midnight concentrates that work at already-busy times.
+Letting Convex choose the minute helps spread scheduled load across the hour,
+making recurring work less likely to compete with your app's traffic and webhooks.
+
+Use `CronWindow` when any minute within a recurring UTC hour is acceptable.
+Use Effect `Cron` when you need a specific minute instead. For example, a reminder
+that can run anytime during the 17:00 UTC hour can use:
 
 ```ts confect/crons.ts
 import { CronJob, CronJobs, CronWindow } from "@confect/server";
@@ -102,8 +110,7 @@ Convex export.
 These constructors omit the minute rather than choosing one in your application.
 For example, `daily({ hourUtc: 17 })` delegates placement within 17:00–18:00 UTC.
 An Effect Cron with an unrestricted minute runs every minute instead; a Duration
-is an interval, not a calendar window. Use Effect Cron when you need an explicit
-minute. `CronWindow` has no local-time-zone option.
+is an interval, not a calendar window. `CronWindow` has no local-time-zone option.
 
 Convex validates calendar fields when you add the job. See the
 [native supported schedules](https://docs.convex.dev/scheduling/cron-jobs#supported-schedules)
