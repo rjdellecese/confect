@@ -74,6 +74,11 @@ export type TestConfectWithoutIdentity<
 };
 
 export type TestConfect<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> = {
+  registerComponent: (
+    componentPath: string,
+    schema: SchemaDefinition<GenericSchema, boolean>,
+    modules: Record<string, () => Promise<any>>,
+  ) => Effect.Effect<void>;
   withIdentity: (
     userIdentity: Partial<UserIdentity>,
   ) => TestConfectWithoutIdentity<DatabaseSchema_>;
@@ -228,6 +233,13 @@ class TestConfectImpl<
       this.testConvex.withIdentity(userIdentity),
     );
 
+  readonly registerComponent: TestConfect<DatabaseSchema_>["registerComponent"] =
+    Effect.fn("TestConfect.registerComponent")(
+      (componentPath, schema, modules) =>
+        Effect.sync(() =>
+          this.testConvex.registerComponent(componentPath, schema, modules),
+        ),
+    );
   readonly jwks = () => this.testConfectImplWithoutIdentity.jwks();
 
   readonly query = <QueryRef extends Ref.AnyQuery>(

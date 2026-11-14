@@ -1,18 +1,22 @@
 import {
-  type GenericActionCtx,
   type HttpRouter as ConvexHttpRouter,
   httpActionGeneric,
   httpRouter,
   ROUTABLE_HTTP_METHODS,
   type RouteSpecWithPathPrefix,
+  type GenericActionCtx,
+  type GenericDataModel,
 } from "convex/server";
 import * as Array from "effect/Array";
+import * as Config from "effect/Config";
 import * as Console from "effect/Console";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Match from "effect/Match";
 import type * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
 import type * as Etag from "effect/http/Etag";
 import type * as HttpPlatform from "effect/http/HttpPlatform";
 import * as HttpRouter from "effect/http/HttpRouter";
@@ -21,6 +25,7 @@ import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
+import type * as Handler from "./Handler";
 import type { ExecutionMetadata } from "./ExecutionMetadata";
 import type { RequestMetadata } from "./RequestMetadata";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
@@ -29,10 +34,10 @@ import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as Scheduler from "./Scheduler";
-import type { Storage } from "./Storage";
-import type { StorageActionWriter } from "./StorageActionWriter";
-import type { StorageReader } from "./StorageReader";
-import type { StorageWriter } from "./StorageWriter";
+import type * as Storage from "./Storage";
+import type * as StorageActionWriter from "./StorageActionWriter";
+import type * as StorageReader from "./StorageReader";
+import type * as StorageWriter from "./StorageWriter";
 import type * as VectorSearch from "./VectorSearch";
 
 /**
@@ -43,14 +48,14 @@ export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
-  | Scheduler.Scheduler
-  | Auth.Auth
+  | Scheduler.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | ExecutionMetadata
   | RequestMetadata
-  | Storage
-  | StorageReader
-  | StorageWriter
-  | StorageActionWriter
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageActionWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>;
 
 /**
@@ -75,19 +80,21 @@ export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  * variables.
  */
 export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
-  Layer.Layer<
-    never,
-    never,
-    | HttpRouter.HttpRouter
-    | Etag.Generator
-    | FileSystem.FileSystem
-    | HttpPlatform.HttpPlatform
-    | Path.Path
-    | HttpRouter.Request<"Requires", Services<DatabaseSchema_>>
-    | HttpRouter.Request<"GlobalRequires", Services<DatabaseSchema_>>
-    | HttpRouter.Request<"Error", any>
-    | HttpRouter.Request<"GlobalError", any>
-  >;
+  RoutesWithServices<Services<DatabaseSchema_>>;
+
+type RoutesWithServices<Services_> = Layer.Layer<
+  never,
+  never,
+  | HttpRouter.HttpRouter
+  | Etag.Generator
+  | FileSystem.FileSystem
+  | HttpPlatform.HttpPlatform
+  | Path.Path
+  | HttpRouter.Request<"Requires", Services_>
+  | HttpRouter.Request<"GlobalRequires", Services_>
+  | HttpRouter.Request<"Error", any>
+  | HttpRouter.Request<"GlobalError", any>
+>;
 
 /**
  * Create a Convex HTTP router from a runtime database schema and routes, with
@@ -105,6 +112,52 @@ export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,
   routes: Routes<NoInfer<DatabaseSchema_>>,
+): ConvexHttpRouter => forSchema(databaseSchema)(routes);
+
+/**
+ * Derive HTTP capabilities and ID scopes from the generated database schema.
+ * Component routes are relative to their installation's HTTP mount prefix.
+ */
+export const forSchema =
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    schema: DatabaseSchema_,
+  ) =>
+  (
+    routes: RoutesWithServices<Handler.ActionServices<DatabaseSchema_>>,
+  ): ConvexHttpRouter =>
+    makeWithLayer<
+      Handler.ActionServices<DatabaseSchema_>,
+      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
+    >(
+      Match.value(schema.target.kind).pipe(
+        Match.when("app", () => routes),
+        Match.when("component", () =>
+          routes.pipe(Layer.provide(componentRouter)),
+        ),
+        Match.exhaustive,
+      ),
+      (ctx) => RegisteredFunction.actionLayer(schema, ctx),
+    );
+
+// Convex uses a component-relative path to select its HTTP action but passes
+// the original request URL to that action. Its CONVEX_SITE_URL includes the
+// installation's full mount prefix (including parent mounts). Prefixing the
+// Effect router preserves relative routes without rewriting the Request body.
+const componentRouter = Layer.effect(
+  HttpRouter.HttpRouter,
+  Effect.gen(function* () {
+    const router = yield* HttpRouter.HttpRouter;
+    const siteUrl = yield* Config.schema(
+      Schema.URLFromString,
+      "CONVEX_SITE_URL",
+    );
+    return router.prefixed(siteUrl.pathname);
+  }).pipe(Effect.orDie),
+);
+
+const makeWithLayer = <Services_, DataModel_ extends GenericDataModel>(
+  routes: RoutesWithServices<Services_>,
+  layer: (ctx: GenericActionCtx<DataModel_>) => Layer.Layer<Services_>,
 ): ConvexHttpRouter => {
   applyMonkeyPatches();
 
@@ -128,14 +181,13 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
-    const services = RegisteredFunction.actionLayer(
-      databaseSchema,
-      ctx as unknown as GenericActionCtx<
-        DataModel.ToConvexDataModel<
-          DataModel.FromDatabaseSchema<DatabaseSchema_>
-        >
-      >,
-    ).pipe(Layer.build, Effect.scoped, Effect.runSync);
+    // Convex's HTTP registration erases the data model. The supplied generated
+    // schema restores it; this does not change the runtime context or services.
+    const services = layer(ctx as unknown as GenericActionCtx<DataModel_>).pipe(
+      Layer.build,
+      Effect.scoped,
+      Effect.runSync,
+    );
     return handler(
       request,
       Context.add(services, Console.Console, globalThis.console),

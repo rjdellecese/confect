@@ -8,9 +8,48 @@ import type {
 } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as IdScope from "@confect/core/IdScope";
+import * as Context from "effect/Context";
+import * as Option from "effect/Option";
 import { vi } from "vitest";
 
 describe("MutationAuth", () => {
+  it.effect("provides signing only for application targets", () => {
+    const signJwt = vi
+      .fn<ConvexMutationAuth["signJwt"]>()
+      .mockResolvedValue("signed");
+    const app = MutationAuth.layerForTarget(
+      { kind: "app", scope: IdScope.app },
+      { signJwt },
+    );
+    const component = MutationAuth.layerForTarget(
+      { kind: "component", scope: IdScope.component("counter") },
+      { signJwt },
+    );
+    expectTypeOf(app).toEqualTypeOf<Layer.Layer<MutationAuth.MutationAuth>>();
+    expectTypeOf(component).toEqualTypeOf<Layer.Layer<never>>();
+    return Effect.gen(function* () {
+      const componentServices = yield* Layer.build(component);
+      expect(
+        Option.isNone(
+          Context.getOption(componentServices, MutationAuth.MutationAuth),
+        ),
+      ).toBe(true);
+      expect(signJwt).not.toHaveBeenCalled();
+      const appServices = yield* Layer.build(app);
+      const auth = Context.get(appServices, MutationAuth.MutationAuth);
+      const signed = yield* auth.signJwt({
+        claims: { aud: "component-boundary-test" },
+        expiresInSeconds: 60,
+      });
+      expect(signed).toBe("signed");
+      expect(signJwt).toHaveBeenCalledExactlyOnceWith({
+        claims: { aud: "component-boundary-test" },
+        expiresInSeconds: 60,
+      });
+    }).pipe(Effect.scoped);
+  });
+
   it("exports the service and retains native claim restrictions", () => {
     expect(BarrelMutationAuth.MutationAuth).toBe(MutationAuth.MutationAuth);
     expectTypeOf<MutationAuth.SignJwtOptions>().toEqualTypeOf<SignJwtOptions>();

@@ -36,9 +36,12 @@ export interface DatabaseWriterTableAccessor<
 > {
   readonly insert: (
     document: Document.WithoutSystemFields<Doc>,
-  ) => Effect.Effect<GenericId<TableName>, Document.DocumentEncodeError>;
+  ) => Effect.Effect<
+    DataModel.Id<DataModel_, TableName>,
+    Document.DocumentEncodeError
+  >;
   readonly patch: (
-    id: GenericId<TableName>,
+    id: DataModel.Id<DataModel_, TableName>,
     patchedValues: PatchValue<Doc>,
   ) => Effect.Effect<
     void,
@@ -47,10 +50,12 @@ export interface DatabaseWriterTableAccessor<
     | Document.DocumentEncodeError
   >;
   readonly replace: (
-    id: GenericId<TableName>,
+    id: DataModel.Id<DataModel_, TableName>,
     value: Document.WithoutSystemFields<Doc>,
   ) => Effect.Effect<void, Document.DocumentEncodeError>;
-  readonly delete: (id: GenericId<TableName>) => Effect.Effect<void>;
+  readonly delete: (
+    id: DataModel.Id<DataModel_, TableName>,
+  ) => Effect.Effect<void>;
 }
 
 /**
@@ -124,11 +129,13 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         ),
       );
 
-      return id;
+      // The database supplies the ID in this table's execution scope. Its
+      // scope brand is erased at the Convex syscall boundary.
+      return id as unknown as DataModel.Id<DataModel_, TableName>;
     });
 
     const patch = Effect.fn("DatabaseWriter.patch")(function* (
-      id: GenericId<TableName>,
+      id: DataModel.Id<DataModel_, TableName>,
       patchedValues: PatchValue<DocumentByName_<DataModel_, TableName>>,
     ) {
       const originalDecodedDoc = yield* QueryInitializer.getById<
@@ -137,7 +144,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       >(
         convexDatabaseWriter as any,
         tableDef,
-      )(id);
+      )(id as unknown as GenericId<TableName>);
 
       const updatedEncodedDoc = yield* pipe(
         patchedValues,
@@ -151,7 +158,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
       yield* Effect.promise(() =>
         convexDatabaseWriter.replace(
-          id,
+          id as unknown as GenericId<TableName>,
           updatedEncodedDoc as Expand<
             BetterOmit<
               DocumentByName<
@@ -166,7 +173,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     });
 
     const replace = Effect.fn("DatabaseWriter.replace")(function* (
-      id: GenericId<TableName>,
+      id: DataModel.Id<DataModel_, TableName>,
       value: Document.WithoutSystemFields<
         DocumentByName_<DataModel_, TableName>
       >,
@@ -175,7 +182,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
       yield* Effect.promise(() =>
         convexDatabaseWriter.replace(
-          id,
+          id as unknown as GenericId<TableName>,
           updatedEncodedDoc as Expand<
             BetterOmit<
               DocumentByName<
@@ -189,8 +196,10 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       );
     });
 
-    const delete_ = (id: GenericId<TableName>) =>
-      Effect.promise(() => convexDatabaseWriter.delete(id));
+    const delete_ = (id: DataModel.Id<DataModel_, TableName>) =>
+      Effect.promise(() =>
+        convexDatabaseWriter.delete(id as unknown as GenericId<TableName>),
+      );
 
     return {
       insert,

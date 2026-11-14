@@ -3,6 +3,7 @@ import {
   GroupImpl,
   MiddlewareImpl,
   RegisteredFunctions,
+  DatabaseSchema,
 } from "@confect/server";
 import type * as DatabaseReaderModule from "@confect/server/DatabaseReader";
 import type * as DatabaseWriterModule from "@confect/server/DatabaseWriter";
@@ -18,7 +19,14 @@ import * as Storage from "@confect/server/Storage";
 import type { StorageWriter } from "@confect/server/StorageWriter";
 import type { StorageActionWriter } from "@confect/server/StorageActionWriter";
 import type { GenericId } from "convex/values";
-import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
+import {
+  FunctionSpec,
+  GroupSpec,
+  MiddlewareSpec,
+  IdScope,
+} from "@confect/core";
+import type * as ScopedStorageActionWriter from "@confect/server/StorageActionWriter";
+import type * as Auth from "@confect/server/Auth";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -48,6 +56,41 @@ type HandlerFor<Group extends GroupSpec.AnyWithProps> = Handler.WithName<
 >;
 
 describe("implementation options", () => {
+  it("keeps shared middleware capabilities scoped to their component", () => {
+    const scope = IdScope.component("middleware-storage");
+    const schema = DatabaseSchema.make({}, { kind: "component", scope });
+    type MutationAction = MiddlewareImpl.CommonServices<
+      typeof schema,
+      "mutation" | "action"
+    >;
+    type QueryMutation = MiddlewareImpl.CommonServices<
+      typeof schema,
+      "query" | "mutation"
+    >;
+    type All = MiddlewareImpl.CommonServices<
+      typeof schema,
+      "query" | "mutation" | "action"
+    >;
+    expectTypeOf<
+      ScopedStorageActionWriter.ForScope<typeof scope>
+    >().toExtend<MutationAction>();
+    expectTypeOf<
+      ScopedStorageActionWriter.ForScope<typeof scope>
+    >().not.toExtend<QueryMutation | All>();
+    expectTypeOf<
+      Auth.Auth | Storage.Storage | StorageWriter | StorageActionWriter
+    >().not.toExtend<MutationAction | QueryMutation | All>();
+    expectTypeOf<
+      Extract<
+        MutationAction | QueryMutation | All,
+        Auth.Auth | Storage.Storage | StorageWriter | StorageActionWriter
+      >
+    >().toEqualTypeOf<never>();
+    expectTypeOf<Storage.ForScope<typeof scope>>().toExtend<MutationAction>();
+    expectTypeOf<Storage.ForScope<typeof scope>>().toExtend<QueryMutation>();
+    expectTypeOf<Storage.ForScope<typeof scope>>().toExtend<All>();
+  });
+
   class GroupPolicy extends MiddlewareSpec.MiddlewareSpec<GroupPolicy>()(
     "GroupPolicy",
     {

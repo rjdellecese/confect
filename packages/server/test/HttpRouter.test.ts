@@ -1,4 +1,9 @@
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
+import type { GenericId as ConfectId } from "@confect/core";
+import { IdScope } from "@confect/core";
+import * as Auth from "@confect/server/Auth";
+import type * as StorageReader from "@confect/server/StorageReader";
+import type * as Scheduler from "@confect/server/Scheduler";
 import type * as DataModel from "@confect/server/DataModel";
 import type * as ActionCtx from "@confect/server/ActionCtx";
 import * as ConfectHttpRouter from "@confect/server/HttpRouter";
@@ -106,6 +111,56 @@ describe("HttpRouter", () => {
     >();
     ConfectHttpRouter.make(otherSchema, routes);
     ConfectHttpRouter.make(schema, routes);
+  });
+
+  it("preserves component vector IDs and excludes application services", () => {
+    const scope = IdScope.component("@example/search");
+    const componentSchema = DatabaseSchema.make(
+      {
+        documents: Table.make(() =>
+          Schema.Struct({ embedding: Schema.Array(Schema.Finite) }),
+        ).vectorIndex("embedding", {
+          vectorField: "embedding",
+          dimensions: 2,
+        })("documents", scope),
+      },
+      { kind: "component", scope },
+    );
+    type ComponentModel = DataModel.FromDatabaseSchema<typeof componentSchema>;
+    type Services = ConfectHttpRouter.Services<typeof componentSchema>;
+    expectTypeOf<Auth.Auth>().not.toExtend<Services>();
+    expectTypeOf<StorageReader.StorageReader>().not.toExtend<Services>();
+    expectTypeOf<Scheduler.Scheduler>().not.toExtend<Services>();
+    expectTypeOf<StorageReader.ForScope<typeof scope>>().toExtend<Services>();
+    expectTypeOf<Scheduler.ForScope<typeof scope>>().toExtend<Services>();
+    const routes = HttpRouter.add(
+      "GET",
+      "/search",
+      Effect.gen(function* () {
+        const search = yield* VectorSearch.VectorSearch<ComponentModel>();
+        const matches = yield* search("documents", "embedding", {
+          vector: [1, 0],
+          limit: 10,
+        });
+        expectTypeOf<(typeof matches)[number]["_id"]>().toEqualTypeOf<
+          ConfectId.GenericId<"documents", typeof scope>
+        >();
+        return yield* HttpServerResponse.json(matches);
+      }),
+    );
+    expectTypeOf<typeof routes>().not.toExtend<
+      ConfectHttpRouter.Routes<typeof schema>
+    >();
+    ConfectHttpRouter.make(componentSchema, routes);
+    ConfectHttpRouter.forSchema(componentSchema)(routes);
+    const authenticated = HttpRouter.add(
+      "GET",
+      "/auth",
+      Auth.Auth.pipe(Effect.as(HttpServerResponse.text("unexpected"))),
+    );
+    expectTypeOf<typeof authenticated>().not.toExtend<
+      ConfectHttpRouter.Routes<typeof componentSchema>
+    >();
   });
 
   it("keeps non-HTTP capabilities unavailable with a schema", () => {

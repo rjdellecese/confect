@@ -1,5 +1,6 @@
 import type { GenericDatabaseReader } from "convex/server";
-import type { GenericId } from "convex/values";
+import type { GenericId } from "@confect/core/GenericId";
+import type * as IdScope from "@confect/core/IdScope";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -10,10 +11,10 @@ import type * as DataModel from "./DataModel";
 import * as DatabaseSchema from "./DatabaseSchema";
 import * as Table from "./Table";
 
-type IdentifiedId<TableName extends string> = {
+type IdentifiedId<TableName extends string, Scope extends IdScope.IdScope> = {
   readonly [Name in TableName]: {
     readonly table: Name;
-    readonly id: GenericId<Name>;
+    readonly id: GenericId<Name, Scope>;
   };
 }[TableName];
 
@@ -25,11 +26,18 @@ export interface DocumentIds<
   >(
     table: Name,
     input: string,
-  ) => Effect.Effect<Option.Option<GenericId<Name>>>;
+  ) => Effect.Effect<
+    Option.Option<GenericId<Name, DatabaseSchema.Scope<DatabaseSchema_>>>
+  >;
   readonly identify: (
     input: string,
   ) => Effect.Effect<
-    Option.Option<IdentifiedId<DatabaseSchema.AllTableNames<DatabaseSchema_>>>
+    Option.Option<
+      IdentifiedId<
+        DatabaseSchema.AllTableNames<DatabaseSchema_>,
+        DatabaseSchema.Scope<DatabaseSchema_>
+      >
+    >
   >;
 }
 
@@ -53,8 +61,8 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   >(
     table: Name,
     input: string,
-  ): GenericId<Name> | null =>
-    (Record.has<string, unknown>(Table.systemTables, table)
+  ): string | null =>
+    Record.has<string, unknown>(Table.systemTables, table)
       ? reader.system.normalizeId(
           table as DatabaseSchema.SystemTableNames,
           input,
@@ -62,7 +70,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       : reader.normalizeId(
           table as DatabaseSchema.TableNames<DatabaseSchema_>,
           input,
-        )) as GenericId<Name> | null;
+        );
 
   return {
     parse: Effect.fn("DocumentIds.parse")(
@@ -72,7 +80,11 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       ) =>
         Effect.sync(() => {
           const id = normalize(table, input);
-          return id === input ? Option.some(id) : Option.none();
+          return id === input
+            ? Option.some(
+                id as GenericId<Name, DatabaseSchema.Scope<DatabaseSchema_>>,
+              )
+            : Option.none();
         }),
     ),
     identify: Effect.fn("DocumentIds.identify")((input: string) =>
@@ -85,7 +97,8 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
           const id = normalize(table, input);
           if (id === input) {
             return Option.some({ table, id } as IdentifiedId<
-              DatabaseSchema.AllTableNames<DatabaseSchema_>
+              DatabaseSchema.AllTableNames<DatabaseSchema_>,
+              DatabaseSchema.Scope<DatabaseSchema_>
             >);
           }
         }
