@@ -196,6 +196,61 @@ describe("QueryResult schema", () => {
     >();
   });
 
+  it.effect("defaults the error schema to Never", () =>
+    Effect.gen(function* () {
+      const withoutErrors = QueryResult.QueryResult(Schema.FiniteFromString);
+      const withUndefined = QueryResult.QueryResult(
+        Schema.FiniteFromString,
+        undefined,
+      );
+      expectTypeOf<typeof withoutErrors.Type>().toEqualTypeOf<
+        QueryResult.QueryResult<number>
+      >();
+      expectTypeOf<typeof withUndefined.Type>().toEqualTypeOf<
+        typeof withoutErrors.Type
+      >();
+      expectTypeOf<typeof withoutErrors.Encoded>().toEqualTypeOf<
+        | { readonly _tag: "Loading" }
+        | { readonly _tag: "Success"; readonly value: string }
+        | { readonly _tag: "Failure"; readonly error: never }
+      >();
+      expectTypeOf<
+        typeof withoutErrors.DecodingServices
+      >().toEqualTypeOf<never>();
+      expectTypeOf<
+        typeof withoutErrors.EncodingServices
+      >().toEqualTypeOf<never>();
+      for (const defaulted of [withoutErrors, withUndefined]) {
+        const codec = Schema.toCodecJson(defaulted);
+        for (const result of [QueryResult.load(), QueryResult.succeed(42)]) {
+          const encoded = yield* Schema.encodeEffect(codec)(result);
+          const decoded = yield* Schema.decodeEffect(codec)(encoded);
+          expect(Equal.equals(decoded, result)).toBe(true);
+          expect(decoded.pipe(QueryResult.isQueryResult)).toBe(true);
+        }
+        expect(
+          Result.isFailure(
+            Schema.decodeUnknownResult(defaulted)({
+              _tag: "Failure",
+              error: "denied",
+            }),
+          ),
+        ).toBe(true);
+        expect(
+          Result.isFailure(
+            Schema.decodeUnknownResult(defaulted)({
+              _tag: "Failure",
+              error: undefined,
+            }),
+          ),
+        ).toBe(true);
+        expect(
+          Schema.is(Schema.toType(defaulted))(QueryResult.fail("denied")),
+        ).toBe(false);
+      }
+    }),
+  );
+
   it.effect(
     "round-trips all states through a Model's JSON representation",
     () =>
@@ -290,6 +345,13 @@ describe("QueryResult schema", () => {
         }),
       );
       const withServices = QueryResult.QueryResult(payload, payload);
+      const defaultedError = QueryResult.QueryResult(payload);
+      expectTypeOf<
+        typeof defaultedError.DecodingServices
+      >().toEqualTypeOf<DecodeOffset>();
+      expectTypeOf<
+        typeof defaultedError.EncodingServices
+      >().toEqualTypeOf<EncodeOffset>();
       expectTypeOf<
         typeof withServices.DecodingServices
       >().toEqualTypeOf<DecodeOffset>();

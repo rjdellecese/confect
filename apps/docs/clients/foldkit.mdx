@@ -407,6 +407,11 @@ Equality compares the variant and its payload using Effect's equality rules.
 The `QueryResult.QueryResult` schema restores these capabilities when decoding
 a saved Model.
 
+The error schema is optional and defaults to `Schema.Never`:
+`QueryResult.QueryResult(Schema.Array(Note))` models results whose failures
+are handled outside this Model field. Supply an error schema when storing
+`onError` Messages, as in the example above.
+
 `QueryResult` does not track whether a subscription is enabled. Keep that
 decision in the Model fields used by the subscription's `args` extractor.
 Returning `None` closes the subscription without changing its stored result.

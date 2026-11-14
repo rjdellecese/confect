@@ -122,10 +122,20 @@ export const fail = <E>(error: E): Failure<E> =>
 /**
  * Builds a Model field schema, preserving the supplied value and error codecs.
  * Encodes tagged records and restores piping, equality, and hashing on decode.
+ * The error schema defaults to `Schema.Never` when omitted.
  */
-export const QueryResult = <A, AI, E, EI, RD, RE, ERD, ERE>(
+export const QueryResult = <
+  A,
+  AI,
+  E = never,
+  EI = never,
+  RD = never,
+  RE = never,
+  ERD = never,
+  ERE = never,
+>(
   valueSchema: Schema.Codec<A, AI, RD, RE>,
-  errorSchema: Schema.Codec<E, EI, ERD, ERE>,
+  errorSchema: Schema.Codec<E, EI, ERD, ERE> = Schema.Never,
 ) => {
   const encoded = Schema.TaggedUnion({
     Loading: {},
