@@ -74,9 +74,10 @@ export type QueryStreamKeyValues = typeof QueryStreamKeyValues.Type;
  *
  * @experimental
  */
-export const ValueOrder: Order_.Order<KeyValue> = Order_.make(
-  (self, that) => Math.sign(compareValues(self, that)) as -1 | 0 | 1,
-);
+export const ValueOrder: Order_.Order<KeyValue> = (self, that) => {
+  const ordering = compareValues(self, that);
+  return ordering < 0 ? -1 : ordering > 0 ? 1 : 0;
+};
 
 const AscendingOrder = Order_.Array(ValueOrder);
 const DescendingOrder = Order_.flip(AscendingOrder);

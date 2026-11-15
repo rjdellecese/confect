@@ -74,6 +74,47 @@ describe("QueryStreamKeyValues", () => {
     }
   });
 
+  it.each([
+    [-0, 0, -1],
+    [0, -0, 1],
+  ] as const)(
+    "distinguishes signed zeros in native order (case %#)",
+    (left, right, expected) => {
+      expect(compareValues(left, right)).toBe(expected);
+      expect(QueryStreamKeyValues.ValueOrder(left, right)).toBe(expected);
+    },
+  );
+
+  it("normalizes native comparison magnitudes", () => {
+    expect(compareValues("a", "c")).toBeLessThan(-1);
+    expect(QueryStreamKeyValues.ValueOrder("a", "c")).toBe(-1);
+    expect(QueryStreamKeyValues.ValueOrder("c", "a")).toBe(1);
+  });
+
+  it.each(["asc", "desc"] as const)(
+    "preserves signed-zero ordering through key arrays in %s order",
+    (direction) => {
+      const negative: QueryStreamKeyValues.QueryStreamKeyValues = [
+        "prefix",
+        -0,
+        "z",
+      ];
+      const positive: QueryStreamKeyValues.QueryStreamKeyValues = [
+        "prefix",
+        0,
+        "a",
+      ];
+      const order = QueryStreamKeyValues.Order(direction);
+      expect(order(negative, positive)).toBe(direction === "asc" ? -1 : 1);
+      expect(order(positive, negative)).toBe(direction === "asc" ? 1 : -1);
+      expect(order(negative, negative)).toBe(0);
+      expect(order(negative, ["prefix", -0, "z"])).toBe(0);
+      expect(order(positive, ["prefix", 0, "a"])).toBe(0);
+      expect(negative).toEqual(["prefix", -0, "z"]);
+      expect(positive).toEqual(["prefix", 0, "a"]);
+    },
+  );
+
   it("requires a direction and compares keys lexicographically", () => {
     expectTypeOf(QueryStreamKeyValues.Order).parameters.toEqualTypeOf<
       [orderDirection: "asc" | "desc"]
