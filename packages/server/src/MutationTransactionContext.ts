@@ -9,8 +9,18 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type { Options as MutationOptions } from "./QueryTransactionContext";
 
+/**
+ * Convex's resource limits for an individual nested transaction call.
+ */
 export type { TransactionLimits } from "convex/server";
+/**
+ * Transaction-limit options accepted by a nested mutation.
+ */
 export type { Options as MutationOptions } from "./QueryTransactionContext";
+/**
+ * Nested-query options including transactionLimits and useStaleSnapshot.
+ * Providing useStaleSnapshot, even false, requires a mutation context.
+ */
 export type QueryOptions = AdvancedRunQueryOptions;
 
 const make = (

@@ -238,7 +238,10 @@ type ApplySystemFields<TableName extends string, S> =
       : never;
 
 /**
- * Extend a table schema with Convex system fields at the type level.
+ * The codec type exposed by a bound table's `Doc`: the table schema extended
+ * with an `_id` branded for `TableName` and numeric `_creationTime` in
+ * milliseconds since the Unix epoch. Both decoded and encoded documents include
+ * those fields.
  *
  * This mirrors the runtime {@link extendWithSystemFields}: a `Struct` gains the
  * system fields directly (matching `Schema.fieldsAssign`), and a `Union` has
@@ -265,11 +268,10 @@ export type ExtendWithSystemFields<
     : ApplySystemFields<TableName, TableSchema>;
 
 /**
- * The decoded/encoded document shape: a table's fields plus Convex's system
- * fields. Deliberately a bare intersection (no `Expand`/`Simplify`)—flattening
- * it with a homomorphic mapped type collapses to `{ [x: string]: any }` when
- * `Document` is still an unresolved generic, which breaks structural
- * comparability in the database reader/writer plumbing.
+ * A document value with the table's fields plus Convex's system fields.
+ * `TableName` brands the `_id` string for that table; `_creationTime` is a
+ * number of milliseconds since the Unix epoch. Apply the type to either a
+ * decoded or encoded document shape. Union members retain their own fields.
  */
 export type WithSystemFields<
   TableName extends string,

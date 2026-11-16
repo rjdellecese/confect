@@ -12,15 +12,31 @@ export const TypeId = "~@confect/server/CronJob";
  */
 export type TypeId = typeof TypeId;
 
+/**
+ * Recurring invocation description created by {@link make}. Add it to a CronJobs
+ * collection to encode arguments and validate the schedule.
+ */
 export interface CronJob {
   /**
    * @internal
    */
   readonly [TypeId]: TypeId;
 
+  /**
+   * Unique job identifier within the cron collection.
+   */
   readonly identifier: string;
+  /**
+   * UTC cron expression, fixed interval or recurring hour window.
+   */
   readonly schedule: Cron.Cron | Duration.Duration | CronWindow.CronWindow;
+  /**
+   * Mutation or action to invoke; prefer an internal ref for scheduled work.
+   */
   readonly ref: Ref.AnyMutation | Ref.AnyAction;
+  /**
+   * Decoded invocation arguments, encoded when added to the collection.
+   */
   readonly args: Record<string, unknown>;
 }
 
@@ -47,6 +63,17 @@ const makeProto = (
     args,
   });
 
+/**
+ * Describe a recurring mutation or action without registering it yet.
+ *
+ * @param identifier - Unique name within the CronJobs collection.
+ * @param schedule - UTC Cron, positive whole-unit Duration or CronWindow.
+ * @param ref - Generated mutation/action ref; internal refs are recommended.
+ * @param args - Decoded arguments, optional for an argument-free ref.
+ *
+ * @returns A job description. CronJobs.add performs argument encoding and
+ *   schedule validation, not this constructor.
+ */
 export const make = <R extends Ref.AnyMutation | Ref.AnyAction>(
   identifier: string,
   schedule: Cron.Cron | Duration.Duration | CronWindow.CronWindow,

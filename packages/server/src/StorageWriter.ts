@@ -8,6 +8,10 @@ import * as Schema from "effect/Schema";
 import { BlobNotFoundError } from "./BlobNotFoundError";
 
 const make = (storageWriter: ConvexStorageWriter) => ({
+  /**
+   * Effect producing a temporary upload URL in mutations, actions and HTTP
+   * handlers. Native failures and invalid URL decoding are defects.
+   */
   generateUploadUrl: Effect.promise(() =>
     storageWriter.generateUploadUrl(),
   ).pipe(
@@ -19,6 +23,14 @@ const make = (storageWriter: ConvexStorageWriter) => ({
       ),
     ),
   ),
+  /**
+   * Delete a blob in a writable storage context.
+   *
+   * @param storageId - ID of the stored blob.
+   *
+   * @returns An Effect producing void; native rejection becomes
+   *   BlobNotFoundError.
+   */
   delete: (storageId: GenericId<"_storage">) =>
     Effect.tryPromise({
       try: () => storageWriter.delete(storageId),
@@ -26,6 +38,10 @@ const make = (storageWriter: ConvexStorageWriter) => ({
     }),
 });
 
+/**
+ * Compatibility upload/delete service supplied in mutations, actions and HTTP
+ * handlers. New code should use the generated unified `Storage` tag instead.
+ */
 export class StorageWriter extends Context.Service<
   StorageWriter,
   ReturnType<typeof make>

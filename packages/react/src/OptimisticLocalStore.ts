@@ -19,18 +19,56 @@ import type {
  * Its methods accept Confect query `Ref`s and operate on decoded (Effect
  * Schema) values rather than the encoded values stored by Convex. Query values
  * are wrapped in `Option`: `Option.none()` represents a query that is not
- * present in the store, and `Option.some(value)` carries the decoded value.
+ * present in the store, and `Option.some(value)` carries the decoded value. Use
+ * this store only inside the synchronous optimistic callback. Treat read values
+ * as immutable and write replacement values with `setQuery`.
  */
 export interface OptimisticLocalStore {
+  /**
+   * Reads one cached query, encoding decoded `args` to identify its cache
+   * entry.
+   *
+   * @param queryRef - The public query ref to read.
+   * @param args - Decoded arguments; omit them only for an argument-free ref.
+   *
+   * @returns `Some` of the decoded result, or `None` when no value is cached
+   *   (including a query that is still loading).
+   *
+   * @throws When argument encoding or cached-result decoding fails.
+   */
   getQuery<Query extends Ref.AnyPublicQuery>(
     queryRef: Query,
     ...args: Ref.OptionalArgs<Query>
   ): Option.Option<Ref.Returns<Query>>;
 
+  /**
+   * Reads all cached argument variants of `queryRef`, including loading
+   * entries.
+   *
+   * @returns Entries with decoded `args` and an optional decoded `value`. An
+   *   empty array means no matching queries are in the local store.
+   *
+   * @throws When cached argument or result decoding fails.
+   */
   getAllQueries<Query extends Ref.AnyPublicQuery>(
     queryRef: Query,
   ): Array<QueryEntry<Query>>;
 
+  /**
+   * Temporarily replaces a query's cached value; it does not write to the
+   * backend.
+   *
+   * @param queryRef - The public query ref to update.
+   * @param args - Decoded arguments identifying the entry, including `{}` for
+   *   an argument-free query.
+   * @param value - `Some` of a replacement decoded result, or `None` to remove
+   *   the cached value and expose a loading state until Convex supplies a
+   *   result.
+   *
+   * @returns Nothing; Convex manages rollback with the optimistic mutation.
+   *
+   * @throws When argument or result encoding fails.
+   */
   setQuery<Query extends Ref.AnyPublicQuery>(
     queryRef: Query,
     args: Ref.Args<Query>,
@@ -80,8 +118,17 @@ export const make = (
   },
 });
 
+/**
+ * A cached argument variant returned by `OptimisticLocalStore.getAllQueries`.
+ */
 interface QueryEntry<Query extends Ref.AnyPublicQuery> {
+  /**
+   * Decoded query arguments, including pagination options for a page query.
+   */
   args: Ref.Args<Query>;
+  /**
+   * The decoded cached result, or `None` while the entry has no loaded value.
+   */
   value: Option.Option<Ref.Returns<Query>>;
 }
 
@@ -90,10 +137,27 @@ interface LoadedPage<Query extends Ref.AnyPublicPaginatedQuery> {
   readonly value: Ref.Returns<Query>;
 }
 
+/**
+ * Decoded inputs shared by the optimistic paginated insertion helpers.
+ */
 interface InsertOptions<Query extends Ref.AnyPublicPaginatedQuery> {
+  /**
+   * The public paginated query whose cached pages should be edited.
+   */
   paginatedQuery: Query;
+  /**
+   * A subset of decoded user arguments to match, excluding `paginationOpts`.
+   * Omit to consider every argument variant. Comparison uses encoded Convex
+   * values, so decoded objects need not have the same identity.
+   */
   argsToMatch?: Partial<PaginatedQueryArgs<Query>>;
+  /**
+   * The store supplied to the mutation's synchronous optimistic callback.
+   */
   localQueryStore: OptimisticLocalStore;
+  /**
+   * The decoded item to insert; helpers encode the updated page for the cache.
+   */
   item: PaginatedQueryItem<Query>;
 }
 
@@ -188,6 +252,19 @@ const writePages = <Query extends Ref.AnyPublicPaginatedQuery>(
 /**
  * Updates every loaded page matching the query ref and decoded user arguments.
  * The callback receives and returns decoded items, not Convex wire values.
+ *
+ * @param localStore - The mutation callback's optimistic store.
+ * @param query - The public paginated query ref.
+ * @param args - All decoded user arguments, excluding `paginationOpts`.
+ *   Matching compares encoded values, not decoded object identities.
+ * @param updateValue - Synchronously returns a replacement for each loaded
+ *   item. Return the current item to leave it unchanged; do not mutate it.
+ *
+ * @returns Nothing; writes replacement pages to the local store. Missing or
+ *   loading entries are ignored and no backend write is performed.
+ *
+ * @throws When a codec, argument serialization, store operation, or callback
+ *   fails.
  */
 export const optimisticallyUpdateValueInPaginatedQuery = <
   Query extends Ref.AnyPublicPaginatedQuery,
@@ -218,6 +295,15 @@ export const optimisticallyUpdateValueInPaginatedQuery = <
 /**
  * Prepends a decoded item to the first matching initial page, if loaded.
  * `argsToMatch` contains decoded user arguments and may omit fields.
+ *
+ * @param options - The query, optional argument filter, callback store, and
+ *   decoded item. An initial page has `paginationOpts.cursor === null`.
+ *
+ * @returns Nothing. Updates at most one page, even if multiple pagination
+ *   instances match; does nothing if the first matching initial page is
+ *   unloaded.
+ *
+ * @throws When argument matching, a codec, or a store operation fails.
  */
 export const insertAtTop = <Query extends Ref.AnyPublicPaginatedQuery>({
   paginatedQuery,
@@ -252,6 +338,14 @@ export const insertAtTop = <Query extends Ref.AnyPublicPaginatedQuery>({
 /**
  * Appends a decoded item to the first matching completed page, if loaded.
  * `argsToMatch` contains decoded user arguments and may omit fields.
+ *
+ * @param options - The query, optional argument filter, callback store, and
+ *   decoded item. A completed page has `isDone === true`.
+ *
+ * @returns Nothing. Updates at most one page; does nothing if no loaded,
+ *   matching page reaches the end of the query.
+ *
+ * @throws When argument matching, a codec, or a store operation fails.
  */
 export const insertAtBottomIfLoaded = <
   Query extends Ref.AnyPublicPaginatedQuery,
@@ -355,6 +449,15 @@ const insertInPages = <Query extends Ref.AnyPublicPaginatedQuery>(
  * Convex values whose ordering matches the server query. Empty or unloaded
  * pages are skipped; insertion beyond a loaded boundary requires the first or
  * completed last page respectively.
+ *
+ * @param options - The query, optional argument filter, callback store, decoded
+ *   item, sort direction, and key callback. Pagination instances are grouped by
+ *   encoded user arguments and `paginationOpts.id`.
+ *
+ * @returns Nothing; updates at most one loaded page per matching instance.
+ *
+ * @throws When argument matching, a codec, store operation, or sort callback
+ *   fails.
  */
 export const insertAtPosition = <Query extends Ref.AnyPublicPaginatedQuery>({
   paginatedQuery,
@@ -364,7 +467,16 @@ export const insertAtPosition = <Query extends Ref.AnyPublicPaginatedQuery>({
   sortKeyFromItem,
   sortOrder,
 }: InsertOptions<Query> & {
+  /**
+   * The server query's sort direction; applied to the Convex sort-key ordering.
+   */
   sortOrder: "asc" | "desc";
+  /**
+   * Computes a Convex-compatible key from a decoded item. Arrays act as
+   * composite keys. Match the server's ordering, including tie-breakers, and
+   * return wire-compatible values rather than decoded objects such as `Date`.
+   * The callback may run repeatedly and must not mutate its item.
+   */
   sortKeyFromItem: (item: PaginatedQueryItem<Query>) => Value | Value[];
 }): void =>
   writePages(

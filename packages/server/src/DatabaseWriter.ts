@@ -29,14 +29,43 @@ export type PatchValue<Doc> = {
   ]?: undefined extends Doc[K] ? Doc[K] | undefined : Doc[K];
 };
 
+/**
+ * Writes to one application table, returned by `DatabaseWriterService.table`.
+ * Inputs contain decoded user fields, not Convex's stored representation.
+ * Signatures expose typed codec failures; native write failures are defects.
+ * See DocumentEncodeError for the current limitation with inputs lacking
+ * `_id`.
+ */
 export interface DatabaseWriterTableAccessor<
   DataModel_ extends DataModel.AnyWithProps,
   TableName extends DataModel.TableNames<DataModel_>,
   Doc = DocumentByName_<DataModel_, TableName>,
 > {
+  /**
+   * Encode and insert a new document.
+   *
+   * @param document - Decoded user fields without `_id` or `_creationTime`.
+   *
+   * @returns An effect yielding the new table-typed ID, or failing with
+   *   `DocumentEncodeError` if the fields cannot be encoded. Current
+   *   limitation: encoding failure on input without `_id` becomes a defect
+   *   while constructing that error, rather than the declared typed failure.
+   */
   readonly insert: (
     document: Document.WithoutSystemFields<Doc>,
   ) => Effect.Effect<GenericId<TableName>, Document.DocumentEncodeError>;
+  /**
+   * Read, shallowly merge, encode, and replace a document within the mutation.
+   * Nested objects are replaced rather than recursively merged. Setting an
+   * optional field to `undefined` removes it; omitted fields remain unchanged.
+   *
+   * @param id - ID of the existing document.
+   * @param patchedValues - Changed decoded user fields, without system fields.
+   *
+   * @returns An effect completing with void. Missing documents fail with
+   *   `GetByIdFailure`; reading or encoding can fail with `DocumentDecodeError`
+   *   or `DocumentEncodeError`. Native database failures remain defects.
+   */
   readonly patch: (
     id: GenericId<TableName>,
     patchedValues: PatchValue<Doc>,
@@ -46,10 +75,30 @@ export interface DatabaseWriterTableAccessor<
     | Document.DocumentDecodeError
     | Document.DocumentEncodeError
   >;
+  /**
+   * Encode and replace all user fields, preserving Convex system fields.
+   *
+   * @param id - ID of the document to replace.
+   * @param value - Complete replacement in decoded form, without system fields.
+   *
+   * @returns An effect completing with void or failing with
+   *   `DocumentEncodeError`. Native failures, including a missing target
+   *   document, are defects rather than `GetByIdFailure`; this operation does
+   *   not decode the old document. Current limitation: encoding failure without
+   *   an input `_id` becomes a defect while constructing DocumentEncodeError.
+   */
   readonly replace: (
     id: GenericId<TableName>,
     value: Document.WithoutSystemFields<Doc>,
   ) => Effect.Effect<void, Document.DocumentEncodeError>;
+  /**
+   * Delete a document through Convex's native database writer.
+   *
+   * @param id - Table-typed document ID.
+   *
+   * @returns An effect completing with void. There is no typed failure channel;
+   *   native database failures are defects.
+   */
   readonly delete: (id: GenericId<TableName>) => Effect.Effect<void>;
 }
 
@@ -57,13 +106,31 @@ export interface DatabaseWriterTableAccessor<
  * The service shape backing the `DatabaseWriter` tag. Named (rather than an
  * inferred anonymous object) so declaration emit prints
  * `DatabaseWriterService<…>` by reference instead of expanding the data model.
- * `Docs` is the optional named document registry (see
- * `DatabaseReaderService`).
+ * `Docs` is the optional named document registry (see `DatabaseReaderService`).
+ * Acquire it from the generated `DatabaseWriter` service inside a mutation.
+ *
+ * @example
+ *   import * as Effect from "effect/Effect";
+ *   import { DatabaseWriter } from "./confect/_generated/services";
+ *
+ *   const insertNote = Effect.gen(function* () {
+ *     const writer = yield* DatabaseWriter;
+ *     return yield* writer.table("notes").insert({ text: "First note" });
+ *   });
  */
 export interface DatabaseWriterService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > {
+  /**
+   * Select an application table for writes.
+   *
+   * @param tableName - A table declared in the schema; system tables are
+   *   excluded.
+   *
+   * @returns Insert, patch, replace, and delete operations with decoded inputs.
+   *   Selecting the table performs no database write.
+   */
   readonly table: <
     const TableName extends DataModel.TableNames<
       DataModel.FromDatabaseSchema<DatabaseSchema_>
@@ -222,6 +289,11 @@ export const DatabaseWriter = <
     DatabaseWriterService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseWriter");
 
+/**
+ * The writer service requirement and uncustomized shape for a schema. Use the
+ * generated `DatabaseWriter` tag to acquire it; {@link DatabaseWriterService}
+ * additionally accepts the generated named-document registry.
+ */
 export type DatabaseWriter<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = DatabaseWriterService<DatabaseSchema_>;

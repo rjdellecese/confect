@@ -23,6 +23,10 @@ export const TypeId = "~@confect/server/CronJobs";
  */
 export type TypeId = typeof TypeId;
 
+/**
+ * Immutable collection default-exported from the application's
+ * confect/crons.ts.
+ */
 export interface CronJobs {
   /**
    * @internal
@@ -37,6 +41,17 @@ export interface CronJobs {
    */
   readonly convexCronJobs: Crons;
 
+  /**
+   * Add a recurring invocation without changing this collection.
+   *
+   * @param cron - Job built with CronJob.make.
+   *
+   * @returns A new collection containing the job.
+   *
+   * @throws On argument encoding failure, duplicate/invalid identifiers or
+   *   invalid schedules. Cron schedules require UTC and no custom seconds;
+   *   intervals require positive whole seconds, minutes or hours.
+   */
   add(cron: CronJob.CronJob): CronJobs;
 }
 
@@ -130,6 +145,12 @@ const makeProto = (
     convexCronJobs,
   });
 
+/**
+ * Create an empty recurring-job collection.
+ *
+ * @returns A collection to extend with immutable add calls and default-export
+ *   from confect/crons.ts. Codegen emits the corresponding Convex cron entry.
+ */
 export const make = (): CronJobs => makeProto({}, makeConvexCrons());
 
 /**

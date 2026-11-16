@@ -5,6 +5,13 @@ import type * as HttpClient from "effect/http/HttpClient";
 import * as InternalAiGatewayDecisionClient from "./internal/AiGatewayDecisionClient";
 import * as AiGatewayServiceToken from "./internal/AiGatewayServiceToken";
 
+/**
+ * Public gateway availability failures and their schema/union.
+ * AiGatewayDisabled describes a plan/setting restriction; AiGatewayUnavailable
+ * describes an unsupported deployment. Definitions are shared with the language
+ * client and remain public through these aliases, with no extra failure payload
+ * fields.
+ */
 export {
   AiGatewayDisabled,
   AiGatewayError,
@@ -15,6 +22,9 @@ export {
  * The client configured for Convex AI gateway decisions.
  */
 export const AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
+/**
+ * Effect requirement of a decision model using the gateway client layer.
+ */
 export type AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 
 /**
@@ -35,6 +45,13 @@ export const make: Effect.Effect<
 
 /**
  * Provide the AI gateway decision client using the current Effect HTTP client.
+ *
+ * Requires an Effect HttpClient and a running Convex action. Construction may
+ * fail with AiGatewayDisabled or AiGatewayUnavailable; later token failures
+ * follow the model/HTTP client's error contract.
+ *
+ * This layer supplies the client for AiGatewayDecisionModel operations; it is a
+ * value, not a layer factory.
  */
 export const layer: Layer.Layer<
   AiGatewayDecisionClient,

@@ -101,6 +101,16 @@ export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  * Plain Convex routes can still be added to the returned router—Convex matches
  * exact paths first and longer path prefixes before the catch-all, so they take
  * precedence.
+ *
+ * @param databaseSchema - Generated runtime DatabaseSchema, required even
+ *   without vector search. Do not pass the deployment/test convexSchema
+ *   artifact.
+ * @param routes - Effect route-registration layer with handler dependencies
+ *   provided.
+ *
+ * @returns A native Convex HttpRouter for the default export of
+ *   confect/http.ts. Add native routes with its route method; route errors
+ *   follow Effect HTTP handling.
  */
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,

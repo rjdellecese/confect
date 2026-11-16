@@ -17,6 +17,9 @@ interface Proto extends Pipeable.Pipeable, Equal.Equal {
  * A query awaiting its first result for the current arguments.
  */
 export interface Loading extends Proto {
+  /**
+   * Discriminant for a result waiting on an application-scheduled query.
+   */
   readonly _tag: "Loading";
 }
 
@@ -24,7 +27,14 @@ export interface Loading extends Proto {
  * The latest successful query result.
  */
 export interface Success<A> extends Proto {
+  /**
+   * Discriminant for a successful result.
+   */
   readonly _tag: "Success";
+  /**
+   * Decoded value, or the value mapped into the Model by the application's
+   * handler.
+   */
   readonly value: A;
 }
 
@@ -32,7 +42,13 @@ export interface Success<A> extends Proto {
  * The latest query error, which does not imply the subscription has ended.
  */
 export interface Failure<E> extends Proto {
+  /**
+   * Discriminant for a failed result.
+   */
   readonly _tag: "Failure";
+  /**
+   * Failure value stored by the application; a later success can replace it.
+   */
   readonly error: E;
 }
 
@@ -98,7 +114,8 @@ const Proto = {
 };
 
 /**
- * Constructs a query awaiting its first result.
+ * Constructs a query awaiting its first result. This only creates Model state;
+ * it does not open or restart a subscription.
  */
 export const load = (): Loading =>
   Object.assign(Object.create(Proto), { _tag: "Loading" });
@@ -125,6 +142,18 @@ export const fail = <E>(error: E): Failure<E> =>
  * Builds a Model field schema, preserving the supplied value and error codecs.
  * Encodes tagged records and restores piping, equality, and hashing on decode.
  * The error schema defaults to `Schema.Never` when omitted.
+ *
+ * @example
+ *   const Notes = QueryResult(Schema.Array(Schema.String), Schema.String);
+ *   const initial = load();
+ *
+ * @param valueSchema - Codec for Success.value, including its encoded form and
+ *   services.
+ * @param errorSchema - Codec for Failure.error; omit when failures are not
+ *   stored here.
+ *
+ * @returns A codec for Loading, Success and Failure records. Schema failures
+ *   and service requirements follow the supplied codecs.
  */
 export const QueryResult = <
   A,
@@ -199,18 +228,39 @@ export const isFailure = <A, E>(self: QueryResult<A, E>): self is Failure<E> =>
 
 /**
  * Matches all three states, passing only the value or error to its handler.
+ * Supports `match(self, handlers)` and pipeable `match(handlers)(self)`. All
+ * handlers are required, including onFailure when E is never. Returns the
+ * selected handler's value without wrapping it or catching thrown exceptions.
  */
 export const match: {
   <A, E, X, Y, Z>(handlers: {
+    /**
+     * Handle Loading; no payload is supplied.
+     */
     readonly onLoading: () => X;
+    /**
+     * Handle Success using its stored value.
+     */
     readonly onSuccess: (value: A) => Y;
+    /**
+     * Handle Failure using its stored error.
+     */
     readonly onFailure: (error: E) => Z;
   }): (self: QueryResult<A, E>) => X | Y | Z;
   <A, E, X, Y, Z>(
     self: QueryResult<A, E>,
     handlers: {
+      /**
+       * Handle Loading; no payload is supplied.
+       */
       readonly onLoading: () => X;
+      /**
+       * Handle Success using its stored value.
+       */
       readonly onSuccess: (value: A) => Y;
+      /**
+       * Handle Failure using its stored error.
+       */
       readonly onFailure: (error: E) => Z;
     },
   ): X | Y | Z;

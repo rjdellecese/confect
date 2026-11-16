@@ -5,6 +5,13 @@ import type * as HttpClient from "effect/http/HttpClient";
 import * as InternalAiGatewayLanguageClient from "./internal/AiGatewayLanguageClient";
 import * as AiGatewayServiceToken from "./internal/AiGatewayServiceToken";
 
+/**
+ * Public gateway availability failures and their schema/union.
+ * AiGatewayDisabled means the plan or gateway setting disallows access;
+ * AiGatewayUnavailable means this deployment cannot use the gateway. Neither
+ * failure has extra payload fields. These aliases remain public although their
+ * definitions live in an internal file.
+ */
 export {
   AiGatewayDisabled,
   AiGatewayError,
@@ -15,6 +22,9 @@ export {
  * The client service configured for Convex AI gateway language models.
  */
 export const AiGatewayLanguageClient = OpenAiClient.OpenAiClient;
+/**
+ * Effect requirement of a language model using the gateway client layer.
+ */
 export type AiGatewayLanguageClient = OpenAiClient.OpenAiClient;
 
 /**
@@ -36,6 +46,14 @@ export const make: Effect.Effect<
 /**
  * Provide the AI gateway language model client using the current Effect HTTP
  * client.
+ *
+ * Requires an Effect HttpClient (for example FetchHttpClient.layer) and a
+ * running Convex action. Layer construction can fail with AiGatewayDisabled or
+ * AiGatewayUnavailable. Credentials are obtained again for outgoing requests;
+ * later failures surface through the model/HTTP client's error contract.
+ *
+ * This layer supplies the gateway language client and can be provided to
+ * AiGatewayLanguageModel.model(...); it is a value, not a layer factory.
  */
 export const layer: Layer.Layer<
   AiGatewayLanguageClient,

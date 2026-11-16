@@ -15,10 +15,35 @@ type IncludedTables<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
 type IncludedDataModel<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   DataModel.FromTables<IncludedTables<DatabaseSchema_>>;
 
+/**
+ * Schema-typed database reads acquired from the generated `DatabaseReader`
+ * service in queries and mutations. `Docs` optionally supplies generated named
+ * document types; reads still decode through each table's codec.
+ *
+ * @example
+ *   import * as Effect from "effect/Effect";
+ *   import { DatabaseReader } from "./confect/_generated/services";
+ *
+ *   const latestNotes = Effect.gen(function* () {
+ *     const reader = yield* DatabaseReader;
+ *     return yield* reader
+ *       .table("notes")
+ *       .index("by_creation_time", "desc")
+ *       .take(10);
+ *   });
+ */
 export interface DatabaseReaderService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > {
+  /**
+   * Select a table for document lookup or query construction.
+   *
+   * @param tableName - A declared table, `_storage`, or `_scheduled_functions`.
+   *
+   * @returns The table's lookup and index/search/stream methods. Selecting a
+   *   table does not itself fetch documents; system tables are read-only.
+   */
   readonly table: <
     const TableName extends Table.Name<IncludedTables<DatabaseSchema_>>,
   >(
@@ -110,6 +135,12 @@ export const DatabaseReader = <
     DatabaseReaderService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseReader");
 
+/**
+ * The database reader service requirement and uncustomized service shape for a
+ * schema. Acquire the generated service tag rather than invoking the raw
+ * same-named factory; use {@link DatabaseReaderService} for a named-doc
+ * registry.
+ */
 export type DatabaseReader<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = DatabaseReaderService<DatabaseSchema_>;

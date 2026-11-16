@@ -29,6 +29,14 @@ export interface Options {
  * Create an Effect AI model backed by the Convex AI gateway.
  *
  * Model identifiers use Convex's `provider/model` format.
+ *
+ * @param modelId - Gateway model identifier, for example "openai/gpt-4o-mini".
+ * @param config - Upstream OpenAI-compatible request settings, such as
+ *   temperature or max_output_tokens; support depends on the selected model.
+ *
+ * @returns An Effect AI model descriptor/layer. Provide
+ *   AiGatewayLanguageClient.layer and an Effect HTTP client to run its
+ *   operations.
  */
 export const model = (
   modelId: string,
@@ -69,5 +77,8 @@ export const layer = ({
 
 /**
  * Apply request configuration to an Effect AI operation within a local scope.
+ * Pass upstream OpenAI-compatible overrides to this combinator and apply it to
+ * the operation Effect. It retains the operation's success/error channels and
+ * does not change the gateway model's supported capabilities.
  */
 export const withConfigOverride = OpenAiLanguageModel.withConfigOverride;
