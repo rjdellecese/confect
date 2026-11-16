@@ -36,6 +36,26 @@ export class MintlifyRouter extends ModuleRouter {
 export class MintlifyTheme extends MarkdownTheme {
   override getRenderContext(page: MarkdownPageEvent<Reflection>) {
     const context = super.getRenderContext(page);
+    const commentParts = context.helpers.getCommentParts;
+    context.helpers.getCommentParts = (parts) =>
+      commentParts(
+        Array.map(parts, (part) =>
+          part.kind === "text"
+            ? {
+                ...part,
+                text: Str.replace(
+                  /</g,
+                  "&lt;",
+                )(
+                  Str.replace(
+                    /\{/g,
+                    "&#123;",
+                  )(Str.replace(/\}/g, "&#125;")(part.text)),
+                ),
+              }
+            : part,
+        ),
+      );
     const declaration = context.partials.declaration;
     context.partials.declaration = (model, options = { headingLevel: 2 }) => {
       const rendered = declaration(model, options);
