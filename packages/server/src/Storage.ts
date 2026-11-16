@@ -31,6 +31,9 @@ export class Storage extends Context.Service<
   Effect.Success<typeof make>
 >()("@confect/server/Storage") {}
 
+/**
+ * @internal
+ */
 export const layer = (storageReader: ConvexStorageReader) =>
   Layer.effect(Storage, make).pipe(
     Layer.provideMerge(StorageReader.layer(storageReader)),

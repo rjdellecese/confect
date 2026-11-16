@@ -38,6 +38,9 @@ export type OrderedQuery<
   ) => Effect.Effect<PaginationResult<Doc>, Document.DocumentDecodeError>;
 };
 
+/**
+ * @internal
+ */
 export const make = <Table_ extends Table.AnyWithProps>(
   query: ConvexOrderedQuery<
     TableInfo.ConvexTableInfo<TableInfo.TableInfo<Table_>>

@@ -7,6 +7,9 @@ import type * as RegistryItems from "./RegistryItems";
 import type * as GroupImpl from "./GroupImpl";
 import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 
+/**
+ * @internal
+ */
 export const make = (
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
 ) => {

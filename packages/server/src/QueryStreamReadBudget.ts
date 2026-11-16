@@ -14,6 +14,8 @@ import * as Tuple from "effect/Tuple";
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export interface QueryStreamReadBudget {
   readonly isUnlimited: Effect.Effect<boolean>;
@@ -36,6 +38,8 @@ const ReadLimit = Schema.Natural.pipe(
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const Limits = Schema.Struct({
   maximumRowsRead: Schema.OptionFromOptionalKey(ReadLimit),
@@ -43,6 +47,8 @@ export const Limits = Schema.Struct({
 });
 /**
  * @experimental
+ *
+ * @internal
  */
 export type Limits = typeof Limits.Type;
 
@@ -62,6 +68,8 @@ export class InvalidReadLimitError extends Schema.TaggedError<
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export interface ReadCounts {
   readonly rowsRead: number;
@@ -77,6 +85,8 @@ const State = Data.taggedEnum<State>();
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const QueryStreamReadBudget =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
@@ -111,6 +121,8 @@ const record = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const make = Effect.fnUntraced(function* (
   limits: Limits,

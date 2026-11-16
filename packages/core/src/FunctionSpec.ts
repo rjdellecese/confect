@@ -15,9 +15,18 @@ import { validateConfectFunctionIdentifier } from "./Identifier";
 import type * as MiddlewareSpec from "./MiddlewareSpec";
 import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
+/**
+ * @internal
+ */
 export const TypeId = "~@confect/core/FunctionSpec";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
+/**
+ * @internal
+ */
 export const isFunctionSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
@@ -70,10 +79,16 @@ export interface Builder<
   >;
 }
 
+/**
+ * @internal
+ */
 export interface Any {
   readonly [TypeId]: TypeId;
 }
 
+/**
+ * @internal
+ */
 export interface AnyWithProps extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
@@ -82,6 +97,9 @@ export interface AnyWithProps extends FunctionSpec<
   MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
+/**
+ * @internal
+ */
 export interface AnyConfect extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
@@ -90,6 +108,9 @@ export interface AnyConfect extends FunctionSpec<
   MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
+/**
+ * @internal
+ */
 export interface AnyConvex extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
@@ -98,6 +119,9 @@ export interface AnyConvex extends FunctionSpec<
   MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
+/**
+ * @internal
+ */
 export interface AnyWithPropsWithRuntime<
   Runtime extends RuntimeAndFunctionType.Runtime,
 > extends FunctionSpec<
@@ -108,6 +132,9 @@ export interface AnyWithPropsWithRuntime<
   MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
+/**
+ * @internal
+ */
 export interface AnyWithPropsWithFunctionType<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
 > extends FunctionSpec<
@@ -118,6 +145,9 @@ export interface AnyWithPropsWithFunctionType<
   MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
+/**
+ * @internal
+ */
 export interface AnyWithPropsWithFunctionProvenance<
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
 > extends FunctionSpec<
@@ -128,22 +158,39 @@ export interface AnyWithPropsWithFunctionProvenance<
   MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
+/**
+ * @internal
+ */
 export type GetRuntimeAndFunctionType<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_["runtimeAndFunctionType"];
 
+/**
+ * @internal
+ */
 export type GetFunctionVisibility<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_["functionVisibility"];
 
+/**
+ * @internal
+ */
 export type GetFunctionProvenance<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_["functionProvenance"];
 
+/**
+ * @internal
+ */
 export type Name<FunctionSpec_ extends AnyWithProps> = FunctionSpec_["name"];
 
+/**
+ * @internal
+ */
 export type MiddlewareSpecs<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_["middlewareSpecs"][number];
 
 /**
  * The field map declared by a Confect-provenance spec.
+ *
+ * @internal
  */
 export type ArgsFields<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
@@ -162,6 +209,8 @@ export type ArgsFields<FunctionSpec_ extends AnyWithProps> =
 
 /**
  * The args schema assembled from a Confect-provenance spec's field map.
+ *
+ * @internal
  */
 export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
@@ -182,6 +231,9 @@ export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
       ? ArgsSchema_
       : never;
 
+/**
+ * @internal
+ */
 export type ReturnsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     readonly functionProvenance: {
@@ -192,6 +244,9 @@ export type ReturnsSchema<FunctionSpec_ extends AnyWithProps> =
     ? ReturnsSchema_
     : never;
 
+/**
+ * @internal
+ */
 export type ErrorSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     readonly functionProvenance: {
@@ -202,6 +257,9 @@ export type ErrorSchema<FunctionSpec_ extends AnyWithProps> =
     ? Extract<ErrorSchema_, Schema.Codec<any, any>>
     : never;
 
+/**
+ * @internal
+ */
 export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
   readonly functionProvenance: { readonly _tag: "Confect" };
 }
@@ -213,6 +271,9 @@ export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
     ? Args_
     : never;
 
+/**
+ * @internal
+ */
 export type Returns<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     readonly functionProvenance: { readonly _tag: "Confect" };
@@ -225,6 +286,9 @@ export type Returns<FunctionSpec_ extends AnyWithProps> =
       ? Awaited<Returns_>
       : never;
 
+/**
+ * @internal
+ */
 export type EncodedArgs<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     readonly functionProvenance: { readonly _tag: "Confect" };
@@ -237,6 +301,9 @@ export type EncodedArgs<FunctionSpec_ extends AnyWithProps> =
       ? Args_
       : never;
 
+/**
+ * @internal
+ */
 export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     readonly functionProvenance: { readonly _tag: "Confect" };
@@ -249,17 +316,29 @@ export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
       ? Returns_
       : never;
 
+/**
+ * @internal
+ */
 export type Error<FunctionSpec_ extends AnyWithProps> =
   ErrorSchema<FunctionSpec_>["Type"];
 
+/**
+ * @internal
+ */
 export type EncodedError<FunctionSpec_ extends AnyWithProps> =
   ErrorSchema<FunctionSpec_>["Encoded"];
 
+/**
+ * @internal
+ */
 export type WithName<
   FunctionSpec_ extends AnyWithProps,
   Name_ extends string,
 > = Extract<FunctionSpec_, { readonly name: Name_ }>;
 
+/**
+ * @internal
+ */
 export type WithRuntimeAndFunctionType<
   FunctionSpec_ extends AnyWithProps,
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
@@ -268,6 +347,9 @@ export type WithRuntimeAndFunctionType<
   { readonly runtimeAndFunctionType: RuntimeAndFunctionType_ }
 >;
 
+/**
+ * @internal
+ */
 export type WithFunctionType<
   FunctionSpec_ extends AnyWithProps,
   FunctionType_ extends FunctionType,
@@ -276,6 +358,9 @@ export type WithFunctionType<
   { readonly runtimeAndFunctionType: { readonly functionType: FunctionType_ } }
 >;
 
+/**
+ * @internal
+ */
 export type WithFunctionProvenance<
   FunctionSpec_ extends AnyWithProps,
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
@@ -284,6 +369,9 @@ export type WithFunctionProvenance<
   { readonly functionProvenance: FunctionProvenance_ }
 >;
 
+/**
+ * @internal
+ */
 export type WithoutName<
   FunctionSpec_ extends AnyWithProps,
   Name_ extends Name<FunctionSpec_>,

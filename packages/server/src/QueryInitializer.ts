@@ -210,6 +210,9 @@ export interface QueryInitializer<
   };
 }
 
+/**
+ * @internal
+ */
 export const make = <
   Tables extends Table.AnyWithProps,
   TableName extends Table.Name<Tables>,
@@ -431,6 +434,9 @@ export const make = <
   };
 };
 
+/**
+ * @internal
+ */
 export const getById =
   <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
     convexDatabaseReader: BaseDatabaseReader<

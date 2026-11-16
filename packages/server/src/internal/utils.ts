@@ -7,6 +7,9 @@ type NestedObject<T> = {
   [key: string]: T | NestedObject<T>;
 };
 
+/**
+ * @internal
+ */
 export const mapLeaves = <T, U>(
   obj: NestedObject<T>,
   leafRefinement: Predicate.Refinement<unknown, T>,
@@ -52,6 +55,9 @@ const collectBranchLeaves = <T>(
   return [...currentBranch, ...nestedBranches];
 };
 
+/**
+ * @internal
+ */
 export const forEachBranchLeaves = <T, A, E, R>(
   obj: NestedObject<T>,
   leafRefinement: Predicate.Refinement<unknown, T>,
@@ -66,6 +72,9 @@ export const forEachBranchLeaves = <T, A, E, R>(
   });
 };
 
+/**
+ * @internal
+ */
 export const setNestedProperty = <T extends object>(
   obj: T,
   path: PropertyKey[],

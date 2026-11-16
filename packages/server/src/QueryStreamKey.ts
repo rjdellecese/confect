@@ -19,6 +19,8 @@ interface Payload {
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type QueryStreamKey = Data.TaggedEnum<{
   Complete: Payload;
@@ -28,15 +30,21 @@ const QueryStreamKey = Data.taggedEnum<QueryStreamKey>();
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type Complete = Data.TaggedEnum.Value<QueryStreamKey, "Complete">;
 /**
  * @experimental
+ *
+ * @internal
  */
 export type Prefix = Data.TaggedEnum.Value<QueryStreamKey, "Prefix">;
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export class KeyWidthMismatchError extends Schema.TaggedError<
   KeyWidthMismatchError,
@@ -53,6 +61,8 @@ export class KeyWidthMismatchError extends Schema.TaggedError<
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const complete = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
@@ -74,6 +84,8 @@ export const complete = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const prefix = (
   layout: QueryStreamKeyLayout.QueryStreamKeyLayout,
@@ -96,6 +108,8 @@ export const prefix = (
 // A complete key already satisfies the prefix width guarantee.
 /**
  * @experimental
+ *
+ * @internal
  */
 export const toPrefix = (self: Complete): Prefix =>
   QueryStreamKey.Prefix({
@@ -106,12 +120,16 @@ export const toPrefix = (self: Complete): Prefix =>
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const values = (
   self: QueryStreamKey,
 ): QueryStreamKeyValues.QueryStreamKeyValues => self.values;
 /**
  * @experimental
+ *
+ * @internal
  */
 export const layout = (
   self: QueryStreamKey,
@@ -119,6 +137,8 @@ export const layout = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const isComplete = (value: unknown): value is Complete =>
   Predicate.hasProperty(value, TypeId) && QueryStreamKey.$is("Complete")(value);

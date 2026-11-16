@@ -14,17 +14,35 @@ import * as Record from "effect/Record";
 import type * as CronJob from "./CronJob";
 import * as CronWindow from "./CronWindow";
 
+/**
+ * @internal
+ */
 export const TypeId = "~@confect/server/CronJobs";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
 export interface CronJobs {
+  /**
+   * @internal
+   */
   readonly [TypeId]: TypeId;
+  /**
+   * @internal
+   */
   readonly cronJobs: Record<string, CronJob.CronJob>;
+  /**
+   * @internal
+   */
   readonly convexCronJobs: Crons;
 
   add(cron: CronJob.CronJob): CronJobs;
 }
 
+/**
+ * @internal
+ */
 export const isCronJobs = (u: unknown): u is CronJobs =>
   Predicate.hasProperty(u, TypeId);
 
@@ -114,6 +132,9 @@ const makeProto = (
 
 export const make = (): CronJobs => makeProto({}, makeConvexCrons());
 
+/**
+ * @internal
+ */
 export const cronToConvexCronString = (cron: Cron.Cron): string => {
   pipe(
     cron.tz,
@@ -166,6 +187,9 @@ const setToField = (set: ReadonlySet<number>): string => {
   );
 };
 
+/**
+ * @internal
+ */
 export const durationToConvexIntervalSchedule = (
   duration: Duration.Duration,
 ): IntervalSchedule => {

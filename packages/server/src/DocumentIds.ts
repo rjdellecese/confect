@@ -33,15 +33,24 @@ export interface DocumentIds<
   >;
 }
 
+/**
+ * @internal
+ */
 export type DocumentIdsTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = Context.Service<DocumentIds<DatabaseSchema_>, DocumentIds<DatabaseSchema_>>;
 
+/**
+ * @internal
+ */
 export const DocumentIds = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(): DocumentIdsTag<DatabaseSchema_> =>
   Context.Service<DocumentIds<DatabaseSchema_>>("@confect/server/DocumentIds");
 
+/**
+ * @internal
+ */
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   schema: DatabaseSchema_,
   reader: GenericDatabaseReader<
@@ -95,6 +104,9 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   };
 };
 
+/**
+ * @internal
+ */
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   schema: DatabaseSchema_,
   reader: GenericDatabaseReader<

@@ -7,6 +7,9 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as GroupImpl from "./GroupImpl";
 import type * as RegisteredFunction from "./RegisteredFunction";
 
+/**
+ * @internal
+ */
 export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
   Types.Simplify<RegisteredFunctionsHelper<Spec.Groups<Spec_>>>;
 
@@ -42,6 +45,8 @@ type RegisteredFunctionsOf<Group extends GroupSpec.AnyWithProps> = {
  * own leaf. For the filesystem layout a leaf `GroupSpec` carries no subgroups
  * (subdirectory children are assembled separately into `_generated/spec.ts`),
  * so this resolves to just the leaf's functions.
+ *
+ * @internal
  */
 export type RegisteredFunctionsForGroupSpec<
   Group extends GroupSpec.AnyWithProps,
@@ -52,6 +57,9 @@ export type RegisteredFunctionsForGroupSpec<
       >
     : RegisteredFunctionsOf<Group>;
 
+/**
+ * @internal
+ */
 export interface AnyWithProps {
   readonly [key: string]: RegisteredFunction.Any | AnyWithProps;
 }
@@ -78,6 +86,8 @@ export interface AnyWithProps {
  * `ConvexFunctionDefinitions.buildForGroup` and add local forwarding handlers
  * before shared registration. Node groups use
  * `RegisteredNodeFunction.buildForGroup` from the Node entry.
+ *
+ * @internal
  */
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   databaseSchema: DatabaseSchema.AnyWithProps,

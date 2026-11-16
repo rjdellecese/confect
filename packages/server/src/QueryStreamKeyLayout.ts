@@ -19,6 +19,8 @@ const NumberValue = Schema.declare<number>(
  * positions.
  *
  * @experimental
+ *
+ * @internal
  */
 export type Position = Data.TaggedEnum<{
   Visible: { readonly label: string };
@@ -50,6 +52,8 @@ const TypeId = "@confect/server/QueryStreamKeyLayout";
  * at runtime. Normally this type is inferred from the source stream.
  *
  * @experimental
+ *
+ * @internal
  */
 export interface QueryStreamKeyLayout<
   out KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels =
@@ -82,6 +86,8 @@ const KeyLayoutStructure = Schema.Struct({
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const QueryStreamKeyLayout = KeyLayoutStructure.pipe(
   Schema.is,
@@ -100,6 +106,8 @@ const make = <KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
  * The runtime positions, including implicit ID tiebreakers.
  *
  * @experimental
+ *
+ * @internal
  */
 export const positions = (
   self: QueryStreamKeyLayout,
@@ -109,6 +117,8 @@ export const positions = (
  * The source field paths remaining after an equality prefix.
  *
  * @experimental
+ *
+ * @internal
  */
 export type RemainingFieldPaths<
   FieldPaths extends ReadonlyArray<string>,
@@ -136,6 +146,8 @@ type DropPrefix<
  * The equality prefix cannot select a whole number of source field paths.
  *
  * @experimental
+ *
+ * @internal
  */
 export class InvalidEqualityPrefixError extends Schema.TaggedError<
   InvalidEqualityPrefixError,
@@ -157,6 +169,8 @@ export class InvalidEqualityPrefixError extends Schema.TaggedError<
  * The requested labels do not form a prefix of the layout's visible labels.
  *
  * @experimental
+ *
+ * @internal
  */
 export class InvalidLabelPrefixError extends Schema.TaggedError<
   InvalidLabelPrefixError,
@@ -174,6 +188,8 @@ export class InvalidLabelPrefixError extends Schema.TaggedError<
  * The replacement labels cannot fill exactly the layout's visible positions.
  *
  * @experimental
+ *
+ * @internal
  */
 export class LabelCountMismatchError extends Schema.TaggedError<
   LabelCountMismatchError,
@@ -195,6 +211,8 @@ export class LabelCountMismatchError extends Schema.TaggedError<
  * prefix lengths return `InvalidEqualityPrefixError`.
  *
  * @experimental
+ *
+ * @internal
  */
 export function fromIndex<const FieldPaths extends ReadonlyArray<string>>(
   fieldPaths: FieldPaths,
@@ -204,6 +222,8 @@ export function fromIndex<const FieldPaths extends ReadonlyArray<string>>(
 >;
 /**
  * @experimental
+ *
+ * @internal
  */
 export function fromIndex<
   const FieldPaths extends ReadonlyArray<string>,
@@ -219,6 +239,9 @@ export function fromIndex<
   >,
   InvalidEqualityPrefixError
 >;
+/**
+ * @internal
+ */
 export function fromIndex(
   fieldPaths: ReadonlyArray<string>,
   eqCount = 0,
@@ -248,6 +271,8 @@ export function fromIndex(
  * Concatenate layouts without losing component tiebreakers.
  *
  * @experimental
+ *
+ * @internal
  */
 export const concat = <
   LeftKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
@@ -263,6 +288,8 @@ export const concat = <
  * Format visible labels and implicit IDs for diagnostics.
  *
  * @experimental
+ *
+ * @internal
  */
 export const format = (self: QueryStreamKeyLayout): string => {
   const tokens = Array.map(
@@ -283,10 +310,15 @@ export const format = (self: QueryStreamKeyLayout): string => {
  * The labels available to `distinct` and `renameKey`.
  *
  * @experimental
+ *
+ * @internal
  */
 export function visibleLabels<
   KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
 >(self: QueryStreamKeyLayout<KeyLabels>): KeyLabels;
+/**
+ * @internal
+ */
 export function visibleLabels(
   self: QueryStreamKeyLayout,
 ): QueryStreamKeyLabels.QueryStreamKeyLabels {
@@ -305,6 +337,8 @@ export function visibleLabels(
  * Number of positions in an element's runtime key.
  *
  * @experimental
+ *
+ * @internal
  */
 export const runtimeWidth = (self: QueryStreamKeyLayout): number =>
   positions(self).length;
@@ -325,12 +359,16 @@ const PositionsEquivalence = Equivalence_.Array<Position>((self, that) =>
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const Equivalence: Equivalence_.Equivalence<QueryStreamKeyLayout> =
   Equivalence_.mapInput(PositionsEquivalence, positions);
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export class KeyLayoutMismatchError extends Schema.TaggedError<
   KeyLayoutMismatchError,
@@ -346,6 +384,8 @@ export class KeyLayoutMismatchError extends Schema.TaggedError<
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const validateEquivalence = (
   expectedKeyLayout: QueryStreamKeyLayout,
@@ -362,6 +402,8 @@ export const validateEquivalence = (
  * before the last selected label are included; implicit IDs after it are not.
  *
  * @experimental
+ *
+ * @internal
  */
 export const resolvePrefix = (
   self: QueryStreamKeyLayout,
@@ -388,6 +430,8 @@ export const resolvePrefix = (
  * Relabel visible positions, preserving every implicit ID.
  *
  * @experimental
+ *
+ * @internal
  */
 export const rename = <
   ReplacementKeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,

@@ -39,6 +39,9 @@ export interface MiddlewareImpl<MiddlewareKey extends string> {
   readonly middlewareKey: MiddlewareKey;
 }
 
+/**
+ * @internal
+ */
 export const MiddlewareImpl = <MiddlewareKey extends string>({
   middlewareKey,
 }: {
@@ -48,6 +51,9 @@ export const MiddlewareImpl = <MiddlewareKey extends string>({
     `@confect/server/MiddlewareImpl/${middlewareKey}`,
   );
 
+/**
+ * @internal
+ */
 export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
   | GroupSpec.MiddlewareSpecs<Group>
   | FunctionSpec.MiddlewareSpecs<
@@ -58,6 +64,9 @@ export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
     : never
   : never;
 
+/**
+ * @internal
+ */
 export type FunctionTypeServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionType_ extends FunctionType,
@@ -77,6 +86,8 @@ export type FunctionTypeServices<
  * `Exclude`/`Extract`—several ctx services are structurally typed (e.g. the raw
  * `GenericQueryCtx`/`GenericMutationCtx` tags), so conditional-type set
  * arithmetic over them is not reliable.
+ *
+ * @internal
  */
 export type CommonServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

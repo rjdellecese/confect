@@ -35,6 +35,9 @@ export interface DatabaseReaderService<
   >;
 }
 
+/**
+ * @internal
+ */
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,
   convexDatabaseReader: GenericDatabaseReader<
@@ -84,6 +87,8 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
  * codegen document registry is supplied—this keeps it identical to what
  * `Handler`/runtime provisioning provide. The tag's _Service_ (what `yield*`
  * produces) carries `Docs`, so queries resolve to the named doc interfaces.
+ *
+ * @internal
  */
 export type DatabaseReaderTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -93,6 +98,9 @@ export type DatabaseReaderTag<
   DatabaseReaderService<DatabaseSchema_, Docs>
 >;
 
+/**
+ * @internal
+ */
 export const DatabaseReader = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
@@ -106,6 +114,9 @@ export type DatabaseReader<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = DatabaseReaderService<DatabaseSchema_>;
 
+/**
+ * @internal
+ */
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,
   convexDatabaseReader: GenericDatabaseReader<

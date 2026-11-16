@@ -154,6 +154,8 @@ export class InnerStreamLayoutMismatchError extends Schema.TaggedError<
  * combinators support reversal.
  *
  * @experimental
+ *
+ * @internal
  */
 export class MissingReversalRecipeError extends Schema.TaggedError<
   MissingReversalRecipeError,
@@ -169,6 +171,8 @@ export class MissingReversalRecipeError extends Schema.TaggedError<
  * an empty initial page cannot establish a continuation boundary. Request a
  * positive number of items for the first page.
  *
+ * @public
+ *
  * @experimental
  */
 export {
@@ -179,6 +183,8 @@ export {
 /**
  * Invalid numeric read limits.
  *
+ * @public
+ *
  * @experimental
  */
 export { InvalidReadLimitError } from "./QueryStreamReadBudget";
@@ -187,12 +193,16 @@ export { InvalidReadLimitError } from "./QueryStreamReadBudget";
  * Runtime identifier used to distinguish query streams from plain streams.
  *
  * @experimental
+ *
+ * @internal
  */
 export const TypeId = "~@confect/server/QueryStream";
 /**
  * Type of the query stream's runtime identifier.
  *
  * @experimental
+ *
+ * @internal
  */
 export type TypeId = typeof TypeId;
 
@@ -202,6 +212,8 @@ export type TypeId = typeof TypeId;
  * a value does not recompute its key.
  *
  * @experimental
+ *
+ * @internal
  */
 export class Element<Doc> extends Data.Class<{
   readonly doc: Option.Option<Doc>;
@@ -252,8 +264,17 @@ export class QueryStream<
   out E = never,
   out R = never,
 > implements Stream.Stream<Doc, E, R> {
+  /**
+   * @internal
+   */
   declare readonly [TypeId]: TypeId;
+  /**
+   * @internal
+   */
   declare readonly "~labels": Types.Invariant<KeyLabels>;
+  /**
+   * @internal
+   */
   declare readonly "~direction": Types.Covariant<OrderDirection>;
 
   // The `Stream` protocol (the variance marker, `pipe`, and the `channel`
@@ -261,8 +282,14 @@ export class QueryStream<
   // `declare`d with their real types here and wired up on the prototype
   // below, so type-parameter inference over `QueryStream` values stays
   // intact for every `Stream.*` combinator.
+  /**
+   * @internal
+   */
   declare readonly [Stream.TypeId]: Stream.VarianceStruct<Doc, E, R>;
   declare readonly pipe: Pipeable["pipe"];
+  /**
+   * @internal
+   */
   declare readonly channel: Channel.Channel<
     Array.NonEmptyReadonlyArray<Doc>,
     E,
@@ -273,17 +300,27 @@ export class QueryStream<
     R
   >;
 
+  /**
+   * @internal
+   */
   constructor(
+    /**
+     * @public
+     */
     readonly orderDirection: OrderDirection,
     /**
      * Shared description of the key positions, including visible labels and
      * implicit IDs. Reuse with `empty` or `flatMap`'s `innerKeyLayout`. Reading
      * this property does not read documents. Direction is in `orderDirection`.
+     *
+     * @public
      */
     readonly keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
     /**
      * Values paired with stored keys, including filtered markers that advance
      * cursors without emitting a value.
+     *
+     * @internal
      */
     readonly annotated: Stream.Stream<
       Element<Doc>,
@@ -294,6 +331,8 @@ export class QueryStream<
      * Query recipe retained by direct index streams and rebuilt on each run.
      * Includes the effective index bounds. Composed streams instead delegate
      * range changes to their inputs through `narrowWith`.
+     *
+     * @internal
      */
     readonly reflection?: Reflection,
     /**
@@ -301,6 +340,8 @@ export class QueryStream<
      * ranges where that preserves the composition's results. Without this
      * recipe, `narrow` filters the annotated stream in memory. The constructor
      * guards recipe calls against bounds from incompatible layouts.
+     *
+     * @internal
      */
     readonly narrowWith?: (
       parsedBounds: QueryStreamKeyBounds.ParsedBounds,
@@ -309,6 +350,8 @@ export class QueryStream<
      * Rebuilds the stream in the opposite direction using index scans and
      * seeks. Distinct streams keep their original representatives. Without this
      * recipe, `reverse` throws `MissingReversalRecipeError`.
+     *
+     * @internal
      */
     readonly reverseWith?: () => QueryStream<
       Doc,
@@ -329,6 +372,9 @@ export class QueryStream<
     }
   }
 
+  /**
+   * @internal
+   */
   toStream(): Stream.Stream<Doc, E, R> {
     return Stream.unwrap(
       Effect.gen({ self: this }, function* () {
@@ -393,6 +439,8 @@ Object.defineProperties(queryStreamPrototype, {
  * A query stream with any value, ordering, error, and requirement types.
  *
  * @experimental
+ *
+ * @internal
  */
 export type Any = QueryStream<any, any, any, any, any>;
 
@@ -460,6 +508,8 @@ export const empty =
  * manually.
  *
  * @experimental
+ *
+ * @internal
  */
 export interface ReflectionReader {
   query(tableName: string): {
@@ -481,6 +531,8 @@ export interface ReflectionReader {
  * and pagination use it to rebuild queries with tighter index bounds.
  *
  * @experimental
+ *
+ * @internal
  */
 export interface Reflection<
   OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection =
@@ -518,6 +570,8 @@ export interface Reflection<
  * values before decoding, with equality-pinned fields removed.
  *
  * @experimental
+ *
+ * @internal
  */
 export const fromReflection = <
   Doc,
