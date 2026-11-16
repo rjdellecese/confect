@@ -25,6 +25,10 @@ than by declaration kind. New category names work without a site-side registry;
 untagged declarations use `Other`. Parameter/type-parameter tables keep the
 outline compact, while callable member details remain expanded so their
 argument, return, and failure documentation is not lost.
+Category titles capitalize their first letter without changing acronyms such
+as HTTP. Short declaration labels distinguish types, functions, and values
+inside each semantic group. Merged type namespaces stay on their owning page
+instead of creating duplicate sidebar entries.
 
 Generation and formatting always happen in a temporary directory before copying
 the result to ignored `api/reference/`, so preview and release output match.
@@ -36,7 +40,10 @@ table names as universal APIs.
 
 The small theme adapter supplies Mintlify frontmatter/routes and asks the
 Markdown plugin to render the existing members inside Effect `Service` type
-arguments. It escapes prose without changing code examples and uses span IDs
+arguments and class-based service contracts. A conversion hook fills missing
+categories on re-exports from their local export statement's standard JSDoc;
+it preserves upstream descriptions and more-specific categories. It escapes
+prose without changing code examples and uses span IDs
 instead of empty links for accessible anchors.
 All signatures, overloads, comments, and error aliases still come
 from TypeDoc; no symbol manifest or custom signature renderer is maintained.
