@@ -2,7 +2,10 @@ import {
   DeclarationReflection,
   Comment,
   ReferenceType,
+  ReferenceReflection,
   IntersectionType,
+  UnionType,
+  ConditionalType,
   ReflectionKind,
   ReflectionType,
   type Reflection,
@@ -10,6 +13,8 @@ import {
   type TypeDocOptions,
   type ProjectReflection,
   type Context,
+  type ContainerReflection,
+  type SomeType,
 } from "typedoc";
 import {
   MarkdownTheme,
@@ -27,29 +32,79 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 
 const JsonString = Schema.fromJsonString(Schema.String);
 
-const declarationKind = (model: DeclarationReflection): string =>
-  model.kindOf(ReflectionKind.Interface | ReflectionKind.TypeAlias)
+const isCallable = (
+  type: SomeType | undefined,
+  seen = new Set<SomeType>(),
+): boolean => {
+  if (type === undefined || seen.has(type)) return false;
+  seen.add(type);
+  if (type instanceof ReflectionType)
+    return (type.declaration.signatures?.length ?? 0) > 0;
+  if (type instanceof IntersectionType || type instanceof UnionType)
+    return Array.some(type.types, (member) => isCallable(member, seen));
+  if (type instanceof ConditionalType)
+    return isCallable(type.trueType, seen) || isCallable(type.falseType, seen);
+  if (
+    type instanceof ReferenceType &&
+    type.reflection instanceof DeclarationReflection
+  ) {
+    return (
+      (type.reflection.signatures?.length ?? 0) > 0 ||
+      isCallable(type.reflection.type, seen)
+    );
+  }
+  return false;
+};
+
+const declarationKind = (model: DeclarationReflection): string => {
+  if (model instanceof ReferenceReflection) {
+    const target = model.getTargetReflectionDeep();
+    if (target instanceof DeclarationReflection) return declarationKind(target);
+  }
+  return model.kindOf(ReflectionKind.Interface | ReflectionKind.TypeAlias)
     ? "type"
     : model.kindOf(ReflectionKind.Class)
       ? "class"
       : model.kindOf(ReflectionKind.Namespace)
         ? "namespace"
-        : model.kindOf(ReflectionKind.Function) ||
-            Array.some(
-              model.type instanceof IntersectionType
-                ? model.type.types
-                : [model.type],
-              (type) =>
-                type instanceof ReflectionType &&
-                (type.declaration.signatures?.length ?? 0) > 0,
-            )
+        : model.kindOf(ReflectionKind.Function | ReflectionKind.Method) ||
+            isCallable(model.type)
           ? "function"
           : "value";
+};
 
-export const formatDeclarationDetails = (
-  markdown: string,
-  semanticHeadings: ReadonlySet<string> = new Set(),
-): string => {
+const categoryOf = (
+  owner: ContainerReflection,
+  model: Reflection,
+): string | undefined =>
+  Option.getOrUndefined(
+    Array.findFirst(owner.categories ?? [], (group) =>
+      Array.some(group.children, (child) => child === model),
+    ),
+  )?.title;
+
+const serviceContract = (
+  model: DeclarationReflection,
+): DeclarationReflection | undefined => {
+  const type =
+    model.type instanceof ReferenceType && model.type.name === "Service"
+      ? model.type
+      : Option.getOrUndefined(
+          Array.findFirst(
+            model.extendedTypes ?? [],
+            (base) =>
+              base instanceof ReferenceType &&
+              base.name === "Shape" &&
+              base.package === "effect",
+          ),
+        );
+  if (!(type instanceof ReferenceType) || type.package !== "effect")
+    return undefined;
+  const service = type.typeArguments?.[1];
+  return service instanceof ReflectionType ? service.declaration : undefined;
+};
+
+export const formatDeclarationDetails = (markdown: string): string => {
   let rendered = markdown;
   for (const node of Array.reverse(fromMarkdown(markdown).children)) {
     if (node.type !== "heading" || node.depth < 4) continue;
@@ -66,10 +121,7 @@ export const formatDeclarationDetails = (
     )
       continue;
     const title = Str.slice(contentStart, contentEnd)(markdown);
-    const heading = semanticHeadings.has(`${node.depth}:${title}`)
-      ? `#### ${title}`
-      : `**${title}**`;
-    rendered = `${Str.slice(0, start)(rendered)}${heading}${Str.slice(end)(rendered)}`;
+    rendered = `${Str.slice(0, start)(rendered)}**${title}**${Str.slice(end)(rendered)}`;
   }
   return rendered;
 };
@@ -162,40 +214,117 @@ export class MintlifyRouter extends ModuleRouter {
 export class MintlifyTheme extends MarkdownTheme {
   override getRenderContext(page: MarkdownPageEvent<Reflection>) {
     const context = super.getRenderContext(page);
-    const semanticHeadings = new Set<string>();
-    const categories = context.partials.categories;
-    context.partials.categories = (models, options) => {
-      for (const model of models)
-        semanticHeadings.add(
-          `${Math.min(options.headingLevel, 6)}:${model.title}`,
-        );
-      return categories(models, options);
+    const entries = new Map<
+      DeclarationReflection,
+      { name: string; category: string; anchor: string }
+    >();
+    const addEntry = (
+      model: DeclarationReflection,
+      name: string,
+      owner: ContainerReflection,
+    ): void => {
+      if (entries.has(model) || context.router.hasOwnDocument(model)) return;
+      const target =
+        model instanceof ReferenceReflection
+          ? model.getTargetReflectionDeep()
+          : undefined;
+      const category =
+        categoryOf(owner, model) ??
+        (target?.parent instanceof DeclarationReflection
+          ? categoryOf(target.parent, target)
+          : undefined) ??
+        "Other";
+      const anchor = context.router.hasUrl(model)
+        ? context.router.getAnchor(model)
+        : undefined;
+      entries.set(model, {
+        name,
+        category,
+        anchor:
+          anchor ??
+          `api-${context.router.getSlugger(page.model).slug(`operation.${name}`)}`,
+      });
+      if (model.kindOf(ReflectionKind.Namespace)) {
+        for (const child of model.children ?? [])
+          addEntry(child, `${name}.${child.name}`, model);
+        return;
+      }
+      const containers = [model];
+      const service = serviceContract(model);
+      if (service !== undefined) containers.push(service);
+      for (const type of model.type instanceof IntersectionType
+        ? model.type.types
+        : [model.type]) {
+        if (
+          type instanceof ReflectionType &&
+          type.declaration.children !== undefined
+        )
+          containers.push(type.declaration);
+      }
+      for (const container of containers) {
+        for (const child of container.children ?? []) {
+          if (
+            child.inheritedFrom === undefined &&
+            declarationKind(child) === "function"
+          )
+            addEntry(child, `${name}.${child.name}`, container);
+        }
+      }
+    };
+    if (
+      page.model instanceof DeclarationReflection &&
+      page.model.kindOf(ReflectionKind.Module | ReflectionKind.Namespace)
+    ) {
+      for (const child of page.model.children ?? [])
+        addEntry(child, child.name, page.model);
+    }
+    let currentEntry: DeclarationReflection | undefined;
+    const body = context.partials.body;
+    context.partials.body = (model, options) => {
+      if (model !== page.model || entries.size === 0)
+        return body(model, options);
+      const groups = new Map<string, DeclarationReflection[]>();
+      for (const [declaration, entry] of entries) {
+        const group = groups.get(entry.category) ?? [];
+        group.push(declaration);
+        groups.set(entry.category, group);
+      }
+      const rendered: string[] = [];
+      for (const [category, declarations] of Array.sort(
+        Array.fromIterable(groups),
+        (
+          a: [string, DeclarationReflection[]],
+          b: [string, DeclarationReflection[]],
+        ) => Str.localeCompare(b[0])(a[0]),
+      )) {
+        rendered.push(`## ${category}`);
+        for (const declaration of Array.sort(
+          declarations,
+          (a: DeclarationReflection, b: DeclarationReflection) =>
+            Str.localeCompare(entries.get(b)?.name ?? b.name)(
+              entries.get(a)?.name ?? a.name,
+            ),
+        )) {
+          currentEntry = declaration;
+          rendered.push(
+            context.partials.memberContainer(declaration, { headingLevel: 3 }),
+          );
+          rendered.push("---");
+        }
+      }
+      currentEntry = undefined;
+      return Array.join(rendered, "\n\n");
     };
     const memberContainer = context.partials.memberContainer;
     context.partials.memberContainer = (model, options) => {
-      semanticHeadings.add(
-        `${Math.min(options.headingLevel, 6)}:${context.partials.memberTitle(model)}`,
-      );
-      return memberContainer(model, options);
+      const entry = entries.get(model);
+      if (entry !== undefined && currentEntry !== model)
+        return `See [${entry.name}](#${entry.anchor}).`;
+      const rendered = memberContainer(model, options);
+      return entry !== undefined && !context.router.hasUrl(model)
+        ? `<a id="${entry.anchor}"></a>\n\n${rendered}`
+        : rendered;
     };
-    const typeDeclarationContainer = context.partials.typeDeclarationContainer;
-    context.partials.typeDeclarationContainer = (
-      model,
-      declaration,
-      options,
-    ) => {
-      for (const category of declaration.categories ?? [])
-        semanticHeadings.add(
-          `${Math.min(options.headingLevel, 6)}:${category.title}`,
-        );
-      return typeDeclarationContainer(model, declaration, options);
-    };
-    const reflection = context.templates.reflection;
-    context.templates.reflection = (event) =>
-      formatDeclarationDetails(reflection(event), semanticHeadings);
-    const index = context.templates.index;
-    context.templates.index = (event) =>
-      formatDeclarationDetails(index(event), semanticHeadings);
     const member = context.partials.member;
     context.partials.member = (model, options) => {
       let rendered = model.kindOf(ReflectionKind.Namespace)
@@ -203,36 +332,21 @@ export class MintlifyTheme extends MarkdownTheme {
             headingLevel: options.headingLevel + 1,
           })
         : member(model, options);
-      if (
-        model.parent?.kindOf(
-          ReflectionKind.Module | ReflectionKind.Namespace,
-        ) === true
-      ) {
+      if (currentEntry === model) {
         rendered = `<Badge color="gray" size="sm">${declarationKind(model)}</Badge>\n\n${rendered}`;
       }
-      const type =
-        model.type instanceof ReferenceType && model.type.name === "Service"
-          ? model.type
-          : Option.getOrUndefined(
-              Array.findFirst(
-                model.extendedTypes ?? [],
-                (base) =>
-                  base instanceof ReferenceType &&
-                  base.name === "Shape" &&
-                  base.package === "effect",
-              ),
-            );
-      if (!(type instanceof ReferenceType) || type.package !== "effect")
-        return rendered;
-      const service = type.typeArguments?.[1];
-      if (!(service instanceof ReflectionType)) return rendered;
+      const service = serviceContract(model);
+      if (service === undefined) return rendered;
       const headingLevel = options.headingLevel + 1;
-      semanticHeadings.add(`${Math.min(headingLevel, 6)}:Service operations`);
-      return `${rendered}\n\n${Str.repeat(headingLevel)("#")} Service operations\n\n${context.partials.typeDeclarationContainer(model, service.declaration, { headingLevel })}`;
+      return `${rendered}\n\n${Str.repeat(headingLevel)("#")} Service operations\n\n${context.partials.typeDeclarationContainer(model, service, { headingLevel })}`;
     };
     const memberTitle = context.partials.memberTitle;
     context.partials.memberTitle = (model) => {
-      const title = memberTitle(model);
+      const entry = entries.get(model);
+      const title =
+        entry !== undefined && entry.name !== model.name
+          ? `${Str.slice(0, entry.name.length - model.name.length)(entry.name)}${memberTitle(model)}`
+          : memberTitle(model);
       const parent = model.parent;
       return parent instanceof DeclarationReflection &&
         parent.kindOf(ReflectionKind.Module | ReflectionKind.Namespace) &&
@@ -270,7 +384,7 @@ export class MintlifyTheme extends MarkdownTheme {
     const body = Str.replace(
       /<a id="([^"]+)"><\/a>/g,
       '<span id="$1"></span>',
-    )(super.render(page));
+    )(formatDeclarationDetails(super.render(page)));
     const model = page.model;
     const names: string[] = [];
     for (
