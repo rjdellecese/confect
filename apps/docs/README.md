@@ -34,7 +34,11 @@ instead of empty links for accessible anchors.
 All signatures, overloads, comments, and error aliases still come
 from TypeDoc; no symbol manifest or custom signature renderer is maintained.
 Internal support types can remain named in public signatures without getting
-their own pages. TypeDoc currently reports non-fatal comment warnings for
+their own pages. Inline dependency-owned option fields are retained; only
+inherited dependency members are omitted (constructors remain). This avoids
+turning an expanded Convex options type into an empty object while keeping
+upstream schema machinery out of Confect's pages.
+TypeDoc currently reports non-fatal comment warnings for
 inferred overload parameters and links to excluded/internal or upstream types;
 those links render as plain text. Broken site links remain CI failures.
 
