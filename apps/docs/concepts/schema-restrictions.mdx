@@ -4,39 +4,23 @@ title: "Schema Restrictions"
 description: "Understand the restrictions on Effect schemas that can be used in Confect."
 ---
 
-Not every Effect schema is valid for use in Confect. In Effect v4, `Schema.Codec<Type, Encoded, DecodingServices, EncodingServices>` tracks both representations of a value and the services required to convert between them. `Schema.Schema<Type>` tracks only the decoded type; it does not preserve the encoded type or service requirements.
+Not every Effect schema is valid for use in Confect. An Effect codec has the following type parameters:
+
+```text
+Schema.Codec<Type, Encoded, DecodingServices, EncodingServices>
+```
 
 For schemas used in Confect:
 
 - `Type` is the decoded value you work with in your code. It does not have to be a Convex value.
 - `Encoded` is the value stored in the database or sent as a Convex function argument or result. It must be a valid [Convex value](https://docs.convex.dev/database/types#convex-values).
-- `DecodingServices` lists the Effect services required to decode `Encoded` into `Type`.
-- `EncodingServices` lists the Effect services required to encode `Type` into `Encoded`.
+- `DecodingServices` and `EncodingServices` are not supported and should always be `never`.
 
-Confect's table and function schemas must have `never` for **both** service requirements. Effect defaults both parameters to `never`, so `Schema.Codec<Type, Encoded>` expresses a codec with no decoding or encoding service requirements. Providing services to a function handler does not remove this restriction on its schemas.
+For reference:
 
-For example, `Schema.DateFromString` decodes a string into a JavaScript `Date` and encodes a `Date` back into a string, without requiring services:
-
-```typescript
-import * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
-
-const dateCodec: Schema.Codec<Date, string> = Schema.DateFromString;
-
-const roundTrip = Effect.gen(function* () {
-  const date = yield* Schema.decodeEffect(dateCodec)(
-    "2026-01-01T00:00:00.000Z",
-  );
-  const encoded = yield* Schema.encodeEffect(dateCodec)(date);
-  return { date, encoded };
-});
-
-const result = await Effect.runPromise(roundTrip);
+```text
+Schema.Codec
 ```
-
-Here, `result.date` is a `Date` and `result.encoded` is `"2026-01-01T00:00:00.000Z"`. The encoded string is a Convex value even though the decoded `Date` is not.
-
-Confect decodes documents when reading from the database and encodes them when writing. For function calls, Confect callers encode arguments and decode results; the server decodes arguments before the handler runs and encodes the handler's result before returning it.
 
 ## Function argument fields
 
