@@ -63,7 +63,11 @@ Contains a typed `components` registry with one entry per Convex [component](htt
 
 #### `convexSchema.ts`
 
-Contains the Convex deploy-time `SchemaDefinition` (a single `defineSchema({...})` call) assembled from every `confect/tables/*.ts` module. `convex/schema.ts` re-exports its default so Convex's CLI and `convex-test` find it where they expect. You should never import this file directly from your own code—use `_generated/schema.ts` for runtime needs.
+Contains the Convex deploy-time `SchemaDefinition` (a single `defineSchema({...})` call) assembled from every `confect/tables/*.ts` module. `convex/schema.ts` re-exports its default for deployment.
+
+Keep this deployment schema out of your Convex function implementations and their runtime import graphs: importing it constructs Convex validators and index definitions for every table. Use `_generated/schema.ts` for Confect's runtime `DatabaseSchema` instead.
+
+Test setup needs both schemas: import `_generated/schema.ts` and `_generated/convexSchema.ts` and pass them to `TestConfect.layer`, as shown in the [Testing guide](/guides/testing#setup).
 
 #### `docs.ts`
 
