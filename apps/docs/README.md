@@ -22,12 +22,14 @@ installed releases. The CLI is a binary, not a package API reference.
 Guides and API Reference have separate top-level Mintlify tabs and sidebars.
 Module pages group types and values by their source `@category` tags, rather
 than by declaration kind. New category names work without a site-side registry;
-untagged declarations use `Other`. Categories, exports, and nested API members
-remain page headings. The renderer records which headings represent semantic
-groups and declarations, rather than treating every deep heading as detail.
-Nested groups and members use H4 so they remain visible in Mintlify's native
-outline. Parameters, returns, and overload labels remain visible as bold detail
-labels and tables without competing with API names in the outline.
+untagged declarations use `Other`. Each module has a category-first index of
+exports and their directly declared callable APIs. Methods and service operations
+use owner-qualified names, such as `Builder.middleware` under Combinators and
+`ActionRunner.runAction` under Invocation. Inherited methods are not repeated as
+index entries on derived types. Data properties, inherited members, parameters,
+returns, and signature details stay in the owning entry's body.
+Each indexed operation is rendered once; its owner links to that canonical
+section instead of duplicating its documentation and anchor.
 Category titles capitalize their first letter without changing acronyms such
 as HTTP. Native Mintlify badges distinguish types, functions, and values in the
 body without lengthening navigation labels. Same-name type/value exports keep a
@@ -51,9 +53,11 @@ it preserves upstream descriptions and more-specific categories. It escapes
 prose without changing code examples and uses span IDs
 instead of empty links for accessible anchors. TypeDoc's `api-` anchor prefix
 keeps cross-reference targets distinct from Mintlify's heading IDs.
-A standard Markdown parser identifies headings, and TypeDoc's rendering hooks
-identify their semantic roles before detail labels are formatted. Only heading
-source ranges change. Fenced examples, tables, and links are
+A page-local view groups the existing TypeDoc reflections without changing
+their names, parents, signatures, or source categories. The Markdown plugin
+still renders each entry's contract. A standard Markdown parser formats body
+detail headings as labels, leaving only categories and indexed APIs in the
+native outline. Fenced examples, tables, and links are
 left intact. No custom navigation component, CSS selectors, DOM scripts, or
 unsupported table-of-contents settings are needed. Effect's custom kind icons
 in its outline are not reproduced; Mintlify retains its native navigation.

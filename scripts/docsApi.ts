@@ -61,6 +61,7 @@ try {
     theme: "mintlify",
     router: "mintlify",
     fileExtension: ".mdx",
+    publicPath: "/api/reference",
     entryFileName: "index",
     hidePageHeader: true,
     hidePageTitle: true,
@@ -113,39 +114,43 @@ try {
   if (app.logger.hasErrors()) process.exit(1);
 
   const packagePages = await Effect.runPromise(
-    Effect.forEach(packages, (name) =>
-      Effect.gen(function* () {
-        const files = yield* fs.readDirectory(
-          `${rendered}/api/reference/${name}`,
-          {
-            recursive: true,
-          },
-        );
-        const pages = Array.map(
-          Array.filter(files, Str.endsWith(".mdx")).sort((a, b) =>
-            a === "index.mdx"
-              ? -1
-              : b === "index.mdx"
-                ? 1
-                : a < b
-                  ? -1
-                  : a > b
-                    ? 1
-                    : 0,
-          ),
-          (file) => `api/reference/${name}/${Str.replace(/\.mdx$/, "")(file)}`,
-        );
-        const metadata = yield* fs.readFileString(
-          `${root}/packages/${name}/package.json`,
-        );
-        const { version } = yield* Schema.decodeEffect(
-          Schema.fromJsonString(Schema.Struct({ version: Schema.String })),
-        )(metadata);
-        return {
-          group: { group: `@confect/${name}`, pages },
-          version: `| @confect/${name} | ${version} |`,
-        };
-      }),
+    Effect.forEach(
+      packages,
+      (name) =>
+        Effect.gen(function* () {
+          const files = yield* fs.readDirectory(
+            `${rendered}/api/reference/${name}`,
+            {
+              recursive: true,
+            },
+          );
+          const pages = Array.map(
+            Array.filter(files, Str.endsWith(".mdx")).sort((a, b) =>
+              a === "index.mdx"
+                ? -1
+                : b === "index.mdx"
+                  ? 1
+                  : a < b
+                    ? -1
+                    : a > b
+                      ? 1
+                      : 0,
+            ),
+            (file) =>
+              `api/reference/${name}/${Str.replace(/\.mdx$/, "")(file)}`,
+          );
+          const metadata = yield* fs.readFileString(
+            `${root}/packages/${name}/package.json`,
+          );
+          const { version } = yield* Schema.decodeEffect(
+            Schema.fromJsonString(Schema.Struct({ version: Schema.String })),
+          )(metadata);
+          return {
+            group: { group: `@confect/${name}`, pages },
+            version: `| @confect/${name} | ${version} |`,
+          };
+        }),
+      { concurrency: 1 },
     ),
   );
   const apiTab = {

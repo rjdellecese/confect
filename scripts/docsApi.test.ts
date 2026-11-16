@@ -21,7 +21,7 @@ import {
 const fs = Effect.runSync(
   FileSystem.FileSystem.pipe(Effect.provide(BunServices.layer)),
 );
-const { resolve, dirname } = Effect.runSync(
+const { resolve } = Effect.runSync(
   Path.Path.pipe(Effect.provide(BunServices.layer)),
 );
 const root = resolve(import.meta.dir, "..");
@@ -80,7 +80,7 @@ test("keeps semantic groups and members in the outline without boilerplate label
   for (const [path, page] of pages) {
     const detailHeadings = Array.filter(
       fromMarkdown(page).children,
-      (node) => node.type === "heading" && node.depth > 4,
+      (node) => node.type === "heading" && node.depth > 3,
     );
     expect(detailHeadings, path).toEqual([]);
   }
@@ -91,25 +91,25 @@ test("keeps semantic groups and members in the outline without boilerplate label
   ).toBeGreaterThan(1);
   expect(functions).toContain("**Returns**");
   expect(functions).toContain("**Throws**");
-  expect(functions).toContain("#### Combinators");
-  expect(functions).toContain("#### middleware()");
-  expect(functions).toContain("#### Middleware");
-  expect(functions).toContain("#### middlewareAttachments");
+  expect(functions).toContain("## Combinators");
+  expect(functions).toContain("### Builder.middleware()");
+  expect(functions).toContain("**Middleware**");
+  expect(functions).toContain("**middlewareAttachments**");
   expect(functions).not.toMatch(
     /^#{2,6} (Parameters|Returns|Type Parameters|Throws|Call Signature|Inherited from)$/m,
   );
   expect(functions).not.toMatch(/^### .*\((function|type|class|value)\)$/m);
   expect(pages.get("api/reference/server/ExecutionMetadata.mdx")).toContain(
-    "#### Service operations",
+    "**Service operations**",
   );
   expect(pages.get("api/reference/server/ExecutionMetadata.mdx")).toContain(
-    "#### getFunction",
+    "### ExecutionMetadata.getFunction",
   );
   expect(pages.get("api/reference/server/ActionRunner.mdx")).toContain(
-    "#### runAction",
+    "### ActionRunner.runAction",
   );
   expect(pages.get("api/reference/server/QueryStream.mdx")).toContain(
-    "#### bytesRead",
+    "**bytesRead**",
   );
 });
 
@@ -155,15 +155,34 @@ test("formats detail labels without rewriting fenced examples, tables, or anchor
 });
 
 test("preserves renderer-identified semantics rather than every heading at a depth", () => {
-  const markdown =
-    "#### Combinators\n\n##### middleware()\n\n###### Parameters\n\n#### Returns\n\n##### next()\n\n###### Returns\n";
+  const functions = pages.get("api/reference/core/FunctionSpec.mdx") ?? "";
+  expect(functions).toMatch(
+    /## Combinators\n\n<span id="api-middleware"><\/span>\n\n### Builder\.middleware\(\)/,
+  );
+  expect(functions).toContain("See [Builder.middleware](#api-middleware).");
   expect(
-    formatDeclarationDetails(
-      markdown,
-      new Set(["4:Combinators", "5:middleware()", "4:Returns", "5:next()"]),
+    Array.fromIterable(
+      Str.matchAll(/Attach middleware around this function's handler/g)(
+        functions,
+      ),
     ),
-  ).toBe(
-    "#### Combinators\n\n#### middleware()\n\n**Parameters**\n\n#### Returns\n\n#### next()\n\n**Returns**\n",
+  ).toHaveLength(1);
+  const service = pages.get("api/reference/server/ActionRunner.mdx") ?? "";
+  expect(service).toMatch(
+    /## Invocation[\s\S]*### ActionRunner\.runAction[\s\S]*## Services/,
+  );
+  expect(service).toContain(
+    "See [ActionRunner.runAction](#api-operationactionrunnerrunaction).",
+  );
+  expect(pages.get("api/reference/foldkit/PaginatedQuery.mdx")).toContain(
+    "### PaginatedQuery.init",
+  );
+  const aliases = pages.get("api/reference/server/Table.mdx") ?? "";
+  expect(aliases).toContain("## Constructors");
+  expect(aliases).toContain("## Models");
+  expect(aliases).not.toContain("## Other");
+  expect(aliases).toContain(
+    "Re-exports [make](/api/reference/core/Table#api-make)",
   );
 });
 
@@ -216,7 +235,31 @@ test("renders public functions, overloads, classes, types, and inferred service 
     "Select a table for document lookup or query construction.",
   );
   expect(pages.get("api/reference/server/DatabaseReader.mdx")).toMatch(
-    /Selecting a\s+table does not itself fetch documents; system tables are read-only\./,
+    /Selecting a\s+handle does not read any documents\./,
+  );
+  expect(pages.get("api/reference/server/DatabaseReader.mdx")).toMatch(
+    /Narrow the handle by `tableName` before selecting a table-specific\s+index/,
+  );
+  expect(pages.get("api/reference/server/Table.mdx")).toContain(
+    "## System tables",
+  );
+  expect(pages.get("api/reference/server/Table.mdx")).toContain(
+    'id="api-_storage"',
+  );
+  expect(pages.get("api/reference/server/Table.mdx")).toContain(
+    'id="api-_scheduled_functions"',
+  );
+  expect(pages.get("api/reference/server/FunctionImpl.mdx")).toContain(
+    "### Builder.make",
+  );
+  expect(pages.get("api/reference/server/MiddlewareImpl.mdx")).toContain(
+    "### Builders.makeByFunctionType",
+  );
+  expect(pages.get("api/reference/server/HttpRouter.mdx")).toContain(
+    "function make<DatabaseSchema_>(routes)",
+  );
+  expect(pages.get("api/reference/test/TestConfect.mdx")).toMatch(
+    /function layer<DatabaseSchema_>\(\s*tableNames,\s*convexSchemaDefinition,\s*modules,/,
   );
   expect(pages.get("api/reference/react/index.mdx")).toContain("useMutation");
   expect(pages.get("api/reference/react/PaginatedQueryResult.mdx")).toContain(
@@ -277,13 +320,8 @@ test("all generated page links and explicit TypeDoc anchors resolve", () => {
       const href = match[1];
       if (/^(?:https?:|mailto:)/.test(href)) continue;
       const [file, anchor] = Str.split("#")(href);
-      const target =
-        file === ""
-          ? path
-          : Str.replace(
-              `${directory}/first/`,
-              "",
-            )(resolve(directory, "first", dirname(path), file));
+      if (file !== "") expect(file).toStartWith("/api/reference/");
+      const target = file === "" ? path : `${Str.slice(1)(file)}.mdx`;
       expect(pages.has(target), `${path}: ${href}`).toBe(true);
       if (anchor !== undefined) {
         expect(pages.get(target), `${path}: ${href}`).toContain(
@@ -378,6 +416,29 @@ export const route = (value: Widget): string => value.name;
  * @category HTTP
  */
 export const protocol = "HTTP";
+/** Base contract.
+ * @category Models
+ */
+export class Base {
+  /** Existing operation.
+   * @category Combinators
+   */
+  existing(): void {}
+}
+/** Builder contract.
+ * @category Models
+ */
+export class Builder extends Base {
+  /** Stored label.
+   * @category Models
+   */
+  readonly label = "builder";
+  /** Attach a new step.
+   * @category Combinators
+   * @returns The same builder.
+   */
+  attach(): this { return this; }
+}
 /** Implementation detail.
  * @internal
  * @category Models
@@ -396,6 +457,7 @@ export const hidden = 1;
           router: "mintlify",
           excludeInternal: true,
           useCodeBlocks: true,
+          useHTMLAnchors: true,
           fileExtension: ".mdx",
           readme: "none",
           out: `${fixture}/output`,
@@ -424,6 +486,16 @@ export const hidden = 1;
         expect(page).toContain("## Models");
         expect(page).toContain("## Constructors");
         expect(page).toContain("## Routing");
+        expect(page).toContain("## Combinators");
+        expect(page).toContain("### Builder.attach()");
+        expect(page).toContain("### Base.existing()");
+        expect(page).not.toContain("### Builder.existing()");
+        expect(page).not.toContain("### Builder.label");
+        expect(page).toContain("**label**");
+        expect(page).toContain("The same builder.");
+        expect(
+          Array.fromIterable(Str.matchAll(/Attach a new step\./g)(page)),
+        ).toHaveLength(1);
         expect(page).toContain(
           '### Widget (type)\n\n<Badge color="gray" size="sm">type</Badge>',
         );
