@@ -156,8 +156,7 @@
                   "api/reference/react/index",
                   "api/reference/react/OptimisticLocalStore",
                   "api/reference/react/PaginatedQueryResult",
-                  "api/reference/react/QueryResult",
-                  "api/reference/react/StreamPagination"
+                  "api/reference/react/QueryResult"
                 ]
               },
               {

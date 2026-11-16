@@ -7,11 +7,13 @@ import * as Path from "effect/Path";
 import * as Str from "effect/String";
 import * as Option from "effect/Option";
 import docsConfig from "../apps/docs/docs.json";
-import { Application } from "typedoc";
+import { Application, Converter } from "typedoc";
 import {
   MintlifyRouter,
   MintlifyTheme,
   presentationOptions,
+  normalizeCategories,
+  preserveReexportCategories,
 } from "./docsApiTheme";
 
 const fs = Effect.runSync(
@@ -72,7 +74,34 @@ afterAll(() =>
   Effect.runPromise(fs.remove(directory, { recursive: true, force: true })),
 );
 
+test("retains source categories and upstream contracts on public reexports", () => {
+  for (const [module, names] of [
+    ["server/ExecutionMetadata", ["DeploymentMetadata", "FunctionMetadata"]],
+    ["server/RequestMetadata", ["Metadata"]],
+    ["server/TransactionMetadata", ["TransactionMetric", "TransactionMetrics"]],
+    ["server/MutationAuth", ["SignJwtClaims", "SignJwtOptions"]],
+    ["test/TestConfect", ["DeploymentJwk", "DeploymentJwks"]],
+  ] as const) {
+    const page = pages.get(`api/reference/${module}.mdx`);
+    expect(page).toContain("## Models");
+    expect(page).not.toContain("## Other");
+    for (const name of names) expect(page).toContain(`### ${name} (type)`);
+  }
+  expect(pages.get("api/reference/server/ExecutionMetadata.mdx")).toContain(
+    "Metadata about the deployment this function is running on.",
+  );
+  expect(pages.get("api/reference/server/ExecutionMetadata.mdx")).toContain(
+    "region: string | null",
+  );
+  expect(pages.get("api/reference/server/ExecutionMetadata.mdx")).toContain(
+    "Read metadata for the current function, including its name and component.",
+  );
+});
+
 test("renders public functions, overloads, classes, types, and inferred service operations", () => {
+  expect(pages.get("api/reference/server/QueryStream.mdx")).toContain(
+    "### map (function)",
+  );
   const functions = pages.get("api/reference/core/FunctionSpec.mdx");
   expect(functions).toContain("publicQuery");
   expect(functions).toMatch(/^#{3,4} Call Signature$/m);
@@ -209,14 +238,29 @@ test(
           '{"compilerOptions":{"strict":true,"types":[]},"include":["categories.ts"]}',
         );
         yield* fs.writeFileString(
+          `${fixture}/upstream.ts`,
+          `
+/** The original contract description. */
+export interface External { readonly id: string }
+/** A more specific original category.
+ * @category Specific
+ */
+export interface Specific { readonly value: number }
+`,
+        );
+        yield* fs.writeFileString(
           `${fixture}/categories.ts`,
           `
+/** Public contracts from another module.
+ * @category Models
+ */
+export type { External, Specific } from "./upstream";
 /** A named value.
  * @category Models
  */
 export interface Widget { readonly name: string }
 /** The default named value.
- * @category Models
+ * @category models
  */
 export const Widget: Widget = { name: "default" };
 /** Create a named value.
@@ -227,6 +271,10 @@ export const make = (name: string): Widget => ({ name });
  * @category Routing
  */
 export const route = (value: Widget): string => value.name;
+/** The protocol name.
+ * @category HTTP
+ */
+export const protocol = "HTTP";
 /** Implementation detail.
  * @internal
  * @category Models
@@ -244,6 +292,7 @@ export const hidden = 1;
           theme: "mintlify",
           router: "mintlify",
           excludeInternal: true,
+          useCodeBlocks: true,
           fileExtension: ".mdx",
           readme: "none",
           out: `${fixture}/output`,
@@ -253,6 +302,15 @@ export const hidden = 1;
         );
         app.renderer.defineTheme("mintlify", MintlifyTheme);
         app.renderer.defineRouter("mintlify", MintlifyRouter);
+        app.converter.on(
+          Converter.EVENT_CREATE_DECLARATION,
+          preserveReexportCategories,
+        );
+        app.converter.on(
+          Converter.EVENT_RESOLVE_END,
+          ({ project }) => normalizeCategories(project),
+          -50,
+        );
         const project = yield* Effect.promise(() => app.convert());
         expect(project).toBeDefined();
         if (project === undefined) return;
@@ -263,8 +321,19 @@ export const hidden = 1;
         expect(page).toContain("## Models");
         expect(page).toContain("## Constructors");
         expect(page).toContain("## Routing");
-        expect(page).toContain("### Widget (interface)");
-        expect(page).toContain("### Widget (variable)");
+        expect(page).toContain("### Widget (type)");
+        expect(page).toContain("### Widget (value)");
+        expect(page).toMatch(/## Models[\s\S]*### External \(type\)/);
+        expect(page).toMatch(/## Specific[\s\S]*### Specific \(type\)/);
+        expect(page).toContain("The original contract description.");
+        expect(page).toContain("readonly id: string");
+        expect(page).toContain("### make() (function)");
+        expect(page).toContain("## HTTP");
+        expect(page).not.toContain("## Http");
+        expect(
+          Array.fromIterable(Str.matchAll(/^## Models$/gm)(page)),
+        ).toHaveLength(1);
+        expect(page).not.toContain("## models");
         expect(page).toMatch(/## Constructors[\s\S]*## Models/);
         expect(page).not.toContain("hidden");
         expect(page).not.toMatch(/^## (Interfaces|Variables|Functions)$/m);
