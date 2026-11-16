@@ -42,11 +42,11 @@ const program = Effect.gen(function* () {
 });
 ```
 
-Each method returns an `Effect` that can fail with `HttpClientError` (wrapping transport-level errors) or `ParseResult.ParseError` (if schema encoding or decoding fails).
+Each method returns an `Effect` that can fail with `HttpClientError` (wrapping transport-level or undeclared backend errors) or `Schema.SchemaError` from `effect/Schema` (if schema encoding or decoding fails).
 
 ## Typed errors
 
-When a ref's spec declares an `error` schema, the decoded error is added to the returned `Effect`'s error channel alongside `HttpClientError` and `ParseError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
+When a ref's spec declares an `error` schema, the decoded error is added to the returned `Effect`'s error channel alongside `HttpClientError` and `Schema.SchemaError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
 
 ```ts
 import { HttpClient } from "@confect/js";
@@ -59,7 +59,7 @@ const lookup = Effect.gen(function* () {
 
   return yield* client.query(refs.public.notes.getOrFail, { noteId });
 });
-// Effect.Effect<Note, NoteNotFound | HttpClientError | ParseError, HttpClient.HttpClient>
+// Effect.Effect<Note, NoteNotFound | HttpClientError | Schema.SchemaError, HttpClient.HttpClient>
 ```
 
 Recover from a typed failure with `Effect.catchTag` (or any other `Effect` error combinator).
