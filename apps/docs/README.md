@@ -19,6 +19,13 @@ TypeScript 5.9.3 for TypeDoc's compiler API; build/typecheck still uses `tsrs`.
 `tsconfig.docs.json` resolves workspace imports to source, not stale `dist` or
 installed releases. The CLI is a binary, not a package API reference.
 
+Guides and API Reference have separate top-level Mintlify tabs and sidebars.
+Module pages group types and values by their source `@category` tags, rather
+than by declaration kind. New category names work without a site-side registry;
+untagged declarations use `Other`. Parameter/type-parameter tables keep the
+outline compact, while callable member details remain expanded so their
+argument, return, and failure documentation is not lost.
+
 Generation and formatting always happen in a temporary directory before copying
 the result to ignored `api/reference/`, so preview and release output match.
 Commit navigation changes in

@@ -5,11 +5,13 @@ import {
   ReflectionType,
   type Reflection,
   type RouterTarget,
+  type TypeDocOptions,
 } from "typedoc";
 import {
   MarkdownTheme,
   ModuleRouter,
   type MarkdownPageEvent,
+  type PluginOptions,
 } from "typedoc-plugin-markdown";
 import * as Array from "effect/Array";
 import * as Schema from "effect/Schema";
@@ -18,7 +20,23 @@ import * as Effect from "effect/Effect";
 
 const JsonString = Schema.fromJsonString(Schema.String);
 
+export const presentationOptions = {
+  categorizeByGroup: false,
+  defaultCategory: "Other",
+  hideGroupHeadings: true,
+  parametersFormat: "table",
+} satisfies Partial<TypeDocOptions & PluginOptions>;
+
 export class MintlifyRouter extends ModuleRouter {
+  protected override getPageKind(reflection: Reflection) {
+    if (
+      reflection.kindOf(ReflectionKind.Namespace) &&
+      reflection.parent?.kindOf(ReflectionKind.Namespace) === true
+    )
+      return undefined;
+    return super.getPageKind(reflection);
+  }
+
   override getIdealBaseName(reflection: Reflection): string {
     const names: string[] = [];
     for (
@@ -36,6 +54,22 @@ export class MintlifyRouter extends ModuleRouter {
 export class MintlifyTheme extends MarkdownTheme {
   override getRenderContext(page: MarkdownPageEvent<Reflection>) {
     const context = super.getRenderContext(page);
+    const member = context.partials.member;
+    context.partials.member = (model, options) =>
+      model.kindOf(ReflectionKind.Namespace)
+        ? context.partials.memberWithGroups(model, {
+            headingLevel: options.headingLevel + 1,
+          })
+        : member(model, options);
+    const memberTitle = context.partials.memberTitle;
+    context.partials.memberTitle = (model) => {
+      const title = memberTitle(model);
+      return model.parent?.kindOf(
+        ReflectionKind.Module | ReflectionKind.Namespace,
+      ) === true
+        ? `${title} (${Str.toLowerCase(ReflectionKind.singularString(model.kind))})`
+        : title;
+    };
     const commentParts = context.helpers.getCommentParts;
     context.helpers.getCommentParts = (parts) =>
       commentParts(
@@ -93,7 +127,11 @@ export class MintlifyTheme extends MarkdownTheme {
         ? `@confect/${Array.join(Array.take(names, 2), "/")}`
         : undefined;
     const title =
-      model instanceof DeclarationReflection ? model.name : "Package reference";
+      model instanceof DeclarationReflection
+        ? model.kindOf(ReflectionKind.Module)
+          ? (importPath ?? model.name)
+          : model.name
+        : "Package reference";
     const introduction =
       importPath !== undefined ? `Import path: \`${importPath}\`.\n\n` : "";
     return `---\ntitle: ${Effect.runSync(Schema.encodeEffect(JsonString)(title))}\ndescription: ${Effect.runSync(Schema.encodeEffect(JsonString)(importPath !== undefined ? `API reference for ${importPath}.` : "Confect package API reference."))}\n---\n\n${introduction}${body}`;
