@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Confect \ud83e\uddc1",
+  "name": "Confect 🧁",
   "colors": {
     "primary": "#941A97",
     "light": "#F9A8D4",
@@ -95,6 +95,115 @@
       {
         "group": "Guides",
         "pages": ["guides/testing"]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api/overview",
+          "api/generated",
+          "api/reference/source",
+          {
+            "group": "@confect/core",
+            "pages": [
+              "api/reference/core/index",
+              "api/reference/core/FunctionSpec",
+              "api/reference/core/GenericId",
+              "api/reference/core/GroupSpec",
+              "api/reference/core/MiddlewareSpec",
+              "api/reference/core/PaginationError",
+              "api/reference/core/PaginationResult",
+              "api/reference/core/Ref",
+              "api/reference/core/Refs",
+              "api/reference/core/Spec",
+              "api/reference/core/SystemFields",
+              "api/reference/core/Table"
+            ]
+          },
+          {
+            "group": "@confect/foldkit",
+            "pages": [
+              "api/reference/foldkit/index",
+              "api/reference/foldkit/Client",
+              "api/reference/foldkit/Command",
+              "api/reference/foldkit/PaginatedQuery",
+              "api/reference/foldkit/QueryResult",
+              "api/reference/foldkit/Subscription"
+            ]
+          },
+          {
+            "group": "@confect/js",
+            "pages": [
+              "api/reference/js/index",
+              "api/reference/js/HttpClient",
+              "api/reference/js/WebSocketClient"
+            ]
+          },
+          {
+            "group": "@confect/react",
+            "pages": [
+              "api/reference/react/index",
+              "api/reference/react/OptimisticLocalStore",
+              "api/reference/react/PaginatedQueryResult",
+              "api/reference/react/PaginatedQueryResult/PaginatedQueryResult",
+              "api/reference/react/QueryResult",
+              "api/reference/react/QueryResult/QueryResult",
+              "api/reference/react/StreamPagination"
+            ]
+          },
+          {
+            "group": "@confect/server",
+            "pages": [
+              "api/reference/server/index",
+              "api/reference/server/ActionCtx",
+              "api/reference/server/ActionRunner",
+              "api/reference/server/AiGatewayDecisionClient",
+              "api/reference/server/AiGatewayDecisionModel",
+              "api/reference/server/AiGatewayLanguageClient",
+              "api/reference/server/AiGatewayLanguageModel",
+              "api/reference/server/Auth",
+              "api/reference/server/BlobNotFoundError",
+              "api/reference/server/ConvexConfigProvider",
+              "api/reference/server/ConvexLogger",
+              "api/reference/server/CronJob",
+              "api/reference/server/CronJobs",
+              "api/reference/server/CronWindow",
+              "api/reference/server/DatabaseReader",
+              "api/reference/server/DatabaseSchema",
+              "api/reference/server/DatabaseWriter",
+              "api/reference/server/Document",
+              "api/reference/server/DocumentIds",
+              "api/reference/server/ExecutionMetadata",
+              "api/reference/server/FunctionImpl",
+              "api/reference/server/GroupImpl",
+              "api/reference/server/HttpRouter",
+              "api/reference/server/MiddlewareImpl",
+              "api/reference/server/MutationAuth",
+              "api/reference/server/MutationCtx",
+              "api/reference/server/MutationRunner",
+              "api/reference/server/OrderedQuery",
+              "api/reference/server/QueryCtx",
+              "api/reference/server/QueryInitializer",
+              "api/reference/server/QueryRunner",
+              "api/reference/server/QueryStream",
+              "api/reference/server/RequestMetadata",
+              "api/reference/server/Scheduler",
+              "api/reference/server/Storage",
+              "api/reference/server/StorageActionWriter",
+              "api/reference/server/StorageReader",
+              "api/reference/server/StorageWriter",
+              "api/reference/server/Table",
+              "api/reference/server/TransactionMetadata",
+              "api/reference/server/VectorSearch"
+            ]
+          },
+          {
+            "group": "@confect/test",
+            "pages": [
+              "api/reference/test/index",
+              "api/reference/test/TestConfect"
+            ]
+          }
+        ]
       }
     ]
   },

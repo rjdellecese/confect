@@ -1,0 +1,161 @@
+---
+title: "Generated APIs"
+description: "Reference for Confect's generated function refs, service tags, document types, table schemas, and component registry."
+---
+
+`confect codegen` creates application-specific helpers in `confect/_generated/`. This page describes their shared contracts; table names, function paths, document aliases, and installed components come from your project. Do not edit generated files directly.
+
+Import examples below are relative to a module directly inside `confect/`. Adjust the relative path for other locations. See [Project structure](/concepts/project-structure) for the full generated layout.
+
+## Function references
+
+```ts
+import refs from "./_generated/refs";
+```
+
+The default export has type `Refs.FromSpec<typeof spec>`, where `spec` is your generated function spec.
+
+| Member          | Contract                                                                      |
+| --------------- | ----------------------------------------------------------------------------- |
+| `refs.public`   | References to public functions, available to clients and server-side callers. |
+| `refs.internal` | References to internal functions, for server-side callers.                    |
+
+Each tree follows your group paths and function names. A leaf is a [`Ref`](/api/reference/core/Ref), not a callable function. Pass it to a Confect client, function runner, or scheduler. Its types track function kind, visibility, arguments, results, and declared failures, including applicable middleware failures.
+
+For Confect functions, argument and result types describe **decoded** values; codecs are evaluated lazily. [Plain Convex functions](/server/plain-convex-functions) retain their Convex argument and result types. The public/internal trees are type-filtered views, not a runtime authorization boundary; Convex enforces deployed visibility.
+
+See [`Refs`](/api/reference/core/Refs), [Function invocation](/concepts/services#function-invocation), and the [JavaScript client guide](/clients/js/http).
+
+## Service tags
+
+```ts
+import { DatabaseReader, QueryRunner } from "./_generated/services";
+```
+
+Each service name exports a value tag and a same-named type for its Effect environment requirement. Inside `Effect.gen`, `yield*` the tag to obtain the service. Confect supplies the supported services when it runs a handler; importing a tag does not provide it.
+
+Database, ID, search, and native context tags are specialized to your generated schema. Database readers and writers also use the generated `Docs` registry to preserve named document types. Use these generated tags rather than constructing package-level tags yourself.
+
+| Tag                                                                | Available in                               | Contract                                                                                                                            |
+| ------------------------------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| [`DatabaseReader`](/api/reference/server/DatabaseReader)           | Queries, mutations                         | Read decoded documents through `table(name)`.                                                                                       |
+| [`DatabaseWriter`](/api/reference/server/DatabaseWriter)           | Mutations                                  | Insert, patch, replace, and delete documents; writes encode decoded field values.                                                   |
+| [`DocumentIds`](/api/reference/server/DocumentIds)                 | Queries, mutations                         | `parse` checks a known table; `identify` checks application and system tables. Both return an `Option` without fetching a document. |
+| [`QueryRunner`](/api/reference/server/QueryRunner)                 | Queries, mutations, actions, HTTP handlers | Invoke a query ref with `runQuery`.                                                                                                 |
+| [`MutationRunner`](/api/reference/server/MutationRunner)           | Mutations, actions, HTTP handlers          | Invoke a mutation ref with `runMutation`.                                                                                           |
+| [`ActionRunner`](/api/reference/server/ActionRunner)               | Actions, HTTP handlers                     | Invoke an action ref with `runAction`.                                                                                              |
+| [`Auth`](/api/reference/server/Auth)                               | Queries, mutations, actions, HTTP handlers | Read the caller's identity; an unauthenticated call fails with `NoUserIdentityFoundError`.                                          |
+| [`MutationAuth`](/api/reference/server/MutationAuth)               | Mutations                                  | Sign JWTs with `signJwt`.                                                                                                           |
+| [`Scheduler`](/api/reference/server/Scheduler)                     | Mutations, actions, HTTP handlers          | Schedule mutation or action refs, or cancel scheduled calls.                                                                        |
+| [`Storage`](/api/reference/server/Storage)                         | Queries, mutations, actions, HTTP handlers | Resolve storage URLs; other operations require a mutation, action, or HTTP handler.                                                 |
+| [`VectorSearch`](/api/reference/server/VectorSearch)               | Actions, HTTP handlers                     | Search a typed vector index; return document IDs and scores, not decoded documents.                                                 |
+| [`ExecutionMetadata`](/api/reference/server/ExecutionMetadata)     | Queries, mutations, actions, HTTP handlers | Read function and deployment metadata.                                                                                              |
+| [`RequestMetadata`](/api/reference/server/RequestMetadata)         | Mutations, actions, HTTP handlers          | Read current request metadata.                                                                                                      |
+| [`TransactionMetadata`](/api/reference/server/TransactionMetadata) | Queries, mutations                         | Read transaction metrics and the snapshot timestamp.                                                                                |
+| [`QueryCtx`](/api/reference/server/QueryCtx)                       | Queries                                    | Access the native Convex query context.                                                                                             |
+| [`MutationCtx`](/api/reference/server/MutationCtx)                 | Mutations                                  | Access the native Convex mutation context.                                                                                          |
+| [`ActionCtx`](/api/reference/server/ActionCtx)                     | Actions                                    | Access the native Convex action context.                                                                                            |
+
+Runner methods accept decoded arguments and return decoded results as Effects. Declared failures and `SchemaError` are typed failures. Query `transactionLimits` require a query or mutation; query `useStaleSnapshot` and mutation `transactionLimits` require a mutation. See [Transaction controls](/concepts/services#transaction-controls).
+
+Native context APIs use Convex's encoded representations rather than Confect's decoded values. Use them when a Convex integration needs a raw context.
+
+`StorageReader`, `StorageWriter`, and `StorageActionWriter` remain exported for compatibility. Prefer `Storage` in new code. URL reads work in every context above; upload URL generation, deletion, blob reads, and blob writes require a mutation, action, or HTTP handler. See [Storage](/server/storage) and [Services](/concepts/services).
+
+## Document IDs
+
+```ts
+import { Id } from "./_generated/id";
+import type { TableNames } from "./_generated/id";
+
+const StorageId = Id("_storage");
+type StorageId = Id<"_storage">;
+```
+
+| Export          | Contract                                                                                                 |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| `TableNames`    | Union of application table names. Excludes system tables; `never` when no application tables exist.      |
+| `Id<TableName>` | A string ID branded with an application or Convex system table name.                                     |
+| `Id(tableName)` | Effect schema whose decoded and encoded types are `Id<TableName>`. Does not import the referenced table. |
+
+`Id` accepts application table names and the system names `_storage` and `_scheduled_functions`. Schema decoding accepts strings; it does **not** check ID format, table membership, or document existence. Use the generated `DocumentIds` service to validate table membership, and a database read to check existence.
+
+Use `import type { Id }` when you only need the TypeScript type. See [`GenericId`](/api/reference/core/GenericId) and [Document IDs](/server/database/schema#document-ids).
+
+## Document types
+
+```ts
+import type { Docs } from "./_generated/docs";
+import type { TableNames } from "./_generated/id";
+
+type DocumentFor<Name extends TableNames> = Docs[Name];
+```
+
+`docs.ts` exports a named document **type alias** for each application table, plus the `Docs` interface mapping table names to those aliases. Each alias is a specialization of [`Document.Document`](/api/reference/server/Document) and includes decoded fields, `_id`, and `_creationTime`. Alias names are derived from table names; use the names emitted for your project.
+
+These exports are types, not runtime schemas. `Docs` excludes system tables and is empty when no application tables exist. For a runtime document schema, use the generated table's `Doc` member. See [Document types](/server/database/schema#document-types).
+
+## Table helpers
+
+Each `confect/_generated/tables/<name>.ts` module default-exports the named [`Table`](/api/reference/core/Table) corresponding to `confect/tables/<name>.ts`. Import this generated wrapper, not the unnamed definition, wherever you need a table's schemas.
+
+| Member      | Contract                                                                                                 |
+| ----------- | -------------------------------------------------------------------------------------------------------- |
+| `tableName` | The table name assigned from the source filename.                                                        |
+| `Fields`    | The user-field codec, without system fields. `typeof table.Fields.Type` is its decoded type.             |
+| `Doc`       | The codec extended with `_id` and `_creationTime`. `typeof table.Doc.Type` is its decoded document type. |
+
+`Fields` and `Doc` are lazy, memoized getters. Importing the wrapper binds the name without evaluating the field-schema callback. The wrapper preserves the table's index definitions and is client-safe when its source definition respects the [spec import boundary](/concepts/project-structure#rules).
+
+See [Database schema](/server/database/schema) for authoring tables and indexes.
+
+## Runtime schema and function spec
+
+```ts
+import schema from "./_generated/schema";
+import spec from "./_generated/spec";
+```
+
+| Module      | Default export                                                                                        | Consumers                                                          |
+| ----------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `schema.ts` | [`DatabaseSchema`](/api/reference/server/DatabaseSchema) containing the generated table registry.     | Implementation builders, HTTP router setup, and tests.             |
+| `spec.ts`   | [`Spec`](/api/reference/core/Spec) assembled from your function groups, including Node action groups. | Generated refs and code that needs the complete function contract. |
+
+The runtime schema registers tables without forcing their codecs. It does not construct your application's Convex deployment validators. The assembled spec describes functions, not their implementations; its schemas also remain lazy.
+
+See [The spec/impl model](/concepts/spec-impl-model) and [HTTP API](/server/http-api) for usage.
+
+## Deployment schema
+
+```ts
+import convexSchema from "./_generated/convexSchema";
+```
+
+The default export is a Convex `SchemaDefinition` containing every table's deployment validators and indexes. Generated `convex/schema.ts` re-exports it for the Convex CLI.
+
+<Warning>
+  Importing `convexSchema` constructs every table's deployment definition. Keep
+  it out of function implementations and their runtime import graphs. Use
+  `_generated/schema` for runtime table and codec access instead.
+</Warning>
+
+Test setup legitimately needs **both** schemas: pass the runtime schema and deployment schema to [`TestConfect.layer`](/api/reference/test/TestConfect). See [Testing setup](/guides/testing#setup).
+
+## Components
+
+```ts
+import { components } from "./_generated/components";
+import type { Components } from "./_generated/components";
+```
+
+`Components` maps names installed with `app.use(...)` in `convex/convex.config.ts` to their component package's `ComponentApi` types. The `components` value exposes that typed registry. Entries use installed names, not a fixed set of Confect component names; the registry type is empty when none are installed.
+
+Pass entries to component clients or their function references to native Convex APIs. They are Convex references, not Confect codec-bearing refs, and accessing the registry does not invoke a function.
+
+Use this module in implementation import graphs instead of `convex/_generated/api`: Confect emits it before Convex codegen runs. See [Components](/server/components) for installation and usage.
+
+## Generated deployment glue
+
+`_generated/registeredFunctions/<path>.ts` binds one function group to its implementation. Generated `convex/<path>.ts` exposes that group's registered functions to Convex. These are deployment artifacts, not the helpers you import to call functions; use `refs` and the appropriate client or runner instead.
+
+When configured, generated `convex/http.ts`, `convex/crons.ts`, and `convex/auth.config.ts` expose your HTTP router, recurring jobs, and authentication configuration. Their source counterparts and ownership rules are listed in [Project structure](/concepts/project-structure).
