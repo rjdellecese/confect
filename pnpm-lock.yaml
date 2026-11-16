@@ -219,6 +219,9 @@ importers:
       eslint-plugin-jsdoc:
         specifier: 65.5.2
         version: 65.5.2(eslint@10.10.0(jiti@1.21.7)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.9.3)
+      mdast-util-from-markdown:
+        specifier: 2.1.0
+        version: 2.1.0(supports-color@10.2.2)
       opensrc:
         specifier: 0.7.3
         version: 0.7.3

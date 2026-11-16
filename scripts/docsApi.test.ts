@@ -8,12 +8,14 @@ import * as Str from "effect/String";
 import * as Option from "effect/Option";
 import docsConfig from "../apps/docs/docs.json";
 import { Application, Converter } from "typedoc";
+import { fromMarkdown } from "mdast-util-from-markdown";
 import {
   MintlifyRouter,
   MintlifyTheme,
   presentationOptions,
   normalizeCategories,
   preserveReexportCategories,
+  formatDeclarationDetails,
 } from "./docsApiTheme";
 
 const fs = Effect.runSync(
@@ -74,6 +76,68 @@ afterAll(() =>
   Effect.runPromise(fs.remove(directory, { recursive: true, force: true })),
 );
 
+test("keeps the page outline to categories and exports without deleting detail", () => {
+  for (const [path, page] of pages) {
+    const detailHeadings = Array.filter(
+      fromMarkdown(page).children,
+      (node) => node.type === "heading" && node.depth > 3,
+    );
+    expect(detailHeadings, path).toEqual([]);
+  }
+  const functions = pages.get("api/reference/core/FunctionSpec.mdx") ?? "";
+  expect(
+    Array.fromIterable(Str.matchAll(/^\*\*Call Signature\*\*$/gm)(functions))
+      .length,
+  ).toBeGreaterThan(1);
+  expect(functions).toContain("**Returns**");
+  expect(functions).toContain("**Throws**");
+  expect(functions).not.toMatch(/^### .*\((function|type|class|value)\)$/m);
+  expect(pages.get("api/reference/server/ExecutionMetadata.mdx")).toContain(
+    "**Service operations**",
+  );
+});
+
+test("formats detail labels without rewriting fenced examples, tables, or anchors", () => {
+  const input = Array.join(
+    [
+      "## Models",
+      "",
+      "### Example",
+      "",
+      '<span id="parameter"></span>',
+      "",
+      "#### Parameters",
+      "",
+      "| Name | Type |",
+      "| --- | --- |",
+      "| value | string |",
+      "",
+      "````md",
+      "#### Not a detail label",
+      "```ts",
+      "const example = '#### Keep this';",
+      "```",
+      "````",
+      "",
+      "~~~~md",
+      "#### Also an example",
+      "~~~~",
+      "",
+      "##### `value`",
+      "",
+      "[Linked parameter](#parameter)",
+      "",
+    ],
+    "\n",
+  );
+  expect(formatDeclarationDetails(input)).toBe(
+    Str.replace(
+      "##### `value`",
+      "**`value`**",
+    )(Str.replace("#### Parameters", "**Parameters**")(input)),
+  );
+});
+
 test("retains source categories and upstream contracts on public reexports", () => {
   for (const [module, names] of [
     ["server/ExecutionMetadata", ["DeploymentMetadata", "FunctionMetadata"]],
@@ -85,7 +149,10 @@ test("retains source categories and upstream contracts on public reexports", () 
     const page = pages.get(`api/reference/${module}.mdx`);
     expect(page).toContain("## Models");
     expect(page).not.toContain("## Other");
-    for (const name of names) expect(page).toContain(`### ${name} (type)`);
+    for (const name of names)
+      expect(page).toContain(
+        `### ${name}\n\n<Badge color="gray" size="sm">\n  type\n</Badge>`,
+      );
   }
   expect(pages.get("api/reference/server/ExecutionMetadata.mdx")).toContain(
     "Metadata about the deployment this function is running on.",
@@ -100,14 +167,14 @@ test("retains source categories and upstream contracts on public reexports", () 
 
 test("renders public functions, overloads, classes, types, and inferred service operations", () => {
   expect(pages.get("api/reference/server/QueryStream.mdx")).toContain(
-    "### map (function)",
+    '### map\n\n<Badge color="gray" size="sm">\n  function\n</Badge>',
   );
   const functions = pages.get("api/reference/core/FunctionSpec.mdx");
   expect(functions).toContain("publicQuery");
-  expect(functions).toMatch(/^#{3,4} Call Signature$/m);
+  expect(functions).toContain("**Call Signature**");
   expect(functions).toContain("Declare a public query in the Convex runtime.");
   expect(pages.get("api/reference/core/PaginationError.mdx")).toContain(
-    '<span id="invalidcursor"></span>',
+    '<span id="api-invalidcursor"></span>',
   );
   expect(pages.get("api/reference/core/GenericId.mdx")).toContain("GenericId");
   expect(pages.get("api/reference/server/ActionRunner.mdx")).toContain(
@@ -124,7 +191,7 @@ test("renders public functions, overloads, classes, types, and inferred service 
   );
   expect(pages.get("api/reference/react/index.mdx")).toContain("useMutation");
   expect(pages.get("api/reference/react/PaginatedQueryResult.mdx")).toContain(
-    '<span id="paginatedqueryresultproto"></span>',
+    '<span id="api-paginatedqueryresultproto"></span>',
   );
   expect(
     pages.has(
@@ -148,9 +215,9 @@ test("renders public functions, overloads, classes, types, and inferred service 
 test("keeps public error aliases and experimental QueryStream docs without internal pages", () => {
   const stream = pages.get("api/reference/server/QueryStream.mdx");
   expect(stream).toContain("Experimental");
-  expect(stream).toContain('<span id="emptyinitialpageerror"></span>');
-  expect(stream).toContain('<span id="invalidpagesizeerror"></span>');
-  expect(stream).toContain('<span id="readbudgetexceedederror"></span>');
+  expect(stream).toContain('<span id="api-emptyinitialpageerror"></span>');
+  expect(stream).toContain('<span id="api-invalidpagesizeerror"></span>');
+  expect(stream).toContain('<span id="api-readbudgetexceedederror"></span>');
   expect(stream).not.toMatch(/^#{2,6} makeEffect/m);
   for (const [path, content] of pages) {
     expect(path).not.toMatch(
@@ -170,6 +237,13 @@ test("keeps public error aliases and experimental QueryStream docs without inter
 
 test("all generated page links and explicit TypeDoc anchors resolve", () => {
   for (const [path, content] of pages) {
+    const anchors = Array.fromIterable(
+      Str.matchAll(/<span id="([^"]+)"><\/span>/g)(content),
+    );
+    expect(new Set(Array.map(anchors, (match) => match[1])).size, path).toBe(
+      anchors.length,
+    );
+    for (const anchor of anchors) expect(anchor[1]).toStartWith("api-");
     for (const match of Str.matchAll(/\]\(([^)\s]+)\)/g)(content)) {
       const href = match[1];
       if (/^(?:https?:|mailto:)/.test(href)) continue;
@@ -321,13 +395,19 @@ export const hidden = 1;
         expect(page).toContain("## Models");
         expect(page).toContain("## Constructors");
         expect(page).toContain("## Routing");
-        expect(page).toContain("### Widget (type)");
-        expect(page).toContain("### Widget (value)");
-        expect(page).toMatch(/## Models[\s\S]*### External \(type\)/);
-        expect(page).toMatch(/## Specific[\s\S]*### Specific \(type\)/);
+        expect(page).toContain(
+          '### Widget (type)\n\n<Badge color="gray" size="sm">type</Badge>',
+        );
+        expect(page).toContain(
+          '### Widget (value)\n\n<Badge color="gray" size="sm">value</Badge>',
+        );
+        expect(page).toMatch(/## Models[\s\S]*### External\n/);
+        expect(page).toMatch(/## Specific[\s\S]*### Specific\n/);
         expect(page).toContain("The original contract description.");
         expect(page).toContain("readonly id: string");
-        expect(page).toContain("### make() (function)");
+        expect(page).toContain(
+          '### make()\n\n<Badge color="gray" size="sm">function</Badge>',
+        );
         expect(page).toContain("## HTTP");
         expect(page).not.toContain("## Http");
         expect(

@@ -23,14 +23,56 @@ import * as Str from "effect/String";
 import * as Effect from "effect/Effect";
 import * as Record from "effect/Record";
 import * as Option from "effect/Option";
+import { fromMarkdown } from "mdast-util-from-markdown";
 
 const JsonString = Schema.fromJsonString(Schema.String);
+
+const declarationKind = (model: DeclarationReflection): string =>
+  model.kindOf(ReflectionKind.Interface | ReflectionKind.TypeAlias)
+    ? "type"
+    : model.kindOf(ReflectionKind.Class)
+      ? "class"
+      : model.kindOf(ReflectionKind.Namespace)
+        ? "namespace"
+        : model.kindOf(ReflectionKind.Function) ||
+            Array.some(
+              model.type instanceof IntersectionType
+                ? model.type.types
+                : [model.type],
+              (type) =>
+                type instanceof ReflectionType &&
+                (type.declaration.signatures?.length ?? 0) > 0,
+            )
+          ? "function"
+          : "value";
+
+export const formatDeclarationDetails = (markdown: string): string => {
+  let rendered = markdown;
+  for (const node of Array.reverse(fromMarkdown(markdown).children)) {
+    if (node.type !== "heading" || node.depth < 4) continue;
+    const start = node.position?.start.offset;
+    const end = node.position?.end.offset;
+    const contentStart = node.children[0]?.position?.start.offset;
+    const contentEnd = Option.getOrUndefined(Array.last(node.children))
+      ?.position?.end.offset;
+    if (
+      start === undefined ||
+      end === undefined ||
+      contentStart === undefined ||
+      contentEnd === undefined
+    )
+      continue;
+    rendered = `${Str.slice(0, start)(rendered)}**${Str.slice(contentStart, contentEnd)(markdown)}**${Str.slice(end)(rendered)}`;
+  }
+  return rendered;
+};
 
 export const presentationOptions = {
   categorizeByGroup: false,
   defaultCategory: "Other",
   hideGroupHeadings: true,
   parametersFormat: "table",
+  anchorPrefix: "api-",
 } satisfies Partial<TypeDocOptions & PluginOptions>;
 
 export const preserveReexportCategories = (
@@ -115,11 +157,18 @@ export class MintlifyTheme extends MarkdownTheme {
     const context = super.getRenderContext(page);
     const member = context.partials.member;
     context.partials.member = (model, options) => {
-      const rendered = model.kindOf(ReflectionKind.Namespace)
+      let rendered = model.kindOf(ReflectionKind.Namespace)
         ? context.partials.memberWithGroups(model, {
             headingLevel: options.headingLevel + 1,
           })
         : member(model, options);
+      if (
+        model.parent?.kindOf(
+          ReflectionKind.Module | ReflectionKind.Namespace,
+        ) === true
+      ) {
+        rendered = `<Badge color="gray" size="sm">${declarationKind(model)}</Badge>\n\n${rendered}`;
+      }
       const type =
         model.type instanceof ReferenceType && model.type.name === "Service"
           ? model.type
@@ -142,32 +191,15 @@ export class MintlifyTheme extends MarkdownTheme {
     const memberTitle = context.partials.memberTitle;
     context.partials.memberTitle = (model) => {
       const title = memberTitle(model);
-      if (
-        model.parent?.kindOf(
-          ReflectionKind.Module | ReflectionKind.Namespace,
-        ) !== true
-      )
-        return title;
-      const kind = model.kindOf(
-        ReflectionKind.Interface | ReflectionKind.TypeAlias,
-      )
-        ? "type"
-        : model.kindOf(ReflectionKind.Class)
-          ? "class"
-          : model.kindOf(ReflectionKind.Namespace)
-            ? "namespace"
-            : model.kindOf(ReflectionKind.Function) ||
-                Array.some(
-                  model.type instanceof IntersectionType
-                    ? model.type.types
-                    : [model.type],
-                  (type) =>
-                    type instanceof ReflectionType &&
-                    (type.declaration.signatures?.length ?? 0) > 0,
-                )
-              ? "function"
-              : "value";
-      return `${title} (${kind})`;
+      const parent = model.parent;
+      return parent instanceof DeclarationReflection &&
+        parent.kindOf(ReflectionKind.Module | ReflectionKind.Namespace) &&
+        Array.filter(
+          parent.children ?? [],
+          (child) => child.name === model.name,
+        ).length > 1
+        ? `${title} (${declarationKind(model)})`
+        : title;
     };
     const commentParts = context.helpers.getCommentParts;
     context.helpers.getCommentParts = (parts) =>
@@ -196,7 +228,7 @@ export class MintlifyTheme extends MarkdownTheme {
     const body = Str.replace(
       /<a id="([^"]+)"><\/a>/g,
       '<span id="$1"></span>',
-    )(super.render(page));
+    )(formatDeclarationDetails(super.render(page)));
     const model = page.model;
     const names: string[] = [];
     for (
