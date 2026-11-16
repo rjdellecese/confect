@@ -85,6 +85,9 @@ test("renders public functions, overloads, classes, types, and inferred service 
     "Select a table for document lookup or query construction.",
   );
   expect(pages.get("api/reference/react/index.mdx")).toContain("useMutation");
+  expect(pages.get("api/reference/server/VectorSearch.mdx")).toContain(
+    "ranked &#123;\\_id, \\_score&#125; matches",
+  );
 });
 
 test("keeps public error aliases and experimental QueryStream docs without internal pages", () => {
