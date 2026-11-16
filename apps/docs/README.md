@@ -19,7 +19,9 @@ TypeScript 5.9.3 for TypeDoc's compiler API; build/typecheck still uses `tsrs`.
 `tsconfig.docs.json` resolves workspace imports to source, not stale `dist` or
 installed releases. The CLI is a binary, not a package API reference.
 
-Generated MDX lives in ignored `api/reference/`. Commit navigation changes in
+Generation and formatting always happen in a temporary directory before copying
+the result to ignored `api/reference/`, so preview and release output match.
+Commit navigation changes in
 `docs.json`, not the rendered pages. Edit package JSDoc for extracted contracts;
 edit `api/generated.mdx` for generic codegen helpers, checking its claims against
 `packages/cli/src/templates.ts`. Do not document an example app's function or
@@ -27,7 +29,8 @@ table names as universal APIs.
 
 The small theme adapter supplies Mintlify frontmatter/routes and asks the
 Markdown plugin to render the existing members inside Effect `Service` type
-arguments. It uses span IDs instead of empty links for accessible anchors.
+arguments. It escapes prose without changing code examples and uses span IDs
+instead of empty links for accessible anchors.
 All signatures, overloads, comments, and error aliases still come
 from TypeDoc; no symbol manifest or custom signature renderer is maintained.
 Internal support types can remain named in public signatures without getting
