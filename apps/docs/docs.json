@@ -32,175 +32,187 @@
         }
       ]
     },
-    "groups": [
+    "tabs": [
       {
-        "group": "Getting Started",
-        "pages": ["getting-started/introduction", "getting-started/quickstart"]
-      },
-      {
-        "group": "Concepts",
-        "pages": [
-          "concepts/packages",
-          "concepts/project-structure",
-          "concepts/spec-impl-model",
-          "concepts/file-naming-conventions",
-          "concepts/services",
-          "concepts/schema-restrictions"
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "getting-started/introduction",
+              "getting-started/quickstart"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/packages",
+              "concepts/project-structure",
+              "concepts/spec-impl-model",
+              "concepts/file-naming-conventions",
+              "concepts/services",
+              "concepts/schema-restrictions"
+            ]
+          },
+          {
+            "group": "Server",
+            "pages": [
+              "server/functions",
+              "server/error-handling",
+              "server/middleware",
+              "server/plain-convex-functions",
+              "server/node-actions",
+              "server/ai-gateway",
+              {
+                "icon": "database",
+                "group": "Database",
+                "pages": [
+                  "server/database/schema",
+                  "server/database/reading",
+                  "server/database/streams",
+                  "server/database/writing",
+                  "server/database/system-tables",
+                  "server/database/determinism"
+                ]
+              },
+              "server/http-api",
+              "server/storage",
+              "server/scheduling",
+              "server/authentication",
+              "server/metadata",
+              "server/cron-jobs",
+              "server/search",
+              "server/components",
+              "server/environment-variables"
+            ]
+          },
+          {
+            "group": "Clients",
+            "pages": [
+              "clients/react",
+              {
+                "icon": "js",
+                "group": "JS",
+                "pages": ["clients/js/http", "clients/js/websocket"]
+              },
+              "clients/foldkit"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": ["guides/testing"]
+          }
         ]
       },
       {
-        "group": "Server",
-        "pages": [
-          "server/functions",
-          "server/error-handling",
-          "server/middleware",
-          "server/plain-convex-functions",
-          "server/node-actions",
-          "server/ai-gateway",
+        "tab": "API Reference",
+        "groups": [
           {
-            "icon": "database",
-            "group": "Database",
-            "pages": [
-              "server/database/schema",
-              "server/database/reading",
-              "server/database/streams",
-              "server/database/writing",
-              "server/database/system-tables",
-              "server/database/determinism"
-            ]
-          },
-          "server/http-api",
-          "server/storage",
-          "server/scheduling",
-          "server/authentication",
-          "server/metadata",
-          "server/cron-jobs",
-          "server/search",
-          "server/components",
-          "server/environment-variables"
-        ]
-      },
-      {
-        "group": "Clients",
-        "pages": [
-          "clients/react",
-          {
-            "icon": "js",
-            "group": "JS",
-            "pages": ["clients/js/http", "clients/js/websocket"]
-          },
-          "clients/foldkit"
-        ]
-      },
-      {
-        "group": "Guides",
-        "pages": ["guides/testing"]
-      },
-      {
-        "group": "API Reference",
-        "pages": [
-          "api/overview",
-          "api/generated",
-          "api/reference/source",
-          {
-            "group": "@confect/core",
-            "pages": [
-              "api/reference/core/index",
-              "api/reference/core/FunctionSpec",
-              "api/reference/core/GenericId",
-              "api/reference/core/GroupSpec",
-              "api/reference/core/MiddlewareSpec",
-              "api/reference/core/PaginationError",
-              "api/reference/core/PaginationResult",
-              "api/reference/core/Ref",
-              "api/reference/core/Refs",
-              "api/reference/core/Spec",
-              "api/reference/core/SystemFields",
-              "api/reference/core/Table"
-            ]
+            "group": "Overview",
+            "pages": ["api/overview", "api/generated", "api/reference/source"]
           },
           {
-            "group": "@confect/foldkit",
+            "group": "Packages",
             "pages": [
-              "api/reference/foldkit/index",
-              "api/reference/foldkit/Client",
-              "api/reference/foldkit/Command",
-              "api/reference/foldkit/PaginatedQuery",
-              "api/reference/foldkit/QueryResult",
-              "api/reference/foldkit/Subscription"
-            ]
-          },
-          {
-            "group": "@confect/js",
-            "pages": [
-              "api/reference/js/index",
-              "api/reference/js/HttpClient",
-              "api/reference/js/WebSocketClient"
-            ]
-          },
-          {
-            "group": "@confect/react",
-            "pages": [
-              "api/reference/react/index",
-              "api/reference/react/OptimisticLocalStore",
-              "api/reference/react/PaginatedQueryResult",
-              "api/reference/react/PaginatedQueryResult/PaginatedQueryResult",
-              "api/reference/react/QueryResult",
-              "api/reference/react/QueryResult/QueryResult",
-              "api/reference/react/StreamPagination"
-            ]
-          },
-          {
-            "group": "@confect/server",
-            "pages": [
-              "api/reference/server/index",
-              "api/reference/server/ActionCtx",
-              "api/reference/server/ActionRunner",
-              "api/reference/server/AiGatewayDecisionClient",
-              "api/reference/server/AiGatewayDecisionModel",
-              "api/reference/server/AiGatewayLanguageClient",
-              "api/reference/server/AiGatewayLanguageModel",
-              "api/reference/server/Auth",
-              "api/reference/server/BlobNotFoundError",
-              "api/reference/server/ConvexConfigProvider",
-              "api/reference/server/ConvexLogger",
-              "api/reference/server/CronJob",
-              "api/reference/server/CronJobs",
-              "api/reference/server/CronWindow",
-              "api/reference/server/DatabaseReader",
-              "api/reference/server/DatabaseSchema",
-              "api/reference/server/DatabaseWriter",
-              "api/reference/server/Document",
-              "api/reference/server/DocumentIds",
-              "api/reference/server/ExecutionMetadata",
-              "api/reference/server/FunctionImpl",
-              "api/reference/server/GroupImpl",
-              "api/reference/server/HttpRouter",
-              "api/reference/server/MiddlewareImpl",
-              "api/reference/server/MutationAuth",
-              "api/reference/server/MutationCtx",
-              "api/reference/server/MutationRunner",
-              "api/reference/server/OrderedQuery",
-              "api/reference/server/QueryCtx",
-              "api/reference/server/QueryInitializer",
-              "api/reference/server/QueryRunner",
-              "api/reference/server/QueryStream",
-              "api/reference/server/RequestMetadata",
-              "api/reference/server/Scheduler",
-              "api/reference/server/Storage",
-              "api/reference/server/StorageActionWriter",
-              "api/reference/server/StorageReader",
-              "api/reference/server/StorageWriter",
-              "api/reference/server/Table",
-              "api/reference/server/TransactionMetadata",
-              "api/reference/server/VectorSearch"
-            ]
-          },
-          {
-            "group": "@confect/test",
-            "pages": [
-              "api/reference/test/index",
-              "api/reference/test/TestConfect"
+              {
+                "group": "@confect/core",
+                "pages": [
+                  "api/reference/core/index",
+                  "api/reference/core/FunctionSpec",
+                  "api/reference/core/GenericId",
+                  "api/reference/core/GroupSpec",
+                  "api/reference/core/MiddlewareSpec",
+                  "api/reference/core/PaginationError",
+                  "api/reference/core/PaginationResult",
+                  "api/reference/core/Ref",
+                  "api/reference/core/Refs",
+                  "api/reference/core/Spec",
+                  "api/reference/core/SystemFields",
+                  "api/reference/core/Table"
+                ]
+              },
+              {
+                "group": "@confect/foldkit",
+                "pages": [
+                  "api/reference/foldkit/index",
+                  "api/reference/foldkit/Client",
+                  "api/reference/foldkit/Command",
+                  "api/reference/foldkit/PaginatedQuery",
+                  "api/reference/foldkit/QueryResult",
+                  "api/reference/foldkit/Subscription"
+                ]
+              },
+              {
+                "group": "@confect/js",
+                "pages": [
+                  "api/reference/js/index",
+                  "api/reference/js/HttpClient",
+                  "api/reference/js/WebSocketClient"
+                ]
+              },
+              {
+                "group": "@confect/react",
+                "pages": [
+                  "api/reference/react/index",
+                  "api/reference/react/OptimisticLocalStore",
+                  "api/reference/react/PaginatedQueryResult",
+                  "api/reference/react/QueryResult",
+                  "api/reference/react/StreamPagination"
+                ]
+              },
+              {
+                "group": "@confect/server",
+                "pages": [
+                  "api/reference/server/index",
+                  "api/reference/server/ActionCtx",
+                  "api/reference/server/ActionRunner",
+                  "api/reference/server/AiGatewayDecisionClient",
+                  "api/reference/server/AiGatewayDecisionModel",
+                  "api/reference/server/AiGatewayLanguageClient",
+                  "api/reference/server/AiGatewayLanguageModel",
+                  "api/reference/server/Auth",
+                  "api/reference/server/BlobNotFoundError",
+                  "api/reference/server/ConvexConfigProvider",
+                  "api/reference/server/ConvexLogger",
+                  "api/reference/server/CronJob",
+                  "api/reference/server/CronJobs",
+                  "api/reference/server/CronWindow",
+                  "api/reference/server/DatabaseReader",
+                  "api/reference/server/DatabaseSchema",
+                  "api/reference/server/DatabaseWriter",
+                  "api/reference/server/Document",
+                  "api/reference/server/DocumentIds",
+                  "api/reference/server/ExecutionMetadata",
+                  "api/reference/server/FunctionImpl",
+                  "api/reference/server/GroupImpl",
+                  "api/reference/server/HttpRouter",
+                  "api/reference/server/MiddlewareImpl",
+                  "api/reference/server/MutationAuth",
+                  "api/reference/server/MutationCtx",
+                  "api/reference/server/MutationRunner",
+                  "api/reference/server/OrderedQuery",
+                  "api/reference/server/QueryCtx",
+                  "api/reference/server/QueryInitializer",
+                  "api/reference/server/QueryRunner",
+                  "api/reference/server/QueryStream",
+                  "api/reference/server/RequestMetadata",
+                  "api/reference/server/Scheduler",
+                  "api/reference/server/Storage",
+                  "api/reference/server/StorageActionWriter",
+                  "api/reference/server/StorageReader",
+                  "api/reference/server/StorageWriter",
+                  "api/reference/server/Table",
+                  "api/reference/server/TransactionMetadata",
+                  "api/reference/server/VectorSearch"
+                ]
+              },
+              {
+                "group": "@confect/test",
+                "pages": [
+                  "api/reference/test/index",
+                  "api/reference/test/TestConfect"
+                ]
+              }
             ]
           }
         ]

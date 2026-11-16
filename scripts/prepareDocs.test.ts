@@ -168,8 +168,20 @@ test("redirects legacy guide groups without inventing versioned API reference ro
         "Clients",
         "Guides",
       ];
-      const groups = Array.filter(docsConfig.navigation.groups, (group) =>
-        legacyGroups.includes(group.group),
+      const guideTabs = Array.filter(
+        docsConfig.navigation.tabs,
+        (tab) => tab.tab === "Guides",
+      );
+      expect(guideTabs).toHaveLength(1);
+      const groups = Array.filter(
+        Array.flatMap(
+          guideTabs,
+          (
+            tab,
+          ): readonly { group: string; pages: readonly NavigationPage[] }[] =>
+            tab.groups,
+        ),
+        (group) => legacyGroups.includes(group.group),
       );
       expect(Array.map(groups, (group) => group.group)).toEqual(legacyGroups);
       const pages = Array.flatMap(groups, (group) =>
