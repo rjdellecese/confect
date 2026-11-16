@@ -88,6 +88,15 @@ test("renders public functions, overloads, classes, types, and inferred service 
   expect(pages.get("api/reference/server/VectorSearch.mdx")).toContain(
     "ranked &#123;\\_id, \\_score&#125; matches",
   );
+  expect(pages.get("api/reference/server/VectorSearch.mdx")).toContain(
+    "`number`[]",
+  );
+  expect(pages.get("api/reference/server/VectorSearch.mdx")).toContain(
+    "_score: number",
+  );
+  expect(pages.get("api/reference/server/VectorSearch.mdx")).toContain(
+    "###### vector",
+  );
 });
 
 test("keeps public error aliases and experimental QueryStream docs without internal pages", () => {
@@ -96,6 +105,7 @@ test("keeps public error aliases and experimental QueryStream docs without inter
   expect(stream).toContain("### EmptyInitialPageError");
   expect(stream).toContain("### InvalidPageSizeError");
   expect(stream).toContain("### ReadBudgetExceededError");
+  expect(stream).not.toContain("##### makeEffect");
   for (const [path, content] of pages) {
     expect(path).not.toMatch(
       /QueryStream(?!\.mdx)|\/internal\/|Registered|Registry|FunctionProvenance/,

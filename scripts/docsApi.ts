@@ -6,7 +6,14 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
-import { Application, type TypeDocOptions } from "typedoc";
+import * as Record from "effect/Record";
+import {
+  Application,
+  Converter,
+  DeclarationReflection,
+  ReflectionKind,
+  type TypeDocOptions,
+} from "typedoc";
 import type { PluginOptions } from "typedoc-plugin-markdown";
 import { MintlifyRouter, MintlifyTheme } from "./docsApiTheme";
 import docsConfig from "../apps/docs/docs.json";
@@ -41,7 +48,6 @@ try {
     tsconfig: `${root}/tsconfig.docs.json`,
     plugin: ["typedoc-plugin-markdown"],
     excludeInternal: true,
-    excludeExternals: true,
     excludePrivate: true,
     excludeProtected: true,
     readme: "none",
@@ -53,6 +59,7 @@ try {
     hidePageTitle: true,
     hideBreadcrumbs: true,
     useCodeBlocks: true,
+    expandObjects: true,
     sanitizeComments: true,
     useHTMLAnchors: true,
     gitRevision: revision,
@@ -63,6 +70,26 @@ try {
   const app = await Application.bootstrapWithPlugins(options);
   app.renderer.defineTheme("mintlify", MintlifyTheme);
   app.renderer.defineRouter("mintlify", MintlifyRouter);
+  app.converter.on(
+    Converter.EVENT_RESOLVE_END,
+    ({ project }) => {
+      for (const reflection of Record.values(project.reflections)) {
+        if (
+          reflection instanceof DeclarationReflection &&
+          reflection.inheritedFrom !== undefined &&
+          !reflection.kindOf(ReflectionKind.Constructor) &&
+          reflection.sources !== undefined &&
+          reflection.sources.length > 0 &&
+          Array.every(reflection.sources, (source) =>
+            Str.startsWith("node_modules/")(source.fileName),
+          )
+        ) {
+          project.removeReflection(reflection);
+        }
+      }
+    },
+    -50,
+  );
   const project = await app.convert();
   if (project === undefined) process.exit(1);
   for (const child of project.children ?? [])
