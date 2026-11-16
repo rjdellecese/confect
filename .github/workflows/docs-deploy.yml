@@ -28,6 +28,16 @@ jobs:
       - name: Fetch main and published tags
         run: git fetch --tags origin refs/heads/main:refs/remotes/origin/main
 
+      - name: Select documentation source
+        env:
+          DOCS_SOURCE_SHA: ${{ inputs.source_ref }}
+        run: |
+          [[ "$DOCS_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$(git cat-file -t "$DOCS_SOURCE_SHA")" == commit ]]
+          git merge-base --is-ancestor "$DOCS_SOURCE_SHA" refs/remotes/origin/main
+          cp scripts/prepareDocs.sh "$RUNNER_TEMP/prepareDocs.sh"
+          git checkout --detach "$DOCS_SOURCE_SHA"
+
       - name: Checkout docs deployment branch
         uses: actions/checkout@v7
         with:
@@ -35,11 +45,13 @@ jobs:
           ref: release
 
       - uses: ./.github/actions/docs-setup
+        env:
+          npm_config_frozen_lockfile: "true"
 
       - name: Prepare docs snapshot
         env:
           DOCS_SOURCE_SHA: ${{ inputs.source_ref }}
-        run: bash scripts/prepareDocs.sh "$DOCS_SOURCE_SHA" docs-release
+        run: bash "$RUNNER_TEMP/prepareDocs.sh" "$DOCS_SOURCE_SHA" docs-release
 
       - name: Validate docs snapshot
         working-directory: docs-release/apps/docs
