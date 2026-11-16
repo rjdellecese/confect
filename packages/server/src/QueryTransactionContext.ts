@@ -8,9 +8,24 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+/**
+ * Convex's nested-call resource limits, including documents, bytes and queries.
+ *
+ * @category Options
+ */
 export type { TransactionLimits } from "convex/server";
 
+/**
+ * Transaction controls accepted by nested query and mutation calls.
+ *
+ * @category Options
+ */
 export interface Options {
+  /**
+   * Limits for the nested call; Convex caps them at platform limits.
+   *
+   * @category Options
+   */
   readonly transactionLimits?: TransactionLimits;
 }
 

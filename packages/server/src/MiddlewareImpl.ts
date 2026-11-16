@@ -34,8 +34,15 @@ import { setNestedProperty } from "./internal/utils";
  * the group's spec (via {@link FromGroupSpec}), so `GroupImpl.finalize`'s `RIn =
  * never` bound rejects a group that attaches a middleware but never provides
  * its implementation—the exact mechanism used for `FunctionImpl`s.
+ *
+ * @category Models
  */
 export interface MiddlewareImpl<MiddlewareKey extends string> {
+  /**
+   * Key of the middleware spec implemented by this layer.
+   *
+   * @category Models
+   */
   readonly middlewareKey: MiddlewareKey;
 }
 
@@ -176,6 +183,17 @@ const layerFromImpls = <
  * actions).
  *
  * Like `FunctionImpl.make`, `databaseSchema` is a type-level carrier only.
+ *
+ * @category Layers
+ *
+ * @param _databaseSchema - Generated runtime schema for service typing.
+ * @param middlewareSpec - Middleware declaration to implement.
+ * @param impl - Wrapper receiving the downstream Effect plus invocation
+ *   metadata and declared options. It provides the spec's service and may fail
+ *   with its declared error; shared wrappers can use only services common to
+ *   all selected function contexts.
+ *
+ * @returns A layer to provide to every group using this middleware.
  */
 export const make = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -214,6 +232,15 @@ export const make = <
  * recommended shape for database-touching middleware that also covers actions:
  * use `DatabaseReader`/`DatabaseWriter` in queries and mutations, and
  * `runQuery` of an internal query in actions.
+ *
+ * @category Layers
+ *
+ * @param _databaseSchema - Generated runtime schema for service typing.
+ * @param middlewareSpec - Middleware declaration to implement.
+ * @param impls - One wrapper per declared query/mutation/action context, each
+ *   receiving the downstream Effect and invocation/options context.
+ *
+ * @returns A middleware layer with the declared service/error contract.
  */
 export const makeByFunctionType = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -243,6 +270,17 @@ export const makeByFunctionType = <
  * shape: run `effect` before the rest of the chain and provide its result under
  * `tag` (the runtime tag for the middleware's type-level `provides` service,
  * passed explicitly since the spec class only knows it at the type level).
+ *
+ * @category Layers
+ *
+ * @param databaseSchema - Generated runtime schema.
+ * @param middlewareSpec - Declaration identifying the provided service/error.
+ * @param tag - Runtime tag of the service declared by the spec's provides
+ *   field.
+ * @param effect - Compute the service before the downstream handler runs. Its
+ *   typed failures must fit the middleware error schema.
+ *
+ * @returns A middleware layer that supplies the computed service downstream.
  */
 export const provides = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

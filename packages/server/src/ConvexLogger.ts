@@ -10,6 +10,8 @@ import * as Match from "effect/Match";
  * uses `console.warn`, and Error and Fatal use `console.error`. The payload
  * retains the original Effect level, cause, annotations, spans, timestamp, and
  * fiber ID.
+ *
+ * @category Logging
  */
 export const logger: Logger.Logger<unknown, void> = Logger.make((options) => {
   const console = options.fiber.getRef(Console.Console);
@@ -28,6 +30,8 @@ export const logger: Logger.Logger<unknown, void> = Logger.make((options) => {
  * Replaces Effect's default console logger without changing custom loggers,
  * tracing, or the minimum log level. Confect installs this layer automatically
  * for function handlers and HTTP routes.
+ *
+ * @category Layers
  */
 export const layer: Layer.Layer<never> = Layer.effect(
   Logger.CurrentLoggers,

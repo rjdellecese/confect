@@ -10,22 +10,83 @@ import type * as DataModel from "./DataModel";
 import * as DatabaseSchema from "./DatabaseSchema";
 import * as Table from "./Table";
 
+/**
+ * Correlated table/ID variants returned inside identify's successful Option.
+ *
+ * @category Models
+ */
 type IdentifiedId<TableName extends string> = {
   readonly [Name in TableName]: {
+    /**
+     * Matched table name; narrowing this field also narrows id.
+     *
+     * @category Getters
+     */
     readonly table: Name;
+    /**
+     * Validated input string branded for the matched table.
+     *
+     * @category Getters
+     */
     readonly id: GenericId<Name>;
   };
 }[TableName];
 
+/**
+ * Validate table-typed IDs using the current Convex runtime and schema. Acquire
+ * the generated `DocumentIds` service in queries, mutations, or middleware
+ * restricted to those contexts; actions and HTTP handlers must call a query
+ * instead. Validation does not prove existence, authorization, or that an ID
+ * originated in this deployment. Native runtime failures remain defects.
+ *
+ * @category Services
+ *
+ * @example
+ *   import * as Effect from "effect/Effect";
+ *   import { DocumentIds } from "./confect/_generated/services";
+ *
+ *   const parseNoteId = (input: string) =>
+ *     Effect.gen(function* () {
+ *       const ids = yield* DocumentIds;
+ *       return yield* ids.parse("notes", input);
+ *     });
+ */
 export interface DocumentIds<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > {
+  /**
+   * Validate a string as an ID for a known table.
+   *
+   * @category Reading
+   *
+   * @param table - A declared table, `_storage`, or `_scheduled_functions`.
+   * @param input - Untrusted ID string; it must match the normalized ID
+   *   exactly.
+   *
+   * @returns An effect yielding `Some(id)` on a match or `None` for invalid or
+   *   wrong-table input. No document is read, so a subsequent get can still
+   *   fail.
+   */
   readonly parse: <
     const Name extends DatabaseSchema.AllTableNames<DatabaseSchema_>,
   >(
     table: Name,
     input: string,
   ) => Effect.Effect<Option.Option<GenericId<Name>>>;
+  /**
+   * Identify which known table a current-format ID belongs to.
+   *
+   * @category Reading
+   *
+   * @param input - Untrusted ID string to check against application and system
+   *   tables.
+   *
+   * @returns An effect yielding `Some({ table, id })` for the first matching
+   *   table, or `None` when none matches. Both fields are readonly and
+   *   correlated: narrowing `table` also narrows the ID's table type. This uses
+   *   runtime ID lookups, not document scans, and cannot discover other
+   *   components' tables.
+   */
   readonly identify: (
     input: string,
   ) => Effect.Effect<

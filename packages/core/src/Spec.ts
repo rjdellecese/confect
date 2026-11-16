@@ -23,10 +23,21 @@ export const isSpec = (u: unknown): u is AnyWithProps =>
  * alongside `GroupSpec.make()` groups in the same namespace. The runtime of a
  * group lives on the group itself (`GroupSpec.runtime`) and on each function's
  * `RuntimeAndFunctionType`; the spec does not carry a runtime of its own.
+ *
+ * Use the codegen-assembled project spec rather than assembling this container
+ * manually. It describes functions and middleware, not the database schema.
+ *
+ * @category Models
  */
 export interface Spec<
   Groups_ extends Record.ReadonlyRecord<string, GroupSpec.AnyWithProps> = {},
 > {
+  /**
+   * The generated group record, preserving each group's precise declaration
+   * type.
+   *
+   * @category Models
+   */
   readonly [TypeId]: Readonly<Groups_>;
 }
 

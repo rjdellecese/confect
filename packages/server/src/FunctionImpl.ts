@@ -11,7 +11,17 @@ import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
 import * as FunctionRegistryItem from "./FunctionRegistryItem";
 
+/**
+ * Service provided by a function implementation layer, keyed by its spec name.
+ *
+ * @category Models
+ */
 export interface FunctionImpl<Name_ extends string> {
+  /**
+   * Name of the implemented function within its group.
+   *
+   * @category Models
+   */
   readonly name: Name_;
 }
 
@@ -22,20 +32,22 @@ export const FunctionImpl = <Name_ extends string>({ name }: { name: Name_ }) =>
   Context.Service<FunctionImpl<Name_>>(`@confect/server/FunctionImpl/${name}`);
 
 /**
- * Register a single function's implementation into the group's `Registry`.
+ * Implement one function declared by a group spec.
  *
- * The function is registered under a flat, single-segment key (its own `name`),
- * not a project-wide dot-path. Each group's impl layer is built in
- * isolation—`RegisteredFunctions.buildForGroup` (and the CLI's `validateImpl`)
- * provide a fresh `Registry` per group—so function names only need to be unique
- * within their own group.
+ * @category Layers
  *
- * `databaseSchema` is retained purely as a type-level carrier: the handler's
- * ctx-service requirements (`DatabaseReader`, `QueryCtx<DataModel>`, …) are
- * derived from it via `Handler.WithName`. It is not read at runtime—the
- * generated per-group registry forwards the schema value to the function
- * builders—so impls depend on `_generated/schema` (table schemas) rather than
- * `_generated/api` (which transitively imports every function spec).
+ * @param _databaseSchema - Generated runtime schema, not convexSchema. It
+ *   carries service types without evaluating table schemas during
+ *   construction.
+ * @param group - Group spec containing the named function.
+ * @param name - Function's local name within the group.
+ * @param handler - For a Confect spec, a function from decoded args to an
+ *   Effect returning the declared result and failing only with declared errors.
+ *   It may use generated context services and middleware-provided services. For
+ *   a plain Convex spec, supply the corresponding native registered function
+ *   instead.
+ *
+ * @returns A layer to provide to GroupImpl.make before finalizing the group.
  */
 export const make = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

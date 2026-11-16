@@ -8,10 +8,32 @@ export {
   TypeId,
   isTable,
   isUnnamedTable,
+  /**
+   * Re-export of the lazy table-definition constructor from
+   * `@confect/core/Table`. Pass a callback producing the user-field codec and
+   * default-export the returned definition from a table file. Prefer the core
+   * import in application specs so they do not depend on the server package.
+   *
+   * @category Constructors
+   */
   make,
+  /**
+   * Bound table contract from `@confect/core/Table`: lazy Fields/Doc codecs and
+   * the generated filename-derived tableName. Import table values through their
+   * generated wrappers rather than constructing this shape manually.
+   *
+   * @category Models
+   */
   type Table,
   type Any,
   type AnyWithProps,
+  /**
+   * Immutable table builder returned by make, before generated name binding.
+   * Its index, searchIndex, and vectorIndex methods return new definitions; the
+   * canonical contract is in `@confect/core/Table`.
+   *
+   * @category Models
+   */
   type UnnamedTable,
   type UnnamedAny,
   type UnnamedAnyWithProps,
