@@ -23,6 +23,10 @@ if [[ "$(git cat-file -t "$source_sha")" != commit ]]; then
   exit 1
 fi
 git merge-base --is-ancestor "$source_sha" refs/remotes/origin/main
+if [[ "$(git rev-parse HEAD)" != "$source_sha" || -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  echo "The source checkout must have the requested commit checked out with no tracked changes." >&2
+  exit 1
+fi
 git cat-file -e "${source_sha}:apps/docs/docs.json"
 version=$(git show "${source_sha}:packages/core/package.json" | jq -er '.version')
 if [[ ! "$version" =~ ^([1-9][0-9]*)\.[0-9]+\.[0-9]+$ || "${BASH_REMATCH[1]}" -lt 10 ]]; then
@@ -38,10 +42,18 @@ if printf '%s\n' "$entries" | grep -qvE '^100(644|755) blob '; then
   exit 1
 fi
 
-archive=$(mktemp)
-trap 'rm -f "$archive"' EXIT
-git archive --format=tar "$source_sha" apps/docs > "$archive"
+snapshot=$(mktemp -d)
+trap 'rm -rf "$snapshot"' EXIT
+git archive --format=tar "$source_sha" apps/docs | tar -xf - -C "$snapshot"
+if git cat-file -e "${source_sha}:scripts/docsApi.ts" 2>/dev/null; then
+  (cd "$repository" && pnpm docs:api --check --out "$snapshot/apps/docs")
+fi
+if [[ -n "$(find "$snapshot/apps/docs" ! -type d ! -type f -print -quit)" ]]; then
+  echo "Documentation must contain only regular files." >&2
+  exit 1
+fi
 git -C "$destination" rm -r --ignore-unmatch -- .
-tar -xf "$archive" -C "$destination"
-git -C "$destination" add --all
+mkdir -p "$destination/apps/docs"
+cp -a "$snapshot/apps/docs/." "$destination/apps/docs/"
+git -C "$destination" add --all --force -- apps/docs
 printf 'Prepared documentation from %s\n' "$source_sha"
