@@ -84,6 +84,9 @@ type NativeTable<
     }
   : never;
 
+/**
+ * @internal
+ */
 export interface NativeReader<Model extends GenericDataModel> {
   readonly table: <
     Table_ extends IncludedTables<DatabaseSchema.FromConvexDataModel<Model>>,
@@ -92,6 +95,9 @@ export interface NativeReader<Model extends GenericDataModel> {
   ) => TableReader<Table_, {}>;
 }
 
+/**
+ * @internal
+ */
 export const make = <Model extends GenericDataModel>(
   convexDatabaseReader: GenericDatabaseReader<Model>,
 ): NativeReader<Model> =>
@@ -113,6 +119,8 @@ export const make = <Model extends GenericDataModel>(
  * codegen document registry is supplied—this keeps it identical to what
  * `Handler`/runtime provisioning provide. The tag's _Service_ (what `yield*`
  * produces) carries `Docs`, so queries resolve to the named doc interfaces.
+ *
+ * @internal
  */
 export type DatabaseReaderTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -122,6 +130,9 @@ export type DatabaseReaderTag<
   DatabaseReaderService<DatabaseSchema_, Docs>
 >;
 
+/**
+ * @internal
+ */
 export const DatabaseReader = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
@@ -135,6 +146,9 @@ export type DatabaseReader<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = DatabaseReaderService<DatabaseSchema_>;
 
+/**
+ * @internal
+ */
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   convexDatabaseReader: GenericDatabaseReader<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>

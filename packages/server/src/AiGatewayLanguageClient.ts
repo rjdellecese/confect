@@ -19,6 +19,8 @@ export type AiGatewayLanguageClient = OpenAiClient.OpenAiClient;
 
 /**
  * Construct a language client using the current Effect HTTP client.
+ *
+ * @internal
  */
 export const make: Effect.Effect<
   OpenAiClient.Service,

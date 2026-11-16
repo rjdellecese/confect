@@ -12,21 +12,38 @@ import * as Ref from "effect/Ref";
 import type * as FunctionImpl from "./FunctionImpl";
 import type * as MiddlewareImpl from "./MiddlewareImpl";
 
+/**
+ * @internal
+ */
 export const TypeId = "~@confect/server/GroupImpl";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
+/**
+ * @internal
+ */
 export type FinalizationStatus = "Unfinalized" | "Finalized";
 
 export interface GroupImpl<
   FinalizationStatus_ extends FinalizationStatus = "Unfinalized",
 > {
+  /**
+   * @internal
+   */
   readonly [TypeId]: TypeId;
+  /**
+   * @internal
+   */
   readonly finalizationStatus: FinalizationStatus_;
   /**
    * Names of every function registered into this group's layer scope by
    * `FunctionImpl.make`. Authoritative only when `finalizationStatus` is
    * `"Finalized"`; the `"Unfinalized"` value is set to `[]` at `make`-time
    * since the list is only known once `finalize` snapshots the registry.
+   *
+   * @internal
    */
   readonly registeredFunctionNames: ReadonlyArray<string>;
   /**
@@ -35,21 +52,41 @@ export interface GroupImpl<
    * caveat as `registeredFunctionNames`. Lets consumers (the CLI's
    * `validateImpl`) verify middleware-impl completeness against a `GroupSpec`'s
    * attached middleware without inspecting the `Registry`.
+   *
+   * @internal
    */
   readonly registeredMiddlewareKeys: ReadonlyArray<string>;
 }
 
+/**
+ * @internal
+ */
 export interface Any extends GroupImpl<FinalizationStatus> {}
 
+/**
+ * @internal
+ */
 export const isGroupImpl = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
+/**
+ * @internal
+ */
 export interface AnyFinalized extends GroupImpl<"Finalized"> {}
+/**
+ * @internal
+ */
 export interface AnyUnfinalized extends GroupImpl<"Unfinalized"> {}
 
+/**
+ * @internal
+ */
 export const isFinalizedGroupImpl = (u: unknown): u is AnyFinalized =>
   isGroupImpl(u) && u.finalizationStatus === "Finalized";
 
+/**
+ * @internal
+ */
 export const isUnfinalizedGroupImpl = (u: unknown): u is AnyUnfinalized =>
   isGroupImpl(u) && u.finalizationStatus === "Unfinalized";
 
@@ -64,6 +101,8 @@ export const isUnfinalizedGroupImpl = (u: unknown): u is AnyUnfinalized =>
  * group's impl layer is built in its own isolated scope
  * (`buildForGroup`/`validateImpl` each provide a fresh `Registry`), so at most
  * one `GroupImpl` service of each status exists per build.
+ *
+ * @internal
  */
 export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({
   finalizationStatus,
@@ -154,6 +193,9 @@ export const finalize = (
     ),
   );
 
+/**
+ * @internal
+ */
 export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
   | FunctionImpl.FromGroupSpec<Group>
   | MiddlewareImpl.FromGroupSpec<Group>;

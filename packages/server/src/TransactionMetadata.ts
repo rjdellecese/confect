@@ -21,6 +21,9 @@ export class TransactionMetadata extends Context.Service<
   ReturnType<typeof make>
 >()("@confect/server/TransactionMetadata") {}
 
+/**
+ * @internal
+ */
 export const layer = (
   meta: Pick<QueryMeta, "getTransactionMetrics" | "getSnapshotTs">,
 ) => Layer.succeed(TransactionMetadata, make(meta));

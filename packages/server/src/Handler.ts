@@ -28,6 +28,9 @@ import type { StorageReader } from "./StorageReader";
 import type { StorageWriter } from "./StorageWriter";
 import type * as VectorSearch from "./VectorSearch";
 
+/**
+ * @internal
+ */
 export type Handler<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
@@ -75,6 +78,9 @@ type ConfectProvenanceHandler<
           ? NodeRuntimeAction<DatabaseSchema_, FunctionSpec_, R>
           : never;
 
+/**
+ * @internal
+ */
 export type QueryServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
@@ -91,6 +97,9 @@ export type QueryServices<
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >;
 
+/**
+ * @internal
+ */
 export type MutationServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
@@ -117,6 +126,8 @@ export type MutationServices<
 
 /**
  * Shared by both action runtimes.
+ *
+ * @internal
  */
 export type ActionServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -137,6 +148,9 @@ export type ActionServices<
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >;
 
+/**
+ * @internal
+ */
 export type ConfectProvenanceQuery<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
@@ -144,6 +158,9 @@ export type ConfectProvenanceQuery<
   R = never,
 > = Base<FunctionSpec_, QueryServices<DatabaseSchema_> | R>;
 
+/**
+ * @internal
+ */
 export type ConfectProvenanceMutation<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
@@ -151,6 +168,9 @@ export type ConfectProvenanceMutation<
   R = never,
 > = Base<FunctionSpec_, MutationServices<DatabaseSchema_> | R>;
 
+/**
+ * @internal
+ */
 export type ConvexRuntimeAction<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
@@ -158,6 +178,9 @@ export type ConvexRuntimeAction<
   R = never,
 > = Base<FunctionSpec_, ActionServices<DatabaseSchema_> | R>;
 
+/**
+ * @internal
+ */
 export type NodeRuntimeAction<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
@@ -176,12 +199,24 @@ type Base<FunctionSpec_ extends FunctionSpec.AnyWithProps, R> = (
   R
 >;
 
+/**
+ * @internal
+ */
 export type Any = AnyConfectProvenance | AnyConvexProvenance;
 
+/**
+ * @internal
+ */
 export type AnyConfectProvenance = Base<FunctionSpec.AnyConfect, any>;
 
+/**
+ * @internal
+ */
 export type AnyConvexProvenance = RegisteredFunction.Any;
 
+/**
+ * @internal
+ */
 export type WithName<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends FunctionSpec.AnyWithProps,

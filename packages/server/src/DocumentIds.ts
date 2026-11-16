@@ -31,6 +31,9 @@ export interface DocumentIdsService<AppTableName extends string> {
 export type DocumentIds<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   DocumentIdsService<DatabaseSchema.TableNames<DatabaseSchema_>>;
 
+/**
+ * @internal
+ */
 export type DocumentIdsTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = Context.Service<DocumentIds<DatabaseSchema_>, DocumentIds<DatabaseSchema_>>;
@@ -40,6 +43,9 @@ const tag = <AppTableName extends string>() =>
     "@confect/server/DocumentIds",
   );
 
+/**
+ * @internal
+ */
 export const DocumentIds = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(): DocumentIdsTag<DatabaseSchema_> =>
@@ -50,6 +56,9 @@ type NativeReader<Name extends string> = Pick<
   "normalizeId" | "system"
 >;
 
+/**
+ * @internal
+ */
 export const make = <const AppTableName extends string>(
   tableNames: ReadonlyArray<AppTableName>,
   reader: NativeReader<NoInfer<AppTableName>>,
@@ -94,6 +103,9 @@ export const make = <const AppTableName extends string>(
   };
 };
 
+/**
+ * @internal
+ */
 export const layer = <const AppTableName extends string>(
   tableNames: ReadonlyArray<AppTableName>,
   reader: NativeReader<NoInfer<AppTableName>>,

@@ -1,7 +1,13 @@
 import type { Crons } from "convex/server";
 import * as Predicate from "effect/Predicate";
 
+/**
+ * @internal
+ */
 export const TypeId = "~@confect/server/CronWindow";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
 type DayOfWeek = Parameters<Crons["weekly"]>[1]["dayOfWeek"];
@@ -17,6 +23,9 @@ export type CronWindow = { readonly [TypeId]: TypeId } & (
   | { readonly _tag: "Monthly"; readonly day: number; readonly hourUtc: number }
 );
 
+/**
+ * @internal
+ */
 export const isCronWindow = (u: unknown): u is CronWindow =>
   Predicate.hasProperty(u, TypeId);
 
