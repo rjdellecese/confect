@@ -45,7 +45,7 @@ const program = Effect.gen(function* () {
 });
 ```
 
-Each method returns an `Effect` that can fail with `WebSocketClientError` (wrapping transport-level errors) or `ParseResult.ParseError` (if schema encoding or decoding fails).
+Each method returns an `Effect` that can fail with `WebSocketClientError` (wrapping transport-level or undeclared backend errors) or `Schema.SchemaError` from `effect/Schema` (if schema encoding or decoding fails).
 
 ## Reactive queries
 
@@ -72,7 +72,7 @@ The underlying WebSocket subscription is cleaned up automatically when the strea
 
 ## Typed errors
 
-When a ref's spec declares an `error` schema, the decoded error is added to the error channel of `query`, `mutation`, `action`, and `reactiveQuery` alongside `WebSocketClientError` and `ParseError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
+When a ref's spec declares an `error` schema, the decoded error is added to the error channel of `query`, `mutation`, `action`, and `reactiveQuery` alongside `WebSocketClientError` and `Schema.SchemaError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
 
 ```ts
 import { WebSocketClient } from "@confect/js";
@@ -85,13 +85,13 @@ const lookup = Effect.gen(function* () {
 
   return yield* client.query(refs.public.notes.getOrFail, { noteId });
 });
-// Effect.Effect<Note, NoteNotFound | WebSocketClientError | ParseError, WebSocketClient.WebSocketClient>
+// Effect.Effect<Note, NoteNotFound | WebSocketClientError | Schema.SchemaError, WebSocketClient.WebSocketClient>
 ```
 
 `reactiveQuery` uses the ordinary `Stream` error channel, so a query failure
 terminates that stream. Use `reactiveQueryResult` when an error should instead
 be one event in a continuing subscription. It emits
-`Result<Returns, TypedError | WebSocketClientError | SchemaError>` values and
+`Result<Returns, TypedError | WebSocketClientError | Schema.SchemaError>` values and
 keeps the underlying Convex listener open, allowing a later query result to
 recover naturally:
 
@@ -103,21 +103,25 @@ import * as Stream from "effect/Stream";
 
 import refs from "./confect/_generated/refs";
 
-const lookups = Effect.gen(function* () {
-  const client = yield* WebSocketClient.WebSocketClient;
+const lookups = Stream.unwrap(
+  Effect.gen(function* () {
+    const client = yield* WebSocketClient.WebSocketClient;
 
-  return client
-    .reactiveQueryResult(refs.public.notes.getOrFail, { noteId })
-    .pipe(
-      Stream.map(
-        Result.match({
-          onSuccess: (note) => `Found: ${note.text}`,
-          onFailure: (error) => `Lookup failed: ${String(error)}`,
-        }),
-      ),
-    );
-});
+    return client
+      .reactiveQueryResult(refs.public.notes.getOrFail, { noteId })
+      .pipe(
+        Stream.map(
+          Result.match({
+            onSuccess: (note) => `Found: ${note.text}`,
+            onFailure: (error) => `Lookup failed: ${String(error)}`,
+          }),
+        ),
+      );
+  }),
+);
 ```
+
+Consume `lookups` with `Stream.runForEach` and provide the `WebSocketClient` layer to that consuming Effect. If argument encoding fails before the subscription opens, `reactiveQueryResult` emits one failed `Result` and ends without registering a listener.
 
 ## Authentication
 
