@@ -19,6 +19,8 @@ declare const process: { env: Record<string, string | undefined> };
  * a missing value, so `Config.withDefault` and `Config.option` recover from
  * it.
  *
+ * @category Constructors
+ *
  * @returns A provider for exact environment-key lookups. It does not enumerate
  *   child keys; configurations requiring a child-key listing are not supported.
  *   Confect already installs this provider for handlers and HTTP routes.

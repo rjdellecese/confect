@@ -10,6 +10,8 @@ import * as Schema from "effect/Schema";
  * (`"SplitRecommended"`, `"SplitRequired"`, or null) support splitting pages.
  * Paginated function constructors compose this codec from their `item`
  * factory.
+ *
+ * @category Schemas
  */
 export type PaginationResult<Doc extends Schema.Codec<any, any>> = ReturnType<
   typeof PaginationResult<Doc>

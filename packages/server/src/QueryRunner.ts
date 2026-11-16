@@ -11,6 +11,8 @@ import * as QueryTransactionContext from "./QueryTransactionContext";
  * Nested-query transaction controls. `transactionLimits` is supported in
  * queries/mutations; specifying `useStaleSnapshot` (even false) requires a
  * mutation. Omit options entirely in actions and HTTP handlers.
+ *
+ * @category Options
  */
 export type Options = MutationTransactionContext.QueryOptions;
 
@@ -21,6 +23,8 @@ const run = Effect.fn("QueryRunner.runQuery")(
 const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
   /**
    * Invoke a query ref with decoded arguments and no transaction overrides.
+   *
+   * @category Invocation
    *
    * @param query - Generated public or internal query ref.
    * @param args - Decoded arguments, optional for an argument-free ref.
@@ -34,6 +38,8 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
   ): Effect.Effect<Ref.Returns<Query>, Ref.Error<Query> | Schema.SchemaError>;
   /**
    * Invoke a query with transaction limits in a query or mutation context.
+   *
+   * @category Invocation
    *
    * @param query - Generated query ref.
    * @param args - Decoded arguments; pass {} for an argument-free ref.
@@ -58,6 +64,8 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
   /**
    * Invoke a query with an explicit stale-snapshot choice in a mutation.
    *
+   * @category Invocation
+   *
    * @param query - Generated query ref.
    * @param args - Decoded arguments, or {} when none are declared.
    * @param options - `useStaleSnapshot` plus optional transaction limits. A
@@ -76,6 +84,8 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
   >;
   /**
    * Invoke a query with dynamically selected transaction options.
+   *
+   * @category Invocation
    *
    * @param query - Generated query ref.
    * @param args - Decoded arguments.
@@ -127,6 +137,8 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
     /**
      * Invoke a generated query ref with decoded arguments.
      *
+     * @category Invocation
+     *
      * @param query - Public or internal query ref.
      * @param args - Decoded arguments; omit for an argument-free ref, or pass
      *   {} before an options argument.
@@ -147,12 +159,16 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
  * Query invocation service. Acquire the generated `QueryRunner` tag in queries,
  * mutations, actions or HTTP handlers, then call the returned `runQuery`
  * method.
+ *
+ * @category Services
  */
 export const QueryRunner =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
   Context.Service<ReturnType<typeof make>>("@confect/server/QueryRunner");
 /**
  * Effect requirement identifier for the generated query invocation service.
+ *
+ * @category Services
  */
 export type QueryRunner = typeof QueryRunner.Identifier;
 

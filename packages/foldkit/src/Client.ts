@@ -45,6 +45,8 @@ export const make = (webSocketClient: WebSocketClient.WebSocketClient) =>
  * emits Result values so a query failure need not close its listener. `setAuth`
  * accepts an effectful token supplier and an optional effectful authentication
  * callback.
+ *
+ * @category Services
  */
 export const Client =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
@@ -54,6 +56,8 @@ export const Client =
 
 /**
  * Effect requirement and acquired service shape for the application resource.
+ *
+ * @category Services
  */
 export type Client = typeof Client.Identifier;
 
@@ -61,6 +65,8 @@ export type Client = typeof Client.Identifier;
  * Constructs one scoped client for a Foldkit application's `resources`. The
  * connection closes when the resource scope ends. Commands and subscriptions
  * sharing this layer share authentication and pagination ids.
+ *
+ * @category Layers
  *
  * @example
  *   import * as Client from "@confect/foldkit/Client";
@@ -86,5 +92,7 @@ export const layer = (
  * Transport or undeclared backend failure from the underlying WebSocket client.
  * Its `cause` preserves the original failure. Commands and subscriptions pass
  * this error to `onError`; pagination includes it in settlement failures.
+ *
+ * @category Errors
  */
 export { WebSocketClientError } from "@confect/js/WebSocketClient";

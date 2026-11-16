@@ -13,10 +13,14 @@ import * as FunctionRegistryItem from "./FunctionRegistryItem";
 
 /**
  * Service provided by a function implementation layer, keyed by its spec name.
+ *
+ * @category Models
  */
 export interface FunctionImpl<Name_ extends string> {
   /**
    * Name of the implemented function within its group.
+   *
+   * @category Models
    */
   readonly name: Name_;
 }
@@ -29,6 +33,8 @@ export const FunctionImpl = <Name_ extends string>({ name }: { name: Name_ }) =>
 
 /**
  * Implement one function declared by a group spec.
+ *
+ * @category Layers
  *
  * @param _databaseSchema - Generated runtime schema, not convexSchema. It
  *   carries service types without evaluating table schemas during

@@ -1,3 +1,8 @@
+/**
+ * @module
+ *
+ * @category Models
+ */
 import * as Equal from "effect/Equal";
 import * as Function from "effect/Function";
 import * as Hash from "effect/Hash";
@@ -11,6 +16,8 @@ type TypeId = typeof TypeId;
 /**
  * A `QueryResult` represents the result of a Confect query.
  *
+ * @category Models
+ *
  * @typeParam A - The type of the decoded `returns` value in the `Success`
  *   variant.
  * @typeParam E - The type of the decoded typed error in the `Failure` variant.
@@ -22,34 +29,48 @@ export type QueryResult<A, E = never> =
 
 /**
  * Type utilities for extracting a query result's success and error types.
+ *
+ * @category Models
  */
 export declare namespace QueryResult {
   /**
    * Shared pipeable shape; the phantom fields describe types, not runtime data.
+   *
+   * @category Models
    */
   export interface Proto<out A, out E> extends Pipeable.Pipeable {
     /**
      * Identifies values created by this module.
+     *
+     * @category Models
      */
     readonly [TypeId]: TypeId;
     /**
      * Type-only witness for the decoded success value.
+     *
+     * @category Models
      */
     readonly "~A": A;
     /**
      * Type-only witness for the decoded declared error.
+     *
+     * @category Models
      */
     readonly "~E": E;
   }
 
   /**
    * Extracts the decoded success type from a result type, or `never` otherwise.
+   *
+   * @category Models
    */
   // eslint-disable-next-line @typescript-eslint/no-shadow
   export type Success<R> = R extends { readonly "~A": infer A } ? A : never;
 
   /**
    * Extracts the declared error type from a result type, or `never` otherwise.
+   *
+   * @category Models
    */
   // eslint-disable-next-line @typescript-eslint/no-shadow
   export type Failure<R> = R extends { readonly "~E": infer E } ? E : never;
@@ -58,42 +79,60 @@ export declare namespace QueryResult {
 /**
  * No query value is available yet, either while loading or because it was
  * skipped.
+ *
+ * @category Models
  */
 export interface Loading<A, E = never> extends QueryResult.Proto<A, E> {
   /**
    * Discriminant for narrowing to the pending/skipped state.
+   *
+   * @category Models
    */
   readonly _tag: "Loading";
   /**
    * `true` when the hook received `"skip"` and did not subscribe.
+   *
+   * @category Models
    */
   readonly skipped: boolean;
 }
 
 /**
  * A query value decoded through the ref's return schema.
+ *
+ * @category Models
  */
 export interface Success<A, E = never> extends QueryResult.Proto<A, E> {
   /**
    * Discriminant for narrowing to a decoded value.
+   *
+   * @category Models
    */
   readonly _tag: "Success";
   /**
    * The decoded query result, not its Convex wire representation.
+   *
+   * @category Models
    */
   readonly value: A;
 }
 
 /**
  * A declared query error; undeclared failures are thrown by the hook instead.
+ *
+ * @category Models
  */
 export interface Failure<A, E = never> extends QueryResult.Proto<A, E> {
   /**
    * Discriminant for narrowing to a declared error.
+   *
+   * @category Models
    */
   readonly _tag: "Failure";
   /**
    * The failure decoded through the ref's error schemas.
+   *
+   * @category Models
    */
   readonly error: E;
 }
@@ -180,6 +219,8 @@ export const fail = <E, A = never>(error: E): Failure<A, E> =>
 /**
  * Narrows `queryResult` to `Loading`, including skipped queries; inspect
  * `skipped` to distinguish them.
+ *
+ * @category Refinements
  */
 export const isLoading = <A, E>(
   queryResult: QueryResult<A, E>,
@@ -187,6 +228,8 @@ export const isLoading = <A, E>(
 
 /**
  * Narrows `queryResult` to `Success`, making its decoded `value` available.
+ *
+ * @category Refinements
  */
 export const isSuccess = <A, E>(
   queryResult: QueryResult<A, E>,
@@ -195,6 +238,8 @@ export const isSuccess = <A, E>(
 /**
  * Narrows `queryResult` to `Failure`, making its decoded declared `error`
  * available.
+ *
+ * @category Refinements
  */
 export const isFailure = <A, E>(
   queryResult: QueryResult<A, E>,
@@ -204,10 +249,14 @@ type MatchOptions<A, E, X, Y, Z> = {
   /**
    * Handles loading or skipped queries; the argument is `true` only when
    * skipped.
+   *
+   * @category Pattern matching
    */
   readonly onLoading: (skipped: boolean) => X;
   /**
    * Handles the decoded query value and returns your branch result.
+   *
+   * @category Pattern matching
    */
   readonly onSuccess: (value: A) => Y;
 } & ([E] extends [never]
@@ -216,6 +265,8 @@ type MatchOptions<A, E, X, Y, Z> = {
       /**
        * Handles the decoded declared error; required when the error type is not
        * `never`.
+       *
+       * @category Pattern matching
        */
       readonly onFailure: (error: E) => Z;
     });
@@ -226,6 +277,8 @@ type MatchReturns<E, X, Y, Z> = [E] extends [never] ? X | Y : X | Y | Z;
  * Matches a {@link QueryResult} to the appropriate handler based on its tag. If
  * the provided `QueryResult` cannot fail (i.e. `E` is `never`), `onFailure` is
  * not required.
+ *
+ * @category Pattern matching
  *
  * @example
  *   const result = QueryResult.match(queryResult, {

@@ -17,6 +17,8 @@ type DayOfWeek = Parameters<Crons["weekly"]>[1]["dayOfWeek"];
  * with hourly/daily/weekly/monthly; `_tag` identifies the cadence. Daily and
  * longer windows carry hourUtc, weekly also dayOfWeek, and monthly also day.
  * Calendar fields are validated when the job is added to CronJobs.
+ *
+ * @category Models
  */
 export type CronWindow = { readonly [TypeId]: TypeId } & (
   | { readonly _tag: "Hourly" }
@@ -42,6 +44,8 @@ const Proto = {
 /**
  * Schedule within every hour, at a minute chosen by Convex.
  *
+ * @category Constructors
+ *
  * @returns A window to pass to CronJob.make; no exact minute is promised.
  */
 export const hourly = (): CronWindow =>
@@ -49,6 +53,8 @@ export const hourly = (): CronWindow =>
 
 /**
  * Schedule within the same UTC hour each day.
+ *
+ * @category Constructors
  *
  * @example
  *   daily({ hourUtc: 17 });
@@ -66,6 +72,8 @@ export const daily = (options: { readonly hourUtc: number }): CronWindow =>
 
 /**
  * Schedule within a UTC hour on one weekday.
+ *
+ * @category Constructors
  *
  * @example
  *   weekly({ dayOfWeek: "monday", hourUtc: 9 });
@@ -86,6 +94,8 @@ export const weekly = (options: {
 
 /**
  * Schedule within a UTC hour on one day of the month.
+ *
+ * @category Constructors
  *
  * @example
  *   monthly({ day: 1, hourUtc: 9 });

@@ -1,14 +1,26 @@
 import type { Document } from "@confect/server";
 import type schemaDefinition from "./schema";
 
-/** Decoded notes document, including _id and _creationTime. */
+/**
+ * Decoded notes document, including _id and _creationTime.
+ * @category Models
+ */
 export type NotesDoc = Document.Document<typeof schemaDefinition, "notes">;
-/** Decoded tags document, including _id and _creationTime. */
+/**
+ * Decoded tags document, including _id and _creationTime.
+ * @category Models
+ */
 export type TagsDoc = Document.Document<typeof schemaDefinition, "tags">;
-/** Decoded users document, including _id and _creationTime. */
+/**
+ * Decoded users document, including _id and _creationTime.
+ * @category Models
+ */
 export type UsersDoc = Document.Document<typeof schemaDefinition, "users">;
 
-/** Application table names mapped to decoded document types used by database services; excludes system tables. */
+/**
+ * Application table names mapped to decoded document types used by database services; excludes system tables.
+ * @category Models
+ */
 export interface Docs {
   notes: NotesDoc;
   tags: TagsDoc;

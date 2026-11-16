@@ -10,6 +10,8 @@ import * as Client from "./Client";
  * `onError` Message: the ref's typed error (if it declares an `error` schema),
  * a transport-level `WebSocketClientError`, or a `SchemaError` from encoding
  * args or decoding returns.
+ *
+ * @category Errors
  */
 export type Error<Ref_ extends Ref.AnyConfect> =
   | Ref.Error<Ref_>
@@ -22,6 +24,8 @@ export type Error<Ref_ extends Ref.AnyConfect> =
  * so the resulting Command's error channel is `never`, as Foldkit requires.
  * Follow Foldkit's naming convention: past-tense facts like
  * `SucceededSaveNote`/`FailedSaveNote`.
+ *
+ * @category Options
  */
 export interface Handlers<
   Ref_ extends Ref.AnyConfect,
@@ -30,16 +34,22 @@ export interface Handlers<
 > {
   /**
    * Convert the decoded return value into one of the declared Messages.
+   *
+   * @category Mapping
    */
   readonly onSuccess: (returns: Ref.Returns<Ref_>) => SuccessMessage;
   /**
    * Convert a declared function, transport or schema failure into a Message.
+   *
+   * @category Mapping
    */
   readonly onError: (error: Error<Ref_>) => ErrorMessage;
 }
 
 /**
  * The Command instance a definition call constructs.
+ *
+ * @category Models
  */
 type Instance<
   Name extends string,
@@ -48,15 +58,21 @@ type Instance<
 > = Readonly<{
   /**
    * Definition name used by Foldkit to identify this Command.
+   *
+   * @category Models
    */
   name: Name;
   /**
    * Decoded function arguments supplied when constructing this invocation.
+   *
+   * @category Models
    */
   args: Ref.Args<Ref_>;
   /**
    * Deferred execution requiring Client and producing a success or failure
    * Message.
+   *
+   * @category Commands
    */
   effect: Effect.Effect<Message, never, Client.Client>;
 }>;
@@ -73,6 +89,8 @@ type SchemaArgs<Ref_ extends Ref.AnyConfect> = Schema.Schema.Type<
  * Foldkit accepts one—including Story/Scene `Command.resolve` and `expectExact`
  * matchers. Call it from `update` to construct a Command instance; nothing runs
  * until the Foldkit runtime executes it.
+ *
+ * @category Models
  */
 export type Definition<
   Name extends string,
@@ -95,6 +113,8 @@ export type Definition<
  * Interrupting stops the client-side Effect and guarantees the invocation's
  * result Messages never dispatch—it does not cancel the Convex function on the
  * server, which runs to completion once the call is on the wire.
+ *
+ * @category Options
  */
 export type InterruptOption<
   Ref_ extends Ref.AnyConfect,
@@ -105,6 +125,8 @@ export type InterruptOption<
 /**
  * The keyed arm of `InterruptOption`: `keyFields` declares the args the
  * `Interrupt` constructor requires; `toKey` derives the key part from them.
+ *
+ * @category Options
  */
 export type KeyedInterrupt<
   Ref_ extends Ref.AnyConfect,
@@ -119,14 +141,19 @@ export type KeyedInterrupt<
  * this name. `toMessage` receives Foldkit's `Interrupted` or `NotFound`
  * outcome. Calling the definition still only constructs a Command; its returned
  * `key` is the interruption key.
+ *
+ * @category Models
  */
 export type InterruptibleDefinition<
   Name extends string,
   Ref_ extends Ref.AnyConfect,
   Message,
-> = ((
-  ...args: Ref.OptionalArgs<Ref_>
-) => Instance<Name, Ref_, Message> & Readonly<{ key: string }>) &
+> = ((...args: Ref.OptionalArgs<Ref_>) => Instance<Name, Ref_, Message> &
+  Readonly<{
+    /**
+     * @category Models
+     */ key: string;
+  }>) &
   FoldkitCommand.Interruptible.DefinitionWithArgsNameKeyed<
     Name,
     Ref.ArgsSchema<Ref_>["fields"],
@@ -141,15 +168,20 @@ export type InterruptibleDefinition<
  * to stop only invocations matching that derived key. `toMessage` maps
  * Foldkit's `Interrupted` or `NotFound` outcome to a Message. Each constructed
  * invocation also carries its derived `key`.
+ *
+ * @category Models
  */
 export type KeyedInterruptibleDefinition<
   Name extends string,
   Ref_ extends Ref.AnyConfect,
   KeyField extends keyof SchemaArgs<Ref_> & string,
   Message,
-> = ((
-  ...args: Ref.OptionalArgs<Ref_>
-) => Instance<Name, Ref_, Message> & Readonly<{ key: string }>) &
+> = ((...args: Ref.OptionalArgs<Ref_>) => Instance<Name, Ref_, Message> &
+  Readonly<{
+    /**
+     * @category Models
+     */ key: string;
+  }>) &
   FoldkitCommand.Interruptible.DefinitionWithArgs<
     Name,
     Ref.ArgsSchema<Ref_>["fields"],
@@ -175,6 +207,8 @@ const run = <Ref_ extends Ref.AnyConfect, SuccessMessage, ErrorMessage>(
  * folded into a Message. Reach for these when the factory below doesn't fit: a
  * custom args schema, `interrupt`, or a Command that makes several calls.
  *
+ * @category Commands
+ *
  * @param ref - Public Confect query ref; plain Convex refs are not accepted.
  * @param handlers - Map decoded outcomes to Messages.
  *
@@ -198,6 +232,8 @@ export const queryEffect =
  * and outcome handlers, then decoded ref args. The returned Effect requires
  * Client; codec, declared and transport failures become Messages. Interrupting
  * it does not undo a server mutation.
+ *
+ * @category Commands
  */
 export const mutationEffect =
   <Mutation extends Ref.AnyConfectPublicMutation, SuccessMessage, ErrorMessage>(
@@ -215,6 +251,8 @@ export const mutationEffect =
  * and outcome handlers, then decoded ref args. The returned Effect requires
  * Client; codec, declared and transport failures become Messages. Interruption
  * does not cancel server-side work.
+ *
+ * @category Commands
  */
 export const actionEffect =
   <Action extends Ref.AnyConfectPublicAction, SuccessMessage, ErrorMessage>(
@@ -301,6 +339,9 @@ function makeDefinition<
   );
 }
 
+/**
+ * @category Options
+ */
 type FactoryConfig<
   Ref_ extends Ref.AnyConfect,
   Messages extends ReadonlyArray<Schema.Top>,
@@ -309,10 +350,15 @@ type FactoryConfig<
 > = Handlers<Ref_, SuccessMessage, ErrorMessage> & {
   /**
    * Schemas of the Messages that onSuccess and onError may construct.
+   *
+   * @category Options
    */
   readonly messages: Messages;
 };
 
+/**
+ * @category Options
+ */
 type KeyedFactoryConfig<
   Ref_ extends Ref.AnyConfect,
   Messages extends ReadonlyArray<Schema.Top>,
@@ -322,10 +368,15 @@ type KeyedFactoryConfig<
 > = FactoryConfig<Ref_, Messages, SuccessMessage, ErrorMessage> & {
   /**
    * Select key fields and derive an interruption key from those decoded args.
+   *
+   * @category Options
    */
   readonly interrupt: KeyedInterrupt<Ref_, KeyField>;
 };
 
+/**
+ * @category Options
+ */
 type NameKeyedFactoryConfig<
   Ref_ extends Ref.AnyConfect,
   Messages extends ReadonlyArray<Schema.Top>,
@@ -335,10 +386,15 @@ type NameKeyedFactoryConfig<
   /**
    * Key interruption by the Command name, grouping all its in-flight
    * invocations.
+   *
+   * @category Options
    */
   readonly interrupt: true;
 };
 
+/**
+ * @category Options
+ */
 type StandardFactoryConfig<
   Ref_ extends Ref.AnyConfect,
   Messages extends ReadonlyArray<Schema.Top>,
@@ -347,6 +403,8 @@ type StandardFactoryConfig<
 > = FactoryConfig<Ref_, Messages, SuccessMessage, ErrorMessage> & {
   /**
    * Omit interrupt for a definition without an Interrupt constructor.
+   *
+   * @category Options
    */
   readonly interrupt?: never;
 };
@@ -484,6 +542,8 @@ const makeFactory = <BoundRef extends Ref.AnyConfect>(
  * // { model, commands: [SaveDraft.Interrupt((outcome) => CompletedCancelSaveDraft({ outcome }))] }
  * ```
  *
+ * @category Constructors
+ *
  * @param name - Foldkit Command name, also used for name-keyed interruption.
  * @param ref - Public Confect query ref supplying the args and result codecs.
  * @param config - Declared message schemas, onSuccess/onError callbacks and an
@@ -501,6 +561,8 @@ export const query: ReturnType<typeof makeFactory<Ref.AnyConfectPublicQuery>> =
  * message/handler/interrupt config as {@link query}. The definition is lazy; the
  * runtime executes its Client-dependent Effect. Declared, codec and transport
  * failures go to onError. Interruption cannot undo server writes.
+ *
+ * @category Constructors
  */
 export const mutation: ReturnType<
   typeof makeFactory<Ref.AnyConfectPublicMutation>
@@ -512,6 +574,8 @@ export const mutation: ReturnType<
  * message/handler/interrupt config as {@link query}. The runtime executes the
  * Client-dependent Effect and maps typed failures to onError Messages.
  * Interruption suppresses the result Message, not server-side work.
+ *
+ * @category Constructors
  */
 export const action: ReturnType<
   typeof makeFactory<Ref.AnyConfectPublicAction>

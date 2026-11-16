@@ -11,6 +11,8 @@ import * as AiGatewayServiceToken from "./internal/AiGatewayServiceToken";
  * describes an unsupported deployment. Definitions are shared with the language
  * client and remain public through these aliases, with no extra failure payload
  * fields.
+ *
+ * @category Errors
  */
 export {
   AiGatewayDisabled,
@@ -20,10 +22,14 @@ export {
 
 /**
  * The client configured for Convex AI gateway decisions.
+ *
+ * @category Services
  */
 export const AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 /**
  * Effect requirement of a decision model using the gateway client layer.
+ *
+ * @category Services
  */
 export type AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 
@@ -52,6 +58,8 @@ export const make: Effect.Effect<
  *
  * This layer supplies the client for AiGatewayDecisionModel operations; it is a
  * value, not a layer factory.
+ *
+ * @category Layers
  */
 export const layer: Layer.Layer<
   AiGatewayDecisionClient,

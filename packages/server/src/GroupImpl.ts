@@ -31,6 +31,8 @@ export type FinalizationStatus = "Unfinalized" | "Finalized";
  * Group implementation layer's service. The status distinguishes a layer still
  * awaiting implementations from one finalized for the codegen entry point.
  * Build through make/provide/finalize rather than constructing this value.
+ *
+ * @category Models
  */
 export interface GroupImpl<
   FinalizationStatus_ extends FinalizationStatus = "Unfinalized",
@@ -122,6 +124,8 @@ export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({
 /**
  * Begin a group's implementation layer, requiring its functions and middleware.
  *
+ * @category Layers
+ *
  * @param _databaseSchema - Generated runtime schema; no schema thunk is
  *   evaluated.
  * @param _group - Group spec whose implementations must be supplied.
@@ -167,6 +171,8 @@ const findUnfinalizedGroupImpl = <S>(
 /**
  * Finish a group after all function and middleware implementations are
  * supplied.
+ *
+ * @category Combinators
  *
  * @param group - An unfinalized layer with no remaining requirements. Missing
  *   implementations are rejected by the parameter's type.

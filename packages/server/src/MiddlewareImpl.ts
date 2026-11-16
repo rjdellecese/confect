@@ -34,10 +34,14 @@ import { setNestedProperty } from "./internal/utils";
  * the group's spec (via {@link FromGroupSpec}), so `GroupImpl.finalize`'s `RIn =
  * never` bound rejects a group that attaches a middleware but never provides
  * its implementation—the exact mechanism used for `FunctionImpl`s.
+ *
+ * @category Models
  */
 export interface MiddlewareImpl<MiddlewareKey extends string> {
   /**
    * Key of the middleware spec implemented by this layer.
+   *
+   * @category Models
    */
   readonly middlewareKey: MiddlewareKey;
 }
@@ -180,6 +184,8 @@ const layerFromImpls = <
  *
  * Like `FunctionImpl.make`, `databaseSchema` is a type-level carrier only.
  *
+ * @category Layers
+ *
  * @param _databaseSchema - Generated runtime schema for service typing.
  * @param middlewareSpec - Middleware declaration to implement.
  * @param impl - Wrapper receiving the downstream Effect plus invocation
@@ -227,6 +233,8 @@ export const make = <
  * use `DatabaseReader`/`DatabaseWriter` in queries and mutations, and
  * `runQuery` of an internal query in actions.
  *
+ * @category Layers
+ *
  * @param _databaseSchema - Generated runtime schema for service typing.
  * @param middlewareSpec - Middleware declaration to implement.
  * @param impls - One wrapper per declared query/mutation/action context, each
@@ -262,6 +270,8 @@ export const makeByFunctionType = <
  * shape: run `effect` before the rest of the chain and provide its result under
  * `tag` (the runtime tag for the middleware's type-level `provides` service,
  * passed explicitly since the spec class only knows it at the type level).
+ *
+ * @category Layers
  *
  * @param databaseSchema - Generated runtime schema.
  * @param middlewareSpec - Declaration identifying the provided service/error.

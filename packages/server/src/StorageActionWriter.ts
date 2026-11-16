@@ -11,6 +11,8 @@ const make = (storageActionWriter: ConvexStorageActionWriter) => ({
   /**
    * Read stored contents in a mutation, action or HTTP handler.
    *
+   * @category Reading
+   *
    * @param storageId - ID of the blob.
    *
    * @returns An Effect producing a Blob, failing with BlobNotFoundError when
@@ -32,6 +34,8 @@ const make = (storageActionWriter: ConvexStorageActionWriter) => ({
   /**
    * Store contents in a mutation, action or HTTP handler.
    *
+   * @category Writing
+   *
    * @param blob - Contents and media type.
    * @param options - Optional `sha256` checksum checked by Convex.
    *
@@ -45,6 +49,8 @@ const make = (storageActionWriter: ConvexStorageActionWriter) => ({
 /**
  * Compatibility blob-content service supplied in mutations, actions and HTTP
  * handlers despite its historical name. Prefer the generated `Storage` tag.
+ *
+ * @category Services
  */
 export class StorageActionWriter extends Context.Service<
   StorageActionWriter,

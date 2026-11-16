@@ -10,12 +10,16 @@ import * as Schema from "effect/Schema";
  * error. Recover with `Effect.catchTag("HttpClientError", ...)`; schema
  * failures from encoding arguments or decoding results use `Schema.SchemaError`
  * instead.
+ *
+ * @category Errors
  */
 export class HttpClientError extends Schema.TaggedError<HttpClientError, {}>()(
   "HttpClientError",
   {
     /**
      * The original rejected value, including undeclared Convex errors.
+     *
+     * @category Errors
      */
     cause: Schema.Unknown,
   },
@@ -112,12 +116,16 @@ const make = (
   return {
     /**
      * The deployment URL used by the underlying Convex HTTP client.
+     *
+     * @category Getters
      */
     url: client.url,
     /**
      * Sets the JWT used by subsequent requests when the returned Effect runs.
      * The token is shared by all users of this service instance; use separate
      * layers for callers that must not share authentication state.
+     *
+     * @category Authentication
      *
      * @param token - The authentication token to send to Convex.
      *
@@ -128,10 +136,14 @@ const make = (
      * Clears the shared authentication token when this Effect runs. Yield the
      * Effect itself (`yield* client.clearAuth`), rather than calling a method.
      * Subsequent requests are unauthenticated; there is no typed failure.
+     *
+     * @category Authentication
      */
     clearAuth,
     /**
      * Runs a public query once, encoding its arguments and decoding its result.
+     *
+     * @category Invocation
      *
      * @param ref - The public query ref, usually from generated `refs`.
      * @param rest - Decoded arguments; omit them only for an argument-free ref.
@@ -145,6 +157,8 @@ const make = (
      * Runs a public mutation with decoded arguments. Mutations are queued by
      * default on this HTTP client.
      *
+     * @category Invocation
+     *
      * @param ref - The public mutation ref.
      * @param rest - Decoded arguments followed by Convex `HttpMutationOptions`.
      *   To pass options for an argument-free mutation, pass `{}` first. Set
@@ -157,6 +171,8 @@ const make = (
     mutation,
     /**
      * Runs a public action, encoding its arguments and decoding its result.
+     *
+     * @category Invocation
      *
      * @param ref - The public action ref.
      * @param rest - Decoded arguments; omit them only for an argument-free ref.
@@ -173,6 +189,8 @@ const make = (
  * A Confect client which uses HTTP to communicate with your Convex backend.
  * Works in any JS runtime that supports `fetch`. Wraps
  * [ConvexHttpClient](https://docs.convex.dev/api/classes/browser.ConvexHttpClient).
+ *
+ * @category Services
  */
 export const HttpClient =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
@@ -181,6 +199,8 @@ export const HttpClient =
 /**
  * The Effect requirement supplied by {@link layer} and accessed with
  * {@link HttpClient}.
+ *
+ * @category Services
  */
 export type HttpClient = typeof HttpClient.Identifier;
 
@@ -188,6 +208,8 @@ export type HttpClient = typeof HttpClient.Identifier;
  * Provides an HTTP client service with its own authentication state and
  * mutation queue. Construction happens when the layer is built, not when it is
  * declared.
+ *
+ * @category Layers
  *
  * @example
  *   import { HttpClient } from "@confect/js";

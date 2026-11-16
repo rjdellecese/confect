@@ -26,6 +26,8 @@ export type TypeId = typeof TypeId;
 /**
  * Immutable collection default-exported from the application's
  * confect/crons.ts.
+ *
+ * @category Models
  */
 export interface CronJobs {
   /**
@@ -43,6 +45,8 @@ export interface CronJobs {
 
   /**
    * Add a recurring invocation without changing this collection.
+   *
+   * @category Combinators
    *
    * @param cron - Job built with CronJob.make.
    *
@@ -147,6 +151,8 @@ const makeProto = (
 
 /**
  * Create an empty recurring-job collection.
+ *
+ * @category Constructors
  *
  * @returns A collection to extend with immutable add calls and default-export
  *   from confect/crons.ts. Codegen emits the corresponding Convex cron entry.

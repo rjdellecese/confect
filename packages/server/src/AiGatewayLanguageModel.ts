@@ -30,6 +30,8 @@ export interface Options {
  *
  * Model identifiers use Convex's `provider/model` format.
  *
+ * @category Constructors
+ *
  * @param modelId - Gateway model identifier, for example "openai/gpt-4o-mini".
  * @param config - Upstream OpenAI-compatible request settings, such as
  *   temperature or max_output_tokens; support depends on the selected model.

@@ -50,6 +50,8 @@ type TableInfoFor<
  * Lookup and query builders for one table, returned by the generated database
  * reader's `table` method. Values are decoded using the table codec; index and
  * search callbacks operate on Convex's stored field values.
+ *
+ * @category Models
  */
 export interface QueryInitializer<
   DataModel_ extends DataModel.AnyWithProps,
@@ -60,9 +62,13 @@ export interface QueryInitializer<
    * Retrieve one decoded document by ID or indexed field values. Missing
    * documents are typed failures, not Options. Native failures, including
    * multiple matches for an index lookup, remain defects.
+   *
+   * @category Reading
    */
   readonly get: {
     /**
+     * @category Reading
+     *
      * @param id - Table-typed document ID.
      *
      * @returns An effect yielding the document, or failing with
@@ -73,6 +79,8 @@ export interface QueryInitializer<
       id: GenericId<TableName>,
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIdFailure>;
     /**
+     * @category Reading
+     *
      * @param indexName - Standard index used for an exact lookup.
      * @param indexFieldValues - Positional stored values in index-field order.
      *
@@ -96,9 +104,13 @@ export interface QueryInitializer<
   /**
    * Build an ordered standard-index query without fetching documents. Built-in
    * indexes `by_creation_time` and `by_id` are always available.
+   *
+   * @category Reading
    */
   readonly index: {
     /**
+     * @category Reading
+     *
      * @param indexName - Standard index name.
      * @param indexRange - Optional native Convex range callback. Apply `eq` to
      *   successive index fields, then optional lower/upper bounds on the next
@@ -126,6 +138,8 @@ export interface QueryInitializer<
     /**
      * Query the entire index without a range callback.
      *
+     * @category Reading
+     *
      * @param indexName - Standard index name.
      * @param order - `"asc"` by default, or `"desc"`.
      *
@@ -142,6 +156,8 @@ export interface QueryInitializer<
   };
   /**
    * Build a full-text query sorted by descending relevance.
+   *
+   * @category Reading
    *
    * @param indexName - Search index declared on the table.
    * @param searchFilter - Native Convex callback: call `search(field, text)` on
@@ -185,6 +201,8 @@ export interface QueryInitializer<
    * The callback's `eq` consumes the next field; `gt`, `gte`, `lt`, and `lte`
    * bound it without consuming it. Bounds come last, except a lower bound may
    * precede an upper bound on the same field. Values are stored field values.
+   *
+   * @category Reading
    *
    * @param indexName - Standard index name, not a full-text search index.
    * @param indexRange - Optional typed range callback; omit it for the full
@@ -535,22 +553,30 @@ export const getById =
 /**
  * No document exists for an ID lookup. A typed failure from `get(id)` and from
  * patch's initial read, even when DocumentIds previously validated the ID.
+ *
+ * @category Errors
  */
 export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
   "GetByIdFailure",
   {
     /**
      * The requested document ID.
+     *
+     * @category Getters
      */
     id: Schema.String,
     /**
      * The selected table's name.
+     *
+     * @category Getters
      */
     tableName: Schema.String,
   },
 ) {
   /**
    * Human-readable absence diagnostic including the table and requested ID.
+   *
+   * @category Getters
    */
   override get message(): string {
     return Document.documentErrorMessage({
@@ -565,6 +591,8 @@ export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
  * No document matched an exact index lookup. This is a typed failure from
  * `get(indexName, ...indexFieldValues)`, not the error for multiple matches;
  * multiple matches cause a native uniqueness defect instead.
+ *
+ * @category Errors
  */
 export class GetByIndexFailure extends Schema.TaggedError<
   GetByIndexFailure,
@@ -572,20 +600,28 @@ export class GetByIndexFailure extends Schema.TaggedError<
 >()("GetByIndexFailure", {
   /**
    * The selected table's name.
+   *
+   * @category Getters
    */
   tableName: Schema.String,
   /**
    * The standard index used for lookup.
+   *
+   * @category Getters
    */
   indexName: Schema.String,
   /**
    * Requested values in index-field order, before any document decoding.
+   *
+   * @category Getters
    */
   indexFieldValues: Schema.Array(Schema.Unknown),
 }) {
   /**
    * Human-readable diagnostic identifying the table, index, and requested
    * values.
+   *
+   * @category Getters
    */
   override get message(): string {
     const fieldValues = Result.getOrThrowWith(

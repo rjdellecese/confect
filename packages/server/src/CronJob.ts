@@ -15,6 +15,8 @@ export type TypeId = typeof TypeId;
 /**
  * Recurring invocation description created by {@link make}. Add it to a CronJobs
  * collection to encode arguments and validate the schedule.
+ *
+ * @category Models
  */
 export interface CronJob {
   /**
@@ -24,18 +26,26 @@ export interface CronJob {
 
   /**
    * Unique job identifier within the cron collection.
+   *
+   * @category Models
    */
   readonly identifier: string;
   /**
    * UTC cron expression, fixed interval or recurring hour window.
+   *
+   * @category Models
    */
   readonly schedule: Cron.Cron | Duration.Duration | CronWindow.CronWindow;
   /**
    * Mutation or action to invoke; prefer an internal ref for scheduled work.
+   *
+   * @category Models
    */
   readonly ref: Ref.AnyMutation | Ref.AnyAction;
   /**
    * Decoded invocation arguments, encoded when added to the collection.
+   *
+   * @category Models
    */
   readonly args: Record<string, unknown>;
 }
@@ -65,6 +75,8 @@ const makeProto = (
 
 /**
  * Describe a recurring mutation or action without registering it yet.
+ *
+ * @category Constructors
  *
  * @param identifier - Unique name within the CronJobs collection.
  * @param schedule - UTC Cron, positive whole-unit Duration or CronWindow.

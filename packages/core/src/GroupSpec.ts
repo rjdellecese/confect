@@ -32,6 +32,8 @@ export const isGroupSpec = (u: unknown): u is AnyWithProps =>
  * schema factories.
  *
  * Group middleware covers this group's functions, not its child groups.
+ *
+ * @category Models
  */
 export interface GroupSpec<
   Runtime extends RuntimeAndFunctionType.Runtime,
@@ -46,22 +48,32 @@ export interface GroupSpec<
 > {
   /**
    * Identifies a Confect group declaration.
+   *
+   * @category Models
    */
   readonly [TypeId]: TypeId;
   /**
    * The runtime required by this group's own functions.
+   *
+   * @category Models
    */
   readonly runtime: Runtime;
   /**
    * Whether this group's Convex queries and mutations opt into context reuse.
+   *
+   * @category Options
    */
   readonly experimental_reuseContext: boolean;
   /**
    * The codegen-assigned group segment; empty on a newly created group.
+   *
+   * @category Models
    */
   readonly name: Name_;
   /**
    * This group's own function declarations, keyed by local function name.
+   *
+   * @category Models
    */
   readonly functions: {
     [
@@ -72,26 +84,36 @@ export interface GroupSpec<
   };
   /**
    * Codegen-assembled child groups; each child may use a different runtime.
+   *
+   * @category Models
    */
   readonly groups: {
     [GroupName in Name<Groups_>]: WithName<Groups_, GroupName>;
   };
   /**
    * Group-level middleware declarations in attachment order.
+   *
+   * @category Middleware
    */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
   /**
    * Group-level middleware declarations paired with their attachment options.
+   *
+   * @category Middleware
    */
   readonly middlewareAttachments: ReadonlyArray<
     MiddlewareAttachment.MiddlewareAttachment<MiddlewareSpecs_>
   >;
   /**
    * The union of this group's function types; not a runtime property.
+   *
+   * @category Models
    */
   readonly "~Functions": Functions_;
   /**
    * The union of child-group types; not a runtime property.
+   *
+   * @category Models
    */
   readonly "~Groups": Groups_;
 
@@ -99,6 +121,8 @@ export interface GroupSpec<
    * Add a function whose runtime matches this group. Its kind must also be
    * covered by every group middleware, and plain Convex functions cannot be
    * covered by Confect middleware.
+   *
+   * @category Combinators
    *
    * @param function_ - The function declaration to add.
    *
@@ -122,6 +146,8 @@ export interface GroupSpec<
    * Attach middleware to every function in this group, but not to child groups.
    * The group chain runs in attachment order, before function-level middleware.
    * Required services must be provided by an earlier group attachment.
+   *
+   * @category Combinators
    *
    * @param middlewareSpec - A policy covering all function kinds in the group.
    * @param options - Its options schema's decoded value, required only when
@@ -378,6 +404,8 @@ const makeProto = <
  * Create an empty group for queries, mutations, and actions in the Convex
  * runtime. Default-export the completed builder from a `*.spec.ts` module.
  *
+ * @category Constructors
+ *
  * @example
  *   import { FunctionSpec, GroupSpec } from "@confect/core";
  *   import * as Schema from "effect/Schema";
@@ -415,6 +443,8 @@ export const make = (
  * from a Node spec module and add `publicNodeAction`, `internalNodeAction`, or
  * their plain-Convex counterparts. Context reuse is not configurable for Node
  * groups.
+ *
+ * @category Constructors
  *
  * @returns A new unnamed Node group; codegen assigns the module's name.
  */

@@ -11,12 +11,16 @@ import * as Schema from "effect/Schema";
  * response. Its `_tag` is `"InvalidCursor"`; `cause` retains the original
  * failure or error data. Restart pagination rather than reusing the rejected
  * cursor.
+ *
+ * @category Errors
  */
 export class InvalidCursor extends Schema.TaggedError<InvalidCursor, {}>()(
   "InvalidCursor",
   {
     /**
      * The original Convex failure or error data, retained for diagnosis.
+     *
+     * @category Errors
      */
     cause: Schema.Defect(),
   },

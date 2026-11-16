@@ -11,6 +11,8 @@ const make = (scheduler: ConvexScheduler) => ({
   /**
    * Cancel a scheduled invocation.
    *
+   * @category Scheduling
+   *
    * @param id - ID in `_scheduled_functions` returned by runAfter/runAt.
    *
    * @returns An Effect producing void. Native rejection is a defect;
@@ -20,6 +22,8 @@ const make = (scheduler: ConvexScheduler) => ({
     Effect.promise(() => scheduler.cancel(id)),
   /**
    * Schedule a mutation or action after a delay.
+   *
+   * @category Scheduling
    *
    * @param delay - Effect Duration, converted to milliseconds.
    * @param ref - Generated mutation or action ref.
@@ -48,6 +52,8 @@ const make = (scheduler: ConvexScheduler) => ({
   },
   /**
    * Schedule a mutation or action at an absolute time.
+   *
+   * @category Scheduling
    *
    * @param dateTime - Effect DateTime, converted to epoch milliseconds.
    * @param ref - Generated mutation or action ref.
@@ -79,12 +85,16 @@ const make = (scheduler: ConvexScheduler) => ({
 /**
  * Scheduling service supplied in mutations, actions and HTTP handlers. Import
  * the generated `Scheduler` tag to obtain runAfter, runAt and cancel.
+ *
+ * @category Services
  */
 export const Scheduler =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
   Context.Service<ReturnType<typeof make>>("@confect/server/Scheduler");
 /**
  * Effect requirement identifier for the generated scheduling service.
+ *
+ * @category Services
  */
 export type Scheduler = typeof Scheduler.Identifier;
 

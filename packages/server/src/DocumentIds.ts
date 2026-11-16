@@ -12,15 +12,21 @@ import * as Table from "./Table";
 
 /**
  * Correlated table/ID variants returned inside identify's successful Option.
+ *
+ * @category Models
  */
 type IdentifiedId<TableName extends string> = {
   readonly [Name in TableName]: {
     /**
      * Matched table name; narrowing this field also narrows id.
+     *
+     * @category Getters
      */
     readonly table: Name;
     /**
      * Validated input string branded for the matched table.
+     *
+     * @category Getters
      */
     readonly id: GenericId<Name>;
   };
@@ -32,6 +38,8 @@ type IdentifiedId<TableName extends string> = {
  * restricted to those contexts; actions and HTTP handlers must call a query
  * instead. Validation does not prove existence, authorization, or that an ID
  * originated in this deployment. Native runtime failures remain defects.
+ *
+ * @category Services
  *
  * @example
  *   import * as Effect from "effect/Effect";
@@ -49,6 +57,8 @@ export interface DocumentIds<
   /**
    * Validate a string as an ID for a known table.
    *
+   * @category Reading
+   *
    * @param table - A declared table, `_storage`, or `_scheduled_functions`.
    * @param input - Untrusted ID string; it must match the normalized ID
    *   exactly.
@@ -65,6 +75,8 @@ export interface DocumentIds<
   ) => Effect.Effect<Option.Option<GenericId<Name>>>;
   /**
    * Identify which known table a current-format ID belongs to.
+   *
+   * @category Reading
    *
    * @param input - Untrusted ID string to check against application and system
    *   tables.

@@ -18,12 +18,16 @@ type ConvexVectorSearch<DataModel_ extends DataModel.AnyWithProps> =
  * The service shape backing the `VectorSearch` tag. Named so declaration emit
  * references it instead of expanding the call signature at every usage. Acquire
  * the generated tag in an action and call the resulting function.
+ *
+ * @category Models
  */
 export interface VectorSearchService<
   in out DataModel_ extends DataModel.AnyWithProps,
 > {
   /**
    * Query a vector index for nearest neighbors.
+   *
+   * @category Models
    *
    * @param tableName - Declared table containing the index.
    * @param indexName - Vector index defined on that table.
@@ -81,6 +85,8 @@ export const VectorSearch = <
 
 /**
  * Callable vector-search service shape specialized to the application's schema.
+ *
+ * @category Models
  */
 export type VectorSearch<DataModel_ extends DataModel.AnyWithProps> =
   VectorSearchService<DataModel_>;

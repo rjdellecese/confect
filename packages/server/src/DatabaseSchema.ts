@@ -33,6 +33,8 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
  * Consume the default export of the application's `_generated/schema` module
  * when passing this value to implementation builders or tests. It is distinct
  * from `_generated/convexSchema`, which constructs deployment validators.
+ *
+ * @category Models
  */
 export interface DatabaseSchema<
   Tables_ extends Readonly<Record<string, Table.AnyWithProps>> = {},

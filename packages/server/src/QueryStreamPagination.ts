@@ -21,14 +21,23 @@ type PageSize = typeof PageSize.Type;
  * `numItems` is not a nonnegative integer. It is a defect, not a typed
  * pagination failure. The `numItems` payload contains the rejected number.
  *
+ * @category Errors
+ *
  * @experimental
  */
 export class InvalidPageSizeError extends Schema.TaggedError<
   InvalidPageSizeError,
   {}
->()("InvalidPageSizeError", { numItems: NumberValue }) {
+>()("InvalidPageSizeError", {
+  /**
+   * @category Getters
+   */
+  numItems: NumberValue,
+}) {
   /**
    * Diagnostic containing the rejected page size and the integer requirement.
+   *
+   * @category Getters
    */
   override get message(): string {
     return `QueryStream.paginate: numItems must be a nonnegative integer (received ${this.numItems})`;
@@ -40,6 +49,8 @@ export class InvalidPageSizeError extends Schema.TaggedError<
  * error for `numItems: 0` with `cursor: null`. An initial page needs a positive
  * size to establish a boundary; zero is allowed when resuming a valid cursor.
  *
+ * @category Errors
+ *
  * @experimental
  */
 export class EmptyInitialPageError extends Schema.TaggedError<
@@ -48,6 +59,8 @@ export class EmptyInitialPageError extends Schema.TaggedError<
 >()("EmptyInitialPageError", {}) {
   /**
    * Diagnostic explaining why the initial zero-sized request cannot proceed.
+   *
+   * @category Getters
    */
   override get message(): string {
     return "QueryStream.paginate: numItems of 0 with a null cursor is not supported";

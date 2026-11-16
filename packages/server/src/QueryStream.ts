@@ -77,6 +77,8 @@ const OrderDirection = Schema.Literals(["asc", "desc"]);
  * provide a strictly interior split of a pinned page. Increase the budget or
  * reduce the query's physical reads; splitting alone cannot resolve it.
  *
+ * @category Errors
+ *
  * @experimental
  */
 export class ReadBudgetExceededError extends Schema.TaggedError<
@@ -85,15 +87,21 @@ export class ReadBudgetExceededError extends Schema.TaggedError<
 >()("ReadBudgetExceededError", {
   /**
    * Physical documents read, including filtered documents and repeated reads.
+   *
+   * @category Getters
    */
   rowsRead: Schema.Natural,
   /**
    * Estimated bytes charged across those reads, not Convex's billed bytes.
+   *
+   * @category Getters
    */
   bytesRead: Schema.Natural,
 }) {
   /**
    * Explanation of the unsafe boundary and how to make progress.
+   *
+   * @category Getters
    */
   override get message() {
     return "The read budget was exhausted before a safe page boundary; increase the budget or simplify the query";
@@ -106,6 +114,8 @@ export class ReadBudgetExceededError extends Schema.TaggedError<
  * actual direction and layout; map and relabel compatible inputs before
  * merging.
  *
+ * @category Errors
+ *
  * @experimental
  */
 export class IncompatibleStreamsError extends Schema.TaggedError<
@@ -114,23 +124,33 @@ export class IncompatibleStreamsError extends Schema.TaggedError<
 >()("IncompatibleStreamsError", {
   /**
    * Direction of the first merge input, which defines the expected order.
+   *
+   * @category Getters
    */
   expectedOrderDirection: OrderDirection,
   /**
    * Direction of an incompatible merge input.
+   *
+   * @category Getters
    */
   actualOrderDirection: OrderDirection,
   /**
    * Layout of the first merge input, including implicit-ID positions.
+   *
+   * @category Getters
    */
   expectedKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   /**
    * Layout of an incompatible merge input.
+   *
+   * @category Getters
    */
   actualKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
 }) {
   /**
    * Diagnostic showing the expected and actual direction/layout pairs.
+   *
+   * @category Getters
    */
   override get message(): string {
     return `QueryStream.merge: all streams must share an order and key layout (got ${this.expectedOrderDirection} ${QueryStreamKeyLayout.format(this.expectedKeyLayout)} and ${this.actualOrderDirection} ${QueryStreamKeyLayout.format(this.actualKeyLayout)})`;
@@ -142,6 +162,8 @@ export class IncompatibleStreamsError extends Schema.TaggedError<
  * The join dies with this error when it runs; `expectedOrderDirection` is the
  * outer direction and `actualOrderDirection` is the inner direction.
  *
+ * @category Errors
+ *
  * @experimental
  */
 export class InnerStreamOrderMismatchError extends Schema.TaggedError<
@@ -150,15 +172,21 @@ export class InnerStreamOrderMismatchError extends Schema.TaggedError<
 >()("InnerStreamOrderMismatchError", {
   /**
    * Direction required by the outer stream.
+   *
+   * @category Getters
    */
   expectedOrderDirection: OrderDirection,
   /**
    * Direction returned by the inner-stream callback.
+   *
+   * @category Getters
    */
   actualOrderDirection: OrderDirection,
 }) {
   /**
    * Diagnostic showing the inner and outer directions.
+   *
+   * @category Getters
    */
   override get message(): string {
     return `QueryStream.flatMap: inner stream order (${this.actualOrderDirection}) differs from the outer stream's (${this.expectedOrderDirection})`;
@@ -170,6 +198,8 @@ export class InnerStreamOrderMismatchError extends Schema.TaggedError<
  * including visible labels and implicit-ID positions. The join dies with this
  * error when it runs; the payload contains the expected and actual layouts.
  *
+ * @category Errors
+ *
  * @experimental
  */
 export class InnerStreamLayoutMismatchError extends Schema.TaggedError<
@@ -178,15 +208,21 @@ export class InnerStreamLayoutMismatchError extends Schema.TaggedError<
 >()("InnerStreamLayoutMismatchError", {
   /**
    * Layout supplied as flatMap's innerKeyLayout template.
+   *
+   * @category Getters
    */
   expectedKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
   /**
    * Layout of the stream returned by the callback.
+   *
+   * @category Getters
    */
   actualKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
 }) {
   /**
    * Diagnostic showing the actual layout and the required template.
+   *
+   * @category Getters
    */
   override get message(): string {
     return `QueryStream.flatMap: inner stream key layout (${QueryStreamKeyLayout.format(this.actualKeyLayout)}) differs from innerKeyLayout (${QueryStreamKeyLayout.format(this.expectedKeyLayout)})`;
@@ -215,6 +251,8 @@ export class MissingReversalRecipeError extends Schema.TaggedError<
  * Public failures for invalid pagination sizes. `paginate` dies with these
  * errors; they are defects, not members of its typed failure channel.
  *
+ * @category Errors
+ *
  * @public
  *
  * @experimental
@@ -225,6 +263,8 @@ export {
    * page cannot establish a continuation boundary. Request a positive initial
    * size.
    *
+   * @category Errors
+   *
    * @public
    */
   EmptyInitialPageError,
@@ -232,6 +272,8 @@ export {
    * Defect for a page size that is not a nonnegative integer. The `numItems`
    * payload records the rejected number. Supply a valid integer before
    * retrying.
+   *
+   * @category Errors
    *
    * @public
    */
@@ -244,6 +286,8 @@ export {
  * `cause` is the SchemaError from validating the limits; supplied limits must
  * be nonnegative integers. This differs from `ReadBudgetExceededError`, which
  * reports a valid budget that could not support safe progress.
+ *
+ * @category Errors
  *
  * @public
  *
@@ -314,6 +358,8 @@ export class Element<Doc> extends Data.Class<{
  * returns an ordinary stream that can be consumed but no longer merged or
  * paginated with this module.
  *
+ * @category Models
+ *
  * @experimental
  */
 export class QueryStream<
@@ -352,6 +398,8 @@ export class QueryStream<
    * Apply functions left to right, passing each result to the next. QueryStream
    * combinators retain ordering metadata; ordinary Stream transforms return
    * plain streams that cannot use QueryStream merge or pagination afterward.
+   *
+   * @category Combinators
    */
   declare readonly pipe: Pipeable["pipe"];
   /**
@@ -375,6 +423,8 @@ export class QueryStream<
      * Traversal direction, `"asc"` or `"desc"`, stored separately from
      * keyLayout. Reversal flips it while retaining the layout.
      *
+     * @category Getters
+     *
      * @public
      */
     readonly orderDirection: OrderDirection,
@@ -382,6 +432,8 @@ export class QueryStream<
      * Shared description of the key positions, including visible labels and
      * implicit IDs. Reuse with `empty` or `flatMap`'s `innerKeyLayout`. Reading
      * this property does not read documents. Direction is in `orderDirection`.
+     *
+     * @category Getters
      *
      * @public
      */
@@ -518,6 +570,8 @@ export type Any = QueryStream<any, any, any, any, any>;
  * Check whether a value retains query-stream ordering and pagination support.
  * Plain `Stream` transforms return ordinary streams, for which this is false.
  *
+ * @category Refinements
+ *
  * @param u - Unknown value to test without consuming it.
  *
  * @returns Whether the value carries the QueryStream brand; narrows its type.
@@ -535,6 +589,8 @@ export const isQueryStream = (u: unknown): u is Any =>
  * Supply the document type in the first call, then reuse a compatible stream's
  * layout: `QueryStream.empty<NotesDoc>()(source.keyLayout, "desc")`. Creating
  * the source solely to obtain its layout does not read documents.
+ *
+ * @category Constructors
  *
  * @returns A layout-and-direction constructor yielding a stream with no emitted
  *   values, typed failures, or service requirements. The second call accepts
@@ -971,6 +1027,8 @@ const mergeStep =
  * `IncompatibleStreamsError` when combined. Map to a common value shape and use
  * `renameKey` when compatible indexes have different field names.
  *
+ * @category Combining
+ *
  * @param streams - Nonempty tuple of streams with compatible values, labels,
  *   implicit-ID positions, and direction.
  *
@@ -1146,6 +1204,8 @@ const transformEffect = <
 /**
  * Control concurrent callback evaluation in `filterEffect` and `mapEffect`.
  *
+ * @category Options
+ *
  * @experimental
  */
 export interface EffectOptions {
@@ -1153,6 +1213,8 @@ export interface EffectOptions {
    * Maximum number of document effects running at once, or `"unbounded"`.
    * Defaults to one at a time. Results retain stream order regardless of
    * completion order; callbacks must remain deterministic and read-only.
+   *
+   * @category Options
    */
   readonly concurrency?: number | "unbounded" | undefined;
 }
@@ -1166,6 +1228,8 @@ export interface EffectOptions {
  * `distinct` selects each group's first matching document; filtering after it
  * tests only the chosen representative. Use `filterEffect` for predicates that
  * read another table, use a service, or fail with a typed error.
+ *
+ * @category Filtering
  *
  * @param self - Input query stream in the data-first form.
  * @param predicate - Pure, deterministic test of each emitted document.
@@ -1210,6 +1274,8 @@ export const filter = dual<
  * deterministic and read-only, since seeks and pagination can run it again.
  * Separate lookups inside the predicate are not counted by pagination's read
  * budgets.
+ *
+ * @category Filtering
  *
  * @param self - Input query stream in the data-first form.
  * @param predicate - Read-only effectful test of each emitted document.
@@ -1269,6 +1335,8 @@ export const filterEffect = dual<
  * creation time, and ID, not by length. Preserve the input value rather than
  * mutating it. Use `mapEffect` when the mapper needs an effect.
  *
+ * @category Mapping
+ *
  * @param self - Input query stream in the data-first form.
  * @param f - Pure, deterministic function from a decoded value to its
  *   replacement.
@@ -1312,6 +1380,8 @@ export const map = dual<
  * concurrent reads without changing output order. Keep the mapper deterministic
  * and read-only: seeks, reversal, and pagination can reevaluate it. Separate
  * lookups inside the mapper are not counted by pagination's read budgets.
+ *
+ * @category Mapping
  *
  * @param self - Input query stream in the data-first form.
  * @param f - Read-only effect producing each replacement value.
@@ -1387,6 +1457,8 @@ export const mapEffect = dual<
  * and reversal can reevaluate them; both outer and inner index reads count
  * toward pagination's budgets.
  *
+ * @category Sequencing
+ *
  * @param self - Outer query stream in the data-first form.
  * @param f - Deterministic callback returning an inner QueryStream per outer
  *   value.
@@ -1414,6 +1486,8 @@ export const flatMap = dual<
     options: {
       /**
        * Layout template shared by every inner stream, including implicit IDs.
+       *
+       * @category Options
        */
       readonly innerKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
         NoInfer<InnerKeyLabels>
@@ -1421,6 +1495,8 @@ export const flatMap = dual<
       /**
        * Emit this deterministic placeholder when an outer value has no inner
        * values.
+       *
+       * @category Options
        */
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
@@ -1452,6 +1528,8 @@ export const flatMap = dual<
     options: {
       /**
        * Layout template shared by every inner stream, including implicit IDs.
+       *
+       * @category Options
        */
       readonly innerKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
         NoInfer<InnerKeyLabels>
@@ -1459,6 +1537,8 @@ export const flatMap = dual<
       /**
        * Emit this deterministic placeholder when an outer value has no inner
        * values.
+       *
+       * @category Options
        */
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
@@ -1573,6 +1653,8 @@ const makeFlatMap = <
   innerKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<InnerKeyLabels>,
   /**
    * What an outer document with no inner rows emits, if it is kept.
+   *
+   * @category Options
    */
   onEmpty: Option.Option<(doc: Doc) => Doc3>,
   refinements: InnerRefinements,
@@ -1809,6 +1891,8 @@ const makeFlatMap = <
  * change the representatives. Preserving representatives may require extra
  * reads outside output bounds and repeated callback evaluation.
  *
+ * @category Filtering
+ *
  * @param self - Input query stream in the data-first form.
  * @param prefixNames - Prefix of visible labels, in order, used to group keys.
  *
@@ -1876,6 +1960,8 @@ export const distinct = dual<
  * establish that semantic compatibility for you. Implicit ID tiebreakers keep
  * their positions. For joined streams, replacement labels cover the combined
  * key, outer labels first.
+ *
+ * @category Ordering
  *
  * @param self - Input query stream in the data-first form.
  * @param replacementNames - One new name for each visible label, in order.
@@ -2148,6 +2234,8 @@ const makeDistinct = <
  * A manually constructed stream without `reverseWith` throws
  * `MissingReversalRecipeError`.
  *
+ * @category Ordering
+ *
  * @param self - Query stream created by the table reader or these combinators.
  *
  * @returns A query stream with the opposite direction and unchanged emitted
@@ -2201,6 +2289,8 @@ export const reverse = <
  *
  * For pagination, pass the previous `continueCursor` unchanged to `paginate`;
  * do not decode a cursor into explicit bounds.
+ *
+ * @category Filtering
  *
  * @param self - Input query stream in the data-first form.
  * @param narrowBounds - At least one of start/end; each contains keyValues and
@@ -2376,6 +2466,8 @@ const narrowInMemory = <
  * value was expected, or use another consumer to handle multiple results. This
  * typed failure has no additional payload fields.
  *
+ * @category Errors
+ *
  * @experimental
  */
 export class NotUniqueError extends Schema.TaggedError<NotUniqueError, {}>()(
@@ -2384,6 +2476,8 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError, {}>()(
 ) {
   /**
    * Diagnostic explaining that the at-most-one expectation was violated.
+   *
+   * @category Getters
    */
   override get message(): string {
     return "Expected the query stream to contain at most one document";
@@ -2396,6 +2490,8 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError, {}>()(
  * `NotUniqueError` for two or more. Like `Stream.runHead` with a uniqueness
  * check, it inspects at most two emitted values; finding them may read
  * additional filtered documents.
+ *
+ * @category Getters
  *
  * @param self - Query stream expected to emit at most one value.
  *
@@ -2448,6 +2544,8 @@ export const unique = Effect.fn("QueryStream.unique")(
  * With `numItems: 0`, an existing cursor is returned unchanged with an empty
  * page and `isDone: false`; a null cursor dies with `EmptyInitialPageError`.
  *
+ * @category Options
+ *
  * @experimental
  */
 export type PaginateOptions = ConvexPaginationOptions;
@@ -2468,6 +2566,8 @@ export type PaginateOptions = ConvexPaginationOptions;
  * - `isDone`: true confirms the stream's end. Reaching a pinned boundary does not
  *   prove completion. A split recommendation can report false even at the end,
  *   so handle splitting before requesting another page.
+ *
+ * @category Models
  *
  * @experimental
  */
@@ -2519,6 +2619,8 @@ export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
  *
  * For example, `source.pipe(QueryStream.paginate({ cursor: null, numItems: 20
  * }))` requests the first page without running the returned effect yet.
+ *
+ * @category Pagination
  *
  * @param self - Query stream in the data-first form.
  * @param options - Pagination boundaries, requested size, and optional read

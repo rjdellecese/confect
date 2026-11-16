@@ -14,20 +14,28 @@ import * as Client from "./Client";
 
 /**
  * Identifies the cursor range fetched for one page.
+ *
+ * @category Models
  */
 export interface PageDescriptor {
   /**
    * Cursor before the page; null starts at the beginning of the query.
+   *
+   * @category Models
    */
   readonly cursor: string | null;
   /**
    * Fixed range end when pinned; None requests a growing page.
+   *
+   * @category Models
    */
   readonly endCursor: Option.Option<string>;
 }
 
 /**
  * Codec for a page's start cursor and optional pinned end cursor.
+ *
+ * @category Schemas
  */
 export const PageDescriptor = Schema.Struct({
   cursor: Schema.Union([Schema.String, Schema.Null]),
@@ -36,21 +44,29 @@ export const PageDescriptor = Schema.Struct({
 
 /**
  * Options that remain fixed for one pagination session.
+ *
+ * @category Options
  */
 export interface Options {
   /**
    * Positive integer target size for a new page; pinned ranges may return more
    * or fewer items.
+   *
+   * @category Options
    */
   readonly initialNumItems: number;
   /**
    * Optional positive integer row-read budget forwarded to each server page
    * request.
+   *
+   * @category Options
    */
   readonly maximumRowsRead?: number;
   /**
    * Optional positive integer byte-read budget forwarded to each server page
    * request.
+   *
+   * @category Options
    */
   readonly maximumBytesRead?: number;
 }
@@ -60,6 +76,8 @@ const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
 /**
  * Validates positive integer page size and optional per-page read budgets.
+ *
+ * @category Schemas
  */
 export const Options = Schema.Struct({
   initialNumItems: PositiveInt,
@@ -71,6 +89,8 @@ export const Options = Schema.Struct({
  * Why the machine is fetching its current target. Initial starts a session;
  * Next, Previous and First navigate within one; Split reloads a narrowed range;
  * Reset starts a fresh session.
+ *
+ * @category Models
  */
 export type Direction =
   | "Initial"
@@ -82,39 +102,55 @@ export type Direction =
 
 /**
  * A complete page that can remain on screen while another page is fetched.
+ *
+ * @category Models
  */
 export interface Page<Item_> {
   /**
    * The cursor range that produced this displayed page.
+   *
+   * @category Models
    */
   readonly descriptor: PageDescriptor;
   /**
    * One-based displayed page number, which can differ from targetPageNumber
    * while refreshing.
+   *
+   * @category Models
    */
   readonly number: number;
   /**
    * Complete decoded items retained while another page loads or a refresh
    * fails.
+   *
+   * @category Models
    */
   readonly items: ReadonlyArray<Item_>;
   /**
    * Server cursor after these items, used to start or pin the next range.
+   *
+   * @category Models
    */
   readonly continueCursor: string;
   /**
    * Whether the server reported the end of the query for this page.
+   *
+   * @category Models
    */
   readonly isDone: boolean;
 }
 
 /**
  * An active request with no complete page to display yet.
+ *
+ * @category Models
  */
 export type Loading = Data.TaggedEnum<{
   Loading: {
     /**
      * Reason the current request is loading.
+     *
+     * @category Models
      */
     readonly direction: Direction;
   };
@@ -122,15 +158,21 @@ export type Loading = Data.TaggedEnum<{
 
 /**
  * An active request retaining the last complete page while another range loads.
+ *
+ * @category Models
  */
 export type Refreshing<Item_> = Data.TaggedEnum<{
   Refreshing: {
     /**
      * Last complete page, not necessarily the current request's target page.
+     *
+     * @category Models
      */
     readonly data: Page<Item_>;
     /**
      * Navigation, reset or split that caused this refresh.
+     *
+     * @category Models
      */
     readonly direction: Direction;
   };
@@ -138,11 +180,15 @@ export type Refreshing<Item_> = Data.TaggedEnum<{
 
 /**
  * A complete current page; its subscription remains live for server updates.
+ *
+ * @category Models
  */
 export type Success<Item_> = Data.TaggedEnum<{
   Success: {
     /**
      * The current complete page.
+     *
+     * @category Models
      */
     readonly data: Page<Item_>;
   };
@@ -150,11 +196,15 @@ export type Success<Item_> = Data.TaggedEnum<{
 
 /**
  * A failed active request with no previously completed page to retain.
+ *
+ * @category Models
  */
 export type Failure<Error_> = Data.TaggedEnum<{
   Failure: {
     /**
      * Latest failure; the live subscription may still recover.
+     *
+     * @category Models
      */
     readonly error: Error_;
   };
@@ -162,15 +212,21 @@ export type Failure<Error_> = Data.TaggedEnum<{
 
 /**
  * A failed active request retaining the last complete page beside the error.
+ *
+ * @category Models
  */
 export type Stale<Item_, Error_> = Data.TaggedEnum<{
   Stale: {
     /**
      * Last complete page, retained rather than replaced by partial data.
+     *
+     * @category Models
      */
     readonly data: Page<Item_>;
     /**
      * Failure of the current request or refresh.
+     *
+     * @category Models
      */
     readonly error: Error_;
   };
@@ -179,6 +235,8 @@ export type Stale<Item_, Error_> = Data.TaggedEnum<{
 /**
  * Tagged status inside an Active session, distinct from the outer Idle/Active
  * tag.
+ *
+ * @category Models
  */
 export type Phase<Item_, Error_> =
   | Loading
@@ -195,11 +253,15 @@ const Phase = Data.taggedEnum<PhaseDefinition>();
 
 /**
  * A closed machine that retains its generation for stale-result rejection.
+ *
+ * @category Models
  */
 export type Idle = Data.TaggedEnum<{
   Idle: {
     /**
      * Last session generation; init advances it to reject late settlements.
+     *
+     * @category Models
      */
     readonly generation: number;
   };
@@ -207,40 +269,58 @@ export type Idle = Data.TaggedEnum<{
 
 /**
  * A live cursor-pagination session.
+ *
+ * @category Models
  */
 export type Active<Item_, UserArgs_, Error_> = Data.TaggedEnum<{
   Active: {
     /**
      * Session generation advanced by init, reinitialize and reset.
+     *
+     * @category Models
      */
     readonly generation: number;
     /**
      * Decoded user arguments, excluding paginationOpts.
+     *
+     * @category Models
      */
     readonly args: UserArgs_;
     /**
      * Page size and read budgets fixed for this session.
+     *
+     * @category Models
      */
     readonly options: Options;
     /**
      * Convex cache-busting id; None until the subscription's first settlement.
+     *
+     * @category Models
      */
     readonly paginationId: Option.Option<number>;
     /**
      * Request revision used to reject settlements from superseded page targets.
+     *
+     * @category Models
      */
     readonly requestId: number;
     /**
      * Requested range, which can differ from the retained displayed page.
+     *
+     * @category Models
      */
     readonly current: PageDescriptor;
     /**
      * Previously visited pinned ranges, oldest first; the final entry is the
      * previous page.
+     *
+     * @category Models
      */
     readonly prevStack: ReadonlyArray<PageDescriptor>;
     /**
      * Loading, data or error state within this live session.
+     *
+     * @category Models
      */
     readonly phase: Phase<Item_, Error_>;
   };
@@ -250,6 +330,8 @@ export type Active<Item_, UserArgs_, Error_> = Data.TaggedEnum<{
  * A schema-backed cursor-pagination machine. Idle closes the subscription;
  * Active carries a Phase. Use the transition functions to produce new states
  * rather than mutating these records.
+ *
+ * @category Models
  */
 export type State<Item_, UserArgs_, Error_> =
   | Idle
@@ -263,89 +345,129 @@ const State = Data.taggedEnum<StateDefinition>();
 
 /**
  * The logical request from which a subscription allocates a session id.
+ *
+ * @category Models
  */
 export interface SubscriptionRequest<UserArgs_> {
   /**
    * Session generation copied from the active Model state.
+   *
+   * @category Models
    */
   readonly generation: number;
   /**
    * Decoded user arguments without paginationOpts.
+   *
+   * @category Models
    */
   readonly args: UserArgs_;
   /**
    * Session page-size and read-budget settings.
+   *
+   * @category Models
    */
   readonly options: Options;
   /**
    * Previously installed cache id, or None before allocation.
+   *
+   * @category Models
    */
   readonly paginationId: Option.Option<number>;
   /**
    * Revision identifying the current page target.
+   *
+   * @category Models
    */
   readonly requestId: number;
   /**
    * Cursor range requested from the server.
+   *
+   * @category Models
    */
   readonly descriptor: PageDescriptor;
 }
 
 /**
  * The complete identity and arguments of a subscribed page request.
+ *
+ * @category Models
  */
 export interface Request<UserArgs_> {
   /**
    * Session generation used to correlate this outcome with Model state.
+   *
+   * @category Models
    */
   readonly generation: number;
   /**
    * Decoded user arguments sent with this request.
+   *
+   * @category Models
    */
   readonly args: UserArgs_;
   /**
    * Page-size and read-budget settings used for the request.
+   *
+   * @category Models
    */
   readonly options: Options;
   /**
    * Allocated Convex cache-busting session id.
+   *
+   * @category Models
    */
   readonly paginationId: number;
   /**
    * Page-target revision checked by settle before accepting this request's
    * outcome.
+   *
+   * @category Models
    */
   readonly requestId: number;
   /**
    * Start cursor and optional pinned end cursor for this request.
+   *
+   * @category Models
    */
   readonly descriptor: PageDescriptor;
 }
 
 /**
  * The successful payload returned by a Convex paginated query.
+ *
+ * @category Models
  */
 export interface PageResult<Item_> {
   /**
    * Decoded items returned by the server, possibly partial when a split is
    * required.
+   *
+   * @category Models
    */
   readonly page: ReadonlyArray<Item_>;
   /**
    * Whether this result reaches the end of the query.
+   *
+   * @category Models
    */
   readonly isDone: boolean;
   /**
    * Cursor immediately after the returned page.
+   *
+   * @category Models
    */
   readonly continueCursor: string;
   /**
    * Server-provided boundary at which an oversized range can be split.
+   *
+   * @category Models
    */
   readonly splitCursor?: string | null;
   /**
    * Whether a split is recommended or required before displaying a complete
    * page.
+   *
+   * @category Models
    */
   readonly pageStatus?: "SplitRecommended" | "SplitRequired" | null;
 }
@@ -353,37 +475,52 @@ export interface PageResult<Item_> {
 /**
  * One correlated subscription outcome. Both success and failure travel through
  * this value so `settle` can mirror `AsyncData.settle`.
+ *
+ * @category Models
  */
 export interface Settlement<Item_, UserArgs_, Error_> {
   /**
    * Complete request identity; stale identities are ignored by settle.
+   *
+   * @category Models
    */
   readonly request: Request<UserArgs_>;
   /**
    * Decoded page or failure; both outcomes travel through the same Message
    * path.
+   *
+   * @category Models
    */
   readonly result: Result.Result<PageResult<Item_>, Error_>;
 }
 
 /**
  * Decoded item type returned in a paginated ref's page array.
+ *
+ * @category Models
  */
 export type Item<Query extends Ref.AnyConfectPublicPaginatedQuery> =
   Ref.Returns<Query>["page"][number];
 
 /**
  * Decoded caller arguments with the machine-managed paginationOpts removed.
+ *
+ * @category Options
  */
 export type UserArgs<Query extends Ref.AnyConfectPublicPaginatedQuery> = Omit<
   Ref.Args<Query>,
   "paginationOpts"
 >;
 
+/**
+ * @category Errors
+ */
 type TaggedFunctionError<Error_> = Data.TaggedEnum<{
   FunctionError: {
     /**
      * Decoded error declared by the query or one of its middleware specs.
+     *
+     * @category Errors
      */
     readonly error: Error_;
   };
@@ -397,6 +534,8 @@ interface FunctionErrorDefinition extends Data.TaggedEnum.WithGenerics<1> {
  * Constructs a declared function or middleware failure envelope. Pass `{ error
  * }` with the decoded failure. Returns a tagged data value with `_tag:
  * "FunctionError"`, not an Error subclass or a thrown exception.
+ *
+ * @category Constructors
  */
 export const FunctionError =
   Data.taggedEnum<FunctionErrorDefinition>().FunctionError;
@@ -405,6 +544,8 @@ export const FunctionError =
  * A declared function or middleware failure, kept distinct from client errors.
  * Its error field contains Ref.Error<Query>; this type is never if the ref
  * declares no function or middleware errors.
+ *
+ * @category Errors
  */
 export type FunctionError<Query extends Ref.AnyConfectPublicPaginatedQuery> = [
   Ref.Error<Query>,
@@ -417,6 +558,8 @@ export type FunctionError<Query extends Ref.AnyConfectPublicPaginatedQuery> = [
  * wraps declared errors; WebSocketClientError preserves unexpected
  * backend/transport failures; Schema.SchemaError covers argument and result
  * codecs. InvalidCursor requests a session restart when passed to settle.
+ *
+ * @category Errors
  */
 export type Error<Query extends Ref.AnyConfectPublicPaginatedQuery> =
   | FunctionError<Query>
@@ -428,6 +571,8 @@ export type Error<Query extends Ref.AnyConfectPublicPaginatedQuery> =
  * Core pagination failure preserving its original cause. Settlements carry it
  * explicitly, but settle handles it by restarting at page one and retaining the
  * last complete page instead of entering Failure or Stale.
+ *
+ * @category Errors
  */
 export { InvalidCursor } from "@confect/core/PaginationError";
 
@@ -445,6 +590,8 @@ type MachineActive<Query extends Ref.AnyConfectPublicPaginatedQuery> = Active<
 
 /**
  * The schema-and-constructor bundle returned by `make`.
+ *
+ * @category Models
  */
 export interface PaginatedQuery<
   Query extends Ref.AnyConfectPublicPaginatedQuery,
@@ -456,11 +603,15 @@ export interface PaginatedQuery<
   /**
    * Model codec for Idle/Active state, decoded args, retained pages and
    * failures.
+   *
+   * @category Schemas
    */
   readonly schema: Schema.Codec<MachineState<Query>, unknown>;
   /**
    * Initial closed state with generation zero; use close to preserve a used
    * session's generation.
+   *
+   * @category Models
    */
   readonly idle: Idle;
   /**
@@ -477,6 +628,8 @@ export interface PaginatedQuery<
   /**
    * Codec for correlated outcomes; use it as the payload schema of a settlement
    * Message.
+   *
+   * @category Schemas
    */
   readonly settlement: Schema.Codec<
     Settlement<Item<Query>, UserArgs<Query>, Error<Query>>,
@@ -489,6 +642,8 @@ export interface PaginatedQuery<
    * budgets when supplied; invalid options throw. This is a pure state
    * transition and does not perform the request until the subscription observes
    * the new state.
+   *
+   * @category Lifecycle
    */
   readonly init: keyof UserArgs<Query> extends never
     ? (state: Idle, options: Options) => MachineActive<Query>
@@ -503,6 +658,8 @@ export interface PaginatedQuery<
    * generation. Pass `(active, args, options?)`, or `(active, options?)` for
    * no-args queries. Omitted options retain the current settings. Invalid
    * options throw as in init.
+   *
+   * @category Lifecycle
    */
   readonly reinitialize: keyof UserArgs<Query> extends never
     ? (state: MachineActive<Query>, options?: Options) => MachineActive<Query>
@@ -515,6 +672,8 @@ export interface PaginatedQuery<
 
 /**
  * Broad bundle type for code accepting any public Confect paginated query.
+ *
+ * @category Models
  */
 export type Any = PaginatedQuery<Ref.AnyConfectPublicPaginatedQuery>;
 
@@ -574,6 +733,8 @@ const SerializableSchemaError = Schema.instanceOf(Schema.SchemaError, {
 
 /**
  * Builds a page machine from a paginated ref.
+ *
+ * @category Constructors
  *
  * @example
  *   const Notes = make(refs.public.notes.paginate);
@@ -831,6 +992,8 @@ const pendingPhase = <Item_>(
  * Close the subscription while retaining its generation tombstone. Returns Idle
  * without visible data. The subscription closes when it observes that state;
  * later init advances the generation so old outcomes are ignored.
+ *
+ * @category Lifecycle
  */
 export const close = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
@@ -841,6 +1004,8 @@ export const close = <Item_, UserArgs_, Error_>(
  * Clears cursor history and the allocated pagination id, retaining args and
  * options. Returns Refreshing when a complete page exists, otherwise Loading.
  * The subscription performs the new request after the Model adopts this state.
+ *
+ * @category Lifecycle
  */
 export const reset = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
@@ -864,6 +1029,8 @@ export const reset = <Item_, UserArgs_, Error_>(
  * that range in its query journal; stream-paginated queries have no journal, so
  * the pin is what keeps consecutive pages gap-free and duplicate-free for
  * them.
+ *
+ * @category Navigation
  *
  * @returns Some refreshed state only from Success with isDone false; None while
  *   loading, after failure, or at the end. Does not mutate the input.
@@ -908,6 +1075,8 @@ export const next = <Item_, UserArgs_, Error_>(
  * Returns Some refreshed state only from Success with a previous pinned range;
  * returns None at page one or in any loading/error phase. Keeps the session
  * id.
+ *
+ * @category Navigation
  */
 export const prev = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
@@ -943,6 +1112,8 @@ export const prev = <Item_, UserArgs_, Error_>(
  * Returns None only when already targeting the unpinned first range. Otherwise
  * clears history and returns a new Loading/Refreshing state, including from an
  * error phase. Unlike reset, it preserves the generation and pagination id.
+ *
+ * @category Navigation
  */
 export const first = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
@@ -1096,6 +1267,8 @@ const settleFailure = <Item_, UserArgs_, Error_>(
  * incomplete page, and an empty terminal page retreats when a previous range
  * exists. The transition never performs network I/O. Supports `settle(state,
  * outcome)` and pipeable `settle(outcome)(state)`.
+ *
+ * @category Settlement
  */
 export const settle: {
   <Item_, UserArgs_, Error_>(
@@ -1147,6 +1320,8 @@ export const settle: {
  * The complete page currently available to render. Returns Some for Success,
  * Refreshing and Stale, including the retained old page during navigation;
  * returns None for Idle, Loading and Failure.
+ *
+ * @category Getters
  */
 export const getPage = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1161,6 +1336,8 @@ export const getPage = <Item_, UserArgs_, Error_>(
  * The items currently available to render. Maps getPage to its items. None
  * means no complete page, not an empty page; a successfully loaded empty page
  * produces Some([]).
+ *
+ * @category Getters
  */
 export const getItems = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1171,6 +1348,8 @@ export const getItems = <Item_, UserArgs_, Error_>(
  * The error from the most recent failed request, if any. Returns Some only in
  * Failure or Stale. Idle and pending/successful phases return None; starting a
  * new refresh clears the previously visible failure.
+ *
+ * @category Getters
  */
 export const getError = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1193,6 +1372,8 @@ export const getError = <Item_, UserArgs_, Error_>(
  * The 1-indexed page number currently targeted by the subscription. Requires
  * Active state. It can differ from getPage(state).number while a retained page
  * is displayed during navigation.
+ *
+ * @category Getters
  */
 export const targetPageNumber = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
@@ -1200,6 +1381,8 @@ export const targetPageNumber = <Item_, UserArgs_, Error_>(
 
 /**
  * True for Success, Refreshing or Stale, when getPage returns a complete page.
+ *
+ * @category Predicates
  */
 export const hasPage = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1208,6 +1391,8 @@ export const hasPage = <Item_, UserArgs_, Error_>(
 /**
  * True for Failure or Stale, when getError returns the current request's
  * failure.
+ *
+ * @category Predicates
  */
 export const hasError = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1217,6 +1402,8 @@ export const hasError = <Item_, UserArgs_, Error_>(
  * Whether an Active session targets page one (its history is empty), including
  * loading and error phases. Returns false for Idle; this is not a navigation
  * guard.
+ *
+ * @category Predicates
  */
 export const isFirst = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1230,6 +1417,8 @@ export const isFirst = <Item_, UserArgs_, Error_>(
 /**
  * True only for Success whose page has isDone true; false while pending, stale
  * or idle.
+ *
+ * @category Predicates
  */
 export const isLast = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1252,6 +1441,8 @@ type WithPhase<State_, Phase_> = Omit<State_, "phase"> & {
 
 /**
  * Narrow to the closed Idle state, whose generation is retained for reopening.
+ *
+ * @category Refinements
  */
 export const isIdle = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1259,6 +1450,8 @@ export const isIdle = <Item_, UserArgs_, Error_>(
 
 /**
  * Narrow to Active with a Loading phase and no complete page to display.
+ *
+ * @category Refinements
  */
 export const isLoading = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1267,6 +1460,8 @@ export const isLoading = <Item_, UserArgs_, Error_>(
 
 /**
  * Narrow to Active with a Refreshing phase retaining a complete page.
+ *
+ * @category Refinements
  */
 export const isRefreshing = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1275,6 +1470,8 @@ export const isRefreshing = <Item_, UserArgs_, Error_>(
 
 /**
  * Narrow to Active with the current successful page in phase.data.
+ *
+ * @category Refinements
  */
 export const isSuccess = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1283,6 +1480,8 @@ export const isSuccess = <Item_, UserArgs_, Error_>(
 
 /**
  * Narrow to Active with phase.error and no retained page.
+ *
+ * @category Refinements
  */
 export const isFailure = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1291,6 +1490,8 @@ export const isFailure = <Item_, UserArgs_, Error_>(
 
 /**
  * Narrow to Active with both phase.error and the last complete phase.data page.
+ *
+ * @category Refinements
  */
 export const isStale = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1300,6 +1501,8 @@ export const isStale = <Item_, UserArgs_, Error_>(
 /**
  * True while an Active request is Loading or Refreshing; false for all settled
  * phases and Idle.
+ *
+ * @category Predicates
  */
 export const isPending = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1318,6 +1521,8 @@ export const isPending = <Item_, UserArgs_, Error_>(
 
 /**
  * True only when next can advance: Active, Success, and not at the query's end.
+ *
+ * @category Predicates
  */
 export const canNext = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1337,6 +1542,8 @@ export const canNext = <Item_, UserArgs_, Error_>(
 /**
  * True only when prev can advance: Active, Success, and a previous pinned range
  * exists.
+ *
+ * @category Predicates
  */
 export const canPrev = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -1358,31 +1565,45 @@ export const canPrev = <Item_, UserArgs_, Error_>(
  * receives the whole Idle record; other handlers receive the phase, not the
  * outer Active record. Supports `match(state, handlers)` and pipeable
  * `match(handlers)(state)` and returns the selected handler's value unchanged.
+ *
+ * @category Pattern matching
  */
 export const match: {
   <Item_, Error_, A, B, C, D, E, F>(handlers: {
     /**
      * Handle the closed state and its retained generation.
+     *
+     * @category Pattern matching
      */
     readonly onIdle: (idle: Idle) => A;
     /**
      * Handle a pending phase with no complete page.
+     *
+     * @category Pattern matching
      */
     readonly onLoading: (loading: Loading) => B;
     /**
      * Handle a pending phase that retains a complete page.
+     *
+     * @category Pattern matching
      */
     readonly onRefreshing: (refreshing: Refreshing<Item_>) => C;
     /**
      * Handle an error with no page to display.
+     *
+     * @category Pattern matching
      */
     readonly onFailure: (failure: Failure<Error_>) => D;
     /**
      * Handle an error alongside the retained complete page.
+     *
+     * @category Pattern matching
      */
     readonly onStale: (stale: Stale<Item_, Error_>) => E;
     /**
      * Handle the current successful page.
+     *
+     * @category Pattern matching
      */
     readonly onSuccess: (success: Success<Item_>) => F;
   }): <UserArgs_>(
@@ -1393,26 +1614,38 @@ export const match: {
     handlers: {
       /**
        * Handle the closed state and its retained generation.
+       *
+       * @category Pattern matching
        */
       readonly onIdle: (idle: Idle) => A;
       /**
        * Handle a pending phase with no complete page.
+       *
+       * @category Pattern matching
        */
       readonly onLoading: (loading: Loading) => B;
       /**
        * Handle a pending phase that retains a complete page.
+       *
+       * @category Pattern matching
        */
       readonly onRefreshing: (refreshing: Refreshing<Item_>) => C;
       /**
        * Handle an error with no page to display.
+       *
+       * @category Pattern matching
        */
       readonly onFailure: (failure: Failure<Error_>) => D;
       /**
        * Handle an error alongside the retained complete page.
+       *
+       * @category Pattern matching
        */
       readonly onStale: (stale: Stale<Item_, Error_>) => E;
       /**
        * Handle the current successful page.
+       *
+       * @category Pattern matching
        */
       readonly onSuccess: (success: Success<Item_>) => F;
     },

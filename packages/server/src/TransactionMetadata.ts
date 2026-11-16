@@ -5,6 +5,8 @@ import * as Layer from "effect/Layer";
 
 /**
  * Native Convex resource metrics, with used and remaining quantities.
+ *
+ * @category Models
  */
 export type { TransactionMetric, TransactionMetrics } from "convex/server";
 
@@ -14,6 +16,8 @@ const make = (
   /**
    * Read current transaction usage and remaining limits without caching them.
    *
+   * @category Getters
+   *
    * @returns An Effect producing native TransactionMetrics; native rejection is
    *   a defect.
    */
@@ -22,6 +26,8 @@ const make = (
   ),
   /**
    * Read the transaction's snapshot timestamp.
+   *
+   * @category Getters
    *
    * @returns An Effect producing bigint nanoseconds. Reading it affects query
    *   caching; a native throw is a defect.
@@ -34,6 +40,8 @@ const make = (
 /**
  * Transaction metrics/snapshot service for queries and mutations. Acquire the
  * generated `TransactionMetadata` tag; successive metric reads may differ.
+ *
+ * @category Services
  */
 export class TransactionMetadata extends Context.Service<
   TransactionMetadata,

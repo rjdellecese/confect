@@ -64,6 +64,8 @@ export const isUnnamedTable = (u: unknown): u is UnnamedAny =>
  * `Name_` is the filename-derived table name. `TableSchema_` describes decoded
  * user fields and their stored representation. Schema getters are lazy and
  * memoized, so importing a bound table does not construct its schemas.
+ *
+ * @category Models
  */
 export interface Table<
   Name_ extends string,
@@ -80,18 +82,24 @@ export interface Table<
   readonly [TypeId]: TypeId;
   /**
    * The table name assigned by the generated wrapper from its filename.
+   *
+   * @category Getters
    */
   readonly tableName: Name_;
   /**
    * The user-field codec, evaluated on first access. Use `typeof
    * table.Fields.Type` for its decoded TypeScript type; system fields are not
    * included.
+   *
+   * @category Getters
    */
   readonly Fields: TableSchema_;
   /**
    * The user-field codec extended with `_id` and `_creationTime`, evaluated on
    * first access. Use it for document returns and `typeof table.Doc.Type` for
    * the decoded document type.
+   *
+   * @category Getters
    */
   readonly Doc: SystemFields.ExtendWithSystemFields<Name_, TableSchema_>;
   /**
@@ -150,6 +158,8 @@ export type AnyWithProps = Table<
  * assigns its filename-derived name. Default-export it from
  * `confect/tables/<name>.ts`. Chain index builders to return new definitions
  * without evaluating the schema callback or changing earlier definitions.
+ *
+ * @category Models
  */
 export interface UnnamedTable<
   TableSchema_ extends Schema.Codec<any, any>,
@@ -197,6 +207,8 @@ export interface UnnamedTable<
   /**
    * Add an ordered database index.
    *
+   * @category Indexes
+   *
    * @param name - Index name used by the table reader's `index`, `get`, or
    *   `stream`.
    * @param fields - Nonempty field-path tuple in index order, including nested
@@ -227,6 +239,8 @@ export interface UnnamedTable<
 
   /**
    * Add a full-text search index for the table reader's `search` method.
+   *
+   * @category Indexes
    *
    * @param name - Search index name.
    * @param indexConfig - `searchField` selects the text field; `filterFields`
@@ -260,6 +274,8 @@ export interface UnnamedTable<
 
   /**
    * Add a vector index for the generated `VectorSearch` service.
+   *
+   * @category Indexes
    *
    * @param name - Vector index name.
    * @param indexConfig - `vectorField` selects the embedding, `dimensions` sets
@@ -542,6 +558,8 @@ const makeUnnamed = <
 
 /**
  * Define a table using a lazy codec for its user fields.
+ *
+ * @category Constructors
  *
  * @example
  *   import { Table } from "@confect/core";

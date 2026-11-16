@@ -14,6 +14,8 @@ import * as Stream from "effect/Stream";
  * error. Appears in request/stream error channels, or inside a failed `Result`
  * from `reactiveQueryResult`. Argument/result codec failures instead use
  * `Schema.SchemaError`.
+ *
+ * @category Errors
  */
 export class WebSocketClientError extends Schema.TaggedError<
   WebSocketClientError,
@@ -21,6 +23,8 @@ export class WebSocketClientError extends Schema.TaggedError<
 >()("WebSocketClientError", {
   /**
    * The original failure, encoded with Effect's defect schema when serialized.
+   *
+   * @category Errors
    */
   cause: Schema.Defect(),
 }) {}
@@ -50,6 +54,8 @@ const make = (
       fetchToken: (args: {
         /**
          * Whether Convex needs a fresh token rather than a cached token.
+         *
+         * @category Authentication
          */
         forceRefreshToken: boolean;
       }) => Effect.Effect<string | null | undefined, never, R1>,
@@ -201,11 +207,15 @@ const make = (
     return {
       /**
        * The deployment address passed to the layer.
+       *
+       * @category Getters
        */
       url: address,
       /**
        * Installs an Effect-based token provider on this shared client instance.
        * Captures the calling Effect's services for later callback invocations.
+       *
+       * @category Authentication
        *
        * @param fetchToken - Called when Convex needs a token. Honor
        *   `forceRefreshToken` by bypassing a cached token; return `null` or
@@ -223,6 +233,8 @@ const make = (
       /**
        * Runs a public query once; use `reactiveQuery` to observe later updates.
        *
+       * @category Invocation
+       *
        * @param ref - The public query ref.
        * @param rest - Decoded arguments; omit them only for an argument-free
        *   ref.
@@ -235,6 +247,8 @@ const make = (
       /**
        * Runs a public mutation, encoding its arguments and decoding its result.
        *
+       * @category Invocation
+       *
        * @param ref - The public mutation ref.
        * @param rest - Decoded arguments; omit them only for an argument-free
        *   ref.
@@ -246,6 +260,8 @@ const make = (
       mutation,
       /**
        * Runs a public action, encoding its arguments and decoding its result.
+       *
+       * @category Invocation
        *
        * @param ref - The public action ref.
        * @param rest - Decoded arguments; omit them only for an argument-free
@@ -262,6 +278,8 @@ const make = (
        * ends or is interrupted; keep the client layer alive while consuming
        * it.
        *
+       * @category Subscriptions
+       *
        * @param ref - The public query ref to observe.
        * @param rest - Decoded arguments; omit them only for an argument-free
        *   ref.
@@ -275,6 +293,8 @@ const make = (
        * Subscribes with query failures represented as events rather than stream
        * failures. A later successful update can recover after a failed event.
        * Each consumption owns a listener, removed on completion/interruption.
+       *
+       * @category Subscriptions
        *
        * @param ref - The public query ref to observe.
        * @param rest - Decoded arguments; omit them only for an argument-free
@@ -297,6 +317,8 @@ const make = (
  * is managed by the layer's scope and closed automatically when the scope ends.
  * Wraps
  * [ConvexClient](https://docs.convex.dev/api/classes/browser.ConvexClient).
+ *
+ * @category Services
  */
 export const WebSocketClient =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
@@ -307,12 +329,16 @@ export const WebSocketClient =
 /**
  * The Effect requirement supplied by {@link layer} and accessed with
  * {@link WebSocketClient}.
+ *
+ * @category Services
  */
 export type WebSocketClient = typeof WebSocketClient.Identifier;
 
 /**
  * Provides a scoped client and closes its underlying connection when the
  * layer's scope ends. Consume subscription streams inside that lifetime.
+ *
+ * @category Layers
  *
  * @example
  *   import { WebSocketClient } from "@confect/js";

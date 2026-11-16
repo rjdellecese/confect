@@ -13,6 +13,8 @@ const make = Effect.gen(function* () {
     /**
      * Get a blob's download URL. Available in every function context.
      *
+     * @category Reading
+     *
      * @param storageId - ID in the `_storage` table.
      *
      * @returns An Effect producing a URL, failing with BlobNotFoundError if the
@@ -23,6 +25,8 @@ const make = Effect.gen(function* () {
      * Effect producing a temporary upload URL. Available in mutations, actions
      * and HTTP handlers; it is a property, not a method call. Native failures
      * and invalid returned URLs are defects.
+     *
+     * @category Writing
      */
     generateUploadUrl: Effect.flatMap(
       StorageWriter,
@@ -30,6 +34,8 @@ const make = Effect.gen(function* () {
     ),
     /**
      * Delete a stored blob in a mutation, action or HTTP handler.
+     *
+     * @category Writing
      *
      * @param storageId - ID of the blob to delete.
      *
@@ -41,6 +47,8 @@ const make = Effect.gen(function* () {
     /**
      * Read blob contents in a mutation, action or HTTP handler.
      *
+     * @category Reading
+     *
      * @param storageId - ID of the stored blob.
      *
      * @returns An Effect producing a Blob, failing with BlobNotFoundError if
@@ -50,6 +58,8 @@ const make = Effect.gen(function* () {
       Effect.flatMap(StorageActionWriter, (writer) => writer.get(storageId)),
     /**
      * Store blob contents in a mutation, action or HTTP handler.
+     *
+     * @category Writing
      *
      * @param blob - Contents and media type to store.
      * @param options - Optional `sha256` checksum checked by Convex.
@@ -68,6 +78,8 @@ const make = Effect.gen(function* () {
  * Unified storage service obtained from the application's generated `Storage`
  * tag. Individual operations require the context described on each member;
  * Confect supplies the required reader/writer services automatically.
+ *
+ * @category Services
  */
 export class Storage extends Context.Service<
   Storage,

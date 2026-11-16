@@ -12,6 +12,8 @@ const make = (storageReader: ConvexStorageReader) => ({
   /**
    * Resolve a stored blob's download URL.
    *
+   * @category Reading
+   *
    * @param storageId - ID in `_storage`.
    *
    * @returns An Effect producing a URL or failing with BlobNotFoundError when
@@ -40,6 +42,8 @@ const make = (storageReader: ConvexStorageReader) => ({
 /**
  * Compatibility storage reader supplied by Confect in all function contexts.
  * New code should use the generated unified `Storage` tag instead.
+ *
+ * @category Services
  */
 export class StorageReader extends Context.Service<
   StorageReader,

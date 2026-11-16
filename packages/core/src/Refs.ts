@@ -13,6 +13,8 @@ import * as Spec from "./Spec";
  * `Predicate` selects compatible ref types, such as public-only refs; groups
  * with no matching functions are omitted from the resulting type. Leaf call
  * types include the function's declared errors and covering middleware errors.
+ *
+ * @category Models
  */
 export type Refs<
   Spec_ extends Spec.AnyWithProps,
@@ -23,14 +25,20 @@ export type Refs<
  * The public and internal reference views generated from a project spec. The
  * two trees are filtered at the type level, not an authorization boundary;
  * Convex enforces the deployed function's visibility.
+ *
+ * @category Models
  */
 export interface FromSpec<Spec_ extends Spec.AnyWithProps> {
   /**
    * Refs typed for public functions, usable by clients and server-side callers.
+   *
+   * @category Models
    */
   public: Refs<Spec_, Ref.AnyPublic>;
   /**
    * Refs typed for internal functions, usable only by server-side callers.
+   *
+   * @category Models
    */
   internal: Refs<Spec_, Ref.AnyInternal>;
 }

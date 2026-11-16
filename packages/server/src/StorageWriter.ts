@@ -11,6 +11,8 @@ const make = (storageWriter: ConvexStorageWriter) => ({
   /**
    * Effect producing a temporary upload URL in mutations, actions and HTTP
    * handlers. Native failures and invalid URL decoding are defects.
+   *
+   * @category Writing
    */
   generateUploadUrl: Effect.promise(() =>
     storageWriter.generateUploadUrl(),
@@ -25,6 +27,8 @@ const make = (storageWriter: ConvexStorageWriter) => ({
   ),
   /**
    * Delete a blob in a writable storage context.
+   *
+   * @category Writing
    *
    * @param storageId - ID of the stored blob.
    *
@@ -41,6 +45,8 @@ const make = (storageWriter: ConvexStorageWriter) => ({
 /**
  * Compatibility upload/delete service supplied in mutations, actions and HTTP
  * handlers. New code should use the generated unified `Storage` tag instead.
+ *
+ * @category Services
  */
 export class StorageWriter extends Context.Service<
   StorageWriter,

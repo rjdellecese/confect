@@ -13,6 +13,8 @@ const make = (auth: ConvexAuth) => ({
    * This is an Effect property, not a function. It fails with
    * {@link NoUserIdentityFoundError} when no identity is present; unexpected
    * native failures are defects.
+   *
+   * @category Authentication
    */
   getUserIdentity: Effect.promise(() => auth.getUserIdentity()).pipe(
     Effect.andThen(
@@ -31,6 +33,8 @@ const make = (auth: ConvexAuth) => ({
  * Authentication service available in queries, mutations, actions and HTTP
  * handlers. Import the application's generated `Auth` tag and yield it to
  * obtain `getUserIdentity`; Confect supplies the invocation-local service.
+ *
+ * @category Services
  */
 export class Auth extends Context.Service<Auth, ReturnType<typeof make>>()(
   "@confect/server/Auth",
@@ -45,6 +49,8 @@ export const layer = (auth: ConvexAuth) => Layer.succeed(Auth, make(auth));
  * Typed failure of `Auth.getUserIdentity` when the invocation is
  * unauthenticated. Catch the `NoUserIdentityFoundError` tag; there is no
  * additional payload.
+ *
+ * @category Errors
  */
 export class NoUserIdentityFoundError extends Schema.TaggedError<
   NoUserIdentityFoundError,
@@ -52,6 +58,8 @@ export class NoUserIdentityFoundError extends Schema.TaggedError<
 >()("NoUserIdentityFoundError", {}) {
   /**
    * Describe the missing identity without exposing authentication data.
+   *
+   * @category Errors
    */
   override get message(): string {
     return "No user identity found";

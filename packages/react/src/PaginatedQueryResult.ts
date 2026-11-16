@@ -1,3 +1,8 @@
+/**
+ * @module
+ *
+ * @category Models
+ */
 import * as Equal from "effect/Equal";
 import * as Function from "effect/Function";
 import * as Hash from "effect/Hash";
@@ -31,6 +36,8 @@ type TypeId = typeof TypeId;
  * variant is excluded from the type entirely, so `isLoading` is accessible
  * without any narrowing.
  *
+ * @category Models
+ *
  * @typeParam Item - The type of a decoded page item.
  * @typeParam E - The type of the decoded typed error in the `Failure` variant.
  */
@@ -51,6 +58,8 @@ export type PaginatedQueryResult<Item, E = never> = [E] extends [never]
  * Every variant regardless of `E`—the parameter type for guards and
  * {@link match}, since `PaginatedQueryResult` itself excludes `Failure` when `E`
  * is `never`.
+ *
+ * @category Models
  */
 export type Variants<Item, E = never> =
   | LoadingFirstPage<Item, E>
@@ -61,29 +70,41 @@ export type Variants<Item, E = never> =
 
 /**
  * Type utilities for extracting paginated item and declared error types.
+ *
+ * @category Models
  */
 export declare namespace PaginatedQueryResult {
   /**
    * Shared pipeable shape; the phantom fields describe types, not runtime data.
+   *
+   * @category Models
    */
   // eslint-disable-next-line @typescript-eslint/no-shadow
   export interface Proto<out Item, out E> extends Pipeable.Pipeable {
     /**
      * Identifies values created by this module.
+     *
+     * @category Models
      */
     readonly [TypeId]: TypeId;
     /**
      * Type-only witness for a decoded page item.
+     *
+     * @category Models
      */
     readonly "~Item": Item;
     /**
      * Type-only witness for the decoded declared error.
+     *
+     * @category Models
      */
     readonly "~E": E;
   }
 
   /**
    * Extracts the decoded item type from a result type, or `never` otherwise.
+   *
+   * @category Models
    */
   export type Item<R> = R extends { readonly "~Item": infer Item_ }
     ? Item_
@@ -91,6 +112,8 @@ export declare namespace PaginatedQueryResult {
 
   /**
    * Extracts the declared error type from a result type, or `never` otherwise.
+   *
+   * @category Models
    */
   // eslint-disable-next-line @typescript-eslint/no-shadow
   export type Failure<R> = R extends { readonly "~E": infer E } ? E : never;
@@ -98,6 +121,8 @@ export declare namespace PaginatedQueryResult {
 
 /**
  * The first page is pending, or the hook was skipped and has no subscription.
+ *
+ * @category Models
  */
 export interface LoadingFirstPage<
   Item,
@@ -105,25 +130,35 @@ export interface LoadingFirstPage<
 > extends PaginatedQueryResult.Proto<Item, E> {
   /**
    * Discriminant for the initial loading/skipped state.
+   *
+   * @category Models
    */
   readonly _tag: "LoadingFirstPage";
   /**
    * `true` when the hook received `"skip"`.
+   *
+   * @category Models
    */
   readonly skipped: boolean;
   /**
    * An empty array until the first page is available.
+   *
+   * @category Models
    */
   readonly results: ReadonlyArray<Item>;
   /**
    * Always `true`, even when skipped; inspect `skipped` before showing a
    * spinner.
+   *
+   * @category Models
    */
   readonly isLoading: true;
 }
 
 /**
  * More pages are pending while previously loaded items remain available.
+ *
+ * @category Models
  */
 export interface LoadingMore<
   Item,
@@ -131,20 +166,28 @@ export interface LoadingMore<
 > extends PaginatedQueryResult.Proto<Item, E> {
   /**
    * Discriminant for loading beyond the first page.
+   *
+   * @category Models
    */
   readonly _tag: "LoadingMore";
   /**
    * Decoded items from the pages currently available, in query order.
+   *
+   * @category Models
    */
   readonly results: ReadonlyArray<Item>;
   /**
    * Always `true` while more items or replacement pages are pending.
+   *
+   * @category Models
    */
   readonly isLoading: true;
 }
 
 /**
  * Loaded items are available and another page can be requested.
+ *
+ * @category Models
  */
 export interface CanLoadMore<
   Item,
@@ -152,20 +195,28 @@ export interface CanLoadMore<
 > extends PaginatedQueryResult.Proto<Item, E> {
   /**
    * Discriminant for the state in which `loadMore` can make progress.
+   *
+   * @category Models
    */
   readonly _tag: "CanLoadMore";
   /**
    * Decoded items from all loaded pages, in query order.
+   *
+   * @category Models
    */
   readonly results: ReadonlyArray<Item>;
   /**
    * Always `false`; no next page is currently pending.
+   *
+   * @category Models
    */
   readonly isLoading: false;
   /**
    * Requests the next page, targeting `numItems` additional items. Returns
    * immediately; observe later hook results for loading, success, or failure.
    * Call this only on the current `CanLoadMore` result, not a saved stale one.
+   *
+   * @category Subscriptions
    */
   readonly loadMore: (numItems: number) => void;
 }
@@ -173,6 +224,8 @@ export interface CanLoadMore<
 /**
  * All currently available pages are loaded; subscriptions can still update
  * their items.
+ *
+ * @category Models
  */
 export interface Exhausted<Item, E = never> extends PaginatedQueryResult.Proto<
   Item,
@@ -180,20 +233,28 @@ export interface Exhausted<Item, E = never> extends PaginatedQueryResult.Proto<
 > {
   /**
    * Discriminant for a fully loaded result.
+   *
+   * @category Models
    */
   readonly _tag: "Exhausted";
   /**
    * Decoded items from all loaded pages, in query order.
+   *
+   * @category Models
    */
   readonly results: ReadonlyArray<Item>;
   /**
    * Always `false`; there is no further page to request.
+   *
+   * @category Models
    */
   readonly isLoading: false;
 }
 
 /**
  * A declared page failure, retaining the items loaded before the error.
+ *
+ * @category Models
  */
 export interface Failure<Item, E = never> extends PaginatedQueryResult.Proto<
   Item,
@@ -201,14 +262,20 @@ export interface Failure<Item, E = never> extends PaginatedQueryResult.Proto<
 > {
   /**
    * Discriminant for a declared error; this state has no `loadMore` callback.
+   *
+   * @category Models
    */
   readonly _tag: "Failure";
   /**
    * The failure decoded through the ref's error schemas.
+   *
+   * @category Models
    */
   readonly error: E;
   /**
    * The pages loaded before the failure.
+   *
+   * @category Models
    */
   readonly results: ReadonlyArray<Item>;
 }
@@ -342,6 +409,8 @@ export const failure = <E, Item = never>(options: {
 /**
  * Narrows `result` to initial loading or skipped state; inspect `skipped` to
  * distinguish them.
+ *
+ * @category Refinements
  */
 export const isLoadingFirstPage = <Item, E>(
   result: Variants<Item, E>,
@@ -350,6 +419,8 @@ export const isLoadingFirstPage = <Item, E>(
 /**
  * Narrows `result` to loading more pages while retaining already available
  * items.
+ *
+ * @category Refinements
  */
 export const isLoadingMore = <Item, E>(
   result: Variants<Item, E>,
@@ -358,6 +429,8 @@ export const isLoadingMore = <Item, E>(
 /**
  * Narrows `result` to the only variant exposing an actionable `loadMore`
  * callback.
+ *
+ * @category Refinements
  */
 export const isCanLoadMore = <Item, E>(
   result: Variants<Item, E>,
@@ -365,6 +438,8 @@ export const isCanLoadMore = <Item, E>(
 
 /**
  * Narrows `result` to the state with all current pages loaded.
+ *
+ * @category Refinements
  */
 export const isExhausted = <Item, E>(
   result: Variants<Item, E>,
@@ -373,6 +448,8 @@ export const isExhausted = <Item, E>(
 /**
  * Narrows `result` to a declared page failure, exposing `error` and retained
  * `results`.
+ *
+ * @category Refinements
  */
 export const isFailure = <Item, E>(
   result: Variants<Item, E>,
@@ -380,6 +457,8 @@ export const isFailure = <Item, E>(
 
 /**
  * Narrows `result` to either loading variant, including a skipped first page.
+ *
+ * @category Refinements
  */
 export const isLoading = <Item, E>(
   result: Variants<Item, E>,
@@ -389,14 +468,20 @@ export const isLoading = <Item, E>(
 type MatchOptions<Item, E, V, W, X, Y, Z> = {
   /**
    * Handles an initial or skipped query; receives whether it was skipped.
+   *
+   * @category Pattern matching
    */
   readonly onLoadingFirstPage: (skipped: boolean) => V;
   /**
    * Handles pending pages while receiving the decoded items already available.
+   *
+   * @category Pattern matching
    */
   readonly onLoadingMore: (results: ReadonlyArray<Item>) => W;
   /**
    * Handles loaded items and a callback that requests `numItems` more items.
+   *
+   * @category Pattern matching
    */
   readonly onCanLoadMore: (
     results: ReadonlyArray<Item>,
@@ -404,6 +489,8 @@ type MatchOptions<Item, E, V, W, X, Y, Z> = {
   ) => X;
   /**
    * Handles all currently loaded items when no further page is available.
+   *
+   * @category Pattern matching
    */
   readonly onExhausted: (results: ReadonlyArray<Item>) => Y;
 } & ([E] extends [never]
@@ -411,6 +498,8 @@ type MatchOptions<Item, E, V, W, X, Y, Z> = {
   : {
       /**
        * Handles the decoded declared error and items retained before it.
+       *
+       * @category Pattern matching
        */
       readonly onFailure: (error: E, results: ReadonlyArray<Item>) => Z;
     });
@@ -423,6 +512,8 @@ type MatchReturns<E, V, W, X, Y, Z> = [E] extends [never]
  * Matches a {@link PaginatedQueryResult} to the appropriate handler based on its
  * tag. If the provided result cannot fail (i.e. `E` is `never`), `onFailure` is
  * not required.
+ *
+ * @category Pattern matching
  *
  * @param self - The result to inspect, or supply it later in the curried form.
  * @param options - Handlers for every possible state. `onCanLoadMore` receives

@@ -5,12 +5,16 @@ import * as Layer from "effect/Layer";
 
 /**
  * Native Convex request metadata returned by the service's get method.
+ *
+ * @category Models
  */
 export type { RequestMetadata as Metadata } from "convex/server";
 
 const make = (meta: Pick<MutationMeta, "getRequestMetadata">) => ({
   /**
    * Read metadata for the request that triggered this invocation.
+   *
+   * @category Getters
    *
    * @returns An Effect producing native request metadata; native rejection is a
    *   defect. Never log or return the sensitive authToken field.
@@ -23,6 +27,8 @@ const make = (meta: Pick<MutationMeta, "getRequestMetadata">) => ({
 /**
  * Request metadata service available in mutations, actions and HTTP handlers.
  * Acquire the application's generated `RequestMetadata` tag.
+ *
+ * @category Services
  */
 export class RequestMetadata extends Context.Service<
   RequestMetadata,

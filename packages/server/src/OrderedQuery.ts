@@ -19,6 +19,8 @@ import type * as Table from "./Table";
  * Obtain this from `reader.table(name).index(...)` or `.search(...)`. Results
  * are decoded documents. Codec failures are typed `DocumentDecodeError`s;
  * native query failures remain defects.
+ *
+ * @category Models
  */
 export type OrderedQuery<
   TableInfo_ extends TableInfo.AnyWithProps,
@@ -26,6 +28,8 @@ export type OrderedQuery<
 > = {
   /**
    * Read at most the first matching document in query order.
+   *
+   * @category Reading
    *
    * @returns An effect yielding `Some(document)` or `None` when there is no
    *   match; decoding the stored document can fail with `DocumentDecodeError`.
@@ -36,6 +40,8 @@ export type OrderedQuery<
   >;
   /**
    * Read a bounded prefix in query order.
+   *
+   * @category Reading
    *
    * @param n - Maximum number of documents to return, validated by Convex.
    *
@@ -48,6 +54,8 @@ export type OrderedQuery<
   /**
    * Read every matching document in query order.
    *
+   * @category Reading
+   *
    * @returns An effect yielding a readonly array, or failing with
    *   `DocumentDecodeError`. Prefer bounded reads or pagination for large
    *   queries to avoid exceeding Convex's transaction limits.
@@ -59,6 +67,8 @@ export type OrderedQuery<
   /**
    * Consume matching documents incrementally as an Effect Stream.
    *
+   * @category Reading
+   *
    * @returns A plain stream of decoded documents with `DocumentDecodeError` in
    *   its error channel. It is not a composable QueryStream; use
    *   `reader.table(name).stream(index)` for mergeable, paginable composition.
@@ -66,6 +76,8 @@ export type OrderedQuery<
   readonly stream: () => Stream.Stream<Doc, Document.DocumentDecodeError>;
   /**
    * Fetch and decode one native Convex pagination page.
+   *
+   * @category Reading
    *
    * @param options - Convex pagination options, normally the handler's
    *   `paginationOpts` unchanged. `cursor: null` starts a query; `numItems`

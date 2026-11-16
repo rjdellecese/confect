@@ -22,6 +22,8 @@ import type * as Table from "./Table";
  * The argument accepted by `patch`: like `Partial<Doc>` without system fields,
  * but the fields that are already optional also accept `undefined`, since
  * setting a field to `undefined` unsets it.
+ *
+ * @category Models
  */
 export type PatchValue<Doc> = {
   [
@@ -35,6 +37,8 @@ export type PatchValue<Doc> = {
  * Signatures expose typed codec failures; native write failures are defects.
  * See DocumentEncodeError for the current limitation with inputs lacking
  * `_id`.
+ *
+ * @category Models
  */
 export interface DatabaseWriterTableAccessor<
   DataModel_ extends DataModel.AnyWithProps,
@@ -43,6 +47,8 @@ export interface DatabaseWriterTableAccessor<
 > {
   /**
    * Encode and insert a new document.
+   *
+   * @category Writing
    *
    * @param document - Decoded user fields without `_id` or `_creationTime`.
    *
@@ -58,6 +64,8 @@ export interface DatabaseWriterTableAccessor<
    * Read, shallowly merge, encode, and replace a document within the mutation.
    * Nested objects are replaced rather than recursively merged. Setting an
    * optional field to `undefined` removes it; omitted fields remain unchanged.
+   *
+   * @category Writing
    *
    * @param id - ID of the existing document.
    * @param patchedValues - Changed decoded user fields, without system fields.
@@ -78,6 +86,8 @@ export interface DatabaseWriterTableAccessor<
   /**
    * Encode and replace all user fields, preserving Convex system fields.
    *
+   * @category Writing
+   *
    * @param id - ID of the document to replace.
    * @param value - Complete replacement in decoded form, without system fields.
    *
@@ -94,6 +104,8 @@ export interface DatabaseWriterTableAccessor<
   /**
    * Delete a document through Convex's native database writer.
    *
+   * @category Writing
+   *
    * @param id - Table-typed document ID.
    *
    * @returns An effect completing with void. There is no typed failure channel;
@@ -108,6 +120,8 @@ export interface DatabaseWriterTableAccessor<
  * `DatabaseWriterService<…>` by reference instead of expanding the data model.
  * `Docs` is the optional named document registry (see `DatabaseReaderService`).
  * Acquire it from the generated `DatabaseWriter` service inside a mutation.
+ *
+ * @category Services
  *
  * @example
  *   import * as Effect from "effect/Effect";
@@ -124,6 +138,8 @@ export interface DatabaseWriterService<
 > {
   /**
    * Select an application table for writes.
+   *
+   * @category Writing
    *
    * @param tableName - A table declared in the schema; system tables are
    *   excluded.
@@ -293,6 +309,8 @@ export const DatabaseWriter = <
  * The writer service requirement and uncustomized shape for a schema. Use the
  * generated `DatabaseWriter` tag to acquire it; {@link DatabaseWriterService}
  * additionally accepts the generated named-document registry.
+ *
+ * @category Services
  */
 export type DatabaseWriter<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

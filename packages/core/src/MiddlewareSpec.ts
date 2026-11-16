@@ -37,18 +37,26 @@ export const allFunctionTypes: ReadonlyArray<FunctionType> = [
  * The function kinds a middleware may cover. Supply all three flags as literal
  * `true` or `false`, with at least one enabled. A group attachment must cover
  * every function in that group; Node.js actions use the `action` flag.
+ *
+ * @category Models
  */
 export interface SupportedFunctionTypes {
   /**
    * Whether the middleware may cover queries.
+   *
+   * @category Options
    */
   readonly query: boolean;
   /**
    * Whether the middleware may cover mutations.
+   *
+   * @category Options
    */
   readonly mutation: boolean;
   /**
    * Whether the middleware may cover actions in either runtime.
+   *
+   * @category Options
    */
   readonly action: boolean;
 }
@@ -74,10 +82,14 @@ export interface SuccessValue {
  * short-circuit with a declared failure. Preserve its opaque success value and
  * unhandled failures; middleware must not reinterpret a handler's result. `R`
  * describes services the wrapper itself requires.
+ *
+ * @category Models
  */
 export interface MiddlewareImpl<Provides_, E, R, Options_ = never> {
   /**
    * Wrap the remaining chain for one function invocation.
+   *
+   * @category Models
    *
    * @param effect - The downstream middleware and handler, with an opaque
    *   result.
@@ -99,29 +111,41 @@ export interface MiddlewareImpl<Provides_, E, R, Options_ = never> {
  * the supplied value is `undefined`; Confect validates the attachment value
  * without decoding or coercing it.
  *
+ * @category Models
+ *
  * @property options - This attachment's validated type-side value, present only
  *   when the middleware declares an options schema.
  */
 export type MiddlewareOptions<Options_ = never> = {
   /**
    * Metadata for the function call being wrapped.
+   *
+   * @category Models
    */
   readonly invocation: {
     /**
      * The function's local spec name.
+     *
+     * @category Models
      */
     readonly name: string;
     /**
      * The invoked function's kind; Node.js actions also report `action`.
+     *
+     * @category Models
      */
     readonly functionType: FunctionType;
     /**
      * Whether the function is public or restricted to server-side calls.
+     *
+     * @category Models
      */
     readonly functionVisibility: FunctionVisibility;
     /**
      * Decoded handler arguments, typed as unknown because a policy may cover
      * many functions.
+     *
+     * @category Models
      */
     readonly args: unknown;
   };
@@ -144,6 +168,8 @@ export interface AnyMiddlewareImpl {
  * type-level `Provides`/`Error` metadata. It is deliberately not a
  * `Context.Tag`: implementations are registered through the group `Registry`
  * (like `FunctionImpl`s), not resolved from a Layer context.
+ *
+ * @category Middleware
  */
 export interface MiddlewareSpec<
   in out Self,
@@ -157,63 +183,91 @@ export interface MiddlewareSpec<
   /**
    * The subclass identity used in type parameters; do not instantiate
    * middleware specs.
+   *
+   * @category Models
    */
   new (_: never): {
     /**
      * Identifies the middleware's instance type.
+     *
+     * @category Models
      */
     readonly [TypeId]: TypeId;
     /**
      * The middleware key associated with this instance type.
+     *
+     * @category Models
      */
     readonly key: Key_;
   };
   /**
    * Identifies a middleware declaration.
+   *
+   * @category Models
    */
   readonly [TypeId]: TypeId;
   /**
    * The unique key shared by this declaration and its registered
    * implementation.
+   *
+   * @category Models
    */
   readonly key: Key_;
   /**
    * The function kinds this middleware may cover.
+   *
+   * @category Options
    */
   readonly functionTypes: SupportedFunctionTypes;
   /**
    * The lazy codec for declared middleware failures; absent when none is
    * declared.
+   *
+   * @category Schemas
    */
   readonly error?: ErrorSchema_;
   /**
    * The lazy schema used to validate attachment values and compare their
    * equivalence.
+   *
+   * @category Schemas
    */
   readonly options?: OptionsSchema_;
   /**
    * The type-only services provided downstream; not a runtime property.
+   *
+   * @category Models
    */
   readonly "~Provides": Provides_;
   /**
    * The type-only services required from earlier middleware; not a runtime
    * property.
+   *
+   * @category Models
    */
   readonly "~Requires": Requires_;
   /**
    * The declared error codec's type; not a runtime property.
+   *
+   * @category Models
    */
   readonly "~Error": ErrorSchema_;
   /**
    * The union of covered function kinds; not a runtime property.
+   *
+   * @category Models
    */
   readonly "~FunctionTypes": FunctionTypes_;
   /**
    * The middleware subclass identity; not a runtime property.
+   *
+   * @category Models
    */
   readonly "~Self": Self;
   /**
    * The attachment-options schema's type; not a runtime property.
+   *
+   * @category Models
    */
   readonly "~Options": OptionsSchema_;
 }
@@ -326,6 +380,8 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
  * `MiddlewareImpl.make` (or `makeByFunctionType`/`provides`) in
  * `@confect/server`. The optional `Config.provides` and `Config.requires` slots
  * declare services at the type level, not runtime service tags.
+ *
+ * @category Middleware
  *
  * @param key - A unique key identifying one declaration and implementation.
  * @param options - Client-safe schema factories and function coverage.

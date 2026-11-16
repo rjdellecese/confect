@@ -5,6 +5,8 @@ import * as Layer from "effect/Layer";
 
 /**
  * Native Convex metadata returned by getDeployment and getFunction.
+ *
+ * @category Models
  */
 export type { DeploymentMetadata, FunctionMetadata } from "convex/server";
 
@@ -14,6 +16,8 @@ const make = (
   /**
    * Read metadata for the current function, including its name and component.
    *
+   * @category Getters
+   *
    * @returns An Effect producing native FunctionMetadata; native rejection is a
    *   defect.
    */
@@ -22,6 +26,8 @@ const make = (
   ),
   /**
    * Read metadata for the deployment executing this invocation.
+   *
+   * @category Getters
    *
    * @returns An Effect producing native DeploymentMetadata; native rejection is
    *   a defect.
@@ -35,6 +41,8 @@ const make = (
  * Function/deployment metadata service available in every function context.
  * Acquire the generated `ExecutionMetadata` tag; metadata remains
  * Convex-owned.
+ *
+ * @category Services
  */
 export class ExecutionMetadata extends Context.Service<
   ExecutionMetadata,

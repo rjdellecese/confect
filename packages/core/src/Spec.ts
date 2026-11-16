@@ -26,6 +26,8 @@ export const isSpec = (u: unknown): u is AnyWithProps =>
  *
  * Use the codegen-assembled project spec rather than assembling this container
  * manually. It describes functions and middleware, not the database schema.
+ *
+ * @category Models
  */
 export interface Spec<
   Groups_ extends Record.ReadonlyRecord<string, GroupSpec.AnyWithProps> = {},
@@ -33,6 +35,8 @@ export interface Spec<
   /**
    * The generated group record, preserving each group's precise declaration
    * type.
+   *
+   * @category Models
    */
   readonly [TypeId]: Readonly<Groups_>;
 }

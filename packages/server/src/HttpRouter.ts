@@ -38,6 +38,8 @@ import type * as VectorSearch from "./VectorSearch";
 /**
  * The Confect services available to HTTP route handlers and middleware,
  * supplied per request from the Convex action context.
+ *
+ * @category Models
  */
 export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | QueryRunner.QueryRunner
@@ -73,6 +75,8 @@ export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  * Layers are built with Confect's Convex-aware `ConfigProvider` in context, so
  * `Config` reads (e.g. in `Layer.unwrap`) resolve against Convex environment
  * variables.
+ *
+ * @category Models
  */
 export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   Layer.Layer<
@@ -101,6 +105,8 @@ export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  * Plain Convex routes can still be added to the returned router—Convex matches
  * exact paths first and longer path prefixes before the catch-all, so they take
  * precedence.
+ *
+ * @category Constructors
  *
  * @param databaseSchema - Generated runtime DatabaseSchema, required even
  *   without vector search. Do not pass the deployment/test convexSchema

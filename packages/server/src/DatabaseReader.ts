@@ -20,6 +20,8 @@ type IncludedDataModel<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  * service in queries and mutations. `Docs` optionally supplies generated named
  * document types; reads still decode through each table's codec.
  *
+ * @category Services
+ *
  * @example
  *   import * as Effect from "effect/Effect";
  *   import { DatabaseReader } from "./confect/_generated/services";
@@ -38,6 +40,8 @@ export interface DatabaseReaderService<
 > {
   /**
    * Select a table for document lookup or query construction.
+   *
+   * @category Reading
    *
    * @param tableName - A declared table, `_storage`, or `_scheduled_functions`.
    *
@@ -140,6 +144,8 @@ export const DatabaseReader = <
  * schema. Acquire the generated service tag rather than invoking the raw
  * same-named factory; use {@link DatabaseReaderService} for a named-doc
  * registry.
+ *
+ * @category Services
  */
 export type DatabaseReader<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

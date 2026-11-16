@@ -59,6 +59,8 @@ export type Limits = typeof Limits.Type;
  * `ReadBudgetExceededError`, it does not indicate exhaustion of a valid
  * budget.
  *
+ * @category Errors
+ *
  * @experimental
  */
 export class InvalidReadLimitError extends Schema.TaggedError<
@@ -67,11 +69,15 @@ export class InvalidReadLimitError extends Schema.TaggedError<
 >()("InvalidReadLimitError", {
   /**
    * SchemaError describing the invalid limit options.
+   *
+   * @category Getters
    */
   cause: Schema.declare<Schema.SchemaError>(Schema.isSchemaError),
 }) {
   /**
    * Diagnostic containing the underlying limit-validation message.
+   *
+   * @category Getters
    */
   override get message(): string {
     return `Invalid read limits: ${this.cause.message}`;

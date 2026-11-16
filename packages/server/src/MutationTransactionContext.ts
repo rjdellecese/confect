@@ -11,15 +11,21 @@ import type { Options as MutationOptions } from "./QueryTransactionContext";
 
 /**
  * Convex's resource limits for an individual nested transaction call.
+ *
+ * @category Options
  */
 export type { TransactionLimits } from "convex/server";
 /**
  * Transaction-limit options accepted by a nested mutation.
+ *
+ * @category Options
  */
 export type { Options as MutationOptions } from "./QueryTransactionContext";
 /**
  * Nested-query options including transactionLimits and useStaleSnapshot.
  * Providing useStaleSnapshot, even false, requires a mutation context.
+ *
+ * @category Options
  */
 export type QueryOptions = AdvancedRunQueryOptions;
 

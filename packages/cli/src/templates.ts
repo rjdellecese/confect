@@ -32,6 +32,7 @@ const schemaEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Convex schema for deployment and convex-test setup.
  * Do not import this module from function runtime code; it constructs validators for every table.
+ * @category Deployment
  */`);
   yield* cbw.writeLine(`export { default } from "${convexSchemaImportPath}";`);
 
@@ -90,6 +91,7 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Runtime table and codec registry for Confect handlers and test setup.
  * Table schemas stay lazy until accessed. Use convexSchema instead for Convex deployment validators.
+ * @category Schemas
  */`);
   if (tableModules.length === 0) {
     yield* cbw.writeLine(
@@ -169,6 +171,7 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
  * Convex validators and indexes for deployment and convex-test setup.
  * Importing this module constructs every table's deployment definition.
  * Use the runtime schema module in function implementations instead.
+ * @category Deployment
  */`);
   if (tableModules.length === 0) {
     yield* cbw.writeLine(`export default $defineSchema({});`);
@@ -223,13 +226,19 @@ const idEffect = Effect.fnUntraced(function* ({
           " | ",
         );
   yield* cbw.writeLine(
-    `/** Application table names; excludes system tables and is never when no tables exist. */`,
+    `/**
+ * Application table names; excludes system tables and is never when no tables exist.
+ * @category Models
+ */`,
   );
   yield* cbw.writeLine(`export type TableNames = ${union};`);
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(
-    `/** A Convex document ID branded with its application or system table name. */`,
+    `/**
+ * A Convex document ID branded with its application or system table name.
+ * @category Schemas
+ */`,
   );
   yield* cbw.writeLine(
     `export type Id<TableName extends TableNames | SystemTableNames> = GenericId.GenericId<TableName>;`,
@@ -244,6 +253,7 @@ const idEffect = Effect.fnUntraced(function* ({
  *
  * @param tableName - An application or Convex system table name.
  * @returns A schema whose decoded and encoded types are Id<TableName>.
+ * @category Schemas
  */`,
   );
   yield* cbw.writeLine(
@@ -282,6 +292,7 @@ const tableWrapperEffect = Effect.fnUntraced(function* ({
  * Named table definition for ${tableName}, including its indexes and lazy Fields and Doc schemas.
  * Doc includes _id and _creationTime; Fields describes the user-defined fields.
  * Importing this wrapper binds the table name without evaluating its field-schema callback.
+ * @category Schemas
  */`);
   yield* cbw.writeLine(`export default unnamed("${tableName}");`);
 
@@ -301,7 +312,10 @@ const httpEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`import http from "${httpImportPath}";`);
   yield* cbw.newLine();
   yield* cbw.writeLine(
-    `/** HTTP router exposed to Convex from the application's HTTP routes. */`,
+    `/**
+ * HTTP router exposed to Convex from the application's HTTP routes.
+ * @category Deployment
+ */`,
   );
   yield* cbw.writeLine(`export default http;`);
 
@@ -321,7 +335,10 @@ const cronsEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`import crons from "${cronsImportPath}";`);
   yield* cbw.newLine();
   yield* cbw.writeLine(
-    `/** Recurring jobs exposed to Convex from the application's cron definitions. */`,
+    `/**
+ * Recurring jobs exposed to Convex from the application's cron definitions.
+ * @category Deployment
+ */`,
   );
   yield* cbw.writeLine(`export default crons.convexCronJobs;`);
 
@@ -343,7 +360,10 @@ const authConfigEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`import auth from "${authImportPath}";`);
   yield* cbw.newLine();
   yield* cbw.writeLine(
-    `/** Authentication provider configuration consumed by Convex at deployment. */`,
+    `/**
+ * Authentication provider configuration consumed by Convex at deployment.
+ * @category Deployment
+ */`,
   );
   yield* cbw.writeLine(`export default auth;`);
 
@@ -381,7 +401,10 @@ const componentsEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(
-    `/** Installed component names mapped to their typed ComponentApi function references. */`,
+    `/**
+ * Installed component names mapped to their typed ComponentApi function references.
+ * @category Components
+ */`,
   );
   if (installedComponents.length === 0) {
     yield* cbw.writeLine(`export type Components = {};`);
@@ -406,6 +429,7 @@ const componentsEffect = Effect.fnUntraced(function* ({
  * Function references for components installed with app.use in convex/convex.config.ts.
  * Entries use their installed names. Pass their references to Convex component APIs or native contexts.
  * This registry is available before Convex codegen and does not invoke component functions.
+ * @category Components
  */`,
   );
   yield* cbw.writeLine(
@@ -434,6 +458,7 @@ const refsEffect = Effect.fnUntraced(function* ({
  * These are type-filtered views, not a runtime authorization boundary.
  * Each leaf is a Ref carrying argument, return, and declared error types, not a callable function.
  * Pass leaves to Confect clients, runners, or the scheduler; Confect codecs are evaluated lazily.
+ * @category References
  */`);
   yield* cbw.writeLine(
     `const refs: Refs.FromSpec<typeof spec> = Refs.make(spec);`,
@@ -475,7 +500,10 @@ const docsEffect = Effect.fnUntraced(function* ({
   // would trip `noUnusedLocals`.
   if (tables.length === 0) {
     yield* cbw.writeLine(
-      `/** Map of application table names to decoded document types; empty when no tables exist. */`,
+      `/**
+ * Map of application table names to decoded document types; empty when no tables exist.
+ * @category Models
+ */`,
     );
     yield* cbw.writeLine(`export interface Docs {}`);
     return yield* cbw.toString();
@@ -489,7 +517,10 @@ const docsEffect = Effect.fnUntraced(function* ({
 
   for (const { tableName, docName } of tables) {
     yield* cbw.writeLine(
-      `/** Decoded ${tableName} document, including _id and _creationTime. */`,
+      `/**
+ * Decoded ${tableName} document, including _id and _creationTime.
+ * @category Models
+ */`,
     );
     yield* cbw.writeLine(
       `export type ${docName} = Document.Document<typeof schemaDefinition, "${tableName}">;`,
@@ -498,7 +529,10 @@ const docsEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(
-    `/** Application table names mapped to decoded document types used by database services; excludes system tables. */`,
+    `/**
+ * Application table names mapped to decoded document types used by database services; excludes system tables.
+ * @category Models
+ */`,
   );
   yield* cbw.writeLine(`export interface Docs {`);
   yield* cbw.indent(
@@ -684,10 +718,12 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Authentication service tag, provided in queries, mutations, actions, and HTTP handlers.
  * Yield this tag to read the caller's identity; getUserIdentity fails with NoUserIdentityFoundError when unauthenticated.
+ * @category Services
  */`);
   yield* cbw.writeLine("export const Auth = Auth_.Auth;");
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link Auth}.
+ * @category Services
  */`);
   yield* cbw.writeLine("export type Auth = typeof Auth.Identifier;");
   yield* cbw.blankLine();
@@ -695,12 +731,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * JWT-signing service tag, provided only in mutations.
  * Yield this tag and pass SignJwtOptions to signJwt; signing failures are defects.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const MutationAuth = MutationAuth_.MutationAuth;",
   );
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link MutationAuth}.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type MutationAuth = typeof MutationAuth.Identifier;",
@@ -710,12 +748,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Execution metadata service tag, provided in queries, mutations, actions, and HTTP handlers.
  * Yield this tag to read function and deployment metadata.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const ExecutionMetadata = ExecutionMetadata_.ExecutionMetadata;",
   );
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link ExecutionMetadata}.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type ExecutionMetadata = typeof ExecutionMetadata.Identifier;",
@@ -725,12 +765,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Request metadata service tag, provided in mutations, actions, and HTTP handlers, not queries.
  * Yield this tag to read metadata for the current request.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const RequestMetadata = RequestMetadata_.RequestMetadata;",
   );
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link RequestMetadata}.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type RequestMetadata = typeof RequestMetadata.Identifier;",
@@ -740,12 +782,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Transaction metadata service tag, provided in queries and mutations.
  * Yield this tag to read transaction metrics and the snapshot timestamp.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const TransactionMetadata = TransactionMetadata_.TransactionMetadata;",
   );
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link TransactionMetadata}.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type TransactionMetadata = typeof TransactionMetadata.Identifier;",
@@ -757,10 +801,12 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Scheduling service tag, provided in mutations, actions, and HTTP handlers.
  * Yield this tag to schedule mutation or action refs with an Effect Duration or DateTime, or cancel a scheduled ID.
  * Scheduling returns the scheduled-function ID; argument encoding can throw synchronously.
+ * @category Services
  */`);
   yield* cbw.writeLine("export const Scheduler = Scheduler_.Scheduler;");
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link Scheduler}.
+ * @category Services
  */`);
   yield* cbw.writeLine("export type Scheduler = typeof Scheduler.Identifier;");
   yield* cbw.blankLine();
@@ -769,10 +815,12 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Storage facade tag, provided in queries, mutations, actions, and HTTP handlers.
  * getUrl returns a URL or fails with BlobNotFoundError. Upload URLs and deletion require StorageWriter;
  * blob reads and writes require StorageActionWriter. Both writer services are provided in mutations, actions, and HTTP handlers.
+ * @category Services
  */`);
   yield* cbw.writeLine("export const Storage = Storage_.Storage;");
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link Storage}.
+ * @category Services
  */`);
   yield* cbw.writeLine("export type Storage = typeof Storage.Identifier;");
   yield* cbw.blankLine();
@@ -781,12 +829,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Compatibility storage URL service tag, provided in queries, mutations, actions, and HTTP handlers.
  * Use Storage in new code. getUrl resolves a storage ID to a URL or fails with BlobNotFoundError.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const StorageReader = StorageReader_.StorageReader;",
   );
   yield* cbw.writeLine(`/**
  * Compatibility environment requirement for {@link StorageReader}; use Storage in new code.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type StorageReader = typeof StorageReader.Identifier;",
@@ -797,12 +847,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Compatibility storage write service tag, provided in mutations, actions, and HTTP handlers.
  * Use Storage in new code. This service generates upload URLs and deletes files; deletion failures become BlobNotFoundError.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const StorageWriter = StorageWriter_.StorageWriter;",
   );
   yield* cbw.writeLine(`/**
  * Compatibility environment requirement for {@link StorageWriter}; use Storage in new code.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type StorageWriter = typeof StorageWriter.Identifier;",
@@ -814,12 +866,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Compatibility blob storage service tag, provided in mutations, actions, and HTTP handlers despite its name.
  * Use Storage in new code.
  * get returns a Blob or fails with BlobNotFoundError; store accepts a Blob and optional sha256 and returns a storage ID.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const StorageActionWriter = StorageActionWriter_.StorageActionWriter;",
   );
   yield* cbw.writeLine(`/**
  * Compatibility environment requirement for {@link StorageActionWriter}; use Storage in new code.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type StorageActionWriter = typeof StorageActionWriter.Identifier;",
@@ -832,6 +886,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Yield this tag and call it with a table, vector index, and search options to return document IDs and scores.
  * Convex search failures are defects; results do not contain decoded documents.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const VectorSearch: VectorSearch_.VectorSearchTag<",
@@ -845,6 +900,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link VectorSearch}.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type VectorSearch = typeof VectorSearch.Identifier;",
@@ -856,6 +912,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * parse checks a string against a table; identify checks application and system tables.
  * Both return Option.none for invalid IDs and do not check whether the document exists.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const DocumentIds: DocumentIds_.DocumentIdsTag<typeof schemaDefinition> = DocumentIds_.DocumentIds<typeof schemaDefinition>();",
@@ -863,6 +920,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link DocumentIds}.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type DocumentIds = typeof DocumentIds.Identifier;",
@@ -875,6 +933,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Yield this tag to read decoded documents using the generated Docs aliases.
  * Document decoding failures use DocumentDecodeError; table(name).get(id) fails with GetByIdFailure when absent.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const DatabaseReader: DatabaseReader_.DatabaseReaderTag<",
@@ -891,6 +950,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link DatabaseReader}.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type DatabaseReader = typeof DatabaseReader.Identifier;",
@@ -903,6 +963,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Yield this tag and select table(name) to insert, patch, replace, or delete documents using decoded field values.
  * Inserts, patches, and replacements encode values through the table schema; see each operation's error behavior.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<",
@@ -919,6 +980,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link DatabaseWriter}.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type DatabaseWriter = typeof DatabaseWriter.Identifier;",
@@ -964,10 +1026,12 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * runQuery accepts a query ref and decoded arguments and returns its decoded result as an Effect.
  * Declared errors and SchemaError are typed failures. transactionLimits require a query or mutation;
  * useStaleSnapshot requires a mutation.
+ * @category Services
  */`);
   yield* cbw.writeLine("export const QueryRunner = QueryRunner_.QueryRunner;");
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link QueryRunner}.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type QueryRunner = typeof QueryRunner.Identifier;",
@@ -979,12 +1043,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Mutation invocation service tag, provided in mutations, actions, and HTTP handlers.
  * runMutation accepts a mutation ref and decoded arguments and returns its decoded result as an Effect.
  * Declared errors and SchemaError are typed failures. transactionLimits require a mutation context.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const MutationRunner = MutationRunner_.MutationRunner;",
   );
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link MutationRunner}.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type MutationRunner = typeof MutationRunner.Identifier;",
@@ -996,12 +1062,14 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Action invocation service tag, provided in actions and HTTP handlers.
  * runAction accepts an action ref and decoded arguments and returns its decoded result as an Effect.
  * Declared errors and SchemaError are typed failures.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const ActionRunner = ActionRunner_.ActionRunner;",
   );
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link ActionRunner}.
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type ActionRunner = typeof ActionRunner.Identifier;",
@@ -1013,6 +1081,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Schema-typed native Convex query context tag, provided only in queries.
  * Yield this tag to access raw Convex APIs; document values use encoded rather than Confect-decoded types.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine("export const QueryCtx: QueryCtx_.QueryCtxTag<");
   yield* cbw.indent(
@@ -1030,6 +1099,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link QueryCtx}.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine("export type QueryCtx = typeof QueryCtx.Identifier;");
   yield* cbw.blankLine();
@@ -1039,6 +1109,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Schema-typed native Convex mutation context tag, provided only in mutations.
  * Yield this tag to access raw Convex APIs; document values use encoded rather than Confect-decoded types.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export const MutationCtx: MutationCtx_.MutationCtxTag<",
@@ -1058,6 +1129,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link MutationCtx}.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine(
     "export type MutationCtx = typeof MutationCtx.Identifier;",
@@ -1069,6 +1141,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
  * Schema-typed native Convex action context tag, provided in actions.
  * Yield this tag to access raw Convex APIs; function arguments and results use their wire representations.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine("export const ActionCtx: ActionCtx_.ActionCtxTag<");
   yield* cbw.indent(
@@ -1086,6 +1159,7 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`/**
  * Effect environment requirement for {@link ActionCtx}.
  * @public
+ * @category Services
  */`);
   yield* cbw.writeLine("export type ActionCtx = typeof ActionCtx.Identifier;");
 

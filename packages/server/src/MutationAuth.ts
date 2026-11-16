@@ -8,12 +8,16 @@ import * as Layer from "effect/Layer";
 
 /**
  * Convex's signing claims and options accepted by `signJwt`.
+ *
+ * @category Models
  */
 export type { SignJwtClaims, SignJwtOptions } from "convex/server";
 
 const make = (auth: Pick<ConvexMutationAuth, "signJwt">) => ({
   /**
    * Sign a JWT with the deployment's signing key when the Effect runs.
+   *
+   * @category Authentication
    *
    * @param options - Native Convex claims and signing options.
    *
@@ -29,6 +33,8 @@ const make = (auth: Pick<ConvexMutationAuth, "signJwt">) => ({
 /**
  * Mutation-only JWT signing service. Acquire the application's generated
  * `MutationAuth` tag in a mutation or mutation-only middleware.
+ *
+ * @category Services
  */
 export class MutationAuth extends Context.Service<
   MutationAuth,

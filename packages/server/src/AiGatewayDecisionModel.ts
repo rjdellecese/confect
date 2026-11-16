@@ -7,10 +7,14 @@ import type * as AiModel from "effect/ai/Model";
 
 /**
  * Settings for constructing a gateway-backed decision service.
+ *
+ * @category Options
  */
 export interface Options {
   /**
    * Gateway provider/model identifier, for example "typesafe/jev-1.13".
+   *
+   * @category Options
    */
   readonly model: string;
 }
@@ -20,6 +24,8 @@ export interface Options {
  *
  * Model identifiers use Convex's `provider/model` format, such as
  * `typesafe/jev-1.13`.
+ *
+ * @category Constructors
  *
  * @param modelId - Gateway provider/model identifier.
  *
@@ -38,6 +44,8 @@ export const model = (
 /**
  * Construct a decision-model service backed by the Convex AI gateway.
  *
+ * @category Constructors
+ *
  * @param options - Gateway model selection.
  *
  * @returns An Effect producing a DecisionModel service and requiring the
@@ -54,6 +62,8 @@ export const make = ({
 
 /**
  * Provide a decision-model service backed by the Convex AI gateway.
+ *
+ * @category Layers
  *
  * @param options - Gateway model selection.
  *

@@ -250,6 +250,8 @@ type ApplySystemFields<TableName extends string, S> =
  * `Struct`/`Union` structure is preserved rather than collapsed to a bare
  * `Codec`; any other schema falls back to a `Codec` carrying the system-field
  * document shape, matching the runtime's AST-level extension.
+ *
+ * @category Schemas
  */
 export type ExtendWithSystemFields<
   TableName extends string,
@@ -272,6 +274,8 @@ export type ExtendWithSystemFields<
  * `TableName` brands the `_id` string for that table; `_creationTime` is a
  * number of milliseconds since the Unix epoch. Apply the type to either a
  * decoded or encoded document shape. Union members retain their own fields.
+ *
+ * @category Models
  */
 export type WithSystemFields<
   TableName extends string,

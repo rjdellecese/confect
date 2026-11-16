@@ -14,6 +14,8 @@ import type * as Table from "./Table";
  * and `_creationTime`. Prefer the generated named aliases in
  * `confect/_generated/docs` when available; this helper also supports inline
  * annotations such as `Document<typeof schema, "notes">`.
+ *
+ * @category Models
  */
 export type Document<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -27,6 +29,8 @@ export type Document<
  * Remove `_id` and `_creationTime` from a decoded document type. Distributes
  * over unions and preserves all user fields, including their optionality. Use
  * it for complete insert or replacement values, not partial patches.
+ *
+ * @category Models
  */
 export type WithoutSystemFields<Doc> = Doc extends unknown
   ? Omit<Doc, "_creationTime" | "_id">
@@ -132,6 +136,8 @@ export const encode = Function.dual<
  * reads expose this as a typed Effect/Stream failure. The payload identifies
  * the table and stored ID and contains the schema diagnostic text; it does not
  * carry the original document or a SchemaError object.
+ *
+ * @category Errors
  */
 export class DocumentDecodeError extends Schema.TaggedError<
   DocumentDecodeError,
@@ -139,19 +145,27 @@ export class DocumentDecodeError extends Schema.TaggedError<
 >()("DocumentDecodeError", {
   /**
    * Name of the table whose document codec rejected the stored value.
+   *
+   * @category Getters
    */
   tableName: Schema.String,
   /**
    * `_id` copied from the stored document.
+   *
+   * @category Getters
    */
   id: Schema.String,
   /**
    * Diagnostic message from the underlying schema error.
+   *
+   * @category Getters
    */
   parseError: Schema.String,
 }) {
   /**
    * Human-readable diagnostic including the table, ID, and decoding failure.
+   *
+   * @category Getters
    */
   override get message(): string {
     return documentErrorMessage({
@@ -170,6 +184,8 @@ export class DocumentDecodeError extends Schema.TaggedError<
  * Current limitation: error construction requires the input's `_id`. If an
  * insert or replacement input lacks it, encoding failure instead becomes a
  * schema-validation defect while constructing this error.
+ *
+ * @category Errors
  */
 export class DocumentEncodeError extends Schema.TaggedError<
   DocumentEncodeError,
@@ -177,20 +193,28 @@ export class DocumentEncodeError extends Schema.TaggedError<
 >()("DocumentEncodeError", {
   /**
    * Name of the table whose field codec rejected the decoded input.
+   *
+   * @category Getters
    */
   tableName: Schema.String,
   /**
    * `_id` copied from the input; required when constructing this error.
+   *
+   * @category Getters
    */
   id: Schema.String,
   /**
    * Diagnostic message from the underlying schema error.
+   *
+   * @category Getters
    */
   parseError: Schema.String,
 }) {
   /**
    * Human-readable diagnostic including the table, input ID, and encoding
    * failure.
+   *
+   * @category Getters
    */
   override get message(): string {
     return documentErrorMessage({
