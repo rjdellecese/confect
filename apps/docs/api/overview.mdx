@@ -1,0 +1,14 @@
+---
+title: "API reference"
+description: "Look up Confect package APIs and the application-specific helpers emitted by Confect codegen."
+---
+
+Use this section to look up signatures, options, return values, and errors. For setup and task-oriented examples, start with [Quickstart](/getting-started/quickstart) or [Services](/concepts/services).
+
+- [Generated APIs](/api/generated) describes the refs, service tags, IDs, document types, tables, and schemas created for your application.
+- The package sections render the public JSDoc from Confect's source. Internal implementation APIs are omitted; types used by public signatures can still appear inline. This is a documentation boundary, not a change to package exports.
+- [Reference source](/api/reference/source) records the exact source commit and package versions. It distinguishes the checked-out source from published npm releases.
+
+Import package modules from the path shown on each page. Acquire application-specialized services through `confect/_generated/services`, and import your function refs from `confect/_generated/refs` rather than constructing them yourself.
+
+APIs marked **Experimental**, including `QueryStream`, remain available but can change. Read their qualifications before depending on them.
