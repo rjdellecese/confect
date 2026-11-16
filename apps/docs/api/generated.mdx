@@ -26,6 +26,16 @@ For Confect functions, argument and result types describe **decoded** values; co
 
 See [`Refs`](/api/reference/core/Refs), [Function invocation](/concepts/services#function-invocation), and the [JavaScript client guide](/clients/js/http).
 
+## Implementation builders
+
+```ts
+import { FunctionImpl, GroupImpl, MiddlewareImpl } from "./_generated/server";
+```
+
+Use `FunctionImpl.make(groupSpec, name, handler)` to implement a function. Use `MiddlewareImpl.make`, `makeByFunctionType`, or `provides` to implement a middleware spec. Codegen binds both builders to your application's database **type**; neither takes a runtime schema argument.
+
+`GroupImpl.make(groupSpec)` creates the group implementation layer. Provide its function and middleware layers, then call `GroupImpl.finalize` to check completeness. See [Functions](/server/functions) and [Middleware](/server/middleware) for complete examples.
+
 ## Service tags
 
 ```ts
@@ -38,8 +48,8 @@ Database, ID, search, and native context tags are specialized to your generated 
 
 | Tag                                                                | Available in                               | Contract                                                                                                                            |
 | ------------------------------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| [`DatabaseReader`](/api/reference/server/DatabaseReader)           | Queries, mutations                         | Read decoded documents through `table(name)`.                                                                                       |
-| [`DatabaseWriter`](/api/reference/server/DatabaseWriter)           | Mutations                                  | Insert, patch, replace, and delete documents; writes encode decoded field values.                                                   |
+| [`DatabaseReader`](/api/reference/server/DatabaseReader)           | Queries, mutations                         | Pass a generated application handle or a read-only system handle to `reader.table(handle)`.                                         |
+| [`DatabaseWriter`](/api/reference/server/DatabaseWriter)           | Mutations                                  | Select an application table with `writer.table(handle)` to insert, patch, replace, or delete documents.                             |
 | [`DocumentIds`](/api/reference/server/DocumentIds)                 | Queries, mutations                         | `parse` checks a known table; `identify` checks application and system tables. Both return an `Option` without fetching a document. |
 | [`QueryRunner`](/api/reference/server/QueryRunner)                 | Queries, mutations, actions, HTTP handlers | Invoke a query ref with `runQuery`.                                                                                                 |
 | [`MutationRunner`](/api/reference/server/MutationRunner)           | Mutations, actions, HTTP handlers          | Invoke a mutation ref with `runMutation`.                                                                                           |
@@ -97,7 +107,7 @@ These exports are types, not runtime schemas. `Docs` excludes system tables and 
 
 ## Table helpers
 
-Each `confect/_generated/tables/<name>.ts` module default-exports the named [`Table`](/api/reference/core/Table) corresponding to `confect/tables/<name>.ts`. Import this generated wrapper, not the unnamed definition, wherever you need a table's schemas.
+Each `confect/_generated/tables/<name>.ts` module default-exports the named [`Table`](/api/reference/core/Table) corresponding to `confect/tables/<name>.ts`. Import the generated handle for reads, writes, and access to that table's schemas. For system reads, pass `Table._storage` or `Table._scheduled_functions` from [`@confect/server/Table`](/api/reference/server/Table) to `reader.table`. Name-based APIs such as `Id`, `DocumentIds.parse`, and vector search still take a table name, not a handle.
 
 | Member      | Contract                                                                                                 |
 | ----------- | -------------------------------------------------------------------------------------------------------- |
@@ -109,19 +119,21 @@ Each `confect/_generated/tables/<name>.ts` module default-exports the named [`Ta
 
 See [Database schema](/server/database/schema) for authoring tables and indexes.
 
-## Runtime schema and function spec
+## Table names, schema registry, and function spec
 
 ```ts
-import schema from "./_generated/schema";
+import type schema from "./_generated/schema";
 import spec from "./_generated/spec";
+import tableNames from "./_generated/tableNames";
 ```
 
-| Module      | Default export                                                                                        | Consumers                                                          |
-| ----------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `schema.ts` | [`DatabaseSchema`](/api/reference/server/DatabaseSchema) containing the generated table registry.     | Implementation builders, HTTP router setup, and tests.             |
-| `spec.ts`   | [`Spec`](/api/reference/core/Spec) assembled from your function groups, including Node action groups. | Generated refs and code that needs the complete function contract. |
+| Module          | Default export                                                                                        | Consumers                                                                                      |
+| --------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `tableNames.ts` | Readonly tuple of application table names, excluding system tables.                                   | Test setup and code that needs names without loading table modules.                            |
+| `schema.ts`     | [`DatabaseSchema`](/api/reference/server/DatabaseSchema) containing all application table handles.    | Import as a type for the full database model; import individual handles as values in handlers. |
+| `spec.ts`       | [`Spec`](/api/reference/core/Spec) assembled from your function groups, including Node action groups. | Generated refs and code that needs the complete function contract.                             |
 
-The runtime schema registers tables without forcing their codecs. It does not construct your application's Convex deployment validators. The assembled spec describes functions, not their implementations; its schemas also remain lazy.
+Importing the registry **as a value** loads every application table module, though its codecs remain lazy. `HttpRouter.make(routes)` does not need the registry; use `HttpRouter.make<typeof schema>(routes)` if your routes require the generated schema-typed `VectorSearch`. The assembled function spec describes contracts, not implementations; its schemas also remain lazy.
 
 See [The spec/impl model](/concepts/spec-impl-model) and [HTTP API](/server/http-api) for usage.
 
@@ -135,11 +147,11 @@ The default export is a Convex `SchemaDefinition` containing every table's deplo
 
 <Warning>
   Importing `convexSchema` constructs every table's deployment definition. Keep
-  it out of function implementations and their runtime import graphs. Use
-  `_generated/schema` for runtime table and codec access instead.
+  it out of function implementations and their runtime import graphs. Import
+  only the `_generated/tables/<name>` handles those functions use.
 </Warning>
 
-Test setup legitimately needs **both** schemas: pass the runtime schema and deployment schema to [`TestConfect.layer`](/api/reference/test/TestConfect). See [Testing setup](/guides/testing#setup).
+For tests, import `schema` **as a type**, and `tableNames` and `convexSchema` as values. Call [`TestConfect.layer<typeof schema>(tableNames, convexSchema, modules)`](/api/reference/test/TestConfect), where `modules` is the Convex modules glob. See [Testing setup](/guides/testing#setup).
 
 ## Components
 
