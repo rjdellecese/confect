@@ -4,54 +4,11 @@ title: "Schema Restrictions"
 description: "Understand the restrictions on Effect schemas that can be used in Confect."
 ---
 
-Not every Effect schema is valid for use in Confect. The restrictions depend on the schema's decoded and encoded representations and its service requirements.
-
-## Schema type views
-
-Effect exposes several TypeScript interfaces for the same schema values. They are not separate runtime constructors: a value such as `Schema.String` can satisfy several views. A type annotation changes which information TypeScript retains, not how the schema validates or transforms values at runtime.
-
-Here, `Schema` refers to the `effect/Schema` module. The primary views are:
+Schemas used with Confect must describe both the value your code works with and its Convex representation. Effect's `Schema.Codec` type tracks that information and the services required by the schema:
 
 ```text
-Schema.Schema<Type>
 Schema.Codec<Type, Encoded, DecodingServices, EncodingServices>
-Schema.Decoder<Type, DecodingServices>
-Schema.Encoder<Encoded, EncodingServices>
-Schema.Optic<Type, Iso>
 ```
-
-| View      | Information retained                                                                       | Information left as `unknown`            |
-| --------- | ------------------------------------------------------------------------------------------ | ---------------------------------------- |
-| `Schema`  | Decoded `Type`. Use when only the application value's type matters.                        | `Encoded` and both service requirements. |
-| `Codec`   | `Type`, `Encoded`, and both service requirements. Use when both representations matter.    | None of those four parameters.           |
-| `Decoder` | Decoded `Type` and `DecodingServices`. Use for decoding-only APIs.                         | `Encoded` and `EncodingServices`.        |
-| `Encoder` | `Encoded` and `EncodingServices`. Use for encoding-only APIs.                              | `Type` and `DecodingServices`.           |
-| `Optic`   | `Type` and the `Iso` representation used by optics; both service requirements are `never`. | `Encoded`.                               |
-
-`Type` is the result of decoding and the input to encoding; `Encoded` is the input to decoding and the result of encoding. The service parameters track the Effect services each direction requires. In particular, `Encoder<Encoded>` does not retain the type of the value being encoded. The `Iso` parameter is for optic operations, such as focusing on and updating parts of a value, not the encoded storage representation.
-
-For `Codec`, `Encoded` defaults to `Type`, and both service parameters default to `never`. `Decoder` and `Encoder` also default their respective service parameter to `never`. An `unknown` service requirement means the view has not retained that information; it does not mean that no services are needed.
-
-### Generic schema constraints
-
-You may also encounter these interfaces in generic APIs. They describe how much of a schema an API needs, rather than different kinds of data to validate:
-
-| Interface                                                                   | Purpose                                                                                                                                                                                                                       |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Schema.Top`                                                                | Accept any full schema, without retaining specific decoded, encoded, or service types. Includes schema methods such as `check`, `annotate`, and `make`.                                                                       |
-| `Schema.Constraint`                                                         | A lightweight structural view of schema properties, including the AST and type information, without requiring the full set of schema methods.                                                                                 |
-| `Schema.ConstraintCodec<Type, Encoded, DecodingServices, EncodingServices>` | The same four type parameters and defaults as `Codec`, on the lightweight `Constraint` interface.                                                                                                                             |
-| `Schema.ConstraintDecoder<Type, DecodingServices>`                          | The lightweight decoding view; leaves the encoded type and encoding services as `unknown`.                                                                                                                                    |
-| `Schema.ConstraintEncoder<Encoded, EncodingServices>`                       | The lightweight encoding view; leaves the decoded type and decoding services as `unknown`.                                                                                                                                    |
-| `Schema.ConstraintRebuildable`                                              | Adds the `Rebuild` type to `Constraint`, without requiring schema methods.                                                                                                                                                    |
-| `Schema.Bottom` and `Schema.BottomWithoutNew`                               | Fully parameterized bases for schema implementations, including the AST, constructor input, `Iso`, and optionality/mutability metadata. `Bottom` adds a construct signature for class extension; `BottomWithoutNew` omits it. |
-| `Schema.BottomLazy` and `Schema.BottomLazyWithoutNew`                       | Implementation bases that let concrete schemas compute precise type views on demand. This laziness affects TypeScript's work, not runtime schema evaluation.                                                                  |
-
-These implementation and constraint types are usually unnecessary as annotations in application code. Prefer to let TypeScript infer the concrete schema type so you retain its fields and other specialized information.
-
-## Confect's requirements
-
-Confect's table, return, and error schemas require the `Codec` view. Function argument fields use `ConstraintCodec`, which retains the same decoded, encoded, and service information without requiring all schema methods.
 
 For schemas used in Confect:
 
@@ -59,7 +16,7 @@ For schemas used in Confect:
 - `Encoded` is the value stored in the database or sent as a Convex function argument or result. It must be a valid [Convex value](https://docs.convex.dev/database/types#convex-values).
 - `DecodingServices` and `EncodingServices` are not supported and should always be `never`.
 
-Keep the concrete inferred schema type when passing schemas to Confect. Widening a schema to `Schema.Schema<Type>`, `Decoder`, or `Encoder` discards information Confect needs, even if the underlying schema has not changed.
+Prefer to let TypeScript infer the concrete schema type. If you need an annotation, use `Schema.Codec<Type, Encoded>`, whose service parameters default to `never`. `Schema.Schema<Type>`, `Schema.Decoder`, and `Schema.Encoder` omit information Confect needs.
 
 ## Function argument fields
 
