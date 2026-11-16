@@ -16,6 +16,13 @@ export const GenericId = <TableName extends string>(
     Schema.toType,
   );
 
+/**
+ * A Convex document identifier branded with its table name. The generated
+ * `Id<TableName>` type aliases this contract. The brand distinguishes IDs from
+ * different tables at compile time; it does not prove that a document exists.
+ *
+ * @category Models
+ */
 export type GenericId<TableName extends string> = ConvexGenericId<TableName>;
 
 /**

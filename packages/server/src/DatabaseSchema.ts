@@ -25,11 +25,17 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 /**
- * A schema definition holding a record of bound `Table`s keyed by table name.
- * Codegen emits a single static `DatabaseSchema.make({ ... })` call; laziness
- * lives entirely on each `Table` (its `Fields` and `Doc` are lazy memoised
- * getters), so this layer is a plain record indirection with no module-loading
- * or async machinery.
+ * The application's registry of bound table handles, exported as the default
+ * from `_generated/schema`. Assembling the registry does not evaluate table
+ * schemas or construct Convex deployment validators.
+ *
+ * Use a type-only import for the database model. A value import brings in every
+ * application table module; handlers that need individual tables should import
+ * their handles from `_generated/tables/<name>` instead. The separate
+ * `_generated/convexSchema` export is the Convex schema for deployment and test
+ * setup.
+ *
+ * @category Models
  */
 export interface DatabaseSchema<
   Tables_ extends Readonly<Record<string, Table.AnyWithProps>> = {},
@@ -62,7 +68,17 @@ export type Tables<DatabaseSchema_ extends AnyWithProps> =
   DatabaseSchema_[TypeId][keyof DatabaseSchema_[TypeId]];
 
 /**
- * The bound table record, without evaluating any table schemas.
+ * Look up bound application table handles by name. Use this when a tool needs
+ * the full registry; if only the names are needed, default-import
+ * `_generated/tableNames` to avoid loading the table modules.
+ *
+ * @category Getters
+ *
+ * @param self - The application registry from `_generated/schema`.
+ *
+ * @returns Its readonly record of application table handles, without evaluating
+ *   their codecs. The two system tables are not part of the generated
+ *   registry.
  */
 export const tables = <DatabaseSchema_ extends AnyWithProps>(
   self: DatabaseSchema_,

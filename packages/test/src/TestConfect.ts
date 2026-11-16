@@ -19,12 +19,43 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+/**
+ * Upstream signing formats: DeploymentJwk is a public verification key;
+ * DeploymentJwks contains its keys array. Use them to verify deployment JWTs
+ * from the same test backend, not as private signing credentials.
+ *
+ * @category Models
+ */
 export type { DeploymentJwk, DeploymentJwks } from "convex-test";
 
+/**
+ * Test operations shared by the default caller and callers returned by
+ * `withIdentity`. The name means this interface has no identity-switching
+ * method; its calls can still run as an authenticated user. All operations are
+ * lazy Effects against the same in-memory test backend.
+ *
+ * @category Services
+ */
 export type TestConfectWithoutIdentity<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = {
+  /**
+   * Read public keys that verify JWTs signed by this test backend's
+   * MutationAuth. Keys belong to this backend instance. Native Promise
+   * rejections are defects.
+   *
+   * @category Getters
+   */
   jwks: () => Effect.Effect<DeploymentJwks>;
+  /**
+   * Run a public or internal query with decoded arguments and decode its
+   * result. Omit args only for a ref with no required arguments. Declared
+   * function and middleware errors and `Schema.SchemaError` are typed failures;
+   * undeclared backend failures are defects. Plain Convex refs pass values
+   * through.
+   *
+   * @category Queries
+   */
   query: <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,
     ...args: Ref.OptionalArgs<QueryRef>
@@ -32,6 +63,14 @@ export type TestConfectWithoutIdentity<
     Ref.Returns<QueryRef>,
     Ref.Error<QueryRef> | Schema.SchemaError
   >;
+  /**
+   * Run a public or internal mutation with decoded arguments and return its
+   * decoded result. Args may be omitted for a no-args ref. Declared errors and
+   * `Schema.SchemaError` are typed failures; other backend failures are
+   * defects. Plain Convex refs pass values through without schema conversion.
+   *
+   * @category Mutations
+   */
   mutation: <MutationRef extends Ref.AnyMutation>(
     mutationRef: MutationRef,
     ...args: Ref.OptionalArgs<MutationRef>
@@ -39,6 +78,14 @@ export type TestConfectWithoutIdentity<
     Ref.Returns<MutationRef>,
     Ref.Error<MutationRef> | Schema.SchemaError
   >;
+  /**
+   * Run a public or internal action, encoding args and decoding the result for
+   * Confect refs. Omit args for a no-args ref. Declared errors and
+   * `Schema.SchemaError` are typed failures; undeclared failures are defects.
+   * Plain Convex refs retain their native args and result values.
+   *
+   * @category Actions
+   */
   action: <ActionRef extends Ref.AnyAction>(
     actionRef: ActionRef,
     ...args: Ref.OptionalArgs<ActionRef>
@@ -46,7 +93,23 @@ export type TestConfectWithoutIdentity<
     Ref.Returns<ActionRef>,
     Ref.Error<ActionRef> | Schema.SchemaError
   >;
+  /**
+   * Execute setup code with schema-specialized mutation-context services.
+   * `DocumentIds.identify` checks the application table names passed to the
+   * layer and the system tables, not extra tables in the test deployment.
+   * Supply a return codec for non-void results. Handler failures and return
+   * encoding failures cross a Promise boundary and become defects; return
+   * decoding failures remain `Schema.SchemaError` in the typed error channel.
+   *
+   * @category Setup
+   */
   run: {
+    /**
+     * Run a void setup effect; discard its result and surface failures as
+     * defects.
+     *
+     * @category Setup
+     */
     <E>(
       handler: Effect.Effect<
         void,
@@ -54,27 +117,86 @@ export type TestConfectWithoutIdentity<
         Handler.MutationServices<DatabaseSchema_>
       >,
     ): Effect.Effect<void>;
+    /**
+     * Run setup and round-trip its result through `returns` before returning A.
+     * The codec's encoded representation must be a Convex value.
+     *
+     * @category Setup
+     */
     <A, B extends Value, E>(
       handler: Effect.Effect<A, E, Handler.MutationServices<DatabaseSchema_>>,
       returns: Schema.Codec<A, B>,
     ): Effect.Effect<A, Schema.SchemaError>;
   };
+  /**
+   * Call an HTTP endpoint by path, query and fragment with optional web
+   * `RequestInit` options. Returns the raw Response, including non-2xx
+   * statuses; native rejections become defects.
+   *
+   * @category HTTP
+   */
   fetch: (
     pathQueryFragment: string,
     init?: RequestInit,
   ) => Effect.Effect<Response>;
+  /**
+   * Wait for scheduled functions already in progress to finish. This does not
+   * advance timers to start future work. Native rejections become defects.
+   *
+   * @category Scheduling
+   */
   finishInProgressScheduledFunctions: () => Effect.Effect<void>;
+  /**
+   * Drain scheduled work, using `advanceTimers` to advance the test's fake
+   * clock between rounds (for example, `() => vi.runAllTimers()`). Includes
+   * work scheduled by other scheduled functions and waits for success or
+   * failure. Use fake timers during the call; real-timer jobs whose due time
+   * has not arrived cannot be forced to run by advancing fake timers. The
+   * upstream iteration limit applies. Native rejections become defects.
+   *
+   * @category Scheduling
+   */
   finishAllScheduledFunctions: (
     advanceTimers: () => void,
   ) => Effect.Effect<void>;
 };
 
+/**
+ * Test caller with operations from {@link TestConfectWithoutIdentity} and
+ * identity selection.
+ *
+ * @category Services
+ */
 export type TestConfect<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> = {
+  /**
+   * Return a caller scoped to a partial Convex UserIdentity without changing
+   * this caller or creating another database. Missing identity fields follow
+   * `convex-test` defaults; the returned caller cannot switch identities
+   * again.
+   *
+   * @category Combinators
+   */
   withIdentity: (
     userIdentity: Partial<UserIdentity>,
   ) => TestConfectWithoutIdentity<DatabaseSchema_>;
 } & TestConfectWithoutIdentity<DatabaseSchema_>;
 
+/**
+ * Create the service tag specialized to your generated database schema type.
+ * Provide {@link layer} to supply the in-memory backend; acquire the tag inside
+ * an Effect to access the test operations.
+ *
+ * @category Services
+ *
+ * @example
+ *   import type schema from "../confect/_generated/schema";
+ *
+ *   const Test = TestConfect<typeof schema>();
+ *   const program = Effect.gen(function* () {
+ *     const test = yield* Test;
+ *     return yield* test.query(refs.public.notes.list);
+ *   });
+ */
 export const TestConfect = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >() =>
@@ -260,6 +382,33 @@ class TestConfectImpl<
     );
 }
 
+/**
+ * Supply a test backend for the schema-specialized {@link TestConfect} tag. Each
+ * layer build creates a fresh in-memory database; provide it separately per
+ * test for isolation or share a built layer to share state.
+ *
+ * @category Layers
+ *
+ * @example
+ *   import { TestConfect } from "@confect/test";
+ *   import type schema from "../confect/_generated/schema";
+ *   import convexSchema from "../confect/_generated/convexSchema";
+ *   import tableNames from "../confect/_generated/tableNames";
+ *
+ *   const testLayer = TestConfect.layer<typeof schema>(
+ *     tableNames,
+ *     convexSchema,
+ *     modules,
+ *   );
+ *
+ * @param tableNames - Default export of `_generated/tableNames`. In `run`,
+ *   these are the application tables that `DocumentIds.identify` can match.
+ * @param convexSchemaDefinition - Generated deployment schema used by
+ *   `convex-test`.
+ * @param modules - Convex modules, typically an `import.meta.glob` result.
+ *
+ * @returns A synchronous layer. Backend construction failures are defects.
+ */
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   tableNames: ReadonlyArray<DatabaseSchema.TableNames<DatabaseSchema_>>,
   convexSchemaDefinition: SchemaDefinition<

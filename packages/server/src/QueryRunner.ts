@@ -7,6 +7,13 @@ import type * as Schema from "effect/Schema";
 import * as MutationTransactionContext from "./MutationTransactionContext";
 import * as QueryTransactionContext from "./QueryTransactionContext";
 
+/**
+ * Nested-query transaction controls. `transactionLimits` is supported in
+ * queries/mutations; specifying `useStaleSnapshot` (even false) requires a
+ * mutation. Omit options entirely in actions and HTTP handlers.
+ *
+ * @category Options
+ */
 export type Options = MutationTransactionContext.QueryOptions;
 
 const run = Effect.fn("QueryRunner.runQuery")(
@@ -14,10 +21,33 @@ const run = Effect.fn("QueryRunner.runQuery")(
 );
 
 const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
+  /**
+   * Invoke a query ref with decoded arguments and no transaction overrides.
+   *
+   * @category Invocation
+   *
+   * @param query - Generated public or internal query ref.
+   * @param args - Decoded arguments, optional for an argument-free ref.
+   *
+   * @returns An Effect with the decoded result. Declared failures and
+   *   SchemaError are typed errors; undeclared/native failures become defects.
+   */
   function runQuery<Query extends Ref.AnyQuery>(
     query: Query,
     ...args: [...Ref.OptionalArgs<Query>, options?: undefined]
   ): Effect.Effect<Ref.Returns<Query>, Ref.Error<Query> | Schema.SchemaError>;
+  /**
+   * Invoke a query with transaction limits in a query or mutation context.
+   *
+   * @category Invocation
+   *
+   * @param query - Generated query ref.
+   * @param args - Decoded arguments; pass {} for an argument-free ref.
+   * @param options - Limits for this nested call, not the entire handler.
+   *
+   * @returns An Effect with the decoded result and the ref's declared errors or
+   *   SchemaError. Native/undeclared failures are defects.
+   */
   function runQuery<Query extends Ref.AnyQuery>(
     query: Query,
     args: Ref.Args<Query>,
@@ -31,6 +61,18 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
     Ref.Error<Query> | Schema.SchemaError,
     QueryTransactionContext.QueryTransactionContext
   >;
+  /**
+   * Invoke a query with an explicit stale-snapshot choice in a mutation.
+   *
+   * @category Invocation
+   *
+   * @param query - Generated query ref.
+   * @param args - Decoded arguments, or {} when none are declared.
+   * @param options - `useStaleSnapshot` plus optional transaction limits. A
+   *   true value may read data older than the enclosing transaction.
+   *
+   * @returns An Effect with the decoded result and declared/schema failures.
+   */
   function runQuery<Query extends Ref.AnyQuery>(
     query: Query,
     args: Ref.Args<Query>,
@@ -40,6 +82,18 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
     Ref.Error<Query> | Schema.SchemaError,
     MutationTransactionContext.MutationTransactionContext
   >;
+  /**
+   * Invoke a query with dynamically selected transaction options.
+   *
+   * @category Invocation
+   *
+   * @param query - Generated query ref.
+   * @param args - Decoded arguments.
+   * @param options - Controls selected at runtime; the environment must supply
+   *   the query/mutation capabilities required by the possible options.
+   *
+   * @returns An Effect with the decoded result and declared/schema failures.
+   */
   function runQuery<Query extends Ref.AnyQuery>(
     query: Query,
     args: Ref.Args<Query>,
@@ -79,12 +133,43 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
       }),
     );
   }
-  return { runQuery };
+  return {
+    /**
+     * Invoke a generated query ref with decoded arguments.
+     *
+     * @category Invocation
+     *
+     * @param query - Public or internal query ref.
+     * @param args - Decoded arguments; omit for an argument-free ref, or pass
+     *   {} before an options argument.
+     * @param options - TransactionLimits requires a query/mutation context;
+     *   useStaleSnapshot, even false, requires a mutation. Omit options in
+     *   actions and HTTP handlers. A true stale-snapshot option permits older
+     *   data.
+     *
+     * @returns An Effect producing the decoded result. Declared errors and
+     *   SchemaError are typed failures; native/undeclared failures are
+     *   defects.
+     */
+    runQuery,
+  };
 };
 
+/**
+ * Query invocation service. Acquire the generated `QueryRunner` tag in queries,
+ * mutations, actions or HTTP handlers, then call the returned `runQuery`
+ * method.
+ *
+ * @category Services
+ */
 export const QueryRunner =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
   Context.Service<ReturnType<typeof make>>("@confect/server/QueryRunner");
+/**
+ * Effect requirement identifier for the generated query invocation service.
+ *
+ * @category Services
+ */
 export type QueryRunner = typeof QueryRunner.Identifier;
 
 /**

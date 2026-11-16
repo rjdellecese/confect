@@ -22,6 +22,13 @@ import * as Lazy from "./Lazy";
 import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
+/**
+ * The common contract of a generated function ref. Its generic parameters track
+ * runtime, visibility, decoded args, decoded returns, and typed failures. Only
+ * `convexFunctionName` is runtime data here; the `~` fields carry types.
+ *
+ * @category Models
+ */
 export interface Base<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
@@ -29,18 +36,54 @@ export interface Base<
   Returns_,
   Error_ = never,
 > {
+  /**
+   * The runtime and function kind carried only at the type level.
+   *
+   * @category Models
+   */
   readonly "~RuntimeAndFunctionType": RuntimeAndFunctionType_;
+  /**
+   * The function visibility carried only at the type level.
+   *
+   * @category Models
+   */
   readonly "~FunctionVisibility": FunctionVisibility_;
+  /**
+   * Decoded call-argument types; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Args": Args_;
+  /**
+   * Decoded result type; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Returns": Returns_;
+  /**
+   * The union of declared function and covering middleware failures; not a
+   * runtime property.
+   *
+   * @category Models
+   */
   readonly "~Error": Error_;
+  /**
+   * The Convex wire name, such as `notes:list` or `team/notes:list`.
+   *
+   * @category Models
+   */
   readonly convexFunctionName: string;
 }
 
 /**
  * A reference to a single Convex function, as callers see it: the wire name
  * plus the data needed to encode args, decode returns, and decode typed errors.
- * A ref is one of two shapes, keyed by the spec's provenance.
+ * A ref is one of two shapes, keyed by the spec's provenance. Import refs from
+ * your generated `refs` module and pass a leaf to a client, function runner, or
+ * scheduler; do not treat it as a callable function. The generic args and
+ * returns describe decoded values, not wire encodings.
+ *
+ * @category Models
  */
 export type Ref<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
@@ -65,6 +108,18 @@ export type Ref<
       Error_
     >;
 
+/**
+ * A generated ref for a function declared with Effect codecs. Arguments are
+ * derived from the declared field map, and return/error types from their
+ * codecs. The failure type also includes errors from covering middleware. Use
+ * the generated refs rather than constructing this shape yourself.
+ *
+ * The `args`, `returns`, and optional function `error` codecs are lazy. The
+ * `error` field does not include middleware errors; those are tracked
+ * separately in the ref's middleware metadata.
+ *
+ * @category Models
+ */
 export type ConfectRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
@@ -101,15 +156,63 @@ interface ConfectRefWithTypes<
   Returns_,
   Error_
 > {
+  /**
+   * Identifies a ref whose args, returns, and typed failures use Effect codecs.
+   *
+   * @category Models
+   */
   readonly _tag: "Confect";
+  /**
+   * The lazy argument codec and its field map; includes `paginationOpts` for
+   * paginated queries.
+   *
+   * @category Schemas
+   */
   readonly args: FunctionProvenance.ArgsSchema<ArgsFields_>;
+  /**
+   * The lazy result codec, including the page wrapper for paginated queries.
+   *
+   * @category Schemas
+   */
   readonly returns: Schema.Codec<any, any>;
+  /**
+   * Whether the declaration is standard or paginated; paginated metadata
+   * retains user-argument and item codecs separately from the wire-level page
+   * shape.
+   *
+   * @category Models
+   */
   readonly kind: FunctionProvenance.ConfectKind;
+  /**
+   * Covering middleware in execution order: group attachments, then function
+   * attachments.
+   *
+   * @category Middleware
+   */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
+  /**
+   * Covering middleware paired with its client-safe attachment values.
+   *
+   * @category Middleware
+   */
   readonly middlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
+  /**
+   * The function's own lazy failure codec, absent if none was declared.
+   * Middleware failure codecs are stored on their declarations, not merged
+   * here.
+   *
+   * @category Schemas
+   */
   readonly error?: Schema.Codec<any, any>;
 }
 
+/**
+ * A generated ref for a plain Convex function. It carries the function name and
+ * inferred call types, but no Effect argument, return, or error codecs. Confect
+ * callers pass its args and results through without codec conversion.
+ *
+ * @category Models
+ */
 export interface ConvexRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
@@ -123,6 +226,11 @@ export interface ConvexRef<
   Returns_,
   Error_
 > {
+  /**
+   * Identifies a plain Convex ref with no Effect codec conversion.
+   *
+   * @category Models
+   */
   readonly _tag: "Convex";
 }
 

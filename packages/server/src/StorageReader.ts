@@ -9,6 +9,16 @@ import * as Schema from "effect/Schema";
 import { BlobNotFoundError } from "./BlobNotFoundError";
 
 const make = (storageReader: ConvexStorageReader) => ({
+  /**
+   * Resolve a stored blob's download URL.
+   *
+   * @category Reading
+   *
+   * @param storageId - ID in `_storage`.
+   *
+   * @returns An Effect producing a URL or failing with BlobNotFoundError when
+   *   absent. Native failures and invalid returned URLs are defects.
+   */
   getUrl: (storageId: GenericId<"_storage">) =>
     Effect.promise(() => storageReader.getUrl(storageId)).pipe(
       Effect.andThen(
@@ -29,6 +39,12 @@ const make = (storageReader: ConvexStorageReader) => ({
     ),
 });
 
+/**
+ * Compatibility storage reader supplied by Confect in all function contexts.
+ * New code should use the generated unified `Storage` tag instead.
+ *
+ * @category Services
+ */
 export class StorageReader extends Context.Service<
   StorageReader,
   ReturnType<typeof make>

@@ -10,6 +10,18 @@ const run = Effect.fn("ActionRunner.runAction")(
 );
 
 const make = (runAction: GenericActionCtx<any>["runAction"]) => ({
+  /**
+   * Invoke an action ref with decoded arguments.
+   *
+   * @category Invocation
+   *
+   * @param action - Generated public or internal action ref.
+   * @param args - Decoded arguments, optional for an argument-free ref. There
+   *   is no transaction-options argument.
+   *
+   * @returns An Effect with decoded results and declared failures or
+   *   SchemaError. Native/undeclared failures become defects.
+   */
   runAction: <Action extends Ref.AnyAction>(
     action: Action,
     ...args: Ref.OptionalArgs<Action>
@@ -27,9 +39,20 @@ const make = (runAction: GenericActionCtx<any>["runAction"]) => ({
     ),
 });
 
+/**
+ * Action invocation service available in actions and HTTP handlers. Acquire the
+ * generated `ActionRunner` tag before calling its `runAction` method.
+ *
+ * @category Services
+ */
 export const ActionRunner =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
   Context.Service<ReturnType<typeof make>>("@confect/server/ActionRunner");
+/**
+ * Effect requirement identifier for the generated action invocation service.
+ *
+ * @category Services
+ */
 export type ActionRunner = typeof ActionRunner.Identifier;
 
 /**
