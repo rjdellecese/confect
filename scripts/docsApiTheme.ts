@@ -1,11 +1,15 @@
 import {
   DeclarationReflection,
+  Comment,
   ReferenceType,
+  IntersectionType,
   ReflectionKind,
   ReflectionType,
   type Reflection,
   type RouterTarget,
   type TypeDocOptions,
+  type ProjectReflection,
+  type Context,
 } from "typedoc";
 import {
   MarkdownTheme,
@@ -17,6 +21,8 @@ import * as Array from "effect/Array";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
 import * as Effect from "effect/Effect";
+import * as Record from "effect/Record";
+import * as Option from "effect/Option";
 
 const JsonString = Schema.fromJsonString(Schema.String);
 
@@ -26,6 +32,59 @@ export const presentationOptions = {
   hideGroupHeadings: true,
   parametersFormat: "table",
 } satisfies Partial<TypeDocOptions & PluginOptions>;
+
+export const preserveReexportCategories = (
+  context: Context,
+  reflection: DeclarationReflection,
+): void => {
+  if (
+    reflection.comment?.getTag("@category") !== undefined ||
+    reflection.parent?.kindOf(
+      ReflectionKind.Module | ReflectionKind.Namespace,
+    ) !== true
+  )
+    return;
+  const owner = context.getSymbolFromReflection(reflection.parent);
+  if (
+    owner === undefined ||
+    context.converter.isExternal(owner, context.checker)
+  )
+    return;
+  const exported = Option.getOrUndefined(
+    Array.findFirst(
+      context.checker.getExportsOfModule(owner),
+      (symbol) => symbol.name === reflection.name,
+    ),
+  );
+  if (
+    exported === undefined ||
+    context.resolveAliasedSymbol(exported) === exported
+  )
+    return;
+  const category = context
+    .getComment(exported, ReflectionKind.Reference)
+    ?.getTag("@category");
+  if (category === undefined) return;
+  reflection.comment ??= new Comment();
+  reflection.comment.blockTags.push(category.clone());
+};
+
+export const normalizeCategories = (project: ProjectReflection): void => {
+  for (const reflection of Record.values(project.reflections)) {
+    for (const tag of reflection.comment?.blockTags ?? []) {
+      if (tag.tag === "@category") {
+        tag.content = [
+          {
+            kind: "text",
+            text: Str.capitalize(
+              Str.trim(Comment.combineDisplayParts(tag.content)),
+            ),
+          },
+        ];
+      }
+    }
+  }
+};
 
 export class MintlifyRouter extends ModuleRouter {
   protected override getPageKind(reflection: Reflection) {
@@ -55,20 +114,60 @@ export class MintlifyTheme extends MarkdownTheme {
   override getRenderContext(page: MarkdownPageEvent<Reflection>) {
     const context = super.getRenderContext(page);
     const member = context.partials.member;
-    context.partials.member = (model, options) =>
-      model.kindOf(ReflectionKind.Namespace)
+    context.partials.member = (model, options) => {
+      const rendered = model.kindOf(ReflectionKind.Namespace)
         ? context.partials.memberWithGroups(model, {
             headingLevel: options.headingLevel + 1,
           })
         : member(model, options);
+      const type =
+        model.type instanceof ReferenceType && model.type.name === "Service"
+          ? model.type
+          : Option.getOrUndefined(
+              Array.findFirst(
+                model.extendedTypes ?? [],
+                (base) =>
+                  base instanceof ReferenceType &&
+                  base.name === "Shape" &&
+                  base.package === "effect",
+              ),
+            );
+      if (!(type instanceof ReferenceType) || type.package !== "effect")
+        return rendered;
+      const service = type.typeArguments?.[1];
+      if (!(service instanceof ReflectionType)) return rendered;
+      const headingLevel = options.headingLevel + 1;
+      return `${rendered}\n\n${Str.repeat(headingLevel)("#")} Service operations\n\n${context.partials.typeDeclarationContainer(model, service.declaration, { headingLevel })}`;
+    };
     const memberTitle = context.partials.memberTitle;
     context.partials.memberTitle = (model) => {
       const title = memberTitle(model);
-      return model.parent?.kindOf(
-        ReflectionKind.Module | ReflectionKind.Namespace,
-      ) === true
-        ? `${title} (${Str.toLowerCase(ReflectionKind.singularString(model.kind))})`
-        : title;
+      if (
+        model.parent?.kindOf(
+          ReflectionKind.Module | ReflectionKind.Namespace,
+        ) !== true
+      )
+        return title;
+      const kind = model.kindOf(
+        ReflectionKind.Interface | ReflectionKind.TypeAlias,
+      )
+        ? "type"
+        : model.kindOf(ReflectionKind.Class)
+          ? "class"
+          : model.kindOf(ReflectionKind.Namespace)
+            ? "namespace"
+            : model.kindOf(ReflectionKind.Function) ||
+                Array.some(
+                  model.type instanceof IntersectionType
+                    ? model.type.types
+                    : [model.type],
+                  (type) =>
+                    type instanceof ReflectionType &&
+                    (type.declaration.signatures?.length ?? 0) > 0,
+                )
+              ? "function"
+              : "value";
+      return `${title} (${kind})`;
     };
     const commentParts = context.helpers.getCommentParts;
     context.helpers.getCommentParts = (parts) =>
@@ -90,21 +189,6 @@ export class MintlifyTheme extends MarkdownTheme {
             : part,
         ),
       );
-    const declaration = context.partials.declaration;
-    context.partials.declaration = (model, options = { headingLevel: 2 }) => {
-      const rendered = declaration(model, options);
-      const type = model.type;
-      if (
-        !(type instanceof ReferenceType) ||
-        type.package !== "effect" ||
-        type.name !== "Service"
-      ) {
-        return rendered;
-      }
-      const service = type.typeArguments?.[1];
-      if (!(service instanceof ReflectionType)) return rendered;
-      return `${rendered}\n\n${Str.repeat(options.headingLevel)("#")} Service operations\n\n${context.partials.typeDeclarationContainer(model, service.declaration, options)}`;
-    };
     return context;
   }
 

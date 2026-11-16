@@ -19,6 +19,8 @@ import {
   MintlifyRouter,
   MintlifyTheme,
   presentationOptions,
+  normalizeCategories,
+  preserveReexportCategories,
 } from "./docsApiTheme";
 import docsConfig from "../apps/docs/docs.json";
 
@@ -76,8 +78,13 @@ try {
   app.renderer.defineTheme("mintlify", MintlifyTheme);
   app.renderer.defineRouter("mintlify", MintlifyRouter);
   app.converter.on(
+    Converter.EVENT_CREATE_DECLARATION,
+    preserveReexportCategories,
+  );
+  app.converter.on(
     Converter.EVENT_RESOLVE_END,
     ({ project }) => {
+      normalizeCategories(project);
       for (const reflection of Record.values(project.reflections)) {
         if (
           reflection instanceof DeclarationReflection &&
