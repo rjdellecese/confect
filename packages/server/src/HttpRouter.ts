@@ -46,6 +46,8 @@ type WithSchema<
  * The Confect services available to HTTP route handlers and middleware,
  * supplied per request from the Convex action context. Pass the application
  * schema type to include its vector search service.
+ *
+ * @category Models
  */
 export type Services<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps = never,
@@ -86,6 +88,8 @@ export type Services<
  * Layers are built with Confect's Convex-aware `ConfigProvider` in context, so
  * `Config` reads (e.g. in `Layer.unwrap`) resolve against Convex environment
  * variables.
+ *
+ * @category Models
  */
 export type Routes<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps = never,
@@ -115,6 +119,14 @@ export type Routes<
  * Plain Convex routes can still be added to the returned router—Convex matches
  * exact paths first and longer path prefixes before the catch-all, so they take
  * precedence.
+ *
+ * @category Constructors
+ *
+ * @param routes - Layer that registers the routes and supplies their group
+ *   handlers. Use `make<typeof schema>(routes)` with a type-only schema import
+ *   if a handler or middleware requires schema-typed vector search.
+ *
+ * @returns A native Convex router for the default export of `confect/http.ts`.
  */
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   routes: Routes<DatabaseSchema_>,

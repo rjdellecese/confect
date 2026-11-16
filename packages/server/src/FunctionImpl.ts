@@ -11,7 +11,17 @@ import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
 import * as FunctionRegistryItem from "./FunctionRegistryItem";
 
+/**
+ * Service provided by a function implementation layer, keyed by its spec name.
+ *
+ * @category Models
+ */
 export interface FunctionImpl<Name_ extends string> {
+  /**
+   * Name of the implemented function within its group.
+   *
+   * @category Models
+   */
   readonly name: Name_;
 }
 
@@ -21,11 +31,26 @@ export interface FunctionImpl<Name_ extends string> {
 export const FunctionImpl = <Name_ extends string>({ name }: { name: Name_ }) =>
   Context.Service<FunctionImpl<Name_>>(`@confect/server/FunctionImpl/${name}`);
 
+/**
+ * The schema-typed `FunctionImpl` builder exported by `_generated/server`.
+ *
+ * @category Models
+ */
 export interface Builder<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
   /**
-   * Register a function in its group's isolated registry under its local name.
-   * The function may require the services available in its runtime and those
-   * provided by middleware attached to the group or the function.
+   * Implement one function declared by a group spec.
+   *
+   * @category Layers
+   *
+   * @param group - The spec from the sibling `.spec.ts` module.
+   * @param name - The function's name within that group.
+   * @param handler - For a Confect function, accept decoded arguments and
+   *   return an Effect with the declared result and error types. The handler
+   *   can use its runtime's services and services supplied by group or function
+   *   middleware. For a plain Convex function, pass its native registered
+   *   function instead.
+   *
+   * @returns A layer to provide to `GroupImpl.make(group)` before finalization.
    */
   readonly make: <
     Group extends GroupSpec.AnyWithProps,
@@ -81,7 +106,16 @@ export const forSchema = <
   },
 });
 
-export const { make } = forSchema<DatabaseSchema.AnyWithProps>();
+export const {
+  /**
+   * Implement a group function without specializing its database services. In
+   * an application, import `FunctionImpl` from `_generated/server` to use the
+   * {@link Builder.make | schema-typed builder} with the same arguments.
+   *
+   * @category Layers
+   */
+  make,
+} = forSchema<DatabaseSchema.AnyWithProps>();
 
 /**
  * Get the function implementation service type for a specific function name.

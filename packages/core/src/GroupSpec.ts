@@ -24,6 +24,17 @@ export type TypeId = typeof TypeId;
 export const isGroupSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
+/**
+ * An immutable group of function declarations sharing one runtime. Build a
+ * Convex group with {@link make}, or a Node.js action group with
+ * {@link makeNode}, then default-export it from a spec module. Codegen assigns
+ * its filename-derived name and assembles child groups without evaluating
+ * schema factories.
+ *
+ * Group middleware covers this group's functions, not its child groups.
+ *
+ * @category Models
+ */
 export interface GroupSpec<
   Runtime extends RuntimeAndFunctionType.Runtime,
   Name_ extends string,
@@ -35,10 +46,35 @@ export interface GroupSpec<
   Groups_ extends AnyWithProps = never,
   MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec = never,
 > {
+  /**
+   * Identifies a Confect group declaration.
+   *
+   * @category Models
+   */
   readonly [TypeId]: TypeId;
+  /**
+   * The runtime required by this group's own functions.
+   *
+   * @category Models
+   */
   readonly runtime: Runtime;
+  /**
+   * Whether this group's Convex queries and mutations opt into context reuse.
+   *
+   * @category Options
+   */
   readonly experimental_reuseContext: boolean;
+  /**
+   * The codegen-assigned group segment; empty on a newly created group.
+   *
+   * @category Models
+   */
   readonly name: Name_;
+  /**
+   * This group's own function declarations, keyed by local function name.
+   *
+   * @category Models
+   */
   readonly functions: {
     [
       FunctionName in FunctionSpec.Name<
@@ -46,16 +82,55 @@ export interface GroupSpec<
       >
     ]: FunctionSpec.WithName<Functions_, FunctionName>;
   };
+  /**
+   * Codegen-assembled child groups; each child may use a different runtime.
+   *
+   * @category Models
+   */
   readonly groups: {
     [GroupName in Name<Groups_>]: WithName<Groups_, GroupName>;
   };
+  /**
+   * Group-level middleware declarations in attachment order.
+   *
+   * @category Middleware
+   */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
+  /**
+   * Group-level middleware declarations paired with their attachment options.
+   *
+   * @category Middleware
+   */
   readonly middlewareAttachments: ReadonlyArray<
     MiddlewareAttachment.MiddlewareAttachment<MiddlewareSpecs_>
   >;
+  /**
+   * The union of this group's function types; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Functions": Functions_;
+  /**
+   * The union of child-group types; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Groups": Groups_;
 
+  /**
+   * Add a function whose runtime matches this group. Its kind must also be
+   * covered by every group middleware, and plain Convex functions cannot be
+   * covered by Confect middleware.
+   *
+   * @category Combinators
+   *
+   * @param function_ - The function declaration to add.
+   *
+   * @returns A new group with the function; this group is unchanged.
+   *
+   * @throws If an optionless middleware key is attached to both the group and
+   *   function.
+   */
   addFunction<Function extends FunctionSpec.AnyWithPropsWithRuntime<Runtime>>(
     function_: Function &
       MiddlewareSpec.ValidateAddedFunction<Function, MiddlewareSpecs_>,
@@ -67,6 +142,23 @@ export interface GroupSpec<
     MiddlewareSpecs_
   >;
 
+  /**
+   * Attach middleware to every function in this group, but not to child groups.
+   * The group chain runs in attachment order, before function-level middleware.
+   * Required services must be provided by an earlier group attachment.
+   *
+   * @category Combinators
+   *
+   * @param middlewareSpec - A policy covering all function kinds in the group.
+   * @param options - Its options schema's decoded value, required only when
+   *   that schema exists.
+   *
+   * @returns A new group with the attachment; this group is unchanged.
+   *
+   * @throws For duplicate optionless keys within the group or across the
+   *   group/function boundary. Options are checked without coercion during
+   *   codegen and registration; equivalent repeated options are rejected then.
+   */
   middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
     middlewareSpec: MiddlewareSpec_ &
       MiddlewareSpec.ValidateAttach<
@@ -308,6 +400,32 @@ const makeProto = <
     MiddlewareAttachments_[number]["spec"]
   >;
 
+/**
+ * Create an empty group for queries, mutations, and actions in the Convex
+ * runtime. Default-export the completed builder from a `*.spec.ts` module.
+ *
+ * @category Constructors
+ *
+ * @example
+ *   import { FunctionSpec, GroupSpec } from "@confect/core";
+ *   import * as Schema from "effect/Schema";
+ *
+ *   export default GroupSpec.make().addFunction(
+ *     FunctionSpec.publicQuery({
+ *       name: "count",
+ *       returns: () => Schema.Number,
+ *     }),
+ *   );
+ *
+ * @param options - Optional group configuration.
+ * @param options.experimental_reuseContext - Opt this group's queries and
+ *   mutations into experimental V8 context reuse; defaults to false. Does not
+ *   affect actions or child groups. Never retain request-specific data in
+ *   module state; reused contexts may serve different users. The function name
+ *   `experimental_reuseContext` is reserved in an opted-in group.
+ *
+ * @returns A new unnamed group; codegen assigns the module's name.
+ */
 export const make = (
   options: { readonly experimental_reuseContext?: boolean | undefined } = {},
 ): GroupSpec<"Convex", ""> =>
@@ -320,6 +438,16 @@ export const make = (
     middlewareAttachments: [],
   });
 
+/**
+ * Create an empty group that accepts only Node.js actions. Default-export it
+ * from a Node spec module and add `publicNodeAction`, `internalNodeAction`, or
+ * their plain-Convex counterparts. Context reuse is not configurable for Node
+ * groups.
+ *
+ * @category Constructors
+ *
+ * @returns A new unnamed Node group; codegen assigns the module's name.
+ */
 export const makeNode = (): GroupSpec<"Node", ""> =>
   makeProto({
     runtime: "Node",

@@ -11,6 +11,8 @@ import * as HttpClientRequest from "effect/http/HttpClientRequest";
 /**
  * The current team is on the free plan or has the Convex AI gateway disabled.
  * Upgrade to a paid plan, or contact Convex support if this looks wrong.
+ *
+ * @category Errors
  */
 export class AiGatewayDisabled extends Schema.TaggedError<
   AiGatewayDisabled,
@@ -25,6 +27,8 @@ export class AiGatewayDisabled extends Schema.TaggedError<
  * The current deployment is anonymous, outdated, or self-hosted and cannot use
  * the Convex AI gateway. Authenticated, project-linked local deployments are
  * supported.
+ *
+ * @category Errors
  */
 export class AiGatewayUnavailable extends Schema.TaggedError<
   AiGatewayUnavailable,
@@ -38,6 +42,8 @@ export class AiGatewayUnavailable extends Schema.TaggedError<
 /**
  * A schema for the possible failures that can occur while obtaining a Convex AI
  * gateway service token.
+ *
+ * @category Errors
  */
 export const AiGatewayError = Schema.Union([
   AiGatewayDisabled,
@@ -47,6 +53,8 @@ export const AiGatewayError = Schema.Union([
 /**
  * The possible failures that can occur while obtaining a Convex AI gateway
  * service token.
+ *
+ * @category Errors
  */
 export type AiGatewayError = typeof AiGatewayError.Type;
 

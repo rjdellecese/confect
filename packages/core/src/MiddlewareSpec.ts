@@ -33,9 +33,31 @@ export const allFunctionTypes: ReadonlyArray<FunctionType> = [
   "action",
 ];
 
+/**
+ * The function kinds a middleware may cover. Supply all three flags as literal
+ * `true` or `false`, with at least one enabled. A group attachment must cover
+ * every function in that group; Node.js actions use the `action` flag.
+ *
+ * @category Models
+ */
 export interface SupportedFunctionTypes {
+  /**
+   * Whether the middleware may cover queries.
+   *
+   * @category Options
+   */
   readonly query: boolean;
+  /**
+   * Whether the middleware may cover mutations.
+   *
+   * @category Options
+   */
   readonly mutation: boolean;
+  /**
+   * Whether the middleware may cover actions in either runtime.
+   *
+   * @category Options
+   */
   readonly action: boolean;
 }
 
@@ -56,20 +78,75 @@ export interface SuccessValue {
  * effect (the remaining middleware plus the function handler) and the covered
  * invocation's metadata, and returns the effect that runs in its place.
  *
- * Mirrors `RpcMiddleware.RpcMiddleware` in Effect.
+ * Provide the downstream effect's `Provides_` services before running it, or
+ * short-circuit with a declared failure. Preserve its opaque success value and
+ * unhandled failures; middleware must not reinterpret a handler's result. `R`
+ * describes services the wrapper itself requires.
+ *
+ * @category Models
  */
 export interface MiddlewareImpl<Provides_, E, R, Options_ = never> {
+  /**
+   * Wrap the remaining chain for one function invocation.
+   *
+   * @category Models
+   *
+   * @param effect - The downstream middleware and handler, with an opaque
+   *   result.
+   * @param context - The decoded invocation and this attachment's options.
+   *
+   * @returns The replacement effect, preserving downstream success and
+   *   failures.
+   */
   (
     effect: Effect.Effect<SuccessValue, E | unhandled, Provides_>,
     context: MiddlewareOptions<Options_>,
   ): Effect.Effect<SuccessValue, E | unhandled, R>;
 }
 
+/**
+ * The per-invocation context passed to a middleware implementation. `Options_`
+ * is the decoded type of its attachment-options schema. When no options schema
+ * is declared, the `options` field is absent. Otherwise it is present even if
+ * the supplied value is `undefined`; Confect validates the attachment value
+ * without decoding or coercing it.
+ *
+ * @category Models
+ *
+ * @property options - This attachment's validated type-side value, present only
+ *   when the middleware declares an options schema.
+ */
 export type MiddlewareOptions<Options_ = never> = {
+  /**
+   * Metadata for the function call being wrapped.
+   *
+   * @category Models
+   */
   readonly invocation: {
+    /**
+     * The function's local spec name.
+     *
+     * @category Models
+     */
     readonly name: string;
+    /**
+     * The invoked function's kind; Node.js actions also report `action`.
+     *
+     * @category Models
+     */
     readonly functionType: FunctionType;
+    /**
+     * Whether the function is public or restricted to server-side calls.
+     *
+     * @category Models
+     */
     readonly functionVisibility: FunctionVisibility;
+    /**
+     * Decoded handler arguments, typed as unknown because a policy may cover
+     * many functions.
+     *
+     * @category Models
+     */
     readonly args: unknown;
   };
 } & ([Options_] extends [never] ? unknown : { readonly options: Options_ });
@@ -91,6 +168,8 @@ export interface AnyMiddlewareImpl {
  * type-level `Provides`/`Error` metadata. It is deliberately not a
  * `Context.Tag`: implementations are registered through the group `Registry`
  * (like `FunctionImpl`s), not resolved from a Layer context.
+ *
+ * @category Middleware
  */
 export interface MiddlewareSpec<
   in out Self,
@@ -101,20 +180,95 @@ export interface MiddlewareSpec<
   FunctionTypes_ extends FunctionType,
   OptionsSchema_ extends Schema.Schema<any> = never,
 > {
+  /**
+   * The subclass identity used in type parameters; do not instantiate
+   * middleware specs.
+   *
+   * @category Models
+   */
   new (_: never): {
+    /**
+     * Identifies the middleware's instance type.
+     *
+     * @category Models
+     */
     readonly [TypeId]: TypeId;
+    /**
+     * The middleware key associated with this instance type.
+     *
+     * @category Models
+     */
     readonly key: Key_;
   };
+  /**
+   * Identifies a middleware declaration.
+   *
+   * @category Models
+   */
   readonly [TypeId]: TypeId;
+  /**
+   * The unique key shared by this declaration and its registered
+   * implementation.
+   *
+   * @category Models
+   */
   readonly key: Key_;
+  /**
+   * The function kinds this middleware may cover.
+   *
+   * @category Options
+   */
   readonly functionTypes: SupportedFunctionTypes;
+  /**
+   * The lazy codec for declared middleware failures; absent when none is
+   * declared.
+   *
+   * @category Schemas
+   */
   readonly error?: ErrorSchema_;
+  /**
+   * The lazy schema used to validate attachment values and compare their
+   * equivalence.
+   *
+   * @category Schemas
+   */
   readonly options?: OptionsSchema_;
+  /**
+   * The type-only services provided downstream; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Provides": Provides_;
+  /**
+   * The type-only services required from earlier middleware; not a runtime
+   * property.
+   *
+   * @category Models
+   */
   readonly "~Requires": Requires_;
+  /**
+   * The declared error codec's type; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Error": ErrorSchema_;
+  /**
+   * The union of covered function kinds; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~FunctionTypes": FunctionTypes_;
+  /**
+   * The middleware subclass identity; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Self": Self;
+  /**
+   * The attachment-options schema's type; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Options": OptionsSchema_;
 }
 
@@ -223,8 +377,27 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
  * ```
  *
  * The implementation is server-only and supplied separately via
- * `MiddlewareImpl.make` (or `makeByFunctionType`/`provides`) in
- * `@confect/server`.
+ * `MiddlewareImpl.make` (or `makeByFunctionType`/`provides`) from the
+ * application's `_generated/server`. The optional `Config.provides` and
+ * `Config.requires` slots declare services at the type level, not runtime
+ * service tags.
+ *
+ * @category Middleware
+ *
+ * @param key - A unique key identifying one declaration and implementation.
+ * @param options - Client-safe schema factories and function coverage.
+ * @param options.error - Optional lazy failure codec, requiring no services and
+ *   encoding to a Convex value; its decoded errors join covered functions'
+ *   errors.
+ * @param options.options - Optional lazy attachment-options schema. Values are
+ *   validated on its type side without decoding, and repeated attachments are
+ *   compared with its equivalence. Keep values and schemas free of secrets.
+ * @param options.functionTypes - Literal flags for query, mutation, and action;
+ *   all flags are required and at least one must be true.
+ *
+ * @returns A class to extend for the declaration; schema factories stay lazy.
+ *
+ * @throws If no function kind is enabled.
  */
 export const MiddlewareSpec =
   <Self, Config extends { provides?: any; requires?: any } = {}>() =>

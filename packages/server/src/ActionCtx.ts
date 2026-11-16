@@ -17,5 +17,11 @@ export const ActionCtx = <
 >(): ActionCtxTag<DataModel> =>
   Context.Service<GenericActionCtx<DataModel>>("@confect/server/ActionCtx");
 
+/**
+ * Native Convex action context exposed by the generated `ActionCtx` service.
+ * Methods retain Convex's encoded-value and Promise contracts.
+ *
+ * @category Services
+ */
 export type ActionCtx<DataModel extends GenericDataModel> =
   GenericActionCtx<DataModel>;

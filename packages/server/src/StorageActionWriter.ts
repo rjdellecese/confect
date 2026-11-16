@@ -8,6 +8,16 @@ import * as Option from "effect/Option";
 import { BlobNotFoundError } from "./BlobNotFoundError";
 
 const make = (storageActionWriter: ConvexStorageActionWriter) => ({
+  /**
+   * Read stored contents in a mutation, action or HTTP handler.
+   *
+   * @category Reading
+   *
+   * @param storageId - ID of the blob.
+   *
+   * @returns An Effect producing a Blob, failing with BlobNotFoundError when
+   *   absent. Native rejections are defects.
+   */
   get: (storageId: GenericId<"_storage">) =>
     Effect.promise(() => storageActionWriter.get(storageId)).pipe(
       Effect.andThen(
@@ -21,10 +31,27 @@ const make = (storageActionWriter: ConvexStorageActionWriter) => ({
         ),
       ),
     ),
+  /**
+   * Store contents in a mutation, action or HTTP handler.
+   *
+   * @category Writing
+   *
+   * @param blob - Contents and media type.
+   * @param options - Optional `sha256` checksum checked by Convex.
+   *
+   * @returns An Effect producing the `_storage` ID; native rejections are
+   *   defects.
+   */
   store: (blob: Blob, options?: { sha256?: string }) =>
     Effect.promise(() => storageActionWriter.store(blob, options)),
 });
 
+/**
+ * Compatibility blob-content service supplied in mutations, actions and HTTP
+ * handlers despite its historical name. Prefer the generated `Storage` tag.
+ *
+ * @category Services
+ */
 export class StorageActionWriter extends Context.Service<
   StorageActionWriter,
   ReturnType<typeof make>

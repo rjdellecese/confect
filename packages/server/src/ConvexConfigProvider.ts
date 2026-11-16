@@ -18,6 +18,12 @@ declare const process: { env: Record<string, string | undefined> };
  * `fromEnv` uses. As with the built-in providers, an empty string is treated as
  * a missing value, so `Config.withDefault` and `Config.option` recover from
  * it.
+ *
+ * @category Constructors
+ *
+ * @returns A provider for exact environment-key lookups. It does not enumerate
+ *   child keys; configurations requiring a child-key listing are not supported.
+ *   Confect already installs this provider for handlers and HTTP routes.
  */
 export const make = (): ConfigProvider.ConfigProvider =>
   ConfigProvider.make((path) => {

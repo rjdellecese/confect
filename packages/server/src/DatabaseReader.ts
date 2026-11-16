@@ -59,10 +59,46 @@ type TableReader<Table_ extends Table.AnyWithProps, Docs> =
         >
     : SingleTableReader<Table_, Docs>;
 
+/**
+ * Schema-typed database reads acquired from the generated `DatabaseReader`
+ * service in queries and mutations. `Docs` optionally supplies generated named
+ * document types; reads still decode through each table's codec.
+ *
+ * @category Services
+ *
+ * @example
+ *   import * as Effect from "effect/Effect";
+ *   import { DatabaseReader } from "./confect/_generated/services";
+ *   import notesTable from "./confect/_generated/tables/notes";
+ *
+ *   const latestNotes = Effect.gen(function* () {
+ *     const reader = yield* DatabaseReader;
+ *     return yield* reader
+ *       .table(notesTable)
+ *       .index("by_creation_time", "desc")
+ *       .take(10);
+ *   });
+ */
 export interface DatabaseReaderService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > {
+  /**
+   * Select a table for document lookup or query construction. Selecting a
+   * handle does not read any documents.
+   *
+   * @category Reading
+   *
+   * @param table - A bound application table from `_generated/tables/<name>`,
+   *   or a read-only system handle from `@confect/server/Table`: `_storage` or
+   *   `_scheduled_functions`.
+   *
+   * @returns The table's lookup and query methods. If the handle may refer to
+   *   several tables, `index(name, order?)` can scan an index they all declare;
+   *   `stream(name, order?)` also requires identical index fields in the same
+   *   order. Narrow the handle by `tableName` before selecting a table-specific
+   *   index, supplying a range callback, or looking up a table-specific ID.
+   */
   readonly table: <Table_ extends IncludedTables<DatabaseSchema_>>(
     table: Table_,
   ) => TableReader<
@@ -142,6 +178,14 @@ export const DatabaseReader = <
     DatabaseReaderService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseReader");
 
+/**
+ * The database reader service requirement and uncustomized service shape for a
+ * schema. Acquire the generated service tag rather than invoking the raw
+ * same-named factory; use {@link DatabaseReaderService} for a named-doc
+ * registry.
+ *
+ * @category Services
+ */
 export type DatabaseReader<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = DatabaseReaderService<DatabaseSchema_>;
