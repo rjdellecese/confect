@@ -46,7 +46,10 @@ const declarationKind = (model: DeclarationReflection): string =>
           ? "function"
           : "value";
 
-export const formatDeclarationDetails = (markdown: string): string => {
+export const formatDeclarationDetails = (
+  markdown: string,
+  semanticHeadings: ReadonlySet<string> = new Set(),
+): string => {
   let rendered = markdown;
   for (const node of Array.reverse(fromMarkdown(markdown).children)) {
     if (node.type !== "heading" || node.depth < 4) continue;
@@ -62,7 +65,11 @@ export const formatDeclarationDetails = (markdown: string): string => {
       contentEnd === undefined
     )
       continue;
-    rendered = `${Str.slice(0, start)(rendered)}**${Str.slice(contentStart, contentEnd)(markdown)}**${Str.slice(end)(rendered)}`;
+    const title = Str.slice(contentStart, contentEnd)(markdown);
+    const heading = semanticHeadings.has(`${node.depth}:${title}`)
+      ? `#### ${title}`
+      : `**${title}**`;
+    rendered = `${Str.slice(0, start)(rendered)}${heading}${Str.slice(end)(rendered)}`;
   }
   return rendered;
 };
@@ -155,6 +162,40 @@ export class MintlifyRouter extends ModuleRouter {
 export class MintlifyTheme extends MarkdownTheme {
   override getRenderContext(page: MarkdownPageEvent<Reflection>) {
     const context = super.getRenderContext(page);
+    const semanticHeadings = new Set<string>();
+    const categories = context.partials.categories;
+    context.partials.categories = (models, options) => {
+      for (const model of models)
+        semanticHeadings.add(
+          `${Math.min(options.headingLevel, 6)}:${model.title}`,
+        );
+      return categories(models, options);
+    };
+    const memberContainer = context.partials.memberContainer;
+    context.partials.memberContainer = (model, options) => {
+      semanticHeadings.add(
+        `${Math.min(options.headingLevel, 6)}:${context.partials.memberTitle(model)}`,
+      );
+      return memberContainer(model, options);
+    };
+    const typeDeclarationContainer = context.partials.typeDeclarationContainer;
+    context.partials.typeDeclarationContainer = (
+      model,
+      declaration,
+      options,
+    ) => {
+      for (const category of declaration.categories ?? [])
+        semanticHeadings.add(
+          `${Math.min(options.headingLevel, 6)}:${category.title}`,
+        );
+      return typeDeclarationContainer(model, declaration, options);
+    };
+    const reflection = context.templates.reflection;
+    context.templates.reflection = (event) =>
+      formatDeclarationDetails(reflection(event), semanticHeadings);
+    const index = context.templates.index;
+    context.templates.index = (event) =>
+      formatDeclarationDetails(index(event), semanticHeadings);
     const member = context.partials.member;
     context.partials.member = (model, options) => {
       let rendered = model.kindOf(ReflectionKind.Namespace)
@@ -186,6 +227,7 @@ export class MintlifyTheme extends MarkdownTheme {
       const service = type.typeArguments?.[1];
       if (!(service instanceof ReflectionType)) return rendered;
       const headingLevel = options.headingLevel + 1;
+      semanticHeadings.add(`${Math.min(headingLevel, 6)}:Service operations`);
       return `${rendered}\n\n${Str.repeat(headingLevel)("#")} Service operations\n\n${context.partials.typeDeclarationContainer(model, service.declaration, { headingLevel })}`;
     };
     const memberTitle = context.partials.memberTitle;
@@ -228,7 +270,7 @@ export class MintlifyTheme extends MarkdownTheme {
     const body = Str.replace(
       /<a id="([^"]+)"><\/a>/g,
       '<span id="$1"></span>',
-    )(formatDeclarationDetails(super.render(page)));
+    )(super.render(page));
     const model = page.model;
     const names: string[] = [];
     for (
