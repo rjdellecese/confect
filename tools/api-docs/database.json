@@ -1,0 +1,1177 @@
+{
+  "modules": {
+    "@confect/core/Table": {
+      "source": "packages/core/src/Table.ts",
+      "entries": [
+        {
+          "symbols": ["make"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/schema.mdx",
+              "contains": "Each table is defined with `Table.make`, which takes a callback returning the table's fields."
+            }
+          ],
+          "note": "Lazy table authoring constructor; callback and derived schemas are not evaluated when the builder is created."
+        },
+        {
+          "symbols": [
+            "UnnamedTable.index",
+            "UnnamedTable.searchIndex",
+            "UnnamedTable.vectorIndex"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/schema.mdx",
+              "contains": ".index(\"by_role\", [\"author.role\"])"
+            },
+            {
+              "path": "apps/docs/server/database/schema.mdx",
+              "contains": "searchField: \"text\""
+            },
+            {
+              "path": "apps/docs/server/database/schema.mdx",
+              "contains": "dimensions: 1536"
+            }
+          ],
+          "note": "Returned unnamed builder methods only, not all UnnamedTable members. Search/vector config shapes are upstream Convex contracts, including filterFields."
+        },
+        {
+          "symbols": ["Table.Fields", "Table.Doc"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/schema.mdx",
+              "contains": "A `Table`'s `Fields` property contains an Effect `Schema`"
+            },
+            {
+              "path": "apps/docs/server/database/schema.mdx",
+              "contains": "A `Table`'s `Doc` property contains an Effect `Schema`"
+            }
+          ],
+          "note": "Bound generated table properties; Schema.Type belongs to Effect, not this module."
+        },
+        {
+          "symbols": ["Table.tableName"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "a table's `Doc`, `Fields`, and `tableName` properties"
+            }
+          ],
+          "note": "Filename-derived name on the bound table returned by the generated wrapper."
+        },
+        {
+          "symbols": ["Table", "UnnamedTable"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/core/src/Table.ts",
+              "contains": "export interface UnnamedTable<"
+            }
+          ],
+          "note": "Retain the owners of the individually included members. This does not include all metadata, predicates, type extractors or the unnamed callable binding operation."
+        }
+      ]
+    },
+    "@confect/server/Document": {
+      "source": "packages/server/src/Document.ts",
+      "entries": [
+        {
+          "symbols": ["Document", "WithoutSystemFields"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/schema.mdx",
+              "contains": "You can also write the type inline with the same helper the generated types alias, `Document.Document<typeof schemaDefinition, \"notes\">`, and drop the system fields with `Document.WithoutSystemFields<NotesDoc>`."
+            }
+          ],
+          "note": "Named decoded-document and system-field omission types; Document also backs generated document aliases."
+        },
+        {
+          "symbols": ["DocumentDecodeError"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "and can fail with `DocumentDecodeError`."
+            }
+          ],
+          "note": "Named typed read failure; payload vocabulary comes from the current source, including parseError."
+        },
+        {
+          "symbols": ["DocumentEncodeError"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/server/src/Document.ts",
+              "contains": "export class DocumentEncodeError extends Schema.TaggedError<"
+            }
+          ],
+          "note": "Source-only write failure candidate; retain in write signatures without automatically adding a named reference page."
+        },
+        {
+          "symbols": ["decode", "encode"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/server/src/Document.ts",
+              "contains": "export const decode = Function.dual<"
+            },
+            {
+              "path": "packages/server/src/Document.ts",
+              "contains": "export const encode = Function.dual<"
+            }
+          ],
+          "note": "Accessible conversion helpers are not taught as authoring APIs; generated document types do not promote them."
+        }
+      ]
+    },
+    "@confect/server/DatabaseReader": {
+      "source": "packages/server/src/DatabaseReader.ts",
+      "entries": [
+        {
+          "symbols": ["DatabaseReaderService.table"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "reader.table(\"notes\").get(noteId);"
+            },
+            {
+              "path": "apps/docs/server/database/system-tables.mdx",
+              "contains": "reader.table(\"_storage\").get(storageId);"
+            }
+          ],
+          "note": "Returned generated-service method selecting ordinary or read-only system tables. Subsequent methods belong to QueryInitializer."
+        },
+        {
+          "symbols": ["DatabaseReaderService"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/server/src/DatabaseReader.ts",
+              "contains": "export interface DatabaseReaderService<"
+            }
+          ],
+          "note": "Owner for the included table method, not a manually constructed service entry point."
+        },
+        {
+          "symbols": ["DatabaseReader", "DatabaseReaderTag", "make", "layer"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "> = DatabaseReader_.DatabaseReader<typeof schemaDefinition, Docs>();"
+            },
+            {
+              "path": "packages/server/src/DatabaseReader.ts",
+              "contains": "export const layer ="
+            }
+          ],
+          "note": "Raw specialization factory, tag type and provisioning machinery support generated services; generated tags, not these raw factories/layers, are the authoring entry points."
+        }
+      ]
+    },
+    "@confect/server/DatabaseWriter": {
+      "source": "packages/server/src/DatabaseWriter.ts",
+      "entries": [
+        {
+          "symbols": ["DatabaseWriterService.table"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/writing.mdx",
+              "contains": "writer.table(\"notes\").insert({"
+            }
+          ],
+          "note": "Returned generated-service method selecting a writable application table; system tables remain read-only."
+        },
+        {
+          "symbols": ["DatabaseWriterTableAccessor.insert"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/writing.mdx",
+              "contains": "Insert a new document."
+            }
+          ],
+          "note": "Returned table-accessor method accepting decoded user fields and returning the inserted ID."
+        },
+        {
+          "symbols": ["DatabaseWriterTableAccessor.patch"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/writing.mdx",
+              "contains": "Optional fields set to `undefined` are unset."
+            }
+          ],
+          "note": "Shallow patch contract; optional fields can be unset with undefined."
+        },
+        {
+          "symbols": ["DatabaseWriterTableAccessor.replace"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/writing.mdx",
+              "contains": "Replace the entire document."
+            }
+          ],
+          "note": "Returned table-accessor method replacing user fields."
+        },
+        {
+          "symbols": ["DatabaseWriterTableAccessor.delete"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/writing.mdx",
+              "contains": "Delete the document with the given ID."
+            }
+          ],
+          "note": "Returned table-accessor deletion method."
+        },
+        {
+          "symbols": [
+            "DatabaseWriterService",
+            "DatabaseWriterTableAccessor",
+            "PatchValue"
+          ],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/server/src/DatabaseWriter.ts",
+              "contains": "export type PatchValue<Doc> = {"
+            }
+          ],
+          "note": "Retain owners and patch argument shape for the included methods; no blanket inclusion of service construction APIs."
+        },
+        {
+          "symbols": ["DatabaseWriter", "DatabaseWriterTag", "make", "layer"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "> = DatabaseWriter_.DatabaseWriter<typeof schemaDefinition, Docs>();"
+            },
+            {
+              "path": "packages/server/src/DatabaseWriter.ts",
+              "contains": "export const layer ="
+            }
+          ],
+          "note": "Raw specialization and provisioning dependencies, not direct authoring entry points."
+        }
+      ]
+    },
+    "@confect/server/DocumentIds": {
+      "source": "packages/server/src/DocumentIds.ts",
+      "entries": [
+        {
+          "symbols": ["DocumentIds.parse"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "`parse` returns `Some(id)` when the string is a valid ID for the specified table."
+            }
+          ],
+          "note": "Returned generated-service method; invalid/wrong-table IDs yield None, not proof of existence, authorization or deployment provenance."
+        },
+        {
+          "symbols": ["DocumentIds.identify"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "The result keeps each table name paired with its ID type. Narrow `table` to"
+            },
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "if (matchedId.table !== \"notes\") return Effect.succeed(Option.none());"
+            }
+          ],
+          "note": "Includes the correlated readonly result table/id fields. Their structural owner IdentifiedId is private, so no invented exported result type or separate private-symbol entry. Unexpected native failures remain defects."
+        },
+        {
+          "symbols": ["DocumentIds", "DocumentIdsTag", "make", "layer"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "DocumentIds_.DocumentIds<typeof schemaDefinition>();"
+            },
+            {
+              "path": "packages/server/src/DocumentIds.ts",
+              "contains": "export const layer ="
+            }
+          ],
+          "note": "DocumentIds merges the method-owner interface and raw factory value; only its listed methods are included. Raw factory, tag type and provisioning remain generated-service support."
+        }
+      ]
+    },
+    "@confect/server/QueryInitializer": {
+      "source": "packages/server/src/QueryInitializer.ts",
+      "entries": [
+        {
+          "symbols": ["QueryInitializer.get"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "reader.table(\"notes\").get(noteId);"
+            },
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "reader.table(\"users\").get(\"by_name_and_age\", \"John Doe\", 21);"
+            }
+          ],
+          "note": "Both documented overloads: ID lookup and positional single/compound-index lookup."
+        },
+        {
+          "symbols": ["QueryInitializer.index"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "reader.table(\"users\").index(\"by_name_and_age\", \"desc\");"
+            },
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "(q) => q.eq(\"name\", \"John Doe\").eq(\"age\", 21),"
+            }
+          ],
+          "note": "Includes callback-free/range-callback forms and optional order. Callback eq and index-field ordering belong to upstream Convex IndexRangeBuilder; no Confect Query or IndexRangeBuilder module is implied."
+        },
+        {
+          "symbols": ["QueryInitializer.search"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": ".search(\"text\", (q) => q.search(\"text\", \"hello\").eq(\"tag\", \"colors\"));"
+            }
+          ],
+          "note": "Includes the taught search/eq callback chain and relevance ordering; SearchFilterBuilder/SearchFilter are upstream Convex contracts, not Confect exports."
+        },
+        {
+          "symbols": ["QueryInitializer.stream"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`stream` takes an index name, an optional range callback, and an optional order (`\"asc\"` by default)."
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`gt`, `gte`, `lt`, and `lte` bound the next field without consuming it"
+            }
+          ],
+          "note": "Includes eq/gt/gte/lt/lte callback semantics and ordering overloads. This callback is Confect-owned; explain it through QueryStream while keeping QueryStreamIndexRange internal.",
+          "qualifier": "experimental"
+        },
+        {
+          "symbols": ["GetByIdFailure"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "fail with `GetByIdFailure`, for example after deletion."
+            }
+          ],
+          "note": "Named typed absence failure for ID lookup; current source owns its id/tableName payload."
+        },
+        {
+          "symbols": ["QueryInitializer"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/server/src/QueryInitializer.ts",
+              "contains": "export interface QueryInitializer<"
+            }
+          ],
+          "note": "Return-contract owner for the four individually included methods, not blanket module inclusion."
+        },
+        {
+          "symbols": ["GetByIndexFailure", "getById"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/server/src/QueryInitializer.ts",
+              "contains": "export class GetByIndexFailure extends Schema.TaggedError<"
+            },
+            {
+              "path": "packages/server/src/QueryInitializer.ts",
+              "contains": "export const getById ="
+            }
+          ],
+          "note": "The index absence error name and raw lookup helper are source-only candidates. Preserve their signature reachability without promoting reference pages."
+        }
+      ]
+    },
+    "@confect/server/OrderedQuery": {
+      "source": "packages/server/src/OrderedQuery.ts",
+      "entries": [
+        {
+          "symbols": [
+            "OrderedQuery.collect",
+            "OrderedQuery.first",
+            "OrderedQuery.take",
+            "OrderedQuery.stream"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "The following methods are available for queries using both database indexes and search indexes."
+            },
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "reader.table(\"notes\").index(\"by_creation_time\").collect();"
+            },
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "reader.table(\"notes\").index(\"by_creation_time\").first();"
+            },
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "reader.table(\"notes\").index(\"by_creation_time\").take(10);"
+            },
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "reader.table(\"notes\").index(\"by_creation_time\").stream();"
+            }
+          ],
+          "note": "Returned query methods only. first yields Option; stream returns a plain Effect Stream rather than a composable QueryStream."
+        },
+        {
+          "symbols": ["OrderedQuery.paginate"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/reading.mdx",
+              "contains": "reader.table(\"notes\").index(\"by_creation_time\").paginate(paginationOpts);"
+            },
+            {
+              "path": "apps/docs/server/functions.mdx",
+              "contains": ".paginate(paginationOpts, (q) => q.eq(q.field(\"author\"), author));"
+            }
+          ],
+          "note": "Includes pagination protocol options/result and optional filter callback. PaginationOptions/PaginationResult and callback eq/field are upstream Convex contracts, not new Confect exports."
+        },
+        {
+          "symbols": ["OrderedQuery"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/server/src/OrderedQuery.ts",
+              "contains": "export type OrderedQuery<"
+            }
+          ],
+          "note": "Owner of the five included returned methods. The raw make adapter is not an authoring entry point."
+        }
+      ]
+    },
+    "@confect/server/Table": {
+      "source": "packages/server/src/Table.ts",
+      "entries": [
+        {
+          "symbols": ["tableDefinition"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "${tableName}: $Table.tableDefinition(${tableName}),"
+            },
+            {
+              "path": "REVIEW.md",
+              "contains": "That conversion belongs at deployment time, not"
+            }
+          ],
+          "note": "Deployment/test-schema conversion for generated convexSchema, not function-runtime construction. Core Table owns the taught authoring API; server reexports are not duplicate entry points."
+        }
+      ]
+    },
+    "@confect/server/QueryStream": {
+      "source": "packages/server/src/QueryStream.ts",
+      "entries": [
+        {
+          "symbols": ["QueryStream"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "QueryStream<Doc, KeyLabels, OrderDirection, Error, Requirements>"
+            }
+          ],
+          "note": "The documented stream type and generic contract, not raw new QueryStream construction or every class member. Only the explicitly listed members are included."
+        },
+        {
+          "symbols": ["QueryStream.keyLayout", "QueryStream.orderDirection"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "Direction is stored in `stream.orderDirection` and checked separately."
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "Reuse a stream's `keyLayout` when calling `empty` or supplying `flatMap`'s `innerKeyLayout`."
+            }
+          ],
+          "note": "Returned stream properties; layout reuse reads no documents. Describe ordering/layout concepts here, not on internal support-module pages."
+        },
+        {
+          "symbols": ["QueryStream.pipe"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "QueryStream.map((note) => note.text),"
+            }
+          ],
+          "note": "Taught composition method implementing Effect's Pipeable protocol; not a separate module-level operation."
+        },
+        {
+          "symbols": ["empty"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "QueryStream.empty<NotesDoc>()(byRole(\"admin\").keyLayout)"
+            }
+          ],
+          "note": "Documented type-argument-then-layout invocation; explicit direction overload is not separately taught."
+        },
+        {
+          "symbols": ["isQueryStream"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`QueryStream.isQueryStream` tells the two apart at runtime"
+            }
+          ],
+          "note": "Runtime guard distinguishing composable query streams from ordinary streams."
+        },
+        {
+          "symbols": ["unique", "NotUniqueError"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`QueryStream.unique` consumes a stream expected to hold at most one document, returning an `Option` and failing with `NotUniqueError` if there are two or more:"
+            }
+          ],
+          "note": "Consumer and named typed uniqueness failure; empty results yield None."
+        },
+        {
+          "symbols": ["merge"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`QueryStream.merge` interleaves streams with matching key layouts into one ordered stream."
+            }
+          ],
+          "note": "Nonempty compatible inputs, key/direction checks and no deduplication. Named source-only mismatch errors remain separate candidates."
+        },
+        {
+          "symbols": ["filter", "map"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`QueryStream.filter` removes emitted values; `QueryStream.map` transforms them. Both preserve the original stored keys."
+            }
+          ],
+          "note": "Deterministic callbacks transform emitted documents, not stored keys; rejected documents still count toward reads and cursor progress."
+        },
+        {
+          "symbols": ["filterEffect", "mapEffect"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "use `QueryStream.filterEffect` and `QueryStream.mapEffect` instead."
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "Pass `{ concurrency }` to run several at once; elements are still emitted in stream order"
+            }
+          ],
+          "note": "Includes optional concurrency, default sequential execution, and propagation of callback errors/services. The source's unbounded concurrency value is not specifically taught."
+        },
+        {
+          "symbols": ["EffectOptions.concurrency"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "{ concurrency: 8 },"
+            }
+          ],
+          "note": "Shared option member for filterEffect/mapEffect; no automatic promotion of other source-only option variants."
+        },
+        {
+          "symbols": ["EffectOptions"],
+          "reference": "supporting",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "packages/server/src/QueryStream.ts",
+              "contains": "export interface EffectOptions {"
+            }
+          ],
+          "note": "Source-owned shape supporting the taught concurrency option, not a separately taught named import."
+        },
+        {
+          "symbols": ["distinct"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`QueryStream.distinct` keeps the first document for each distinct value of a prefix of the key."
+            }
+          ],
+          "note": "Includes label-prefix grouping and representative-selection semantics; support-module prefix helpers stay hidden."
+        },
+        {
+          "symbols": ["narrow"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "Each endpoint has `keyValues` and a required `inclusive` flag"
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "Provide at least one endpoint; omit the other to leave that side unbounded."
+            }
+          ],
+          "note": "Both data-first and pipeable forms; includes start/end, keyValues/inclusive, prefix bounds and repeated intersection. Structural types live in internal QueryStreamKeyBounds."
+        },
+        {
+          "symbols": ["flatMap"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "Supply `innerKeyLayout` from a stream whose layout matches every stream returned by the callback."
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "Pass `onEmpty` to `flatMap` to keep it: the document is emitted as `onEmpty(outer)`"
+            }
+          ],
+          "note": "Includes callback contract and inline options innerKeyLayout/onEmpty; ordered joins concatenate keys and retain empty-inner cursor progress."
+        },
+        {
+          "symbols": [
+            "InnerStreamLayoutMismatchError",
+            "InnerStreamOrderMismatchError"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "runtime mismatches die with `InnerStreamLayoutMismatchError` or `InnerStreamOrderMismatchError` when the join runs."
+            }
+          ],
+          "note": "Named flatMap defects, not typed Effect failures; preserve the distinction in reference writing."
+        },
+        {
+          "symbols": ["renameKey"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`QueryStream.renameKey` replaces a stream's visible labels positionally."
+            }
+          ],
+          "note": "Includes replacement-label count, unchanged keys and implicit-ID positions; does not reorder values."
+        },
+        {
+          "symbols": ["reverse"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`QueryStream.reverse` runs a composed stream in the opposite direction."
+            }
+          ],
+          "note": "Reversal of supported reader/combinator streams by scans/seeks, including distinct representative semantics; raw reversal recipes are not taught."
+        },
+        {
+          "symbols": ["paginate"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`QueryStream.paginate` returns an effect producing one page of a composed stream."
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`maximumRowsRead`"
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`maximumBytesRead`"
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`continueCursor`"
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`splitCursor`"
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`pageStatus`"
+            }
+          ],
+          "note": "Both invocation forms. Includes cursor/numItems/endCursor/maximumRowsRead/maximumBytesRead options; page/continueCursor/isDone/splitCursor/pageStatus results; safe progress and invalid-cursor behavior. Shapes originate in Convex; no internal pagination constructors are taught."
+        },
+        {
+          "symbols": ["PaginateOptions", "PaginationResult"],
+          "reference": "supporting",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "packages/server/src/QueryStream.ts",
+              "contains": "export type PaginateOptions = ConvexPaginationOptions;"
+            },
+            {
+              "path": "packages/server/src/QueryStream.ts",
+              "contains": "export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;"
+            }
+          ],
+          "note": "Public aliases preserve the taught options/result shapes under paginate. These alias names are source-only; upstream-owned fields are not invented local members."
+        },
+        {
+          "symbols": ["ReadBudgetExceededError"],
+          "reference": "included",
+          "audience": "application",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "`QueryStream.paginate` fails with `ReadBudgetExceededError` instead"
+            }
+          ],
+          "note": "Named typed pagination failure when no safe progress or interior split is possible; keep its rowsRead/bytesRead source payload."
+        },
+        {
+          "symbols": ["IncompatibleStreamsError", "MissingReversalRecipeError"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "packages/server/src/QueryStream.ts",
+              "contains": "export class IncompatibleStreamsError extends Schema.TaggedError<"
+            },
+            {
+              "path": "packages/server/src/QueryStream.ts",
+              "contains": "export class MissingReversalRecipeError extends Schema.TaggedError<"
+            }
+          ],
+          "note": "Source-only named-error candidates. The guide describes merge mismatch behavior but does not name this class or teach manual reversal recipes."
+        },
+        {
+          "symbols": ["EmptyInitialPageError", "InvalidPageSizeError"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "packages/server/src/QueryStream.ts",
+              "contains": "} from \"./QueryStreamPagination\";"
+            },
+            {
+              "path": "packages/server/src/QueryStreamPagination.ts",
+              "contains": "export class EmptyInitialPageError extends Schema.TaggedError<"
+            }
+          ],
+          "note": "Existing public QueryStream aliases are preserved, not hidden by support-module ownership. Their names are not taught in current MDX; any future reference expansion belongs under QueryStream, not QueryStreamPagination.",
+          "source": "packages/server/src/QueryStreamPagination.ts"
+        },
+        {
+          "symbols": ["InvalidReadLimitError"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "packages/server/src/QueryStream.ts",
+              "contains": "export { InvalidReadLimitError } from \"./QueryStreamReadBudget\";"
+            }
+          ],
+          "note": "Existing public QueryStream alias is preserved but not named in current MDX; candidate for future QueryStream reference coverage, not an internal-module page.",
+          "source": "packages/server/src/QueryStreamReadBudget.ts"
+        },
+        {
+          "symbols": [
+            "fromReflection",
+            "QueryStream.annotated",
+            "QueryStream.reflection",
+            "QueryStream.narrowWith",
+            "QueryStream.reverseWith",
+            "QueryStream.toStream"
+          ],
+          "reference": "omitted",
+          "audience": "undecided",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "packages/server/src/QueryStream.ts",
+              "contains": "export const fromReflection = <"
+            },
+            {
+              "path": "packages/server/src/QueryStream.ts",
+              "contains": "toStream(): Stream.Stream<Doc, E, R>"
+            }
+          ],
+          "note": "Accessible low-level construction, recipes and explicit conversion are source-only candidates. Genuine Stream compatibility does not promote every implementation-facing member."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamIndexRange": {
+      "source": "packages/server/src/QueryStreamIndexRange.ts",
+      "entries": [
+        {
+          "symbols": [
+            "QueryStreamIndexRange",
+            "Builder",
+            "LowerBoundedBuilder"
+          ],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            }
+          ],
+          "note": "Internal owners of the stream range callback; retain signature support without standalone module reference. Only the listed methods' semantics are taught through QueryStream."
+        },
+        {
+          "symbols": ["Builder.eq"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`eq` pins the next index field to a value and consumes it"
+            }
+          ],
+          "note": "Document callback behavior through QueryInitializer.stream/QueryStream, not a public import of this internal module."
+        },
+        {
+          "symbols": [
+            "Builder.gt",
+            "Builder.gte",
+            "Builder.lt",
+            "Builder.lte",
+            "LowerBoundedBuilder.lt",
+            "LowerBoundedBuilder.lte"
+          ],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "`gt`, `gte`, `lt`, and `lte` bound the next field without consuming it"
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "a lower bound may be followed by an upper bound on the same field"
+            }
+          ],
+          "note": "Semantic coverage includes all four bounds and lower-then-upper chaining. Keep these as callback support under QueryStream, not independent reference entry points."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamKeyBounds": {
+      "source": "packages/server/src/QueryStreamKeyBounds.ts",
+      "entries": [
+        {
+          "symbols": [
+            "NarrowBounds",
+            "NarrowBounds.start",
+            "NarrowBounds.end",
+            "KeyBound",
+            "KeyBound.keyValues",
+            "KeyBound.inclusive"
+          ],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "Each endpoint has `keyValues` and a required `inclusive` flag"
+            }
+          ],
+          "note": "Structural narrow argument support; describe the start/end and keyValues/inclusive contract through QueryStream.narrow, not direct imports or internal bound-conversion helpers."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamKeyLayout": {
+      "source": "packages/server/src/QueryStreamKeyLayout.ts",
+      "entries": [
+        {
+          "symbols": ["QueryStreamKeyLayout"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "Reuse a stream's `keyLayout` when calling `empty`"
+            }
+          ],
+          "note": "Internal layout type used by keyLayout and flatMap/empty. Explain visible labels and implicit-ID positions through QueryStream; do not promote constructors or inspectors."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamKeyLabels": {
+      "source": "packages/server/src/QueryStreamKeyLabels.ts",
+      "entries": [
+        {
+          "symbols": ["QueryStreamKeyLabels"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "The `KeyLabels` parameter requires the brand; a plain string tuple is not a labels type."
+            }
+          ],
+          "note": "Internal branded tuple behind QueryStream's KeyLabels parameter; consumers normally infer it. No standalone labels-module reference."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamKeyValues": {
+      "source": "packages/server/src/QueryStreamKeyValues.ts",
+      "entries": [
+        {
+          "symbols": ["KeyValue", "QueryStreamKeyValues"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            }
+          ],
+          "note": "Internal stored-key value types needed by bounds and signatures; value-order implementation is not an application entry point."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamOrderDirection": {
+      "source": "packages/server/src/QueryStreamOrderDirection.ts",
+      "entries": [
+        {
+          "symbols": ["QueryStreamOrderDirection"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "The type parameter defaults to their union; the `stream(...)` method defaults to `\"asc\"`."
+            }
+          ],
+          "note": "Internal direction type; teach asc/desc and reversal through QueryStream, not this module."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamCursor": {
+      "source": "packages/server/src/QueryStreamCursor.ts",
+      "entries": [
+        {
+          "symbols": ["QueryStreamCursor"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            },
+            {
+              "path": "apps/docs/server/database/streams.mdx",
+              "contains": "Save cursors returned by `QueryStream.paginate` and pass them back unchanged."
+            }
+          ],
+          "note": "Internal cursor representation retained for signature closure. The public contract passes returned cursor strings unchanged; no cursor codec helpers are included."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamKey": {
+      "source": "packages/server/src/QueryStreamKey.ts",
+      "entries": [
+        {
+          "symbols": ["QueryStreamKey"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            }
+          ],
+          "note": "Internal complete/prefix key representation retained transitively; explain prefix-bound concepts through QueryStream rather than direct key construction."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamIndexPrefix": {
+      "source": "packages/server/src/QueryStreamIndexPrefix.ts",
+      "entries": [
+        {
+          "symbols": ["QueryStreamIndexPrefix"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            }
+          ],
+          "note": "Internal index-coordinate representation; not an authoring API or independent documentation page."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamReadBudget": {
+      "source": "packages/server/src/QueryStreamReadBudget.ts",
+      "entries": [
+        {
+          "symbols": ["QueryStreamReadBudget"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            }
+          ],
+          "note": "Internal shared budget service; public limits and accounting behavior belong to QueryStream.paginate. Public error aliases are classified separately under QueryStream."
+        }
+      ]
+    },
+    "@confect/server/QueryStreamPagination": {
+      "source": "packages/server/src/QueryStreamPagination.ts",
+      "entries": [
+        {
+          "symbols": ["QueryStreamPagination"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "qualifier": "experimental",
+          "evidence": [
+            {
+              "path": "AGENTS.md",
+              "contains": "Other `QueryStream*` modules are internal and undocumented; explain their concepts only when useful to readers."
+            }
+          ],
+          "note": "Internal pagination state machine; public page/cursor behavior belongs to QueryStream.paginate. Do not promote its errors automatically; existing public aliases are classified under QueryStream."
+        }
+      ]
+    }
+  }
+}

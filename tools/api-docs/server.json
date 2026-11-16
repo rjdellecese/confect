@@ -1,0 +1,1054 @@
+{
+  "modules": {
+    "@confect/server/FunctionImpl": {
+      "source": "packages/server/src/FunctionImpl.ts",
+      "entries": [
+        {
+          "symbols": ["make"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/functions.mdx",
+              "contains": "FunctionImpl.make"
+            },
+            {
+              "path": "apps/docs/server/plain-convex-functions.mdx",
+              "contains": "FunctionImpl.make"
+            }
+          ],
+          "note": "Schema/group/name/decoded-args handler contract; also accepts registered native functions for plain Convex specs."
+        }
+      ]
+    },
+    "@confect/server/GroupImpl": {
+      "source": "packages/server/src/GroupImpl.ts",
+      "entries": [
+        {
+          "symbols": ["make", "finalize"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/spec-impl-model.mdx",
+              "contains": "GroupImpl.finalize"
+            }
+          ],
+          "note": "Layer composition and completeness checks; raw GroupImpl tag factory is not the entry point."
+        }
+      ]
+    },
+    "@confect/server/MiddlewareImpl": {
+      "source": "packages/server/src/MiddlewareImpl.ts",
+      "entries": [
+        {
+          "symbols": ["make", "provides", "makeByFunctionType"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/middleware.mdx",
+              "contains": "makeByFunctionType"
+            }
+          ],
+          "note": "Wrapper callback context is classified under core MiddlewareSpec.MiddlewareOptions; provide only function-context-compatible services."
+        }
+      ]
+    },
+    "@confect/server/HttpRouter": {
+      "source": "packages/server/src/HttpRouter.ts",
+      "entries": [
+        {
+          "symbols": ["make"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/http-api.mdx",
+              "contains": "Pass your generated runtime database schema and a `Layer` that registers your routes."
+            }
+          ],
+          "note": "Two-argument runtime-schema/routes-layer factory; returned route is Convex-owned, Effect HttpRouter methods are upstream."
+        }
+      ]
+    },
+    "@confect/server/ConvexLogger": {
+      "source": "packages/server/src/ConvexLogger.ts",
+      "entries": [
+        {
+          "symbols": ["logger", "layer"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/functions.mdx",
+              "contains": "ConvexLogger.layer"
+            }
+          ],
+          "note": "Explicitly taught logger/layer, not covered by the generated platform-service-only boundary."
+        }
+      ]
+    },
+    "@confect/server/ConvexConfigProvider": {
+      "source": "packages/server/src/ConvexConfigProvider.ts",
+      "entries": [
+        {
+          "symbols": ["make"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/environment-variables.mdx",
+              "contains": "ConvexConfigProvider.make"
+            }
+          ],
+          "note": "No-argument provider factory is explicitly taught."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/HttpRouter.ts",
+              "contains": "ConvexConfigProvider.layer"
+            }
+          ],
+          "note": "Runtime dependency, not promoted by the documented make factory."
+        }
+      ]
+    },
+    "@confect/server/Auth": {
+      "source": "packages/server/src/Auth.ts",
+      "entries": [
+        {
+          "symbols": ["Auth.getUserIdentity"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/authentication.mdx",
+              "contains": "getUserIdentity"
+            }
+          ],
+          "note": "Acquired service Effect property, not a method call; upstream UserIdentity result."
+        },
+        {
+          "symbols": ["Auth"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "Auth ="
+            }
+          ],
+          "note": "Raw package tag is backing for the generated entry point; inclusion of acquired members does not promote direct tag imports."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/Auth.ts",
+              "contains": "export const layer"
+            }
+          ],
+          "note": "Invocation boundary supplies the layer; no manual platform service construction reference."
+        },
+        {
+          "symbols": ["NoUserIdentityFoundError"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/authentication.mdx",
+              "contains": "NoUserIdentityFoundError"
+            }
+          ],
+          "note": "Named failure gets a reference entry even without constructor examples."
+        }
+      ]
+    },
+    "@confect/server/MutationAuth": {
+      "source": "packages/server/src/MutationAuth.ts",
+      "entries": [
+        {
+          "symbols": ["MutationAuth.signJwt"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/authentication.mdx",
+              "contains": "signJwt"
+            }
+          ],
+          "note": "Acquired mutation-only service operation; Convex-owned signing options."
+        },
+        {
+          "symbols": ["MutationAuth"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "MutationAuth ="
+            }
+          ],
+          "note": "Raw package tag is backing for the generated entry point; inclusion of acquired members does not promote direct tag imports."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/MutationAuth.ts",
+              "contains": "export const layer"
+            }
+          ],
+          "note": "Invocation boundary supplies the layer; no manual platform service construction reference."
+        }
+      ]
+    },
+    "@confect/server/Storage": {
+      "source": "packages/server/src/Storage.ts",
+      "entries": [
+        {
+          "symbols": [
+            "Storage.getUrl",
+            "Storage.generateUploadUrl",
+            "Storage.delete",
+            "Storage.get",
+            "Storage.store"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/storage.mdx",
+              "contains": "generateUploadUrl"
+            }
+          ],
+          "note": "Acquired service contract; generateUploadUrl is an Effect property. get/store are available in mutations, actions and HTTP; getUrl also in queries. store options.sha256 is taught."
+        },
+        {
+          "symbols": ["Storage"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "Storage ="
+            }
+          ],
+          "note": "Raw package tag is backing for the generated entry point; inclusion of acquired members does not promote direct tag imports."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/Storage.ts",
+              "contains": "export const layer"
+            }
+          ],
+          "note": "Invocation boundary supplies the layer; no manual platform service construction reference."
+        }
+      ]
+    },
+    "@confect/server/Scheduler": {
+      "source": "packages/server/src/Scheduler.ts",
+      "entries": [
+        {
+          "symbols": [
+            "Scheduler.runAfter",
+            "Scheduler.runAt",
+            "Scheduler.cancel"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/scheduling.mdx",
+              "contains": "runAfter"
+            }
+          ],
+          "note": "Acquired service methods; Duration/DateTime scheduling and optional typed ref args."
+        },
+        {
+          "symbols": ["Scheduler"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "Scheduler ="
+            }
+          ],
+          "note": "Raw package tag is backing for the generated entry point; inclusion of acquired members does not promote direct tag imports."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/Scheduler.ts",
+              "contains": "export const layer"
+            }
+          ],
+          "note": "Invocation boundary supplies the layer; no manual platform service construction reference."
+        }
+      ]
+    },
+    "@confect/server/QueryRunner": {
+      "source": "packages/server/src/QueryRunner.ts",
+      "entries": [
+        {
+          "symbols": ["QueryRunner.runQuery"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/services.mdx",
+              "contains": "runQuery(ref, args, options?)"
+            }
+          ],
+          "note": "Acquired service method, including optional args, transactionLimits in queries/mutations, and useStaleSnapshot only in mutations."
+        },
+        {
+          "symbols": ["QueryRunner"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "QueryRunner ="
+            }
+          ],
+          "note": "Raw package tag is backing for the generated entry point; inclusion of acquired members does not promote direct tag imports."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/QueryRunner.ts",
+              "contains": "export const layer"
+            }
+          ],
+          "note": "Invocation boundary supplies the layer; no manual platform service construction reference."
+        }
+      ]
+    },
+    "@confect/server/MutationRunner": {
+      "source": "packages/server/src/MutationRunner.ts",
+      "entries": [
+        {
+          "symbols": ["MutationRunner.runMutation"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/services.mdx",
+              "contains": "runMutation(ref, args, options?)"
+            }
+          ],
+          "note": "Acquired service method; transactionLimits only in mutations."
+        },
+        {
+          "symbols": ["MutationRunner"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "MutationRunner ="
+            }
+          ],
+          "note": "Raw package tag is backing for the generated entry point; inclusion of acquired members does not promote direct tag imports."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/MutationRunner.ts",
+              "contains": "export const layer"
+            }
+          ],
+          "note": "Invocation boundary supplies the layer; no manual platform service construction reference."
+        }
+      ]
+    },
+    "@confect/server/ActionRunner": {
+      "source": "packages/server/src/ActionRunner.ts",
+      "entries": [
+        {
+          "symbols": ["ActionRunner.runAction"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/services.mdx",
+              "contains": "runAction(ref, args)"
+            }
+          ],
+          "note": "Acquired service method with optional args and no options parameter."
+        },
+        {
+          "symbols": ["ActionRunner"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "ActionRunner ="
+            }
+          ],
+          "note": "Raw package tag is backing for the generated entry point; inclusion of acquired members does not promote direct tag imports."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/ActionRunner.ts",
+              "contains": "export const layer"
+            }
+          ],
+          "note": "Invocation boundary supplies the layer; no manual platform service construction reference."
+        }
+      ]
+    },
+    "@confect/server/ExecutionMetadata": {
+      "source": "packages/server/src/ExecutionMetadata.ts",
+      "entries": [
+        {
+          "symbols": [
+            "ExecutionMetadata.getFunction",
+            "ExecutionMetadata.getDeployment"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/metadata.mdx",
+              "contains": "getFunction"
+            }
+          ],
+          "note": "Acquired methods return native Convex metadata; no duplicated upstream field reference."
+        },
+        {
+          "symbols": ["ExecutionMetadata"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "ExecutionMetadata ="
+            }
+          ],
+          "note": "Raw package tag is backing for the generated entry point; inclusion of acquired members does not promote direct tag imports."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/ExecutionMetadata.ts",
+              "contains": "export const layer"
+            }
+          ],
+          "note": "Invocation boundary supplies the layer; no manual platform service construction reference."
+        }
+      ]
+    },
+    "@confect/server/RequestMetadata": {
+      "source": "packages/server/src/RequestMetadata.ts",
+      "entries": [
+        {
+          "symbols": ["RequestMetadata.get"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/metadata.mdx",
+              "contains": "RequestMetadata"
+            }
+          ],
+          "note": "Acquired method returns native Convex request metadata. authToken is sensitive."
+        },
+        {
+          "symbols": ["RequestMetadata"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "RequestMetadata ="
+            }
+          ],
+          "note": "Raw package tag is backing for the generated entry point; inclusion of acquired members does not promote direct tag imports."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/RequestMetadata.ts",
+              "contains": "export const layer"
+            }
+          ],
+          "note": "Invocation boundary supplies the layer; no manual platform service construction reference."
+        }
+      ]
+    },
+    "@confect/server/TransactionMetadata": {
+      "source": "packages/server/src/TransactionMetadata.ts",
+      "entries": [
+        {
+          "symbols": [
+            "TransactionMetadata.getMetrics",
+            "TransactionMetadata.getSnapshotTs"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/metadata.mdx",
+              "contains": "getSnapshotTs"
+            }
+          ],
+          "note": "Acquired methods return native Convex metrics and bigint nanoseconds."
+        },
+        {
+          "symbols": ["TransactionMetadata"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "TransactionMetadata ="
+            }
+          ],
+          "note": "Raw package tag is backing for the generated entry point; inclusion of acquired members does not promote direct tag imports."
+        },
+        {
+          "symbols": ["layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/TransactionMetadata.ts",
+              "contains": "export const layer"
+            }
+          ],
+          "note": "Invocation boundary supplies the layer; no manual platform service construction reference."
+        }
+      ]
+    },
+    "@confect/server/BlobNotFoundError": {
+      "source": "packages/server/src/BlobNotFoundError.ts",
+      "entries": [
+        {
+          "symbols": ["BlobNotFoundError"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/storage.mdx",
+              "contains": "BlobNotFoundError"
+            }
+          ],
+          "note": "Documented named storage failure; payload should be read from source when writing reference prose."
+        }
+      ]
+    },
+    "@confect/server/VectorSearch": {
+      "source": "packages/server/src/VectorSearch.ts",
+      "entries": [
+        {
+          "symbols": ["VectorSearchService"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/search.mdx",
+              "contains": "vectorSearch("
+            }
+          ],
+          "note": "Callable acquired service, not an object with a vectorSearch method. Include table/index/query options and {_id,_score} results; query.filter is Convex-owned."
+        },
+        {
+          "symbols": ["VectorSearch", "VectorSearchTag", "make", "layer"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "VectorSearch_.VectorSearch"
+            }
+          ],
+          "note": "Generated specialization and signature support; generated tag is the application entry point."
+        }
+      ]
+    },
+    "@confect/server/QueryCtx": {
+      "source": "packages/server/src/QueryCtx.ts",
+      "entries": [
+        {
+          "symbols": ["QueryCtx", "QueryCtxTag"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "QueryCtxTag"
+            }
+          ],
+          "note": "Generated tags expose upstream Convex context; no Confect-owned copies of its member APIs."
+        }
+      ]
+    },
+    "@confect/server/MutationCtx": {
+      "source": "packages/server/src/MutationCtx.ts",
+      "entries": [
+        {
+          "symbols": ["MutationCtx", "MutationCtxTag"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "MutationCtxTag"
+            }
+          ],
+          "note": "Generated tags expose upstream Convex context; no Confect-owned copies of its member APIs."
+        }
+      ]
+    },
+    "@confect/server/ActionCtx": {
+      "source": "packages/server/src/ActionCtx.ts",
+      "entries": [
+        {
+          "symbols": ["ActionCtx", "ActionCtxTag"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "ActionCtxTag"
+            }
+          ],
+          "note": "Generated tags expose upstream Convex context; no Confect-owned copies of its member APIs."
+        }
+      ]
+    },
+    "@confect/server/StorageReader": {
+      "source": "packages/server/src/StorageReader.ts",
+      "entries": [
+        {
+          "symbols": ["StorageReader", "layer"],
+          "reference": "supporting",
+          "audience": "compatibility",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/services.mdx",
+              "contains": "remain available for compatibility"
+            }
+          ],
+          "note": "Legacy storage aliases and requirement dependencies remain accessible; new authoring uses generated Storage."
+        }
+      ]
+    },
+    "@confect/server/StorageWriter": {
+      "source": "packages/server/src/StorageWriter.ts",
+      "entries": [
+        {
+          "symbols": ["StorageWriter", "layer"],
+          "reference": "supporting",
+          "audience": "compatibility",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/services.mdx",
+              "contains": "remain available for compatibility"
+            }
+          ],
+          "note": "Legacy storage aliases and requirement dependencies remain accessible; new authoring uses generated Storage."
+        }
+      ]
+    },
+    "@confect/server/StorageActionWriter": {
+      "source": "packages/server/src/StorageActionWriter.ts",
+      "entries": [
+        {
+          "symbols": ["StorageActionWriter", "layer"],
+          "reference": "supporting",
+          "audience": "compatibility",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/services.mdx",
+              "contains": "remain available for compatibility"
+            }
+          ],
+          "note": "Legacy storage aliases and requirement dependencies remain accessible; new authoring uses generated Storage."
+        }
+      ]
+    },
+    "@confect/server/CronJob": {
+      "source": "packages/server/src/CronJob.ts",
+      "entries": [
+        {
+          "symbols": ["make"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/cron-jobs.mdx",
+              "contains": "CronJob.make"
+            }
+          ],
+          "note": "Identifier/schedule/internal mutation-or-action ref/optional args contract."
+        }
+      ]
+    },
+    "@confect/server/CronJobs": {
+      "source": "packages/server/src/CronJobs.ts",
+      "entries": [
+        {
+          "symbols": ["make", "CronJobs.add"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/cron-jobs.mdx",
+              "contains": "CronJobs.make()"
+            }
+          ],
+          "note": "Immutable collection builder and returned add method."
+        },
+        {
+          "symbols": ["CronJobs.convexCronJobs"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "convexCronJobs"
+            }
+          ],
+          "note": "Generated native crons entry consumes this property; no direct authoring reference."
+        }
+      ]
+    },
+    "@confect/server/CronWindow": {
+      "source": "packages/server/src/CronWindow.ts",
+      "entries": [
+        {
+          "symbols": ["CronWindow", "hourly", "daily", "weekly", "monthly"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/cron-jobs.mdx",
+              "contains": "CronWindow.weekly"
+            }
+          ],
+          "note": "Included from codebase docs, regardless of live release lag; named schedule union does not promote guards."
+        },
+        {
+          "symbols": [
+            "daily.options.hourUtc",
+            "weekly.options.dayOfWeek",
+            "weekly.options.hourUtc",
+            "monthly.options.day",
+            "monthly.options.hourUtc"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/cron-jobs.mdx",
+              "contains": "lowercase weekdays"
+            }
+          ],
+          "note": "Taught constructor option contracts, not raw object/discriminant construction."
+        },
+        {
+          "symbols": ["isCronWindow"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/server/src/CronWindow.ts",
+              "contains": "export const isCronWindow"
+            }
+          ],
+          "note": "Untaught guard remains accessible; no implication of safe removal."
+        }
+      ]
+    },
+    "@confect/server/AiGatewayLanguageClient": {
+      "source": "packages/server/src/AiGatewayLanguageClient.ts",
+      "entries": [
+        {
+          "symbols": ["layer"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/ai-gateway.mdx",
+              "contains": "AiGatewayLanguageClient.layer"
+            }
+          ],
+          "note": "Explicitly taught AI client layer; not a generated platform service."
+        },
+        {
+          "symbols": ["AiGatewayDisabled", "AiGatewayUnavailable"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/ai-gateway.mdx",
+              "contains": "AiGatewayDisabled"
+            }
+          ],
+          "note": "Named gateway failure aliases under this public owner; definitions are in an export-map-hidden file. Reference can share one failure definition.",
+          "source": "packages/server/src/internal/AiGatewayServiceToken.ts"
+        },
+        {
+          "symbols": ["AiGatewayError"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/server/src/internal/AiGatewayServiceToken.ts",
+              "contains": "export type AiGatewayError"
+            }
+          ],
+          "note": "Union/value alias needed by layer signatures; do not hide it with its implementation file.",
+          "source": "packages/server/src/internal/AiGatewayServiceToken.ts"
+        },
+        {
+          "symbols": ["make", "AiGatewayLanguageClient"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/server/src/AiGatewayLanguageClient.ts",
+              "contains": "export const make"
+            }
+          ],
+          "note": "Untaught raw factory/service remains available; taught layer does not promote all exports."
+        }
+      ]
+    },
+    "@confect/server/AiGatewayDecisionClient": {
+      "source": "packages/server/src/AiGatewayDecisionClient.ts",
+      "entries": [
+        {
+          "symbols": ["layer"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/ai-gateway.mdx",
+              "contains": "AiGatewayDecisionClient.layer"
+            }
+          ],
+          "note": "Explicitly taught AI client layer; not a generated platform service."
+        },
+        {
+          "symbols": ["AiGatewayDisabled", "AiGatewayUnavailable"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/ai-gateway.mdx",
+              "contains": "AiGatewayDisabled"
+            }
+          ],
+          "note": "Named gateway failure aliases under this public owner; definitions are in an export-map-hidden file. Reference can share one failure definition.",
+          "source": "packages/server/src/internal/AiGatewayServiceToken.ts"
+        },
+        {
+          "symbols": ["AiGatewayError"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/server/src/internal/AiGatewayServiceToken.ts",
+              "contains": "export type AiGatewayError"
+            }
+          ],
+          "note": "Union/value alias needed by layer signatures; do not hide it with its implementation file.",
+          "source": "packages/server/src/internal/AiGatewayServiceToken.ts"
+        },
+        {
+          "symbols": ["make", "AiGatewayDecisionClient"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/server/src/AiGatewayDecisionClient.ts",
+              "contains": "export const make"
+            }
+          ],
+          "note": "Untaught raw factory/service remains available; taught layer does not promote all exports."
+        }
+      ]
+    },
+    "@confect/server/AiGatewayLanguageModel": {
+      "source": "packages/server/src/AiGatewayLanguageModel.ts",
+      "entries": [
+        {
+          "symbols": ["model", "withConfigOverride"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/ai-gateway.mdx",
+              "contains": "AiGatewayLanguageModel.withConfigOverride"
+            }
+          ],
+          "note": "model's upstream options include taught temperature and max_output_tokens; request options remain upstream-owned."
+        },
+        {
+          "symbols": ["Config", "Options", "make", "layer"],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/server/src/AiGatewayLanguageModel.ts",
+              "contains": "export const make"
+            }
+          ],
+          "note": "Other model exports are not automatically included; preserve signature support without standalone entries."
+        }
+      ]
+    },
+    "@confect/server/AiGatewayDecisionModel": {
+      "source": "packages/server/src/AiGatewayDecisionModel.ts",
+      "entries": [
+        {
+          "symbols": ["model", "make", "layer"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/ai-gateway.mdx",
+              "contains": "AiGatewayDecisionModel.make({ model })"
+            }
+          ],
+          "note": "Explicit direct service/layer construction is taught here; no language-model-style overrides."
+        },
+        {
+          "symbols": ["Options.model"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/ai-gateway.mdx",
+              "contains": "AiGatewayDecisionModel.layer({ model })"
+            }
+          ],
+          "note": "Taught model option shared by make/layer."
+        }
+      ]
+    },
+    "@confect/server/DatabaseSchema": {
+      "source": "packages/server/src/DatabaseSchema.ts",
+      "entries": [
+        {
+          "symbols": ["DatabaseSchema", "make"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "DatabaseSchema.make"
+            }
+          ],
+          "note": "Generated runtime schema assembly; consumer-facing artifact is classified separately."
+        }
+      ]
+    },
+    "@confect/server/RegisteredFunctions": {
+      "source": "packages/server/src/RegisteredFunctions.ts",
+      "entries": [
+        {
+          "symbols": ["buildForGroup", "RegisteredFunctionsForGroupSpec"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "RegisteredFunctions.buildForGroup"
+            }
+          ],
+          "note": "Generated registration consumer dependency, not a hand-authored library reference."
+        }
+      ]
+    },
+    "@confect/server/RegisteredNodeFunction": {
+      "source": "packages/server/src/RegisteredNodeFunction.ts",
+      "entries": [
+        {
+          "symbols": ["buildForGroup"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "RegisteredNodeFunction.buildForGroup"
+            }
+          ],
+          "note": "Generated registration consumer dependency, not a hand-authored library reference."
+        }
+      ]
+    },
+    "@confect/server/ConvexFunctionDefinitions": {
+      "source": "packages/server/src/ConvexFunctionDefinitions.ts",
+      "entries": [
+        {
+          "symbols": ["buildForGroup"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "ConvexFunctionDefinitions.buildForGroup"
+            }
+          ],
+          "note": "Generated registration consumer dependency, not a hand-authored library reference."
+        }
+      ]
+    },
+    "@confect/server/RegisteredConvexFunction": {
+      "source": "packages/server/src/RegisteredConvexFunction.ts",
+      "entries": [
+        {
+          "symbols": ["register"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "RegisteredConvexFunction.register"
+            }
+          ],
+          "note": "Generated registration consumer dependency, not a hand-authored library reference."
+        }
+      ]
+    }
+  }
+}

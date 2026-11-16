@@ -1,0 +1,429 @@
+{
+  "modules": {
+    "@confect/core/FunctionSpec": {
+      "source": "packages/core/src/FunctionSpec.ts",
+      "entries": [
+        {
+          "symbols": [
+            "publicQuery",
+            "publicMutation",
+            "publicAction",
+            "internalQuery",
+            "internalMutation",
+            "internalAction"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/functions.mdx",
+              "contains": "FunctionSpec.publicQuery"
+            }
+          ],
+          "note": "The internal prefix controls application function visibility, not library reference visibility."
+        },
+        {
+          "symbols": ["publicPaginatedQuery", "internalPaginatedQuery"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/functions.mdx",
+              "contains": "publicPaginatedQuery"
+            }
+          ],
+          "note": "Include lazy item/args/error options and the automatically supplied paginationOpts contract; do not permit paginationOpts in user args."
+        },
+        {
+          "symbols": ["publicNodeAction", "internalNodeAction"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/node-actions.mdx",
+              "contains": "internalNodeAction"
+            }
+          ],
+          "note": "Node-only constructors."
+        },
+        {
+          "symbols": [
+            "convexPublicQuery",
+            "convexPublicMutation",
+            "convexPublicAction",
+            "convexPublicNodeAction",
+            "convexInternalQuery",
+            "convexInternalMutation",
+            "convexInternalAction",
+            "convexInternalNodeAction"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/plain-convex-functions.mdx",
+              "contains": "convexPublicNodeAction"
+            }
+          ],
+          "note": "Curried registered-function type constructor and name, not schema-based construction."
+        },
+        {
+          "symbols": ["Builder.middleware"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/middleware.mdx",
+              "contains": ".middleware("
+            }
+          ],
+          "note": "Returned builder attachment including options and ordering; not every FunctionSpec property."
+        },
+        {
+          "symbols": [
+            "publicQuery.name",
+            "publicQuery.args",
+            "publicQuery.returns",
+            "publicQuery.error",
+            "publicPaginatedQuery.item"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/functions.mdx",
+              "contains": "returns:"
+            }
+          ],
+          "note": "Representative option paths shared by the schema-based constructors; args/returns/error/item are lazy. Node variants share the contract, plain Convex variants do not."
+        },
+        {
+          "symbols": ["FunctionSpec", "Builder"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/core/src/FunctionSpec.ts",
+              "contains": "export interface Builder"
+            }
+          ],
+          "note": "Container types remain available to describe taught constructors and middleware; not independent whole-type/member promotion."
+        }
+      ]
+    },
+    "@confect/core/GroupSpec": {
+      "source": "packages/core/src/GroupSpec.ts",
+      "entries": [
+        {
+          "symbols": [
+            "make",
+            "makeNode",
+            "GroupSpec.addFunction",
+            "GroupSpec.middleware"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/functions.mdx",
+              "contains": "GroupSpec.make"
+            },
+            {
+              "path": "apps/docs/server/node-actions.mdx",
+              "contains": "makeNode"
+            },
+            {
+              "path": "apps/docs/server/middleware.mdx",
+              "contains": ".middleware("
+            }
+          ],
+          "note": "The returned builder is taught; no assembly or introspection helper is implied."
+        },
+        {
+          "symbols": ["make.experimental_reuseContext"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/functions.mdx",
+              "contains": "experimental_reuseContext"
+            }
+          ],
+          "note": "Experimental option on make, not makeNode; only this group's queries/mutations.",
+          "qualifier": "experimental"
+        },
+        {
+          "symbols": ["GroupSpec"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/core/src/GroupSpec.ts",
+              "contains": "export interface GroupSpec"
+            }
+          ],
+          "note": "Retain returned builder and its signature dependencies."
+        },
+        {
+          "symbols": ["withName", "addGroupsAt"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/SpecAssemblyNode.ts",
+              "contains": "GroupSpec.addGroupsAt"
+            }
+          ],
+          "note": "Generated spec assembly dependencies, not manually promoted builder operations."
+        }
+      ]
+    },
+    "@confect/core/MiddlewareSpec": {
+      "source": "packages/core/src/MiddlewareSpec.ts",
+      "entries": [
+        {
+          "symbols": ["MiddlewareSpec"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/middleware.mdx",
+              "contains": "MiddlewareSpec.MiddlewareSpec"
+            }
+          ],
+          "note": "Include class-factory invocation, not all module exports."
+        },
+        {
+          "symbols": [
+            "MiddlewareSpec.Config.provides",
+            "MiddlewareSpec.Config.requires",
+            "MiddlewareSpec.error",
+            "MiddlewareSpec.options",
+            "MiddlewareSpec.functionTypes"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/middleware.mdx",
+              "contains": "functionTypes:"
+            }
+          ],
+          "note": "Factory generic configuration and lazy schema options; Config is a generic parameter, not an exported type."
+        },
+        {
+          "symbols": [
+            "SupportedFunctionTypes.query",
+            "SupportedFunctionTypes.mutation",
+            "SupportedFunctionTypes.action"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/middleware.mdx",
+              "contains": "query: true"
+            }
+          ],
+          "note": "Attachment applicability flags, not application function constructors."
+        },
+        {
+          "symbols": [
+            "MiddlewareOptions.invocation.name",
+            "MiddlewareOptions.invocation.functionType",
+            "MiddlewareOptions.invocation.functionVisibility",
+            "MiddlewareOptions.invocation.args",
+            "MiddlewareOptions.options"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/server/middleware.mdx",
+              "contains": "invocation"
+            }
+          ],
+          "note": "Returned implementation callback context; options exists only when declared."
+        },
+        {
+          "symbols": [
+            "MiddlewareOptions",
+            "MiddlewareImpl",
+            "SupportedFunctionTypes"
+          ],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/core/src/MiddlewareSpec.ts",
+              "contains": "export type MiddlewareOptions"
+            }
+          ],
+          "note": "Retain callback/signature containers without promoting helper exports."
+        }
+      ]
+    },
+    "@confect/core/Ref": {
+      "source": "packages/core/src/Ref.ts",
+      "entries": [
+        {
+          "symbols": [
+            "ConfectRef.args",
+            "ConfectRef.returns",
+            "ConfectRef.error",
+            "Base.convexFunctionName"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "function names"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "error"
+            }
+          ],
+          "note": "Generated reference leaf contract. Schema properties apply to Confect refs; plain Convex refs do not gain schemas."
+        },
+        {
+          "symbols": ["Ref", "ConfectRef", "ConvexRef", "Base"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/core/src/Ref.ts",
+              "contains": "export type Ref"
+            }
+          ],
+          "note": "Retain reference signature types; no independent constructor reference."
+        },
+        {
+          "symbols": [
+            "make",
+            "getFunctionReference",
+            "encodeArgs",
+            "decodeReturns"
+          ],
+          "reference": "supporting",
+          "audience": "implementation",
+          "evidence": [
+            {
+              "path": "packages/core/src/Refs.ts",
+              "contains": "Ref.make"
+            }
+          ],
+          "note": "Construction and transport dependencies are not directly taught authoring helpers."
+        }
+      ]
+    },
+    "@confect/core/Refs": {
+      "source": "packages/core/src/Refs.ts",
+      "entries": [
+        {
+          "symbols": ["Refs", "make"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "Refs.make"
+            }
+          ],
+          "note": "Generated tree is documented separately; factory and mapped types remain available to generated code."
+        }
+      ]
+    },
+    "@confect/core/Spec": {
+      "source": "packages/core/src/Spec.ts",
+      "entries": [
+        {
+          "symbols": ["Spec", "fromGroups"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/spec.ts",
+              "contains": "Spec.fromGroups"
+            }
+          ],
+          "note": "Generated assembly, not a hand-authoring entry point."
+        }
+      ]
+    },
+    "@confect/core/GenericId": {
+      "source": "packages/core/src/GenericId.ts",
+      "entries": [
+        {
+          "symbols": ["GenericId"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "packages/cli/src/templates.ts",
+              "contains": "GenericId.GenericId"
+            }
+          ],
+          "note": "Generated Id constructor/type backing; testing guide's GenericId import is Convex-owned."
+        }
+      ]
+    },
+    "@confect/core/PaginationError": {
+      "source": "packages/core/src/PaginationError.ts",
+      "entries": [
+        {
+          "symbols": ["InvalidCursor"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "InvalidCursor"
+            }
+          ],
+          "note": "Named failure contract, independently of conversion helper scope."
+        },
+        {
+          "symbols": ["fromConvexQueryError", "fromConvexErrorData"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/core/src/PaginationError.ts",
+              "contains": "fromConvexErrorData"
+            }
+          ],
+          "note": "Untaught conversion helpers; not expanded by including InvalidCursor."
+        }
+      ]
+    },
+    "@confect/core/SchemaToValidator": {
+      "source": "packages/core/src/SchemaToValidator.ts",
+      "entries": [
+        {
+          "symbols": [
+            "TopLevelMustBeObjectError",
+            "TopLevelMustBeObjectOrUnionError",
+            "UnsupportedPropertySignatureKeyTypeError",
+            "EmptyTupleIsNotSupportedError",
+            "EmptyUnionIsNotSupportedError",
+            "UnsupportedSchemaTypeError",
+            "IndexSignaturesAreNotSupportedError",
+            "MixedIndexAndPropertySignaturesAreNotSupportedError",
+            "OptionalTupleElementsAreNotSupportedError"
+          ],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/core/src/SchemaToValidator.ts",
+              "contains": "TopLevelMustBeObjectError"
+            }
+          ],
+          "note": "Audit candidates, not named failure contracts taught by the schema-restrictions page. No automatic reference expansion."
+        }
+      ]
+    }
+  }
+}

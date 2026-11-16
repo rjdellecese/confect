@@ -1,0 +1,1207 @@
+{
+  "modules": {
+    "@confect/js/HttpClient": {
+      "source": "packages/js/src/HttpClient.ts",
+      "entries": [
+        {
+          "symbols": ["HttpClient", "layer"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/js/http.mdx",
+              "contains": "const HttpClientLive = HttpClient.layer("
+            },
+            {
+              "path": "apps/docs/clients/js/http.mdx",
+              "contains": "const client = yield* HttpClient.HttpClient;"
+            }
+          ],
+          "note": "Application service and taught URL-based layer; not a generated server factory. Constructor options are not separately taught."
+        },
+        {
+          "symbols": [
+            "HttpClient.query",
+            "HttpClient.mutation",
+            "HttpClient.action"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/js/http.mdx",
+              "contains": "It provides `query`, `mutation`, and `action` methods that accept refs"
+            }
+          ],
+          "note": "Inferred service methods accept refs and decoded args and return Effects; extra mutation queue options are not taught."
+        },
+        {
+          "symbols": ["HttpClient.setAuth", "HttpClient.clearAuth"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/js/http.mdx",
+              "contains": "yield* client.setAuth(token);"
+            },
+            {
+              "path": "apps/docs/clients/js/http.mdx",
+              "contains": "yield* client.clearAuth;"
+            }
+          ],
+          "note": "clearAuth is an Effect-valued property, not a callable method."
+        },
+        {
+          "symbols": ["HttpClientError"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/js/http.mdx",
+              "contains": "`HttpClientError` (wrapping transport-level or undeclared backend errors)"
+            }
+          ],
+          "note": "Named failure contract; payload is cause, not a separately taught constructor API. Schema.SchemaError belongs to Effect."
+        },
+        {
+          "symbols": ["HttpClient.url"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/js/src/HttpClient.ts",
+              "contains": "url: client.url,"
+            }
+          ],
+          "note": "Accessible service field, not taught by the HTTP guide."
+        }
+      ]
+    },
+    "@confect/js/WebSocketClient": {
+      "source": "packages/js/src/WebSocketClient.ts",
+      "entries": [
+        {
+          "symbols": ["WebSocketClient", "layer"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/js/websocket.mdx",
+              "contains": "const WebSocketClientLive = WebSocketClient.layer("
+            },
+            {
+              "path": "apps/docs/clients/js/websocket.mdx",
+              "contains": "const client = yield* WebSocketClient.WebSocketClient;"
+            }
+          ],
+          "note": "Application service and scoped URL-based layer; constructor options are not separately taught."
+        },
+        {
+          "symbols": [
+            "WebSocketClient.query",
+            "WebSocketClient.mutation",
+            "WebSocketClient.action",
+            "WebSocketClient.reactiveQuery",
+            "WebSocketClient.reactiveQueryResult"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/js/websocket.mdx",
+              "contains": "It provides the same `query`, `mutation`, and `action` methods"
+            },
+            {
+              "path": "apps/docs/clients/js/websocket.mdx",
+              "contains": "Use `reactiveQueryResult` when an error should instead"
+            }
+          ],
+          "note": "Decoded invocation and stream contracts; reactiveQuery fails its stream, while reactiveQueryResult emits failures and can recover."
+        },
+        {
+          "symbols": ["WebSocketClient.setAuth"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/js/websocket.mdx",
+              "contains": "`setAuth` accepts an Effect-returning function"
+            },
+            {
+              "path": "apps/docs/clients/js/websocket.mdx",
+              "contains": "The optional second argument is a function that receives the current `isAuthenticated` status"
+            }
+          ],
+          "note": "Includes forceRefreshToken input and optional effectful auth-change callback."
+        },
+        {
+          "symbols": ["WebSocketClientError"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/js/websocket.mdx",
+              "contains": "`WebSocketClientError` (wrapping transport-level or undeclared backend errors)"
+            }
+          ],
+          "note": "Named failure contract with cause encoded by Schema.Defect; Effect owns Schema.SchemaError."
+        },
+        {
+          "symbols": ["WebSocketClient.url"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/js/src/WebSocketClient.ts",
+              "contains": "url: address,"
+            }
+          ],
+          "note": "Accessible service field, not taught by the WebSocket guide."
+        }
+      ]
+    },
+    "@confect/foldkit/Client": {
+      "source": "packages/foldkit/src/Client.ts",
+      "entries": [
+        {
+          "symbols": ["Client", "layer"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "resources: Confect.Client.layer(import.meta.env.VITE_CONVEX_URL),"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`setAuth` is available on the `Client` service."
+            }
+          ],
+          "note": "Application resource and service; taught setAuth is inherited from WebSocketClient.setAuth. Other inherited methods and constructor options are not promoted."
+        },
+        {
+          "symbols": ["WebSocketClient.setAuth"],
+          "reference": "included",
+          "audience": "application",
+          "source": "packages/js/src/WebSocketClient.ts",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "client.setAuth(({ forceRefreshToken }) => fetchToken(forceRefreshToken))"
+            }
+          ],
+          "note": "Inherited Client service operation, located at its actual exported source owner rather than an invented local declaration."
+        },
+        {
+          "symbols": ["WebSocketClientError"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`WebSocketClientError`\nrepresents an unexpected client failure"
+            }
+          ],
+          "note": "Retain the public Foldkit alias of the documented JS transport failure.",
+          "source": "packages/js/src/WebSocketClient.ts"
+        },
+        {
+          "symbols": ["make", "Client.resolvePaginationId"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/foldkit/src/Client.ts",
+              "contains": "export const make ="
+            },
+            {
+              "path": "packages/foldkit/src/Client.ts",
+              "contains": "resolvePaginationId: (restored:"
+            }
+          ],
+          "note": "Untaught composition factory and allocator; retain existing access without standalone reference coverage."
+        }
+      ]
+    },
+    "@confect/foldkit/Command": {
+      "source": "packages/foldkit/src/Command.ts",
+      "entries": [
+        {
+          "symbols": [
+            "query",
+            "mutation",
+            "action",
+            "queryEffect",
+            "mutationEffect",
+            "actionEffect",
+            "Error"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`Command.query`, `Command.mutation`, and `Command.action`"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`Command.queryEffect`, `Command.mutationEffect`, and `Command.actionEffect`"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`Confect.Command.Error<typeof ref>`"
+            }
+          ],
+          "note": "Factories and execute-body helpers map decoded success/errors to Messages; Error is the explicitly taught union."
+        },
+        {
+          "symbols": ["Handlers.onSuccess", "Handlers.onError"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "onSuccess: (noteId) => Message.SucceededSaveNote({ noteId }),"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "onError: (error) => Message.FailedSaveNote({ message: String(error) }),"
+            }
+          ],
+          "note": "Shared callbacks taught for factories and custom execute bodies."
+        },
+        {
+          "symbols": [
+            "InterruptibleDefinition.Interrupt",
+            "KeyedInterruptibleDefinition.Interrupt",
+            "KeyedInterrupt.keyFields",
+            "KeyedInterrupt.toKey"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`interrupt: { keyFields, toKey }` derives the key from the ref's args"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "gains an `Interrupt` constructor that builds an ordinary Command"
+            }
+          ],
+          "note": "Inherited Foldkit members of the exported Confect definition/option contracts. Include name-keyed and key-args Interrupt overloads; outcome variants remain upstream-owned."
+        },
+        {
+          "symbols": [
+            "Handlers",
+            "Definition",
+            "InterruptOption",
+            "KeyedInterrupt",
+            "InterruptibleDefinition",
+            "KeyedInterruptibleDefinition"
+          ],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`messages`\ndeclares the Messages the Command can produce"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`interrupt: { keyFields, toKey }` derives the key from the ref's args"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "gains an `Interrupt` constructor that builds an ordinary Command"
+            }
+          ],
+          "note": "Retain signature types. Explain messages and interrupt options beside factories; included inherited members do not promote every Foldkit definition member."
+        }
+      ]
+    },
+    "@confect/foldkit/Subscription": {
+      "source": "packages/foldkit/src/Subscription.ts",
+      "entries": [
+        {
+          "symbols": ["reactiveQuery", "reactiveQueryStream", "paginatedQuery"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`Subscription.reactiveQuery` builds a complete Foldkit subscription entry"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "use `Subscription.reactiveQueryStream` as its `dependenciesToStream` body"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "notesPage: Confect.Subscription.paginatedQuery<Model>()(Notes, {"
+            }
+          ],
+          "note": "Includes args extractor gating/equivalence, stream helper callbacks, and pagination state/onSettled options; these anonymous option shapes stay with their functions."
+        },
+        {
+          "symbols": ["Handlers.onSuccess", "Handlers.onError"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`onSuccess` receives the decoded return value on every server update;"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`onError` receives the ref's decoded typed error"
+            }
+          ],
+          "note": "Callbacks produce Messages; failure does not terminate the subscription."
+        },
+        {
+          "symbols": ["Handlers", "Error", "Dependencies"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Its dependencies are the query args wrapped in an `Option`"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "or a `SchemaError`. Errors are emitted as Messages"
+            }
+          ],
+          "note": "Signature support, not independent constructor or dependency-building APIs."
+        }
+      ]
+    },
+    "@confect/foldkit/QueryResult": {
+      "source": "packages/foldkit/src/QueryResult.ts",
+      "entries": [
+        {
+          "symbols": [
+            "QueryResult",
+            "Loading",
+            "Success",
+            "Failure",
+            "Success.value",
+            "Failure.error"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Model. It has three states: `Loading`, `Success` with a `value`, and `Failure`"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "const Notes = QueryResult.QueryResult(Schema.Array(Note), Schema.String);"
+            }
+          ],
+          "note": "Includes the schema/type and granular result payloads. Error schema defaults to Never; decoded values retain pipe, Equal and Hash protocols."
+        },
+        {
+          "symbols": [
+            "load",
+            "succeed",
+            "fail",
+            "match",
+            "isLoading",
+            "isSuccess",
+            "isFailure"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "QueryResult.load()"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "QueryResult.succeed(notes)"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "QueryResult.fail(errorMessage)"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Use `QueryResult.match` to handle each state, or narrow with"
+            }
+          ],
+          "note": "Includes match callbacks and documented protocol behavior; no skipped/enabled state."
+        },
+        {
+          "symbols": ["isQueryResult"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/foldkit/src/QueryResult.ts",
+              "contains": "export const isQueryResult ="
+            }
+          ],
+          "note": "Whole-result recognition is not taught; do not infer it from variant predicates."
+        }
+      ]
+    },
+    "@confect/foldkit/PaginatedQuery": {
+      "source": "packages/foldkit/src/PaginatedQuery.ts",
+      "entries": [
+        {
+          "symbols": [
+            "make",
+            "PaginatedQuery.schema",
+            "PaginatedQuery.idle",
+            "PaginatedQuery.settlement",
+            "PaginatedQuery.init",
+            "PaginatedQuery.reinitialize"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "export const Notes = Confect.PaginatedQuery.make(refs.public.notes.paginate);"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "notes: Notes.schema,"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "notes: Notes.idle"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "settlement: Notes.settlement"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Notes.init(idle, { channel }, { initialNumItems: 20 })"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Notes.reinitialize(active, { channel }, { initialNumItems: 20 })"
+            }
+          ],
+          "note": "Taught returned bundle members only; reinitialize is not a module function."
+        },
+        {
+          "symbols": ["settle", "next", "close", "first", "reset"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "notes: Confect.PaginatedQuery.settle(settlement),"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Confect.PaginatedQuery.next(active)"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Match.tag(\"Active\", Confect.PaginatedQuery.close)"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`first` is ordinary navigation back to page one"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`reset` purely requests a fresh session"
+            }
+          ],
+          "note": "Pure transitions retain pages and reject obsolete settlements as described."
+        },
+        {
+          "symbols": [
+            "getPage",
+            "getItems",
+            "targetPageNumber",
+            "Page.number",
+            "canNext",
+            "canPrev"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`getPage` and `getItems` return `Option`s"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`Page.number` is the page being displayed;"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`targetPageNumber` is the page currently requested"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Confect.PaginatedQuery.canNext(state)"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Confect.PaginatedQuery.canPrev(state)"
+            }
+          ],
+          "note": "Only the displayed page number is independently taught among Page fields."
+        },
+        {
+          "symbols": [
+            "isIdle",
+            "isLoading",
+            "isRefreshing",
+            "isSuccess",
+            "isFailure",
+            "isStale",
+            "isPending",
+            "hasPage",
+            "hasError",
+            "match"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`isIdle`, `isLoading`, `isRefreshing`, `isSuccess`, `isFailure`, and `isStale`"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "are refinements; `isPending`, `hasPage`, `hasError`, and the exhaustive `match`"
+            }
+          ],
+          "note": "Taught view refinements and matcher; no promotion of other guards."
+        },
+        {
+          "symbols": [
+            "Idle",
+            "Active",
+            "Loading",
+            "Refreshing",
+            "Success",
+            "Failure",
+            "Stale"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Match.tag(\"Active\", (active) =>"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "the same vocabulary as Foldkit's `AsyncData`: `Idle`, `Loading`, `Refreshing`,"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "`Success`, `Failure`, and `Stale`."
+            }
+          ],
+          "note": "Idle/Active are outer states; the other variants describe Active.phase. Untaught correlation fields remain signature support."
+        },
+        {
+          "symbols": [
+            "Options.initialNumItems",
+            "Options.maximumRowsRead",
+            "Options.maximumBytesRead"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Options use Convex's names: `initialNumItems` is"
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "required, while `maximumRowsRead` and `maximumBytesRead` are optional positive"
+            }
+          ],
+          "note": "Session option fields, not blanket inclusion of the Options schema constructor."
+        },
+        {
+          "symbols": ["FunctionError"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Failed settlements carry an exhaustive error union: `FunctionError` wraps an"
+            }
+          ],
+          "note": "Named declared-error envelope, not an Error subclass; retain its error payload in the contract without promoting manual construction."
+        },
+        {
+          "symbols": ["InvalidCursor"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Convex's `InvalidCursor`\npseudo-error is also represented explicitly in settlements"
+            }
+          ],
+          "note": "Public alias of the core failure; settle handles it by restarting the session.",
+          "source": "packages/core/src/PaginationError.ts"
+        },
+        {
+          "symbols": [
+            "PaginatedQuery",
+            "Options",
+            "State",
+            "Phase",
+            "Page",
+            "Settlement",
+            "Request",
+            "PageDescriptor",
+            "PageResult",
+            "Item",
+            "UserArgs",
+            "Error"
+          ],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "correlated-settlement schemas together with its operations."
+            },
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "Failed settlements carry an exhaustive error union"
+            }
+          ],
+          "note": "Retain signature closure for bundle, state, options and correlated outcomes; schema values and untaught members are not independently included."
+        },
+        {
+          "symbols": ["prev"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/foldkit.mdx",
+              "contains": "previous—over Convex's cursor-based pagination."
+            }
+          ],
+          "note": "Previous-page behavior is described, but prev is never named. Explicit documentation candidate rather than automatic promotion."
+        },
+        {
+          "symbols": [
+            "getError",
+            "isFirst",
+            "isLast",
+            "PaginatedQuery.ref",
+            "PaginatedQuery.subscriptionRequestSchema",
+            "PaginatedQuery.requestSchema"
+          ],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/foldkit/src/PaginatedQuery.ts",
+              "contains": "readonly subscriptionRequestSchema:"
+            },
+            {
+              "path": "packages/foldkit/src/PaginatedQuery.ts",
+              "contains": "readonly requestSchema:"
+            }
+          ],
+          "note": "Untaught navigation helpers and bundle plumbing stay accessible but outside this reference."
+        }
+      ]
+    },
+    "@confect/react": {
+      "source": "packages/react/src/index.ts",
+      "entries": [
+        {
+          "symbols": [
+            "useQuery",
+            "usePaginatedQuery",
+            "useStreamPaginatedQuery",
+            "useMutation",
+            "useAction"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "## `useQuery`"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "## `usePaginatedQuery`"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "## `useStreamPaginatedQuery`"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "## `useMutation`"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "## `useAction`"
+            }
+          ],
+          "note": "Includes skip behavior, decoded calls/results and conditional declared-error contracts. Pagination options include initialNumItems; stream options also include maximumRowsRead/maximumBytesRead."
+        },
+        {
+          "symbols": ["ReactMutation.withOptimisticUpdate"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "The callback passed to `useMutation(ref).withOptimisticUpdate(...)` receives"
+            }
+          ],
+          "note": "Returned mutation handle member; decoded mutation args and callback-provided store, not raw adapter construction."
+        },
+        {
+          "symbols": [
+            "optimisticallyUpdateValueInPaginatedQuery",
+            "insertAtTop",
+            "insertAtBottomIfLoaded",
+            "insertAtPosition"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "Import `optimisticallyUpdateValueInPaginatedQuery`, `insertAtTop`,"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "`insertAtBottomIfLoaded`, and `insertAtPosition` from `@confect/react`"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "from `sortKeyFromItem` whose ordering matches your server query"
+            }
+          ],
+          "note": "Root aliases retain their actual source owner. Includes decoded items, Option semantics and the sortKeyFromItem contract.",
+          "source": "packages/react/src/OptimisticLocalStore.ts"
+        },
+        {
+          "symbols": [
+            "InvokeReturn",
+            "UsePaginatedQueryArgs",
+            "PaginatedQueryOptions",
+            "OptimisticUpdate",
+            "ReactMutation"
+          ],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "The function returns `Promise<A>`"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "the function returns `Promise<Result<A, E>>`"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "Its local store\naccepts Confect query refs and decoded arguments/results"
+            }
+          ],
+          "note": "Signature support for taught hooks and callback handles; inclusion of a member does not promote every type member or overload."
+        }
+      ]
+    },
+    "@confect/react/QueryResult": {
+      "source": "packages/react/src/QueryResult.ts",
+      "entries": [
+        {
+          "symbols": [
+            "QueryResult",
+            "Loading",
+            "Success",
+            "Failure",
+            "match",
+            "isLoading",
+            "isSuccess",
+            "isFailure",
+            "Loading.skipped"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "Returns a `QueryResult<A, E>`—a tagged union with `Loading`, `Success`, and `Failure` variants."
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "`QueryResult` also exposes the lower-level predicates"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "The hook returns a `Loading` variant whose `skipped` flag is `true`"
+            }
+          ],
+          "note": "Taught result variants, match callbacks, refinements and skipped field; no import of Foldkit constructor/schema/protocol scope."
+        },
+        {
+          "symbols": ["Success.value", "Failure.error", "QueryResult.Proto"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "`QueryResult.match` requires an `onFailure` handler that receives the decoded typed error"
+            }
+          ],
+          "note": "Payload/protocol declarations support the result union; React prose teaches payloads through match, not direct value/error field access."
+        },
+        {
+          "symbols": ["load", "succeed", "fail", "isQueryResult"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/react/src/QueryResult.ts",
+              "contains": "export const load ="
+            },
+            {
+              "path": "packages/react/src/QueryResult.ts",
+              "contains": "export const isQueryResult ="
+            }
+          ],
+          "note": "Untaught constructors and whole-result guard; preserve exports."
+        }
+      ]
+    },
+    "@confect/react/PaginatedQueryResult": {
+      "source": "packages/react/src/PaginatedQueryResult.ts",
+      "entries": [
+        {
+          "symbols": [
+            "PaginatedQueryResult",
+            "LoadingFirstPage",
+            "LoadingMore",
+            "CanLoadMore",
+            "Exhausted",
+            "Failure",
+            "LoadingFirstPage.results",
+            "LoadingFirstPage.isLoading",
+            "LoadingMore.results",
+            "LoadingMore.isLoading",
+            "CanLoadMore.results",
+            "CanLoadMore.isLoading",
+            "CanLoadMore.loadMore",
+            "Exhausted.results",
+            "Exhausted.isLoading",
+            "Failure.results",
+            "Failure.error"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "The loaded variants—`LoadingFirstPage`, `LoadingMore`, `CanLoadMore`, and `Exhausted`—all carry `results` and `isLoading`"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "Every variant carries `results`, `Failure` included"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "{notes.error.reason}"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "`loadMore` lives only on `CanLoadMore`"
+            }
+          ],
+          "note": "Granular taught fields; Failure retains loaded items and has no isLoading/loadMore. Application error.reason is not a library member."
+        },
+        {
+          "symbols": [
+            "match",
+            "isLoadingFirstPage",
+            "isLoadingMore",
+            "isCanLoadMore",
+            "isExhausted",
+            "isLoading",
+            "isFailure"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "`PaginatedQueryResult` also provides `match` for exhaustive pattern matching"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "the predicates `isLoadingFirstPage`, `isLoadingMore`, `isExhausted`, `isLoading`, and `isFailure`"
+            },
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "PaginatedQueryResult.isCanLoadMore(notes)"
+            }
+          ],
+          "note": "Matcher and refinements, not constructors."
+        },
+        {
+          "symbols": [
+            "Variants",
+            "PaginatedQueryResult.Proto",
+            "LoadingFirstPage.skipped"
+          ],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "packages/react/src/PaginatedQueryResult.ts",
+              "contains": "export type Variants<Item, E = never>"
+            },
+            {
+              "path": "packages/react/src/PaginatedQueryResult.ts",
+              "contains": "readonly skipped: boolean;"
+            }
+          ],
+          "note": "Keep structural support for hook results and matcher signatures; skipped is not separately taught for pagination."
+        },
+        {
+          "symbols": [
+            "loadingFirstPage",
+            "loadingMore",
+            "canLoadMore",
+            "exhausted",
+            "failure",
+            "isPaginatedQueryResult"
+          ],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/react/src/PaginatedQueryResult.ts",
+              "contains": "export const loadingFirstPage ="
+            },
+            {
+              "path": "packages/react/src/PaginatedQueryResult.ts",
+              "contains": "export const isPaginatedQueryResult ="
+            }
+          ],
+          "note": "Untaught constructors and whole-result guard remain accessible."
+        }
+      ]
+    },
+    "@confect/react/OptimisticLocalStore": {
+      "source": "packages/react/src/OptimisticLocalStore.ts",
+      "entries": [
+        {
+          "symbols": ["OptimisticLocalStore"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "Its local store\naccepts Confect query refs and decoded arguments/results; query values use\n`Option`"
+            }
+          ],
+          "note": "Named source contract for the callback-provided decoded store; not a blanket inclusion of its methods."
+        },
+        {
+          "symbols": [
+            "OptimisticLocalStore.getQuery",
+            "OptimisticLocalStore.getAllQueries",
+            "OptimisticLocalStore.setQuery"
+          ],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "apps/docs/clients/react.mdx",
+              "contains": "`Option`, with `Option.none()` representing a query missing from the store."
+            }
+          ],
+          "note": "The store is taught semantically, but these method names are absent from the guide. getQuery/setQuery appear in application examples; all three are explicit documentation candidates, not internal APIs."
+        },
+        {
+          "symbols": ["make"],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/react/src/OptimisticLocalStore.ts",
+              "contains": "export const make ="
+            }
+          ],
+          "note": "Untaught manual Convex-store adapter; prefer the documented callback-provided store."
+        }
+      ]
+    },
+    "@confect/react/StreamPagination": {
+      "source": "packages/react/src/StreamPagination.ts",
+      "entries": [
+        {
+          "symbols": [
+            "empty",
+            "initial",
+            "pin",
+            "loadMore",
+            "split",
+            "completeSplit",
+            "isLastPageSplitting",
+            "pageRequests",
+            "interpret"
+          ],
+          "reference": "omitted",
+          "audience": "undecided",
+          "evidence": [
+            {
+              "path": "packages/react/src/StreamPagination.ts",
+              "contains": "export const empty: State ="
+            },
+            {
+              "path": "packages/react/src/StreamPagination.ts",
+              "contains": "export const interpret ="
+            }
+          ],
+          "note": "Untaught lower-level state machine; preserve root/subpath access. Server QueryStream internal-module policy does not apply here."
+        }
+      ]
+    },
+    "@confect/test/TestConfect": {
+      "source": "packages/test/src/TestConfect.ts",
+      "entries": [
+        {
+          "symbols": ["TestConfect", "layer"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "export const TestConfect = TestConfect_.TestConfect<typeof confectSchema>();"
+            },
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "export const layer = TestConfect_.layer("
+            }
+          ],
+          "note": "Explicitly taught application-created factory and test layer; both runtime and deployment schemas are legitimate test inputs."
+        },
+        {
+          "symbols": ["TestConfect.withIdentity"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "const asUser = c.withIdentity({"
+            }
+          ],
+          "note": "Returns the identity-scoped TestConfectWithoutIdentity contract; identity fields belong to upstream UserIdentity."
+        },
+        {
+          "symbols": [
+            "TestConfectWithoutIdentity.query",
+            "TestConfectWithoutIdentity.mutation",
+            "TestConfectWithoutIdentity.action"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "`TestConfect` provides `query`, `mutation`, and `action` methods that accept a ref and args"
+            }
+          ],
+          "note": "Decoded Effect calls live on the shared exported contract. Current source uses Schema.SchemaError; the guide's ParseError wording is stale."
+        },
+        {
+          "symbols": [
+            "TestConfectWithoutIdentity.run",
+            "TestConfectWithoutIdentity.fetch"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "Use `run` to execute arbitrary code with mutation-context services"
+            },
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "When the handler returns `void`, the second argument can be omitted."
+            },
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "Use `fetch` to test your"
+            }
+          ],
+          "note": "run has schema-return and void overloads. fetch is taught with a path; optional upstream RequestInit remains signature support."
+        },
+        {
+          "symbols": [
+            "TestConfectWithoutIdentity.jwks",
+            "DeploymentJwk",
+            "DeploymentJwks"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "`TestConfect.jwks()` wraps"
+            },
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "The `DeploymentJwk` and `DeploymentJwks` types are re-exported"
+            }
+          ],
+          "note": "jwks is a service method; named key types are upstream convex-test reexports, not Confect-defined formats."
+        },
+        {
+          "symbols": [
+            "TestConfectWithoutIdentity.finishInProgressScheduledFunctions",
+            "TestConfectWithoutIdentity.finishAllScheduledFunctions"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "yield* c.finishInProgressScheduledFunctions();"
+            },
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "yield* c.finishAllScheduledFunctions(() => {"
+            }
+          ],
+          "note": "Scheduled-function helpers with the documented timer callback."
+        },
+        {
+          "symbols": ["TestConfectWithoutIdentity"],
+          "reference": "supporting",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/guides/testing.mdx",
+              "contains": "const identity = yield* asUser.query(refs.public.auth.getIdentity, {});"
+            }
+          ],
+          "note": "Shared returned service contract; not another service tag or automatic inclusion of future members."
+        }
+      ]
+    }
+  }
+}

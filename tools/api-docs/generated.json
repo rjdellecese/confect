@@ -1,0 +1,248 @@
+{
+  "modules": {
+    "confect/_generated/components": {
+      "kind": "generated",
+      "source": "apps/example/confect/_generated/components.ts",
+      "entries": [
+        {
+          "symbols": ["components"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "typed `components` registry"
+            }
+          ],
+          "note": "Installed component keys vary per app; ComponentApi and component methods are upstream, not Confect exports."
+        }
+      ]
+    },
+    "confect/_generated/docs": {
+      "kind": "generated",
+      "source": "apps/example/confect/_generated/docs.ts",
+      "entries": [
+        {
+          "symbols": ["Docs"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "Docs"
+            }
+          ],
+          "note": "Also include the per-table <Table>Doc naming contract (e.g. NotesDoc), not the example's concrete table names as package APIs."
+        }
+      ]
+    },
+    "confect/_generated/id": {
+      "kind": "generated",
+      "source": "apps/example/confect/_generated/id.ts",
+      "entries": [
+        {
+          "symbols": ["Id", "TableNames"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "Id<TableName>"
+            }
+          ],
+          "note": "Id is both schema constructor and type; accepts declared and system tables, while TableNames contains only declared tables."
+        }
+      ]
+    },
+    "confect/_generated/refs": {
+      "kind": "generated",
+      "source": "apps/example/confect/_generated/refs.ts",
+      "entries": [
+        {
+          "symbols": ["default"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "single default `Refs` export"
+            }
+          ],
+          "note": "Tree branches public/internal then app-derived group/function paths. Leaf name/schema contract is classified under core Ref. Do not expose Refs.make as a hand-authoring entry point."
+        }
+      ]
+    },
+    "confect/_generated/schema": {
+      "kind": "generated",
+      "source": "apps/example/confect/_generated/schema.ts",
+      "entries": [
+        {
+          "symbols": ["default"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "runtime `DatabaseSchema`"
+            }
+          ],
+          "note": "Lazy runtime codec/table registry used by FunctionImpl/GroupImpl and tests; not the deployment SchemaDefinition."
+        }
+      ]
+    },
+    "confect/_generated/convexSchema": {
+      "kind": "generated",
+      "source": "apps/example/confect/_generated/convexSchema.ts",
+      "entries": [
+        {
+          "symbols": ["default"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "Test setup needs both schemas"
+            }
+          ],
+          "note": "Deployment/test-only artifact. Keep eager application validator/index construction out of function runtime import graphs; testing intentionally supplies both schemas."
+        }
+      ]
+    },
+    "confect/_generated/tables/<table>": {
+      "kind": "generated",
+      "source": "apps/example/confect/_generated/tables/notes.ts",
+      "entries": [
+        {
+          "symbols": ["default"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "tableName"
+            }
+          ],
+          "note": "Filename-bound default wrapper: Doc, Fields, tableName and the derived Effect Schema Type view. Actual member ownership is core Table; example name notes is not an API symbol."
+        }
+      ]
+    },
+    "confect/_generated/spec": {
+      "kind": "generated",
+      "source": "apps/example/confect/_generated/spec.ts",
+      "entries": [
+        {
+          "symbols": ["default"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "assembled Confect spec"
+            }
+          ],
+          "note": "Explained assembly artifact that builds refs, not a hand-built spec entry point."
+        }
+      ]
+    },
+    "confect/_generated/registeredFunctions/<group>": {
+      "kind": "generated",
+      "source": "packages/cli/src/templates.ts",
+      "entries": [
+        {
+          "symbols": ["default"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "you should not need to import them directly"
+            }
+          ],
+          "note": "One group per registration module; consumed by generated convex files, not direct application imports."
+        }
+      ]
+    },
+    "confect/_generated/services": {
+      "kind": "generated",
+      "source": "apps/example/confect/_generated/services.ts",
+      "entries": [
+        {
+          "symbols": [
+            "ActionRunner",
+            "Auth",
+            "DatabaseReader",
+            "DatabaseWriter",
+            "DocumentIds",
+            "ExecutionMetadata",
+            "MutationRunner",
+            "QueryRunner",
+            "RequestMetadata",
+            "Scheduler",
+            "Storage",
+            "TransactionMetadata",
+            "VectorSearch",
+            "MutationAuth",
+            "QueryCtx",
+            "MutationCtx",
+            "ActionCtx"
+          ],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/project-structure.mdx",
+              "contains": "Effect service wrappers"
+            }
+          ],
+          "note": "These generated value tags are the platform service entry points. Acquired methods are classified by their package-owned shapes; emitted same-name Identifier type aliases support signatures rather than a second authoring API."
+        },
+        {
+          "symbols": ["StorageReader", "StorageWriter", "StorageActionWriter"],
+          "reference": "supporting",
+          "audience": "compatibility",
+          "evidence": [
+            {
+              "path": "apps/docs/concepts/services.mdx",
+              "contains": "remain available for compatibility"
+            }
+          ],
+          "note": "Retained generated legacy aliases, not recommended new imports."
+        },
+        {
+          "symbols": ["QueryTransactionContext", "MutationTransactionContext"],
+          "reference": "supporting",
+          "audience": "generated-code",
+          "evidence": [
+            {
+              "path": "apps/example/confect/_generated/services.ts",
+              "contains": "QueryTransactionContext ="
+            }
+          ],
+          "note": "Generated transaction machinery is not automatically promoted by presence in services.ts."
+        }
+      ]
+    },
+    "confect": {
+      "kind": "command",
+      "source": "packages/cli/src/confect.ts",
+      "entries": [
+        {
+          "symbols": ["codegen", "dev"],
+          "reference": "included",
+          "audience": "application",
+          "evidence": [
+            {
+              "path": "apps/docs/getting-started/quickstart.mdx",
+              "contains": "confect codegen"
+            },
+            {
+              "path": "apps/docs/getting-started/quickstart.mdx",
+              "contains": "confect dev"
+            }
+          ],
+          "note": "@confect/cli executable commands, not package import symbols. Codegen generates/checks; dev watches. No source exports or additional flags are promoted."
+        }
+      ]
+    }
+  }
+}
