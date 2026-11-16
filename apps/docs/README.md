@@ -22,10 +22,12 @@ installed releases. The CLI is a binary, not a package API reference.
 Guides and API Reference have separate top-level Mintlify tabs and sidebars.
 Module pages group types and values by their source `@category` tags, rather
 than by declaration kind. New category names work without a site-side registry;
-untagged declarations use `Other`. Only categories and exports are page headings,
-so Mintlify's native right-hand outline has two levels, like Effect's reference.
-Parameters, returns, overloads, and nested members remain visible as bold detail
-labels and tables; they do not compete with exports in the outline.
+untagged declarations use `Other`. Categories, exports, and nested API members
+remain page headings. The renderer records which headings represent semantic
+groups and declarations, rather than treating every deep heading as detail.
+Nested groups and members use H4 so they remain visible in Mintlify's native
+outline. Parameters, returns, and overload labels remain visible as bold detail
+labels and tables without competing with API names in the outline.
 Category titles capitalize their first letter without changing acronyms such
 as HTTP. Native Mintlify badges distinguish types, functions, and values in the
 body without lengthening navigation labels. Same-name type/value exports keep a
@@ -49,8 +51,9 @@ it preserves upstream descriptions and more-specific categories. It escapes
 prose without changing code examples and uses span IDs
 instead of empty links for accessible anchors. TypeDoc's `api-` anchor prefix
 keeps cross-reference targets distinct from Mintlify's heading IDs.
-A standard Markdown parser identifies detail headings before replacing only
-their source ranges with bold labels. Fenced examples, tables, and links are
+A standard Markdown parser identifies headings, and TypeDoc's rendering hooks
+identify their semantic roles before detail labels are formatted. Only heading
+source ranges change. Fenced examples, tables, and links are
 left intact. No custom navigation component, CSS selectors, DOM scripts, or
 unsupported table-of-contents settings are needed. Effect's custom kind icons
 in its outline are not reproduced; Mintlify retains its native navigation.
