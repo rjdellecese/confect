@@ -15,7 +15,11 @@ import {
   type TypeDocOptions,
 } from "typedoc";
 import type { PluginOptions } from "typedoc-plugin-markdown";
-import { MintlifyRouter, MintlifyTheme } from "./docsApiTheme";
+import {
+  MintlifyRouter,
+  MintlifyTheme,
+  presentationOptions,
+} from "./docsApiTheme";
 import docsConfig from "../apps/docs/docs.json";
 
 const fs = Effect.runSync(
@@ -40,6 +44,7 @@ const rendered = await Effect.runPromise(
 );
 try {
   const options: Partial<TypeDocOptions & PluginOptions> = {
+    ...presentationOptions,
     name: "Confect API",
     entryPoints: Array.map(
       packages,
@@ -136,26 +141,26 @@ try {
       }),
     ),
   );
-  const apiGroup = {
-    group: "API Reference",
-    pages: [
-      "api/overview",
-      "api/generated",
-      "api/reference/source",
-      ...Array.map(packagePages, (item) => item.group),
+  const apiTab = {
+    tab: "API Reference",
+    groups: [
+      {
+        group: "Overview",
+        pages: ["api/overview", "api/generated", "api/reference/source"],
+      },
+      {
+        group: "Packages",
+        pages: Array.map(packagePages, (item) => item.group),
+      },
     ],
   };
   const config = {
     ...docsConfig,
     navigation: {
       ...docsConfig.navigation,
-      groups: [
-        ...Array.filter(
-          docsConfig.navigation.groups,
-          (group) => group.group !== "API Reference",
-        ),
-        apiGroup,
-      ],
+      tabs: Array.map(docsConfig.navigation.tabs, (tab) =>
+        tab.tab === "API Reference" ? apiTab : tab,
+      ),
     },
   };
   const encoded = Effect.runSync(Schema.encodeEffect(Json)(config));
