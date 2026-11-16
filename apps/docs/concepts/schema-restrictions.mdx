@@ -6,8 +6,8 @@ description: "Understand the restrictions on Effect schemas that can be used in 
 
 Schemas used with Confect must describe both the value your code works with and its Convex representation. Effect's `Schema.Codec` type tracks that information and the services required by the schema:
 
-```text
-Schema.Codec<Type, Encoded, DecodingServices, EncodingServices>
+```typescript
+Schema.Codec<Type, Encoded, DecodingServices, EncodingServices>;
 ```
 
 For schemas used in Confect:
@@ -15,8 +15,6 @@ For schemas used in Confect:
 - `Type` is the decoded value you work with in your code. It does not have to be a Convex value.
 - `Encoded` is the value stored in the database or sent as a Convex function argument or result. It must be a valid [Convex value](https://docs.convex.dev/database/types#convex-values).
 - `DecodingServices` and `EncodingServices` are not supported and should always be `never`.
-
-Prefer to let TypeScript infer the concrete schema type. If you need an annotation, use `Schema.Codec<Type, Encoded>`, whose service parameters default to `never`. `Schema.Schema<Type>`, `Schema.Decoder`, and `Schema.Encoder` omit information Confect needs.
 
 ## Function argument fields
 
