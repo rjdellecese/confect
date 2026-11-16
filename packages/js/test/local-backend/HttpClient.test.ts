@@ -96,7 +96,9 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             const span = vi.fn(tracer.span.bind(tracer));
             const request = operation.run(client);
             expect(span).not.toHaveBeenCalled();
-            const observed1 = yield* Effect.all([request, request]).pipe(
+            const observed1 = yield* Effect.all([request, request], {
+              concurrency: 1,
+            }).pipe(
               Effect.withSpan("caller"),
               Effect.withTracer(Tracer.make({ span })),
             );

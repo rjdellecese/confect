@@ -2160,10 +2160,13 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
 
-            yield* Effect.forEach(Array.range(1, 10), (i) =>
-              writer.table("notes").insert({
-                text: `${i}`,
-              }),
+            yield* Effect.forEach(
+              Array.range(1, 10),
+              (i) =>
+                writer.table("notes").insert({
+                  text: `${i}`,
+                }),
+              { concurrency: 1 },
             );
           }),
         );
@@ -2324,8 +2327,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
 
-          yield* Effect.forEach(Array.range(1, 5), (i) =>
-            writer.table("notes").insert({ text: `note ${i}` }),
+          yield* Effect.forEach(
+            Array.range(1, 5),
+            (i) => writer.table("notes").insert({ text: `note ${i}` }),
+            { concurrency: 1 },
           );
         }),
       );
@@ -2354,8 +2359,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
 
-          yield* Effect.forEach(Array.range(1, 3), (i) =>
-            writer.table("notes").insert({ text: `note ${i}` }),
+          yield* Effect.forEach(
+            Array.range(1, 3),
+            (i) => writer.table("notes").insert({ text: `note ${i}` }),
+            { concurrency: 1 },
           );
         }),
       );
@@ -2434,10 +2441,14 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
 
-          yield* Effect.forEach(Array.range(1, 10), (i) =>
-            writer
-              .table("notes")
-              .insert({ text: `note ${i}`, tag: i % 2 === 0 ? "even" : "odd" }),
+          yield* Effect.forEach(
+            Array.range(1, 10),
+            (i) =>
+              writer.table("notes").insert({
+                text: `note ${i}`,
+                tag: i % 2 === 0 ? "even" : "odd",
+              }),
+            { concurrency: 1 },
           );
         }),
       );

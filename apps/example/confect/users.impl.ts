@@ -29,8 +29,10 @@ const clearAll = FunctionImpl.make(databaseSchema, users, "clearAll", () =>
       .index("by_creation_time")
       .collect();
 
-    yield* Effect.forEach(allUsers, (user) =>
-      writer.table("users").delete(user._id),
+    yield* Effect.forEach(
+      allUsers,
+      (user) => writer.table("users").delete(user._id),
+      { concurrency: 1 },
     );
 
     return null;

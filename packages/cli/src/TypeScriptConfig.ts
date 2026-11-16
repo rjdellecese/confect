@@ -166,6 +166,7 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
           ),
         ),
         (value) => extend(path.dirname(source.value.path), value, lineage),
+        { concurrency: 1 },
       );
       const paths = property(
         property(source.value.tree, "compilerOptions"),

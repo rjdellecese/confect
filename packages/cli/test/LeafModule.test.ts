@@ -88,8 +88,11 @@ const withTempFiles = Effect.fnUntraced(
   > {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    yield* Effect.forEach(files, ({ relativePath, contents }) =>
-      fs.writeFileString(path.join(fixtureConfect, relativePath), contents),
+    yield* Effect.forEach(
+      files,
+      ({ relativePath, contents }) =>
+        fs.writeFileString(path.join(fixtureConfect, relativePath), contents),
+      { concurrency: 1 },
     );
     return yield* use;
   },
@@ -99,13 +102,16 @@ const withTempFiles = Effect.fnUntraced(
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
-          yield* Effect.forEach(files, ({ relativePath }) =>
-            Effect.gen(function* () {
-              const absolutePath = path.join(fixtureConfect, relativePath);
-              if (yield* fs.exists(absolutePath)) {
-                yield* fs.remove(absolutePath);
-              }
-            }),
+          yield* Effect.forEach(
+            files,
+            ({ relativePath }) =>
+              Effect.gen(function* () {
+                const absolutePath = path.join(fixtureConfect, relativePath);
+                if (yield* fs.exists(absolutePath)) {
+                  yield* fs.remove(absolutePath);
+                }
+              }),
+            { concurrency: 1 },
           );
         }).pipe(Effect.orDie),
       ),

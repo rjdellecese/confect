@@ -112,19 +112,22 @@ const emitDeclarations = Effect.gen(function* () {
       ),
     );
 
-  const declarations = yield* Effect.forEach(entries, (entry) =>
-    fs.exists(declarationPath(entry)).pipe(
-      Effect.flatMap((exists) =>
-        exists
-          ? fs.readFileString(declarationPath(entry))
-          : Effect.die(
-              new Error(
-                `${entry} produced no declaration emit:\n${diagnostics}`,
+  const declarations = yield* Effect.forEach(
+    entries,
+    (entry) =>
+      fs.exists(declarationPath(entry)).pipe(
+        Effect.flatMap((exists) =>
+          exists
+            ? fs.readFileString(declarationPath(entry))
+            : Effect.die(
+                new Error(
+                  `${entry} produced no declaration emit:\n${diagnostics}`,
+                ),
               ),
-            ),
+        ),
+        Effect.map((declaration) => [entry, declaration] as const),
       ),
-      Effect.map((declaration) => [entry, declaration] as const),
-    ),
+    { concurrency: 1 },
   ).pipe(Effect.map(Record.fromEntries));
 
   return { diagnostics, declarations };

@@ -53,8 +53,11 @@ const renderEffect = Effect.fnUntraced(function* ({
     yield* cbw.writeLine("export const experimental_reuseContext = true;");
     yield* cbw.newLine();
   }
-  yield* Effect.forEach(functionNames, (name) =>
-    cbw.writeLine(`export const ${name} = registeredFunctions.${name};`),
+  yield* Effect.forEach(
+    functionNames,
+    (name) =>
+      cbw.writeLine(`export const ${name} = registeredFunctions.${name};`),
+    { concurrency: 1 },
   );
 
   return yield* cbw.toString();
@@ -163,6 +166,7 @@ const logGroupPaths = Effect.fnUntraced(function* <R>(
       const relativeModulePath = yield* GroupPath.modulePath(gp);
       yield* logFn(path.join(convexDirectory, relativeModulePath));
     }),
+    { concurrency: 1 },
   );
 });
 
@@ -215,8 +219,9 @@ const getGroupPathsFromFs = Effect.gen(function* () {
         !RESERVED_CONVEX_TS_FILE_NAMES.has(path.basename(convexPath)) &&
         path.basename(path.dirname(convexPath)) !== "_generated",
     ),
-    Effect.forEach((groupModulePath) =>
-      GroupPath.fromGroupModulePath(groupModulePath),
+    Effect.forEach(
+      (groupModulePath) => GroupPath.fromGroupModulePath(groupModulePath),
+      { concurrency: 1 },
     ),
   );
   return GroupPaths.GroupPaths.make(HashSet.fromIterable(groupPathArray));
@@ -276,4 +281,5 @@ export const writeGroups = (
         Match.exhaustive,
       );
     }),
+    { concurrency: 1 },
   );

@@ -435,8 +435,11 @@ export const parse = Effect.fn("WatchBuild.parse")(function* (
       failures: [Failure.InvalidBuildResult({ missing: "outputFiles" })],
       warnings: result.warnings,
     });
-  const hashes = yield* Effect.forEach(result.outputFiles, (file) =>
-    digest.digest(Digest.sha256, file.contents).pipe(Effect.map(Hex.encode)),
+  const hashes = yield* Effect.forEach(
+    result.outputFiles,
+    (file) =>
+      digest.digest(Digest.sha256, file.contents).pipe(Effect.map(Hex.encode)),
+    { concurrency: 1 },
   );
   return Outcome.Succeeded({
     snapshot: {

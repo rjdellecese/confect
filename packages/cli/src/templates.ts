@@ -76,8 +76,11 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
 
   if (tableModules.length > 0) {
     yield* cbw.blankLine();
-    yield* Effect.forEach(tableModules, ({ tableName, importPath }) =>
-      cbw.writeLine(`import ${tableName} from "${importPath}";`),
+    yield* Effect.forEach(
+      tableModules,
+      ({ tableName, importPath }) =>
+        cbw.writeLine(`import ${tableName} from "${importPath}";`),
+      { concurrency: 1 },
     );
   }
 
@@ -96,7 +99,7 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
         tableModules,
         ({ tableName }) =>
           cbw.writeLine(`readonly ${tableName}: typeof ${tableName};`),
-        { discard: true },
+        { concurrency: 1, discard: true },
       ),
     );
     yield* cbw.writeLine(`}> = $DatabaseSchema.make({`);
@@ -150,8 +153,11 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
   if (tableModules.length > 0) {
     yield* cbw.writeLine(`import { Table as $Table } from "@confect/server";`);
     yield* cbw.blankLine();
-    yield* Effect.forEach(tableModules, ({ tableName, importPath }) =>
-      cbw.writeLine(`import ${tableName} from "${importPath}";`),
+    yield* Effect.forEach(
+      tableModules,
+      ({ tableName, importPath }) =>
+        cbw.writeLine(`import ${tableName} from "${importPath}";`),
+      { concurrency: 1 },
     );
   }
 
@@ -348,7 +354,7 @@ const componentsEffect = Effect.fnUntraced(function* ({
           cbw.writeLine(
             `"${name}": import("${typeImportPath}/_generated/component.js").ComponentApi<"${name}">;`,
           ),
-        { discard: true },
+        { concurrency: 1, discard: true },
       ),
     );
     yield* cbw.writeLine(`};`);
@@ -532,6 +538,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
                 : `RegisteredConvexFunction.register({ ...${definition}, handler: forward(${definition}.handler) })`
             },`;
           }),
+          { concurrency: 1 },
         );
         const groups = yield* Effect.forEach(
           Record.toEntries(group.groups),
@@ -545,6 +552,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
             const childBindings = yield* bindings(child, `${path}[${key}]`);
             return `[${key}]: ${childBindings},`;
           }),
+          { concurrency: 1 },
         );
         return `{\n${Array.join([...functions, ...groups], "\n")}\n}`;
       });

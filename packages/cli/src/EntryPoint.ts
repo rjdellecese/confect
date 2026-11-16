@@ -129,20 +129,23 @@ export const discover = Effect.gen(function* () {
     });
   });
 
-  const fixedEntryOptions = yield* Effect.all([
-    tryEntry(Kind.Http({ relativePath: "http.ts" })),
-    tryEntry(Kind.Crons({ relativePath: "crons.ts" })),
-    tryEntry(Kind.Auth({ relativePath: "auth.ts" })),
-  ]);
+  const fixedEntryOptions = yield* Effect.all(
+    [
+      tryEntry(Kind.Http({ relativePath: "http.ts" })),
+      tryEntry(Kind.Crons({ relativePath: "crons.ts" })),
+      tryEntry(Kind.Auth({ relativePath: "auth.ts" })),
+    ],
+    { concurrency: 1 },
+  );
 
-  const moduleRelativePaths = yield* Effect.all([
-    discoverLeafSpecFiles,
-    discoverLeafImplFiles,
-    discoverTableFiles,
-  ]).pipe(Effect.map(Array.flatten));
+  const moduleRelativePaths = yield* Effect.all(
+    [discoverLeafSpecFiles, discoverLeafImplFiles, discoverTableFiles],
+    { concurrency: 1 },
+  ).pipe(Effect.map(Array.flatten));
   const moduleEntryOptions = yield* Effect.forEach(
     Array.getSomes(Array.map(moduleRelativePaths, parse)),
     tryEntry,
+    { concurrency: 1 },
   );
 
   // `convex/convex.config.ts` feeds the generated components registry, so
