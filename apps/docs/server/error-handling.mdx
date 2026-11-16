@@ -41,6 +41,7 @@ export default GroupSpec.make().addFunction(
 To declare more than one failure mode, combine them with `Schema.Union`.
 
 ```ts
+import { FunctionSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
 import { Id } from "./_generated/id";
@@ -100,7 +101,7 @@ The decoded error is surfaced at every call site. The exact shape depends on the
 ### `@confect/react`
 
 - **`useQuery`** returns a `QueryResult<A, E>`. Match it with `QueryResult.match`, where `onFailure` is required when the ref declares an `error` schema.
-- **`useMutation`** and **`useAction`** return `Promise<Either<A, E>>` when the ref declares an `error` schema (and `Promise<A>` otherwise).
+- **`useMutation`** and **`useAction`** return `Promise<Result<A, E>>` when the ref declares an `error` schema (and `Promise<A>` otherwise). Handle the success and failure values with `Result.match` from `effect/Result`.
 
 See [React](/clients/react) for full examples.
 
@@ -119,18 +120,48 @@ QueryResult.match(lookup, {
 
 ### `@confect/js`
 
-Both `HttpClient` and `WebSocketClient` add the decoded error to the returned `Effect`'s error channel, alongside the existing transport error and `ParseError`.
+Both `HttpClient` and `WebSocketClient` add the decoded error to the returned `Effect`'s error channel, alongside the client's transport error and `Schema.SchemaError` from `effect/Schema` (for argument encoding or return-value decoding failures).
+
+The imports from `@confect/js` are module namespaces, not client instances. Acquire the service inside `Effect.gen`, then call its methods with your generated refs:
 
 ```ts
-HttpClient.query(refs.public.notes.getOrFail, { noteId });
-// Effect.Effect<Note, NoteNotFound | HttpClientError | ParseError>
+import { HttpClient } from "@confect/js";
+import * as Effect from "effect/Effect";
+
+import type { Id } from "../confect/_generated/id";
+import refs from "../confect/_generated/refs";
+
+const lookup = (noteId: Id<"notes">) =>
+  Effect.gen(function* () {
+    const client = yield* HttpClient.HttpClient;
+
+    return yield* client.query(refs.public.notes.getOrFail, { noteId });
+  });
 ```
 
-`WebSocketClient.reactiveQuery` carries typed errors too: when the subscribed
-query fails, its `Stream` terminates with the decoded value in the error
-channel. `reactiveQueryResult` instead emits successes and failures as `Result`
-values while leaving the Convex subscription open. See
-[HTTP](/clients/js/http) and [WebSocket](/clients/js/websocket).
+The Effect returned by `lookup` requires `HttpClient.HttpClient`; provide `HttpClient.layer(deploymentUrl)` when running it, as shown in [HTTP](/clients/js/http).
+
+The WebSocket service's `reactiveQuery` method carries typed errors too. When the subscribed query fails, its `Stream` terminates with the decoded value in the error channel:
+
+```ts
+import { WebSocketClient } from "@confect/js";
+import * as Effect from "effect/Effect";
+import * as Stream from "effect/Stream";
+
+import type { Id } from "../confect/_generated/id";
+import refs from "../confect/_generated/refs";
+
+const watchNote = (noteId: Id<"notes">) =>
+  Stream.unwrap(
+    Effect.gen(function* () {
+      const client = yield* WebSocketClient.WebSocketClient;
+
+      return client.reactiveQuery(refs.public.notes.getOrFail, { noteId });
+    }),
+  );
+```
+
+Provide `WebSocketClient.layer(deploymentUrl)` to the Effect that consumes this stream. To handle query failures without ending the subscription, call the acquired client's `reactiveQueryResult` instead. It emits successes and failures as `Result` values while leaving the Convex subscription open, so later updates can recover. Argument-encoding failure happens before subscription: it emits one failed `Result` and ends without opening a listener. See [WebSocket](/clients/js/websocket) for consumption and recovery examples.
 
 ### `@confect/test`
 
@@ -138,4 +169,4 @@ values while leaving the Convex subscription open. See
 
 ## Non-typed failures
 
-Failures that are not declared in the `error` schema are not silently swallowed. They propagate through Convex's normal failure path: they reject promises in `@convex/react`, fail `Effect`s with `HttpClientError`/`WebSocketClientError` in `@confect/js`, and surface as defects (cause) in `TestConfect`. Use a typed `error` schema for failures you want callers to handle, and let everything else die.
+Backend failures that do not match a declared `error` schema are not silently swallowed. In `@confect/react`, mutation and action promises reject, while query hooks throw during render to the nearest React error boundary. In `@confect/js`, these failures become `HttpClientError` or `WebSocketClientError`: ordinary calls fail their `Effect`, `reactiveQuery` fails its stream, and `reactiveQueryResult` emits a failed `Result`. In `TestConfect`, undeclared backend failures surface as defects in the cause. Use a typed `error` schema for domain failures you want callers to handle by type.
