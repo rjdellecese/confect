@@ -22,12 +22,15 @@ installed releases. The CLI is a binary, not a package API reference.
 Guides and API Reference have separate top-level Mintlify tabs and sidebars.
 Module pages group types and values by their source `@category` tags, rather
 than by declaration kind. New category names work without a site-side registry;
-untagged declarations use `Other`. Parameter/type-parameter tables keep the
-outline compact, while callable member details remain expanded so their
-argument, return, and failure documentation is not lost.
+untagged declarations use `Other`. Only categories and exports are page headings,
+so Mintlify's native right-hand outline has two levels, like Effect's reference.
+Parameters, returns, overloads, and nested members remain visible as bold detail
+labels and tables; they do not compete with exports in the outline.
 Category titles capitalize their first letter without changing acronyms such
-as HTTP. Short declaration labels distinguish types, functions, and values
-inside each semantic group. Merged type namespaces stay on their owning page
+as HTTP. Native Mintlify badges distinguish types, functions, and values in the
+body without lengthening navigation labels. Same-name type/value exports keep a
+short kind suffix so their native outline entries remain distinguishable.
+Merged type namespaces stay on their owning page
 instead of creating duplicate sidebar entries.
 
 Generation and formatting always happen in a temporary directory before copying
@@ -44,7 +47,13 @@ arguments and class-based service contracts. A conversion hook fills missing
 categories on re-exports from their local export statement's standard JSDoc;
 it preserves upstream descriptions and more-specific categories. It escapes
 prose without changing code examples and uses span IDs
-instead of empty links for accessible anchors.
+instead of empty links for accessible anchors. TypeDoc's `api-` anchor prefix
+keeps cross-reference targets distinct from Mintlify's heading IDs.
+A standard Markdown parser identifies detail headings before replacing only
+their source ranges with bold labels. Fenced examples, tables, and links are
+left intact. No custom navigation component, CSS selectors, DOM scripts, or
+unsupported table-of-contents settings are needed. Effect's custom kind icons
+in its outline are not reproduced; Mintlify retains its native navigation.
 All signatures, overloads, comments, and error aliases still come
 from TypeDoc; no symbol manifest or custom signature renderer is maintained.
 Internal support types can remain named in public signatures without getting
