@@ -442,18 +442,21 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
       capacity: entries.length,
       lookup: TypeScriptConfig.discover,
     });
-    const configured = yield* Effect.forEach(entries, (entry) =>
-      Effect.map(
-        Cache.get(configs, path.dirname(entry.absolutePath)),
-        (config) => ({
-          entry,
-          config,
-          key: Option.match(config, {
-            onNone: () => "",
-            onSome: (selected) => selected.path,
+    const configured = yield* Effect.forEach(
+      entries,
+      (entry) =>
+        Effect.map(
+          Cache.get(configs, path.dirname(entry.absolutePath)),
+          (config) => ({
+            entry,
+            config,
+            key: Option.match(config, {
+              onNone: () => "",
+              onSome: (selected) => selected.path,
+            }),
           }),
-        }),
-      ),
+        ),
+      { concurrency: 1 },
     ).pipe(
       Effect.mapError((cause) =>
         OperationError.make({ operation: "create", cause }),
@@ -469,94 +472,104 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
       ),
       (left, right) => left.key === right.key,
     );
-    const groups = yield* Effect.forEach(partitions, (partition) =>
-      Effect.gen(function* () {
-        const config = Array.headNonEmpty(partition).config;
-        const groupEntries = Array.map(partition, (selected) => selected.entry);
-        const captureRef = yield* Ref.make(WatchBuild.emptyCapture);
-        const progress = yield* Ref.make(WatchBuild.initialProgress);
-        const initial = yield* Deferred.make<void>();
-        const selfReferences = yield* Effect.forEach(
-          Array.dedupe(
-            Array.map(groupEntries, (entry) =>
-              path.dirname(entry.absolutePath),
-            ),
-          ),
-          PackageSelfReference.discover,
-        ).pipe(
-          Effect.mapError((cause) =>
-            OperationError.make({ operation: "create", cause }),
-          ),
-        );
-        const notExternal = [
-          ...TypeScriptConfig.aliasPatterns(config),
-          ...Array.getSomes(selfReferences),
-        ];
-        const context = yield* Effect.acquireRelease(
-          Effect.tryPromise({
-            try: () =>
-              esbuild.context(
-                esbuildOptions(
-                  path,
-                  fs,
-                  digest,
-                  projectRoot,
-                  generatedDirectory,
-                  groupEntries,
-                  notExternal,
-                  config,
-                  watcher.observation,
-                  captureRef,
-                  progress,
-                  signal,
-                  pendingRef,
-                  initial,
-                ),
+    const groups = yield* Effect.forEach(
+      partitions,
+      (partition) =>
+        Effect.gen(function* () {
+          const config = Array.headNonEmpty(partition).config;
+          const groupEntries = Array.map(
+            partition,
+            (selected) => selected.entry,
+          );
+          const captureRef = yield* Ref.make(WatchBuild.emptyCapture);
+          const progress = yield* Ref.make(WatchBuild.initialProgress);
+          const initial = yield* Deferred.make<void>();
+          const selfReferences = yield* Effect.forEach(
+            Array.dedupe(
+              Array.map(groupEntries, (entry) =>
+                path.dirname(entry.absolutePath),
               ),
-            catch: (cause) =>
+            ),
+            PackageSelfReference.discover,
+            { concurrency: 1 },
+          ).pipe(
+            Effect.mapError((cause) =>
               OperationError.make({ operation: "create", cause }),
-          }),
-          (ctx) =>
+            ),
+          );
+          const notExternal = [
+            ...TypeScriptConfig.aliasPatterns(config),
+            ...Array.getSomes(selfReferences),
+          ];
+          const context = yield* Effect.acquireRelease(
             Effect.tryPromise({
-              try: () => ctx.dispose(),
+              try: () =>
+                esbuild.context(
+                  esbuildOptions(
+                    path,
+                    fs,
+                    digest,
+                    projectRoot,
+                    generatedDirectory,
+                    groupEntries,
+                    notExternal,
+                    config,
+                    watcher.observation,
+                    captureRef,
+                    progress,
+                    signal,
+                    pendingRef,
+                    initial,
+                  ),
+                ),
               catch: (cause) =>
-                OperationError.make({ operation: "dispose", cause }),
-            }).pipe(Effect.orDie),
-        ).pipe(Scope.provide(scope));
-        const requestIds = new WeakMap<
-          Promise<esbuild.BuildResult>,
-          WatchBuild.RequestId
-        >();
-        return {
-          initial,
-          context,
-          identifyRequest: (promise) => {
-            const existing = requestIds.get(promise);
-            if (existing !== undefined) return existing;
-            const id = WatchBuild.makeRequestId();
-            requestIds.set(promise, id);
-            return id;
-          },
-          progress,
-          verifyInputs: (snapshot) =>
-            WatchBuild.verifyInputs(snapshot, fs, digest),
-        } satisfies WatchGroup;
-      }),
+                OperationError.make({ operation: "create", cause }),
+            }),
+            (ctx) =>
+              Effect.tryPromise({
+                try: () => ctx.dispose(),
+                catch: (cause) =>
+                  OperationError.make({ operation: "dispose", cause }),
+              }).pipe(Effect.orDie),
+          ).pipe(Scope.provide(scope));
+          const requestIds = new WeakMap<
+            Promise<esbuild.BuildResult>,
+            WatchBuild.RequestId
+          >();
+          return {
+            initial,
+            context,
+            identifyRequest: (promise) => {
+              const existing = requestIds.get(promise);
+              if (existing !== undefined) return existing;
+              const id = WatchBuild.makeRequestId();
+              requestIds.set(promise, id);
+              return id;
+            },
+            progress,
+            verifyInputs: (snapshot) =>
+              WatchBuild.verifyInputs(snapshot, fs, digest),
+          } satisfies WatchGroup;
+        }),
+      { concurrency: 1 },
     );
     const initial = yield* Deferred.make<void>();
     yield* Ref.set(
       watcher.lifecycle,
       WatcherLifecycle.Active({ initial, key, scope, entries, groups }),
     );
-    yield* Effect.forEach(groups, ({ context }) =>
-      Effect.tryPromise({
-        try: () => context.watch(),
-        catch: (cause) => OperationError.make({ operation: "watch", cause }),
-      }),
+    yield* Effect.forEach(
+      groups,
+      ({ context }) =>
+        Effect.tryPromise({
+          try: () => context.watch(),
+          catch: (cause) => OperationError.make({ operation: "watch", cause }),
+        }),
+      { concurrency: 1 },
     );
-    yield* Effect.forEach(groups, (group) =>
-      Deferred.await(group.initial),
-    ).pipe(
+    yield* Effect.forEach(groups, (group) => Deferred.await(group.initial), {
+      concurrency: 1,
+    }).pipe(
       Effect.andThen(Deferred.succeed(initial, undefined)),
       Effect.forkIn(scope),
     );
@@ -584,7 +597,9 @@ const refresh = Effect.fnUntraced(function* (watcher: State) {
           ),
         Active: ({ groups }) =>
           Effect.gen(function* () {
-            const outcomes = yield* Effect.forEach(groups, refreshGroup);
+            const outcomes = yield* Effect.forEach(groups, refreshGroup, {
+              concurrency: 1,
+            });
             if (groups.length > 1) {
               const unchanged = yield* Effect.forEach(
                 Array.zip(groups, outcomes),
@@ -601,6 +616,7 @@ const refresh = Effect.fnUntraced(function* (watcher: State) {
                         ),
                       ),
                   }),
+                { concurrency: 1 },
               );
               if (!Array.every(unchanged, (matches) => matches))
                 return Option.none<RefreshOutcome>();

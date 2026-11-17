@@ -129,7 +129,7 @@ it.effect(
         { tableName: "first", relativePath: "tables/first.ts" },
         { tableName: "second", relativePath: "tables/second.ts" },
       ];
-      const visits = Effect.forEach(entries, visit);
+      const visits = Effect.forEach(entries, visit, { concurrency: 1 });
       expectTypeOf(visits).toEqualTypeOf<
         Effect.Effect<Array<string>, Rejected, Prefix>
       >();
@@ -153,6 +153,7 @@ it.effect(
       const error = yield* Effect.forEach(
         [{ tableName: "rejected", relativePath: "tables/rejected.ts" }],
         visit,
+        { concurrency: 1 },
       ).pipe(Effect.provideService(Prefix, "./"), Effect.flip);
       expect(error).toEqual(
         Rejected.make({ relativePath: "tables/rejected.ts" }),
@@ -171,7 +172,7 @@ it.effect("preserves generic callback specialization through forEach", () =>
       Prefix,
       "value" as const,
     );
-    const result = Effect.forEach([task], evaluate);
+    const result = Effect.forEach([task], evaluate, { concurrency: 1 });
     expectTypeOf(result).toEqualTypeOf<
       Effect.Effect<Array<"value">, Rejected, Prefix>
     >();

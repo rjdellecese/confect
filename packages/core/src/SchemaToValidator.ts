@@ -405,7 +405,10 @@ const handleUnionTypes = Effect.fnUntraced(function* (
     : types;
 
   const [firstValidator, secondValidator, ...restValidators] =
-    yield* Effect.all(Array.map(members, (type) => compileAst(type)));
+    yield* Effect.all(
+      Array.map(members, (type) => compileAst(type)),
+      { concurrency: 1 },
+    );
 
   if (firstValidator === undefined) {
     return yield* EmptyUnionIsNotSupportedError.make();
@@ -429,10 +432,13 @@ const handleObjects = (objectsAst: SchemaAST.Objects) =>
           Option.match({
             onNone: () =>
               Effect.map(
-                Effect.all({
-                  parameter_: compileAst(parameter),
-                  type_: compileAst(type),
-                }),
+                Effect.all(
+                  {
+                    parameter_: compileAst(parameter),
+                    type_: compileAst(type),
+                  },
+                  { concurrency: 1 },
+                ),
                 ({ parameter_, type_ }) => v.record(parameter_, type_),
               ),
             onSome: () =>
@@ -472,7 +478,9 @@ const handleArrayElements = Effect.fnUntraced(function* (
       : Effect.gen(function* () {
           const firstValidator = yield* elementToValidator(f);
           const secondValidator = yield* elementToValidator(s);
-          const restValidators = yield* Effect.forEach(r, elementToValidator);
+          const restValidators = yield* Effect.forEach(r, elementToValidator, {
+            concurrency: 1,
+          });
 
           return v.union(firstValidator, secondValidator, ...restValidators);
         });
@@ -483,33 +491,38 @@ const handleArrayElements = Effect.fnUntraced(function* (
 const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
   pipe(
     objectsAst.propertySignatures,
-    Effect.forEach(({ type, name }) => {
-      const isOptional = SchemaAST.isOptional(type);
-      if (String.isString(name)) {
-        // Somehow, somewhere, keys of type number are being coerced to strings…
-        return Option.match(Number.parse(name), {
-          onNone: () =>
-            Effect.gen(function* () {
-              const validator = yield* compileAst(type, isOptional);
+    Effect.forEach(
+      ({ type, name }) => {
+        const isOptional = SchemaAST.isOptional(type);
+        if (String.isString(name)) {
+          // Somehow, somewhere, keys of type number are being coerced to strings…
+          return Option.match(Number.parse(name), {
+            onNone: () =>
+              Effect.gen(function* () {
+                const validator = yield* compileAst(type, isOptional);
 
-              return {
-                propertyName: name,
-                validator: isOptional ? v.optional(validator) : validator,
-              };
-            }),
-          onSome: (number) =>
-            Effect.fail(
-              UnsupportedPropertySignatureKeyTypeError.make({
-                propertyKey: number,
+                return {
+                  propertyName: name,
+                  validator: isOptional ? v.optional(validator) : validator,
+                };
               }),
-            ),
-        });
-      } else {
-        return Effect.fail(
-          UnsupportedPropertySignatureKeyTypeError.make({ propertyKey: name }),
-        );
-      }
-    }),
+            onSome: (number) =>
+              Effect.fail(
+                UnsupportedPropertySignatureKeyTypeError.make({
+                  propertyKey: number,
+                }),
+              ),
+          });
+        } else {
+          return Effect.fail(
+            UnsupportedPropertySignatureKeyTypeError.make({
+              propertyKey: name,
+            }),
+          );
+        }
+      },
+      { concurrency: 1 },
+    ),
     Effect.andThen((propertyNamesWithValidators) =>
       pipe(
         propertyNamesWithValidators,

@@ -6,7 +6,7 @@
     "@effect/platform-node": "4.1.0",
     "@effect/vitest": "4.1.0",
     "effect": "4.1.0",
-    "effect-oxlint": "0.4.0",
+    "effect-oxlint": "0.5.1",
     "shx": "0.4.0",
     "vitest": "5.1.0"
   },

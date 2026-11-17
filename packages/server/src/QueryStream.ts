@@ -896,7 +896,9 @@ const mergeUnchecked = <
     R | QueryStreamReadBudget.QueryStreamReadBudget
   > = Stream.unwrap(
     Effect.map(
-      Effect.forEach(streams, (stream) => Stream.toPull(stream.annotated)),
+      Effect.forEach(streams, (stream) => Stream.toPull(stream.annotated), {
+        concurrency: 1,
+      }),
       (pulls) =>
         Stream.unfold(
           Array.map(pulls, (pull) => MergeSource.NeedsPull({ pull })),
@@ -2328,29 +2330,34 @@ export const paginate: {
           QueryStreamKey.complete(self.keyLayout, keyValues),
           identity,
         );
-      const decoded = yield* Effect.all({
-        start: Option.match(Option.fromNullOr(options.cursor), {
-          onNone: () => Effect.succeed(QueryStreamPagination.Start.Beginning()),
-          onSome: (cursor) =>
-            Effect.map(Schema.decodeEffect(cursorSchema)(cursor), (key) =>
-              QueryStreamPagination.Start.After({
-                cursor,
-                key,
-              }),
-            ),
-        }),
-        range: Option.match(Option.fromNullishOr(options.endCursor), {
-          onNone: () => Effect.succeed(QueryStreamPagination.Range.Unpinned()),
-          onSome: (cursor) =>
-            cursor === QueryStreamCursor.END_CURSOR
-              ? Effect.succeed(QueryStreamPagination.Range.ThroughEnd())
-              : Effect.map(Schema.decodeEffect(cursorSchema)(cursor), (key) =>
-                  QueryStreamPagination.Range.ThroughKey({
-                    key,
-                  }),
-                ),
-        }),
-      }).pipe(
+      const decoded = yield* Effect.all(
+        {
+          start: Option.match(Option.fromNullOr(options.cursor), {
+            onNone: () =>
+              Effect.succeed(QueryStreamPagination.Start.Beginning()),
+            onSome: (cursor) =>
+              Effect.map(Schema.decodeEffect(cursorSchema)(cursor), (key) =>
+                QueryStreamPagination.Start.After({
+                  cursor,
+                  key,
+                }),
+              ),
+          }),
+          range: Option.match(Option.fromNullishOr(options.endCursor), {
+            onNone: () =>
+              Effect.succeed(QueryStreamPagination.Range.Unpinned()),
+            onSome: (cursor) =>
+              cursor === QueryStreamCursor.END_CURSOR
+                ? Effect.succeed(QueryStreamPagination.Range.ThroughEnd())
+                : Effect.map(Schema.decodeEffect(cursorSchema)(cursor), (key) =>
+                    QueryStreamPagination.Range.ThroughKey({
+                      key,
+                    }),
+                  ),
+          }),
+        },
+        { concurrency: 1 },
+      ).pipe(
         Effect.catchTag("SchemaError", () =>
           Effect.die(new ConvexError({ paginationError: "InvalidCursor" })),
         ),

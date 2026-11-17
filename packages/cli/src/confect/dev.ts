@@ -85,13 +85,17 @@ const logFunctionPathDiff = Effect.fnUntraced(function* (
     fnPaths: FunctionPaths.FunctionPaths,
     logFn: typeof logFunctionAdded,
   ) =>
-    Effect.forEach(groupPaths, (gp) =>
-      Effect.forEach(
-        Array.fromIterable(
-          HashSet.filter(fnPaths, (fp) => Equal.equals(fp.groupPath, gp)),
+    Effect.forEach(
+      groupPaths,
+      (gp) =>
+        Effect.forEach(
+          Array.fromIterable(
+            HashSet.filter(fnPaths, (fp) => Equal.equals(fp.groupPath, gp)),
+          ),
+          logFn,
+          { concurrency: 1 },
         ),
-        logFn,
-      ),
+      { concurrency: 1 },
     );
 
   yield* logForGroups(groupsRemoved, functionsRemoved, logFunctionRemoved);
@@ -106,6 +110,7 @@ const logFunctionPathDiff = Effect.fnUntraced(function* (
           ),
         ),
         logFunctionAdded,
+        { concurrency: 1 },
       );
       yield* Effect.forEach(
         Array.fromIterable(
@@ -114,8 +119,10 @@ const logFunctionPathDiff = Effect.fnUntraced(function* (
           ),
         ),
         logFunctionRemoved,
+        { concurrency: 1 },
       );
     }),
+    { concurrency: 1 },
   );
 });
 

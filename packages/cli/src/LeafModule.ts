@@ -524,13 +524,16 @@ export const withImplFiles = Effect.fnUntraced(function* <A, E, R>(
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
-  const pairs = yield* Effect.forEach(relativePaths, (implRelativePath) =>
-    specPathForImpl(implRelativePath).pipe(
-      Effect.map((specRelativePath) => ({
-        implRelativePath,
-        specRelativePath,
-      })),
-    ),
+  const pairs = yield* Effect.forEach(
+    relativePaths,
+    (implRelativePath) =>
+      specPathForImpl(implRelativePath).pipe(
+        Effect.map((specRelativePath) => ({
+          implRelativePath,
+          specRelativePath,
+        })),
+      ),
+    { concurrency: 1 },
   );
 
   return yield* Bundler.withBatch(
@@ -588,6 +591,7 @@ export const validateAllImpls = Effect.fnUntraced(function* (
       implPathForSpec(relativePath).pipe(
         Effect.map((implPath) => path.resolve(confectDirectory, implPath)),
       ),
+    { concurrency: 1 },
   );
   yield* Bundler.withBatch(
     implementationPaths,
@@ -670,5 +674,6 @@ const validateOrphanImpls = Effect.fnUntraced(function* (
         });
       }
     }),
+    { concurrency: 1 },
   );
 });

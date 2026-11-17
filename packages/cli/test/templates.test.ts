@@ -234,6 +234,7 @@ export default implementation;`,
                 contents,
               );
             }),
+          { concurrency: 1 },
         );
         yield* fs.writeFileString(
           path.join(directory, "tsconfig.json"),
@@ -548,18 +549,22 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
           path.join(directory, "schemaReads.ts"),
           "export const schemaReads = { args: 0, returns: 0, error: 0 };\n",
         );
-        yield* Effect.forEach(leaves, (leaf) =>
-          Effect.gen(function* () {
-            const target = path.join(directory, leaf.relativePath);
-            const isNode = leaf.groupPathDot === "jobs";
-            const schemaReadsImport =
-              leaf.pathSegments.length === 1
-                ? "./schemaReads"
-                : `${pipe("../", Str.repeat(leaf.pathSegments.length - 1))}schemaReads`;
-            yield* fs.makeDirectory(path.dirname(target), { recursive: true });
-            yield* fs.writeFileString(
-              target,
-              `import { FunctionSpec, GroupSpec } from "@confect/core";
+        yield* Effect.forEach(
+          leaves,
+          (leaf) =>
+            Effect.gen(function* () {
+              const target = path.join(directory, leaf.relativePath);
+              const isNode = leaf.groupPathDot === "jobs";
+              const schemaReadsImport =
+                leaf.pathSegments.length === 1
+                  ? "./schemaReads"
+                  : `${pipe("../", Str.repeat(leaf.pathSegments.length - 1))}schemaReads`;
+              yield* fs.makeDirectory(path.dirname(target), {
+                recursive: true,
+              });
+              yield* fs.writeFileString(
+                target,
+                `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 import { schemaReads } from "${schemaReadsImport}";
 
@@ -572,8 +577,9 @@ export default GroupSpec.${isNode ? "makeNode" : "make"}().addFunction(
   }),
 );
 `,
-            );
-          }),
+              );
+            }),
+          { concurrency: 1 },
         );
         const actual3 = yield* templates.assembledSpec({
           nodes: assemblyNodesFromLeaves(leaves),

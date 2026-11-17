@@ -61,9 +61,7 @@ export const forEachBranchLeaves = <T, A, E, R>(
   }) => Effect.Effect<A, E, R>,
 ): Effect.Effect<void, E, R> => {
   const branchLeaves = collectBranchLeaves(obj, leafRefinement);
-  return Effect.forEach(branchLeaves, f, {
-    discard: true,
-  });
+  return Effect.forEach(branchLeaves, f, { concurrency: 1, discard: true });
 };
 
 export const setNestedProperty = <T extends object>(

@@ -340,10 +340,13 @@ layer(NodeServices.layer)("package self-reference resolution", (test) => {
     () =>
       Effect.gen(function* () {
         const preferred = yield* Ref.make("./leaf.ts");
-        const makeGates = Effect.all({
-          waiting: Deferred.make<void>(),
-          loaded: Deferred.make<void>(),
-        });
+        const makeGates = Effect.all(
+          {
+            waiting: Deferred.make<void>(),
+            loaded: Deferred.make<void>(),
+          },
+          { concurrency: 1 },
+        );
         const actual12 = yield* makeGates;
         const gates = yield* Ref.make(actual12);
         const resolutions = yield* Ref.make<ReadonlyArray<string>>([]);
@@ -601,10 +604,13 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               ],
             });
           yield* Effect.addFinalizer(() =>
-            Effect.all([
-              Deferred.succeed(releaseOld, undefined),
-              Deferred.succeed(releaseInitial, undefined),
-            ]),
+            Effect.all(
+              [
+                Deferred.succeed(releaseOld, undefined),
+                Deferred.succeed(releaseInitial, undefined),
+              ],
+              { concurrency: 1 },
+            ),
           );
           yield* watcher.refresh;
           yield* watcher.next;

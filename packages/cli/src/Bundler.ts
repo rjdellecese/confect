@@ -100,6 +100,7 @@ const canonicalInputPaths = Effect.fnUntraced(function* (
         Effect.map((real) => [absolute, real] as const),
       );
     },
+    { concurrency: 1 },
   );
   return new Map(inputPaths);
 });
@@ -383,6 +384,7 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   const configs = yield* Effect.forEach(
     Array.dedupe(Array.map(entries, path.dirname)),
     TypeScriptConfig.discover,
+    { concurrency: 1 },
   );
   const config = Array.headNonEmpty(configs);
   const configPath = (
@@ -400,15 +402,18 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   const directory = yield* fs
     .makeTempDirectoryScoped({ prefix: "confect-batch-" })
     .pipe(Effect.flatMap((temporary) => fs.realPath(temporary)));
-  const artifacts = yield* Effect.forEach(entries, (entry, index) =>
-    Effect.map(
-      fs.realPath(entry),
-      (source) =>
-        [
-          entry,
-          { source, output: path.join(directory, `${index}.mjs`) },
-        ] as const,
-    ),
+  const artifacts = yield* Effect.forEach(
+    entries,
+    (entry, index) =>
+      Effect.map(
+        fs.realPath(entry),
+        (source) =>
+          [
+            entry,
+            { source, output: path.join(directory, `${index}.mjs`) },
+          ] as const,
+      ),
+    { concurrency: 1 },
   );
   const externalImports = yield* Ref.make(
     HashMap.empty<string, ReadonlyArray<ExternalImport>>(),
@@ -416,6 +421,7 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   const discoveredSelfReferences = yield* Effect.forEach(
     Array.dedupe(Array.map(entries, path.dirname)),
     PackageSelfReference.discover,
+    { concurrency: 1 },
   );
   const selfReferences = Array.getSomes(discoveredSelfReferences);
   const result = yield* Effect.tryPromise({
@@ -470,8 +476,10 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
         "; ",
       )}`,
     });
-  yield* Effect.forEach(result.outputFiles, (output) =>
-    fs.writeFile(output.path, output.contents),
+  yield* Effect.forEach(
+    result.outputFiles,
+    (output) => fs.writeFile(output.path, output.contents),
+    { concurrency: 1 },
   );
   const capturedExternalImports = yield* Ref.get(externalImports);
   const canonicalPaths = yield* canonicalInputPaths(
