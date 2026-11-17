@@ -328,13 +328,17 @@ if (existsSync(block)) {
               (_, i) => `other${i}`,
             ),
             (name) =>
-              Effect.all([
-                project.write(`confect/${name}.spec.ts`, Project.spec),
-                project.write(
-                  `confect/${name}.impl.ts`,
-                  `${pipe(Project.impl, Str.replace('"./notes.spec"', `"./${name}.spec"`))}\nprocess.stdout.write("${unrelatedMarker}\\n");\n`,
-                ),
-              ]),
+              Effect.all(
+                [
+                  project.write(`confect/${name}.spec.ts`, Project.spec),
+                  project.write(
+                    `confect/${name}.impl.ts`,
+                    `${pipe(Project.impl, Str.replace('"./notes.spec"', `"./${name}.spec"`))}\nprocess.stdout.write("${unrelatedMarker}\\n");\n`,
+                  ),
+                ],
+                { concurrency: 1 },
+              ),
+            { concurrency: 1 },
           );
           yield* project.write(
             "confect/tables/notes.ts",

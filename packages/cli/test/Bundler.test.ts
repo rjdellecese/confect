@@ -272,8 +272,10 @@ layer(BundlerLayer)("importersOfPackage", (it) => {
         "@scope/lib",
         () => true,
       );
-      const actual = yield* Effect.forEach(importers, (importer) =>
-        fs.realPath(importer),
+      const actual = yield* Effect.forEach(
+        importers,
+        (importer) => fs.realPath(importer),
+        { concurrency: 1 },
       );
       expect(actual).toStrictEqual([yield* fs.realPath(entry)]);
     }).pipe(Effect.scoped),
@@ -443,7 +445,9 @@ layer(BundlerLayer)("withBatch", (it) => {
         const second = file("nested/second.ts");
         const bundled = yield* Bundler.withBatch(
           [first, second],
-          Effect.all([Bundler.bundle(first), Bundler.bundle(second)]),
+          Effect.all([Bundler.bundle(first), Bundler.bundle(second)], {
+            concurrency: 1,
+          }),
         );
         expect(Array.map(bundled, (result) => result.module.value)).toEqual([
           "assigned",
@@ -525,10 +529,13 @@ layer(BundlerLayer)("withBatch", (it) => {
         const individual = yield* Bundler.bundle(file("first.ts"));
         const [first, second] = yield* Bundler.withBatch(
           [file("first.ts"), file("nested/second.ts")],
-          Effect.all([
-            Bundler.bundle(file("first.ts")),
-            Bundler.bundle(file("nested/second.ts")),
-          ]),
+          Effect.all(
+            [
+              Bundler.bundle(file("first.ts")),
+              Bundler.bundle(file("nested/second.ts")),
+            ],
+            { concurrency: 1 },
+          ),
         );
         const services = yield* ConfigProvider.fromUnknown({
           NODE_OPTIONS: "--conditions=custom",
@@ -874,6 +881,7 @@ layer(BundlerLayer)("withBatch", (it) => {
             const actual8 = yield* Effect.forEach(
               ["first.ts", "left.ts", "right.ts", "shared.ts"],
               (name) => fs.realPath(file(name)),
+              { concurrency: 1 },
             );
             expect(Rec.keys(first.metafile.inputs)).toEqual(actual8);
             expect(Rec.keys(unrelated.metafile.inputs)).toEqual([
@@ -1010,10 +1018,13 @@ layer(BundlerLayer)("withBatch", (it) => {
         const original = yield* Bundler.bundle(file("first.ts"));
         const [first, second] = yield* Bundler.withBatch(
           [file("first.ts"), file("nested/second.ts")],
-          Effect.all([
-            Bundler.bundle(file("first.ts")),
-            Bundler.bundle(file("nested/second.ts")),
-          ]),
+          Effect.all(
+            [
+              Bundler.bundle(file("first.ts")),
+              Bundler.bundle(file("nested/second.ts")),
+            ],
+            { concurrency: 1 },
+          ),
         );
         expect(first.module.data).toEqual(original.module.data);
         expect(first.module.data).toBe(second.module.data);
@@ -1048,16 +1059,22 @@ layer(BundlerLayer)("withBatch", (it) => {
             '{ "type": "module", "exports": { "import": "./index.js" } }',
           "nested/node_modules/dependency/index.js": 'export default "nested";',
         });
-        const originals = yield* Effect.all([
-          Bundler.bundle(file("first.ts")),
-          Bundler.bundle(file("nested/second.ts")),
-        ]);
-        const batch = yield* Bundler.withBatch(
-          [file("first.ts"), file("nested/second.ts")],
-          Effect.all([
+        const originals = yield* Effect.all(
+          [
             Bundler.bundle(file("first.ts")),
             Bundler.bundle(file("nested/second.ts")),
-          ]),
+          ],
+          { concurrency: 1 },
+        );
+        const batch = yield* Bundler.withBatch(
+          [file("first.ts"), file("nested/second.ts")],
+          Effect.all(
+            [
+              Bundler.bundle(file("first.ts")),
+              Bundler.bundle(file("nested/second.ts")),
+            ],
+            { concurrency: 1 },
+          ),
         );
         expect(Array.map(batch, (entry) => entry.module.default)).toEqual(
           Array.map(originals, (entry) => entry.module.default),
@@ -1097,10 +1114,13 @@ layer(BundlerLayer)("withBatch", (it) => {
         const original = yield* Bundler.bundle(file("first.ts"));
         const [first, second] = yield* Bundler.withBatch(
           [file("first.ts"), file("second.ts")],
-          Effect.all([
-            Bundler.bundle(file("first.ts")),
-            Bundler.bundle(file("second.ts")),
-          ]),
+          Effect.all(
+            [
+              Bundler.bundle(file("first.ts")),
+              Bundler.bundle(file("second.ts")),
+            ],
+            { concurrency: 1 },
+          ),
         );
         expect(first.module.shared).toBe(second.module.shared);
         const actual9 = yield* settle(first.module.load);
@@ -1126,10 +1146,13 @@ layer(BundlerLayer)("withBatch", (it) => {
         const original = yield* Bundler.bundle(file("first.ts"));
         const [first, second] = yield* Bundler.withBatch(
           [file("first.ts"), file("second.ts")],
-          Effect.all([
-            Bundler.bundle(file("first.ts")),
-            Bundler.bundle(file("second.ts")),
-          ]),
+          Effect.all(
+            [
+              Bundler.bundle(file("first.ts")),
+              Bundler.bundle(file("second.ts")),
+            ],
+            { concurrency: 1 },
+          ),
         );
         expect(first.module.default).toBe(original.module.default);
         expect(first.module.shared).toBe(second.module.shared);
@@ -1152,10 +1175,10 @@ layer(BundlerLayer)("withBatch", (it) => {
       }).pipe(ConfigProvider.layer, Layer.build);
       const [first, second] = yield* Bundler.withBatch(
         [file("first.ts"), file("second.ts")],
-        Effect.all([
-          Bundler.bundle(file("first.ts")),
-          Bundler.bundle(file("second.ts")),
-        ]),
+        Effect.all(
+          [Bundler.bundle(file("first.ts")), Bundler.bundle(file("second.ts"))],
+          { concurrency: 1 },
+        ),
       ).pipe(Effect.provideContext(services5));
       expect(first.module.shared).not.toBe(second.module.shared);
     }).pipe(Effect.scoped),
@@ -1175,10 +1198,13 @@ layer(BundlerLayer)("withBatch", (it) => {
         });
         const entries = yield* Bundler.withBatch(
           [file("first.ts"), file("nested/second.ts")],
-          Effect.all([
-            Bundler.bundle(file("first.ts")),
-            Bundler.bundle(file("nested/second.ts")),
-          ]),
+          Effect.all(
+            [
+              Bundler.bundle(file("first.ts")),
+              Bundler.bundle(file("nested/second.ts")),
+            ],
+            { concurrency: 1 },
+          ),
         );
         expect(Array.map(entries, (entry) => entry.module.value)).toEqual([
           "root",

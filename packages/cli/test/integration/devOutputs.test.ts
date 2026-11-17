@@ -120,8 +120,10 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const project = yield* Project.make;
           const outputs = ["auth.config.ts", "http.ts", "crons.ts"];
           const contents = "export default {};\n";
-          yield* Effect.forEach(outputs, (output) =>
-            project.write(`convex/${output}`, contents),
+          yield* Effect.forEach(
+            outputs,
+            (output) => project.write(`convex/${output}`, contents),
+            { concurrency: 1 },
           );
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);

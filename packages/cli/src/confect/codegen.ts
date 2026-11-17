@@ -186,7 +186,7 @@ const runCodegen = Effect.gen(function* () {
         Bundler.check(path.join(confectDirectory, file)).pipe(
           Effect.mapError((error) => BuildError.fromBundlerError(file, error)),
         ),
-      { discard: true },
+      { concurrency: 1, discard: true },
     ),
   );
   return {
@@ -313,6 +313,7 @@ const removeLegacyFiles = Effect.gen(function* () {
         yield* logFileRemoved(absolutePath);
       }
     }),
+    { concurrency: 1 },
   );
 });
 
@@ -387,6 +388,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
 
       yield* writeFileStringAndLog(registryPath, contents);
     }),
+    { concurrency: 1 },
   );
 });
 
@@ -406,28 +408,34 @@ const removeObsoleteRegisteredFunctions = Effect.fnUntraced(function* (
     return;
   }
 
-  const expectedPaths = yield* Effect.forEach(leaves, (leaf) =>
-    registeredFunctionsRelativePath(leaf),
+  const expectedPaths = yield* Effect.forEach(
+    leaves,
+    (leaf) => registeredFunctionsRelativePath(leaf),
+    { concurrency: 1 },
   );
   const expected = new Set(expectedPaths);
 
   const existing = yield* fs.readDirectory(registryRoot, { recursive: true });
-  yield* Effect.forEach(existing, (relativePath) => {
-    if (path.extname(relativePath) !== ".ts") {
+  yield* Effect.forEach(
+    existing,
+    (relativePath) => {
+      if (path.extname(relativePath) !== ".ts") {
+        return Effect.void;
+      }
+      const normalized = path.join("registeredFunctions", relativePath);
+      if (!expected.has(normalized)) {
+        return Effect.gen(function* () {
+          const absolutePath = path.join(registryRoot, relativePath);
+          if (yield* fs.exists(absolutePath)) {
+            yield* removePathIfExists(absolutePath);
+            yield* logFileRemoved(absolutePath);
+          }
+        });
+      }
       return Effect.void;
-    }
-    const normalized = path.join("registeredFunctions", relativePath);
-    if (!expected.has(normalized)) {
-      return Effect.gen(function* () {
-        const absolutePath = path.join(registryRoot, relativePath);
-        if (yield* fs.exists(absolutePath)) {
-          yield* removePathIfExists(absolutePath);
-          yield* logFileRemoved(absolutePath);
-        }
-      });
-    }
-    return Effect.void;
-  });
+    },
+    { concurrency: 1 },
+  );
 });
 
 const getGeneratedSpecPath = Effect.gen(function* () {
@@ -560,6 +568,7 @@ const tableModuleBindings = Effect.fnUntraced(function* (
         tableName: tableModule.tableName,
       };
     }),
+    { concurrency: 1 },
   );
 });
 
@@ -652,21 +661,25 @@ const removeObsoleteTableWrappers = Effect.fnUntraced(function* (
     Array.map(tableModules, (tableModule) => `${tableModule.tableName}.ts`),
   );
   const existing = yield* fs.readDirectory(wrappersDir, { recursive: true });
-  yield* Effect.forEach(existing, (entry) => {
-    if (path.extname(entry) !== ".ts") {
+  yield* Effect.forEach(
+    existing,
+    (entry) => {
+      if (path.extname(entry) !== ".ts") {
+        return Effect.void;
+      }
+      if (!expected.has(entry)) {
+        return Effect.gen(function* () {
+          const absolutePath = path.join(wrappersDir, entry);
+          if (yield* fs.exists(absolutePath)) {
+            yield* removePathIfExists(absolutePath);
+            yield* logFileRemoved(absolutePath);
+          }
+        });
+      }
       return Effect.void;
-    }
-    if (!expected.has(entry)) {
-      return Effect.gen(function* () {
-        const absolutePath = path.join(wrappersDir, entry);
-        if (yield* fs.exists(absolutePath)) {
-          yield* removePathIfExists(absolutePath);
-          yield* logFileRemoved(absolutePath);
-        }
-      });
-    }
-    return Effect.void;
-  });
+    },
+    { concurrency: 1 },
+  );
 });
 
 const generateRuntimeSchema = Effect.fnUntraced(function* (

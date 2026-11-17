@@ -198,8 +198,10 @@ const candidatesFor = Effect.fn("Consumer.candidatesFor")(function* (
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const sources = yield* Effect.forEach(profiles[profile].packages, (name) =>
-    manifestAt(path.join(repository, "packages", name)),
+  const sources = yield* Effect.forEach(
+    profiles[profile].packages,
+    (name) => manifestAt(path.join(repository, "packages", name)),
+    { concurrency: 1 },
   );
   const versions = Record.fromEntries(
     Array.map(sources, (manifest) => [manifest.name, manifest.version]),

@@ -27,15 +27,18 @@ const generatedModificationTimes = Effect.fnUntraced(function* (
   const fs = yield* FileSystem.FileSystem;
   const generated = `${directory}/confect/_generated`;
   const files = yield* fs.readDirectory(generated, { recursive: true });
-  return yield* Effect.forEach(files.sort(), (file) =>
-    fs
-      .stat(`${generated}/${file}`)
-      .pipe(
-        Effect.map((stat) => [
-          file,
-          Option.map(stat.mtime, (time) => time.getTime()),
-        ]),
-      ),
+  return yield* Effect.forEach(
+    files.sort(),
+    (file) =>
+      fs
+        .stat(`${generated}/${file}`)
+        .pipe(
+          Effect.map((stat) => [
+            file,
+            Option.map(stat.mtime, (time) => time.getTime()),
+          ]),
+        ),
+    { concurrency: 1 },
   );
 });
 const freshFixture = Effect.gen(function* () {

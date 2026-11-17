@@ -118,8 +118,8 @@ const make = Effect.gen(function* () {
       });
     }).pipe(
       Scope.provide(attemptScope),
-      Effect.onExit((exit) =>
-        Exit.isFailure(exit) ? Scope.close(attemptScope, exit) : Effect.void,
+      Effect.onError((cause) =>
+        Scope.close(attemptScope, Exit.failCause(cause)),
       ),
     );
   }).pipe(

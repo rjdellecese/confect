@@ -128,14 +128,10 @@ describe("server operation tracing", () => {
         expect(reads).toBe(0);
         expect(recorder.spans).toEqual([]);
 
-        const results = yield* Effect.all([
-          unique,
-          paginate,
-          curried,
-          unique,
-          paginate,
-          curried,
-        ]).pipe(Effect.withSpan("caller"), Effect.withTracer(recorder.tracer));
+        const results = yield* Effect.all(
+          [unique, paginate, curried, unique, paginate, curried],
+          { concurrency: 1 },
+        ).pipe(Effect.withSpan("caller"), Effect.withTracer(recorder.tracer));
 
         const page = {
           page: [8],
@@ -257,12 +253,9 @@ describe("server operation tracing", () => {
           expect(invoke).not.toHaveBeenCalled();
           expect(recorder.spans).toEqual([]);
 
-          const result = yield* Effect.all([
-            query,
-            mutation,
-            action,
-            query,
-          ]).pipe(
+          const result = yield* Effect.all([query, mutation, action, query], {
+            concurrency: 1,
+          }).pipe(
             Effect.withSpan("caller"),
             Effect.withTracer(recorder.tracer),
           );
@@ -362,12 +355,10 @@ describe("server operation tracing", () => {
         expect(get).not.toHaveBeenCalled();
         expect(recorder.spans).toEqual([]);
 
-        yield* Effect.all([
-          insertEffect,
-          patchEffect,
-          replaceEffect,
-          insertEffect,
-        ]).pipe(Effect.withTracer(recorder.tracer));
+        yield* Effect.all(
+          [insertEffect, patchEffect, replaceEffect, insertEffect],
+          { concurrency: 1 },
+        ).pipe(Effect.withTracer(recorder.tracer));
 
         expect(insert.mock.calls).toEqual([
           ["notes", { value: "2" }],
@@ -438,9 +429,9 @@ describe("server operation tracing", () => {
 
         expect(filter).not.toHaveBeenCalled();
         expect(paginate).not.toHaveBeenCalled();
-        const results = yield* Effect.all([page, page]).pipe(
-          Effect.withTracer(recorder.tracer),
-        );
+        const results = yield* Effect.all([page, page], {
+          concurrency: 1,
+        }).pipe(Effect.withTracer(recorder.tracer));
         expect(results[0]?.page).toEqual([
           { _id: noteId, _creationTime: 1, value: 7 },
         ]);

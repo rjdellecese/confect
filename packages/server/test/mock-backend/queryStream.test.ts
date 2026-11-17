@@ -78,8 +78,10 @@ const paginateAll = <
 const insertNotes = Effect.fnUntraced(function* (texts: ReadonlyArray<string>) {
   const writer = yield* DatabaseWriter;
 
-  yield* Effect.forEach(texts, (text) =>
-    writer.table("notes").insert({ text }),
+  yield* Effect.forEach(
+    texts,
+    (text) => writer.table("notes").insert({ text }),
+    { concurrency: 1 },
   );
 });
 

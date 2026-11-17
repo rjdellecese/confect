@@ -63,7 +63,7 @@ export const make = <Table_ extends Table.AnyWithProps>(
     pipe(
       Effect.promise(() => query.take(n)),
       Effect.flatMap((encoded) =>
-        Effect.forEach(encoded, Document.decode(table)),
+        Effect.forEach(encoded, Document.decode(table), { concurrency: 1 }),
       ),
     );
 
@@ -82,6 +82,7 @@ export const make = <Table_ extends Table.AnyWithProps>(
     const parsedPage = yield* Effect.forEach(
       paginationResult.page,
       Document.decode(table),
+      { concurrency: 1 },
     );
 
     return {

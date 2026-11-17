@@ -14,8 +14,10 @@ const seedPagination = FunctionImpl.make(
   ({ run }) =>
     Effect.gen(function* () {
       const { runMutation } = yield* MutationRunner;
-      const ids = yield* Effect.forEach([2, 3, 5], (count) =>
-        runMutation(first.counter.create, { run, count }),
+      const ids = yield* Effect.forEach(
+        [2, 3, 5],
+        (count) => runMutation(first.counter.create, { run, count }),
+        { concurrency: 1 },
       );
       yield* runMutation(second.counter.create, { run, count: 99 });
       return { first: ids };

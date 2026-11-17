@@ -19,8 +19,10 @@ const directories: string[] = [];
 
 afterEach(() =>
   Effect.runPromise(
-    Effect.forEach(directories.splice(0), (directory) =>
-      fs.remove(directory, { recursive: true, force: true }),
+    Effect.forEach(
+      directories.splice(0),
+      (directory) => fs.remove(directory, { recursive: true, force: true }),
+      { concurrency: 1 },
     ),
   ),
 );

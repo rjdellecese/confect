@@ -174,11 +174,15 @@ export const make = Effect.gen(function* () {
             ),
           ),
         ),
+      { concurrency: 1 },
     );
-    const actual = yield* Effect.forEach(files.flat(), (file) =>
-      fs
-        .readFileString(path.join(root, file))
-        .pipe(Effect.map((contents) => [file, contents] as const)),
+    const actual = yield* Effect.forEach(
+      files.flat(),
+      (file) =>
+        fs
+          .readFileString(path.join(root, file))
+          .pipe(Effect.map((contents) => [file, contents] as const)),
+      { concurrency: 1 },
     );
     return Rec.fromEntries(actual);
   });

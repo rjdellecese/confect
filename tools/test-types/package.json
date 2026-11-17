@@ -5,7 +5,7 @@
   "devDependencies": {
     "@effect/vitest": "4.1.0",
     "effect": "4.1.0",
-    "tsrs": "0.23.0-ts7.1.0-beta",
+    "tsrs": "0.25.0-ts7.1.0-beta",
     "vitest": "5.1.0"
   },
   "exports": {

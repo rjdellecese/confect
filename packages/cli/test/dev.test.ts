@@ -125,7 +125,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                       pipe(arg, Str.includes("Build errors")),
                   ),
                   (text) => Queue.offer(errors, text),
-                  { discard: true },
+                  { concurrency: 1, discard: true },
                 ),
               ),
             ),
@@ -394,17 +394,23 @@ export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionI
               (_, i) => `other${i}`,
             ),
           ];
-          yield* Effect.forEach(names.slice(1), (name) =>
-            Effect.all([
-              project.write(`confect/${name}.spec.ts`, Project.spec),
-              project.write(
-                `confect/${name}.impl.ts`,
-                pipe(
-                  Project.impl,
-                  Str.replace('"./notes.spec"', `"./${name}.spec"`),
-                ),
+          yield* Effect.forEach(
+            names.slice(1),
+            (name) =>
+              Effect.all(
+                [
+                  project.write(`confect/${name}.spec.ts`, Project.spec),
+                  project.write(
+                    `confect/${name}.impl.ts`,
+                    pipe(
+                      Project.impl,
+                      Str.replace('"./notes.spec"', `"./${name}.spec"`),
+                    ),
+                  ),
+                ],
+                { concurrency: 1 },
               ),
-            ]),
+            { concurrency: 1 },
           );
           const unseen = new Set([
             ...Array.flatMap(names, (name) => [

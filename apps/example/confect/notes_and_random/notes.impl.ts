@@ -142,8 +142,10 @@ const clearAll = FunctionImpl.make(databaseSchema, notes, "clearAll", () =>
       .index("by_creation_time")
       .collect();
 
-    yield* Effect.forEach(allNotes, (note) =>
-      writer.table("notes").delete(note._id),
+    yield* Effect.forEach(
+      allNotes,
+      (note) => writer.table("notes").delete(note._id),
+      { concurrency: 1 },
     );
 
     return null;

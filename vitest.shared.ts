@@ -25,30 +25,33 @@ const discoverPackageAliases = Effect.gen(function* () {
   const packagesDir = path.resolve(import.meta.dirname, "packages");
   const entries = yield* fs.readDirectory(packagesDir);
 
-  return yield* Effect.forEach(entries, (entry) =>
-    Effect.gen(function* () {
-      const srcDir = path.join(packagesDir, entry, "src");
+  return yield* Effect.forEach(
+    entries,
+    (entry) =>
+      Effect.gen(function* () {
+        const srcDir = path.join(packagesDir, entry, "src");
 
-      if (!(yield* fs.exists(path.join(srcDir, "index.ts")))) {
-        return [];
-      }
+        if (!(yield* fs.exists(path.join(srcDir, "index.ts")))) {
+          return [];
+        }
 
-      const contents = yield* fs.readFileString(
-        path.join(packagesDir, entry, "package.json"),
-      );
-      const { name } = yield* Schema.decodeEffect(PackageManifest)(contents);
+        const contents = yield* fs.readFileString(
+          path.join(packagesDir, entry, "package.json"),
+        );
+        const { name } = yield* Schema.decodeEffect(PackageManifest)(contents);
 
-      return [
-        {
-          find: new RegExp(`^${name}$`),
-          replacement: path.join(srcDir, "index.ts"),
-        },
-        {
-          find: new RegExp(`^${name}/(.*)$`),
-          replacement: path.join(srcDir, "$1"),
-        },
-      ];
-    }),
+        return [
+          {
+            find: new RegExp(`^${name}$`),
+            replacement: path.join(srcDir, "index.ts"),
+          },
+          {
+            find: new RegExp(`^${name}/(.*)$`),
+            replacement: path.join(srcDir, "$1"),
+          },
+        ];
+      }),
+    { concurrency: 1 },
   ).pipe(Effect.map(Array.flatten));
 });
 

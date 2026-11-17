@@ -101,7 +101,9 @@ const writeGroupAssembly: (
       Effect.gen(function* () {
         yield* cbw.write(`GroupSpec.addGroupsAt(${group}, {\n`);
         yield* cbw.indent(
-          Effect.forEach(children, (child) => writeGroupEntry(cbw, child)),
+          Effect.forEach(children, (child) => writeGroupEntry(cbw, child), {
+            concurrency: 1,
+          }),
         );
         yield* cbw.write("})");
       }),
@@ -146,8 +148,13 @@ export const render = Effect.fnUntraced(function* (
     }),
   );
 
-  yield* Effect.forEach(collectImportBindings(nodes), (binding) =>
-    cbw.writeLine(`import ${binding.localName} from "${binding.importPath}";`),
+  yield* Effect.forEach(
+    collectImportBindings(nodes),
+    (binding) =>
+      cbw.writeLine(
+        `import ${binding.localName} from "${binding.importPath}";`,
+      ),
+    { concurrency: 1 },
   );
 
   yield* cbw.blankLine();
@@ -159,10 +166,13 @@ export const render = Effect.fnUntraced(function* (
       Effect.gen(function* () {
         yield* cbw.write("Spec.Spec<{\n");
         yield* cbw.indent(
-          Effect.forEach(nonEmptyNodes, (node) =>
-            cbw.writeLine(
-              `readonly ${node.segment}: ${rootGroupTypeMember(node)};`,
-            ),
+          Effect.forEach(
+            nonEmptyNodes,
+            (node) =>
+              cbw.writeLine(
+                `readonly ${node.segment}: ${rootGroupTypeMember(node)};`,
+              ),
+            { concurrency: 1 },
           ),
         );
         yield* cbw.write("}>");
@@ -170,7 +180,9 @@ export const render = Effect.fnUntraced(function* (
   });
   yield* cbw.write(" = Spec.fromGroups({\n");
   yield* cbw.indent(
-    Effect.forEach(nodes, (node) => writeGroupEntry(cbw, node)),
+    Effect.forEach(nodes, (node) => writeGroupEntry(cbw, node), {
+      concurrency: 1,
+    }),
   );
   yield* cbw.writeLine("}) as typeof spec;");
   yield* cbw.blankLine();
