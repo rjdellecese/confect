@@ -42,6 +42,9 @@ import type * as StorageReader from "./StorageReader";
 import * as StorageWriter from "./StorageWriter";
 import * as VectorSearch from "./VectorSearch";
 
+/**
+ * @internal
+ */
 export type Any =
   | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
   | RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any>
@@ -79,6 +82,9 @@ type ConfectRegisteredFunction<
           : never
     : never;
 
+/**
+ * @internal
+ */
 export type ConvexRegisteredFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
 > = FunctionSpec_ extends FunctionSpec.AnyWithProps
@@ -114,6 +120,9 @@ export type ConvexRegisteredFunction<
     : never
   : never;
 
+/**
+ * @internal
+ */
 export type RegisteredFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
 > =
@@ -129,6 +138,9 @@ export type RegisteredFunction<
       ? ConfectRegisteredFunction<FunctionSpec_>
       : never;
 
+/**
+ * @internal
+ */
 export const toConvexDefinition = <
   Args extends PropertyValidators,
   Returns extends Validator<any, any, any>,
@@ -152,6 +164,8 @@ export const toConvexDefinition = <
  * `MiddlewareSpec.MiddlewareImpl`/`MiddlewareImpl.make` signatures, and the
  * composed effect's error channel is re-accounted by
  * {@link combineErrorSchemas}.
+ *
+ * @internal
  */
 export const applyMiddleware = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -176,6 +190,8 @@ export const applyMiddleware = <A, E, R>(
  * declared `error` schema unioned with every covering middleware's error
  * schema. `undefined` (⇒ every failure dies) only when neither declares
  * one—mirroring the ref-side union clients decode against.
+ *
+ * @internal
  */
 export const combineErrorSchemas = (
   error: Schema.Codec<any, any> | undefined,
@@ -219,6 +235,8 @@ export const combineErrorSchemas = (
  * before the `orDie`/`catch`/`result` wrappers this function adds. The fiber's
  * op counter survives context pops, so a cooperative yield can fire inside
  * those wrappers—only a root-context scheduler covers them.
+ *
+ * @internal
  */
 export const runHandlerPromise =
   (
@@ -269,6 +287,9 @@ export const runHandlerPromise =
     );
   };
 
+/**
+ * @internal
+ */
 export const actionFunctionBase = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
@@ -336,6 +357,9 @@ export const actionFunctionBase = <
     }).pipe(runHandlerPromise(combineErrorSchemas(error, resolvedMiddlewares))),
 });
 
+/**
+ * @internal
+ */
 export type ActionServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
@@ -355,6 +379,9 @@ export type ActionServices<
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >;
 
+/**
+ * @internal
+ */
 export const actionLayer = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(

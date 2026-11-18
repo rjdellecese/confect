@@ -8,6 +8,8 @@ import type { RegistryItems } from "./RegistryItems";
  * `RegisteredFunctions` reads it, and the CLI's impl validation inspects it—all
  * through this one tag, without relying on Effect's global default-value cache
  * to align separately-defined tags by string key.
+ *
+ * @internal
  */
 export const Registry = Context.Reference<Ref.Ref<RegistryItems>>(
   "@confect/server/Registry",

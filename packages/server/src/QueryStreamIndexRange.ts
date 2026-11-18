@@ -64,6 +64,8 @@ interface Constraints {
  * The equality prefix followed by at most one bounded field.
  *
  * @experimental
+ *
+ * @internal
  */
 export interface QueryStreamIndexRange<
   out RemainingFieldPaths extends ReadonlyArray<string> = ReadonlyArray<string>,
@@ -75,6 +77,8 @@ export interface QueryStreamIndexRange<
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type Remaining<IndexRange> =
   IndexRange extends QueryStreamIndexRange<infer RemainingFieldPaths>
@@ -87,6 +91,8 @@ export type Remaining<IndexRange> =
  * it (bounded field paths still vary within the range).
  *
  * @experimental
+ *
+ * @internal
  */
 export interface Builder<
   ConvexDoc extends GenericDocument,
@@ -118,6 +124,8 @@ export interface Builder<
  * After `gt`/`gte`, only an upper bound on the same field may follow.
  *
  * @experimental
+ *
+ * @internal
  */
 export interface LowerBoundedBuilder<
   ConvexDoc extends GenericDocument,
@@ -200,6 +208,8 @@ const makeBuilder = (
  * The initial builder handed to a range callback.
  *
  * @experimental
+ *
+ * @internal
  */
 export const builder = <
   ConvexDoc extends GenericDocument,
@@ -211,6 +221,8 @@ export const builder = <
  * Number of index fields pinned by equality constraints.
  *
  * @experimental
+ *
+ * @internal
  */
 export const equalityPrefixLength = (self: QueryStreamIndexRange): number =>
   self[TypeId].equalities.length;
@@ -245,6 +257,8 @@ interface ConvexRangeBuilder extends ConvexUpperBoundBuilder {
  * Apply one range to Convex's index-range builder.
  *
  * @experimental
+ *
+ * @internal
  */
 export const apply = (
   self: QueryStreamIndexRange,
@@ -365,6 +379,8 @@ const rangeFor = (
  * of Convex-expressible ranges, ordered for the given direction.
  *
  * @experimental
+ *
+ * @internal
  */
 export const fromBounds = (
   fieldPaths: ReadonlyArray<string>,
@@ -463,6 +479,8 @@ export const fromBounds = (
  * Derive full-index bounds directly from the structural range.
  *
  * @experimental
+ *
+ * @internal
  */
 export const toBounds = (
   self: QueryStreamIndexRange,

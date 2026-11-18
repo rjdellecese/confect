@@ -41,6 +41,9 @@ const tableDefinitionCache = new WeakMap<
   TableDefinition<any, any, any, any>
 >();
 
+/**
+ * @internal
+ */
 export const tableDefinition = <Table extends Table_.AnyWithProps>(
   table: Table,
 ): TableDefinition<
@@ -92,6 +95,9 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
 // System tables
 // -----------------------------------------------------------------------------
 
+/**
+ * @internal
+ */
 export const scheduledFunctionsTable = Table_.make(() =>
   Schema.Struct({
     name: Schema.String,
@@ -111,6 +117,9 @@ export const scheduledFunctionsTable = Table_.make(() =>
   }),
 )("_scheduled_functions");
 
+/**
+ * @internal
+ */
 export const storageTable = Table_.make(() =>
   Schema.Struct({
     sha256: Schema.String,
@@ -119,9 +128,15 @@ export const storageTable = Table_.make(() =>
   }),
 )("_storage");
 
+/**
+ * @internal
+ */
 export const systemTables = {
   _scheduled_functions: scheduledFunctionsTable,
   _storage: storageTable,
 } as const;
 
+/**
+ * @internal
+ */
 export type SystemTables = typeof scheduledFunctionsTable | typeof storageTable;

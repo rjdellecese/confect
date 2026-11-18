@@ -62,5 +62,8 @@ export const MutationRunner =
   Context.Service<ReturnType<typeof make>>("@confect/server/MutationRunner");
 export type MutationRunner = typeof MutationRunner.Identifier;
 
+/**
+ * @internal
+ */
 export const layer = (runMutation: GenericActionCtx<any>["runMutation"]) =>
   Layer.succeed(MutationRunner, make(runMutation));

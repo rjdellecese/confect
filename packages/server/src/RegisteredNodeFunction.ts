@@ -19,6 +19,9 @@ import type * as GroupImpl from "./GroupImpl";
 import type * as RegisteredFunctions from "./RegisteredFunctions";
 import { mapLeaves } from "./internal/utils";
 
+/**
+ * @internal
+ */
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   databaseSchema: DatabaseSchema.AnyWithProps,
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
@@ -45,6 +48,9 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   ) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>;
 };
 
+/**
+ * @internal
+ */
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,

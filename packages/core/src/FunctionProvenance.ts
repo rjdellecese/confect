@@ -9,6 +9,8 @@ import * as PaginationResult from "./PaginationResult";
  * A field map accepted as Confect function args. Restricting each field to a
  * context-free codec means the struct assembled from the fields can always be
  * encoded and decoded synchronously at a Convex boundary.
+ *
+ * @internal
  */
 export type ArgsFields = {
   readonly [key: PropertyKey]: Schema.ConstraintCodec<any, any>;
@@ -20,6 +22,8 @@ export type ArgsFields = {
  * encoded args are derived directly from `ArgsFields_`; keeping the runtime
  * codec structural prevents every ref lookup from expanding the full Effect
  * schema type.
+ *
+ * @internal
  */
 export interface ArgsSchema<
   ArgsFields_ extends ArgsFields,
@@ -29,9 +33,14 @@ export interface ArgsSchema<
 
 /**
  * Erased structural view used after the exact field map is no longer needed.
+ *
+ * @internal
  */
 export type AnyArgsSchema = ArgsSchema<ArgsFields>;
 
+/**
+ * @internal
+ */
 export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
     args: AnyArgsSchema;
@@ -51,13 +60,21 @@ export type FunctionProvenance = Data.TaggedEnum<{
  * `Standard` function declares its args fields and returns schema directly; a
  * `Paginated` function declares user-args fields and an item schema from which
  * the Convex-facing `args`/`returns` are composed.
+ *
+ * @internal
  */
 export type ConfectKind = Standard | Paginated;
 
+/**
+ * @internal
+ */
 export interface Standard {
   readonly _tag: "Standard";
 }
 
+/**
+ * @internal
+ */
 export interface Paginated<
   UserArgsFields_ extends ArgsFields = ArgsFields,
   Item extends Schema.Codec<any, any> = Schema.Codec<any, any>,
@@ -77,6 +94,9 @@ export interface Paginated<
   readonly page: Schema.Codec<any, any>;
 }
 
+/**
+ * @internal
+ */
 export interface Confect<
   ArgsFields_ extends ArgsFields,
   Returns extends Schema.Codec<any, any>,
@@ -91,6 +111,9 @@ export interface Confect<
   readonly kind: Kind;
 }
 
+/**
+ * @internal
+ */
 export interface AnyConfect {
   readonly _tag: "Confect";
   readonly args: AnyArgsSchema;
@@ -99,14 +122,23 @@ export interface AnyConfect {
   readonly kind: ConfectKind;
 }
 
+/**
+ * @internal
+ */
 export interface Convex<Args extends DefaultFunctionArgs, Returns> {
   readonly _tag: "Convex";
   readonly "~args": Args;
   readonly "~returns": Returns;
 }
 
+/**
+ * @internal
+ */
 export interface AnyConvex extends Convex<DefaultFunctionArgs, any> {}
 
+/**
+ * @internal
+ */
 export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
 
 const Standard: Standard = { _tag: "Standard" };
@@ -127,6 +159,8 @@ const Standard: Standard = { _tag: "Standard" };
  * is only installed when an `errorThunk` is provided, so its absence is
  * observable via `"error" in provenance` without forcing anything; nothing
  * relies on `Data`'s structural `Equal`/`Hash` for provenance values.
+ *
+ * @internal
  */
 export const Confect = <
   const ArgsFields_ extends ArgsFields,
@@ -154,12 +188,17 @@ export const Confect = <
  *
  * The fields-first representation keeps the user-declared map available for
  * type-level composition without reconstructing it from an erased schema.
+ *
+ * @internal
  */
 export type PaginatedArgsFields<UserArgsFields extends ArgsFields> =
   UserArgsFields & {
     readonly paginationOpts: typeof PaginationOptions.PaginationOptions;
   };
 
+/**
+ * @internal
+ */
 export type PaginatedArgs<UserArgsFields extends ArgsFields> = Schema.Struct<
   PaginatedArgsFields<UserArgsFields>
 >;
@@ -167,6 +206,8 @@ export type PaginatedArgs<UserArgsFields extends ArgsFields> = Schema.Struct<
 /**
  * The composed returns schema of a paginated query: a `PaginationResult` of the
  * item schema. Same deferred-conditional device as {@link PaginatedArgs}.
+ *
+ * @internal
  */
 export type PaginatedReturns<Item extends Schema.Codec<any, any>> =
   PaginationResult.PaginationResult<Item> extends infer ComposedReturns extends
@@ -174,6 +215,9 @@ export type PaginatedReturns<Item extends Schema.Codec<any, any>> =
     ? ComposedReturns
     : never;
 
+/**
+ * @internal
+ */
 export interface ConfectPaginated<
   UserArgsFields extends ArgsFields,
   Item extends Schema.Codec<any, any>,
@@ -185,6 +229,9 @@ export interface ConfectPaginated<
   Paginated<UserArgsFields, Item>
 > {}
 
+/**
+ * @internal
+ */
 export interface AnyConfectPaginated extends AnyConfect {
   readonly kind: Paginated;
 }
@@ -198,6 +245,8 @@ export interface AnyConfectPaginated extends AnyConfect {
  * them: `args` spreads the user fields plus `paginationOpts`, and `returns`
  * wraps the item in `PaginationResult`. Composition living here means the
  * composed schemas can never drift from the stored user schemas.
+ *
+ * @internal
  */
 export const ConfectPaginated = <
   const UserArgsFields_ extends ArgsFields,
@@ -243,6 +292,9 @@ export const ConfectPaginated = <
   return self;
 };
 
+/**
+ * @internal
+ */
 export const Convex = <Args extends DefaultFunctionArgs, Returns>() =>
   FunctionProvenance.Convex(
     {} as {

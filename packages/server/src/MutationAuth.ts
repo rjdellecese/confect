@@ -19,5 +19,8 @@ export class MutationAuth extends Context.Service<
   ReturnType<typeof make>
 >()("@confect/server/MutationAuth") {}
 
+/**
+ * @internal
+ */
 export const layer = (auth: Pick<ConvexMutationAuth, "signJwt">) =>
   Layer.succeed(MutationAuth, make(auth));

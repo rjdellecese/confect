@@ -16,5 +16,8 @@ export class RequestMetadata extends Context.Service<
   ReturnType<typeof make>
 >()("@confect/server/RequestMetadata") {}
 
+/**
+ * @internal
+ */
 export const layer = (meta: Pick<MutationMeta, "getRequestMetadata">) =>
   Layer.succeed(RequestMetadata, make(meta));

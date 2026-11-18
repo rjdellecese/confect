@@ -15,6 +15,9 @@ export interface FunctionImpl<Name_ extends string> {
   readonly name: Name_;
 }
 
+/**
+ * @internal
+ */
 export const FunctionImpl = <Name_ extends string>({ name }: { name: Name_ }) =>
   Context.Service<FunctionImpl<Name_>>(`@confect/server/FunctionImpl/${name}`);
 
@@ -80,11 +83,15 @@ export const make = <
 
 /**
  * Get the function implementation service type for a specific function name.
+ *
+ * @internal
  */
 export type ForFunction<Name_ extends string> = FunctionImpl<Name_>;
 
 /**
  * Get all function implementation services required for a group spec.
+ *
+ * @internal
  */
 export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
   FunctionSpec.Name<

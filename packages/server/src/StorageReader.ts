@@ -33,6 +33,9 @@ export class StorageReader extends Context.Service<
   StorageReader,
   ReturnType<typeof make>
 >()("@confect/server/StorageReader") {
+  /**
+   * @internal
+   */
   static readonly layer = (storageReader: ConvexStorageReader) =>
     Layer.succeed(this, make(storageReader));
 }

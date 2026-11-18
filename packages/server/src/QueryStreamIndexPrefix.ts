@@ -12,6 +12,8 @@ const TypeId = "~@confect/server/QueryStreamIndexPrefix";
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type IndexEntries = ReadonlyArray<
   readonly [string, QueryStreamKeyValues.QueryStreamKeyValues[number]]
@@ -21,6 +23,8 @@ export type IndexEntries = ReadonlyArray<
  * Index coordinates retain the field path belonging to each value.
  *
  * @experimental
+ *
+ * @internal
  */
 export interface QueryStreamIndexPrefix {
   readonly [TypeId]: IndexEntries;
@@ -28,6 +32,8 @@ export interface QueryStreamIndexPrefix {
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export class IndexPrefixWidthMismatchError extends Schema.TaggedError<
   IndexPrefixWidthMismatchError,
@@ -43,6 +49,8 @@ export class IndexPrefixWidthMismatchError extends Schema.TaggedError<
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const make = (
   fieldPaths: ReadonlyArray<string>,
@@ -59,12 +67,16 @@ export const make = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const entries = (self: QueryStreamIndexPrefix): IndexEntries =>
   self[TypeId];
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const keyValues = (
   self: QueryStreamIndexPrefix,
@@ -75,6 +87,8 @@ export const keyValues = (
  * Restore equality values when crossing into index coordinates.
  *
  * @experimental
+ *
+ * @internal
  */
 export const fromStreamKey = (
   fieldPaths: ReadonlyArray<string>,

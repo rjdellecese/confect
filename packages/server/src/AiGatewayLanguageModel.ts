@@ -7,11 +7,19 @@ import type * as AiModel from "effect/ai/Model";
 
 /**
  * Configuration overrides for Convex AI gateway language-model requests.
+ *
+ * @internal
  */
 export const Config = OpenAiLanguageModel.Config;
 
+/**
+ * @internal
+ */
 export type Config = OpenAiLanguageModel.Config;
 
+/**
+ * @internal
+ */
 export interface Options {
   readonly model: string;
   readonly config?: Omit<typeof OpenAiLanguageModel.Config.Service, "model">;
@@ -33,6 +41,8 @@ export const model = (
 
 /**
  * Construct a language-model service backed by the Convex AI gateway.
+ *
+ * @internal
  */
 export const make = ({
   model: modelId,
@@ -45,6 +55,8 @@ export const make = ({
 
 /**
  * Provide a language-model service backed by the Convex AI gateway.
+ *
+ * @internal
  */
 export const layer = ({
   model: modelId,

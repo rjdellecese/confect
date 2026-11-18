@@ -54,16 +54,22 @@ const KeyValue = Schema.Json.pipe(
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type KeyValue = typeof KeyValue.Type;
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const QueryStreamKeyValues = Schema.Array(KeyValue);
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type QueryStreamKeyValues = typeof QueryStreamKeyValues.Type;
 
@@ -73,6 +79,8 @@ export type QueryStreamKeyValues = typeof QueryStreamKeyValues.Type;
  * within the type, including UTF-8 string order and NaN bit-level ordering).
  *
  * @experimental
+ *
+ * @internal
  */
 export const ValueOrder: Order_.Order<KeyValue> = (self, that) => {
   const ordering = compareValues(self, that);
@@ -88,6 +96,8 @@ const DescendingOrder = Order_.flip(AscendingOrder);
  * descending order reverses it.
  *
  * @experimental
+ *
+ * @internal
  */
 export const Order = (
   orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
@@ -96,6 +106,8 @@ export const Order = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const extract = (
   encoded: Record.ReadonlyRecord<string, unknown>,

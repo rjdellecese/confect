@@ -9,12 +9,24 @@ import type * as FunctionSpec from "./FunctionSpec";
 import * as Lazy from "./Lazy";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
+/**
+ * @internal
+ */
 export const TypeId = "~@confect/core/MiddlewareSpec";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
+/**
+ * @internal
+ */
 export const isMiddlewareSpec = (u: unknown): u is AnyMiddlewareSpec =>
   Predicate.hasProperty(u, TypeId);
 
+/**
+ * @internal
+ */
 export const allFunctionTypes: ReadonlyArray<FunctionType> = [
   "query",
   "mutation",
@@ -32,6 +44,8 @@ export interface SupportedFunctionTypes {
  * without exposing its concrete success value.
  *
  * Mirrors `RpcMiddleware.SuccessValue` in Effect.
+ *
+ * @internal
  */
 export interface SuccessValue {
   readonly _: unique symbol;
@@ -60,6 +74,9 @@ export type MiddlewareOptions<Options_ = never> = {
   };
 } & ([Options_] extends [never] ? unknown : { readonly options: Options_ });
 
+/**
+ * @internal
+ */
 export interface AnyMiddlewareImpl {
   (
     effect: Effect.Effect<SuccessValue, any, any>,
@@ -101,6 +118,9 @@ export interface MiddlewareSpec<
   readonly "~Options": OptionsSchema_;
 }
 
+/**
+ * @internal
+ */
 export interface AnyMiddlewareSpec {
   readonly [TypeId]: TypeId;
   readonly key: string;
@@ -114,9 +134,15 @@ export interface AnyMiddlewareSpec {
   readonly "~Options": any;
 }
 
+/**
+ * @internal
+ */
 export type Options<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_["~Options"]["Type"];
 
+/**
+ * @internal
+ */
 export type WithoutOptions<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
     ? [MiddlewareSpec_["~Options"]] extends [never]
@@ -124,9 +150,15 @@ export type WithoutOptions<MiddlewareSpec_ extends AnyMiddlewareSpec> =
       : never
     : never;
 
+/**
+ * @internal
+ */
 export type Key<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_["key"];
 
+/**
+ * @internal
+ */
 export type Provides<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
     ? MiddlewareSpec_["~Provides"]
@@ -135,25 +167,39 @@ export type Provides<MiddlewareSpec_ extends AnyMiddlewareSpec> =
 /**
  * The services a middleware's implementation may consume from middleware that
  * runs earlier in the same chain (type-level only, like `provides`).
+ *
+ * @internal
  */
 export type Requires<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
     ? MiddlewareSpec_["~Requires"]
     : never;
 
+/**
+ * @internal
+ */
 export type ErrorSchema<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec ? MiddlewareSpec_["~Error"] : never;
 
+/**
+ * @internal
+ */
 export type Error<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
     ? MiddlewareSpec_["~Error"]["Type"]
     : never;
 
+/**
+ * @internal
+ */
 export type EncodedError<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
     ? MiddlewareSpec_["~Error"]["Encoded"]
     : never;
 
+/**
+ * @internal
+ */
 export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
     ? MiddlewareSpec_["~FunctionTypes"]
@@ -245,6 +291,9 @@ type ValidateFunctionTypesConfig<Config extends SupportedFunctionTypes> =
         : never)
   >;
 
+/**
+ * @internal
+ */
 export const errorSchemas = (
   middlewareSpecs: ReadonlyArray<AnyMiddlewareSpec>,
 ): ReadonlyArray<Schema.Codec<any, any>> =>
@@ -258,6 +307,8 @@ export const errorSchemas = (
  * A branded, unconstructible type carrying a spec-authoring error message.
  * Surfaced as (part of) a parameter type so the diagnostic names the exact
  * problem at the `.middleware()`/`.addFunction()` call site.
+ *
+ * @internal
  */
 export interface AttachmentError<Message extends string> {
   readonly "~@confect/core/MiddlewareSpec/AttachmentError": Message;
@@ -272,6 +323,8 @@ type ValidationResult<Errors> = [Errors] extends [never] ? unknown : Errors;
  * A matching-type Convex-provenance function is rejected rather than silently
  * skipped: its raw handler passes through Confect untouched, so the middleware
  * could not actually cover it, and skipping it would be a policy hole.
+ *
+ * @internal
  */
 export type ValidateFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
@@ -301,6 +354,8 @@ export type ValidateFunction<
  * Attachment order is chain order, so requiring `requires` to be satisfied by
  * already-attached middleware is exactly requiring the provider to run
  * earlier.
+ *
+ * @internal
  */
 export type ValidateAttach<
   MiddlewareSpec_ extends AnyMiddlewareSpec,
@@ -319,6 +374,9 @@ export type ValidateAttach<
     : AttachmentError<`Middleware "${Key<MiddlewareSpec_>}" requires services that no middleware attached earlier to this group provides—attach the providing middleware first`>
   : AttachmentError<`Middleware "${Key<MiddlewareSpec_>}" is already attached to this group`>;
 
+/**
+ * @internal
+ */
 export type ValidateAddedFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   MiddlewareSpecs_ extends AnyMiddlewareSpec,
@@ -355,6 +413,8 @@ type GroupOverlap<
  * legitimately be satisfied by a group middleware the function spec never sees,
  * and group attachment is declaratively order-independent with respect to
  * `addFunction`.
+ *
+ * @internal
  */
 export type ValidateImplRequires<
   Functions_ extends FunctionSpec.AnyWithProps,
@@ -374,6 +434,9 @@ export type ValidateImplRequires<
     : never
 >;
 
+/**
+ * @internal
+ */
 export type ValidateFunctionAttach<
   MiddlewareSpec_ extends AnyMiddlewareSpec,
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,

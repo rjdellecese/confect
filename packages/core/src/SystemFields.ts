@@ -15,6 +15,8 @@ import * as GenericId from "./GenericId";
 /**
  * Produces a schema for Convex system fields. In Confect, system fields include
  * `_id`.
+ *
+ * @internal
  */
 export const SystemFields = <TableName extends string>(tableName: TableName) =>
   Schema.Struct({
@@ -166,6 +168,8 @@ const makeExtendAst = (
  * Note that struct-level checks on an extended schema observe the value with
  * the system fields attached, and encoding an extended schema emits the system
  * fields alongside the table fields.
+ *
+ * @internal
  */
 export const extendWithSystemFields = <
   TableName extends string,

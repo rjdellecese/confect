@@ -24,6 +24,9 @@ export class Auth extends Context.Service<Auth, ReturnType<typeof make>>()(
   "@confect/server/Auth",
 ) {}
 
+/**
+ * @internal
+ */
 export const layer = (auth: ConvexAuth) => Layer.succeed(Auth, make(auth));
 
 export class NoUserIdentityFoundError extends Schema.TaggedError<

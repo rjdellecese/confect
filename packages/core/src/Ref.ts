@@ -126,17 +126,31 @@ export interface ConvexRef<
   readonly _tag: "Convex";
 }
 
+/**
+ * @internal
+ */
 export type Any = Ref<any, any, any, any, any>;
 
 /**
  * Erased Confect-provenance ref used by provenance-specific APIs.
+ *
+ * @internal
  */
 export type AnyConfect = Extract<Any, { readonly _tag: "Confect" }>;
 
+/**
+ * @internal
+ */
 export type AnyInternal = Ref<any, "internal", any, any, any>;
 
+/**
+ * @internal
+ */
 export type AnyPublic = Ref<any, "public", any, any, any>;
 
+/**
+ * @internal
+ */
 export type AnyQuery = Ref<
   RuntimeAndFunctionType.AnyQuery,
   FunctionVisibility,
@@ -158,9 +172,15 @@ type PaginatedQueryWithVisibility<
   any
 >;
 
+/**
+ * @internal
+ */
 export type AnyPaginatedQuery =
   PaginatedQueryWithVisibility<FunctionVisibility>;
 
+/**
+ * @internal
+ */
 export type AnyMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
   FunctionVisibility,
@@ -169,6 +189,9 @@ export type AnyMutation = Ref<
   any
 >;
 
+/**
+ * @internal
+ */
 export type AnyAction = Ref<
   RuntimeAndFunctionType.AnyAction,
   FunctionVisibility,
@@ -177,6 +200,9 @@ export type AnyAction = Ref<
   any
 >;
 
+/**
+ * @internal
+ */
 export type AnyPublicQuery = Ref<
   RuntimeAndFunctionType.AnyQuery,
   "public",
@@ -185,15 +211,27 @@ export type AnyPublicQuery = Ref<
   any
 >;
 
+/**
+ * @internal
+ */
 export type AnyConfectPublicQuery = Extract<AnyPublicQuery, AnyConfect>;
 
+/**
+ * @internal
+ */
 export type AnyPublicPaginatedQuery = PaginatedQueryWithVisibility<"public">;
 
+/**
+ * @internal
+ */
 export type AnyConfectPublicPaginatedQuery = Extract<
   AnyPublicPaginatedQuery,
   AnyConfect
 >;
 
+/**
+ * @internal
+ */
 export type AnyPublicMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
   "public",
@@ -202,8 +240,14 @@ export type AnyPublicMutation = Ref<
   any
 >;
 
+/**
+ * @internal
+ */
 export type AnyConfectPublicMutation = Extract<AnyPublicMutation, AnyConfect>;
 
+/**
+ * @internal
+ */
 export type AnyPublicAction = Ref<
   RuntimeAndFunctionType.AnyAction,
   "public",
@@ -212,8 +256,14 @@ export type AnyPublicAction = Ref<
   any
 >;
 
+/**
+ * @internal
+ */
 export type AnyConfectPublicAction = Extract<AnyPublicAction, AnyConfect>;
 
+/**
+ * @internal
+ */
 export type GetRuntimeAndFunctionType<Ref_> = Ref_ extends {
   readonly "~RuntimeAndFunctionType": infer RuntimeAndFunctionType_ extends
     RuntimeAndFunctionType.RuntimeAndFunctionType;
@@ -221,26 +271,40 @@ export type GetRuntimeAndFunctionType<Ref_> = Ref_ extends {
   ? RuntimeAndFunctionType_
   : never;
 
+/**
+ * @internal
+ */
 export type GetRuntime<Ref_> = RuntimeAndFunctionType.GetRuntime<
   GetRuntimeAndFunctionType<Ref_>
 >;
 
+/**
+ * @internal
+ */
 export type GetFunctionType<Ref_> = RuntimeAndFunctionType.GetFunctionType<
   GetRuntimeAndFunctionType<Ref_>
 >;
 
+/**
+ * @internal
+ */
 export type GetFunctionVisibility<Ref_> = Ref_ extends {
   readonly "~FunctionVisibility": infer FunctionVisibility_;
 }
   ? FunctionVisibility_
   : never;
 
+/**
+ * @internal
+ */
 export type Args<Ref_> = Ref_ extends { readonly "~Args": infer Args_ }
   ? Args_
   : never;
 
 /**
  * The field map captured by a Confect-provenance ref.
+ *
+ * @internal
  */
 export type ArgsFields<Ref_> = Ref_ extends {
   readonly _tag: "Confect";
@@ -253,6 +317,8 @@ export type ArgsFields<Ref_> = Ref_ extends {
 
 /**
  * The assembled args schema carried by a Confect-provenance ref.
+ *
+ * @internal
  */
 export type ArgsSchema<Ref_> = Ref_ extends {
   readonly _tag: "Confect";
@@ -261,10 +327,16 @@ export type ArgsSchema<Ref_> = Ref_ extends {
   ? ArgsSchema_
   : never;
 
+/**
+ * @internal
+ */
 export type OptionalArgs<Ref_ extends Any> = keyof Args<Ref_> extends never
   ? [args?: Args<Ref_>]
   : [args: Args<Ref_>];
 
+/**
+ * @internal
+ */
 export type Returns<Ref_> = Ref_ extends { readonly "~Returns": infer Returns_ }
   ? Returns_
   : never;
@@ -272,6 +344,8 @@ export type Returns<Ref_> = Ref_ extends { readonly "~Returns": infer Returns_ }
 /**
  * The decoded user arguments of a paginated query, excluding `paginationOpts`.
  * When no user arguments remain, only an empty object is accepted.
+ *
+ * @internal
  */
 export type PaginatedArgs<Query extends AnyPublicPaginatedQuery> =
   OmitKey<Args<Query>, "paginationOpts"> extends infer Args_
@@ -282,19 +356,30 @@ export type PaginatedArgs<Query extends AnyPublicPaginatedQuery> =
 
 /**
  * The decoded item type of a paginated query's `page` field.
+ *
+ * @internal
  */
 export type PaginatedItem<Query extends AnyPublicPaginatedQuery> =
   Returns<Query>["page"][number];
 
+/**
+ * @internal
+ */
 export type Error<Ref_> = Ref_ extends { readonly "~Error": infer Error_ }
   ? Error_
   : never;
 
+/**
+ * @internal
+ */
 export type FunctionReference<Ref_ extends Any> = ConvexFunctionReference<
   GetFunctionType<Ref_>,
   GetFunctionVisibility<Ref_>
 >;
 
+/**
+ * @internal
+ */
 export type FromFunctionSpec<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   MiddlewareError = never,
@@ -348,6 +433,9 @@ type FromFunctionSpecHelper<
           Error_
         >;
 
+/**
+ * @internal
+ */
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   /**
    * The namespace portion of a Convex function name, i.e. the part before the
@@ -398,11 +486,17 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   ) as FromFunctionSpec<FunctionSpec_>;
 };
 
+/**
+ * @internal
+ */
 export const getConvexFunctionName = (ref: Any): string =>
   ref.convexFunctionName;
 
 const functionReferenceCache = new Map<string, FunctionReference<Any>>();
 
+/**
+ * @internal
+ */
 export const getFunctionReference = <Ref_ extends Any>(
   ref: Ref_,
 ): FunctionReference<Ref_> => {
@@ -419,6 +513,9 @@ export const getFunctionReference = <Ref_ extends Any>(
   return functionReference as FunctionReference<Ref_>;
 };
 
+/**
+ * @internal
+ */
 export const hasErrorSchema = (ref: Any): boolean =>
   Match.value(ref).pipe(
     Match.tag(
@@ -434,6 +531,9 @@ export const hasErrorSchema = (ref: Any): boolean =>
     Match.exhaustive,
   );
 
+/**
+ * @internal
+ */
 export const encodeArgs = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
@@ -446,6 +546,9 @@ export const encodeArgs = <Ref_ extends Any>(
     Match.exhaustive,
   );
 
+/**
+ * @internal
+ */
 export const decodeReturns = <Ref_ extends Any>(
   ref: Ref_,
   returns: unknown,
@@ -458,6 +561,9 @@ export const decodeReturns = <Ref_ extends Any>(
     Match.exhaustive,
   );
 
+/**
+ * @internal
+ */
 export const encodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
@@ -470,6 +576,9 @@ export const encodeArgsSync = <Ref_ extends Any>(
     Match.exhaustive,
   );
 
+/**
+ * @internal
+ */
 export const decodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedArgs: unknown,
@@ -484,6 +593,9 @@ export const decodeArgsSync = <Ref_ extends Any>(
     Match.exhaustive,
   ) as Args<Ref_>;
 
+/**
+ * @internal
+ */
 export const encodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   returns: Returns<Ref_>,
@@ -496,6 +608,9 @@ export const encodeReturnsSync = <Ref_ extends Any>(
     Match.exhaustive,
   );
 
+/**
+ * @internal
+ */
 export const decodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedReturns: unknown,
@@ -512,6 +627,9 @@ export const decodeReturnsSync = <Ref_ extends Any>(
 
 const ConvexErrorIdentifier = Symbol.for("ConvexError");
 
+/**
+ * @internal
+ */
 export const isConvexError = (error: unknown): error is ConvexError<Value> =>
   error instanceof ConvexError ||
   (typeof error === "object" &&
@@ -526,6 +644,8 @@ export const isConvexError = (error: unknown): error is ConvexError<Value> =>
  * the ref's error contract. Useful when adapting non-Effect APIs (e.g. emitter
  * callbacks for streamed subscriptions) to the same error semantics that
  * `runWithCodec` provides.
+ *
+ * @internal
  */
 export const decodeErrorOrElse =
   <Ref_ extends Any, E>(ref: Ref_, mapUnknownError: (error: unknown) => E) =>
@@ -566,6 +686,8 @@ const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
  * definition there's nothing to decode the value into, and the caller is
  * responsible for deciding what to do (typically: surface the original value as
  * a defect).
+ *
+ * @internal
  */
 export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
@@ -592,6 +714,8 @@ export const decodeError = <Ref_ extends Any>(
  * the only useful diagnostic. Hence the `Option` suffix rather than `Sync`,
  * matching `Schema.decodeUnknownOption`: the sibling `*Sync` helpers in this
  * module all throw on a parse failure, and this one deliberately doesn't.
+ *
+ * @internal
  */
 export const decodeErrorOption = <Ref_ extends Any>(
   ref: Ref_,
@@ -633,6 +757,8 @@ const paginatedKind = (ref: AnyConfect): FunctionProvenance.Paginated =>
  * managed by the client (e.g. `usePaginatedQuery` from `convex/react`), not by
  * the caller. Requires a ref built with `FunctionSpec.publicPaginatedQuery` (or
  * `internalPaginatedQuery`).
+ *
+ * @internal
  */
 export const encodePaginatedQueryArgsSync = <
   Ref_ extends AnyPublicPaginatedQuery,
@@ -654,6 +780,8 @@ export const encodePaginatedQueryArgsSync = <
  * Decode a page of a paginated query's results via the ref's item schema.
  * Requires a ref built with `FunctionSpec.publicPaginatedQuery` (or
  * `internalPaginatedQuery`).
+ *
+ * @internal
  */
 export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
   ref: Ref_,
@@ -676,6 +804,8 @@ export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
  * server-side runtime errors, validation failures, etc.—is passed to
  * `mapUnknownError` to be turned into a typed `E`, or surfaced as a defect when
  * no handler is provided.
+ *
+ * @internal
  */
 export const runWithCodec = Effect.fnUntraced(function* <
   Ref_ extends Any,
