@@ -15,8 +15,8 @@ import {
   RequestMetadata,
   VectorSearch,
 } from "./_generated/services";
-import databaseSchema from "./_generated/schema";
 import { Id } from "./_generated/id";
+import type schema from "./_generated/schema";
 
 const search = Effect.fn("http.vectorSearch")(function* (caseId: string) {
   const vectorSearch = yield* VectorSearch;
@@ -44,8 +44,7 @@ const VectorApiLive = HttpApiBuilder.group(VectorApi, "vectors", (handlers) =>
   handlers.handle("search", ({ query }) => search(query.caseId)),
 );
 
-export default ConfectHttpRouter.make(
-  databaseSchema,
+export default ConfectHttpRouter.make<typeof schema>(
   Layer.mergeAll(
     HttpApiBuilder.layer(VectorApi).pipe(Layer.provide(VectorApiLive)),
     HttpRouter.add(

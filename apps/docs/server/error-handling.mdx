@@ -69,26 +69,22 @@ FunctionSpec.publicMutation({
 When a spec declares an `error` schema, the corresponding `FunctionImpl` handler's `Effect` error channel is typed as that schema's `Type`. Use `Effect.fail` (or `Effect.mapError`) to fail with any value matching the schema.
 
 ```ts confect/notes.impl.ts
-import { FunctionImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 
-import databaseSchema from "./_generated/schema";
+import { FunctionImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
+import notesTable from "./_generated/tables/notes";
 import notes, { NoteNotFound } from "./notes.spec";
 
-const getOrFail = FunctionImpl.make(
-  databaseSchema,
-  notes,
-  "getOrFail",
-  ({ noteId }) =>
-    Effect.gen(function* () {
-      const reader = yield* DatabaseReader;
+const getOrFail = FunctionImpl.make(notes, "getOrFail", ({ noteId }) =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
 
-      return yield* reader
-        .table("notes")
-        .get(noteId)
-        .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
-    }),
+    return yield* reader
+      .table(notesTable)
+      .get(noteId)
+      .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
+  }),
 );
 ```
 

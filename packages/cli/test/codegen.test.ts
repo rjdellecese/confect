@@ -48,6 +48,65 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
     it.effect(
+      "switches between native and registered outputs during incremental codegen",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const { snapshot } = yield* project.provide(generateWithSnapshot);
+          const before = yield* project.generatedFiles;
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { GroupSpec, FunctionSpec } from "@confect/core";
+import type { list } from "./notes.native";
+export default GroupSpec.make({convexModule: true}).addFunction(FunctionSpec.convexPublicQuery<typeof list>()("list"));`,
+          );
+          yield* project.write(
+            "confect/notes.native.ts",
+            'import { queryGeneric } from "convex/server"; export const list = queryGeneric(() => 1);',
+          );
+          const entry = [
+            {
+              _tag: "Spec",
+              relativePath: SpecModulePath.make("notes.spec.ts"),
+            },
+          ] as const;
+          const conflict = yield* project
+            .provide(updateDeclarations(snapshot, entry, []))
+            .pipe(Effect.result);
+          assert(conflict._tag === "Failure");
+          expect(conflict.failure).toMatchObject({
+            _tag: "InvalidConvexModuleError",
+            reason: expect.stringContaining("conflicting notes.impl.ts"),
+          });
+          yield* fs.remove(path.join(project.root, "confect/notes.impl.ts"));
+          const direct = yield* project.provide(
+            updateDeclarations(snapshot, entry, []),
+          );
+          const generated = yield* project.generatedFiles;
+          expect(generated[path.join("convex", "notes.ts")]).toContain(
+            'export { list } from "../confect/notes.native";',
+          );
+          expect(
+            generated[
+              path.join(
+                "confect",
+                "_generated",
+                "registeredFunctions",
+                "notes.ts",
+              )
+            ],
+          ).toBeUndefined();
+          yield* project.write("confect/notes.impl.ts", Project.impl);
+          yield* project.write("confect/notes.spec.ts", Project.spec);
+          yield* project.provide(updateDeclarations(direct, entry, []));
+          const ordinary = yield* project.generatedFiles;
+          expect(ordinary).toEqual(before);
+        }).pipe(Effect.scoped),
+      { timeout: 30000 },
+    );
+    it.effect(
       "matches fresh output with workspace-linked dependencies",
       () =>
         Effect.gen(function* () {
@@ -439,12 +498,12 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           );
           yield* project.write(
             "confect/notes.impl.ts",
-            `import { FunctionImpl, GroupImpl } from "@confect/server";
+            `import { GroupImpl } from "@confect/server";
+import { FunctionImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import schema from "./_generated/schema";
 import spec from "./notes.spec";
-export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make(schema, spec, "list", () => Effect.succeed([]))), GroupImpl.finalize);
+export default GroupImpl.make(spec).pipe(Layer.provide(FunctionImpl.make(spec, "list", () => Effect.succeed([]))), GroupImpl.finalize);
 `,
           );
           snapshot = yield* project.provide(
@@ -640,9 +699,8 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
             yield* project.write(
               `confect/group${index}.impl.ts`,
               `import { GroupImpl } from "@confect/server";
-import databaseSchema from "./_generated/schema";
 import spec from "./group${index}.spec";
-export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
+export default GroupImpl.make(spec).pipe(GroupImpl.finalize);`,
             );
           }
           const active = { spec: 0, impl: 0 };

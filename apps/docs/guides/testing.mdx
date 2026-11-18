@@ -30,22 +30,21 @@ bun add -D @confect/test convex-test @effect/vitest
 
 ## Setup
 
-Create a `TestConfect.ts` file that configures the test layer with your generated runtime schema, generated Convex schema definition, and Convex modules. Both schemas are emitted by `confect codegen` from `confect/tables/*.ts`; you never edit them by hand.
+Pass your generated Convex deployment schema and Convex modules to `TestConfect.layer`. The Confect schema is a **type-only** import: it types the test services but isn't needed at runtime.
 
 ```ts test/TestConfect.ts
 /// <reference types="vite/client" />
 
 import { TestConfect as TestConfect_ } from "@confect/test";
 
-import confectSchema from "./confect/_generated/schema";
-import convexSchema from "./confect/_generated/convexSchema";
+import type confectSchema from "../confect/_generated/schema";
+import convexSchema from "../confect/_generated/convexSchema";
 
 export const TestConfect = TestConfect_.TestConfect<typeof confectSchema>();
 
-export const layer = TestConfect_.layer(
-  confectSchema,
+export const layer = TestConfect_.layer<typeof confectSchema>(
   convexSchema,
-  import.meta.glob("./convex/**/!(*.*.*)*.*s"),
+  import.meta.glob("../convex/**/!(*.*.*)*.*s"),
 );
 ```
 
@@ -60,7 +59,7 @@ import { describe, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import * as Effect from "effect/Effect";
 
-import refs from "./confect/_generated/refs";
+import refs from "../confect/_generated/refs";
 import * as TestConfect from "./TestConfect";
 
 describe("notes", () => {
@@ -121,8 +120,8 @@ import { assertFailure } from "@effect/vitest/utils";
 import type { GenericId } from "convex/values";
 import * as Effect from "effect/Effect";
 
-import { NoteNotFound } from "./confect/notes.spec";
-import refs from "./confect/_generated/refs";
+import { NoteNotFound } from "../confect/notes.spec";
+import refs from "../confect/_generated/refs";
 import * as TestConfect from "./TestConfect";
 
 describe("notes", () => {
@@ -149,6 +148,7 @@ Use `run` to execute arbitrary code with mutation-context services (like `Databa
 ```ts
 import { Id } from "./confect/_generated/id";
 import { DatabaseWriter } from "./confect/_generated/services";
+import notesTable from "./confect/_generated/tables/notes";
 
 Effect.gen(function* () {
   const c = yield* TestConfect.TestConfect;
@@ -157,7 +157,7 @@ Effect.gen(function* () {
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      return yield* writer.table("notes").insert({ text: "seed data" });
+      return yield* writer.table(notesTable).insert({ text: "seed data" });
     }),
     Id("notes"),
   );
@@ -175,7 +175,7 @@ Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
       yield* Effect.forEach(items, (item) =>
-        writer.table("notes").insert(item),
+        writer.table(notesTable).insert(item),
       );
     }),
   );

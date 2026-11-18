@@ -16,6 +16,68 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
     it.effect(
+      "revalidates native exports when a transitive source changes or the native sibling is replaced",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* fs.remove(path.join(project.root, "confect/notes.impl.ts"));
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { FunctionSpec, GroupSpec } from "@confect/core";
+import type { list } from "./notes.native";
+export default GroupSpec.make({convexModule: true, experimental_reuseContext: true})
+  .addFunction(FunctionSpec.convexPublicQuery<typeof list>()("list"));`,
+          );
+          const helper = (
+            builder: string,
+          ) => `import { ${builder} } from "convex/server";
+export const list = ${builder}(() => "ok");`;
+          yield* project.write("handler.ts", helper("queryGeneric"));
+          const native = 'export { list } from "../handler";';
+          yield* project.write("confect/notes.native.ts", native);
+          const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const generated = yield* project.generatedFiles;
+          const entry = generated[path.join("convex", "notes.ts")];
+          expect(entry).toContain(
+            'export { list } from "../confect/notes.native";',
+          );
+          expect(entry).toContain(
+            "export const experimental_reuseContext = true;",
+          );
+          expect(
+            generated[
+              path.join(
+                "confect",
+                "_generated",
+                "registeredFunctions",
+                "notes.ts",
+              )
+            ],
+          ).toBeUndefined();
+          for (const builder of ["internalQueryGeneric", "mutationGeneric"]) {
+            yield* project.write("handler.ts", helper(builder));
+            yield* watching.waitFor(
+              'Expected named export "list" to be a registered public Convex query',
+            );
+            yield* project.write("handler.ts", helper("queryGeneric"));
+            yield* watching.waitFor(success);
+          }
+          yield* fs.remove(path.join(project.root, "confect/notes.native.ts"));
+          yield* watching.waitFor("Missing native module notes.native.ts");
+          yield* project.write(
+            "confect/notes.native.ts",
+            "export const other = 1;",
+          );
+          yield* watching.waitFor('Expected named export "list"');
+          yield* project.write("confect/notes.native.ts", native);
+          yield* watching.waitFor(success);
+        }).pipe(Effect.scoped),
+      { timeout: 60000 },
+    );
+    it.effect(
       "stabilizes a newly discovered external helper without another edit",
       () =>
         Effect.gen(function* () {

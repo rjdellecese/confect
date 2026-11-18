@@ -9,6 +9,7 @@ import type {
   RegisteredQuery,
 } from "convex/server";
 import type * as Schema from "effect/Schema";
+import type { Equals } from "effect/Types";
 import * as Predicate from "effect/Predicate";
 import * as FunctionProvenance from "./FunctionProvenance";
 import { validateConfectFunctionIdentifier } from "./Identifier";
@@ -548,6 +549,29 @@ type ExtractReturns<F> =
       : F extends RegisteredAction<any, any, infer R>
         ? R
         : never;
+
+export type InvalidConvexExports<
+  F extends AnyWithProps,
+  Module,
+> = F extends AnyConvex
+  ? F["name"] extends keyof Module
+    ? Module[F["name"]] extends infer Handler extends
+        MatchingRegisteredFunction<
+          F["runtimeAndFunctionType"],
+          F["functionVisibility"]
+        >
+      ? Equals<
+          [ExtractArgs<Handler>, ExtractReturns<Handler>],
+          [
+            F["functionProvenance"]["~args"],
+            F["functionProvenance"]["~returns"],
+          ]
+        > extends true
+        ? never
+        : F["name"]
+      : F["name"]
+    : F["name"]
+  : F["name"];
 
 const makeConvex =
   <

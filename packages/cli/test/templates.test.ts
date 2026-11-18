@@ -61,7 +61,7 @@ it.effect.each([false, true])(
                 returns: () => Schema.String,
               }),
             ),
-        schemaImportPath: "../schema",
+        tableNamesImportPath: "../tableNames",
         specImportPath: "../../notes.spec",
         implImportPath: "../../notes.impl",
       });
@@ -113,7 +113,7 @@ it.effect(
       });
       const code = yield* templates.registeredFunctionsForGroup({
         spec,
-        schemaImportPath: "../schema",
+        tableNamesImportPath: "../tableNames",
         specImportPath: "../../notes.spec",
         implImportPath: "../../notes.impl",
       });
@@ -141,7 +141,7 @@ it.effect.each([
     Effect.gen(function* () {
       const code = yield* templates.registeredFunctionsForGroup({
         spec,
-        schemaImportPath: "../schema",
+        tableNamesImportPath: "../tableNames",
         specImportPath: "../../notes.spec",
         implImportPath: "../../notes.impl",
       });
@@ -191,9 +191,8 @@ export default GroupSpec.makeNode();`,
           prefix: "registry-alias-",
         });
         yield* fs.writeFileString(
-          path.join(directory, "schema.ts"),
-          `import { DatabaseSchema } from "@confect/server";
-export default DatabaseSchema.make({});`,
+          path.join(directory, "tableNames.ts"),
+          templates.tableNames([]),
         );
         yield* Effect.forEach(
           [
@@ -205,6 +204,7 @@ export default DatabaseSchema.make({});`,
             "RegisteredFunctions",
             "RegisteredNodeFunction",
             "databaseSchema",
+            "tableNames",
             "groupLayer",
           ],
           (name) =>
@@ -222,7 +222,7 @@ export default implementation;`,
               );
               const contents = yield* templates.registeredFunctionsForGroup({
                 spec,
-                schemaImportPath: "./schema",
+                tableNamesImportPath: "./tableNames",
                 specImportPath: `./${name}.spec`,
                 implImportPath: `./${name}.impl`,
               });
@@ -377,7 +377,11 @@ layer(NodeServices.layer)("id", (test) => {
           directory: import.meta.dirname,
           prefix: "id-",
         });
-        const contents = yield* templates.id({ tableNames });
+        const contents = templates.id;
+        yield* fs.writeFileString(
+          path.join(directory, "tableNames.ts"),
+          templates.tableNames(tableNames),
+        );
         expect(contents).toContain(
           'import type { SystemTableNames } from "convex/server";',
         );

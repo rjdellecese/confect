@@ -5,11 +5,11 @@
  * functions only succeed if the scheduler never dispatches through timer APIs.
  */
 
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as MutableRef from "effect/MutableRef";
-import databaseSchema from "../_generated/schema";
+import { FunctionImpl } from "../_generated/server";
 import scheduling from "./scheduling.spec";
 
 const sumToN = Effect.fnUntraced(function* (n: number) {
@@ -23,21 +23,15 @@ const sumToN = Effect.fnUntraced(function* (n: number) {
   return MutableRef.get(sum);
 });
 
-const manyOpsQuery = FunctionImpl.make(
-  databaseSchema,
-  scheduling,
-  "manyOpsQuery",
-  () => sumToN(5000),
+const manyOpsQuery = FunctionImpl.make(scheduling, "manyOpsQuery", () =>
+  sumToN(5000),
 );
 
-const manyOpsMutation = FunctionImpl.make(
-  databaseSchema,
-  scheduling,
-  "manyOpsMutation",
-  () => sumToN(5000),
+const manyOpsMutation = FunctionImpl.make(scheduling, "manyOpsMutation", () =>
+  sumToN(5000),
 );
 
-export default GroupImpl.make(databaseSchema, scheduling).pipe(
+export default GroupImpl.make(scheduling).pipe(
   Layer.provide(manyOpsQuery),
   Layer.provide(manyOpsMutation),
   GroupImpl.finalize,

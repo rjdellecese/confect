@@ -41,7 +41,7 @@ describe("HttpRouter", () => {
   type Model = DataModel.FromDatabaseSchema<typeof schema>;
   const Search = VectorSearch.VectorSearch<Model>();
 
-  it("requires a matching schema for vector-search route requirements", () => {
+  it("checks vector-search route requirements against a type-only schema", () => {
     const routes = HttpRouter.add(
       "GET",
       "/search",
@@ -74,41 +74,40 @@ describe("HttpRouter", () => {
     expectTypeOf<typeof routes>().toExtend<
       ConfectHttpRouter.Routes<typeof schema>
     >();
-    expectTypeOf<[typeof routes]>().not.toExtend<
+    expectTypeOf<[typeof routes]>().toExtend<
       Parameters<typeof ConfectHttpRouter.make<typeof schema>>
     >();
     expectTypeOf<typeof routes>().not.toExtend<
       ConfectHttpRouter.Routes<typeof otherSchema>
     >();
-    expectTypeOf<[typeof otherSchema, typeof routes]>().not.toExtend<
+    expectTypeOf<[typeof routes]>().not.toExtend<
       Parameters<typeof ConfectHttpRouter.make<typeof otherSchema>>
     >();
     expectTypeOf<typeof routes>().not.toExtend<
       ConfectHttpRouter.Routes<typeof wrongIndexSchema>
     >();
-    ConfectHttpRouter.make(schema, routes);
+    ConfectHttpRouter.make<typeof schema>(routes);
   });
 
-  it("requires a schema even when routes do not use vector search", () => {
+  it("accepts routes without a schema value or type argument", () => {
     const routes = HttpRouter.add(
       "GET",
       "/health",
       HttpServerResponse.text("ok"),
     );
-    expectTypeOf<[typeof routes]>().not.toExtend<
-      Parameters<typeof ConfectHttpRouter.make<typeof schema>>
+    expectTypeOf<[typeof routes]>().toExtend<
+      Parameters<typeof ConfectHttpRouter.make>
     >();
     expectTypeOf<
       Parameters<typeof ConfectHttpRouter.make>["length"]
-    >().toEqualTypeOf<2>();
+    >().toEqualTypeOf<1>();
     expectTypeOf<typeof routes>().toExtend<
       ConfectHttpRouter.Routes<typeof schema>
     >();
-    ConfectHttpRouter.make(otherSchema, routes);
-    ConfectHttpRouter.make(schema, routes);
+    ConfectHttpRouter.make(routes);
   });
 
-  it("keeps non-HTTP capabilities unavailable with a schema", () => {
+  it("keeps non-HTTP capabilities unavailable", () => {
     type Services = ConfectHttpRouter.Services<typeof schema>;
     expectTypeOf<VectorSearch.VectorSearch<Model>>().toExtend<Services>();
     expectTypeOf<VectorSearch.VectorSearch<Model>>().not.toExtend<
@@ -136,10 +135,20 @@ describe("HttpRouter", () => {
     const lazySchema = DatabaseSchema.make(tables);
     const routes = HttpRouter.add(
       "GET",
-      "/health",
-      HttpServerResponse.text("ok"),
+      "/search",
+      Effect.gen(function* () {
+        const search =
+          yield* VectorSearch.VectorSearch<
+            DataModel.FromDatabaseSchema<typeof lazySchema>
+          >();
+        const matches = yield* search("lazy", "embedding", {
+          vector: [0, 1],
+          limit: 1,
+        });
+        return yield* HttpServerResponse.json(matches);
+      }),
     );
-    ConfectHttpRouter.make(lazySchema, routes);
+    ConfectHttpRouter.make<typeof lazySchema>(routes);
     expect(fields).not.toHaveBeenCalled();
     expect(DatabaseSchema.tables(lazySchema)).toBe(tables);
     expect(DatabaseSchema.tables(lazySchema).lazy).toBe(table);

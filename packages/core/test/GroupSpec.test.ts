@@ -6,6 +6,7 @@ import * as GroupSpec from "@confect/core/GroupSpec";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Schema from "effect/Schema";
+import type { queryGeneric } from "convex/server";
 import * as Result from "effect/Result";
 
 describe("isGroupSpec", () => {
@@ -27,11 +28,16 @@ describe("experimental_reuseContext", () => {
       GroupSpec.make({ experimental_reuseContext: true })
         .experimental_reuseContext,
     ).toBe(true);
-    expectTypeOf(GroupSpec.makeNode).parameters.toEqualTypeOf<[]>();
+    expectTypeOf(GroupSpec.makeNode).parameters.toEqualTypeOf<
+      [options?: { readonly convexModule?: boolean | undefined } | undefined]
+    >();
     expectTypeOf(GroupSpec.make).parameters.toEqualTypeOf<
       [
         options?:
-          | { readonly experimental_reuseContext?: boolean | undefined }
+          | {
+              readonly experimental_reuseContext?: boolean | undefined;
+              readonly convexModule?: boolean | undefined;
+            }
           | undefined,
       ]
     >();
@@ -67,6 +73,28 @@ describe("experimental_reuseContext", () => {
     expect(original.name).toBe("");
     expect(renamed.groups).toEqual({});
     expect(evaluated).toBe(0);
+  });
+});
+
+describe("convexModule", () => {
+  it("preserves the selected implementation across builders, not across groups", () => {
+    for (const group of [
+      GroupSpec.make({ convexModule: true }),
+      GroupSpec.makeNode({ convexModule: true }),
+    ]) {
+      expect(group.convexModule).toBe(true);
+      const combined = GroupSpec.addGroupsAt(
+        GroupSpec.withName("parent", group),
+        { child: GroupSpec.make() },
+      );
+      expect(combined.convexModule).toBe(true);
+      expect(combined.groups.child.convexModule).toBe(false);
+    }
+    const group = GroupSpec.make({ convexModule: true }).addFunction(
+      FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()("list"),
+    );
+    expect(group.convexModule).toBe(true);
+    expect(GroupSpec.makeNode().convexModule).toBe(false);
   });
 });
 

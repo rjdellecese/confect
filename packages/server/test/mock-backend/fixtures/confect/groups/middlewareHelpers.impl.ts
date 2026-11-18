@@ -1,13 +1,13 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import databaseSchema from "../_generated/schema";
+import { FunctionImpl } from "../_generated/server";
+import usersTable from "../_generated/tables/users";
 import { DatabaseReader } from "../_generated/services";
 import middlewareHelpers from "./middlewareHelpers.spec";
 
 const firstUsername = FunctionImpl.make(
-  databaseSchema,
   middlewareHelpers,
   "firstUsername",
   () =>
@@ -15,7 +15,7 @@ const firstUsername = FunctionImpl.make(
       const reader = yield* DatabaseReader;
 
       const user = yield* reader
-        .table("users")
+        .table(usersTable)
         .index("by_creation_time")
         .first();
 
@@ -26,7 +26,7 @@ const firstUsername = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(databaseSchema, middlewareHelpers).pipe(
+export default GroupImpl.make(middlewareHelpers).pipe(
   Layer.provide(firstUsername),
   GroupImpl.finalize,
 );

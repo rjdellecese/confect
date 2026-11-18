@@ -1,8 +1,9 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
-import databaseSchema from "../_generated/schema";
+import { FunctionImpl } from "../_generated/server";
+import notesTable from "../_generated/tables/notes";
 import refs from "../_generated/refs";
 import {
   ActionRunner,
@@ -15,7 +16,6 @@ import typedErrors from "./typedErrors.spec";
 import { Forbidden, NotFound } from "./typedErrors.spec";
 
 const getNoteOrFail = FunctionImpl.make(
-  databaseSchema,
   typedErrors,
   "getNoteOrFail",
   ({ noteId }) =>
@@ -23,14 +23,13 @@ const getNoteOrFail = FunctionImpl.make(
       const reader = yield* DatabaseReader;
 
       return yield* reader
-        .table("notes")
+        .table(notesTable)
         .get(noteId)
         .pipe(Effect.mapError(() => NotFound.make({ id: noteId })));
     }),
 );
 
 const deleteNoteOrFail = FunctionImpl.make(
-  databaseSchema,
   typedErrors,
   "deleteNoteOrFail",
   ({ noteId, asAdmin }) =>
@@ -43,18 +42,17 @@ const deleteNoteOrFail = FunctionImpl.make(
       const writer = yield* DatabaseWriter;
 
       yield* reader
-        .table("notes")
+        .table(notesTable)
         .get(noteId)
         .pipe(Effect.mapError(() => NotFound.make({ id: noteId })));
 
-      yield* writer.table("notes").delete(noteId);
+      yield* writer.table(notesTable).delete(noteId);
 
       return null;
     }),
 );
 
 const failingAction = FunctionImpl.make(
-  databaseSchema,
   typedErrors,
   "failingAction",
   ({ kind }) =>
@@ -70,43 +68,36 @@ const failingAction = FunctionImpl.make(
 );
 
 const insertThenFail = FunctionImpl.make(
-  databaseSchema,
   typedErrors,
   "insertThenFail",
   ({ text }) =>
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      yield* writer.table("notes").insert({ text }).pipe(Effect.orDie);
+      yield* writer.table(notesTable).insert({ text }).pipe(Effect.orDie);
 
       return yield* NotFound.make({ id: "rolled-back" });
     }),
 );
 
-const tryGetNote = FunctionImpl.make(
-  databaseSchema,
-  typedErrors,
-  "tryGetNote",
-  ({ noteId }) =>
-    Effect.gen(function* () {
-      const { runQuery } = yield* QueryRunner;
+const tryGetNote = FunctionImpl.make(typedErrors, "tryGetNote", ({ noteId }) =>
+  Effect.gen(function* () {
+    const { runQuery } = yield* QueryRunner;
 
-      const note = yield* runQuery(
-        refs.public.groups.typedErrors.getNoteOrFail,
-        { noteId },
-      );
+    const note = yield* runQuery(refs.public.groups.typedErrors.getNoteOrFail, {
+      noteId,
+    });
 
-      return { _tag: "Ok" as const, text: note.text };
-    }).pipe(
-      Effect.catchTag("NotFound", (notFound: NotFound) =>
-        Effect.succeed({ _tag: "NotFound" as const, id: notFound.id }),
-      ),
-      Effect.orDie,
+    return { _tag: "Ok" as const, text: note.text };
+  }).pipe(
+    Effect.catchTag("NotFound", (notFound: NotFound) =>
+      Effect.succeed({ _tag: "NotFound" as const, id: notFound.id }),
     ),
+    Effect.orDie,
+  ),
 );
 
 const tryDeleteNote = FunctionImpl.make(
-  databaseSchema,
   typedErrors,
   "tryDeleteNote",
   ({ noteId, asAdmin }) =>
@@ -134,7 +125,6 @@ const tryDeleteNote = FunctionImpl.make(
 );
 
 const tryFailingAction = FunctionImpl.make(
-  databaseSchema,
   typedErrors,
   "tryFailingAction",
   ({ kind }) =>
@@ -161,7 +151,6 @@ const tryFailingAction = FunctionImpl.make(
 );
 
 const internalGetNoteOrFail = FunctionImpl.make(
-  databaseSchema,
   typedErrors,
   "internalGetNoteOrFail",
   ({ noteId }) =>
@@ -169,14 +158,13 @@ const internalGetNoteOrFail = FunctionImpl.make(
       const reader = yield* DatabaseReader;
 
       return yield* reader
-        .table("notes")
+        .table(notesTable)
         .get(noteId)
         .pipe(Effect.mapError(() => NotFound.make({ id: noteId })));
     }),
 );
 
 const tryInternalGetNote = FunctionImpl.make(
-  databaseSchema,
   typedErrors,
   "tryInternalGetNote",
   ({ noteId }) =>
@@ -197,7 +185,7 @@ const tryInternalGetNote = FunctionImpl.make(
     ),
 );
 
-export default GroupImpl.make(databaseSchema, typedErrors).pipe(
+export default GroupImpl.make(typedErrors).pipe(
   Layer.provide(getNoteOrFail),
   Layer.provide(deleteNoteOrFail),
   Layer.provide(failingAction),

@@ -5,9 +5,6 @@ import {
   vWorkId,
 } from "@convex-dev/workpool";
 import { v } from "convex/values";
-import * as Duration from "effect/Duration";
-import * as Effect from "effect/Effect";
-import * as Random from "effect/Random";
 import { internal } from "../convex/_generated/api";
 import {
   internalAction,
@@ -25,11 +22,8 @@ export const backgroundWork = internalAction({
   args: {},
   returns: v.null(),
   handler: (): Promise<null> =>
-    Effect.gen(function* () {
-      const delay = yield* Random.nextBetween(2_000, 5_000);
-      yield* Effect.sleep(Duration.millis(delay));
-      return null;
-    }).pipe(Effect.runPromise),
+    // oxlint-disable-next-line effecttsgo/new-promise, effecttsgo/global-timers -- Keep this native Convex demo independent of the Effect runtime.
+    new Promise((resolve) => setTimeout(() => resolve(null), 3_000)),
 });
 
 export const onComplete = internalMutation({

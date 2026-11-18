@@ -90,8 +90,8 @@ export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   >;
 
 /**
- * Create a Convex HTTP router from a runtime database schema and routes, with
- * schema-typed vector search in handlers and middleware.
+ * Create a Convex HTTP router. Pass the application's database schema as a type
+ * argument for schema-typed vector search in handlers and middleware.
  *
  * A single catch-all `httpAction` is registered for every routable method under
  * the path prefix `"/"`, making the Effect router the single source of truth
@@ -103,8 +103,7 @@ export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  * precedence.
  */
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-  databaseSchema: DatabaseSchema_,
-  routes: Routes<NoInfer<DatabaseSchema_>>,
+  routes: Routes<DatabaseSchema_>,
 ): ConvexHttpRouter => {
   applyMonkeyPatches();
 
@@ -128,8 +127,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
-    const services = RegisteredFunction.actionLayer(
-      databaseSchema,
+    const services = RegisteredFunction.actionLayer<DatabaseSchema_>(
       ctx as unknown as GenericActionCtx<
         DataModel.ToConvexDataModel<
           DataModel.FromDatabaseSchema<DatabaseSchema_>

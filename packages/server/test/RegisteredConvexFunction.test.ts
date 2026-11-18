@@ -2,7 +2,6 @@ import * as Result from "effect/Result";
 import * as Str from "effect/String";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as SchemaToValidator from "@confect/core/SchemaToValidator";
-import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
 import {
@@ -94,7 +93,6 @@ describe("make", () => {
         handler,
       });
       assert(item._tag === "Confect");
-      const database = DatabaseSchema.make({});
       const compileArgs = vi.spyOn(SchemaToValidator, "compileArgsSchema");
       const compileReturns = vi.spyOn(
         SchemaToValidator,
@@ -102,7 +100,7 @@ describe("make", () => {
       );
       const registration = vi.mocked(register);
       registration.mockClear();
-      const prepared = RegisteredConvexFunction.prepare(database, item);
+      const prepared = RegisteredConvexFunction.prepare([], item);
       expect(registration).not.toHaveBeenCalled();
       expect(Str.toLowerCase(prepared._tag)).toBe(
         `${spec.functionVisibility}${spec.runtimeAndFunctionType.functionType}`,
@@ -156,7 +154,7 @@ describe("make", () => {
         ).pipe(Result.getOrThrow),
       ).toEqual({ type: "string" });
       registration.mockClear();
-      RegisteredConvexFunction.make(database, item);
+      RegisteredConvexFunction.make([], item);
       expect(registration).toHaveBeenCalledOnce();
       const [call] = registration.mock.calls;
       assert(call);

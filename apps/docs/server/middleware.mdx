@@ -187,26 +187,22 @@ For a group-wide role policy, use `GroupSpec.make().middleware(RequireUser).midd
 The implementation reads the trusted user from `CurrentUser`, not from caller-supplied function arguments:
 
 ```ts confect/middleware/RequireRole.impl.ts
-import { MiddlewareImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 
-import databaseSchema from "../_generated/schema";
+import { MiddlewareImpl } from "../_generated/server";
 import RequireRole, { AccessDenied } from "./RequireRole.spec";
 import { CurrentUser } from "./RequireUser.spec";
 
-export default MiddlewareImpl.make(
-  databaseSchema,
-  RequireRole,
-  (effect, { options }) =>
-    Effect.gen(function* () {
-      const { user } = yield* CurrentUser;
+export default MiddlewareImpl.make(RequireRole, (effect, { options }) =>
+  Effect.gen(function* () {
+    const { user } = yield* CurrentUser;
 
-      if (options[user.role] !== true) {
-        return yield* new AccessDenied();
-      }
+    if (options[user.role] !== true) {
+      return yield* new AccessDenied();
+    }
 
-      return yield* effect;
-    }),
+    return yield* effect;
+  }),
 );
 ```
 
@@ -271,20 +267,20 @@ Like `provides`, `requires` is type-level only, so ordering _within one function
 Handlers of covered functions consume the provided service like any other. This is the type-safety contract: a handler requiring `CurrentUser` type-checks exactly when a middleware providing it is attached to the group—remove the `.middleware(RequireUser)` call and the handler below stops compiling.
 
 ```ts confect/notes.impl.ts
-import { FunctionImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 
-import databaseSchema from "./_generated/schema";
+import { FunctionImpl } from "./_generated/server";
 import { DatabaseWriter } from "./_generated/services";
+import notesTable from "./_generated/tables/notes";
 import { CurrentUser } from "./middleware/RequireUser.spec";
 import notes from "./notes.spec";
 
-const create = FunctionImpl.make(databaseSchema, notes, "create", ({ text }) =>
+const create = FunctionImpl.make(notes, "create", ({ text }) =>
   Effect.gen(function* () {
     const { user } = yield* CurrentUser;
     const writer = yield* DatabaseWriter;
 
-    return yield* writer.table("notes").insert({ text, userId: user._id });
+    return yield* writer.table(notesTable).insert({ text, userId: user._id });
   }).pipe(Effect.orDie),
 );
 ```
@@ -302,16 +298,15 @@ A middleware implementation wraps the downstream effect (any remaining middlewar
 For the common "run something, provide a service" shape, use the `MiddlewareImpl.provides` shorthand, passing the runtime tag for the spec's type-level `provides`:
 
 ```ts confect/middleware/RequireUser.impl.ts
-import { MiddlewareImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
-import databaseSchema from "../_generated/schema";
+import { MiddlewareImpl } from "../_generated/server";
 import { Auth, DatabaseReader } from "../_generated/services";
+import usersTable from "../_generated/tables/users";
 import RequireUser, { CurrentUser, NotSignedIn } from "./RequireUser.spec";
 
 export default MiddlewareImpl.provides(
-  databaseSchema,
   RequireUser,
   CurrentUser,
   Effect.gen(function* () {
@@ -322,7 +317,7 @@ export default MiddlewareImpl.provides(
       Effect.mapError(() => new NotSignedIn()),
     );
     const user = yield* reader
-      .table("users")
+      .table(usersTable)
       .index("by_token_identifier", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
@@ -346,7 +341,6 @@ class Timed extends MiddlewareSpec.MiddlewareSpec<Timed>()("Timed", {
 }) {}
 
 const TimedImpl = MiddlewareImpl.make(
-  databaseSchema,
   Timed,
   (effect, { invocation: { name } }) =>
     Effect.gen(function* () {
@@ -388,7 +382,7 @@ An implementation provided with `MiddlewareImpl.make` uses one strategy for ever
 The all-function-types intersection leaves `QueryRunner` as the only database route, but Convex best practices say to [use `ctx.runQuery` sparingly in queries and mutations](https://docs.convex.dev/understanding/best-practices/#use-ctxrunquery-and-ctxrunmutation-sparingly-in-queries-and-mutations). So for database-touching middleware that should also cover actions—say, extending `RequireUser` above to cover all three function types (flipping its `action` flag to `true`)—implement per function type with `MiddlewareImpl.makeByFunctionType` instead: each entry gets that function type's full service set. Read directly in queries and mutations, and call an internal query (defined in a middleware-free group) in actions, where `runQuery` is the only route to the database:
 
 ```ts
-export default MiddlewareImpl.makeByFunctionType(databaseSchema, RequireUser, {
+export default MiddlewareImpl.makeByFunctionType(RequireUser, {
   query: (effect) =>
     Effect.provideServiceEffect(effect, CurrentUser, viaDatabaseReader),
   mutation: (effect) =>
@@ -405,7 +399,7 @@ Provide the middleware implementation to the group's impl layer like any functio
 ```ts confect/notes.impl.ts
 import RequireUser from "./middleware/RequireUser.impl";
 
-export default GroupImpl.make(databaseSchema, notes).pipe(
+export default GroupImpl.make(notes).pipe(
   Layer.provide(create),
   Layer.provide(RequireUser),
   GroupImpl.finalize,

@@ -1,4 +1,10 @@
-import registeredFunctions from "../../confect/_generated/registeredFunctions/groups/cacheControl";
+export { control } from "../../confect/groups/cacheControl.native";
+export { snapshot } from "../../confect/groups/cacheControl.native";
 
-export const control = registeredFunctions.control;
-export const snapshot = registeredFunctions.snapshot;
+import type { InvalidConvexExports } from "@confect/core/FunctionSpec";
+import type * as native from "../../confect/groups/cacheControl.native";
+import type group from "../../confect/groups/cacheControl.spec";
+
+type Specs = (typeof group)["~Functions"];
+type Assert<T extends never> = T;
+declare type _Check = Assert<InvalidConvexExports<Specs, typeof native>>;

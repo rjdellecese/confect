@@ -52,9 +52,8 @@ const makeProject = Effect.fnUntraced(function* () {
     Array.join(
       [
         'import { GroupImpl } from "@confect/server";',
-        'import databaseSchema from "./_generated/schema";',
         'import notes from "./notes.spec";',
-        "export default GroupImpl.make(databaseSchema, notes).pipe(GroupImpl.finalize);",
+        "export default GroupImpl.make(notes).pipe(GroupImpl.finalize);",
         "",
       ],
       "\n",

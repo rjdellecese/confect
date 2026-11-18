@@ -13,15 +13,16 @@ description: "Understand the structure of a Confect project."
       <Tree.File name="id.ts" />
       <Tree.File name="refs.ts" />
       <Tree.File name="schema.ts" />
+      <Tree.File name="server.ts" />
       <Tree.File name="services.ts" />
       <Tree.File name="spec.ts" />
+      <Tree.File name="tableNames.ts" />
       <Tree.Folder name="registeredFunctions" defaultOpen>
         <Tree.File name="env.ts" />
         <Tree.Folder name="notes_and_random" defaultOpen>
           <Tree.File name="notes.ts" />
           <Tree.File name="random.ts" />
         </Tree.Folder>
-        <Tree.File name="workpool.ts" />
       </Tree.Folder>
       <Tree.Folder name="tables" defaultOpen>
         <Tree.File name="notes.ts" />
@@ -48,7 +49,7 @@ description: "Understand the structure of a Confect project."
     <Tree.File name="env.impl.ts" />
     <Tree.File name="http.ts" />
     <Tree.File name="workpool.spec.ts" />
-    <Tree.File name="workpool.impl.ts" />
+    <Tree.File name="workpool.native.ts" />
   </Tree.Folder>
   <Tree.Folder name="convex" />
 </Tree>
@@ -65,9 +66,7 @@ Contains a typed `components` registry with one entry per Convex [component](htt
 
 Contains the Convex deploy-time `SchemaDefinition` (a single `defineSchema({...})` call) assembled from every `confect/tables/*.ts` module. `convex/schema.ts` re-exports its default for deployment.
 
-Keep this deployment schema out of your Convex function implementations and their runtime import graphs: importing it constructs Convex validators and index definitions for every table. Use `_generated/schema.ts` for Confect's runtime `DatabaseSchema` instead.
-
-Test setup needs both schemas: import `_generated/schema.ts` and `_generated/convexSchema.ts` and pass them to `TestConfect.layer`, as shown in the [Testing guide](/guides/testing#setup).
+Keep the deployment schema out of function implementations: importing it constructs validators and indexes for every table. Handlers import individual handles from `_generated/tables/`. [Test setup](/guides/testing#setup) passes the deployment schema to `TestConfect.layer` and uses the Confect schema as a type only.
 
 #### `docs.ts`
 
@@ -79,7 +78,7 @@ Exports an `Id` schema constructor and an `Id<TableName>` TypeScript type. Use `
 
 #### `registeredFunctions/`
 
-Contains one module per group (for example `registeredFunctions/notes_and_random/notes.ts`), each exporting that group's functions in a form the Convex CLI can consume. These modules are consumed by the generated `convex/` files; you should not need to import them directly.
+For groups with a `.impl.ts`, each module (for example `registeredFunctions/notes_and_random/notes.ts`) registers its own group's functions for the Convex CLI. These modules are consumed by the generated `convex/` files; you should not need to import them directly. [Native-module groups](/server/plain-convex-functions) re-export their Convex functions directly rather than building a Confect registration layer.
 
 #### `refs.ts`
 
@@ -87,7 +86,15 @@ Contains a single default `Refs` export, which is a map of your Convex functions
 
 #### `schema.ts`
 
-Contains the runtime `DatabaseSchema`—the codec-lookup view of your tables. Impls import it and pass it to `FunctionImpl.make`/`GroupImpl.make`. It is generated from `confect/tables/*.ts` and intentionally avoids any `convex/server` import so a runtime cold start never evaluates `defineSchema(...)`. Each table's field-schema is constructed lazily on the first access to its `Fields` or `Doc` and then cached, so a function only pays the schema-construction cost at cold start for the tables it actually touches via `db.table(name)`. Use this when a test or a non-codegen-generated module needs to refer to your `DatabaseSchema` type or value.
+Contains a registry of all your application table handles. Use a type-only import when you need the full database model in TypeScript. A value import loads every table module; reserve it for code that intentionally needs the [full registry](/server/database/schema#selecting-a-table).
+
+#### `server.ts`
+
+Exports the `FunctionImpl` and `MiddlewareImpl` builders bound to your application's database **type**. Import these from server implementations, not from specs. They do not import the full registry as a value.
+
+#### `tableNames.ts`
+
+Exports `tableNames`, the list of declared application table names. It imports no table handles. [DocumentIds](/server/database/reading#validate-document-ids) uses the names to identify IDs without loading document schemas.
 
 #### `tables/`
 
@@ -135,7 +142,7 @@ Defines your [middleware](/server/middleware), as a `<Name>.spec.ts`/`<Name>.imp
 
 <Badge color="green">Required</Badge>
 
-Your Convex API is defined as colocated `*.spec.ts`/`*.impl.ts` pairs, one pair per group. Each file's path within `confect/` becomes the group's name. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
+Each function group has a `*.spec.ts` and a sibling `*.impl.ts` or, for an explicit native-module group, `*.native.ts`. The path within `confect/` determines the group's name. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
 
 ## Rules
 

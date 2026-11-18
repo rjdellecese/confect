@@ -20,13 +20,12 @@ Provide three layers to an Effect AI operation:
 import {
   AiGatewayLanguageClient,
   AiGatewayLanguageModel,
-  FunctionImpl,
 } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as LanguageModel from "effect/ai/LanguageModel";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import databaseSchema from "./_generated/schema";
+import { FunctionImpl } from "./_generated/server";
 import assistant from "./assistant.spec";
 
 const Claude = AiGatewayLanguageModel.model("anthropic/claude-sonnet-4.5").pipe(
@@ -34,16 +33,12 @@ const Claude = AiGatewayLanguageModel.model("anthropic/claude-sonnet-4.5").pipe(
   Layer.provide(FetchHttpClient.layer),
 );
 
-const answer = FunctionImpl.make(
-  databaseSchema,
-  assistant,
-  "answer",
-  ({ prompt }) =>
-    LanguageModel.generateText({ prompt }).pipe(
-      Effect.map((response) => response.text),
-      Effect.provide(Claude),
-      Effect.orDie,
-    ),
+const answer = FunctionImpl.make(assistant, "answer", ({ prompt }) =>
+  LanguageModel.generateText({ prompt }).pipe(
+    Effect.map((response) => response.text),
+    Effect.provide(Claude),
+    Effect.orDie,
+  ),
 );
 ```
 

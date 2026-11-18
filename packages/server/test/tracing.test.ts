@@ -341,11 +341,11 @@ describe("server operation tracing", () => {
         const get = vi
           .fn<GenericDatabaseWriter<ConvexDataModel>["get"]>()
           .mockResolvedValue({ _id: noteId, _creationTime: 1, value: "1" });
-        const writer = DatabaseWriter.make(databaseSchema, {
+        const writer = DatabaseWriter.make({
           insert,
           replace,
           get,
-        } as unknown as GenericDatabaseWriter<ConvexDataModel>).table("notes");
+        } as unknown as GenericDatabaseWriter<ConvexDataModel>).table(notes);
         const insertEffect = writer.insert({ value: 2 });
         const patchEffect = writer.patch(noteId, { value: 3 });
         const replaceEffect = writer.replace(noteId, { value: 4 });
@@ -386,10 +386,10 @@ describe("server operation tracing", () => {
       const get = vi
         .fn<GenericDatabaseWriter<ConvexDataModel>["get"]>()
         .mockResolvedValue({ _id: noteId, _creationTime: 1, value: "1" });
-      const writer = DatabaseWriter.make(databaseSchema, {
+      const writer = DatabaseWriter.make({
         replace,
         get,
-      } as unknown as GenericDatabaseWriter<ConvexDataModel>).table("notes");
+      } as unknown as GenericDatabaseWriter<ConvexDataModel>).table(notes);
       const error = yield* writer
         .patch(noteId, { value: "invalid" as never })
         .pipe(Effect.flip, Effect.withTracer(recorder.tracer));

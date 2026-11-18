@@ -17,6 +17,11 @@ import {
 import { createLocalJWKSet, errors, jwtVerify } from "jose";
 import * as Console from "effect/Console";
 import * as TestConsole from "effect/testing/TestConsole";
+import eventsTable from "./fixtures/confect/_generated/tables/events";
+import notesTable from "./fixtures/confect/_generated/tables/notes";
+import tagsTable from "./fixtures/confect/_generated/tables/tags";
+import usersTable from "./fixtures/confect/_generated/tables/users";
+import { tableNames } from "./fixtures/confect/_generated/tableNames";
 import confectSchema from "./fixtures/confect/_generated/schema";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
 import type * as CompilerOptions from "confect-test-types/CompilerOptions";
@@ -56,8 +61,7 @@ import {
   TransactionMetadata,
 } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
-import type notes from "./fixtures/confect/_generated/tables/notes";
-import notesTable from "./fixtures/confect/tables/notes";
+import unnamedNotes from "./fixtures/confect/tables/notes";
 import { PaginationDenied } from "./fixtures/confect/databaseReader.spec";
 import {
   Forbidden,
@@ -275,8 +279,7 @@ describe("mock search compatibility", () => {
     }),
   ).searchIndex("text", { searchField: "text" })("entries");
   const schema = DatabaseSchema.make({ entries: table });
-  const layer = TestConfect_.layer(
-    schema,
+  const layer = TestConfect_.layer<typeof schema>(
     defineSchema({ entries: Table.tableDefinition(table) }),
     import.meta.glob("./fixtures/convex/_generated/*.js"),
   );
@@ -293,13 +296,11 @@ describe("mock search compatibility", () => {
               const reader =
                 yield* DatabaseReader_.DatabaseReader<typeof schema>();
               yield* writer
-                .table("entries")
+                .table(table)
                 .insert(value === undefined ? {} : { text: value });
-              yield* writer
-                .table("entries")
-                .insert({ text: "123 null undefined" });
+              yield* writer.table(table).insert({ text: "123 null undefined" });
               const results = yield* reader
-                .table("entries")
+                .table(table)
                 .search("text", (q) => q.search("text", String(value)))
                 .collect();
               expect(Array.map(results, (doc) => doc.text)).toEqual([
@@ -325,8 +326,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             vi.setSystemTime(1_750_000_001_000);
             const writer = yield* DatabaseWriter;
             const reader = yield* DatabaseReader;
-            const id = yield* writer.table("notes").insert({ text: "pinned" });
-            const doc = yield* reader.table("notes").get(id);
+            const id = yield* writer
+              .table(notesTable)
+              .insert({ text: "pinned" });
+            const doc = yield* reader.table(notesTable).get(id);
             const after = yield* Clock.currentTimeMillis;
             expect(before).toBe(1_750_000_000_000);
             expect(after).toBe(before);
@@ -347,12 +350,12 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               const reader = yield* DatabaseReader;
               for (let i = 0; i < 1025; i++) {
                 yield* writer
-                  .table("notes")
+                  .table(notesTable)
                   .insert({ text: "candidate", tag: "skip" });
               }
               const search = () =>
                 reader
-                  .table("notes")
+                  .table(notesTable)
                   .search("text", (q) => q.search("text", "candidate"));
               const taken = yield* search().take(2);
               expect(taken).toHaveLength(2);
@@ -389,14 +392,14 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             Effect.gen(function* () {
               const writer = yield* DatabaseWriter;
               const reader = yield* DatabaseReader;
-              yield* writer.table("notes").insert({ text: "first" });
-              yield* writer.table("notes").insert({ text: "second" });
+              yield* writer.table(notesTable).insert({ text: "first" });
+              yield* writer.table(notesTable).insert({ text: "second" });
               const first = yield* reader
-                .table("notes")
+                .table(notesTable)
                 .index("by_text")
                 .paginate({ numItems: 1, cursor: null });
               const second = yield* reader
-                .table("notes")
+                .table(notesTable)
                 .index("by_text")
                 .paginate({ numItems: 1, cursor: first.continueCursor });
               expect(Array.map(first.page, (doc) => doc.text)).toEqual([
@@ -454,8 +457,8 @@ describe("mock transaction clocks", () => {
         const writer = yield* DatabaseWriter;
         const reader = yield* DatabaseReader;
         const clock = yield* runner.runQuery(readRef);
-        const id = yield* writer.table("notes").insert({ text: "clock" });
-        const doc = yield* reader.table("notes").get(id);
+        const id = yield* writer.table(notesTable).insert({ text: "clock" });
+        const doc = yield* reader.table(notesTable).get(id);
         const time = yield* Clock.currentTimeMillis;
         expect(time).toBe(clock.time);
         return { ...clock, creationTime: doc._creationTime };
@@ -463,12 +466,12 @@ describe("mock transaction clocks", () => {
   });
   assert(read._tag === "Confect");
   assert(insert._tag === "Confect");
-  const layer = TestConfect_.layer(confectSchema, convexSchema, {
+  const layer = TestConfect_.layer<typeof confectSchema>(convexSchema, {
     ...import.meta.glob("./fixtures/convex/_generated/*.js"),
     "./fixtures/convex/clocks.ts": () =>
       Promise.resolve({
-        read: RegisteredConvexFunction.make(confectSchema, read),
-        insert: RegisteredConvexFunction.make(confectSchema, insert),
+        read: RegisteredConvexFunction.make(tableNames, read),
+        insert: RegisteredConvexFunction.make(tableNames, insert),
       }),
   });
 
@@ -552,18 +555,18 @@ describe("Generated function registration", () => {
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
             yield* reader
-              .table("notes")
+              .table(notesTable)
               .index("by_text")
               .paginate({ numItems: 1, cursor: null });
             yield* reader
-              .table("notes")
+              .table(notesTable)
               .index("by_text")
               .paginate({ numItems: 1, cursor: null });
             return null;
           }).pipe(Effect.orDie),
       });
       assert(item._tag === "Confect");
-      const registered = RegisteredConvexFunction.make(confectSchema, item);
+      const registered = RegisteredConvexFunction.make(tableNames, item);
       const t = convexTest(convexSchema, {
         ...import.meta.glob("./fixtures/convex/_generated/*.js"),
         "./fixtures/convex/paginationBudget.ts": () =>
@@ -622,6 +625,34 @@ describe("Generated function registration", () => {
 });
 
 describe("DocumentIds", () => {
+  it.layer(TestConfect.layer, { buildPerTest: true })(
+    "TestConfect.run",
+    (test) => {
+      test.effect.each([false, true])(
+        "identifies application IDs from the deployment schema with identity=%s",
+        (authenticated) =>
+          Effect.gen(function* () {
+            const c = yield* TestConfect.TestConfect;
+            const client = authenticated
+              ? c.withIdentity({ subject: "viewer" })
+              : c;
+            yield* client.run(
+              Effect.gen(function* () {
+                const writer = yield* DatabaseWriter;
+                const ids =
+                  yield* DocumentIds.DocumentIds<typeof confectSchema>();
+                const id = yield* writer
+                  .table(notesTable)
+                  .insert({ text: "ID inspection" });
+                const identified = yield* ids.identify(id);
+                expect(identified).toEqual(Option.some({ table: "notes", id }));
+              }),
+            );
+          }),
+      );
+    },
+  );
+
   const cases = [
     {
       name: "public query",
@@ -693,7 +724,7 @@ describe("DocumentIds", () => {
             }),
         });
         assert(item._tag === "Confect");
-        const registered = RegisteredConvexFunction.make(confectSchema, item);
+        const registered = RegisteredConvexFunction.make(tableNames, item);
         const t = convexTest(convexSchema, {
           ...import.meta.glob("./fixtures/convex/_generated/*.js"),
           "./fixtures/convex/documentIds.ts": () =>
@@ -747,7 +778,7 @@ describe("Storage", () => {
       }),
       handler: read,
       expected: "shared reader",
-      register: RegisteredConvexFunction.make,
+      register: RegisteredConvexFunction.make.bind(undefined, tableNames),
       invoke: (t: ReturnType<typeof convexTest>) =>
         t.query(makeFunctionReference<"query">("storage:run"), {}),
     },
@@ -759,7 +790,7 @@ describe("Storage", () => {
       }),
       handler: write,
       expected: "https:",
-      register: RegisteredConvexFunction.make,
+      register: RegisteredConvexFunction.make.bind(undefined, tableNames),
       invoke: (t: ReturnType<typeof convexTest>) =>
         t.mutation(makeFunctionReference<"mutation">("storage:run"), {}),
     },
@@ -771,7 +802,7 @@ describe("Storage", () => {
       }),
       handler: roundtrip,
       expected: "storage roundtrip",
-      register: RegisteredConvexFunction.make,
+      register: RegisteredConvexFunction.make.bind(undefined, tableNames),
       invoke: (t: ReturnType<typeof convexTest>) =>
         t.mutation(makeFunctionReference<"mutation">("storage:run"), {}),
     },
@@ -783,7 +814,7 @@ describe("Storage", () => {
       }),
       handler: roundtrip,
       expected: "storage roundtrip",
-      register: RegisteredConvexFunction.make,
+      register: RegisteredConvexFunction.make.bind(undefined, tableNames),
       invoke: (t: ReturnType<typeof convexTest>) =>
         t.action(makeFunctionReference<"action">("storage:run"), {}),
     },
@@ -811,7 +842,7 @@ describe("Storage", () => {
           handler: () => handler,
         });
         assert(item._tag === "Confect");
-        const registered = register(confectSchema, item);
+        const registered = register(item);
         const t = convexTest(convexSchema, {
           ...import.meta.glob("./fixtures/convex/_generated/*.js"),
           "./fixtures/convex/storage.ts": () =>
@@ -893,14 +924,14 @@ describe("action storage transaction isolation", () => {
       ...import.meta.glob("./fixtures/convex/_generated/*.js"),
       "./fixtures/convex/storageIsolation.ts": () =>
         Promise.resolve({
-          run: RegisteredConvexFunction.make(confectSchema, run),
-          replace: RegisteredConvexFunction.make(confectSchema, replace),
+          run: RegisteredConvexFunction.make(tableNames, run),
+          replace: RegisteredConvexFunction.make(tableNames, replace),
         }),
     };
     return Effect.runSync(
       TestConfect.TestConfect.pipe(
         Effect.provide(
-          TestConfect_.layer(confectSchema, convexSchema, modules),
+          TestConfect_.layer<typeof confectSchema>(convexSchema, modules),
         ),
       ),
     );
@@ -945,7 +976,10 @@ describe("action storage transaction isolation", () => {
     });
   const files = Effect.gen(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table("_storage").index("by_creation_time").collect();
+    return yield* reader
+      .table(Table.storageTable)
+      .index("by_creation_time")
+      .collect();
   });
 
   it.effect.each(["direct", "scheduled"])(
@@ -984,8 +1018,9 @@ describe("action storage transaction isolation", () => {
                   Effect.gen(function* () {
                     const reader = yield* DatabaseReader;
                     expect(
-                      (yield* reader.table("_scheduled_functions").get(job))
-                        .state.kind,
+                      (yield* reader
+                        .table(Table.scheduledFunctionsTable)
+                        .get(job)).state.kind,
                     ).toBe("success");
                   }),
                 ),
@@ -1353,7 +1388,10 @@ describe("mutation Blob transactions", () => {
         Effect.runPromise(
           effect.pipe(
             Effect.provide(
-              RegisteredConvexFunction.mutationLayer(confectSchema, ctx),
+              RegisteredConvexFunction.mutationLayer<typeof confectSchema>(
+                tableNames,
+                ctx,
+              ),
             ),
           ),
         ),
@@ -1388,7 +1426,7 @@ describe("mutation Blob transactions", () => {
             const blob = yield* storage.get(id);
             expect(blob.size).toBe(2);
             expect(blob.type).toBe(type);
-            const metadata = yield* reader.table("_storage").get(id);
+            const metadata = yield* reader.table(Table.storageTable).get(id);
             expect(metadata.sha256).toBe(
               "v2DkNJys5rzg1VLo14NCjbZtDWSb2eQwo2J+LuFKyDk=",
             );
@@ -1419,7 +1457,7 @@ describe("mutation Blob transactions", () => {
         Effect.gen(function* () {
           const reader = yield* DatabaseReader;
           const files = yield* reader
-            .table("_storage")
+            .table(Table.storageTable)
             .index("by_creation_time")
             .collect();
           expect(files).toEqual([]);
@@ -1472,7 +1510,7 @@ describe("mutation Blob transactions", () => {
               expect((yield* Effect.flip(storage.getUrl(id))).id).toBe(id);
             }
             const files = yield* reader
-              .table("_storage")
+              .table(Table.storageTable)
               .index("by_creation_time")
               .collect();
             expect(Array.map(files, (file) => file._id)).toEqual([existingId]);
@@ -1536,7 +1574,7 @@ describe("mutation Blob transactions", () => {
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
             const files = yield* reader
-              .table("_storage")
+              .table(Table.storageTable)
               .index("by_creation_time")
               .collect();
             expect(files).toHaveLength(1);
@@ -1606,7 +1644,7 @@ describe("function logging", () => {
         name: "run",
         returns: () => Schema.Null,
       }),
-      register: RegisteredConvexFunction.make,
+      register: RegisteredConvexFunction.make.bind(undefined, tableNames),
       invoke: (t: ReturnType<typeof convexTest>) =>
         t.query(makeFunctionReference<"query">("logging:run"), {}),
     },
@@ -1616,7 +1654,7 @@ describe("function logging", () => {
         name: "run",
         returns: () => Schema.Null,
       }),
-      register: RegisteredConvexFunction.make,
+      register: RegisteredConvexFunction.make.bind(undefined, tableNames),
       invoke: (t: ReturnType<typeof convexTest>) =>
         t.mutation(makeFunctionReference<"mutation">("logging:run"), {}),
     },
@@ -1626,7 +1664,7 @@ describe("function logging", () => {
         name: "run",
         returns: () => Schema.Null,
       }),
-      register: RegisteredConvexFunction.make,
+      register: RegisteredConvexFunction.make.bind(undefined, tableNames),
       invoke: (t: ReturnType<typeof convexTest>) =>
         t.action(makeFunctionReference<"action">("logging:run"), {}),
     },
@@ -1661,7 +1699,7 @@ describe("function logging", () => {
             ),
         });
         assert(item._tag === "Confect");
-        const registered = register(confectSchema, item);
+        const registered = register(item);
         const t = convexTest(convexSchema, {
           ...import.meta.glob("./fixtures/convex/_generated/*.js"),
           "./fixtures/convex/logging.ts": () =>
@@ -1695,7 +1733,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               const snapshot = transaction.getSnapshotTs();
               const timestamp = yield* snapshot;
               expect(typeof timestamp).toBe("bigint");
-              yield* writer.table("notes").insert({ text: "snapshot" });
+              yield* writer.table(notesTable).insert({ text: "snapshot" });
               const repeated = yield* snapshot;
               expect(repeated).toBe(timestamp);
               return timestamp;
@@ -1724,8 +1762,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             const getMetrics = transaction.getMetrics();
             const before = yield* getMetrics;
 
-            const id = yield* writer.table("notes").insert({ text: "metrics" });
-            yield* reader.table("notes").get(id);
+            const id = yield* writer
+              .table(notesTable)
+              .insert({ text: "metrics" });
+            yield* reader.table(notesTable).get(id);
             const after = yield* getMetrics;
 
             expect(after.documentsWritten.used).toBeGreaterThan(
@@ -1767,7 +1807,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
                   { text: "already due" },
                 );
             const scheduled = yield* reader
-              .table("_scheduled_functions")
+              .table(Table.scheduledFunctionsTable)
               .get(id);
             expect(time).toBe(now);
             const after = yield* Clock.currentTimeMillis;
@@ -1786,7 +1826,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
             expect(
-              (yield* reader.table("_scheduled_functions").get(job)).state.kind,
+              (yield* reader.table(Table.scheduledFunctionsTable).get(job))
+                .state.kind,
             ).toBe("success");
           }),
         );
@@ -1810,7 +1851,9 @@ it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
 
           yield* scheduler.cancel(id);
 
-          const scheduled = yield* reader.table("_scheduled_functions").get(id);
+          const scheduled = yield* reader
+            .table(Table.scheduledFunctionsTable)
+            .get(id);
           expect(scheduled.state.kind).toBe("canceled");
         }),
       );
@@ -1824,13 +1867,12 @@ it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
 });
 
 describe("DatabaseReader table isolation", () => {
-  const otherNotes = notesTable("otherNotes");
+  const otherNotes = unnamedNotes("otherNotes");
   const schema = DatabaseSchema.make({
     ...DatabaseSchema.tables(confectSchema),
     otherNotes,
   });
-  const layer = TestConfect_.layer(
-    schema,
+  const layer = TestConfect_.layer<typeof schema>(
     defineSchema({
       ...convexSchema.tables,
       otherNotes: Table.tableDefinition(otherNotes),
@@ -1843,7 +1885,7 @@ describe("DatabaseReader table isolation", () => {
   it.layer(layer, { buildPerTest: true })("table reads", (test) => {
     const readTables = Effect.gen(function* () {
       const reader = yield* Reader;
-      const notes = reader.table("notes");
+      const notes = reader.table(notesTable);
       const ascending = yield* notes.index("by_creation_time").collect();
       const descending = yield* notes
         .index("by_creation_time", "desc")
@@ -1855,15 +1897,15 @@ describe("DatabaseReader table isolation", () => {
         .search("text", (q) => q.search("text", "hello").eq("tag", "keep"))
         .collect();
       const users = yield* reader
-        .table("users")
+        .table(usersTable)
         .index("by_creation_time")
         .collect();
       const events = yield* reader
-        .table("events")
+        .table(eventsTable)
         .index("by_creation_time")
         .collect();
       const other = yield* reader
-        .table("otherNotes")
+        .table(otherNotes)
         .index("by_creation_time")
         .collect();
       return {
@@ -1874,7 +1916,10 @@ describe("DatabaseReader table isolation", () => {
         users: Array.map(users, (doc) => doc.username),
         events: Array.map(events, (doc) => doc._id),
         otherNotes: Array.map(other, (doc) => doc.text),
-        tags: yield* reader.table("tags").index("by_creation_time").collect(),
+        tags: yield* reader
+          .table(tagsTable)
+          .index("by_creation_time")
+          .collect(),
       };
     });
 
@@ -1887,22 +1932,22 @@ describe("DatabaseReader table isolation", () => {
             Effect.gen(function* () {
               const writer = yield* Writer;
               const kept = yield* writer
-                .table("notes")
+                .table(notesTable)
                 .insert({ text: "hello match", tag: "keep" });
               const user = yield* writer
-                .table("users")
+                .table(usersTable)
                 .insert({ username: "hello match" });
               const other = yield* writer
-                .table("otherNotes")
+                .table(otherNotes)
                 .insert({ text: "hello match", tag: "keep" });
               const deleted = yield* writer
-                .table("notes")
+                .table(notesTable)
                 .insert({ text: "hello match", tag: "keep" });
               const event = yield* writer
-                .table("events")
+                .table(eventsTable)
                 .insert({ kind: "a", a: "hello match" });
               const patched = yield* writer
-                .table("notes")
+                .table(notesTable)
                 .insert({ text: "hello match", tag: "keep" });
               return { kept, deleted, patched, user, event, other };
             }),
@@ -1945,20 +1990,20 @@ describe("DatabaseReader table isolation", () => {
             c.run(
               Effect.gen(function* () {
                 const writer = yield* Writer;
-                const notes = writer.table("notes");
+                const notes = writer.table(notesTable);
                 const inserted = yield* notes.insert({ text: "unmatched" });
                 const temporary = yield* notes.insert({
                   text: "hello match",
                   tag: "keep",
                 });
                 yield* writer
-                  .table("otherNotes")
+                  .table(otherNotes)
                   .patch(ids.other, { text: "hello foreign" });
                 yield* writer
-                  .table("otherNotes")
+                  .table(otherNotes)
                   .insert({ text: "hello match", tag: "keep" });
                 yield* writer
-                  .table("users")
+                  .table(usersTable)
                   .patch(ids.user, { username: "pending" });
                 const pending = yield* readTables;
                 expect(pending.ascending).toEqual([
@@ -1996,12 +2041,12 @@ describe("DatabaseReader table isolation", () => {
                   text: "hello match",
                   tag: "keep",
                 });
-                yield* writer.table("users").delete(ids.user);
+                yield* writer.table(usersTable).delete(ids.user);
                 yield* writer
-                  .table("users")
+                  .table(usersTable)
                   .insert({ username: "replacement" });
-                yield* writer.table("events").delete(ids.event);
-                yield* writer.table("otherNotes").delete(ids.other);
+                yield* writer.table(eventsTable).delete(ids.event);
+                yield* writer.table(otherNotes).delete(ids.other);
                 const pendingChanges = yield* readTables;
                 expect(pendingChanges).toEqual(changed(inserted));
                 if (outcome === "rollback")
@@ -2052,15 +2097,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               })
                 .index("by_text", ["text"])
                 .searchIndex("text", { searchField: "text" })("notes");
-              const schema = DatabaseSchema.make({ notes: table });
-              const reader = DatabaseReader_.make<typeof schema>(
-                schema,
-                ctx.db,
-              ).table("notes");
-              const writer = DatabaseWriter_.make<typeof schema>(
-                schema,
-                ctx.db,
-              ).table("notes");
+              const reader = DatabaseReader_.make(ctx.db).table(table);
+              const writer = DatabaseWriter_.make(ctx.db).table(table);
               const get = reader.get(id);
               const getByIndex = reader.get("by_text", "hello");
               const first = reader.index("by_text").first();
@@ -2137,7 +2175,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
 
-            return yield* writer.table("notes").insert({
+            return yield* writer.table(notesTable).insert({
               text,
             });
           }),
@@ -2163,7 +2201,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             yield* Effect.forEach(
               Array.range(1, 10),
               (i) =>
-                writer.table("notes").insert({
+                writer.table(notesTable).insert({
                   text: `${i}`,
                 }),
               { concurrency: 1 },
@@ -2187,7 +2225,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
             const take = (n: number) =>
-              reader.table("notes").index("by_text").take(n);
+              reader.table(notesTable).index("by_text").take(n);
 
             const takeResult2 = yield* take(0);
             expect(takeResult2).toEqual([]);
@@ -2226,11 +2264,11 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             const writer = yield* DatabaseWriter;
 
             const id = yield* writer
-              .table("notes")
+              .table(notesTable)
               .insert({ text: "original", tag: "draft" });
 
             yield* writer
-              .table("notes")
+              .table(notesTable)
               .patch(id, { text: "patched", tag: undefined });
 
             return id;
@@ -2248,7 +2286,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
     );
 
     test("patch accepts undefined according to field types and compiler optionality", () => {
-      const patchNote = (writer: DatabaseWriter) => writer.table("notes").patch;
+      const patchNote = (writer: DatabaseWriter) =>
+        writer.table(notesTable).patch;
       type Patch = Parameters<ReturnType<typeof patchNote>>[1];
 
       expectTypeOf<{ tag: undefined }>().toExtend<Patch>();
@@ -2278,7 +2317,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
         const note = yield* c.query(refs.public.databaseReader.getNote, {
           noteId,
         });
-        expectTypeOf(note).toEqualTypeOf<(typeof notes.Doc)["Type"]>();
+        expectTypeOf(note).toEqualTypeOf<(typeof notesTable.Doc)["Type"]>();
         assertEquals(note.text, text);
       }),
     );
@@ -2329,7 +2368,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
 
           yield* Effect.forEach(
             Array.range(1, 5),
-            (i) => writer.table("notes").insert({ text: `note ${i}` }),
+            (i) => writer.table(notesTable).insert({ text: `note ${i}` }),
             { concurrency: 1 },
           );
         }),
@@ -2361,7 +2400,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
 
           yield* Effect.forEach(
             Array.range(1, 3),
-            (i) => writer.table("notes").insert({ text: `note ${i}` }),
+            (i) => writer.table(notesTable).insert({ text: `note ${i}` }),
             { concurrency: 1 },
           );
         }),
@@ -2387,11 +2426,17 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
 
-          yield* writer.table("notes").insert({ text: "a", tag: "important" });
-          yield* writer.table("notes").insert({ text: "b", tag: "trivial" });
-          yield* writer.table("notes").insert({ text: "c", tag: "important" });
-          yield* writer.table("notes").insert({ text: "d", tag: "trivial" });
-          yield* writer.table("notes").insert({ text: "e", tag: "important" });
+          yield* writer
+            .table(notesTable)
+            .insert({ text: "a", tag: "important" });
+          yield* writer.table(notesTable).insert({ text: "b", tag: "trivial" });
+          yield* writer
+            .table(notesTable)
+            .insert({ text: "c", tag: "important" });
+          yield* writer.table(notesTable).insert({ text: "d", tag: "trivial" });
+          yield* writer
+            .table(notesTable)
+            .insert({ text: "e", tag: "important" });
         }),
       );
 
@@ -2418,8 +2463,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
 
-          yield* writer.table("notes").insert({ text: "a", tag: "trivial" });
-          yield* writer.table("notes").insert({ text: "b", tag: "trivial" });
+          yield* writer.table(notesTable).insert({ text: "a", tag: "trivial" });
+          yield* writer.table(notesTable).insert({ text: "b", tag: "trivial" });
         }),
       );
 
@@ -2444,7 +2489,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
           yield* Effect.forEach(
             Array.range(1, 10),
             (i) =>
-              writer.table("notes").insert({
+              writer.table(notesTable).insert({
                 text: `note ${i}`,
                 tag: i % 2 === 0 ? "even" : "odd",
               }),
@@ -2509,8 +2554,8 @@ const insertAndDeleteNote = Effect.gen(function* () {
   return yield* c.run(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
-      const id = yield* writer.table("notes").insert({ text: "transient" });
-      yield* writer.table("notes").delete(id);
+      const id = yield* writer.table(notesTable).insert({ text: "transient" });
+      yield* writer.table(notesTable).delete(id);
       return id;
     }),
     Id("notes"),
@@ -2619,7 +2664,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("typed errors", (test) => {
         const noteId = yield* c.run(
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
-            return yield* writer.table("notes").insert({ text: "hello" });
+            return yield* writer.table(notesTable).insert({ text: "hello" });
           }),
           Id("notes"),
         );
@@ -2671,7 +2716,9 @@ it.layer(TestConfect.layer, { buildPerTest: true })("typed errors", (test) => {
         const noteId = yield* c.run(
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
-            return yield* writer.table("notes").insert({ text: "to delete" });
+            return yield* writer
+              .table(notesTable)
+              .insert({ text: "to delete" });
           }),
           Id("notes"),
         );

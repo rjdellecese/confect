@@ -30,6 +30,7 @@ import * as Auth from "./Auth";
 import * as ConvexLogger from "./ConvexLogger";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
+import type { ActionServices } from "./Handler";
 import * as ExecutionMetadata from "./ExecutionMetadata";
 import * as RequestMetadata from "./RequestMetadata";
 import * as MutationRunner from "./MutationRunner";
@@ -38,7 +39,6 @@ import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
 import * as Storage from "./Storage";
 import * as StorageActionWriter from "./StorageActionWriter";
-import type * as StorageReader from "./StorageReader";
 import * as StorageWriter from "./StorageWriter";
 import * as VectorSearch from "./VectorSearch";
 
@@ -336,33 +336,15 @@ export const actionFunctionBase = <
     }).pipe(runHandlerPromise(combineErrorSchemas(error, resolvedMiddlewares))),
 });
 
-export type ActionServices<
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-> =
-  | Scheduler.Scheduler
-  | Auth.Auth
-  | ExecutionMetadata.ExecutionMetadata
-  | RequestMetadata.RequestMetadata
-  | Storage.Storage
-  | StorageReader.StorageReader
-  | StorageWriter.StorageWriter
-  | StorageActionWriter.StorageActionWriter
-  | QueryRunner.QueryRunner
-  | MutationRunner.MutationRunner
-  | ActionRunner.ActionRunner
-  | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>
-  | ActionCtx.ActionCtx<
-      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
-    >;
+export type { ActionServices } from "./Handler";
 
 export const actionLayer = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(
-  databaseSchema: DatabaseSchema_,
   ctx: GenericActionCtx<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
-) =>
+): Layer.Layer<ActionServices<DatabaseSchema_>> =>
   Layer.mergeAll(
     Scheduler.layer(ctx.scheduler),
     Auth.layer(ctx.auth),

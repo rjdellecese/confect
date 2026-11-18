@@ -23,11 +23,14 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import databaseSchema from "./mock-backend/fixtures/confect/_generated/schema";
+import { tableNames } from "./mock-backend/fixtures/confect/_generated/tableNames";
+import type databaseSchema from "./mock-backend/fixtures/confect/_generated/schema";
 import type { NoViewer } from "./mock-backend/fixtures/confect/middleware/ProvideViewer.spec";
 import ProvideViewer, {
   Viewer,
 } from "./mock-backend/fixtures/confect/middleware/ProvideViewer.spec";
+
+const boundMiddleware = MiddlewareImpl.forSchema<typeof databaseSchema>();
 
 const viewerName = FunctionSpec.publicQuery({
   name: "viewerName",
@@ -69,26 +72,22 @@ describe("implementation options", () => {
   }) {}
 
   it("types options for the common implementation strategy", () => {
-    MiddlewareImpl.make(
-      databaseSchema,
-      GroupPolicy,
-      (effect, { options, invocation }) => {
-        expectTypeOf(options).toEqualTypeOf<{
-          readonly label: string;
-        }>();
-        expectTypeOf(invocation).toEqualTypeOf<{
-          readonly name: string;
-          readonly functionType: "query" | "mutation" | "action";
-          readonly functionVisibility: "public" | "internal";
-          readonly args: unknown;
-        }>();
-        return effect;
-      },
-    );
+    boundMiddleware.make(GroupPolicy, (effect, { options, invocation }) => {
+      expectTypeOf(options).toEqualTypeOf<{
+        readonly label: string;
+      }>();
+      expectTypeOf(invocation).toEqualTypeOf<{
+        readonly name: string;
+        readonly functionType: "query" | "mutation" | "action";
+        readonly functionVisibility: "public" | "internal";
+        readonly args: unknown;
+      }>();
+      return effect;
+    });
   });
 
   it("types options for each function-type implementation", () => {
-    MiddlewareImpl.makeByFunctionType(databaseSchema, FunctionPolicy, {
+    boundMiddleware.makeByFunctionType(FunctionPolicy, {
       query: (effect, { options }) => {
         expectTypeOf(options).toEqualTypeOf<{
           readonly tolerateMissing: boolean;
@@ -111,7 +110,7 @@ describe("implementation options", () => {
   });
 
   it("omits options from the context type for optionless middleware", () => {
-    MiddlewareImpl.make(databaseSchema, Observe, (effect, context) => {
+    boundMiddleware.make(Observe, (effect, context) => {
       expectTypeOf<keyof typeof context>().toEqualTypeOf<"invocation">();
       expectTypeOf(context.invocation).toEqualTypeOf<
         MiddlewareSpec.MiddlewareOptions["invocation"]
@@ -129,14 +128,14 @@ describe("implementation options", () => {
       },
     ) {}
 
-    MiddlewareImpl.make(databaseSchema, UndefinedPolicy, (effect, context) => {
+    boundMiddleware.make(UndefinedPolicy, (effect, context) => {
       expectTypeOf<keyof typeof context>().toEqualTypeOf<
         "options" | "invocation"
       >();
       expectTypeOf(context.options).toBeUndefined();
       return effect;
     });
-    MiddlewareImpl.makeByFunctionType(databaseSchema, UndefinedPolicy, {
+    boundMiddleware.makeByFunctionType(UndefinedPolicy, {
       query: (effect, { options }) => {
         expectTypeOf(options).toBeUndefined();
         return effect;
@@ -153,13 +152,13 @@ describe("implementation options", () => {
   });
 
   it("allows invocation-only callbacks with either implementation strategy", () => {
-    MiddlewareImpl.make(databaseSchema, Observe, (effect, { invocation }) => {
+    boundMiddleware.make(Observe, (effect, { invocation }) => {
       expectTypeOf(invocation).toEqualTypeOf<
         MiddlewareSpec.MiddlewareOptions["invocation"]
       >();
       return effect;
     });
-    MiddlewareImpl.makeByFunctionType(databaseSchema, Observe, {
+    boundMiddleware.makeByFunctionType(Observe, {
       query: (effect, context) => {
         expectTypeOf<keyof typeof context>().toEqualTypeOf<"invocation">();
         expectTypeOf(context.invocation).toEqualTypeOf<
@@ -187,7 +186,7 @@ describe("implementation options", () => {
 
 describe("handler environment widening", () => {
   it("accepts handlers consuming a service provided by an attached middleware", () => {
-    FunctionImpl.make(databaseSchema, coveredGroup, "viewerName", () =>
+    FunctionImpl.make(coveredGroup, "viewerName", () =>
       Effect.gen(function* () {
         const viewer = yield* Viewer;
 
@@ -221,7 +220,7 @@ describe("handler environment widening", () => {
 
     expectTypeOf<FunctionLevelExtra>().toEqualTypeOf<Viewer>();
 
-    FunctionImpl.make(databaseSchema, functionCoveredGroup, "viewerName", () =>
+    FunctionImpl.make(functionCoveredGroup, "viewerName", () =>
       Effect.gen(function* () {
         const viewer = yield* Viewer;
 
@@ -240,7 +239,7 @@ describe("cross-middleware requires", () => {
   }) {}
 
   it("lets an implementation consume its declared requires", () => {
-    MiddlewareImpl.make(databaseSchema, NeedsViewer, (effect) =>
+    boundMiddleware.make(NeedsViewer, (effect) =>
       Effect.gen(function* () {
         const viewer = yield* Viewer;
 
@@ -255,7 +254,7 @@ describe("cross-middleware requires", () => {
     );
 
     // @ts-expect-error—nothing covering viewerName provides Viewer
-    GroupImpl.make(databaseSchema, unsatisfied);
+    GroupImpl.make(unsatisfied);
   });
 
   it("accepts a group whose provider middleware covers the requirement", () => {
@@ -263,7 +262,7 @@ describe("cross-middleware requires", () => {
       .middleware(ProvideViewer)
       .addFunction(viewerName.middleware(NeedsViewer));
 
-    GroupImpl.make(databaseSchema, satisfied);
+    GroupImpl.make(satisfied);
   });
 });
 
@@ -301,7 +300,7 @@ describe("implementation service bounds", () => {
         functionTypes: { query: true, mutation: true, action: false },
       },
     ) {}
-    MiddlewareImpl.make(databaseSchema, CheckIds, (effect) =>
+    boundMiddleware.make(CheckIds, (effect) =>
       Effect.flatMap(DocumentIds.DocumentIds<typeof databaseSchema>(), (ids) =>
         Effect.andThen(ids.identify("input"), effect),
       ),
@@ -364,27 +363,27 @@ describe("implementation service bounds", () => {
       },
     ) {}
 
-    MiddlewareImpl.make(databaseSchema, Transactions, (effect) =>
+    boundMiddleware.make(Transactions, (effect) =>
       Effect.flatMap(
         QueryTransactionContext.QueryTransactionContext,
         () => effect,
       ),
     );
-    MiddlewareImpl.make(databaseSchema, Everywhere, (effect) =>
+    boundMiddleware.make(Everywhere, (effect) =>
       // @ts-expect-error All-function middleware cannot require transaction controls.
       Effect.flatMap(
         QueryTransactionContext.QueryTransactionContext,
         () => effect,
       ),
     );
-    MiddlewareImpl.make(databaseSchema, Transactions, (effect) =>
+    boundMiddleware.make(Transactions, (effect) =>
       // @ts-expect-error Queries cannot provide mutation-only controls.
       Effect.flatMap(
         MutationTransactionContext.MutationTransactionContext,
         () => effect,
       ),
     );
-    MiddlewareImpl.makeByFunctionType(databaseSchema, Everywhere, {
+    boundMiddleware.makeByFunctionType(Everywhere, {
       query: (effect) =>
         // @ts-expect-error A query implementation cannot require mutation controls.
         Effect.flatMap(
@@ -450,41 +449,41 @@ describe("implementation service bounds", () => {
       Extract<AllFunctionTypes, StorageWriter | StorageActionWriter>
     >().toBeNever();
 
-    MiddlewareImpl.make(databaseSchema, ObserveStorage, (effect) =>
+    boundMiddleware.make(ObserveStorage, (effect) =>
       Effect.andThen(read, effect),
     );
-    MiddlewareImpl.make(databaseSchema, ObserveQueryActionStorage, (effect) =>
+    boundMiddleware.make(ObserveQueryActionStorage, (effect) =>
       Effect.andThen(read, effect),
     );
-    MiddlewareImpl.make(databaseSchema, ObserveStorage, (effect) =>
+    boundMiddleware.make(ObserveStorage, (effect) =>
       // @ts-expect-error All-context middleware cannot generate upload URLs.
       Effect.andThen(upload, effect),
     );
-    MiddlewareImpl.make(databaseSchema, ObserveStorage, (effect) =>
+    boundMiddleware.make(ObserveStorage, (effect) =>
       // @ts-expect-error All-context middleware cannot delete blobs.
       Effect.andThen(remove, effect),
     );
-    MiddlewareImpl.make(databaseSchema, ObserveStorage, (effect) =>
+    boundMiddleware.make(ObserveStorage, (effect) =>
       // @ts-expect-error All-context middleware cannot read blob contents.
       Effect.andThen(get, effect),
     );
-    MiddlewareImpl.make(databaseSchema, ObserveStorage, (effect) =>
+    boundMiddleware.make(ObserveStorage, (effect) =>
       // @ts-expect-error All-context middleware cannot store blobs.
       Effect.andThen(store, effect),
     );
-    MiddlewareImpl.make(databaseSchema, ObserveQueryActionStorage, (effect) =>
+    boundMiddleware.make(ObserveQueryActionStorage, (effect) =>
       // @ts-expect-error Query+action middleware cannot generate upload URLs.
       Effect.andThen(upload, effect),
     );
-    MiddlewareImpl.make(databaseSchema, ObserveQueryActionStorage, (effect) =>
+    boundMiddleware.make(ObserveQueryActionStorage, (effect) =>
       // @ts-expect-error Query+action middleware cannot delete blobs.
       Effect.andThen(remove, effect),
     );
-    MiddlewareImpl.make(databaseSchema, ObserveQueryActionStorage, (effect) =>
+    boundMiddleware.make(ObserveQueryActionStorage, (effect) =>
       // @ts-expect-error Query+action middleware cannot read blob contents.
       Effect.andThen(get, effect),
     );
-    MiddlewareImpl.make(databaseSchema, ObserveQueryActionStorage, (effect) =>
+    boundMiddleware.make(ObserveQueryActionStorage, (effect) =>
       // @ts-expect-error Query+action middleware cannot store blobs.
       Effect.andThen(store, effect),
     );
@@ -504,7 +503,7 @@ describe("implementation service bounds", () => {
     expectTypeOf<StorageActionWriter>().toExtend<MutationAction>();
     expectTypeOf<StorageActionWriter>().not.toExtend<QueryMutation>();
 
-    MiddlewareImpl.make(databaseSchema, WriteBlobs, (effect) =>
+    boundMiddleware.make(WriteBlobs, (effect) =>
       Effect.gen(function* () {
         const storage = yield* Storage.Storage;
         const id = yield* storage.store(new Blob(["middleware"]));
@@ -532,7 +531,7 @@ describe("implementation service bounds", () => {
     class Sign extends MiddlewareSpec.MiddlewareSpec<Sign>()("Sign", {
       functionTypes: { query: false, mutation: true, action: false },
     }) {}
-    MiddlewareImpl.make(databaseSchema, Sign, (effect) =>
+    boundMiddleware.make(Sign, (effect) =>
       Effect.flatMap(MutationAuth.MutationAuth, (auth) =>
         auth
           .signJwt({ claims: { aud: "service" }, expiresInSeconds: 60 })
@@ -655,8 +654,7 @@ describe("implementation service bounds", () => {
   });
 
   it("accepts a provides-sugar implementation within the bounds", () => {
-    MiddlewareImpl.provides(
-      databaseSchema,
+    boundMiddleware.provides(
       ProvideViewer,
       Viewer,
       Effect.succeed({ username: "static" }),
@@ -665,20 +663,16 @@ describe("implementation service bounds", () => {
 });
 
 describe("group assembly enforcement", () => {
-  const viewerNameImpl = FunctionImpl.make(
-    databaseSchema,
-    coveredGroup,
-    "viewerName",
-    () =>
-      Effect.gen(function* () {
-        const viewer = yield* Viewer;
+  const viewerNameImpl = FunctionImpl.make(coveredGroup, "viewerName", () =>
+    Effect.gen(function* () {
+      const viewer = yield* Viewer;
 
-        return viewer.username;
-      }),
+      return viewer.username;
+    }),
   );
 
   it("keeps the middleware implementation as a layer requirement until provided", () => {
-    const missingMiddleware = GroupImpl.make(databaseSchema, coveredGroup).pipe(
+    const missingMiddleware = GroupImpl.make(coveredGroup).pipe(
       Layer.provide(viewerNameImpl),
     );
 
@@ -693,13 +687,13 @@ describe("group assembly enforcement", () => {
   });
 
   it("throws at build time when a middleware implementation is missing", () => {
-    const missingMiddleware = GroupImpl.make(databaseSchema, coveredGroup).pipe(
+    const missingMiddleware = GroupImpl.make(coveredGroup).pipe(
       Layer.provide(viewerNameImpl),
     ) as unknown as Layer.Layer<GroupImpl.GroupImpl<"Unfinalized">>;
 
     expect(() =>
       RegisteredFunctions.buildForGroup<typeof coveredGroup>(
-        databaseSchema,
+        tableNames,
         GroupImpl.finalize(missingMiddleware),
       ),
     ).toThrowError(
@@ -708,16 +702,15 @@ describe("group assembly enforcement", () => {
   });
 
   it("builds registered functions when the middleware implementation is provided", () => {
-    const provideViewerLive = MiddlewareImpl.provides(
-      databaseSchema,
+    const provideViewerLive = boundMiddleware.provides(
       ProvideViewer,
       Viewer,
       Effect.succeed({ username: "static" }),
     );
 
     const registered = RegisteredFunctions.buildForGroup<typeof coveredGroup>(
-      databaseSchema,
-      GroupImpl.make(databaseSchema, coveredGroup).pipe(
+      tableNames,
+      GroupImpl.make(coveredGroup).pipe(
         Layer.provide(viewerNameImpl),
         Layer.provide(provideViewerLive),
         GroupImpl.finalize,
@@ -741,20 +734,16 @@ describe("registry key namespacing", () => {
 
     const group = GroupSpec.make().middleware(Clash).addFunction(clashFunction);
 
-    const groupLayer = GroupImpl.make(databaseSchema, group).pipe(
+    const groupLayer = GroupImpl.make(group).pipe(
       Layer.provide(
-        FunctionImpl.make(databaseSchema, group, "clash", () =>
-          Effect.succeed("ok"),
-        ),
+        FunctionImpl.make(group, "clash", () => Effect.succeed("ok")),
       ),
-      Layer.provide(
-        MiddlewareImpl.make(databaseSchema, Clash, (effect) => effect),
-      ),
+      Layer.provide(boundMiddleware.make(Clash, (effect) => effect)),
       GroupImpl.finalize,
     );
 
     const registered = RegisteredFunctions.buildForGroup<typeof group>(
-      databaseSchema,
+      tableNames,
       groupLayer,
     );
 

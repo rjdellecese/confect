@@ -19,7 +19,7 @@ import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as LeafModules from "@confect/cli/LeafModule";
 import * as GenerationSnapshot from "@confect/cli/GenerationSnapshot";
-import { DatabaseSchema, GroupImpl } from "@confect/server";
+import { GroupImpl } from "@confect/server";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as String from "effect/String";
@@ -220,6 +220,48 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
 }
 
 layer(LeafModuleLayer)("loadSpec", (it) => {
+  it.effect.each([
+    {
+      source: 'GroupSpec.make({ convexModule: "native" })',
+      reason: "must be a boolean",
+    },
+    {
+      source:
+        'GroupSpec.make({ convexModule: true }).addFunction(FunctionSpec.publicQuery({ name: "query", returns: () => Schema.Null }))',
+      reason: 'check "query"',
+    },
+    {
+      source:
+        'GroupSpec.makeNode({ convexModule: true }).addFunction(FunctionSpec.convexPublicQuery()("query"))',
+      reason: "group's runtime is Node",
+    },
+    {
+      source:
+        "GroupSpec.addGroupsAt(GroupSpec.make(), { child: GroupSpec.make({ convexModule: true }) })",
+      reason: "own .spec.ts files",
+    },
+  ])(
+    "rejects an invalid convexModule declaration: $reason",
+    ({ source, reason }) =>
+      Effect.gen(function* () {
+        const leaf = yield* toLeafModule("groups/nativeConfig.spec.ts");
+        yield* withTempFile(
+          leaf.relativePath,
+          `import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+export default ${source};`,
+          Effect.gen(function* () {
+            const result = yield* loadSpec(leaf).pipe(Effect.result);
+            assert(result._tag === "Failure");
+            expect(result.failure).toMatchObject({
+              _tag: "InvalidConvexModuleError",
+              path: leaf.relativePath,
+              reason: expect.stringContaining(reason),
+            });
+          }),
+        );
+      }),
+  );
   it.effect.each([
     { option: "yes", runtime: "Convex", name: "list", reason: "InvalidOption" },
     { option: true, runtime: "Node", name: "list", reason: "NodeRuntime" },
@@ -823,53 +865,54 @@ export default GroupImpl.make(
         const result = yield* Effect.result(
           withTempLeaf(
             "_unfinalized",
-            `import { FunctionImpl, GroupImpl } from "@confect/server";
+            `import { GroupImpl } from "@confect/server";
+import { FunctionImpl } from "../_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../_generated/schema";
+import notesTable from "../_generated/tables/notes";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import notes from "./_unfinalized.spec";
 
-const insert = FunctionImpl.make(databaseSchema, notes, "insert", ({ text }) =>
+const insert = FunctionImpl.make(notes, "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
-    return yield* writer.table("notes").insert({ text });
+    return yield* writer.table(notesTable).insert({ text });
   }).pipe(Effect.orDie),
 );
 
-const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
+const list = FunctionImpl.make(notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     return yield* reader
-      .table("notes")
+      .table(notesTable)
       .index("by_creation_time", "desc")
       .collect();
   }).pipe(Effect.orDie),
 );
 
-const delete_ = FunctionImpl.make(databaseSchema, notes, "delete_", ({ noteId }) =>
+const delete_ = FunctionImpl.make(notes, "delete_", ({ noteId }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
-    yield* writer.table("notes").delete(noteId);
+    yield* writer.table(notesTable).delete(noteId);
     return null;
   }).pipe(Effect.orDie),
 );
 
-const getFirst = FunctionImpl.make(databaseSchema, notes, "getFirst", () =>
+const getFirst = FunctionImpl.make(notes, "getFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table("notes").index("by_creation_time").first();
+    return yield* reader.table(notesTable).index("by_creation_time").first();
   }).pipe(Effect.orDie),
 );
 
-const internalGetFirst = FunctionImpl.make(databaseSchema, notes, "internalGetFirst", () =>
+const internalGetFirst = FunctionImpl.make(notes, "internalGetFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table("notes").index("by_creation_time").first();
+    return yield* reader.table(notesTable).index("by_creation_time").first();
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(databaseSchema, notes).pipe(
+export default GroupImpl.make(notes).pipe(
   Layer.provide(insert),
   Layer.provide(list),
   Layer.provide(delete_),
@@ -893,21 +936,22 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
         const result = yield* Effect.result(
           withTempLeaf(
             "_incomplete",
-            `import { FunctionImpl, GroupImpl } from "@confect/server";
+            `import { GroupImpl } from "@confect/server";
+import { FunctionImpl } from "../_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../_generated/schema";
+import notesTable from "../_generated/tables/notes";
 import { DatabaseWriter } from "../_generated/services";
 import notes from "./_incomplete.spec";
 
-const insert = FunctionImpl.make(databaseSchema, notes, "insert", ({ text }) =>
+const insert = FunctionImpl.make(notes, "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
-    return yield* writer.table("notes").insert({ text });
+    return yield* writer.table(notesTable).insert({ text });
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(databaseSchema, notes).pipe(
+export default GroupImpl.make(notes).pipe(
   Layer.provide(insert),
   // Cast away the remaining FunctionImpl requirements so the file
   // compiles even though only "insert" is implemented; the CLI must
@@ -944,9 +988,7 @@ const emptyLeafBundle = (
     pipe(entry, String.slice(0, -".impl.ts".length)) + ".spec.ts";
   return {
     module: {
-      default: GroupImpl.make(DatabaseSchema.make({}), GroupSpec.make()).pipe(
-        GroupImpl.finalize,
-      ),
+      default: GroupImpl.make(GroupSpec.make()).pipe(GroupImpl.finalize),
     },
     metafile: {
       inputs: {

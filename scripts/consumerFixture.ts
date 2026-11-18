@@ -35,14 +35,14 @@ export default GroupSpec.make().addFunction(FunctionSpec.internalMutation({
   returns: () => Schema.Void,
 }));
 `,
-  "confect/tasks.impl.ts": `import { FunctionImpl, GroupImpl } from "@confect/server";
+  "confect/tasks.impl.ts": `import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./_generated/schema";
+import { FunctionImpl } from "./_generated/server";
 import tasks from "./tasks.spec";
 
-export default GroupImpl.make(databaseSchema, tasks).pipe(
-  Layer.provide(FunctionImpl.make(databaseSchema, tasks, "count", () => Effect.void)),
+export default GroupImpl.make(tasks).pipe(
+  Layer.provide(FunctionImpl.make(tasks, "count", () => Effect.void)),
   GroupImpl.finalize,
 );
 `,
@@ -86,12 +86,11 @@ export default Table.make(() => Schema.Struct({
 import * as Effect from "effect/Effect";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
-import databaseSchema from "./_generated/schema";
+import type databaseSchema from "./_generated/schema";
 import type { Id } from "./_generated/id";
 import { VectorSearch } from "./_generated/services";
 
-export const health = ConfectHttpRouter.make(
-  databaseSchema,
+export const health = ConfectHttpRouter.make<typeof databaseSchema>(
   HttpRouter.add("GET", "/health", HttpServerResponse.text("ok")),
 );
 
@@ -106,7 +105,7 @@ const routes: ConfectHttpRouter.Routes<typeof databaseSchema> = HttpRouter.add(
   }),
 );
 
-export default ConfectHttpRouter.make(databaseSchema, routes);
+export default ConfectHttpRouter.make<typeof databaseSchema>(routes);
 `,
   "confect/notes.spec.ts": `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
@@ -124,10 +123,10 @@ export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({
   },
 }));
 `,
-  "confect/notes.impl.ts": `import { FunctionImpl, GroupImpl } from "@confect/server";
+  "confect/notes.impl.ts": `import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./_generated/schema";
+import { FunctionImpl } from "./_generated/server";
 import { Auth } from "./_generated/services";
 import notes from "./notes.spec";
 
@@ -137,8 +136,8 @@ export const count = Effect.fn("notes.count")(function* (args: { readonly count:
   return args.count + identity.subject.length;
 });
 
-const countImpl = FunctionImpl.make(databaseSchema, notes, "count", count);
-export default GroupImpl.make(databaseSchema, notes).pipe(
+const countImpl = FunctionImpl.make(notes, "count", count);
+export default GroupImpl.make(notes).pipe(
   Layer.provide(countImpl),
   GroupImpl.finalize,
 );
@@ -149,6 +148,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import refs from "./confect/_generated/refs";
 import type { NotesDoc } from "./confect/_generated/docs";
+import notes from "./confect/_generated/tables/notes";
 import { Id } from "./confect/_generated/id";
 import type databaseSchema from "./confect/_generated/schema";
 import { DatabaseReader, MutationAuth, Storage, TransactionMetadata } from "./confect/_generated/services";
@@ -159,7 +159,7 @@ export const noteId: Id<"notes"> = Schema.decodeUnknownSync(Id("notes"))("consum
 export const readNotes: () => Effect.Effect<ReadonlyArray<NotesDoc>, never, DatabaseReader> =
   Effect.fn("consumer.readNotes")(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table("notes").index("by_creation_time").collect().pipe(Effect.orDie);
+    return yield* reader.table(notes).index("by_creation_time").collect().pipe(Effect.orDie);
   });
 
 export const copyBlob: (id: Id<"_storage">) => Effect.Effect<Id<"_storage">, never, Handler.MutationServices<typeof databaseSchema>> =

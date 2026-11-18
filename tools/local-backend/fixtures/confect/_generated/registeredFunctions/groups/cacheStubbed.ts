@@ -1,10 +1,10 @@
 import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";
-import databaseSchema from "../../schema";
+import { tableNames } from "../../tableNames";
 import groupLayer from "../../../groups/cacheStubbed.impl";
 
 const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
 
-const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/cacheStubbed.spec")["default"]>(databaseSchema, groupLayer);
+const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/cacheStubbed.spec")["default"]>(tableNames, groupLayer);
 
 export default {
 ["confectWithSnapshot"]: RegisteredConvexFunction.register({ ...definitions["confectWithSnapshot"], handler: forward(definitions["confectWithSnapshot"].handler) }),

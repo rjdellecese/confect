@@ -285,13 +285,13 @@ export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name, ret
           );
           yield* project.write(
             "confect/notes.impl.ts",
-            `import { FunctionImpl, GroupImpl } from "@confect/server";
+            `import { GroupImpl } from "@confect/server";
+import { FunctionImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./_generated/schema";
 import spec from "./notes.spec";
 import { name } from "${importPath}";
-export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionImpl.make(databaseSchema, spec, name, () => Effect.succeed(null))), GroupImpl.finalize);
+export default GroupImpl.make(spec).pipe(Layer.provide(FunctionImpl.make(spec, name, () => Effect.succeed(null))), GroupImpl.finalize);
 `,
           );
           const ready = yield* Deferred.make<void>();

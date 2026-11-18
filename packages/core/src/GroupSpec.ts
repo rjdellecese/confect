@@ -28,6 +28,7 @@ export interface GroupSpec<
 > {
   readonly [TypeId]: TypeId;
   readonly runtime: Runtime;
+  readonly convexModule: boolean;
   readonly experimental_reuseContext: boolean;
   readonly name: Name_;
   readonly functions: {
@@ -169,6 +170,7 @@ const Proto = {
 
     return makeProto({
       runtime: this_.runtime,
+      convexModule: this_.convexModule,
       experimental_reuseContext: this_.experimental_reuseContext,
       name: this_.name,
       functions: Record.set(this_.functions, function_.name, function_),
@@ -212,6 +214,7 @@ const Proto = {
 
     return makeProto({
       runtime: this_.runtime,
+      convexModule: this_.convexModule,
       experimental_reuseContext: this_.experimental_reuseContext,
       name: this_.name,
       functions: this_.functions,
@@ -233,6 +236,7 @@ const makeProto = <
     ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>,
 >({
   runtime,
+  convexModule = false,
   experimental_reuseContext,
   name,
   functions,
@@ -240,6 +244,7 @@ const makeProto = <
   middlewareAttachments,
 }: {
   runtime: Runtime;
+  convexModule?: boolean | undefined;
   experimental_reuseContext?: boolean | undefined;
   name: Name_;
   functions: Record.ReadonlyRecord<string, Functions_>;
@@ -254,6 +259,7 @@ const makeProto = <
 > =>
   Object.assign(Object.create(Proto), {
     runtime,
+    convexModule,
     experimental_reuseContext:
       experimental_reuseContext === undefined
         ? false
@@ -271,10 +277,14 @@ const makeProto = <
   >;
 
 export const make = (
-  options: { readonly experimental_reuseContext?: boolean | undefined } = {},
+  options: {
+    readonly convexModule?: boolean | undefined;
+    readonly experimental_reuseContext?: boolean | undefined;
+  } = {},
 ): GroupSpec<"Convex", ""> =>
   makeProto({
     runtime: "Convex",
+    convexModule: options.convexModule,
     experimental_reuseContext: options.experimental_reuseContext,
     name: "",
     functions: Record.empty(),
@@ -282,9 +292,12 @@ export const make = (
     middlewareAttachments: [],
   });
 
-export const makeNode = (): GroupSpec<"Node", ""> =>
+export const makeNode = (
+  options: { readonly convexModule?: boolean | undefined } = {},
+): GroupSpec<"Node", ""> =>
   makeProto({
     runtime: "Node",
+    convexModule: options.convexModule,
     name: "",
     functions: Record.empty(),
     groups: Record.empty(),
@@ -305,6 +318,7 @@ export function withName(name: string, group: Any): AnyWithProps {
 
   return makeProto({
     runtime: group_.runtime,
+    convexModule: group_.convexModule,
     experimental_reuseContext: group_.experimental_reuseContext,
     name,
     functions: group_.functions,
@@ -319,6 +333,7 @@ export const addGroupsAt = (
 ): AnyWithProps =>
   makeProto({
     runtime: group.runtime,
+    convexModule: group.convexModule,
     experimental_reuseContext: group.experimental_reuseContext,
     name: group.name,
     functions: group.functions,

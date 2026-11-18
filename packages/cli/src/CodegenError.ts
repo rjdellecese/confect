@@ -173,6 +173,14 @@ export class InvalidConvexConfigError extends Schema.TaggedError<
   reason: Schema.String,
 }) {}
 
+export class InvalidConvexModuleError extends Schema.TaggedError<
+  InvalidConvexModuleError,
+  { readonly brand: unique symbol }
+>()("InvalidConvexModuleError", {
+  path: Schema.String,
+  reason: Schema.String,
+}) {}
+
 export const CodegenError = Schema.Union([
   SnapshotError,
   BuildError,
@@ -194,6 +202,7 @@ export const CodegenError = Schema.Union([
   LegacySchemaFileError,
   ConflictingDocNameError,
   InvalidConvexConfigError,
+  InvalidConvexModuleError,
 ]);
 export type CodegenError = typeof CodegenError.Type;
 
@@ -275,14 +284,14 @@ const renderImplMissingDefaultLayerError = (
   singleLine(
     "Impl ",
     formatPath(error.implPath),
-    " must default-export a GroupImpl layer; wrap your handlers with `GroupImpl.make(databaseSchema, groupSpec).pipe(Layer.provide(...))` and `export default` it.",
+    " must default-export a GroupImpl layer; wrap your handlers with `GroupImpl.make(groupSpec).pipe(Layer.provide(...))` and `export default` it.",
   );
 
 const renderImplNotFinalizedError = (error: ImplNotFinalizedError): string =>
   singleLine(
     "Impl ",
     formatPath(error.implPath),
-    " is not finalized; append `GroupImpl.finalize` to the end of the pipeline (e.g. `GroupImpl.make(databaseSchema, group).pipe(Layer.provide(...), GroupImpl.finalize)`).",
+    " is not finalized; append `GroupImpl.finalize` to the end of the pipeline (e.g. `GroupImpl.make(group).pipe(Layer.provide(...), GroupImpl.finalize)`).",
   );
 
 const renderImplMissingFunctionsError = (
@@ -392,6 +401,8 @@ const renderParentChildNameCollisionError = (
  */
 export const renderCodegenError = (error: CodegenError): string => {
   if (isBuildError(error)) return renderBuildError(error);
+  if (error._tag === "InvalidConvexModuleError")
+    return singleLine(formatPath(error.path), ": ", error.reason);
   return Match.value(error).pipe(
     Match.tag("SnapshotError", ({ reason, relativePath, pathSegments }) =>
       singleLine(

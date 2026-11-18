@@ -1,7 +1,7 @@
 import * as RecordEffect from "effect/Record";
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Registry, type RegistryItems } from "@confect/server";
-import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl } from "@confect/server";
 import { describe, expect, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -15,14 +15,7 @@ const fnSpec = <const Name extends string>(name: Name) =>
     returns: () => Schema.Null,
   });
 
-const databaseSchema = DatabaseSchema.make({});
-
-// The handler type FunctionImpl.make infers for a strongly-typed DatabaseSchema
-// is more specific than the empty `DatabaseSchema.make({})` used here can
-// satisfy; the runtime behavior being tested is independent of the handler
-// shape, so we cast the placeholder to `never` (a subtype of every expected
-// handler type) to keep the test focused on registration.
-const handler = (() => Effect.succeed(null)) as never;
+const handler = () => Effect.succeed(null);
 
 /**
  * Build a layer against a fresh, isolated `Registry` (mirroring how
@@ -50,8 +43,8 @@ describe("FunctionImpl.make", () => {
           .addFunction(fnSpec("list"));
 
         const layers = Layer.mergeAll(
-          FunctionImpl.make(databaseSchema, notes, "insert", handler),
-          FunctionImpl.make(databaseSchema, notes, "list", handler),
+          FunctionImpl.make(notes, "insert", handler),
+          FunctionImpl.make(notes, "list", handler),
         );
 
         const registry = yield* collectRegistry(layers);
@@ -77,10 +70,10 @@ describe("FunctionImpl.make", () => {
         const child = GroupSpec.make().addFunction(fnSpec("childFn"));
 
         const parentRegistry = yield* collectRegistry(
-          FunctionImpl.make(databaseSchema, parent, "parentFn", handler),
+          FunctionImpl.make(parent, "parentFn", handler),
         );
         const childRegistry = yield* collectRegistry(
-          FunctionImpl.make(databaseSchema, child, "childFn", handler),
+          FunctionImpl.make(child, "childFn", handler),
         );
 
         expect(RecordEffect.keys<string, unknown>(parentRegistry)).toEqual([
@@ -102,13 +95,9 @@ describe("GroupImpl.finalize", () => {
           .addFunction(fnSpec("insert"))
           .addFunction(fnSpec("list"));
 
-        const groupLayer = GroupImpl.make(databaseSchema, notes).pipe(
-          Layer.provide(
-            FunctionImpl.make(databaseSchema, notes, "insert", handler),
-          ),
-          Layer.provide(
-            FunctionImpl.make(databaseSchema, notes, "list", handler),
-          ),
+        const groupLayer = GroupImpl.make(notes).pipe(
+          Layer.provide(FunctionImpl.make(notes, "insert", handler)),
+          Layer.provide(FunctionImpl.make(notes, "list", handler)),
           GroupImpl.finalize,
         );
 

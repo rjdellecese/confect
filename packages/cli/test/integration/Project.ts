@@ -27,23 +27,23 @@ import notes from "./_generated/tables/notes";
 export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "list", returns: () => Schema.Array(notes.Doc) }));
 `;
 
-export const impl = `import { FunctionImpl, GroupImpl } from "@confect/server";
+export const impl = `import { GroupImpl } from "@confect/server";
+import { FunctionImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";
+import notesTable from "./_generated/tables/notes";
 import notes from "./notes.spec";
-const list = FunctionImpl.make(databaseSchema, notes, "list", () => Effect.gen(function* () {
+const list = FunctionImpl.make(notes, "list", () => Effect.gen(function* () {
   const reader = yield* DatabaseReader;
-  return yield* reader.table("notes").collect();
+  return yield* reader.table(notesTable).index("by_creation_time").collect();
 }).pipe(Effect.orDie));
-export default GroupImpl.make(databaseSchema, notes).pipe(Layer.provide(list), GroupImpl.finalize);
+export default GroupImpl.make(notes).pipe(Layer.provide(list), GroupImpl.finalize);
 `;
 
 export const emptyImpl = `import { GroupImpl } from "@confect/server";
-import databaseSchema from "./_generated/schema";
 import notes from "./notes.spec";
-export default GroupImpl.make(databaseSchema, notes).pipe(GroupImpl.finalize);
+export default GroupImpl.make(notes).pipe(GroupImpl.finalize);
 `;
 
 /**

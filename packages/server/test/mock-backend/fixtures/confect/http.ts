@@ -12,10 +12,9 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as HttpApiScalar from "effect/http-api/HttpApiScalar";
-import refs from "./_generated/refs";
-import databaseSchema from "./_generated/schema";
-import { QueryRunner } from "./_generated/services";
 import notes from "./_generated/tables/notes";
+import refs from "./_generated/refs";
+import { QueryRunner } from "./_generated/services";
 
 class NotesGroup extends HttpApiGroup.make("notes").add(
   HttpApiEndpoint.get("listNotes", "/notes", {
@@ -56,7 +55,6 @@ const withTestHeader: HttpMiddleware.HttpMiddleware = (httpApp) =>
   );
 
 const http = ConfectHttpRouter.make(
-  databaseSchema,
   Layer.mergeAll(
     HttpApiBuilder.layer(NotesApi).pipe(Layer.provide(NotesApiLive)),
     HttpApiBuilder.layer(MetaApi).pipe(Layer.provide(MetaApiLive)),

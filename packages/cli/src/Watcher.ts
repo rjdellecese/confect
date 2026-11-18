@@ -844,6 +844,8 @@ const handleConfectChange = ({
   );
 
   const entry = EntryPoint.parse(relativePath);
+  if (isLifecycleChange && String.endsWith(".native.ts")(relativePath))
+    return restart;
   if (Option.isSome(entry)) {
     return isLifecycleChange ? restartEntry(entry.value) : Effect.void;
   }

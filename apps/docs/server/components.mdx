@@ -20,7 +20,7 @@ export default app;
 
 Component clients (like `Workpool`) take a component reference. Import the typed `components` registry that Confect generates at `confect/_generated/components.ts`:
 
-```ts confect/workpool.ts
+```ts confect/workpool.native.ts
 import { Workpool } from "@convex-dev/workpool";
 import { components } from "./_generated/components";
 
@@ -47,6 +47,6 @@ const pool = new Workpool(components.workpool, {
 
 ## Defining functions for components
 
-Some components (such as [Workflow](https://www.convex.dev/components/workflow), [Migrations](https://www.convex.dev/components/migrations), and [Workpool](https://www.convex.dev/components/workpool)) expect you to define Convex functions in your project that they can reference. You can integrate these into your Confect spec and impl using [plain Convex functions](/server/plain-convex-functions).
+Some components (such as [Workflow](https://www.convex.dev/components/workflow), [Migrations](https://www.convex.dev/components/migrations), and [Workpool](https://www.convex.dev/components/workpool)) expect you to define Convex functions in your project that they can reference. Use a [native-module group](/server/plain-convex-functions) to expose these through Confect refs without adding an Effect registration layer.
 
 See the [Convex components documentation](https://docs.convex.dev/components) for details on installing and using components.

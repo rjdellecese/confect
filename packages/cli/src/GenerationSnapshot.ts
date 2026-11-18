@@ -24,6 +24,7 @@ export { SnapshotError } from "./SnapshotError";
 export const GroupSummary = Schema.Struct({
   path: GroupPath.GroupPath,
   runtime: Schema.Literals(["Convex", "Node"]),
+  convexModule: Schema.optionalKey(Schema.Literal(true)),
   experimental_reuseContext: Schema.optionalKey(Schema.Boolean),
   functionNames: Schema.Array(Schema.NonEmptyString),
 });
@@ -31,6 +32,7 @@ export type GroupSummary = typeof GroupSummary.Type;
 
 export interface GroupTree {
   readonly runtime: "Convex" | "Node";
+  readonly convexModule?: true;
   readonly experimental_reuseContext?: boolean;
   readonly functionNames: ReadonlyArray<string>;
   readonly groups: { readonly [name: string]: GroupTree };
@@ -38,6 +40,7 @@ export interface GroupTree {
 
 export const GroupTree: Schema.Codec<GroupTree> = Schema.Struct({
   runtime: GroupSummary.fields.runtime,
+  convexModule: GroupSummary.fields.convexModule,
   experimental_reuseContext: GroupSummary.fields.experimental_reuseContext,
   functionNames: GroupSummary.fields.functionNames,
   groups: Schema.Record(
@@ -236,6 +239,7 @@ export const GenerationSnapshot = Entries.pipe(
 
 const summarize = (group: GroupSpec.AnyWithProps): GroupTree => ({
   runtime: group.runtime,
+  ...(group.convexModule ? { convexModule: true } : {}),
   ...(group.experimental_reuseContext
     ? { experimental_reuseContext: true }
     : {}),
@@ -283,6 +287,7 @@ const groups = (snapshot: GenerationSnapshot): ReadonlyArray<GroupSummary> => {
     {
       path,
       runtime: tree.runtime,
+      ...(tree.convexModule === true ? { convexModule: true } : {}),
       ...(tree.experimental_reuseContext === true
         ? { experimental_reuseContext: true }
         : {}),

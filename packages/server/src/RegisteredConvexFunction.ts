@@ -43,11 +43,11 @@ import * as QueryRunner from "./QueryRunner";
 import * as QueryTransactionContext from "./QueryTransactionContext";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as FunctionRegistryItem from "./FunctionRegistryItem";
+import type { MutationServices, QueryServices } from "./Handler";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
 import * as Storage from "./Storage";
 import { StorageActionWriter } from "./StorageActionWriter";
-import type { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 
 export type Definition = Data.TaggedEnum<{
@@ -62,14 +62,14 @@ export type Definition = Data.TaggedEnum<{
 export const Definition = Data.taggedEnum<Definition>();
 
 export const prepare = (
-  databaseSchema: DatabaseSchema.AnyWithProps,
+  tableNames: ReadonlyArray<string>,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
 ) =>
   Match.value(item.functionType).pipe(
     Match.when("query", () => {
       const definition = queryFunction({
-        databaseSchema,
+        tableNames,
         name: item.name,
         functionVisibility: item.functionVisibility,
         args: item.args,
@@ -86,7 +86,7 @@ export const prepare = (
     }),
     Match.when("mutation", () => {
       const definition = mutationFunction({
-        databaseSchema,
+        tableNames,
         name: item.name,
         functionVisibility: item.functionVisibility,
         args: item.args,
@@ -102,7 +102,7 @@ export const prepare = (
       );
     }),
     Match.when("action", () => {
-      const definition = convexActionFunction(databaseSchema, {
+      const definition = convexActionFunction({
         name: item.name,
         functionVisibility: item.functionVisibility,
         args: item.args,
@@ -121,11 +121,11 @@ export const prepare = (
   );
 
 export const make = (
-  databaseSchema: DatabaseSchema.AnyWithProps,
+  tableNames: ReadonlyArray<string>,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
 ): RegisteredFunction.Any =>
-  register(prepare(databaseSchema, item, resolvedMiddlewares));
+  register(prepare(tableNames, item, resolvedMiddlewares));
 
 export const register = (self: Definition): RegisteredFunction.Any =>
   Definition.$match(self, {
@@ -192,7 +192,7 @@ const queryFunction = <
   ConvexReturns,
   E,
 >({
-  databaseSchema,
+  tableNames,
   name,
   functionVisibility,
   args,
@@ -201,7 +201,7 @@ const queryFunction = <
   handler,
   resolvedMiddlewares,
 }: {
-  databaseSchema: DatabaseSchema_;
+  tableNames: ReadonlyArray<DatabaseSchema.TableNames<DatabaseSchema_>>;
   name: string;
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
@@ -209,24 +209,7 @@ const queryFunction = <
   error: Schema.Codec<Error, Value> | undefined;
   handler: (
     a: Args,
-  ) => Effect.Effect<
-    Returns,
-    E,
-    | DatabaseReader.DatabaseReader<DatabaseSchema_>
-    | DocumentIds.DocumentIds<DatabaseSchema_>
-    | Auth.Auth
-    | ExecutionMetadata.ExecutionMetadata
-    | TransactionMetadata.TransactionMetadata
-    | Storage.Storage
-    | StorageReader
-    | QueryRunner.QueryRunner
-    | QueryTransactionContext.QueryTransactionContext
-    | QueryCtx.QueryCtx<
-        DataModel.ToConvexDataModel<
-          DataModel.FromDatabaseSchema<DatabaseSchema_>
-        >
-      >
-  >;
+  ) => Effect.Effect<Returns, E, QueryServices<DatabaseSchema_>>;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
   args: () => compileArgsSchema(args),
@@ -255,8 +238,8 @@ const queryFunction = <
         },
       ).pipe(
         Effect.provide([
-          DatabaseReader.layer(databaseSchema, ctx.db),
-          DocumentIds.layer(databaseSchema, ctx.db),
+          DatabaseReader.layer<DatabaseSchema_>(ctx.db),
+          DocumentIds.layer(tableNames, ctx.db),
           Auth.layer(ctx.auth),
           ExecutionMetadata.layer(ctx.meta),
           TransactionMetadata.layer(ctx.meta),
@@ -291,15 +274,15 @@ const queryFunction = <
 export const mutationLayer = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(
-  schema: DatabaseSchema_,
+  tableNames: ReadonlyArray<DatabaseSchema.TableNames<DatabaseSchema_>>,
   ctx: GenericMutationCtx<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
-) =>
+): Layer.Layer<MutationServices<DatabaseSchema_>> =>
   Layer.mergeAll(
-    DatabaseReader.layer(schema, ctx.db),
-    DocumentIds.layer(schema, ctx.db),
-    DatabaseWriter.layer(schema, ctx.db),
+    DatabaseReader.layer<DatabaseSchema_>(ctx.db),
+    DocumentIds.layer(tableNames, ctx.db),
+    DatabaseWriter.layer<DatabaseSchema_>(ctx.db),
     MutationAuth.layer(ctx.auth),
     Auth.layer(ctx.auth),
     ExecutionMetadata.layer(ctx.meta),
@@ -324,29 +307,7 @@ export const mutationLayer = <
     ConvexConfigProvider.layer,
   );
 
-export type MutationServices<
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-> =
-  | DatabaseReader.DatabaseReader<DatabaseSchema_>
-  | DocumentIds.DocumentIds<DatabaseSchema_>
-  | DatabaseWriter.DatabaseWriter<DatabaseSchema_>
-  | MutationAuth.MutationAuth
-  | Auth.Auth
-  | ExecutionMetadata.ExecutionMetadata
-  | RequestMetadata.RequestMetadata
-  | TransactionMetadata.TransactionMetadata
-  | Scheduler.Scheduler
-  | Storage.Storage
-  | StorageReader
-  | StorageWriter
-  | StorageActionWriter
-  | QueryRunner.QueryRunner
-  | MutationRunner.MutationRunner
-  | QueryTransactionContext.QueryTransactionContext
-  | MutationTransactionContext.MutationTransactionContext
-  | MutationCtx.MutationCtx<
-      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
-    >;
+export type { MutationServices } from "./Handler";
 
 const mutationFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -356,7 +317,7 @@ const mutationFunction = <
   ConvexReturns,
   E,
 >({
-  databaseSchema,
+  tableNames,
   name,
   functionVisibility,
   args,
@@ -365,7 +326,7 @@ const mutationFunction = <
   handler,
   resolvedMiddlewares,
 }: {
-  databaseSchema: DatabaseSchema_;
+  tableNames: ReadonlyArray<DatabaseSchema.TableNames<DatabaseSchema_>>;
   name: string;
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
@@ -402,7 +363,7 @@ const mutationFunction = <
         },
       ).pipe(
         // oxlint-disable-next-line effecttsgo/strict-effect-provide -- This Convex entry point provides invocation-local services before runHandlerPromise executes the handler.
-        Effect.provide(mutationLayer(databaseSchema, ctx)),
+        Effect.provide(mutationLayer<DatabaseSchema_>(tableNames, ctx)),
       );
       return yield* pipe(
         decodedReturns,
@@ -418,38 +379,34 @@ const mutationFunction = <
 });
 
 const convexActionFunction = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
   ConvexArgs extends DefaultFunctionArgs,
   Returns,
   ConvexReturns,
   E,
->(
-  schema: DatabaseSchema_,
-  {
-    name,
-    functionVisibility,
-    args,
-    returns,
-    error,
-    handler,
-    resolvedMiddlewares,
-  }: {
-    name: string;
-    functionVisibility: FunctionVisibility;
-    args: Schema.Codec<Args, ConvexArgs>;
-    returns: Schema.Codec<Returns, ConvexReturns>;
-    error: Schema.Codec<any, any> | undefined;
-    handler: (
-      a: Args,
-    ) => Effect.Effect<
-      Returns,
-      E,
-      RegisteredFunction.ActionServices<DatabaseSchema_>
-    >;
-    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
-  },
-) =>
+>({
+  name,
+  functionVisibility,
+  args,
+  returns,
+  error,
+  handler,
+  resolvedMiddlewares,
+}: {
+  name: string;
+  functionVisibility: FunctionVisibility;
+  args: Schema.Codec<Args, ConvexArgs>;
+  returns: Schema.Codec<Returns, ConvexReturns>;
+  error: Schema.Codec<any, any> | undefined;
+  handler: (
+    a: Args,
+  ) => Effect.Effect<
+    Returns,
+    E,
+    RegisteredFunction.ActionServices<DatabaseSchema.AnyWithProps>
+  >;
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
+}) =>
   RegisteredFunction.actionFunctionBase({
     name,
     functionVisibility,
@@ -460,7 +417,7 @@ const convexActionFunction = <
     resolvedMiddlewares,
     createLayer: (ctx) =>
       Layer.mergeAll(
-        RegisteredFunction.actionLayer(schema, ctx),
+        RegisteredFunction.actionLayer(ctx),
         ConvexConfigProvider.layer,
       ),
   });

@@ -53,6 +53,38 @@ export default Table.make(() =>
 
 Each `confect/tables/*.ts` file **must default-export a `Table`**—codegen reads `module.default` and applies the filename as the table name. Consumers (specs, impls, HTTP handlers, etc.) reach a table's derived `Schema`s through the generated wrapper at `confect/_generated/tables/<name>`, e.g. `import notes from "../_generated/tables/notes"` and then `notes.Doc`.
 
+## Selecting a table
+
+Pass the named handle from `_generated/tables/<name>` to `reader.table` or `writer.table`. A function that reads only notes needs only the notes handle. Shared helpers and middleware import their own handles; you don't need to list those tables in the group spec.
+
+If a handler chooses between a few tables at runtime, import just those handles. Branch before calling a table-specific index or using fields that differ between documents:
+
+```ts
+import * as Effect from "effect/Effect";
+import { DatabaseReader } from "./_generated/services";
+import notes from "./_generated/tables/notes";
+import users from "./_generated/tables/users";
+
+const latestLabel = (name: "notes" | "users") =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    if (name === "notes") {
+      const [note] = yield* reader
+        .table(notes)
+        .index("by_creation_time", "desc")
+        .take(1);
+      return note?.text;
+    }
+    const [user] = yield* reader
+      .table(users)
+      .index("by_creation_time", "desc")
+      .take(1);
+    return user?.username;
+  });
+```
+
+An admin tool that needs **every** table can opt in to the full registry with `DatabaseSchema.tables(schema)`, where `schema` is the default export of `_generated/schema` and `DatabaseSchema` comes from `@confect/server`. This brings every table module into that tool's runtime dependencies. For a list of application table **names** without codecs, import `{ tableNames }` from `_generated/tableNames` instead.
+
 ## Document IDs
 
 Import `Id` from `confect/_generated/id` for both ID schemas and TypeScript types:

@@ -1,19 +1,20 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../_generated/schema";
+import { FunctionImpl } from "../_generated/server";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
+import httpVectorsTable from "../_generated/tables/httpVectors";
 import httpVectors from "./httpVectors.spec";
 
-export default GroupImpl.make(databaseSchema, httpVectors).pipe(
+export default GroupImpl.make(httpVectors).pipe(
   Layer.provide(
-    FunctionImpl.make(databaseSchema, httpVectors, "seed", ({ caseId }) =>
+    FunctionImpl.make(httpVectors, "seed", ({ caseId }) =>
       Effect.gen(function* () {
         const writer = yield* DatabaseWriter;
         const reader = yield* DatabaseReader;
-        const table = writer.table("httpVectors");
+        const table = writer.table(httpVectorsTable);
         const previous = yield* reader
-          .table("httpVectors")
+          .table(httpVectorsTable)
           .index("by_creation_time")
           .collect();
         for (const doc of previous) yield* table.delete(doc._id);
