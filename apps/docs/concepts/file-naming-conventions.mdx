@@ -8,7 +8,7 @@ Confect requires a small number of fixed entry-point files in your `confect/` di
 
 ## Spec and impl files
 
-For an Effect-backed or mixed group, name its spec and impl with `.spec.ts` and `.impl.ts` suffixes. Each file must default-export its `GroupSpec` or `GroupImpl`; additional named exports on `.spec.ts` (for example error classes) are fine.
+Use `.spec.ts` and `.impl.ts` suffixes for every group. The spec must default-export its `GroupSpec`; additional named exports (for example error classes) are fine. If the spec includes an Effect function or is empty, the impl default-exports a finalized `GroupImpl` layer. For a group containing only [plain Convex functions](#native-convex-functions), the impl uses named exports instead.
 
 A complete pair looks like this. The impl default-imports its sibling spec, passes it to `FunctionImpl.make` and `GroupImpl.make`, and finalizes the resulting layer with `GroupImpl.finalize`:
 
@@ -72,12 +72,12 @@ Run `confect codegen` after adding or changing specs and impls.
 
 ## Native Convex functions
 
-When a group contains only [native Convex functions](/server/plain-convex-functions), use `GroupSpec.make({ convexModule: true })` in its spec. Export the registered Convex functions by name from the sibling `.native.ts`. There is no `.impl.ts` in this mode:
+When a group declares only [native Convex functions](/server/plain-convex-functions), export the registered functions by name from the sibling `.impl.ts`. The spec can import their types without importing the handlers at runtime:
 
 ```
 confect/
-  workpool.native.ts   ← named native Convex function exports
-  workpool.spec.ts     ← spec (type-only imports from workpool.native.ts)
+  workpool.impl.ts     ← named native Convex function exports
+  workpool.spec.ts     ← spec (type-only imports from workpool.impl.ts)
 ```
 
 ## Middleware
@@ -91,11 +91,11 @@ confect/
     RequireUser.impl.ts   ← implementation: MiddlewareImpl layer (server-only)
 ```
 
-Each spec module default-exports its middleware and names the errors and services it provides as named exports; each impl module default-exports its layer, the same shape as a group impl.
+Each spec module default-exports its middleware and names the errors and services it provides as named exports; each middleware impl default-exports its layer.
 
 ## Node actions
 
-[Node action](/server/node-actions) groups follow the same naming and nesting conventions as other groups. Use `GroupSpec.makeNode()` for an ordinary group or `GroupSpec.makeNode({ convexModule: true })` for a native-module group. Confect emits Convex's `"use node"` directive into the generated module based on the spec.
+[Node action](/server/node-actions) groups follow the same naming and export conventions as other groups. Use `GroupSpec.makeNode()` to select the runtime. Confect emits Convex's `"use node"` directive into the generated module based on the spec.
 
 ```
 confect/
@@ -163,7 +163,7 @@ Putting it all together, a project using all of these conventions might look lik
     <Tree.File name="env.spec.ts" />
     <Tree.File name="env.impl.ts" />
     <Tree.File name="http.ts" />
-    <Tree.File name="workpool.native.ts" />
+    <Tree.File name="workpool.impl.ts" />
     <Tree.File name="workpool.spec.ts" />
   </Tree.Folder>
 </Tree>

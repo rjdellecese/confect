@@ -1,10 +1,10 @@
-export { backgroundWork } from "../confect/workpool.native";
-export { enqueue } from "../confect/workpool.native";
-export { onComplete } from "../confect/workpool.native";
-export { status } from "../confect/workpool.native";
+export { backgroundWork } from "../confect/workpool.impl";
+export { enqueue } from "../confect/workpool.impl";
+export { onComplete } from "../confect/workpool.impl";
+export { status } from "../confect/workpool.impl";
 
 import type { InvalidConvexExports } from "@confect/core/FunctionSpec";
-import type * as native from "../confect/workpool.native";
+import type * as native from "../confect/workpool.impl";
 import type group from "../confect/workpool.spec";
 
 type Specs = (typeof group)["~Functions"];

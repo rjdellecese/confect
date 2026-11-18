@@ -1,8 +1,8 @@
-export { control } from "../../confect/groups/cacheControl.native";
-export { snapshot } from "../../confect/groups/cacheControl.native";
+export { control } from "../../confect/groups/cacheControl.impl";
+export { snapshot } from "../../confect/groups/cacheControl.impl";
 
 import type { InvalidConvexExports } from "@confect/core/FunctionSpec";
-import type * as native from "../../confect/groups/cacheControl.native";
+import type * as native from "../../confect/groups/cacheControl.impl";
 import type group from "../../confect/groups/cacheControl.spec";
 
 type Specs = (typeof group)["~Functions"];

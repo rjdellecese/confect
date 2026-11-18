@@ -48,6 +48,7 @@ export interface LeafModule {
 
 export type LoadedLeafModule = LeafModule & {
   readonly spec: GroupSpec.AnyWithProps;
+  readonly directExports: boolean;
 } & Brand.Brand<"@confect/cli/LoadedLeafModule">;
 
 const LoadedLeafModule = Brand.nominal<LoadedLeafModule>();
@@ -56,7 +57,6 @@ const VALIDATION_CONCURRENCY = 4;
 
 export const SPEC_SUFFIX = ".spec.ts";
 export const IMPL_SUFFIX = ".impl.ts";
-export const NATIVE_SUFFIX = ".native.ts";
 
 const swapModuleSuffix = Effect.fnUntraced(function* (
   relativePath: string,
@@ -140,26 +140,13 @@ export const specImportPathFromGenerated = Effect.fnUntraced(function* (
  * @internal
  */
 export const specPathForImpl = (implRelativePath: string) =>
-  swapModuleSuffix(
-    implRelativePath,
-    String.endsWith(NATIVE_SUFFIX)(implRelativePath)
-      ? NATIVE_SUFFIX
-      : IMPL_SUFFIX,
-    SPEC_SUFFIX,
-  );
+  swapModuleSuffix(implRelativePath, IMPL_SUFFIX, SPEC_SUFFIX);
 
 /**
  * @internal
  */
-export const implPathForSpec = (
-  specRelativePath: string,
-  convexModule = false,
-) =>
-  swapModuleSuffix(
-    specRelativePath,
-    SPEC_SUFFIX,
-    convexModule ? NATIVE_SUFFIX : IMPL_SUFFIX,
-  );
+export const implPathForSpec = (specRelativePath: string) =>
+  swapModuleSuffix(specRelativePath, SPEC_SUFFIX, IMPL_SUFFIX);
 
 export const registeredFunctionsRelativePath = Effect.fnUntraced(function* (
   leaf: LeafModule,
@@ -213,20 +200,11 @@ export const discoverLeafImplFiles = Effect.gen(function* () {
     recursive: true,
   });
 
-  const paths = HashSet.fromIterable(allPaths);
   return Array.filter(
     Array.filterMap(allPaths, (relativePath) =>
       Schema.decodeResult(ImplModulePath)(relativePath),
     ),
     (relativePath) => {
-      if (String.endsWith(NATIVE_SUFFIX)(relativePath)) {
-        const stem = String.slice(0, -NATIVE_SUFFIX.length)(relativePath);
-        if (
-          !HashSet.has(paths, stem + SPEC_SUFFIX) ||
-          HashSet.has(paths, stem + IMPL_SUFFIX)
-        )
-          return false;
-      }
       const segments = String.split(relativePath, path.sep);
       return !Array.some(segments, (segment) =>
         HashSet.has(excludedDirs, segment),
@@ -334,8 +312,11 @@ export const loadSpec = Effect.fn("LeafModule.loadSpec")(function* (
 
   yield* validateClientSafety(leaf, bundled);
 
+  const directExports = yield* Effect.fromResult(
+    classifyDirectExports(groupSpec, leaf.relativePath),
+  );
   const warnings = yield* Effect.fromResult(
-    validateGroupOptions(groupSpec, leaf.relativePath, leaf.groupPathDot, true),
+    validateContextReuse(groupSpec, leaf.relativePath, leaf.groupPathDot),
   );
   for (const groupPath of warnings) {
     yield* logWarn(
@@ -355,54 +336,50 @@ export const loadSpec = Effect.fn("LeafModule.loadSpec")(function* (
   return LoadedLeafModule({
     ...leaf,
     spec: groupSpec,
+    directExports,
   });
 });
 
-const validateGroupOptions = (
+const classifyDirectExports = (
+  group: GroupSpec.AnyWithProps,
+  specPath: string,
+): Result.Result<boolean, InvalidConvexModuleError> => {
+  const functions = Record.values(group.functions);
+  if (
+    !Record.isEmptyRecord(group.groups) ||
+    functions.length === 0 ||
+    !Array.every(functions, (fn) => fn.functionProvenance._tag === "Convex")
+  )
+    return Result.succeed(false);
+  if (
+    group.middlewareAttachments.length > 0 ||
+    Array.some(functions, (fn) => fn.middlewareAttachments.length > 0)
+  )
+    return Result.fail(
+      InvalidConvexModuleError.make({
+        path: specPath,
+        reason:
+          "Plain Convex functions are exported directly and cannot run Confect middleware.",
+      }),
+    );
+  for (const fn of functions) {
+    if (fn.runtimeAndFunctionType.runtime !== group.runtime)
+      return Result.fail(
+        InvalidConvexModuleError.make({
+          path: specPath,
+          reason: `"${fn.name}" declares the ${fn.runtimeAndFunctionType.runtime} runtime, but the group's runtime is ${group.runtime}.`,
+        }),
+      );
+  }
+  return Result.succeed(true);
+};
+
+const validateContextReuse = (
   group: GroupSpec.AnyWithProps,
   specPath: string,
   groupPath: string,
-  leafRoot: boolean,
-): Result.Result<
-  ReadonlyArray<string>,
-  InvalidContextReuseError | InvalidConvexModuleError
-> =>
+): Result.Result<ReadonlyArray<string>, InvalidContextReuseError> =>
   Result.gen(function* () {
-    const invalidModule = (reason: string) =>
-      Result.fail(
-        InvalidConvexModuleError.make({
-          path: specPath,
-          reason: `Group ${groupPath}: ${reason}`,
-        }),
-      );
-    if (
-      group.convexModule !== undefined &&
-      typeof group.convexModule !== "boolean"
-    )
-      return yield* invalidModule("convexModule must be a boolean.");
-    if (group.convexModule) {
-      if (!leafRoot || !Record.isEmptyRecord(group.groups))
-        return yield* invalidModule(
-          "convexModule applies to a single file group; put subgroups in their own .spec.ts files.",
-        );
-      if (group.middlewareAttachments.length !== 0)
-        return yield* invalidModule(
-          "convexModule cannot run Confect middleware.",
-        );
-      for (const fn of Record.values(group.functions)) {
-        if (fn.runtimeAndFunctionType.runtime !== group.runtime)
-          return yield* invalidModule(
-            `"${fn.name}" declares the ${fn.runtimeAndFunctionType.runtime} runtime, but the group's runtime is ${group.runtime}.`,
-          );
-        if (
-          fn.functionProvenance._tag !== "Convex" ||
-          fn.middlewareAttachments.length !== 0
-        )
-          return yield* invalidModule(
-            `convexModule requires FunctionSpec.convex* declarations without middleware; check "${fn.name}".`,
-          );
-      }
-    }
     const isEnabled = group.experimental_reuseContext;
     if (isEnabled !== undefined && typeof isEnabled !== "boolean") {
       return yield* Result.fail(
@@ -447,7 +424,7 @@ const validateGroupOptions = (
       group.groups,
       Record.toEntries,
       Iterable.map(([name, child]) =>
-        validateGroupOptions(child, specPath, `${groupPath}.${name}`, false),
+        validateContextReuse(child, specPath, `${groupPath}.${name}`),
       ),
       Result.all,
     );
@@ -482,19 +459,15 @@ const buildImplLayer = Effect.fnUntraced(function* (
 }, Effect.scoped);
 
 /**
- * Validate that the leaf's sibling impl file imports the spec, default-exports
- * a finalized `GroupImpl` layer, and provides a `FunctionImpl` for every
- * function declared by the spec.
+ * Validate the sibling impl against the spec's selected contract: named Convex
+ * registrations for a plain-only leaf, or a finalized group layer otherwise.
  *
  * @internal
  */
 export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
   leaf: LoadedLeafModule,
 ) {
-  const implRelativePath = yield* implPathForSpec(
-    leaf.relativePath,
-    leaf.spec.convexModule,
-  );
+  const implRelativePath = yield* implPathForSpec(leaf.relativePath);
   const implAbsolutePath = yield* absoluteModulePath(implRelativePath);
   const specAbsolutePath = yield* absoluteModulePath(leaf.relativePath);
 
@@ -502,7 +475,7 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
     Effect.mapError((error) => fromBundlerError(implRelativePath, error)),
   );
 
-  if (leaf.spec.convexModule) {
+  if (leaf.directExports) {
     for (const fn of Record.values(leaf.spec.functions)) {
       const handler = bundled.module[fn.name];
       const kind = fn.runtimeAndFunctionType.functionType;
@@ -611,54 +584,51 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
 export const withImplFiles = Effect.fnUntraced(function* <A, E, R>(
   relativePaths: ReadonlyArray<ImplModulePath>,
   use: (leaves: ReadonlyArray<LoadedLeafModule>) => Effect.Effect<A, E, R>,
-  requiredPaths: ReadonlyArray<ImplModulePath> = relativePaths,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
   const pairs = yield* Effect.forEach(
     relativePaths,
-    Effect.fnUntraced(function* (implRelativePath) {
-      const specRelativePath = yield* specPathForImpl(implRelativePath);
-      if (!(yield* fs.exists(path.join(confectDirectory, specRelativePath))))
-        return yield* MissingSpecFileError.make({
-          implPath: implRelativePath,
-          expectedSpecPath: specRelativePath,
-        });
-      if (yield* fs.exists(path.join(confectDirectory, implRelativePath)))
-        return { implRelativePath, specRelativePath };
-      if (requiredPaths.includes(implRelativePath)) {
-        if (String.endsWith(NATIVE_SUFFIX)(implRelativePath))
-          return yield* InvalidConvexModuleError.make({
-            path: specRelativePath,
-            reason: `Missing native module ${implRelativePath}.`,
-          });
-        return yield* MissingImplFileError.make({
-          specPath: specRelativePath,
-          expectedImplPath: implRelativePath,
-        });
-      }
-      return {
-        implRelativePath: yield* implPathForSpec(specRelativePath, true),
-        specRelativePath,
-      };
-    }),
+    (implRelativePath) =>
+      specPathForImpl(implRelativePath).pipe(
+        Effect.map((specRelativePath) => ({
+          implRelativePath,
+          specRelativePath,
+        })),
+      ),
     { concurrency: 1 },
   );
 
   return yield* Bundler.withBatch(
-    Array.dedupe(
-      Array.flatMap(pairs, ({ implRelativePath, specRelativePath }) => [
-        path.resolve(confectDirectory, implRelativePath),
-        path.resolve(confectDirectory, specRelativePath),
-      ]),
-    ),
+    Array.flatMap(pairs, ({ implRelativePath, specRelativePath }) => [
+      path.resolve(confectDirectory, implRelativePath),
+      path.resolve(confectDirectory, specRelativePath),
+    ]),
     Effect.gen(function* () {
       const leaves = yield* Effect.forEach(
-        Array.dedupe(
-          Array.map(pairs, ({ specRelativePath }) => specRelativePath),
-        ),
-        loadWithSibling,
+        pairs,
+        Effect.fnUntraced(function* ({ implRelativePath, specRelativePath }) {
+          if (
+            !(yield* fs.exists(path.join(confectDirectory, specRelativePath)))
+          ) {
+            return yield* MissingSpecFileError.make({
+              implPath: implRelativePath,
+              expectedSpecPath: specRelativePath,
+            });
+          }
+          if (
+            !(yield* fs.exists(path.join(confectDirectory, implRelativePath)))
+          ) {
+            return yield* MissingImplFileError.make({
+              specPath: specRelativePath,
+              expectedImplPath: implRelativePath,
+            });
+          }
+          const leafModule = yield* toLeafModule(specRelativePath);
+          const leaf = yield* loadSpec(leafModule);
+          return leaf;
+        }),
         { concurrency: VALIDATION_CONCURRENCY },
       );
       return yield* use(leaves);
@@ -681,8 +651,8 @@ export const validateAllImpls = Effect.fnUntraced(function* (
   const confectDirectory = yield* ConfectDirectory.get;
   const implementationPaths = yield* Effect.forEach(
     leaves,
-    ({ relativePath, spec }) =>
-      implPathForSpec(relativePath, spec.convexModule).pipe(
+    ({ relativePath }) =>
+      implPathForSpec(relativePath).pipe(
         Effect.map((implPath) => path.resolve(confectDirectory, implPath)),
       ),
     { concurrency: 1 },
@@ -699,33 +669,8 @@ export const validateAllImpls = Effect.fnUntraced(function* (
 /**
  * @internal
  */
-const loadWithSibling = Effect.fnUntraced(function* (specRelativePath: string) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const discovered = yield* toLeafModule(specRelativePath);
-  const leaf = yield* loadSpec(discovered);
-  const regular = yield* implPathForSpec(specRelativePath);
-  const hasImpl = yield* fs.exists(path.join(confectDirectory, regular));
-  if (leaf.spec.convexModule) {
-    const native = yield* implPathForSpec(specRelativePath, true);
-    if (hasImpl || !(yield* fs.exists(path.join(confectDirectory, native))))
-      return yield* InvalidConvexModuleError.make({
-        path: specRelativePath,
-        reason: hasImpl
-          ? `convexModule uses ${native}; remove the conflicting ${regular}.`
-          : `Missing native module ${native}.`,
-      });
-  } else if (!hasImpl) {
-    return yield* MissingImplFileError.make({
-      specPath: specRelativePath,
-      expectedImplPath: regular,
-    });
-  }
-  return leaf;
-});
-
 export const loadAll = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
   const specFiles = yield* discoverLeafSpecFiles;
@@ -734,9 +679,25 @@ export const loadAll = Effect.gen(function* () {
     Array.map(specFiles, (relativePath) =>
       path.resolve(confectDirectory, relativePath),
     ),
-    Effect.forEach(specFiles, loadWithSibling, {
-      concurrency: VALIDATION_CONCURRENCY,
-    }),
+    Effect.forEach(
+      specFiles,
+      Effect.fnUntraced(function* (specRelativePath: string) {
+        const discovered = yield* toLeafModule(specRelativePath);
+        const leaf = yield* loadSpec(discovered);
+
+        const implRelativePath = yield* implPathForSpec(specRelativePath);
+        const implAbsolutePath = path.join(confectDirectory, implRelativePath);
+        if (!(yield* fs.exists(implAbsolutePath))) {
+          return yield* MissingImplFileError.make({
+            specPath: specRelativePath,
+            expectedImplPath: implRelativePath,
+          });
+        }
+
+        return leaf;
+      }),
+      { concurrency: VALIDATION_CONCURRENCY },
+    ),
   );
 
   yield* validateOrphanImpls(specFiles);

@@ -5,9 +5,9 @@ import type {
   echoQuery,
   read,
   write,
-} from "./clients.native";
+} from "./clients.impl";
 
-export default GroupSpec.make({ convexModule: true })
+export default GroupSpec.make()
   .addFunction(FunctionSpec.convexPublicQuery<typeof echoQuery>()("echoQuery"))
   .addFunction(
     FunctionSpec.convexPublicMutation<typeof echoMutation>()("echoMutation"),

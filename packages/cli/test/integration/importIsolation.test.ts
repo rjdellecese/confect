@@ -77,15 +77,16 @@ export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({
 }));`,
           );
           yield* project.write(
-            "confect/direct.native.ts",
+            "confect/direct.impl.ts",
             `import { queryGeneric } from "convex/server";
-export const ping = queryGeneric(() => "pong");`,
+export const ping = queryGeneric(() => "pong");
+export const helper = "not a declared function";`,
           );
           yield* project.write(
             "confect/direct.spec.ts",
             `import { FunctionSpec, GroupSpec } from "@confect/core";
-import type { ping } from "./direct.native";
-export default GroupSpec.make({ convexModule: true }).addFunction(
+import type { ping } from "./direct.impl";
+export default GroupSpec.make().addFunction(
   FunctionSpec.convexPublicQuery<typeof ping>()("ping"),
 );`,
           );
@@ -93,7 +94,7 @@ export default GroupSpec.make({ convexModule: true }).addFunction(
             "confect/mixed.spec.ts",
             `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
-import type { ping } from "./direct.native";
+import type { ping } from "./direct.impl";
 export default GroupSpec.make()
   .addFunction(FunctionSpec.convexPublicQuery<typeof ping>()("ping"))
   .addFunction(FunctionSpec.publicQuery({ name: "echo", returns: () => Schema.String }));`,
@@ -104,7 +105,7 @@ export default GroupSpec.make()
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl } from "./_generated/server";
-import { ping } from "./direct.native";
+import { ping } from "./direct.impl";
 import mixed from "./mixed.spec";
 export default GroupImpl.make(mixed).pipe(
   Layer.provide(FunctionImpl.make(mixed, "ping", ping)),
@@ -167,11 +168,12 @@ export default GroupImpl.make(audited).pipe(
 
           const control = yield* buildEntry(
             project.root,
-            "confect/direct.native.ts",
+            "confect/direct.impl.ts",
           );
           const direct = yield* buildEntry(project.root, "convex/direct.ts");
           expect(direct.inputs).toEqual(control.inputs);
           expect(direct.runtime.ping.isQuery).toBe(true);
+          expect(direct.runtime).not.toHaveProperty("helper");
           for (const [entry, names, functions] of [
             ["mixed", [], ["echo", "ping"]],
             ["notes", ["notes"], ["list"]],

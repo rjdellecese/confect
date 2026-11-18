@@ -244,7 +244,7 @@ export const writeGroups = (
       const relativeModulePath = yield* GroupPath.modulePath(group.path);
       const modulePath = path.join(convexDirectory, relativeModulePath);
       const change =
-        group.convexModule === true
+        group.directExports === true
           ? yield* generateConvexModule(group, modulePath, relativeModulePath)
           : yield* generateGroupModule({
               groupPath: group.path,
@@ -282,7 +282,7 @@ const generateConvexModule = Effect.fnUntraced(function* (
     ),
   );
   const JsonString = Schema.fromJsonString(Schema.String);
-  const source = yield* Schema.encodeEffect(JsonString)(`${base}.native`).pipe(
+  const source = yield* Schema.encodeEffect(JsonString)(`${base}.impl`).pipe(
     Effect.orDie,
   );
   const spec = yield* Schema.encodeEffect(JsonString)(`${base}.spec`).pipe(

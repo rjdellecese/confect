@@ -106,6 +106,30 @@ const metadataGroup = (
 });
 
 describe("GenerationSnapshot parsing", () => {
+  test.each([
+    { runtime: "Convex", functionNames: [], groups: {}, directExports: true },
+    {
+      runtime: "Convex",
+      functionNames: ["list"],
+      groups: { child: metadataGroup() },
+      directExports: true,
+    },
+    metadataGroup([], {
+      child: {
+        runtime: "Convex",
+        functionNames: ["list"],
+        groups: {},
+        directExports: true,
+      },
+    }),
+  ])(
+    "rejects direct-export metadata outside a nonempty physical leaf: %j",
+    (tree) => {
+      const result = GenerationSnapshot.parse([["notes.spec.ts", tree]]);
+      assert(result._tag === "Failure");
+      expect(result.failure).toMatchObject({ reason: "InvalidDirectExports" });
+    },
+  );
   test("roundtrips context reuse and detects flag-only changes without inheriting them", () => {
     const makeSnapshot = (enabled?: boolean) =>
       Result.getOrThrow(
@@ -365,6 +389,27 @@ describe("GenerationSnapshot parsing", () => {
 layer(Layer.merge(baseLayer, NodePath.layerPosix))(
   "GenerationSnapshot",
   (it) => {
+    it.effect(
+      "keeps inline subgroups layer-backed while classifying sibling files independently",
+      () =>
+        Effect.gen(function* () {
+          const plain = GroupSpec.make().addFunction(
+            FunctionSpec.convexPublicQuery()("list"),
+          );
+          const parent = yield* loadLeaf(
+            "notes.spec.ts",
+            GroupSpec.addGroupsAt(plain, { inline: plain }),
+          );
+          const sibling = yield* loadLeaf("notes/archive.spec.ts", plain);
+          const decoded = roundtrip(fromLoadedLeaves([parent, sibling]));
+          const aggregate = getLeaf(decoded, "notes.spec.ts");
+          expect(aggregate.directExports).toBeUndefined();
+          expect(aggregate.groups.inline?.directExports).toBeUndefined();
+          expect(getLeaf(decoded, "notes/archive.spec.ts").directExports).toBe(
+            true,
+          );
+        }),
+    );
     it.effect(
       "summarizes an opted-in group without propagating the flag to children",
       () =>

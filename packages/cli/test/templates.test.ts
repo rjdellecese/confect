@@ -132,9 +132,13 @@ it.effect(
 
 it.effect.each([
   GroupSpec.make(),
-  GroupSpec.make().addFunction(
-    FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()("native"),
-  ),
+  GroupSpec.addGroupsAt(GroupSpec.make(), {
+    child: GroupSpec.make().addFunction(
+      FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()(
+        "native",
+      ),
+    ),
+  }),
 ])(
   "uses the fixed builder when there are no Confect handlers to forward",
   (spec) =>
@@ -163,15 +167,25 @@ import * as Schema from "effect/Schema";
 export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }));`,
     },
     {
-      kind: "native",
-      spec: GroupSpec.make().addFunction(
-        FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()(
-          "get",
+      kind: "mixed",
+      spec: GroupSpec.make()
+        .addFunction(
+          FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()(
+            "get",
+          ),
+        )
+        .addFunction(
+          FunctionSpec.publicQuery({
+            name: "list",
+            returns: () => Schema.String,
+          }),
         ),
-      ),
       source: `import { FunctionSpec, GroupSpec } from "@confect/core";
-import { queryGeneric } from "convex/server";
-export default GroupSpec.make().addFunction(FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()("get"));`,
+import type { queryGeneric } from "convex/server";
+import * as Schema from "effect/Schema";
+export default GroupSpec.make()
+  .addFunction(FunctionSpec.convexPublicQuery<ReturnType<typeof queryGeneric>>()("get"))
+  .addFunction(FunctionSpec.publicQuery({ name: "list", returns: () => Schema.String }));`,
     },
     {
       kind: "Node",

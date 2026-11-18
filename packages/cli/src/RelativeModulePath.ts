@@ -17,14 +17,12 @@ export const RelativeModulePath = Schema.String.check(
 
 export type RelativeModulePath = typeof RelativeModulePath.Type;
 
-export const withSuffix = (...suffixes: Array.NonEmptyReadonlyArray<string>) =>
+export const withSuffix = (suffix: string) =>
   RelativeModulePath.check(
     Schema.makeFilter((value) => {
       const filename = Array.lastNonEmpty(String.split(value, /[/\\]/));
-      return Array.some(
-        suffixes,
-        (suffix) =>
-          String.endsWith(suffix)(filename) && filename.length > suffix.length,
+      return (
+        String.endsWith(suffix)(filename) && filename.length > suffix.length
       );
     }),
   );

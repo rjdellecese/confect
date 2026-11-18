@@ -220,21 +220,18 @@ export const updateDeclarations = Effect.fn("Cli.updateDeclarations")(
       path,
     );
     yield* TableModule.validate(tables);
-    return yield* withImplFiles(
-      paths,
-      (leaves) =>
-        Effect.gen(function* () {
-          const next = yield* Effect.fromResult(
-            GenerationSnapshot.update(snapshot, leaves),
-          );
-          yield* validateAllImpls(leaves);
-          yield* generateGroupRegisteredFunctions(leaves);
-          yield* FunctionModule.applyFunctionPlan(
-            GenerationSnapshot.diff(snapshot, next),
-          );
-          return next;
-        }),
-      affectedImpls,
+    return yield* withImplFiles(paths, (leaves) =>
+      Effect.gen(function* () {
+        const next = yield* Effect.fromResult(
+          GenerationSnapshot.update(snapshot, leaves),
+        );
+        yield* validateAllImpls(leaves);
+        yield* generateGroupRegisteredFunctions(leaves);
+        yield* FunctionModule.applyFunctionPlan(
+          GenerationSnapshot.diff(snapshot, next),
+        );
+        return next;
+      }),
     );
   },
 );
@@ -305,7 +302,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
         "_generated",
         registryRelativePath,
       );
-      if (leaf.spec.convexModule) {
+      if (leaf.directExports) {
         yield* removePathIfExists(registryPath);
         return;
       }

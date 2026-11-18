@@ -16,33 +16,43 @@ layer(NodeServices.layer, { excludeTestServices: true })(
   "built confect dev",
   (it) => {
     it.effect(
-      "revalidates native exports when a transitive source changes or the native sibling is replaced",
+      "switches same-name handlers by provenance and revalidates their transitive dependencies",
       () =>
         Effect.gen(function* () {
           const project = yield* Project.make;
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
-          yield* fs.remove(path.join(project.root, "confect/notes.impl.ts"));
-          yield* project.write(
-            "confect/notes.spec.ts",
-            `import { FunctionSpec, GroupSpec } from "@confect/core";
-import type { list } from "./notes.native";
-export default GroupSpec.make({convexModule: true, experimental_reuseContext: true})
-  .addFunction(FunctionSpec.convexPublicQuery<typeof list>()("list"));`,
+          const ordinarySpec = pipe(
+            Project.spec,
+            Str.replace(
+              "GroupSpec.make()",
+              "GroupSpec.make({ experimental_reuseContext: true })",
+            ),
           );
+          yield* project.write("confect/notes.spec.ts", ordinarySpec);
           const helper = (
             builder: string,
           ) => `import { ${builder} } from "convex/server";
 export const list = ${builder}(() => "ok");`;
           yield* project.write("handler.ts", helper("queryGeneric"));
           const native = 'export { list } from "../handler";';
-          yield* project.write("confect/notes.native.ts", native);
           const watching = yield* project.start("dev");
+          yield* watching.waitFor(success);
+          const ordinary = yield* project.generatedFiles;
+          yield* project.write(
+            "confect/notes.spec.ts",
+            `import { FunctionSpec, GroupSpec } from "@confect/core";
+import type { list } from "../handler";
+export default GroupSpec.make({ experimental_reuseContext: true })
+  .addFunction(FunctionSpec.convexPublicQuery<typeof list>()("list"));`,
+          );
+          yield* watching.waitFor('Expected named export "list"');
+          yield* project.write("confect/notes.impl.ts", native);
           yield* watching.waitFor(success);
           const generated = yield* project.generatedFiles;
           const entry = generated[path.join("convex", "notes.ts")];
           expect(entry).toContain(
-            'export { list } from "../confect/notes.native";',
+            'export { list } from "../confect/notes.impl";',
           );
           expect(entry).toContain(
             "export const experimental_reuseContext = true;",
@@ -65,15 +75,21 @@ export const list = ${builder}(() => "ok");`;
             yield* project.write("handler.ts", helper("queryGeneric"));
             yield* watching.waitFor(success);
           }
-          yield* fs.remove(path.join(project.root, "confect/notes.native.ts"));
-          yield* watching.waitFor("Missing native module notes.native.ts");
+          yield* fs.remove(path.join(project.root, "confect/notes.impl.ts"));
+          yield* watching.waitFor("has no sibling impl");
           yield* project.write(
-            "confect/notes.native.ts",
+            "confect/notes.impl.ts",
             "export const other = 1;",
           );
           yield* watching.waitFor('Expected named export "list"');
-          yield* project.write("confect/notes.native.ts", native);
+          yield* project.write("confect/notes.impl.ts", native);
           yield* watching.waitFor(success);
+          yield* project.write("confect/notes.spec.ts", ordinarySpec);
+          yield* watching.waitFor("does not import its sibling spec");
+          yield* project.write("confect/notes.impl.ts", Project.impl);
+          yield* watching.waitFor(success);
+          const restored = yield* project.generatedFiles;
+          expect(restored).toEqual(ordinary);
         }).pipe(Effect.scoped),
       { timeout: 60000 },
     );

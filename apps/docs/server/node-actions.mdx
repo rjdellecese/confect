@@ -8,7 +8,7 @@ Node actions are like regular actions, but they are executed in the Node.js runt
 
 ## Node Spec
 
-A node spec uses `GroupSpec.makeNode()` and one of `FunctionSpec.publicNodeAction()` or `FunctionSpec.internalNodeAction()` to define functions.
+A Node spec uses `GroupSpec.makeNode()`. Define Effect-backed actions with `FunctionSpec.publicNodeAction` or `FunctionSpec.internalNodeAction`. For [plain Convex actions](/server/plain-convex-functions), use their `convexPublicNodeAction` or `convexInternalNodeAction` counterparts.
 
 ```ts confect/email.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
@@ -29,7 +29,7 @@ export default GroupSpec.makeNode().addFunction(
 
 ## Node Impl
 
-A Node impl uses the same generated `FunctionImpl` builder as any other impl. Its sibling spec selects the runtime with `GroupSpec.makeNode()`. Each handler runs in Node.js, so it has access to `NodeServices` from the `@effect/platform-node` package (filesystem, path, child processes, and more).
+An Effect-backed Node impl uses the generated `FunctionImpl` builder. Its handler runs in Node.js, so it has access to `NodeServices` from the `@effect/platform-node` package (filesystem, path, child processes, and more). If the spec declares only plain Convex actions, export the registered actions by name from the same `.impl.ts` file instead.
 
 ```ts confect/email.impl.ts
 import { GroupImpl } from "@confect/server";

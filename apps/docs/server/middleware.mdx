@@ -100,7 +100,7 @@ Several attachments are rejected at the type level (and at runtime), each with a
 
 - **Duplicates without options**—attaching the same middleware key without an options schema to a group twice. Middleware with options can be repeated with non-equivalent values; see [Repeating a policy](#repeating-a-policy).
 - **Uncovered function types**—attaching a middleware whose `functionTypes` don't include some declared function's type (or adding such a function later).
-- **[Plain Convex functions](/server/plain-convex-functions)** of a matching type—their raw handlers pass through Confect untouched, so a middleware could not actually cover them; rejecting the attachment prevents a silent policy hole. A plain Convex function whose type the middleware doesn't declare is fine.
+- **[Plain Convex functions](/server/plain-convex-functions)** of a matching type—their native handlers do not run Confect middleware. In a mixed group, attach middleware to individual Effect functions instead. A group containing only plain Convex functions cannot declare Confect middleware.
 
 Middleware does not propagate to subgroups: `GroupSpec.middleware` covers only the declaring group's own functions.
 

@@ -52,19 +52,30 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
       () =>
         Effect.gen(function* () {
           const project = yield* Project.make;
-          const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const { snapshot } = yield* project.provide(generateWithSnapshot);
           const before = yield* project.generatedFiles;
           yield* project.write(
-            "confect/notes.spec.ts",
-            `import { GroupSpec, FunctionSpec } from "@confect/core";
-import type { list } from "./notes.native";
-export default GroupSpec.make({convexModule: true}).addFunction(FunctionSpec.convexPublicQuery<typeof list>()("list"));`,
+            "handler.ts",
+            'import { queryGeneric } from "convex/server"; export const list = queryGeneric(() => 1);',
           );
           yield* project.write(
-            "confect/notes.native.ts",
-            'import { queryGeneric } from "convex/server"; export const list = queryGeneric(() => 1);',
+            "confect/notes.spec.ts",
+            `import { GroupSpec, FunctionSpec } from "@confect/core";
+import type { list } from "../handler";
+export default GroupSpec.make().addFunction(FunctionSpec.convexPublicQuery<typeof list>()("list"));`,
+          );
+          yield* project.write(
+            "confect/notes.impl.ts",
+            `import { GroupImpl } from "@confect/server";
+import * as Layer from "effect/Layer";
+import { list } from "../handler";
+import { FunctionImpl } from "./_generated/server";
+import notes from "./notes.spec";
+export default GroupImpl.make(notes).pipe(
+  Layer.provide(FunctionImpl.make(notes, "list", list)),
+  GroupImpl.finalize,
+);`,
           );
           const entry = [
             {
@@ -72,21 +83,25 @@ export default GroupSpec.make({convexModule: true}).addFunction(FunctionSpec.con
               relativePath: SpecModulePath.make("notes.spec.ts"),
             },
           ] as const;
-          const conflict = yield* project
+          const legacy = yield* project
             .provide(updateDeclarations(snapshot, entry, []))
             .pipe(Effect.result);
-          assert(conflict._tag === "Failure");
-          expect(conflict.failure).toMatchObject({
+          assert(legacy._tag === "Failure");
+          expect(legacy.failure).toMatchObject({
             _tag: "InvalidConvexModuleError",
-            reason: expect.stringContaining("conflicting notes.impl.ts"),
+            path: "notes.impl.ts",
+            reason: expect.stringContaining('named export "list"'),
           });
-          yield* fs.remove(path.join(project.root, "confect/notes.impl.ts"));
+          yield* project.write(
+            "confect/notes.impl.ts",
+            'export { list } from "../handler";',
+          );
           const direct = yield* project.provide(
             updateDeclarations(snapshot, entry, []),
           );
           const generated = yield* project.generatedFiles;
           expect(generated[path.join("convex", "notes.ts")]).toContain(
-            'export { list } from "../confect/notes.native";',
+            'export { list } from "../confect/notes.impl";',
           );
           expect(
             generated[

@@ -40,7 +40,7 @@ layer(NodeServices.layer)("native exports", (it) => {
         const groups = ["exact", "wrongArgs", "wrongReturns"] as const;
         for (const group of groups) {
           yield* project.write(
-            `confect/${group}.native.ts`,
+            `confect/${group}.impl.ts`,
             `import { internalActionGeneric as action } from "convex/server";
 import { v } from "convex/values";
 export const exact = action({ args: { id: v.string() }, handler: (_, {id}) => id });
@@ -51,8 +51,8 @@ export const run = exact;`,
           yield* project.write(
             `confect/${group}.spec.ts`,
             `import { FunctionSpec, GroupSpec } from "@confect/core";
-import type { ${group} } from "./${group}.native";
-export default GroupSpec.makeNode({ convexModule: true })
+import type { ${group} } from "./${group}.impl";
+export default GroupSpec.makeNode()
   .addFunction(FunctionSpec.convexInternalNodeAction<typeof ${group}>()("run"));`,
           );
         }
@@ -62,7 +62,7 @@ export default GroupSpec.makeNode({ convexModule: true })
               `${group}.spec.ts`,
               {
                 runtime: "Node",
-                convexModule: true,
+                directExports: true,
                 functionNames: ["run"],
                 groups: {},
               },
@@ -76,7 +76,7 @@ export default GroupSpec.makeNode({ convexModule: true })
           path.join(project.root, "convex", "exact.ts"),
         );
         expect(entry).toMatch(
-          /^"use node";\n\nexport \{ run \} from "\.\.\/confect\/exact\.native";/,
+          /^"use node";\n\nexport \{ run \} from "\.\.\/confect\/exact\.impl";/,
         );
         yield* project.write(
           "tsconfig.json",

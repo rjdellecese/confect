@@ -49,7 +49,7 @@ description: "Understand the structure of a Confect project."
     <Tree.File name="env.impl.ts" />
     <Tree.File name="http.ts" />
     <Tree.File name="workpool.spec.ts" />
-    <Tree.File name="workpool.native.ts" />
+    <Tree.File name="workpool.impl.ts" />
   </Tree.Folder>
   <Tree.Folder name="convex" />
 </Tree>
@@ -78,7 +78,7 @@ Exports an `Id` schema constructor and an `Id<TableName>` TypeScript type. Use `
 
 #### `registeredFunctions/`
 
-For groups with a `.impl.ts`, each module (for example `registeredFunctions/notes_and_random/notes.ts`) registers its own group's functions for the Convex CLI. These modules are consumed by the generated `convex/` files; you should not need to import them directly. [Native-module groups](/server/plain-convex-functions) re-export their Convex functions directly rather than building a Confect registration layer.
+For groups that use an implementation layer, each module (for example `registeredFunctions/notes_and_random/notes.ts`) registers its own group's functions for the Convex CLI. These modules are consumed by the generated `convex/` files; you should not need to import them directly. For groups containing only [plain Convex functions](/server/plain-convex-functions), the generated `convex/` entry re-exports the declared functions directly from the group's `.impl.ts`.
 
 #### `refs.ts`
 
@@ -142,7 +142,7 @@ Defines your [middleware](/server/middleware), as a `<Name>.spec.ts`/`<Name>.imp
 
 <Badge color="green">Required</Badge>
 
-Each function group has a `*.spec.ts` and a sibling `*.impl.ts` or, for an explicit native-module group, `*.native.ts`. The path within `confect/` determines the group's name. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
+Each function group has a `*.spec.ts` and a sibling `*.impl.ts`. The path within `confect/` determines the group's name. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
 
 ## Rules
 

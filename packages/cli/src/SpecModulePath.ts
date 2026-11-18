@@ -13,6 +13,4 @@ export const toImpl = (path: SpecModulePath): ImplModulePath =>
   ImplModulePath.make(`${String.slice(0, -".spec.ts".length)(path)}.impl.ts`);
 
 export const fromImpl = (path: ImplModulePath): SpecModulePath =>
-  SpecModulePath.make(
-    String.replace(/\.(?:impl|native)\.ts$/, ".spec.ts")(path),
-  );
+  SpecModulePath.make(`${String.slice(0, -".impl.ts".length)(path)}.spec.ts`);

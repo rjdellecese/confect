@@ -4,9 +4,9 @@ import type {
   enqueue,
   onComplete,
   status,
-} from "./workpool.native";
+} from "./workpool.impl";
 
-export default GroupSpec.make({ convexModule: true })
+export default GroupSpec.make()
   .addFunction(FunctionSpec.convexPublicMutation<typeof enqueue>()("enqueue"))
   .addFunction(FunctionSpec.convexPublicQuery<typeof status>()("status"))
   .addFunction(

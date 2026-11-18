@@ -235,7 +235,7 @@ const renderMissingImplFileError = (error: MissingImplFileError): string =>
     formatPath(error.specPath),
     " has no sibling impl; create ",
     formatPath(error.expectedImplPath),
-    " and default-export a GroupImpl layer from it.",
+    " and implement the functions declared by the spec.",
   );
 
 const renderMissingSpecFileError = (error: MissingSpecFileError): string =>

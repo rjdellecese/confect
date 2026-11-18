@@ -13,7 +13,7 @@ The suites exercise the public `HttpClient.layer` and `WebSocketClient.layer`
 against a real local Convex backend. Both client and server suites use the private
 [`confect-local-backend` harness](../../../../tools/local-backend/README.md).
 The shared fixture project lives in `tools/local-backend/fixtures`. Its
-`confect/clients.native.ts` endpoints use raw Convex functions so the tests can
+`confect/clients.impl.ts` endpoints use raw Convex functions so the tests can
 check client codecs independently of the server bindings.
 
 The backend uses ports 3210 and 3211. Run this suite separately from the server
