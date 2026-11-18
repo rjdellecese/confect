@@ -26,15 +26,6 @@ export default defineApp();
 `,
   "confect/probes.ts": `export const schemaBuilds = { table: 0, args: 0, returns: 0 };
 `,
-  "confect/status.spec.ts": `import { FunctionSpec, GroupSpec } from "@confect/core";
-import type { ping } from "./status.impl";
-
-export default GroupSpec.make().addFunction(FunctionSpec.convexPublicQuery<typeof ping>()("ping"));
-`,
-  "confect/status.impl.ts": `import { queryGeneric } from "convex/server";
-
-export const ping = queryGeneric(() => "ready");
-`,
   "confect/tasks.spec.ts": `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
@@ -199,11 +190,7 @@ import { Auth } from "./confect/_generated/services";
 import notes from "./confect/_generated/tables/notes";
 import notesImpl, { count } from "./confect/notes.impl";
 import { schemaBuilds } from "./confect/probes";
-import { ping } from "./confect/status.impl";
-import * as status from "./convex/status";
 
-assert.deepEqual(Object.keys(status), ["ping"]);
-assert.equal(status.ping, ping);
 assert.deepEqual(schemaBuilds, { table: 0, args: 0, returns: 0 });
 
 let acquired = 0;

@@ -1,5 +1,5 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import type { control, snapshot } from "./cacheControl.impl";
+import type { control, snapshot } from "./cacheControl";
 
 export default GroupSpec.make()
   .addFunction(FunctionSpec.convexPublicQuery<typeof control>()("control"))

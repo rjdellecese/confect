@@ -31,14 +31,10 @@ Convex function's cold-start bundle scales with its own group, not the whole
 project. This is invisible to types, lint, and most tests—a stray import in a
 codegen template silently regresses every function's bundle. Flag as 🔴
 Important any change (chiefly in `packages/cli/src/templates.ts`, the generated
-`_generated/` layout, or `packages/server/src/`) that breaks either rule:
+`_generated/` layout, or `packages/server/src/`) that breaks any of these rules:
 
-1. **One group per bundle.** When a leaf group's spec declares one or more functions
-   and all are plain Convex functions, its generated `convex/{path}.ts` must
-   directly re-export only the declared names from `{path}.impl`. Type-only
-   signature checks must not introduce a runtime dependency on the spec or
-   registration layer. Mixed and Effect groups import their own
-   `_generated/registeredFunctions/{path}` module instead. Each
+1. **One group per bundle.** A generated `convex/{path}.ts` must import only its
+   own `_generated/registeredFunctions/{path}` module, and each
    `_generated/registeredFunctions/{path}.ts` must import only its own sibling
    `{path}.impl`. Flag any reintroduction of an aggregate registry (e.g.
    `_generated/registeredFunctions.ts`) or any cross-group import that pulls one

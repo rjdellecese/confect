@@ -29,7 +29,6 @@ import {
   ImplNotFinalizedError,
   InvalidMiddlewareAttachmentError,
   InvalidContextReuseError,
-  InvalidConvexModuleError,
   SpecImportsServerError,
   SpecMissingDefaultGroupSpecError,
 } from "./CodegenError";
@@ -48,7 +47,6 @@ export interface LeafModule {
 
 export type LoadedLeafModule = LeafModule & {
   readonly spec: GroupSpec.AnyWithProps;
-  readonly directExports: boolean;
 } & Brand.Brand<"@confect/cli/LoadedLeafModule">;
 
 const LoadedLeafModule = Brand.nominal<LoadedLeafModule>();
@@ -312,9 +310,6 @@ export const loadSpec = Effect.fn("LeafModule.loadSpec")(function* (
 
   yield* validateClientSafety(leaf, bundled);
 
-  const directExports = yield* Effect.fromResult(
-    classifyDirectExports(groupSpec, leaf.relativePath),
-  );
   const warnings = yield* Effect.fromResult(
     validateContextReuse(groupSpec, leaf.relativePath, leaf.groupPathDot),
   );
@@ -336,43 +331,8 @@ export const loadSpec = Effect.fn("LeafModule.loadSpec")(function* (
   return LoadedLeafModule({
     ...leaf,
     spec: groupSpec,
-    directExports,
   });
 });
-
-const classifyDirectExports = (
-  group: GroupSpec.AnyWithProps,
-  specPath: string,
-): Result.Result<boolean, InvalidConvexModuleError> => {
-  const functions = Record.values(group.functions);
-  if (
-    !Record.isEmptyRecord(group.groups) ||
-    functions.length === 0 ||
-    !Array.every(functions, (fn) => fn.functionProvenance._tag === "Convex")
-  )
-    return Result.succeed(false);
-  if (
-    group.middlewareAttachments.length > 0 ||
-    Array.some(functions, (fn) => fn.middlewareAttachments.length > 0)
-  )
-    return Result.fail(
-      InvalidConvexModuleError.make({
-        path: specPath,
-        reason:
-          "Plain Convex functions are exported directly and cannot run Confect middleware.",
-      }),
-    );
-  for (const fn of functions) {
-    if (fn.runtimeAndFunctionType.runtime !== group.runtime)
-      return Result.fail(
-        InvalidConvexModuleError.make({
-          path: specPath,
-          reason: `"${fn.name}" declares the ${fn.runtimeAndFunctionType.runtime} runtime, but the group's runtime is ${group.runtime}.`,
-        }),
-      );
-  }
-  return Result.succeed(true);
-};
 
 const validateContextReuse = (
   group: GroupSpec.AnyWithProps,
@@ -459,8 +419,9 @@ const buildImplLayer = Effect.fnUntraced(function* (
 }, Effect.scoped);
 
 /**
- * Validate the sibling impl against the spec's selected contract: named Convex
- * registrations for a plain-only leaf, or a finalized group layer otherwise.
+ * Validate that the leaf's sibling impl file imports the spec, default-exports
+ * a finalized `GroupImpl` layer, and provides a `FunctionImpl` for every
+ * function declared by the spec.
  *
  * @internal
  */
@@ -474,31 +435,6 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
   const bundled = yield* Bundler.bundle(implAbsolutePath).pipe(
     Effect.mapError((error) => fromBundlerError(implRelativePath, error)),
   );
-
-  if (leaf.directExports) {
-    for (const fn of Record.values(leaf.spec.functions)) {
-      const handler = bundled.module[fn.name];
-      const kind = fn.runtimeAndFunctionType.functionType;
-      const kindMarker = {
-        query: "isQuery",
-        mutation: "isMutation",
-        action: "isAction",
-      }[kind];
-      const visibilityMarker =
-        fn.functionVisibility === "public" ? "isPublic" : "isInternal";
-      if (
-        typeof handler !== "function" ||
-        handler[kindMarker] !== true ||
-        handler[visibilityMarker] !== true
-      ) {
-        return yield* InvalidConvexModuleError.make({
-          path: implRelativePath,
-          reason: `Expected named export "${fn.name}" to be a registered ${fn.functionVisibility} Convex ${kind}.`,
-        });
-      }
-    }
-    return;
-  }
 
   if (
     !(yield* Bundler.directlyImports(

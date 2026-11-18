@@ -8,13 +8,6 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Array from "effect/Array";
-import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as ChildProcess from "effect/process/ChildProcess";
-import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
-import * as Stream from "effect/Stream";
-import { fileURLToPath } from "node:url";
-import * as Project from "./integration/Project";
 import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -30,89 +23,6 @@ import {
 } from "@confect/cli/FunctionModule";
 
 const fixtureRoot = `${import.meta.dirname}/../../server/test/mock-backend/fixtures`;
-
-layer(NodeServices.layer)("native exports", (it) => {
-  it.effect(
-    "emits Node actions directly and type-checks the exact named export's args and returns",
-    () =>
-      Effect.gen(function* () {
-        const project = yield* Project.make;
-        const groups = ["exact", "wrongArgs", "wrongReturns"] as const;
-        for (const group of groups) {
-          yield* project.write(
-            `confect/${group}.impl.ts`,
-            `import { internalActionGeneric as action } from "convex/server";
-import { v } from "convex/values";
-export const exact = action({ args: { id: v.string() }, handler: (_, {id}) => id });
-export const wrongArgs = action({ args: { count: v.number() }, handler: (_, {count}) => String(count) });
-export const wrongReturns = action({ args: { id: v.string() }, handler: (_, {id}) => id.length });
-export const run = exact;`,
-          );
-          yield* project.write(
-            `confect/${group}.spec.ts`,
-            `import { FunctionSpec, GroupSpec } from "@confect/core";
-import type { ${group} } from "./${group}.impl";
-export default GroupSpec.makeNode()
-  .addFunction(FunctionSpec.convexInternalNodeAction<typeof ${group}>()("run"));`,
-          );
-        }
-        const snapshot = yield* Effect.fromResult(
-          GenerationSnapshot.parse(
-            Array.map(groups, (group) => [
-              `${group}.spec.ts`,
-              {
-                runtime: "Node",
-                directExports: true,
-                functionNames: ["run"],
-                groups: {},
-              },
-            ]),
-          ),
-        );
-        yield* project.provide(generateFunctions(snapshot));
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const entry = yield* fs.readFileString(
-          path.join(project.root, "convex", "exact.ts"),
-        );
-        expect(entry).toMatch(
-          /^"use node";\n\nexport \{ run \} from "\.\.\/confect\/exact\.impl";/,
-        );
-        yield* project.write(
-          "tsconfig.json",
-          '{"compilerOptions":{"moduleResolution":"Bundler","module":"ESNext","target":"ESNext","strict":true,"noEmit":true,"noUnusedLocals":true,"skipLibCheck":true},"include":["convex/*.ts"]}',
-        );
-        const spawner = yield* ChildProcessSpawner;
-        const compiler = yield* spawner.spawn(
-          ChildProcess.make(process.execPath, [
-            fileURLToPath(
-              new URL(
-                "dist/effect-tsgo.cjs",
-                import.meta.resolve("@effect/tsgo/package.json"),
-              ),
-            ),
-            "tsrs",
-            "-p",
-            project.root,
-          ]),
-        );
-        const output = yield* compiler.all.pipe(
-          Stream.decodeText(),
-          Stream.mkString,
-        );
-        const status = yield* compiler.exitCode;
-        expect(status, output).not.toBe(0);
-        expect(output).toMatch(
-          /wrongArgs\.ts\(\d+,\d+\): error TS2344: Type '"run"' does not satisfy the constraint 'never'/,
-        );
-        expect(output).toMatch(
-          /wrongReturns\.ts\(\d+,\d+\): error TS2344: Type '"run"' does not satisfy the constraint 'never'/,
-        );
-        expect(output).not.toContain("exact.ts(");
-      }).pipe(Effect.scoped),
-    { timeout: 30000 },
-  );
-});
 const fixtureConvex = `${fixtureRoot}/convex`;
 
 const RemoveGroupsLayer = Layer.mergeAll(

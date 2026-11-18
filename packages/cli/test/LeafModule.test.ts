@@ -55,10 +55,7 @@ test("requires a loaded leaf rather than an arbitrary leaf/spec pair", () => {
   expectTypeOf(validateImpl).parameters.toEqualTypeOf<[LoadedLeafModule]>();
   expectTypeOf<LeafModule>().not.toExtend<LoadedLeafModule>();
   expectTypeOf<
-    LeafModule & {
-      readonly spec: GroupSpec.AnyWithProps;
-      readonly directExports: boolean;
-    }
+    LeafModule & { readonly spec: GroupSpec.AnyWithProps }
   >().not.toExtend<LoadedLeafModule>();
 });
 
@@ -223,44 +220,6 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
 }
 
 layer(LeafModuleLayer)("loadSpec", (it) => {
-  it.effect.each([
-    {
-      source:
-        'GroupSpec.makeNode().addFunction(FunctionSpec.convexPublicQuery()("query"))',
-      reason: "group's runtime is Node",
-    },
-    {
-      source:
-        'GroupSpec.make().middleware(Policy).addFunction(FunctionSpec.convexPublicQuery()("query"))',
-      reason: "cannot run Confect middleware",
-    },
-    {
-      source:
-        'GroupSpec.make().addFunction({ ...FunctionSpec.convexPublicQuery()("query"), middlewareAttachments: [{ spec: Policy }] })',
-      reason: "cannot run Confect middleware",
-    },
-  ])("rejects an invalid all-plain group: $source", ({ source, reason }) =>
-    Effect.gen(function* () {
-      const leaf = yield* toLeafModule("groups/nativeConfig.spec.ts");
-      yield* withTempFile(
-        leaf.relativePath,
-        `import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
-class Policy extends MiddlewareSpec.MiddlewareSpec()("Policy", {
-  functionTypes: { query: true, mutation: false, action: false },
-}) {}
-export default ${source};`,
-        Effect.gen(function* () {
-          const result = yield* loadSpec(leaf).pipe(Effect.result);
-          assert(result._tag === "Failure");
-          expect(result.failure).toMatchObject({
-            _tag: "InvalidConvexModuleError",
-            path: leaf.relativePath,
-            reason: expect.stringContaining(reason),
-          });
-        }),
-      );
-    }),
-  );
   it.effect.each([
     { option: "yes", runtime: "Convex", name: "list", reason: "InvalidOption" },
     { option: true, runtime: "Node", name: "list", reason: "NodeRuntime" },
@@ -645,8 +604,6 @@ layer(LeafModuleLayer)("discovery", (it) => {
         const files = [
           "notes.impl.ts",
           "notes.spec.ts",
-          "other.spec.ts",
-          "other.native.ts",
           "notes.impl.tsx",
           path.join("_generated", "notes.impl.ts"),
           path.join("groups", "nested.impl.ts"),
@@ -664,7 +621,7 @@ layer(LeafModuleLayer)("discovery", (it) => {
           path.join("groups", "nested.impl.ts"),
         ]);
         expectTypeOf(implFiles).toEqualTypeOf<ImplModulePath[]>();
-        expect(files).toHaveLength(7);
+        expect(files).toHaveLength(5);
       }),
   );
 
@@ -705,20 +662,6 @@ layer(LeafModuleLayer)("discovery", (it) => {
 });
 
 layer(LeafModuleLayer)("validateImpl", (it) => {
-  it.effect("requires a default layer even for an empty group", () =>
-    Effect.gen(function* () {
-      const result = yield* Effect.result(
-        withTempLeaf(
-          "_empty",
-          'export { default as group } from "./_empty.spec";',
-          validateImpl,
-          'import { GroupSpec } from "@confect/core"; export default GroupSpec.make();',
-        ),
-      );
-      assert(result._tag === "Failure");
-      expect(result.failure._tag).toBe("ImplMissingDefaultLayerError");
-    }),
-  );
   it.effect("reuses a supplied validated spec without bundling it again", () =>
     Effect.gen(function* () {
       const path = yield* Path.Path;

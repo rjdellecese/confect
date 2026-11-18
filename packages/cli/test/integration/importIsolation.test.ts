@@ -77,24 +77,35 @@ export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({
 }));`,
           );
           yield* project.write(
-            "confect/direct.impl.ts",
+            "confect/ping.ts",
             `import { queryGeneric } from "convex/server";
-export const ping = queryGeneric(() => "pong");
-export const helper = "not a declared function";`,
+export const ping = queryGeneric(() => "pong");`,
           );
           yield* project.write(
-            "confect/direct.spec.ts",
+            "confect/plain.spec.ts",
             `import { FunctionSpec, GroupSpec } from "@confect/core";
-import type { ping } from "./direct.impl";
+import type { ping } from "./ping";
 export default GroupSpec.make().addFunction(
   FunctionSpec.convexPublicQuery<typeof ping>()("ping"),
+);`,
+          );
+          yield* project.write(
+            "confect/plain.impl.ts",
+            `import { GroupImpl } from "@confect/server";
+import * as Layer from "effect/Layer";
+import { FunctionImpl } from "./_generated/server";
+import { ping } from "./ping";
+import plain from "./plain.spec";
+export default GroupImpl.make(plain).pipe(
+  Layer.provide(FunctionImpl.make(plain, "ping", ping)),
+  GroupImpl.finalize,
 );`,
           );
           yield* project.write(
             "confect/mixed.spec.ts",
             `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
-import type { ping } from "./direct.impl";
+import type { ping } from "./ping";
 export default GroupSpec.make()
   .addFunction(FunctionSpec.convexPublicQuery<typeof ping>()("ping"))
   .addFunction(FunctionSpec.publicQuery({ name: "echo", returns: () => Schema.String }));`,
@@ -105,7 +116,7 @@ export default GroupSpec.make()
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl } from "./_generated/server";
-import { ping } from "./direct.impl";
+import { ping } from "./ping";
 import mixed from "./mixed.spec";
 export default GroupImpl.make(mixed).pipe(
   Layer.provide(FunctionImpl.make(mixed, "ping", ping)),
@@ -166,15 +177,8 @@ export default GroupImpl.make(audited).pipe(
           const log = yield* Ref.get(generation.output);
           expect(Number(exitCode), log).toBe(0);
 
-          const control = yield* buildEntry(
-            project.root,
-            "confect/direct.impl.ts",
-          );
-          const direct = yield* buildEntry(project.root, "convex/direct.ts");
-          expect(direct.inputs).toEqual(control.inputs);
-          expect(direct.runtime.ping.isQuery).toBe(true);
-          expect(direct.runtime).not.toHaveProperty("helper");
           for (const [entry, names, functions] of [
+            ["plain", [], ["ping"]],
             ["mixed", [], ["echo", "ping"]],
             ["notes", ["notes"], ["list"]],
             ["audited", ["notes", "users"], ["list"]],
@@ -183,6 +187,10 @@ export default GroupImpl.make(audited).pipe(
               project.root,
               `convex/${entry}.ts`,
             );
+            expect(inputs, entry).toContain(
+              `confect/_generated/registeredFunctions/${entry}.ts`,
+            );
+            expect(inputs, entry).toContain(`confect/${entry}.impl.ts`);
             expect(
               Array.filter(inputs, Str.startsWith("confect/tables/")),
               entry,

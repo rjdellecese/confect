@@ -44,18 +44,6 @@ Leave `Id("notes")`, `documentIds.parse("notes", input)`, and `vectorSearch("not
 
 Pass just the routes layer to [`HttpRouter.make`](/server/http-api#creating-the-router). For [`TestConfect.layer`](/guides/testing#setup), pass the deployment schema and modules, and use the Confect schema as a type argument: `TestConfect.layer<typeof schema>(convexSchema, modules)`. Neither call takes the full Confect schema as a value.
 
-## Replace plain-only implementation layers
-
-Check each `.spec.ts`. If it declares one or more functions and **all** use `FunctionSpec.convex*`, keep its sibling `.impl.ts` but remove the default `GroupImpl` layer. Export the registered Convex functions under their declared names instead. If you already keep the functions in a separate module, re-export them:
-
-```ts confect/workpool.impl.ts
-export { backgroundWork, enqueue, onComplete, status } from "./workpool";
-```
-
-Alternatively, define them in the `.impl.ts` itself and use a type-only import from that file in the spec. The [plain Convex functions guide](/server/plain-convex-functions) shows the complete pair. Codegen selects direct exports from the declarations; no setting or file rename is required.
-
-Keep the default finalized layer for groups that include any Effect function, even a single one alongside native functions. Empty groups keep their default finalized layer and expose no endpoint.
-
 ## Regenerate bindings
 
 Upgrade the Confect packages and CLI together, run `confect codegen`, then typecheck your application. Do not hand-edit generated bindings.

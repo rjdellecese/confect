@@ -173,14 +173,6 @@ export class InvalidConvexConfigError extends Schema.TaggedError<
   reason: Schema.String,
 }) {}
 
-export class InvalidConvexModuleError extends Schema.TaggedError<
-  InvalidConvexModuleError,
-  { readonly brand: unique symbol }
->()("InvalidConvexModuleError", {
-  path: Schema.String,
-  reason: Schema.String,
-}) {}
-
 export const CodegenError = Schema.Union([
   SnapshotError,
   BuildError,
@@ -202,7 +194,6 @@ export const CodegenError = Schema.Union([
   LegacySchemaFileError,
   ConflictingDocNameError,
   InvalidConvexConfigError,
-  InvalidConvexModuleError,
 ]);
 export type CodegenError = typeof CodegenError.Type;
 
@@ -235,7 +226,7 @@ const renderMissingImplFileError = (error: MissingImplFileError): string =>
     formatPath(error.specPath),
     " has no sibling impl; create ",
     formatPath(error.expectedImplPath),
-    " and implement the functions declared by the spec.",
+    " and default-export a GroupImpl layer from it.",
   );
 
 const renderMissingSpecFileError = (error: MissingSpecFileError): string =>
@@ -401,8 +392,6 @@ const renderParentChildNameCollisionError = (
  */
 export const renderCodegenError = (error: CodegenError): string => {
   if (isBuildError(error)) return renderBuildError(error);
-  if (error._tag === "InvalidConvexModuleError")
-    return singleLine(formatPath(error.path), ": ", error.reason);
   return Match.value(error).pipe(
     Match.tag("SnapshotError", ({ reason, relativePath, pathSegments }) =>
       singleLine(

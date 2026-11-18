@@ -302,10 +302,6 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
         "_generated",
         registryRelativePath,
       );
-      if (leaf.directExports) {
-        yield* removePathIfExists(registryPath);
-        return;
-      }
       const registryDir = path.dirname(registryPath);
       const fs = yield* FileSystem.FileSystem;
       if (!(yield* fs.exists(registryDir))) {

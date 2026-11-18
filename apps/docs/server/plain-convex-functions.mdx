@@ -1,14 +1,12 @@
 ---
 icon: "plug"
 title: "Plain Convex Functions"
-description: "Expose native Convex functions through typed Confect refs without adding a Confect runtime dependency to the handlers."
+description: "Integrate plain Convex functions into your Confect spec and impl tree."
 ---
 
 Some Convex libraries and [components](https://docs.convex.dev/components) expect you to define standard Convex functions in your project. For example, [Workpool](https://www.convex.dev/components/workpool), [Workflow](https://www.convex.dev/components/workflow), and [Migrations](https://www.convex.dev/components/migrations) all require user-defined Convex functions.
 
-For a group whose spec declares only plain Convex functions, export the registered functions by name from `<group>.impl.ts`. Codegen re-exports those names directly: callers get typed Confect refs, but the Convex entry does not import Effect, the spec, or a Confect registration layer at runtime. A handler still loads its own dependencies.
-
-The **spec** determines the shape of the impl, not the filename or the code inside it. A nonempty group of `FunctionSpec.convex*` declarations uses named exports. A group with any Effect function, including a [mixed group](#mixing-confect-and-plain-functions), uses a default finalized `GroupImpl` layer. Empty groups and specs that build subgroups inline also keep the layer form. Groups in separate files are classified independently.
+Confect lets you include these plain Convex function definitions in your spec and impl tree so that they are registered, routed, and callable through refs alongside your Effect-based Confect functions.
 
 ## Spec constructors
 
@@ -47,9 +45,9 @@ export default app;
 
 ### Write the Convex functions
 
-Write standard Convex functions in the group's `.impl.ts` file. Export each registered function under its name in the spec. The component reference comes from Confect's generated [components registry](/server/components#referencing-components).
+Write standard Convex functions using the Convex API and place them in your `confect/` directory. By [convention](/concepts/file-naming-conventions), they go adjacent to their corresponding spec and impl files—for example, `workpool.ts` alongside `workpool.spec.ts` and `workpool.impl.ts`. The component reference comes from Confect's generated [components registry](/server/components#referencing-components).
 
-```ts confect/workpool.impl.ts
+```ts confect/workpool.ts
 import {
   type WorkId,
   Workpool,
@@ -104,8 +102,12 @@ export const status = query({
 export const backgroundWork = internalAction({
   args: {},
   returns: v.null(),
-  handler: (): Promise<null> =>
-    new Promise((resolve) => setTimeout(() => resolve(null), 3_000)),
+  handler: async (): Promise<null> => {
+    await new Promise((resolve) =>
+      setTimeout(resolve, 2000 + Math.random() * 3000),
+    );
+    return null;
+  },
 });
 
 export const onComplete = internalMutation({
@@ -124,16 +126,11 @@ export const onComplete = internalMutation({
 
 ### Define the spec
 
-Use the `convex*` spec constructors and pass each native export's type as a type argument. Confect extracts argument and return types from the Convex registration so that refs are fully typed.
+Use the `convex*` spec constructors and pass each Convex function's type as a type argument. Confect extracts argument and return types from the Convex `RegisteredQuery`, `RegisteredMutation`, or `RegisteredAction` type so that refs are fully typed.
 
 ```ts confect/workpool.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import type {
-  backgroundWork,
-  enqueue,
-  onComplete,
-  status,
-} from "./workpool.impl";
+import type { backgroundWork, enqueue, onComplete, status } from "./workpool";
 
 export default GroupSpec.make()
   .addFunction(FunctionSpec.convexPublicMutation<typeof enqueue>()("enqueue"))
@@ -154,9 +151,38 @@ export default GroupSpec.make()
   the function implementation to the client bundle.
 </Note>
 
-Run `confect codegen`. It checks that each declared export is registered with the right function kind and visibility. Typechecking the generated Convex module also checks arguments and return types. Only names declared in the spec become endpoints. These plain handlers do not run Confect middleware.
+Run `confect codegen` to pick up the new spec.
 
-For native Node actions, use `GroupSpec.makeNode()` with the Node action spec constructors. For native queries and mutations, you can opt into [experimental context reuse](/server/functions#experimental-context-reuse); it does not change what the cold-start bundle imports.
+### Implement the functions
+
+For plain Convex functions, the impl is the Convex function value itself. Pass each one directly to `FunctionImpl.make`.
+
+```ts confect/workpool.impl.ts
+import { GroupImpl } from "@confect/server";
+import * as Layer from "effect/Layer";
+import { FunctionImpl } from "./_generated/server";
+import { backgroundWork, enqueue, onComplete, status } from "./workpool";
+import workpool from "./workpool.spec";
+
+const enqueueImpl = FunctionImpl.make(workpool, "enqueue", enqueue);
+const statusImpl = FunctionImpl.make(workpool, "status", status);
+const backgroundWorkImpl = FunctionImpl.make(
+  workpool,
+  "backgroundWork",
+  backgroundWork,
+);
+const onCompleteImpl = FunctionImpl.make(workpool, "onComplete", onComplete);
+
+export default GroupImpl.make(workpool).pipe(
+  Layer.provide(enqueueImpl),
+  Layer.provide(statusImpl),
+  Layer.provide(backgroundWorkImpl),
+  Layer.provide(onCompleteImpl),
+  GroupImpl.finalize,
+);
+```
+
+Run `confect codegen` to pick up the new impl.
 
 ### Call plain functions from the client
 
@@ -177,8 +203,8 @@ A single group can contain both Confect functions (with Effect schemas) and plai
 ```ts confect/notes.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
-import notes from "./_generated/tables/notes";
 import type { search } from "./search";
+import notes from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
@@ -190,14 +216,4 @@ const searchSpec = FunctionSpec.convexPublicQuery<typeof search>()("search");
 export default GroupSpec.make().addFunction(list).addFunction(searchSpec);
 ```
 
-In the mixed group's `notes.impl.ts`, pass the Effect handler and the registered native function to the generated `FunctionImpl.make` builder as usual:
-
-```ts
-import { FunctionImpl } from "./_generated/server";
-import notes from "./notes.spec";
-import { search } from "./search";
-
-const searchImpl = FunctionImpl.make(notes, "search", search);
-```
-
-Provide both function implementations to `GroupImpl.make(notes)`. Native functions in a mixed group keep their native semantics, but share the group's runtime bundle.
+In the impl, Confect functions use Effect handlers while plain functions pass through the Convex function value directly.

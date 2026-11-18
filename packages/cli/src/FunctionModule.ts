@@ -5,7 +5,6 @@ import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
 import * as Match from "effect/Match";
-import * as Schema from "effect/Schema";
 import * as GenerationSnapshot from "./GenerationSnapshot";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";
@@ -69,16 +68,32 @@ const renderEffect = Effect.fnUntraced(function* ({
  */
 export const generateGroupModule = ({
   groupPath,
-  ...options
-}: Parameters<typeof render>[0] & { groupPath: GroupPath.GroupPath }) =>
-  render(options).pipe(
-    Effect.flatMap((contents) => writeGroupModule(groupPath, contents)),
-  );
+  functionNames,
+  registeredFunctionsImportPath,
+  useNode = false,
+  experimental_reuseContext = false,
+}: Parameters<typeof generateGroupModuleEffect>[0]) =>
+  generateGroupModuleEffect({
+    groupPath,
+    functionNames,
+    registeredFunctionsImportPath,
+    useNode,
+    experimental_reuseContext,
+  });
 
-const writeGroupModule = Effect.fnUntraced(function* (
-  groupPath: GroupPath.GroupPath,
-  functionsContentsString: string,
-) {
+const generateGroupModuleEffect = Effect.fnUntraced(function* ({
+  groupPath,
+  functionNames,
+  registeredFunctionsImportPath,
+  useNode = false,
+  experimental_reuseContext = false,
+}: {
+  groupPath: GroupPath.GroupPath;
+  functionNames: ReadonlyArray<string>;
+  registeredFunctionsImportPath: string;
+  useNode?: boolean;
+  experimental_reuseContext?: boolean;
+}) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const convexDirectory = yield* ConvexDirectory.get;
@@ -90,6 +105,13 @@ const writeGroupModule = Effect.fnUntraced(function* (
   if (!(yield* fs.exists(directoryPath))) {
     yield* fs.makeDirectory(directoryPath, { recursive: true });
   }
+
+  const functionsContentsString = yield* render({
+    functionNames,
+    registeredFunctionsImportPath,
+    useNode,
+    experimental_reuseContext,
+  });
 
   if (!(yield* fs.exists(modulePath))) {
     yield* fs.writeFileString(modulePath, functionsContentsString);
@@ -243,21 +265,15 @@ export const writeGroups = (
       const convexDirectory = yield* ConvexDirectory.get;
       const relativeModulePath = yield* GroupPath.modulePath(group.path);
       const modulePath = path.join(convexDirectory, relativeModulePath);
-      const change =
-        group.directExports === true
-          ? yield* generateConvexModule(group, modulePath, relativeModulePath)
-          : yield* generateGroupModule({
-              groupPath: group.path,
-              functionNames: group.functionNames,
-              registeredFunctionsImportPath:
-                yield* registeredFunctionsImportPathForGroup(
-                  group.path,
-                  modulePath,
-                ),
-              useNode: group.runtime === "Node",
-              experimental_reuseContext:
-                group.experimental_reuseContext === true,
-            });
+      const registeredFunctionsImportPath =
+        yield* registeredFunctionsImportPathForGroup(group.path, modulePath);
+      const change = yield* generateGroupModule({
+        groupPath: group.path,
+        functionNames: group.functionNames,
+        registeredFunctionsImportPath,
+        useNode: group.runtime === "Node",
+        experimental_reuseContext: group.experimental_reuseContext === true,
+      });
       yield* Match.value(change).pipe(
         Match.when("Added", () => logFileAdded(modulePath)),
         Match.when("Modified", () => logFileModified(modulePath)),
@@ -267,50 +283,3 @@ export const writeGroups = (
     }),
     { concurrency: 1 },
   );
-
-const generateConvexModule = Effect.fnUntraced(function* (
-  group: GenerationSnapshot.GroupSummary,
-  modulePath: string,
-  relativeModulePath: string,
-) {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const base = yield* toModuleImportPath(
-    path.relative(
-      path.dirname(modulePath),
-      path.join(confectDirectory, relativeModulePath),
-    ),
-  );
-  const JsonString = Schema.fromJsonString(Schema.String);
-  const source = yield* Schema.encodeEffect(JsonString)(`${base}.impl`).pipe(
-    Effect.orDie,
-  );
-  const spec = yield* Schema.encodeEffect(JsonString)(`${base}.spec`).pipe(
-    Effect.orDie,
-  );
-  return yield* writeGroupModule(
-    group.path,
-    Array.join(
-      [
-        ...(group.runtime === "Node" ? ['"use node";', ""] : []),
-        ...Array.map(
-          group.functionNames,
-          (name) => `export { ${name} } from ${source};`,
-        ),
-        ...(group.experimental_reuseContext === true
-          ? ["export const experimental_reuseContext = true;"]
-          : []),
-        "",
-        'import type { InvalidConvexExports } from "@confect/core/FunctionSpec";',
-        `import type * as native from ${source};`,
-        `import type group from ${spec};`,
-        "",
-        'type Specs = (typeof group)["~Functions"];',
-        "type Assert<T extends never> = T;",
-        "declare type _Check = Assert<InvalidConvexExports<Specs, typeof native>>;",
-        "",
-      ],
-      "\n",
-    ),
-  );
-});

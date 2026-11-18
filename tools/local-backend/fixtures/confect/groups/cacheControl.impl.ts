@@ -1,18 +1,13 @@
-import { query } from "../../convex/_generated/server";
+import { GroupImpl } from "@confect/server";
+import * as Layer from "effect/Layer";
+import { FunctionImpl } from "../_generated/server";
+import { control, snapshot } from "./cacheControl";
+import cacheControl from "./cacheControl.spec";
 
-/**
- * Positive control: a vanilla Convex query that calls `Date.now()` and so
- * observes time. The local backend evicts it from the reactive cache after
- * `MAX_CACHE_AGE`, and the returned timestamp changes between executions,
- * letting the test detect re-execution.
- */
-export const control = query({
-  args: {},
-  // oxlint-disable-next-line effecttsgo/global-date -- The raw clock read is the positive control for Convex's cache tracker.
-  handler: () => Date.now(),
-});
+const controlImpl = FunctionImpl.make(cacheControl, "control", control);
 
-export const snapshot = query({
-  args: {},
-  handler: (ctx) => ctx.meta.getSnapshotTs(),
-});
+export default GroupImpl.make(cacheControl).pipe(
+  Layer.provide(controlImpl),
+  Layer.provide(FunctionImpl.make(cacheControl, "snapshot", snapshot)),
+  GroupImpl.finalize,
+);

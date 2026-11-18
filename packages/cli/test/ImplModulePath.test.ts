@@ -24,7 +24,6 @@ it.each([
   "groups/.impl.ts",
   "groups\\.impl.ts",
   "notes.spec.ts",
-  "notes.native.ts",
   "notes.impl.tsx",
   "notes.impl.js",
   "notes.impl.ts/child",

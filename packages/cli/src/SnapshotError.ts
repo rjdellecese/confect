@@ -10,7 +10,6 @@ export class SnapshotError extends Schema.TaggedError<
     "DuplicateLeaf",
     "NoncanonicalFunctionNames",
     "InvalidContextReuse",
-    "InvalidDirectExports",
   ]),
   relativePath: Schema.String,
   pathSegments: Schema.Array(Schema.String),

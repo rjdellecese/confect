@@ -24,7 +24,6 @@ export { SnapshotError } from "./SnapshotError";
 export const GroupSummary = Schema.Struct({
   path: GroupPath.GroupPath,
   runtime: Schema.Literals(["Convex", "Node"]),
-  directExports: Schema.optionalKey(Schema.Literal(true)),
   experimental_reuseContext: Schema.optionalKey(Schema.Boolean),
   functionNames: Schema.Array(Schema.NonEmptyString),
 });
@@ -32,7 +31,6 @@ export type GroupSummary = typeof GroupSummary.Type;
 
 export interface GroupTree {
   readonly runtime: "Convex" | "Node";
-  readonly directExports?: true;
   readonly experimental_reuseContext?: boolean;
   readonly functionNames: ReadonlyArray<string>;
   readonly groups: { readonly [name: string]: GroupTree };
@@ -40,7 +38,6 @@ export interface GroupTree {
 
 export const GroupTree: Schema.Codec<GroupTree> = Schema.Struct({
   runtime: GroupSummary.fields.runtime,
-  directExports: GroupSummary.fields.directExports,
   experimental_reuseContext: GroupSummary.fields.experimental_reuseContext,
   functionNames: GroupSummary.fields.functionNames,
   groups: Schema.Record(
@@ -85,23 +82,8 @@ const parseTree = (
   relativePath: SpecModulePath.SpecModulePath,
   path: GroupPath.GroupPath,
   tree: GroupTree,
-  atLeafRoot = true,
 ): Result.Result<GroupTree, SnapshotError> =>
   Result.gen(function* () {
-    if (
-      tree.directExports === true &&
-      (!atLeafRoot ||
-        tree.functionNames.length === 0 ||
-        !Record.isEmptyRecord(tree.groups))
-    ) {
-      return yield* Result.fail(
-        SnapshotError.make({
-          reason: "InvalidDirectExports",
-          relativePath,
-          pathSegments: path.pathSegments,
-        }),
-      );
-    }
     if (
       tree.experimental_reuseContext === true &&
       (tree.runtime === "Node" ||
@@ -149,12 +131,7 @@ const parseTree = (
             pathSegments: [...path.pathSegments, name],
           }),
       });
-      yield* parseTree(
-        relativePath,
-        GroupPath.append(path, name),
-        child,
-        false,
-      );
+      yield* parseTree(relativePath, GroupPath.append(path, name), child);
     }
     return tree;
   });
@@ -257,17 +234,13 @@ export const GenerationSnapshot = Entries.pipe(
   ),
 );
 
-const summarize = (
-  group: GroupSpec.AnyWithProps,
-  directExports: boolean,
-): GroupTree => ({
+const summarize = (group: GroupSpec.AnyWithProps): GroupTree => ({
   runtime: group.runtime,
-  ...(directExports ? { directExports: true } : {}),
   ...(group.experimental_reuseContext
     ? { experimental_reuseContext: true }
     : {}),
   functionNames: Record.keys(group.functions),
-  groups: Record.map(group.groups, (child) => summarize(child, false)),
+  groups: Record.map(group.groups, summarize),
 });
 
 export const update = (
@@ -297,7 +270,7 @@ export const fromLoadedLeaves = (
       (leaf) =>
         [
           String.replaceAll("\\", "/")(leaf.relativePath),
-          summarize(leaf.spec, leaf.directExports),
+          summarize(leaf.spec),
         ] as const,
     ),
   );
@@ -310,7 +283,6 @@ const groups = (snapshot: GenerationSnapshot): ReadonlyArray<GroupSummary> => {
     {
       path,
       runtime: tree.runtime,
-      ...(tree.directExports === true ? { directExports: true } : {}),
       ...(tree.experimental_reuseContext === true
         ? { experimental_reuseContext: true }
         : {}),

@@ -5,7 +5,7 @@ import type {
   echoQuery,
   read,
   write,
-} from "./clients.impl";
+} from "./clients";
 
 export default GroupSpec.make()
   .addFunction(FunctionSpec.convexPublicQuery<typeof echoQuery>()("echoQuery"))

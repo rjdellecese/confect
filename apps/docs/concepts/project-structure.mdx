@@ -23,6 +23,7 @@ description: "Understand the structure of a Confect project."
           <Tree.File name="notes.ts" />
           <Tree.File name="random.ts" />
         </Tree.Folder>
+        <Tree.File name="workpool.ts" />
       </Tree.Folder>
       <Tree.Folder name="tables" defaultOpen>
         <Tree.File name="notes.ts" />
@@ -78,7 +79,7 @@ Exports an `Id` schema constructor and an `Id<TableName>` TypeScript type. Use `
 
 #### `registeredFunctions/`
 
-For groups that use an implementation layer, each module (for example `registeredFunctions/notes_and_random/notes.ts`) registers its own group's functions for the Convex CLI. These modules are consumed by the generated `convex/` files; you should not need to import them directly. For groups containing only [plain Convex functions](/server/plain-convex-functions), the generated `convex/` entry re-exports the declared functions directly from the group's `.impl.ts`.
+Contains one module per group (for example `registeredFunctions/notes_and_random/notes.ts`), each exporting that group's functions in a form the Convex CLI can consume. These modules are consumed by the generated `convex/` files; you should not need to import them directly.
 
 #### `refs.ts`
 
@@ -142,7 +143,7 @@ Defines your [middleware](/server/middleware), as a `<Name>.spec.ts`/`<Name>.imp
 
 <Badge color="green">Required</Badge>
 
-Each function group has a `*.spec.ts` and a sibling `*.impl.ts`. The path within `confect/` determines the group's name. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
+Your Convex API is defined as colocated `*.spec.ts`/`*.impl.ts` pairs, one pair per group. Each file's path within `confect/` becomes the group's name. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
 
 ## Rules
 
