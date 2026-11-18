@@ -1,1 +1,1 @@
-export const tableNames = ["notes", "tags", "users"] as const;
+export default ["notes", "tags", "users"] as const;

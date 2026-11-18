@@ -10,7 +10,7 @@ import type { RegisteredQuery } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { tableNames } from "./mock-backend/fixtures/confect/_generated/tableNames";
+import tableNames from "./mock-backend/fixtures/confect/_generated/tableNames";
 import registeredFunctions from "./mock-backend/fixtures/confect/_generated/registeredFunctions/groups/notes";
 // Imported as a value (not `import type`) because its type parameterizes
 // `buildForGroup` via `typeof notesSpec`, and `typeof` requires a value

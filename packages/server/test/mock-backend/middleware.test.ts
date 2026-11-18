@@ -12,7 +12,7 @@ import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 import notesTable from "./fixtures/confect/_generated/tables/notes";
 import usersTable from "./fixtures/confect/_generated/tables/users";
-import { tableNames } from "./fixtures/confect/_generated/tableNames";
+import tableNames from "./fixtures/confect/_generated/tableNames";
 import type databaseSchema from "./fixtures/confect/_generated/schema";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
 import { NameRejected } from "./fixtures/confect/middleware/RequireName.spec";

@@ -83,7 +83,7 @@ const latestLabel = (name: "notes" | "users") =>
   });
 ```
 
-An admin tool that needs **every** table can opt in to the full registry with `DatabaseSchema.tables(schema)`, where `schema` is the default export of `_generated/schema` and `DatabaseSchema` comes from `@confect/server`. This brings every table module into that tool's runtime dependencies. For a list of application table **names** without codecs, import `{ tableNames }` from `_generated/tableNames` instead.
+An admin tool that needs **every** table can opt in to the full registry with `DatabaseSchema.tables(schema)`, where `schema` is the default export of `_generated/schema` and `DatabaseSchema` comes from `@confect/server`. This brings every table module into that tool's runtime dependencies. For a list of application table **names** without codecs, use the default import instead: `import tableNames from "./_generated/tableNames"`.
 
 ## Document IDs
 

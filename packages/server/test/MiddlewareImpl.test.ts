@@ -23,7 +23,7 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { tableNames } from "./mock-backend/fixtures/confect/_generated/tableNames";
+import tableNames from "./mock-backend/fixtures/confect/_generated/tableNames";
 import type databaseSchema from "./mock-backend/fixtures/confect/_generated/schema";
 import type { NoViewer } from "./mock-backend/fixtures/confect/middleware/ProvideViewer.spec";
 import ProvideViewer, {

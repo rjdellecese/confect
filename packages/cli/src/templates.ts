@@ -176,7 +176,7 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
 });
 
 export const tableNames = (names: ReadonlyArray<string>) =>
-  `export const tableNames = [${Array.join(
+  `export default [${Array.join(
     Array.map(names, (name) => `"${name}"`),
     ", ",
   )}] as const;\n`;
@@ -201,7 +201,7 @@ export const MiddlewareImpl = MiddlewareImpl_.forSchema<typeof schema>();
  */
 export const id = `import { GenericId } from "@confect/core";
 import type { SystemTableNames } from "convex/server";
-import type { tableNames } from "./tableNames";
+import type tableNames from "./tableNames";
 
 export type TableNames = (typeof tableNames)[number];
 
@@ -489,9 +489,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   }
 
   if (usesTableNames) {
-    yield* cbw.writeLine(
-      `import { tableNames } from "${tableNamesImportPath}";`,
-    );
+    yield* cbw.writeLine(`import tableNames from "${tableNamesImportPath}";`);
   }
   yield* cbw.writeLine(`import groupLayer from "${implImportPath}";`);
   yield* cbw.blankLine();

@@ -1,1 +1,1 @@
-export const tableNames = ["httpVectors", "transactionNotes"] as const;
+export default ["httpVectors", "transactionNotes"] as const;

@@ -1,6 +1,6 @@
 import { GenericId } from "@confect/core";
 import type { SystemTableNames } from "convex/server";
-import type { tableNames } from "./tableNames";
+import type tableNames from "./tableNames";
 
 export type TableNames = (typeof tableNames)[number];
 

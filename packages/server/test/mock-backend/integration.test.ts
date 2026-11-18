@@ -21,7 +21,7 @@ import eventsTable from "./fixtures/confect/_generated/tables/events";
 import notesTable from "./fixtures/confect/_generated/tables/notes";
 import tagsTable from "./fixtures/confect/_generated/tables/tags";
 import usersTable from "./fixtures/confect/_generated/tables/users";
-import { tableNames } from "./fixtures/confect/_generated/tableNames";
+import tableNames from "./fixtures/confect/_generated/tableNames";
 import confectSchema from "./fixtures/confect/_generated/schema";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
 import type * as CompilerOptions from "confect-test-types/CompilerOptions";

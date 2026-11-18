@@ -1,5 +1,5 @@
 import { ConvexFunctionDefinitions, RegisteredConvexFunction, type RegisteredFunctions } from "@confect/server";
-import { tableNames } from "../../tableNames";
+import tableNames from "../../tableNames";
 import groupLayer from "../../../groups/cjsImporter.impl";
 
 const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
