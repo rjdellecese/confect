@@ -94,7 +94,7 @@
       },
       {
         "group": "Guides",
-        "pages": ["guides/testing", "guides/migrating-table-handles"]
+        "pages": ["guides/testing"]
       }
     ]
   },
@@ -257,10 +257,6 @@
       "destination": "/guides/testing"
     },
     {
-      "source": "/v9/guides/migrating-table-handles",
-      "destination": "/guides/migrating-table-handles"
-    },
-    {
       "source": "/v10/getting-started/introduction",
       "destination": "/getting-started/introduction"
     },
@@ -395,10 +391,6 @@
     {
       "source": "/v10/guides/testing",
       "destination": "/guides/testing"
-    },
-    {
-      "source": "/v10/guides/migrating-table-handles",
-      "destination": "/guides/migrating-table-handles"
     }
   ]
 }
