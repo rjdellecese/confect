@@ -33,14 +33,11 @@ Use Effect's `Clock` service when you need the real timestamp:
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import { DatabaseReader } from "./confect/_generated/services";
-import notesTable from "./confect/_generated/tables/notes";
+import notes from "./confect/_generated/tables/notes";
 
 Effect.gen(function* () {
   const reader = yield* DatabaseReader;
-  const rows = yield* reader
-    .table(notesTable)
-    .index("by_creation_time")
-    .collect();
+  const rows = yield* reader.table(notes).index("by_creation_time").collect();
   const fetchedAt = yield* Clock.currentTimeMillis;
 
   return { fetchedAt, rows };

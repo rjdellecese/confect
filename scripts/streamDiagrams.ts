@@ -249,7 +249,7 @@ export const diagrams: Readonly<Record<string, string>> = {
   ),
 
   "rename-key-merge": lines(
-    track("notes", [...BY_TEXT, undefined, undefined, undefined]),
+    track("noteEntries", [...BY_TEXT, undefined, undefined, undefined]),
     track("relabeled", [
       undefined,
       undefined,
@@ -262,7 +262,7 @@ export const diagrams: Readonly<Record<string, string>> = {
       "c3",
     ]),
     "",
-    op("merge([notes, relabeled])"),
+    op("merge([noteEntries, relabeled])"),
     "",
     track("merged", [...BY_TEXT, "c1", "c2", "c3"]),
     keys([...BY_TEXT_KEYS, "[great,7]", "[meh,8]", "[nice,9]"]),

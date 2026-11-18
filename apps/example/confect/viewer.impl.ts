@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl } from "./_generated/server";
 import { DatabaseWriter } from "./_generated/services";
-import notesTable from "./_generated/tables/notes";
+import notes from "./_generated/tables/notes";
 import RequireViewer from "./middleware/RequireViewer.impl";
 import { Viewer } from "./middleware/RequireViewer.spec";
 import viewer from "./viewer.spec";
@@ -21,7 +21,7 @@ const postNote = FunctionImpl.make(viewer, "postNote", ({ text }) =>
     const { user } = yield* Viewer;
     const writer = yield* DatabaseWriter;
 
-    yield* writer.table(notesTable).insert({ text, userId: user._id });
+    yield* writer.table(notes).insert({ text, userId: user._id });
 
     return null;
   }).pipe(Effect.orDie),

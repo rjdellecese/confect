@@ -73,15 +73,15 @@ import * as Effect from "effect/Effect";
 
 import { FunctionImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
-import notesTable from "./_generated/tables/notes";
-import notes, { NoteNotFound } from "./notes.spec";
+import notes from "./_generated/tables/notes";
+import notesSpec, { NoteNotFound } from "./notes.spec";
 
-const getOrFail = FunctionImpl.make(notes, "getOrFail", ({ noteId }) =>
+const getOrFail = FunctionImpl.make(notesSpec, "getOrFail", ({ noteId }) =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
     return yield* reader
-      .table(notesTable)
+      .table(notes)
       .get(noteId)
       .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
   }),

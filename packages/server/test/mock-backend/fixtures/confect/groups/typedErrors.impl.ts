@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import { FunctionImpl } from "../_generated/server";
-import notesTable from "../_generated/tables/notes";
+import notes from "../_generated/tables/notes";
 import refs from "../_generated/refs";
 import {
   ActionRunner,
@@ -23,7 +23,7 @@ const getNoteOrFail = FunctionImpl.make(
       const reader = yield* DatabaseReader;
 
       return yield* reader
-        .table(notesTable)
+        .table(notes)
         .get(noteId)
         .pipe(Effect.mapError(() => NotFound.make({ id: noteId })));
     }),
@@ -42,11 +42,11 @@ const deleteNoteOrFail = FunctionImpl.make(
       const writer = yield* DatabaseWriter;
 
       yield* reader
-        .table(notesTable)
+        .table(notes)
         .get(noteId)
         .pipe(Effect.mapError(() => NotFound.make({ id: noteId })));
 
-      yield* writer.table(notesTable).delete(noteId);
+      yield* writer.table(notes).delete(noteId);
 
       return null;
     }),
@@ -74,7 +74,7 @@ const insertThenFail = FunctionImpl.make(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      yield* writer.table(notesTable).insert({ text }).pipe(Effect.orDie);
+      yield* writer.table(notes).insert({ text }).pipe(Effect.orDie);
 
       return yield* NotFound.make({ id: "rolled-back" });
     }),
@@ -158,7 +158,7 @@ const internalGetNoteOrFail = FunctionImpl.make(
       const reader = yield* DatabaseReader;
 
       return yield* reader
-        .table(notesTable)
+        .table(notes)
         .get(noteId)
         .pipe(Effect.mapError(() => NotFound.make({ id: noteId })));
     }),

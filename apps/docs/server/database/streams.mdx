@@ -20,16 +20,16 @@ import { QueryStream } from "@confect/server";
 import * as Effect from "effect/Effect";
 import { FunctionImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
-import notesTable from "./_generated/tables/notes";
-import notes from "./notes.spec";
+import notes from "./_generated/tables/notes";
+import notesSpec from "./notes.spec";
 
-const feed = FunctionImpl.make(notes, "feed", ({ paginationOpts }) =>
+const feed = FunctionImpl.make(notesSpec, "feed", ({ paginationOpts }) =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
     const byRole = (role: "admin" | "user") =>
       reader
-        .table(notesTable)
+        .table(notes)
         .stream("by_role", (q) => q.eq("author.role", role), "desc");
 
     return yield* QueryStream.merge([byRole("admin"), byRole("user")]).pipe(
@@ -49,8 +49,8 @@ const feed = FunctionImpl.make(notes, "feed", ({ paginationOpts }) =>
 </Warning>
 
 <Note>
-  `reader.table(notesTable).stream(...)` is different from
-  `reader.table(notesTable).index(...).stream()` on the
+  `reader.table(notes).stream(...)` is different from
+  `reader.table(notes).index(...).stream()` on the
   [Reading](/server/database/reading#stream) page. The latter is a plain
   `Stream` over one query; the former is a composable query stream.
 </Note>
@@ -134,19 +134,19 @@ by_text
 Creating or composing a stream does not read documents. Reads begin when you run a consuming effect, such as `Stream.runCollect` or `QueryStream.paginate`; each run executes the queries again.
 
 ```ts Every note, sorted by text
-reader.table(notesTable).stream("by_text");
+reader.table(notes).stream("by_text");
 ```
 
 ```ts Every note, sorted by text, descending
-reader.table(notesTable).stream("by_text", "desc");
+reader.table(notes).stream("by_text", "desc");
 ```
 
 ```ts Notes whose text is at least "banana", sorted by text
-reader.table(notesTable).stream("by_text", (q) => q.gte("text", "banana"));
+reader.table(notes).stream("by_text", (q) => q.gte("text", "banana"));
 ```
 
 ```ts Notes whose text is exactly "apple", sorted by creation time
-reader.table(notesTable).stream("by_text", (q) => q.eq("text", "apple"));
+reader.table(notes).stream("by_text", (q) => q.eq("text", "apple"));
 ```
 
 The four streams over the example data, with each element's key. A bound keeps a field in the key; pinning with `eq` removes it:
@@ -214,7 +214,7 @@ Layouts are **compatible** when they have the same total width, the same labels 
 Reuse a stream's `keyLayout` when calling `empty` or supplying `flatMap`'s `innerKeyLayout`. Creating a stream to obtain its layout reads no documents. Let TypeScript infer the layout type from that stream:
 
 ```ts
-const keyLayout = reader.table(notesTable).stream("by_text").keyLayout;
+const keyLayout = reader.table(notes).stream("by_text").keyLayout;
 ```
 
 The inferred type tracks labels; implicit-ID positions are checked at runtime. For explicit `narrow` bounds, pass key **values**, including any intervening implicit IDs. For `distinct`, pass a prefix of the **labels**; for `renameKey`, pass replacement labels for every labeled position.
@@ -236,10 +236,10 @@ Pass the document type as a type argument, then reuse a compatible stream's `key
 import { QueryStream } from "@confect/server";
 import * as Array from "effect/Array";
 import type { NotesDoc } from "./confect/_generated/docs";
-import notesTable from "./confect/_generated/tables/notes";
+import notes from "./confect/_generated/tables/notes";
 
 const byRole = (role: "admin" | "user") =>
-  reader.table(notesTable).stream("by_role", (q) => q.eq("author.role", role));
+  reader.table(notes).stream("by_role", (q) => q.eq("author.role", role));
 
 const notesByRoles = (roles: ReadonlyArray<"admin" | "user">) =>
   Array.match(roles, {
@@ -260,7 +260,7 @@ import * as Stream from "effect/Stream";
 
 Effect.gen(function* () {
   const firstTwoTexts = yield* reader
-    .table(notesTable)
+    .table(notes)
     .stream("by_text")
     .pipe(
       QueryStream.map((note) => note.text),
@@ -279,7 +279,7 @@ import * as Effect from "effect/Effect";
 
 Effect.gen(function* () {
   const cherry = yield* QueryStream.unique(
-    reader.table(notesTable).stream("by_text", (q) => q.eq("text", "cherry")),
+    reader.table(notes).stream("by_text", (q) => q.eq("text", "cherry")),
   );
 });
 ```
@@ -311,10 +311,10 @@ It is an ordered merge, the step of merge sort that combines sorted runs, always
 
 ```ts
 const admin = reader
-  .table(notesTable)
+  .table(notes)
   .stream("by_role", (q) => q.eq("author.role", "admin"));
 const user = reader
-  .table(notesTable)
+  .table(notes)
   .stream("by_role", (q) => q.eq("author.role", "user"));
 
 const merged = QueryStream.merge([admin, user]);
@@ -347,7 +347,7 @@ Inputs must have compatible document types and matching key layouts and directio
 
 ```ts
 reader
-  .table(notesTable)
+  .table(notes)
   .stream("by_text")
   .pipe(
     QueryStream.filter((note) => note.tag !== "hidden"),
@@ -382,16 +382,16 @@ A mapper may replace any emitted fields, including fields named in the index, or
 When the predicate or mapper needs to run an effect—read another table, use a service, or fail with a typed error—use `QueryStream.filterEffect` and `QueryStream.mapEffect` instead. They behave the same way, and the effect's error and requirement types flow into the stream's:
 
 ```ts
-import commentsTable from "./_generated/tables/comments";
+import comments from "./_generated/tables/comments";
 
 // Comments on notes that aren't hidden.
 reader
-  .table(commentsTable)
+  .table(comments)
   .stream("by_body")
   .pipe(
     QueryStream.filterEffect((comment) =>
       reader
-        .table(notesTable)
+        .table(notes)
         .get(comment.noteId)
         .pipe(Effect.map((note) => note.tag !== "hidden")),
     ),
@@ -403,13 +403,13 @@ Both run one document's effect at a time by default. Pass `{ concurrency }` to r
 ```ts
 // Each comment with its note attached.
 reader
-  .table(commentsTable)
+  .table(comments)
   .stream("by_body")
   .pipe(
     QueryStream.mapEffect(
       (comment) =>
         reader
-          .table(notesTable)
+          .table(notes)
           .get(comment.noteId)
           .pipe(Effect.map((note) => ({ ...comment, note }))),
       { concurrency: 8 },
@@ -426,7 +426,7 @@ After a group's first document, `distinct` seeks past the group with a fresh ind
 ```ts
 // One note per distinct text.
 reader
-  .table(notesTable)
+  .table(notes)
   .stream("by_text")
   .pipe(QueryStream.distinct(["text"]));
 ```
@@ -458,7 +458,7 @@ Operation order determines which document represents each group. Apply `filter` 
 Endpoints follow **stream order**: on an ascending stream, `start` is the lower key; on a descending stream, it is the upper key. Narrowing intersects existing bounds, so repeated calls can only restrict the range further.
 
 ```ts
-const between = QueryStream.narrow(reader.table(notesTable).stream("by_text"), {
+const between = QueryStream.narrow(reader.table(notes).stream("by_text"), {
   start: { keyValues: ["banana", 2, "n2"], inclusive: false },
   end: { keyValues: ["cherry", 4, "n4"], inclusive: true },
 });
@@ -490,7 +490,7 @@ const startTime = Date.UTC(2026, 0, 1);
 const endTime = Date.UTC(2026, 0, 2);
 
 const duringDay = reader
-  .table(notesTable)
+  .table(notes)
   .stream("by_creation_time")
   .pipe(
     QueryStream.narrow({
@@ -524,15 +524,13 @@ import { QueryStream } from "@confect/server";
 // The comments on admin notes, grouped by note in note order and by
 // creation time within each note.
 const commentsOn = (note: NotesDoc) =>
-  reader
-    .table(commentsTable)
-    .stream("by_note", (q) => q.eq("noteId", note._id));
+  reader.table(comments).stream("by_note", (q) => q.eq("noteId", note._id));
 const innerKeyLayout = reader
-  .table(commentsTable)
+  .table(comments)
   .stream("by_creation_time").keyLayout;
 
 reader
-  .table(notesTable)
+  .table(notes)
   .stream("by_role", (q) => q.eq("author.role", "admin"))
   .pipe(QueryStream.flatMap(commentsOn, { innerKeyLayout }));
 ```
@@ -568,12 +566,12 @@ For renamed inner streams, apply the same renaming to the template and the strea
 ```ts
 const labelCommentTime = QueryStream.renameKey(["commentTime"]);
 const renamedInnerKeyLayout = reader
-  .table(commentsTable)
+  .table(comments)
   .stream("by_creation_time")
   .pipe(labelCommentTime).keyLayout;
 
 reader
-  .table(notesTable)
+  .table(notes)
   .stream("by_role", (q) => q.eq("author.role", "admin"))
   .pipe(
     QueryStream.flatMap((note) => commentsOn(note).pipe(labelCommentTime), {
@@ -592,7 +590,7 @@ By default an outer document whose inner stream is empty contributes nothing. Pa
 // Every admin note with its comments, and notes without any as a single
 // entry saying so.
 reader
-  .table(notesTable)
+  .table(notes)
   .stream("by_role", (q) => q.eq("author.role", "admin"))
   .pipe(
     QueryStream.flatMap(
@@ -645,24 +643,23 @@ interface Entry {
 }
 
 // Notes and comments together, alphabetically by their text.
-const entries = QueryStream.merge([
-  reader
-    .table(notesTable)
-    .stream("by_text") // visible ordering labels: ["text", "_creationTime"]
-    .pipe(
-      QueryStream.map((note): Entry => ({ kind: "note", text: note.text })),
-    ),
-  reader
-    .table(commentsTable)
-    .stream("by_body") // visible ordering labels: ["body", "_creationTime"]
-    .pipe(
-      QueryStream.map((comment): Entry => ({
-        kind: "comment",
-        text: comment.body,
-      })),
-      QueryStream.renameKey(["text", "_creationTime"]),
-    ),
-]);
+const noteEntries = reader
+  .table(notes)
+  .stream("by_text") // visible ordering labels: ["text", "_creationTime"]
+  .pipe(QueryStream.map((note): Entry => ({ kind: "note", text: note.text })));
+
+const relabeled = reader
+  .table(comments)
+  .stream("by_body") // visible ordering labels: ["body", "_creationTime"]
+  .pipe(
+    QueryStream.map((comment): Entry => ({
+      kind: "comment",
+      text: comment.body,
+    })),
+    QueryStream.renameKey(["text", "_creationTime"]),
+  );
+
+const entries = QueryStream.merge([noteEntries, relabeled]);
 ```
 
 Relabeling changes the visible labels; key values and implicit-ID positions stay the same:
@@ -686,12 +683,12 @@ With matching key labels and implicit-ID positions, the two streams merge by the
 {/* stream-diagram: rename-key-merge */}
 
 ```text
-notes
+noteEntries
 ╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────────────────────────────────────────┤
 relabeled
 ╰───────────────────────────────────────────────────────────────────────── c1 ──────── c2 ──────── c3 ───────┤
 
-╞═ merge([notes, relabeled]) ═╡
+╞═ merge([noteEntries, relabeled]) ═╡
 
 merged
 ╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ──────── c1 ──────── c2 ──────── c3 ───────┤
@@ -760,7 +757,7 @@ import { QueryStream } from "@confect/server";
 import * as Effect from "effect/Effect";
 
 Effect.gen(function* () {
-  const query = reader.table(notesTable).stream("by_text");
+  const query = reader.table(notes).stream("by_text");
   const first = yield* QueryStream.paginate(query, {
     cursor: null,
     numItems: 2,
@@ -855,6 +852,6 @@ QueryStream<Doc, KeyLabels, OrderDirection, Error, Requirements>
 | `Error` (`E`)        | Typed failures while reading or transforming values. `never` means no typed failures, not no defects.                                                                                                   |
 | `Requirements` (`R`) | Effect services needed to run the stream. `never` means no outstanding service requirements.                                                                                                            |
 
-For example, the notes `by_text` query carries branded labels for `["text", "_creationTime"]`, emits decoded notes in `"asc"` order, and can fail with `DocumentDecodeError`. For a type alias, prefer `typeof notes` from an existing stream rather than manually supplying its parameters. The `KeyLabels` parameter requires the brand; a plain string tuple is not a labels type. It retains the database access supplied when it was created, so consuming it doesn't require providing `DatabaseReader` again. `mapEffect` and other effectful operations can add errors and service requirements.
+For example, the notes `by_text` query carries branded labels for `["text", "_creationTime"]`, emits decoded notes in `"asc"` order, and can fail with `DocumentDecodeError`. For a type alias, use `typeof query` on the stream in the [pagination example](#result) rather than manually supplying its parameters. The `KeyLabels` parameter requires the brand; a plain string tuple is not a labels type. It retains the database access supplied when it was created, so consuming it doesn't require providing `DatabaseReader` again. `mapEffect` and other effectful operations can add errors and service requirements.
 
 A `QueryStream<Doc, KeyLabels, OrderDirection, E, R>` is also a `Stream<Doc, E, R>`; only `QueryStream` carries the visible-label and direction types and the runtime key layout.

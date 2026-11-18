@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import notesTable from "../_generated/tables/notes";
+import notes from "../_generated/tables/notes";
 import { DatabaseWriter } from "../_generated/services";
 
 /**
@@ -10,5 +10,5 @@ import { DatabaseWriter } from "../_generated/services";
 export const insertMarker = Effect.fnUntraced(function* (text: string) {
   const writer = yield* DatabaseWriter;
 
-  yield* writer.table(notesTable).insert({ text });
+  yield* writer.table(notes).insert({ text });
 }, Effect.orDie);

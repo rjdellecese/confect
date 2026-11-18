@@ -11,7 +11,7 @@ import {
   RequestMetadata,
   TransactionMetadata,
 } from "../_generated/services";
-import transactionNotesTable from "../_generated/tables/transactionNotes";
+import transactionNotes from "../_generated/tables/transactionNotes";
 import metadata, { ObserveExecution } from "./metadata.spec";
 
 const readExecution = Effect.gen(function* () {
@@ -89,7 +89,7 @@ const snapshotMutation = FunctionImpl.make(metadata, "snapshotMutation", () =>
     const writer = yield* DatabaseWriter;
     const before = yield* transaction.getSnapshotTs();
     yield* writer
-      .table(transactionNotesTable)
+      .table(transactionNotes)
       .insert({ caseId: "snapshot-metadata", value: "pending" });
     return { before, after: yield* transaction.getSnapshotTs() };
   }).pipe(Effect.orDie),

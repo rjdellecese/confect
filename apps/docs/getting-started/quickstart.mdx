@@ -156,29 +156,29 @@ for how it affects optional properties and schema validation.
 
     import { FunctionImpl } from "./_generated/server";
     import { DatabaseReader, DatabaseWriter } from "./_generated/services";
-    import notesTable from "./_generated/tables/notes";
-    import notes from "./notes.spec";
+    import notes from "./_generated/tables/notes";
+    import notesSpec from "./notes.spec";
 
-    const list = FunctionImpl.make(notes, "list", () =>
+    const list = FunctionImpl.make(notesSpec, "list", () =>
       Effect.gen(function* () {
         const reader = yield* DatabaseReader;
 
         return yield* reader
-          .table(notesTable)
+          .table(notes)
           .index("by_creation_time", "desc")
           .collect();
       }).pipe(Effect.orDie),
     );
 
-    const create = FunctionImpl.make(notes, "create", ({ text }) =>
+    const create = FunctionImpl.make(notesSpec, "create", ({ text }) =>
       Effect.gen(function* () {
         const writer = yield* DatabaseWriter;
 
-        return yield* writer.table(notesTable).insert({ text });
+        return yield* writer.table(notes).insert({ text });
       }).pipe(Effect.orDie),
     );
 
-    export default GroupImpl.make(notes).pipe(
+    export default GroupImpl.make(notesSpec).pipe(
       Layer.provide(list),
       Layer.provide(create),
       GroupImpl.finalize,

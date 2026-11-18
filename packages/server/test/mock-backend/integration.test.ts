@@ -17,10 +17,10 @@ import {
 import { createLocalJWKSet, errors, jwtVerify } from "jose";
 import * as Console from "effect/Console";
 import * as TestConsole from "effect/testing/TestConsole";
-import eventsTable from "./fixtures/confect/_generated/tables/events";
-import notesTable from "./fixtures/confect/_generated/tables/notes";
-import tagsTable from "./fixtures/confect/_generated/tables/tags";
-import usersTable from "./fixtures/confect/_generated/tables/users";
+import events from "./fixtures/confect/_generated/tables/events";
+import notes from "./fixtures/confect/_generated/tables/notes";
+import tags from "./fixtures/confect/_generated/tables/tags";
+import users from "./fixtures/confect/_generated/tables/users";
 import tableNames from "./fixtures/confect/_generated/tableNames";
 import confectSchema from "./fixtures/confect/_generated/schema";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
@@ -326,10 +326,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             vi.setSystemTime(1_750_000_001_000);
             const writer = yield* DatabaseWriter;
             const reader = yield* DatabaseReader;
-            const id = yield* writer
-              .table(notesTable)
-              .insert({ text: "pinned" });
-            const doc = yield* reader.table(notesTable).get(id);
+            const id = yield* writer.table(notes).insert({ text: "pinned" });
+            const doc = yield* reader.table(notes).get(id);
             const after = yield* Clock.currentTimeMillis;
             expect(before).toBe(1_750_000_000_000);
             expect(after).toBe(before);
@@ -350,12 +348,12 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               const reader = yield* DatabaseReader;
               for (let i = 0; i < 1025; i++) {
                 yield* writer
-                  .table(notesTable)
+                  .table(notes)
                   .insert({ text: "candidate", tag: "skip" });
               }
               const search = () =>
                 reader
-                  .table(notesTable)
+                  .table(notes)
                   .search("text", (q) => q.search("text", "candidate"));
               const taken = yield* search().take(2);
               expect(taken).toHaveLength(2);
@@ -392,14 +390,14 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             Effect.gen(function* () {
               const writer = yield* DatabaseWriter;
               const reader = yield* DatabaseReader;
-              yield* writer.table(notesTable).insert({ text: "first" });
-              yield* writer.table(notesTable).insert({ text: "second" });
+              yield* writer.table(notes).insert({ text: "first" });
+              yield* writer.table(notes).insert({ text: "second" });
               const first = yield* reader
-                .table(notesTable)
+                .table(notes)
                 .index("by_text")
                 .paginate({ numItems: 1, cursor: null });
               const second = yield* reader
-                .table(notesTable)
+                .table(notes)
                 .index("by_text")
                 .paginate({ numItems: 1, cursor: first.continueCursor });
               expect(Array.map(first.page, (doc) => doc.text)).toEqual([
@@ -457,8 +455,8 @@ describe("mock transaction clocks", () => {
         const writer = yield* DatabaseWriter;
         const reader = yield* DatabaseReader;
         const clock = yield* runner.runQuery(readRef);
-        const id = yield* writer.table(notesTable).insert({ text: "clock" });
-        const doc = yield* reader.table(notesTable).get(id);
+        const id = yield* writer.table(notes).insert({ text: "clock" });
+        const doc = yield* reader.table(notes).get(id);
         const time = yield* Clock.currentTimeMillis;
         expect(time).toBe(clock.time);
         return { ...clock, creationTime: doc._creationTime };
@@ -555,11 +553,11 @@ describe("Generated function registration", () => {
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
             yield* reader
-              .table(notesTable)
+              .table(notes)
               .index("by_text")
               .paginate({ numItems: 1, cursor: null });
             yield* reader
-              .table(notesTable)
+              .table(notes)
               .index("by_text")
               .paginate({ numItems: 1, cursor: null });
             return null;
@@ -642,7 +640,7 @@ describe("DocumentIds", () => {
                 const ids =
                   yield* DocumentIds.DocumentIds<typeof confectSchema>();
                 const id = yield* writer
-                  .table(notesTable)
+                  .table(notes)
                   .insert({ text: "ID inspection" });
                 const identified = yield* ids.identify(id);
                 expect(identified).toEqual(Option.some({ table: "notes", id }));
@@ -1733,7 +1731,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               const snapshot = transaction.getSnapshotTs();
               const timestamp = yield* snapshot;
               expect(typeof timestamp).toBe("bigint");
-              yield* writer.table(notesTable).insert({ text: "snapshot" });
+              yield* writer.table(notes).insert({ text: "snapshot" });
               const repeated = yield* snapshot;
               expect(repeated).toBe(timestamp);
               return timestamp;
@@ -1762,10 +1760,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             const getMetrics = transaction.getMetrics();
             const before = yield* getMetrics;
 
-            const id = yield* writer
-              .table(notesTable)
-              .insert({ text: "metrics" });
-            yield* reader.table(notesTable).get(id);
+            const id = yield* writer.table(notes).insert({ text: "metrics" });
+            yield* reader.table(notes).get(id);
             const after = yield* getMetrics;
 
             expect(after.documentsWritten.used).toBeGreaterThan(
@@ -1820,8 +1816,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
         );
         vi.advanceTimersByTime(0);
         yield* c.finishInProgressScheduledFunctions();
-        const notes = yield* c.query(refs.public.groups.notes.list);
-        expect(Array.map(notes, (note) => note.text)).toEqual(["already due"]);
+        const listedNotes = yield* c.query(refs.public.groups.notes.list);
+        expect(Array.map(listedNotes, (note) => note.text)).toEqual([
+          "already due",
+        ]);
         yield* c.run(
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
@@ -1885,23 +1883,23 @@ describe("DatabaseReader table isolation", () => {
   it.layer(layer, { buildPerTest: true })("table reads", (test) => {
     const readTables = Effect.gen(function* () {
       const reader = yield* Reader;
-      const notes = reader.table(notesTable);
-      const ascending = yield* notes.index("by_creation_time").collect();
-      const descending = yield* notes
+      const noteReader = reader.table(notes);
+      const ascending = yield* noteReader.index("by_creation_time").collect();
+      const descending = yield* noteReader
         .index("by_creation_time", "desc")
         .collect();
-      const indexed = yield* notes
+      const indexed = yield* noteReader
         .index("by_text", (q) => q.eq("text", "hello match"))
         .collect();
-      const searched = yield* notes
+      const searched = yield* noteReader
         .search("text", (q) => q.search("text", "hello").eq("tag", "keep"))
         .collect();
-      const users = yield* reader
-        .table(usersTable)
+      const userDocs = yield* reader
+        .table(users)
         .index("by_creation_time")
         .collect();
-      const events = yield* reader
-        .table(eventsTable)
+      const eventDocs = yield* reader
+        .table(events)
         .index("by_creation_time")
         .collect();
       const other = yield* reader
@@ -1913,13 +1911,10 @@ describe("DatabaseReader table isolation", () => {
         descending: Array.map(descending, (doc) => doc._id),
         indexed: Array.map(indexed, (doc) => doc._id),
         searched: Array.map(searched, (doc) => doc._id),
-        users: Array.map(users, (doc) => doc.username),
-        events: Array.map(events, (doc) => doc._id),
+        users: Array.map(userDocs, (doc) => doc.username),
+        events: Array.map(eventDocs, (doc) => doc._id),
         otherNotes: Array.map(other, (doc) => doc.text),
-        tags: yield* reader
-          .table(tagsTable)
-          .index("by_creation_time")
-          .collect(),
+        tags: yield* reader.table(tags).index("by_creation_time").collect(),
       };
     });
 
@@ -1932,22 +1927,22 @@ describe("DatabaseReader table isolation", () => {
             Effect.gen(function* () {
               const writer = yield* Writer;
               const kept = yield* writer
-                .table(notesTable)
+                .table(notes)
                 .insert({ text: "hello match", tag: "keep" });
               const user = yield* writer
-                .table(usersTable)
+                .table(users)
                 .insert({ username: "hello match" });
               const other = yield* writer
                 .table(otherNotes)
                 .insert({ text: "hello match", tag: "keep" });
               const deleted = yield* writer
-                .table(notesTable)
+                .table(notes)
                 .insert({ text: "hello match", tag: "keep" });
               const event = yield* writer
-                .table(eventsTable)
+                .table(events)
                 .insert({ kind: "a", a: "hello match" });
               const patched = yield* writer
-                .table(notesTable)
+                .table(notes)
                 .insert({ text: "hello match", tag: "keep" });
               return { kept, deleted, patched, user, event, other };
             }),
@@ -1990,9 +1985,11 @@ describe("DatabaseReader table isolation", () => {
             c.run(
               Effect.gen(function* () {
                 const writer = yield* Writer;
-                const notes = writer.table(notesTable);
-                const inserted = yield* notes.insert({ text: "unmatched" });
-                const temporary = yield* notes.insert({
+                const noteWriter = writer.table(notes);
+                const inserted = yield* noteWriter.insert({
+                  text: "unmatched",
+                });
+                const temporary = yield* noteWriter.insert({
                   text: "hello match",
                   tag: "keep",
                 });
@@ -2003,7 +2000,7 @@ describe("DatabaseReader table isolation", () => {
                   .table(otherNotes)
                   .insert({ text: "hello match", tag: "keep" });
                 yield* writer
-                  .table(usersTable)
+                  .table(users)
                   .patch(ids.user, { username: "pending" });
                 const pending = yield* readTables;
                 expect(pending.ascending).toEqual([
@@ -2031,21 +2028,19 @@ describe("DatabaseReader table isolation", () => {
                   "hello match",
                 ]);
                 expect(pending.tags).toEqual([]);
-                yield* notes.delete(temporary);
-                yield* notes.delete(ids.deleted);
-                yield* notes.patch(ids.patched, {
+                yield* noteWriter.delete(temporary);
+                yield* noteWriter.delete(ids.deleted);
+                yield* noteWriter.patch(ids.patched, {
                   text: "goodbye",
                   tag: "skip",
                 });
-                yield* notes.patch(inserted, {
+                yield* noteWriter.patch(inserted, {
                   text: "hello match",
                   tag: "keep",
                 });
-                yield* writer.table(usersTable).delete(ids.user);
-                yield* writer
-                  .table(usersTable)
-                  .insert({ username: "replacement" });
-                yield* writer.table(eventsTable).delete(ids.event);
+                yield* writer.table(users).delete(ids.user);
+                yield* writer.table(users).insert({ username: "replacement" });
+                yield* writer.table(events).delete(ids.event);
                 yield* writer.table(otherNotes).delete(ids.other);
                 const pendingChanges = yield* readTables;
                 expect(pendingChanges).toEqual(changed(inserted));
@@ -2175,7 +2170,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
 
-            return yield* writer.table(notesTable).insert({
+            return yield* writer.table(notes).insert({
               text,
             });
           }),
@@ -2201,7 +2196,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             yield* Effect.forEach(
               Array.range(1, 10),
               (i) =>
-                writer.table(notesTable).insert({
+                writer.table(notes).insert({
                   text: `${i}`,
                 }),
               { concurrency: 1 },
@@ -2209,11 +2204,13 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           }),
         );
 
-        const notes = yield* c.query(refs.public.databaseReader.listNotes);
+        const listedNotes = yield* c.query(
+          refs.public.databaseReader.listNotes,
+        );
 
-        assertEquals(notes.length, 10);
-        assertEquals(notes[0]?.text, "10");
-        assertEquals(notes[9]?.text, "1");
+        assertEquals(listedNotes.length, 10);
+        assertEquals(listedNotes[0]?.text, "10");
+        assertEquals(listedNotes[9]?.text, "1");
       }),
     );
 
@@ -2225,7 +2222,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
             const take = (n: number) =>
-              reader.table(notesTable).index("by_text").take(n);
+              reader.table(notes).index("by_text").take(n);
 
             const takeResult2 = yield* take(0);
             expect(takeResult2).toEqual([]);
@@ -2264,11 +2261,11 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             const writer = yield* DatabaseWriter;
 
             const id = yield* writer
-              .table(notesTable)
+              .table(notes)
               .insert({ text: "original", tag: "draft" });
 
             yield* writer
-              .table(notesTable)
+              .table(notes)
               .patch(id, { text: "patched", tag: undefined });
 
             return id;
@@ -2286,8 +2283,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
     );
 
     test("patch accepts undefined according to field types and compiler optionality", () => {
-      const patchNote = (writer: DatabaseWriter) =>
-        writer.table(notesTable).patch;
+      const patchNote = (writer: DatabaseWriter) => writer.table(notes).patch;
       type Patch = Parameters<ReturnType<typeof patchNote>>[1];
 
       expectTypeOf<{ tag: undefined }>().toExtend<Patch>();
@@ -2317,7 +2313,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
         const note = yield* c.query(refs.public.databaseReader.getNote, {
           noteId,
         });
-        expectTypeOf(note).toEqualTypeOf<(typeof notesTable.Doc)["Type"]>();
+        expectTypeOf(note).toEqualTypeOf<(typeof notes.Doc)["Type"]>();
         assertEquals(note.text, text);
       }),
     );
@@ -2368,7 +2364,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
 
           yield* Effect.forEach(
             Array.range(1, 5),
-            (i) => writer.table(notesTable).insert({ text: `note ${i}` }),
+            (i) => writer.table(notes).insert({ text: `note ${i}` }),
             { concurrency: 1 },
           );
         }),
@@ -2400,7 +2396,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
 
           yield* Effect.forEach(
             Array.range(1, 3),
-            (i) => writer.table(notesTable).insert({ text: `note ${i}` }),
+            (i) => writer.table(notes).insert({ text: `note ${i}` }),
             { concurrency: 1 },
           );
         }),
@@ -2426,17 +2422,11 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
 
-          yield* writer
-            .table(notesTable)
-            .insert({ text: "a", tag: "important" });
-          yield* writer.table(notesTable).insert({ text: "b", tag: "trivial" });
-          yield* writer
-            .table(notesTable)
-            .insert({ text: "c", tag: "important" });
-          yield* writer.table(notesTable).insert({ text: "d", tag: "trivial" });
-          yield* writer
-            .table(notesTable)
-            .insert({ text: "e", tag: "important" });
+          yield* writer.table(notes).insert({ text: "a", tag: "important" });
+          yield* writer.table(notes).insert({ text: "b", tag: "trivial" });
+          yield* writer.table(notes).insert({ text: "c", tag: "important" });
+          yield* writer.table(notes).insert({ text: "d", tag: "trivial" });
+          yield* writer.table(notes).insert({ text: "e", tag: "important" });
         }),
       );
 
@@ -2463,8 +2453,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
 
-          yield* writer.table(notesTable).insert({ text: "a", tag: "trivial" });
-          yield* writer.table(notesTable).insert({ text: "b", tag: "trivial" });
+          yield* writer.table(notes).insert({ text: "a", tag: "trivial" });
+          yield* writer.table(notes).insert({ text: "b", tag: "trivial" });
         }),
       );
 
@@ -2489,7 +2479,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("paginate", (test) => {
           yield* Effect.forEach(
             Array.range(1, 10),
             (i) =>
-              writer.table(notesTable).insert({
+              writer.table(notes).insert({
                 text: `note ${i}`,
                 tag: i % 2 === 0 ? "even" : "odd",
               }),
@@ -2554,8 +2544,8 @@ const insertAndDeleteNote = Effect.gen(function* () {
   return yield* c.run(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
-      const id = yield* writer.table(notesTable).insert({ text: "transient" });
-      yield* writer.table(notesTable).delete(id);
+      const id = yield* writer.table(notes).insert({ text: "transient" });
+      yield* writer.table(notes).delete(id);
       return id;
     }),
     Id("notes"),
@@ -2664,7 +2654,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("typed errors", (test) => {
         const noteId = yield* c.run(
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
-            return yield* writer.table(notesTable).insert({ text: "hello" });
+            return yield* writer.table(notes).insert({ text: "hello" });
           }),
           Id("notes"),
         );
@@ -2716,9 +2706,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("typed errors", (test) => {
         const noteId = yield* c.run(
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
-            return yield* writer
-              .table(notesTable)
-              .insert({ text: "to delete" });
+            return yield* writer.table(notes).insert({ text: "to delete" });
           }),
           Id("notes"),
         );
@@ -2815,8 +2803,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })("typed errors", (test) => {
           assert(matchesSchema8);
           expect(error.id).toBe("rolled-back");
 
-          const notes = yield* c.query(refs.public.databaseReader.listNotes);
-          assertEquals(notes.length, 0);
+          const listedNotes = yield* c.query(
+            refs.public.databaseReader.listNotes,
+          );
+          assertEquals(listedNotes.length, 0);
         }),
     );
   });

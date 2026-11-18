@@ -2,7 +2,7 @@ import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl } from "./_generated/server";
-import notesTable from "./_generated/tables/notes";
+import notes from "./_generated/tables/notes";
 import { DatabaseReader } from "./_generated/services";
 import databaseReader, { PaginationDenied } from "./databaseReader.spec";
 
@@ -13,7 +13,7 @@ export default GroupImpl.make(databaseReader).pipe(
         Effect.gen(function* () {
           const reader = yield* DatabaseReader;
 
-          return yield* reader.table(notesTable).get(noteId);
+          return yield* reader.table(notes).get(noteId);
         }).pipe(Effect.orDie),
       ),
       FunctionImpl.make(databaseReader, "listNotes", () =>
@@ -21,7 +21,7 @@ export default GroupImpl.make(databaseReader).pipe(
           const reader = yield* DatabaseReader;
 
           return yield* reader
-            .table(notesTable)
+            .table(notes)
             .index("by_creation_time", "desc")
             .collect();
         }).pipe(Effect.orDie),
@@ -31,7 +31,7 @@ export default GroupImpl.make(databaseReader).pipe(
           const reader = yield* DatabaseReader;
 
           return yield* reader
-            .table(notesTable)
+            .table(notes)
             .index("by_creation_time")
             .paginate(paginationOpts);
         }).pipe(Effect.orDie),
@@ -44,7 +44,7 @@ export default GroupImpl.make(databaseReader).pipe(
             const reader = yield* DatabaseReader;
 
             return yield* reader
-              .table(notesTable)
+              .table(notes)
               .index("by_creation_time")
               .paginate(paginationOpts, (q) => q.eq(q.field("tag"), tag));
           }).pipe(Effect.orDie),
@@ -61,7 +61,7 @@ export default GroupImpl.make(databaseReader).pipe(
             const reader = yield* DatabaseReader;
 
             return yield* reader
-              .table(notesTable)
+              .table(notes)
               .index("by_creation_time")
               .paginate(paginationOpts)
               .pipe(Effect.orDie);

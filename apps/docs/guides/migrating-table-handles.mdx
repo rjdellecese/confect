@@ -10,7 +10,7 @@ The database reader and writer now take **table handles** rather than strings. T
 
 1. Import `FunctionImpl` and `MiddlewareImpl` from your generated `_generated/server` module. Keep importing `GroupImpl` from `@confect/server`.
 2. Remove the first (database schema) argument from `FunctionImpl.make`, `GroupImpl.make`, `MiddlewareImpl.make`, `MiddlewareImpl.provides`, and `MiddlewareImpl.makeByFunctionType`. Remove the runtime schema import too. The generated builders carry the application model as a type.
-3. In each handler, helper, or middleware that reads or writes documents, import its table handles directly from `_generated/tables/<name>`. Replace calls such as `reader.table("notes")` with `reader.table(notesTable)`. Keep the rest of the query or write unchanged.
+3. In each handler, helper, or middleware that reads or writes documents, import its table handles directly from `_generated/tables/<name>`. Replace calls such as `reader.table("notes")` with `reader.table(notes)`. Keep the rest of the query or write unchanged.
 
 ```ts confect/notes.impl.ts
 import { GroupImpl } from "@confect/server";
@@ -18,17 +18,17 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
-import notesTable from "./_generated/tables/notes";
-import notesGroup from "./notes.spec";
+import notes from "./_generated/tables/notes";
+import notesSpec from "./notes.spec";
 
-const list = FunctionImpl.make(notesGroup, "list", () =>
+const list = FunctionImpl.make(notesSpec, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table(notesTable).index("by_creation_time").collect();
+    return yield* reader.table(notes).index("by_creation_time").collect();
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(notesGroup).pipe(
+export default GroupImpl.make(notesSpec).pipe(
   Layer.provide(list),
   GroupImpl.finalize,
 );

@@ -271,16 +271,16 @@ import * as Effect from "effect/Effect";
 
 import { FunctionImpl } from "./_generated/server";
 import { DatabaseWriter } from "./_generated/services";
-import notesTable from "./_generated/tables/notes";
+import notes from "./_generated/tables/notes";
 import { CurrentUser } from "./middleware/RequireUser.spec";
-import notes from "./notes.spec";
+import notesSpec from "./notes.spec";
 
-const create = FunctionImpl.make(notes, "create", ({ text }) =>
+const create = FunctionImpl.make(notesSpec, "create", ({ text }) =>
   Effect.gen(function* () {
     const { user } = yield* CurrentUser;
     const writer = yield* DatabaseWriter;
 
-    return yield* writer.table(notesTable).insert({ text, userId: user._id });
+    return yield* writer.table(notes).insert({ text, userId: user._id });
   }).pipe(Effect.orDie),
 );
 ```
@@ -303,7 +303,7 @@ import * as Option from "effect/Option";
 
 import { MiddlewareImpl } from "../_generated/server";
 import { Auth, DatabaseReader } from "../_generated/services";
-import usersTable from "../_generated/tables/users";
+import users from "../_generated/tables/users";
 import RequireUser, { CurrentUser, NotSignedIn } from "./RequireUser.spec";
 
 export default MiddlewareImpl.provides(
@@ -317,7 +317,7 @@ export default MiddlewareImpl.provides(
       Effect.mapError(() => new NotSignedIn()),
     );
     const user = yield* reader
-      .table(usersTable)
+      .table(users)
       .index("by_token_identifier", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
@@ -399,7 +399,7 @@ Provide the middleware implementation to the group's impl layer like any functio
 ```ts confect/notes.impl.ts
 import RequireUser from "./middleware/RequireUser.impl";
 
-export default GroupImpl.make(notes).pipe(
+export default GroupImpl.make(notesSpec).pipe(
   Layer.provide(create),
   Layer.provide(RequireUser),
   GroupImpl.finalize,

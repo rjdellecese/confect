@@ -148,7 +148,7 @@ Use `run` to execute arbitrary code with mutation-context services (like `Databa
 ```ts
 import { Id } from "./confect/_generated/id";
 import { DatabaseWriter } from "./confect/_generated/services";
-import notesTable from "./confect/_generated/tables/notes";
+import notes from "./confect/_generated/tables/notes";
 
 Effect.gen(function* () {
   const c = yield* TestConfect.TestConfect;
@@ -157,7 +157,7 @@ Effect.gen(function* () {
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      return yield* writer.table(notesTable).insert({ text: "seed data" });
+      return yield* writer.table(notes).insert({ text: "seed data" });
     }),
     Id("notes"),
   );
@@ -174,9 +174,7 @@ Effect.gen(function* () {
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      yield* Effect.forEach(items, (item) =>
-        writer.table(notesTable).insert(item),
-      );
+      yield* Effect.forEach(items, (item) => writer.table(notes).insert(item));
     }),
   );
 });

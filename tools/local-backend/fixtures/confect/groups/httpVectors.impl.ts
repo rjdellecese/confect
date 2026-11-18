@@ -3,18 +3,18 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl } from "../_generated/server";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
-import httpVectorsTable from "../_generated/tables/httpVectors";
-import httpVectors from "./httpVectors.spec";
+import httpVectors from "../_generated/tables/httpVectors";
+import httpVectorsSpec from "./httpVectors.spec";
 
-export default GroupImpl.make(httpVectors).pipe(
+export default GroupImpl.make(httpVectorsSpec).pipe(
   Layer.provide(
-    FunctionImpl.make(httpVectors, "seed", ({ caseId }) =>
+    FunctionImpl.make(httpVectorsSpec, "seed", ({ caseId }) =>
       Effect.gen(function* () {
         const writer = yield* DatabaseWriter;
         const reader = yield* DatabaseReader;
-        const table = writer.table(httpVectorsTable);
+        const table = writer.table(httpVectors);
         const previous = yield* reader
-          .table(httpVectorsTable)
+          .table(httpVectors)
           .index("by_creation_time")
           .collect();
         for (const doc of previous) yield* table.delete(doc._id);

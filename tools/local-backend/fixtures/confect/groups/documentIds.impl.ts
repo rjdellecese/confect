@@ -4,7 +4,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { FunctionImpl } from "../_generated/server";
 import { DatabaseWriter, DocumentIds, QueryCtx } from "../_generated/services";
-import transactionNotesTable from "../_generated/tables/transactionNotes";
+import transactionNotes from "../_generated/tables/transactionNotes";
 import documentIds from "./documentIds.spec";
 
 const inspect = ({
@@ -27,7 +27,7 @@ const inspect = ({
 const createAndDelete = FunctionImpl.make(documentIds, "createAndDelete", () =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
-    const table = writer.table(transactionNotesTable);
+    const table = writer.table(transactionNotes);
     const id = yield* table.insert({
       caseId: "document-id-inspection",
       value: "deleted",

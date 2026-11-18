@@ -10,14 +10,14 @@ import {
   MutationRunner,
   QueryRunner,
 } from "../_generated/services";
-import transactionNotesTable from "../_generated/tables/transactionNotes";
+import transactionNotes from "../_generated/tables/transactionNotes";
 import transactions, { RejectedWrite } from "./transactions.spec";
 
 const read = FunctionImpl.make(transactions, "read", ({ caseId }) =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     const notes = yield* reader
-      .table(transactionNotesTable)
+      .table(transactionNotes)
       .index("by_caseId", (q) => q.eq("caseId", caseId))
       .collect();
     return Array.map(notes, (note) => note.value);
@@ -31,7 +31,7 @@ const write = FunctionImpl.make(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
       yield* writer
-        .table(transactionNotesTable)
+        .table(transactionNotes)
         .insert({ caseId, value })
         .pipe(Effect.orDie);
       if (fail) return yield* RejectedWrite.make({ value });
@@ -44,14 +44,14 @@ const seed = FunctionImpl.make(transactions, "seed", ({ caseId, count }) =>
     const writer = yield* DatabaseWriter;
     const reader = yield* DatabaseReader;
     const notes = yield* reader
-      .table(transactionNotesTable)
+      .table(transactionNotes)
       .index("by_caseId", (q) => q.eq("caseId", caseId))
       .collect();
     for (const note of notes)
-      yield* writer.table(transactionNotesTable).delete(note._id);
+      yield* writer.table(transactionNotes).delete(note._id);
     for (let i = 0; i < count; i++) {
       yield* writer
-        .table(transactionNotesTable)
+        .table(transactionNotes)
         .insert({ caseId, value: `seed-${i}` });
     }
     return null;
@@ -109,9 +109,7 @@ const limitedWrite = FunctionImpl.make(
 const rollback = FunctionImpl.make(transactions, "rollback", ({ caseId }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
-    yield* writer
-      .table(transactionNotesTable)
-      .insert({ caseId, value: "parent" });
+    yield* writer.table(transactionNotes).insert({ caseId, value: "parent" });
     const mutations = yield* MutationRunner;
     return yield* mutations
       .runMutation(
@@ -135,7 +133,7 @@ const staleRead = FunctionImpl.make(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
       yield* writer
-        .table(transactionNotesTable)
+        .table(transactionNotes)
         .insert({ caseId, value: "uncommitted" });
       const queries = yield* QueryRunner;
       return yield* queries.runQuery(

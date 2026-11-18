@@ -122,15 +122,15 @@ Do not declare `paginationOpts` in `args`—it is added automatically, and decla
 The handler receives the decoded args including `paginationOpts`, which it typically forwards directly to [`paginate`](/server/database/reading#paginate):
 
 ```ts confect/notes.impl.ts
-import notesTable from "./_generated/tables/notes";
-import notes from "./notes.spec";
+import notes from "./_generated/tables/notes";
+import notesSpec from "./notes.spec";
 
-FunctionImpl.make(notes, "listByAuthor", ({ author, paginationOpts }) =>
+FunctionImpl.make(notesSpec, "listByAuthor", ({ author, paginationOpts }) =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
     return yield* reader
-      .table(notesTable)
+      .table(notes)
       .index("by_creation_time", "desc")
       .paginate(paginationOpts, (q) => q.eq(q.field("author"), author));
   }).pipe(Effect.orDie),
@@ -152,21 +152,21 @@ import * as Layer from "effect/Layer";
 
 import { FunctionImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
-import notesTable from "./_generated/tables/notes";
-import notes from "./notes.spec";
+import notes from "./_generated/tables/notes";
+import notesSpec from "./notes.spec";
 
-const list = FunctionImpl.make(notes, "list", () =>
+const list = FunctionImpl.make(notesSpec, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
     return yield* reader
-      .table(notesTable)
+      .table(notes)
       .index("by_creation_time", "desc")
       .collect();
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(notes).pipe(
+export default GroupImpl.make(notesSpec).pipe(
   Layer.provide(list),
   GroupImpl.finalize,
 );

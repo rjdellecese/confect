@@ -32,13 +32,13 @@ import { FunctionImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { DatabaseReader } from "./_generated/services";
-import notesTable from "./_generated/tables/notes";
-import notes from "./notes.spec";
-const list = FunctionImpl.make(notes, "list", () => Effect.gen(function* () {
+import notes from "./_generated/tables/notes";
+import notesSpec from "./notes.spec";
+const list = FunctionImpl.make(notesSpec, "list", () => Effect.gen(function* () {
   const reader = yield* DatabaseReader;
-  return yield* reader.table(notesTable).index("by_creation_time").collect();
+  return yield* reader.table(notes).index("by_creation_time").collect();
 }).pipe(Effect.orDie));
-export default GroupImpl.make(notes).pipe(Layer.provide(list), GroupImpl.finalize);
+export default GroupImpl.make(notesSpec).pipe(Layer.provide(list), GroupImpl.finalize);
 `;
 
 export const emptyImpl = `import { GroupImpl } from "@confect/server";

@@ -2,7 +2,7 @@ import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl } from "../_generated/server";
-import notesTable from "../_generated/tables/notes";
+import notes from "../_generated/tables/notes";
 import { DatabaseWriter } from "../_generated/services";
 import Gate from "../middleware/Gate.impl";
 import RecordFirst from "../middleware/RecordFirst.impl";
@@ -14,7 +14,7 @@ const record = FunctionImpl.make(middlewareOrder, "record", () =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
 
-    yield* writer.table(notesTable).insert({ text: "handler" });
+    yield* writer.table(notes).insert({ text: "handler" });
 
     return null;
   }).pipe(Effect.orDie),
@@ -24,7 +24,7 @@ const recordPlain = FunctionImpl.make(middlewareOrder, "recordPlain", () =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
 
-    yield* writer.table(notesTable).insert({ text: "handler" });
+    yield* writer.table(notes).insert({ text: "handler" });
 
     return null;
   }).pipe(Effect.orDie),

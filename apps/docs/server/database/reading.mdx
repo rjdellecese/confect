@@ -9,12 +9,12 @@ Use `DatabaseReader` for reads in queries and mutations. Pass a generated **tabl
 ```ts
 import * as Effect from "effect/Effect";
 import { DatabaseReader } from "./confect/_generated/services";
-import notesTable from "./confect/_generated/tables/notes";
+import notes from "./confect/_generated/tables/notes";
 
 Effect.gen(function* () {
   const reader = yield* DatabaseReader;
 
-  return yield* reader.table(notesTable).index("by_creation_time").collect();
+  return yield* reader.table(notes).index("by_creation_time").collect();
 });
 ```
 
@@ -23,7 +23,7 @@ Effect.gen(function* () {
 ### By ID
 
 ```ts
-reader.table(notesTable).get(noteId);
+reader.table(notes).get(noteId);
 ```
 
 ### By index
@@ -31,15 +31,15 @@ reader.table(notesTable).get(noteId);
 #### Single field
 
 ```ts
-reader.table(notesTable).get("by_author", "John Doe");
+reader.table(notes).get("by_author", "John Doe");
 ```
 
 #### Multiple fields
 
 ```ts
-import usersTable from "./confect/_generated/tables/users";
+import users from "./confect/_generated/tables/users";
 
-reader.table(usersTable).get("by_name_and_age", "John Doe", 21);
+reader.table(users).get("by_name_and_age", "John Doe", 21);
 ```
 
 ## Validate document IDs
@@ -71,7 +71,7 @@ Invalid strings and IDs for a different table return `None`.
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { DatabaseReader, DocumentIds } from "./confect/_generated/services";
-import notesTable from "./confect/_generated/tables/notes";
+import notes from "./confect/_generated/tables/notes";
 
 const findNote = (input: string) =>
   Effect.gen(function* () {
@@ -82,10 +82,7 @@ const findNote = (input: string) =>
     return yield* Option.match(parsedId, {
       onNone: () => Effect.succeed(Option.none()),
       onSome: (noteId) =>
-        databaseReader
-          .table(notesTable)
-          .get(noteId)
-          .pipe(Effect.map(Option.some)),
+        databaseReader.table(notes).get(noteId).pipe(Effect.map(Option.some)),
     });
   });
 ```
@@ -109,7 +106,7 @@ use `id` with a specific table:
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { DatabaseReader, DocumentIds } from "./confect/_generated/services";
-import notesTable from "./confect/_generated/tables/notes";
+import notes from "./confect/_generated/tables/notes";
 
 const findNoteFromUnknownId = (input: string) =>
   Effect.gen(function* () {
@@ -123,7 +120,7 @@ const findNoteFromUnknownId = (input: string) =>
         if (matchedId.table !== "notes") return Effect.succeed(Option.none());
 
         return databaseReader
-          .table(notesTable)
+          .table(notes)
           .get(matchedId.id)
           .pipe(Effect.map(Option.some));
       },
@@ -153,22 +150,20 @@ Standard indexes determine both the sort order of the results and which fields m
 Order is ascending by default, but can be specified in the final argument to the `index` method.
 
 ```ts Users sorted by name and age, ascending
-reader.table(usersTable).index("by_name_and_age");
+reader.table(users).index("by_name_and_age");
 ```
 
 ```ts Users sorted by name and age, descending
-reader.table(usersTable).index("by_name_and_age", "desc");
+reader.table(users).index("by_name_and_age", "desc");
 ```
 
 ```ts Users sorted by name and age, where name equals "John Doe", ascending
-reader
-  .table(usersTable)
-  .index("by_name_and_age", (q) => q.eq("name", "John Doe"));
+reader.table(users).index("by_name_and_age", (q) => q.eq("name", "John Doe"));
 ```
 
 ```ts Users sorted by name and age, where name equals "John Doe", and age equals 21, descending
 reader
-  .table(usersTable)
+  .table(users)
   .index(
     "by_name_and_age",
     (q) => q.eq("name", "John Doe").eq("age", 21),
@@ -182,7 +177,7 @@ Search indexes are used for full-text search, and are defined in your schema. Th
 
 ```ts
 reader
-  .table(notesTable)
+  .table(notes)
   .search("text", (q) => q.search("text", "hello").eq("tag", "colors"));
 ```
 
@@ -195,7 +190,7 @@ The following methods are available for queries using both database indexes and 
 Collect all documents matching the query.
 
 ```ts
-reader.table(notesTable).index("by_creation_time").collect();
+reader.table(notes).index("by_creation_time").collect();
 ```
 
 #### First
@@ -203,7 +198,7 @@ reader.table(notesTable).index("by_creation_time").collect();
 Retrieve the first document matching the query.
 
 ```ts
-reader.table(notesTable).index("by_creation_time").first();
+reader.table(notes).index("by_creation_time").first();
 ```
 
 #### Take
@@ -211,7 +206,7 @@ reader.table(notesTable).index("by_creation_time").first();
 Take the first `n` documents matching the query.
 
 ```ts
-reader.table(notesTable).index("by_creation_time").take(10);
+reader.table(notes).index("by_creation_time").take(10);
 ```
 
 #### Paginate
@@ -219,7 +214,7 @@ reader.table(notesTable).index("by_creation_time").take(10);
 Retrieve a page of documents matching the query. Expects a [`PaginationOptions`](https://docs.convex.dev/api/interfaces/server.PaginationOptions) object, including Convex's optional pagination protocol fields. A [paginated query](/server/functions#paginated-queries) handler typically forwards its decoded `paginationOpts` argument unchanged.
 
 ```ts
-reader.table(notesTable).index("by_creation_time").paginate(paginationOpts);
+reader.table(notes).index("by_creation_time").paginate(paginationOpts);
 ```
 
 #### Stream
@@ -227,10 +222,10 @@ reader.table(notesTable).index("by_creation_time").paginate(paginationOpts);
 Get a `Stream` of documents matching the query.
 
 ```ts
-reader.table(notesTable).index("by_creation_time").stream();
+reader.table(notes).index("by_creation_time").stream();
 ```
 
-To merge, join, or paginate several queries together, use a [query stream](/server/database/streams) instead—`reader.table(notesTable).stream("by_creation_time")`—which stays paginable after composition.
+To merge, join, or paginate several queries together, use a [query stream](/server/database/streams) instead—`reader.table(notes).stream("by_creation_time")`—which stays paginable after composition.
 
 ### Accessing the current time
 

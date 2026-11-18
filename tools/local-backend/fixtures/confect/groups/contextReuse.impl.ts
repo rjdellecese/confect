@@ -9,7 +9,7 @@ import {
   DatabaseWriter,
   ExecutionMetadata,
 } from "../_generated/services";
-import transactionNotesTable from "../_generated/tables/transactionNotes";
+import transactionNotes from "../_generated/tables/transactionNotes";
 import contextReuse from "./contextReuse.spec";
 
 const previousInvocations = new Map<
@@ -37,7 +37,7 @@ const read = FunctionImpl.make(contextReuse, "read", ({ caseId, nonce }) =>
     const observation = yield* observeInvocation(nonce);
     const reader = yield* DatabaseReader;
     const notes = yield* reader
-      .table(transactionNotesTable)
+      .table(transactionNotes)
       .index("by_caseId", (q) => q.eq("caseId", caseId))
       .collect();
     return { ...observation, values: Array.map(notes, (note) => note.value) };
@@ -53,15 +53,15 @@ const write = FunctionImpl.make(
       const reader = yield* DatabaseReader;
       const writer = yield* DatabaseWriter;
       const notes = yield* reader
-        .table(transactionNotesTable)
+        .table(transactionNotes)
         .index("by_caseId", (q) => q.eq("caseId", caseId))
         .collect();
       for (const note of notes) {
-        yield* writer.table(transactionNotesTable).delete(note._id);
+        yield* writer.table(transactionNotes).delete(note._id);
       }
-      yield* writer.table(transactionNotesTable).insert({ caseId, value });
+      yield* writer.table(transactionNotes).insert({ caseId, value });
       const after = yield* reader
-        .table(transactionNotesTable)
+        .table(transactionNotes)
         .index("by_caseId", (q) => q.eq("caseId", caseId))
         .collect();
       return {

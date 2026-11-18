@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { MiddlewareImpl } from "../_generated/server";
 import { DatabaseReader } from "../_generated/services";
-import usersTable from "../_generated/tables/users";
+import users from "../_generated/tables/users";
 import RequireViewer, { NotSignedIn, Viewer } from "./RequireViewer.spec";
 
 export default MiddlewareImpl.provides(
@@ -12,7 +12,7 @@ export default MiddlewareImpl.provides(
     const reader = yield* DatabaseReader;
 
     const user = yield* reader
-      .table(usersTable)
+      .table(users)
       .index("by_creation_time", "desc")
       .first()
       .pipe(Effect.orDie);

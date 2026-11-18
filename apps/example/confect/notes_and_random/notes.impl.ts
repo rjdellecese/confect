@@ -3,50 +3,50 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl } from "../_generated/server";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
-import notesTable from "../_generated/tables/notes";
-import notes, { NoteNotFound } from "./notes.spec";
+import notes from "../_generated/tables/notes";
+import notesSpec, { NoteNotFound } from "./notes.spec";
 
-const insert = FunctionImpl.make(notes, "insert", ({ text }) =>
+const insert = FunctionImpl.make(notesSpec, "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
 
-    return yield* writer.table(notesTable).insert({ text });
+    return yield* writer.table(notes).insert({ text });
   }).pipe(Effect.orDie),
 );
 
-const list = FunctionImpl.make(notes, "list", () =>
+const list = FunctionImpl.make(notesSpec, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
     return yield* reader
-      .table(notesTable)
+      .table(notes)
       .index("by_creation_time", "desc")
       .collect();
   }).pipe(Effect.orDie),
 );
 
 const listPaginated = FunctionImpl.make(
-  notes,
+  notesSpec,
   "listPaginated",
   ({ paginationOpts }) =>
     Effect.gen(function* () {
       const reader = yield* DatabaseReader;
 
       return yield* reader
-        .table(notesTable)
+        .table(notes)
         .index("by_creation_time", "desc")
         .paginate(paginationOpts);
     }).pipe(Effect.orDie),
 );
 
 const insertAuthored = FunctionImpl.make(
-  notes,
+  notesSpec,
   "insertAuthored",
   ({ hidden, role, text }) =>
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      return yield* writer.table(notesTable).insert({
+      return yield* writer.table(notes).insert({
         text,
         author: { role, name: role === "admin" ? "Ada" : "Uma" },
         ...(hidden === true ? { tag: "hidden" } : {}),
@@ -60,13 +60,13 @@ const insertAuthored = FunctionImpl.make(
 // breaking pagination. Cursors resume via index-range narrowing, and pages
 // stay gap-free on the client via `useStreamPaginatedQuery`'s
 // endCursor pinning.
-const feed = FunctionImpl.make(notes, "feed", ({ paginationOpts }) =>
+const feed = FunctionImpl.make(notesSpec, "feed", ({ paginationOpts }) =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
     const authoredBy = (role: "admin" | "user") =>
       reader
-        .table(notesTable)
+        .table(notes)
         .stream("by_role", (q) => q.eq("author.role", role), "desc");
 
     return yield* QueryStream.merge([
@@ -79,55 +79,55 @@ const feed = FunctionImpl.make(notes, "feed", ({ paginationOpts }) =>
   }).pipe(Effect.orDie),
 );
 
-const delete_ = FunctionImpl.make(notes, "delete_", ({ noteId }) =>
+const delete_ = FunctionImpl.make(notesSpec, "delete_", ({ noteId }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
 
-    yield* writer.table(notesTable).delete(noteId);
+    yield* writer.table(notes).delete(noteId);
 
     return null;
   }).pipe(Effect.orDie),
 );
 
-const getFirst = FunctionImpl.make(notes, "getFirst", () =>
+const getFirst = FunctionImpl.make(notesSpec, "getFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
-    return yield* reader.table(notesTable).index("by_creation_time").first();
+    return yield* reader.table(notes).index("by_creation_time").first();
   }).pipe(Effect.orDie),
 );
 
-const getOrFail = FunctionImpl.make(notes, "getOrFail", ({ noteId }) =>
+const getOrFail = FunctionImpl.make(notesSpec, "getOrFail", ({ noteId }) =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
     return yield* reader
-      .table(notesTable)
+      .table(notes)
       .get(noteId)
       .pipe(Effect.mapError(() => NoteNotFound.make({ noteId })));
   }),
 );
 
-const internalGetFirst = FunctionImpl.make(notes, "internalGetFirst", () =>
+const internalGetFirst = FunctionImpl.make(notesSpec, "internalGetFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
-    return yield* reader.table(notesTable).index("by_creation_time").first();
+    return yield* reader.table(notes).index("by_creation_time").first();
   }).pipe(Effect.orDie),
 );
 
-const clearAll = FunctionImpl.make(notes, "clearAll", () =>
+const clearAll = FunctionImpl.make(notesSpec, "clearAll", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     const writer = yield* DatabaseWriter;
     const allNotes = yield* reader
-      .table(notesTable)
+      .table(notes)
       .index("by_creation_time")
       .collect();
 
     yield* Effect.forEach(
       allNotes,
-      (note) => writer.table(notesTable).delete(note._id),
+      (note) => writer.table(notes).delete(note._id),
       { concurrency: 1 },
     );
 
@@ -135,17 +135,20 @@ const clearAll = FunctionImpl.make(notes, "clearAll", () =>
   }).pipe(Effect.orDie),
 );
 
-const insertDefault = FunctionImpl.make(notes, "insertDefault", ({ text }) =>
-  Effect.gen(function* () {
-    const writer = yield* DatabaseWriter;
+const insertDefault = FunctionImpl.make(
+  notesSpec,
+  "insertDefault",
+  ({ text }) =>
+    Effect.gen(function* () {
+      const writer = yield* DatabaseWriter;
 
-    yield* writer.table(notesTable).insert({ text });
+      yield* writer.table(notes).insert({ text });
 
-    return null;
-  }).pipe(Effect.orDie),
+      return null;
+    }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(notes).pipe(
+export default GroupImpl.make(notesSpec).pipe(
   Layer.provide(insert),
   Layer.provide(insertAuthored),
   Layer.provide(list),

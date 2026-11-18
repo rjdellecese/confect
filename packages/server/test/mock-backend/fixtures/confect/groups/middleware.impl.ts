@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { FunctionImpl } from "../_generated/server";
-import notesTable from "../_generated/tables/notes";
+import notes from "../_generated/tables/notes";
 import { DatabaseReader } from "../_generated/services";
 import ProvideViewer from "../middleware/ProvideViewer.impl";
 import { Viewer } from "../middleware/ProvideViewer.spec";
@@ -44,7 +44,7 @@ const firstNoteForViewer = FunctionImpl.make(
       const reader = yield* DatabaseReader;
 
       const note = yield* reader
-        .table(notesTable)
+        .table(notes)
         .index("by_creation_time")
         .first()
         .pipe(Effect.orDie);
