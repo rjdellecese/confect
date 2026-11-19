@@ -23,6 +23,7 @@ describe("providers", () => {
           Convex.Deployment,
           Convex.DeployKey,
           Convex.EnvironmentVariables,
+          Convex.AuthoritativeEnvironmentVariable,
           Convex.Code,
         ]) {
           const provider = collection.get(resource.Type);

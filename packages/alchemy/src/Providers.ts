@@ -1,6 +1,7 @@
 import * as Provider from "alchemy/Provider";
 import * as Layer from "effect/Layer";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as AuthoritativeEnvironmentVariable from "./AuthoritativeEnvironmentVariable";
 import * as Code from "./Code";
 import * as ConvexClient from "./ConvexClient";
 import * as Deployment from "./Deployment";
@@ -24,6 +25,7 @@ export const providers = (options?: Parameters<typeof ConvexClient.layer>[0]) =>
       Deployment.Deployment,
       DeployKey.DeployKey,
       EnvironmentVariables.EnvironmentVariables,
+      AuthoritativeEnvironmentVariable.AuthoritativeEnvironmentVariable,
       Code.Code,
     ]),
   ).pipe(
@@ -33,6 +35,7 @@ export const providers = (options?: Parameters<typeof ConvexClient.layer>[0]) =>
         Deployment.layer,
         DeployKey.layer,
         EnvironmentVariables.layer,
+        AuthoritativeEnvironmentVariable.layer,
         Code.layer,
       ),
     ),

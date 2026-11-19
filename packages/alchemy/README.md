@@ -10,6 +10,8 @@ Use `Convex.providers()` in your Alchemy stack. The integration targets Alchemy 
 
 See the [deployment guide](https://confect.dev/guides/alchemy) for complete examples, credentials, ownership, and deletion policies.
 
+Use `Confect.Backend`'s `env` option to adopt existing readable environment variables and restore them on removal. To create or overwrite a name, including a hidden secret, declare a `Convex.AuthoritativeEnvironmentVariable`. It retains the value by default and cannot restore the previous one.
+
 Projects and deployments are retained by default. Treat your Alchemy state as a secret store: it contains deployment credentials and managed environment values. Code deployment runs on every apply and never deletes data when removed from a stack. All resources are cloud-backed, including in `alchemy dev`.
 
 ## Tests

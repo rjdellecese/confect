@@ -3,6 +3,7 @@ import * as Arr from "effect/Array";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
 import { Confect, Convex } from "@confect/alchemy";
+import * as AuthoritativeEnvironmentVariable from "@confect/alchemy/AuthoritativeEnvironmentVariable";
 import * as Code from "@confect/alchemy/Code";
 import * as Deployment from "@confect/alchemy/Deployment";
 import * as DeployKey from "@confect/alchemy/DeployKey";
@@ -66,6 +67,7 @@ const makeHarness = (
   const providers = Layer.effect(
     Providers,
     Provider.collection([
+      AuthoritativeEnvironmentVariable.AuthoritativeEnvironmentVariable,
       Project.Project,
       Deployment.Deployment,
       DeployKey.DeployKey,
@@ -75,6 +77,7 @@ const makeHarness = (
   ).pipe(
     Layer.provide(
       Layer.mergeAll(
+        AuthoritativeEnvironmentVariable.layer,
         Project.layer,
         Deployment.layer,
         DeployKey.layer,
@@ -108,6 +111,131 @@ const makeHarness = (
 };
 
 describe("cloud deployment lifecycle", () => {
+  it.effect.each([false, true])(
+    "overwrites only the declared name before pushing code and unsets it only with destroy=%s",
+    (destroy) =>
+      Effect.gen(function* () {
+        const fixture = mockClient();
+        fixture.state.variables = {
+          TOKEN: Redacted.make("hidden-original"),
+          OTHER: Redacted.make("untouched"),
+        };
+        const pushes: string[] = [];
+        const deploy = makeHarness(
+          Layer.succeed(ConvexClient, {
+            ...fixture.client,
+            listEnvironmentVariables: () =>
+              Effect.die("The writer must not require read permission"),
+          }),
+          Layer.succeed(CommandRunner, {
+            prepare: () => Effect.void,
+            deploy: () =>
+              Effect.sync(() => {
+                pushes.push(Redacted.value(fixture.state.variables.TOKEN));
+              }),
+          }),
+        );
+        const deployment = {
+          name: "happy-otter-123",
+          url: "https://happy-otter-123.convex.cloud",
+        };
+        const deployKey = Redacted.make(
+          "prod:happy-otter-123|integration-test",
+        );
+        const resources = (value: string) =>
+          Effect.gen(function* () {
+            const write = Convex.AuthoritativeEnvironmentVariable("Token", {
+              deployment,
+              deployKey,
+              name: "TOKEN",
+              value: Redacted.make(value),
+            });
+            const token = yield* destroy
+              ? write.pipe(RemovalPolicy.destroy())
+              : write;
+            const backend = yield* Confect.Backend("Backend", {
+              deployment: { name: deployment.name, url: token.url },
+              deployKey,
+            });
+            return { url: backend.url };
+          });
+        yield* deploy(resources("desired"));
+        fixture.state.variables.TOKEN = Redacted.make("external-drift");
+        yield* deploy(resources("desired"));
+        yield* deploy(resources("rotated"));
+        expect(pushes).toEqual(["desired", "desired", "rotated"]);
+        yield* deploy(Effect.succeed({}));
+        expect(Record.map(fixture.state.variables, Redacted.value)).toEqual({
+          OTHER: "untouched",
+          ...(destroy ? {} : { TOKEN: "rotated" }),
+        });
+      }),
+  );
+
+  it.effect.each([false, true])(
+    "destroys an interrupted authoritative write only if it could have reached Convex (applied=%s)",
+    (applied) =>
+      Effect.gen(function* () {
+        const fixture = mockClient();
+        fixture.state.variables.TOKEN = Redacted.make("original");
+        const deploy = makeHarness(
+          Layer.succeed(ConvexClient, {
+            ...fixture.client,
+            updateEnvironmentVariables: (url, key, changes) => {
+              if (changes[0]?.value === undefined)
+                return fixture.client.updateEnvironmentVariables(
+                  url,
+                  key,
+                  changes,
+                );
+              return applied
+                ? fixture.client
+                    .updateEnvironmentVariables(url, key, changes)
+                    .pipe(
+                      Effect.andThen(
+                        Effect.fail(
+                          ConvexApiError.make({
+                            operation: "updateEnvironmentVariables",
+                            code: "TransportError",
+                          }),
+                        ),
+                      ),
+                    )
+                : Effect.fail(
+                    ConvexApiError.make({
+                      operation: "updateEnvironmentVariables",
+                      code: "HttpError",
+                      status: 400,
+                    }),
+                  );
+            },
+          }),
+          Layer.succeed(CommandRunner, {
+            prepare: () => Effect.void,
+            deploy: () => Effect.void,
+          }),
+        );
+        const write = Convex.AuthoritativeEnvironmentVariable("Token", {
+          deployment: {
+            name: "happy-otter-123",
+            url: "https://happy-otter-123.convex.cloud",
+          },
+          deployKey: Redacted.make("prod:happy-otter-123|integration-test"),
+          name: "TOKEN",
+          value: Redacted.make("replacement"),
+        }).pipe(RemovalPolicy.destroy(), Effect.as({}));
+        const result = yield* deploy(write).pipe(Effect.result);
+        expect(Result.isFailure(result)).toBe(true);
+        expect(Redacted.value(fixture.state.variables.TOKEN)).toBe(
+          applied ? "replacement" : "original",
+        );
+        yield* deploy(Effect.succeed({}));
+        expect(Record.map(fixture.state.variables, Redacted.value)).toEqual(
+          applied ? {} : { TOKEN: "original" },
+        );
+      }),
+  );
+
   it.effect("does not report deployed code as verified by a drift check", () =>
     Effect.gen(function* () {
       const stack = { name: "integration", stage: "test" };
@@ -194,6 +322,7 @@ describe("cloud deployment lifecycle", () => {
         const fixture = mockClient({
           deployKey: "prod:happy-otter-123|integration-test",
         });
+        fixture.state.variables.ORIGIN = Redacted.make("original");
         let reject = true;
         const names: string[] = [];
         const client = Layer.succeed(ConvexClient, {
@@ -254,7 +383,7 @@ describe("cloud deployment lifecycle", () => {
             deployment,
             deployKey: key.deployKey,
             env: { ORIGIN: "https://example.com" },
-          });
+          }).pipe(adopt(true));
           return { url: backend.url };
         });
         const deploymentResult = yield* deploy(resources).pipe(Effect.result);
@@ -276,7 +405,9 @@ describe("cloud deployment lifecycle", () => {
         expect(fixture.state.projects).toHaveLength(0);
         expect(fixture.state.deployments).toHaveLength(0);
         expect(fixture.state.keys).toHaveLength(0);
-        expect(fixture.state.variables).toEqual({});
+        expect(Record.map(fixture.state.variables, Redacted.value)).toEqual({
+          ORIGIN: "original",
+        });
       }),
   );
 
@@ -501,11 +632,12 @@ describe("cloud deployment lifecycle", () => {
     { updating: false, retry: true, status: 503 },
     { updating: true, retry: false, status: 503 },
   ])(
-    "recovers newly managed variables after a lost response (updating=$updating, retry=$retry, status=$status)",
+    "restores adopted variables after a lost response (updating=$updating, retry=$retry, status=$status)",
     ({ updating, retry, status }) =>
       Effect.gen(function* () {
         const fixture = mockClient();
         fixture.state.variables.UNRELATED = Redacted.make("preserved");
+        fixture.state.variables.NEW = Redacted.make("original");
         let loseResponse = false;
         const deploy = makeHarness(
           Layer.succeed(ConvexClient, {
@@ -538,8 +670,8 @@ describe("cloud deployment lifecycle", () => {
             url: "https://happy-otter-123.convex.cloud",
             deployKey: Redacted.make("test-key"),
             variables,
-          }).pipe(Effect.as({}));
-        if (updating) yield* deploy(resource({ OLD: "old" }));
+          }).pipe(adopt(true), Effect.as({}));
+        if (updating) yield* deploy(resource({ NEW: "old" }));
         const desired = resource({ NEW: "new" });
         loseResponse = true;
         const failure = yield* deploy(desired).pipe(Effect.result);
@@ -547,74 +679,90 @@ describe("cloud deployment lifecycle", () => {
         expect(Redacted.value(fixture.state.variables.NEW)).toBe("new");
         if (retry) yield* deploy(desired);
         yield* deploy(Effect.succeed({}));
-        expect(Record.keys(fixture.state.variables)).toEqual(["UNRELATED"]);
+        expect(Record.map(fixture.state.variables, Redacted.value)).toEqual({
+          UNRELATED: "preserved",
+          NEW: "original",
+        });
       }),
   );
 
-  it.effect.each([
-    { start: "create", retry: false },
-    { start: "create", retry: true },
-    { start: "update", retry: false },
-    { start: "update", retry: true },
-    { start: "adopt", retry: false },
-    { start: "adopt", retry: true },
-  ])(
-    "does not claim a new variable after a rejected write (start=$start, retry=$retry)",
-    ({ start, retry }) =>
+  it.effect.each([false, true])(
+    "rejects a mixed batch containing an unlisted variable even with adoption=%s",
+    (allowAdoption) =>
       Effect.gen(function* () {
         const fixture = mockClient();
+        fixture.state.variables.READABLE = Redacted.make("original");
         fixture.state.variables.UNRELATED = Redacted.make("preserved");
-        let reject = false;
         const deploy = makeHarness(
-          Layer.succeed(ConvexClient, {
-            ...fixture.client,
-            updateEnvironmentVariables: (url, key, changes) =>
-              reject
-                ? Effect.fail(
-                    ConvexApiError.make({
-                      operation: "updateEnvironmentVariables",
-                      code: "HttpError",
-                      status: 400,
-                    }),
-                  )
-                : fixture.client.updateEnvironmentVariables(url, key, changes),
-          }),
+          fixture.layer,
           Layer.succeed(CommandRunner, {
             prepare: () => Effect.void,
             deploy: () => Effect.void,
           }),
-          true,
+          allowAdoption,
         );
-        const resource = (variables: Record<string, string>) =>
-          Convex.EnvironmentVariables("Environment", {
+        const desired = Confect.Backend("Backend", {
+          deployment: {
+            name: "happy-otter-123",
             url: "https://happy-otter-123.convex.cloud",
-            deployKey: Redacted.make("test-key"),
-            variables,
-          }).pipe(Effect.as({}));
-        if (start === "update") yield* deploy(resource({ OLD: "owned" }));
-        if (start === "adopt")
-          fixture.state.variables.OLD = Redacted.make("original");
-        const desired = resource({ OLD: "changed", NEW: "new" });
-        reject = true;
+          },
+          deployKey: Redacted.make("prod:happy-otter-123|test-key"),
+          env: { READABLE: "changed", UNLISTED: Redacted.make("new") },
+        }).pipe(Effect.as({}));
         const failure = yield* deploy(desired).pipe(Effect.result);
         expect(failure).toMatchObject({
           _tag: "Failure",
-          failure: { _tag: "ConvexApiError", status: 400 },
+          failure: {
+            _tag: "UnreadableEnvironmentVariable",
+            variableName: "UNLISTED",
+          },
         });
-        reject = false;
-        fixture.state.variables.NEW = Redacted.make("external");
-        if (retry) {
-          const collision = yield* deploy(desired).pipe(Effect.result);
-          expect(collision).toMatchObject({
-            _tag: "Failure",
-            failure: { _tag: "OwnedBySomeoneElse" },
-          });
-        }
         yield* deploy(Effect.succeed({}));
+        expect(
+          fixture.client.updateEnvironmentVariables,
+        ).not.toHaveBeenCalled();
         expect(Record.map(fixture.state.variables, Redacted.value)).toEqual({
           UNRELATED: "preserved",
-          NEW: "external",
-          ...(start === "adopt" ? { OLD: "original" } : {}),
+          READABLE: "original",
+        });
+      }),
+  );
+
+  it.effect(
+    "refuses the whole restore if an adopted name becomes unreadable",
+    () =>
+      Effect.gen(function* () {
+        const fixture = mockClient();
+        fixture.state.variables = {
+          FIRST: Redacted.make("original-1"),
+          SECOND: Redacted.make("original-2"),
+        };
+        const deploy = makeHarness(
+          fixture.layer,
+          Layer.succeed(CommandRunner, {
+            prepare: () => Effect.void,
+            deploy: () => Effect.void,
+          }),
+        );
+        yield* deploy(
+          Convex.EnvironmentVariables("Env", {
+            url: "https://happy-otter-123.convex.cloud",
+            deployKey: Redacted.make("prod:happy-otter-123|integration-test"),
+            variables: { FIRST: "desired-1", SECOND: "desired-2" },
+          }).pipe(adopt(true), Effect.as({})),
+        );
+        delete fixture.state.variables.SECOND;
+        const result = yield* deploy(Effect.succeed({})).pipe(Effect.result);
+        expect(Result.isFailure(result)).toBe(true);
+        expect(fixture.client.updateEnvironmentVariables).toHaveBeenCalledTimes(
+          1,
+        );
+        expect(Redacted.value(fixture.state.variables.FIRST)).toBe("desired-1");
+        fixture.state.variables.SECOND = Redacted.make("visible-again");
+        yield* deploy(Effect.succeed({}));
+        expect(Record.map(fixture.state.variables, Redacted.value)).toEqual({
+          FIRST: "original-1",
+          SECOND: "original-2",
         });
       }),
   );
@@ -626,6 +774,7 @@ describe("cloud deployment lifecycle", () => {
         const fixture = mockClient({
           deployKey: "prod:happy-otter-123|integration-test",
         });
+        fixture.state.variables.ORIGIN = Redacted.make("original");
         const operations: string[] = [];
         const runner = Layer.succeed(CommandRunner, {
           prepare: () =>
@@ -665,7 +814,7 @@ describe("cloud deployment lifecycle", () => {
             deployment,
             deployKey: key.deployKey,
             env: { ORIGIN: "https://example.com" },
-          });
+          }).pipe(adopt(true));
           return { url: backend.url };
         });
         const first = yield* deploy(resources);
@@ -690,7 +839,11 @@ describe("cloud deployment lifecycle", () => {
         expect(fixture.state.projects).toHaveLength(1);
         expect(fixture.state.deployments).toHaveLength(1);
         expect(fixture.state.keys).toHaveLength(0);
-        expect(Record.keys(fixture.state.variables)).toEqual(["UNRELATED"]);
+        expect(Record.keys(fixture.state.variables).sort()).toEqual([
+          "ORIGIN",
+          "UNRELATED",
+        ]);
+        expect(Redacted.value(fixture.state.variables.ORIGIN)).toBe("original");
         expect(Redacted.value(fixture.state.variables.UNRELATED)).toBe(
           "preserve-me",
         );

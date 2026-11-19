@@ -14,5 +14,10 @@ export {
   type EnvironmentVariablesProps,
   type EnvironmentVariablesAttributes,
 } from "./EnvironmentVariables";
+export {
+  AuthoritativeEnvironmentVariable,
+  type AuthoritativeEnvironmentVariableProps,
+  type AuthoritativeEnvironmentVariableAttributes,
+} from "./AuthoritativeEnvironmentVariable";
 export { Code, type CodeProps, type CodeAttributes } from "./Code";
 export { providers, Providers } from "./Providers";

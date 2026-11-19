@@ -10,7 +10,12 @@ export class LifecycleStateError extends Schema.TaggedError<
 >()("LifecycleStateError", { fqn: Schema.String }) {}
 
 export const checkpointResource = Effect.fn("Lifecycle.checkpointResource")(
-  function* (fqn: string, instanceId: string, props: object, output?: object) {
+  function* (
+    fqn: string,
+    instanceId: string,
+    props: object,
+    output?: object | null,
+  ) {
     const stack = yield* Effect.serviceOption(Stack);
     if (Option.isNone(stack)) return;
     const state = yield* Effect.serviceOption(State);
@@ -30,7 +35,7 @@ export const checkpointResource = Effect.fn("Lifecycle.checkpointResource")(
       value: {
         ...row,
         props,
-        ...(output === undefined ? {} : { attr: output }),
+        ...(output === undefined ? {} : { attr: output ?? undefined }),
       },
     });
   },

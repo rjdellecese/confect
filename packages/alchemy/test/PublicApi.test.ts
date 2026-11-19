@@ -21,17 +21,21 @@ describe("public API", () => {
         });
         const key = yield* Convex.DeployKey("DeployKey", {
           deploymentName: deployment.name,
-          allowedActions: [
-            "deployment:deploy",
-            "deployment:env:view",
-            "deployment:env:write",
-          ],
+          allowedActions: ["deployment:deploy", "deployment:env:write"],
         });
+        const token = yield* Convex.AuthoritativeEnvironmentVariable(
+          "ServiceToken",
+          {
+            deployment,
+            deployKey: key.deployKey,
+            name: "SERVICE_TOKEN",
+            value: yield* Config.Redacted("SERVICE_TOKEN"),
+          },
+        );
         const backend = yield* Confect.Backend("Backend", {
-          deployment,
+          deployment: { name: deployment.name, url: token.url },
           deployKey: key.deployKey,
           cwd: "apps/backend",
-          env: { SERVICE_TOKEN: yield* Config.Redacted("SERVICE_TOKEN") },
         });
         return { url: backend.url };
       }),
