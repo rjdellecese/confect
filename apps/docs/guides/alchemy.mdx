@@ -143,13 +143,15 @@ If a requested or previously managed name is missing from the [Convex list API](
 `Convex.Code` runs the Convex deploy command without Confect codegen:
 
 ```ts
-const code =
-  yield *
-  Convex.Code("Backend", {
+Effect.gen(function* () {
+  const code = yield* Convex.Code("Backend", {
     deployment,
     deployKey: key.deployKey,
     cwd: "apps/backend",
   });
+
+  return { url: code.url };
+});
 ```
 
 You can also declare `Convex.EnvironmentVariables` separately. A standalone code resource must depend on its outputs if those variables need to be applied first; declaring resources in source order alone does not establish a dependency. `Confect.Backend` handles this ordering for its `env` option.
