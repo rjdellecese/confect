@@ -14,11 +14,12 @@ import * as Effect from "effect/Effect";
 const listProjects = Effect.gen(function* () {
   const token = yield* Config.Redacted("CONVEX_ACCESS_TOKEN");
   const client = ManagementClient.make(token);
-  const page = yield* client.request("get", "/teams/{team_id}/projects", {
-    params: { path: { team_id: yield* Config.Number("CONVEX_TEAM_ID") } },
-  });
+  const teamId = yield* Config.Number("CONVEX_TEAM_ID");
+  const page = yield* client.listProjects(teamId, { limit: 20 });
   return page.items;
 });
 ```
 
-`ManagementClient` uses an access token for the management API. `DeploymentClient` takes a deployment name or full URL and a deployment credential. Both wrap the upstream SDK's typed routes and return Effects; both expose a `layer` for dependency injection. See the [platform client guide](https://confect.dev/clients/platform) for deployment requests, pagination, and errors.
+`ManagementClient` uses an access token for team, project, deployment, and credential operations. `DeploymentClient` takes a deployment name or full URL and a deployment credential. Both expose named operations as Effects, validate success responses, and provide a `layer` for dependency injection. Use `streamProjects` or another cursor stream to consume a listing without writing a pagination loop.
+
+See the [platform client guide](https://confect.dev/clients/platform) for examples of dependency injection, redacted credentials, and handling the specific errors each operation can return.

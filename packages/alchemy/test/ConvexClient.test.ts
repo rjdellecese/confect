@@ -179,12 +179,14 @@ describe("ConvexClient", () => {
           .listProjects(7)
           .pipe(Effect.flip);
         expect(listProjectsResult2).toMatchObject({
+          operation: "listProjects",
           code: "InvalidPagination",
         });
         const listProjectsResult3 = yield* client
           .listProjects(7)
           .pipe(Effect.flip);
         expect(listProjectsResult3).toMatchObject({
+          operation: "listProjects",
           code: "InvalidPagination",
         });
         expect(http.requests).toHaveLength(3);
@@ -650,6 +652,14 @@ describe("ConvexClient", () => {
       new Response(secret),
       Response.json({ ...project, id: secret }, { status: 201 }),
       Response.json({ deployKey: { secret } }),
+      Response.json([
+        {
+          id: 5,
+          name: "automation",
+          creationTime: 100,
+          allowedActions: [{ secret }],
+        },
+      ]),
       Response.json({ environmentVariables: { SECRET: { secret } } }),
     ]);
     return Effect.gen(function* () {
@@ -667,6 +677,7 @@ describe("ConvexClient", () => {
               .createDeployKey(deployment.name, { name: "automation" })
               .pipe(Effect.asVoid),
           ],
+          [200, client.listDeployKeys(deployment.name).pipe(Effect.asVoid)],
           [
             200,
             client
