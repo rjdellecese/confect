@@ -37,6 +37,8 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 - `@confect/cli` - CLI tooling for codegen and dev-mode watching (depends on core, server)
 - `@confect/test` - Testing utilities via convex-test (depends on core, server)
 
+`@confect/platform` pins the Convex Platform SDK because it validates responses against that release's OpenAPI documents. When upgrading it, review changes to operations, success schemas, and documented error statuses. Update the source hashes in `scripts/platformResponseSchemas.mjs`, regenerate with `bun scripts/platformResponseSchemas.mjs`, and use `--check` to verify the checked-in schemas. Do not infer new error variants from examples of unversioned server responses.
+
 ## Apps
 
 - `apps/example` - Vite + React example app demonstrating Confect usage

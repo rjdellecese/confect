@@ -510,14 +510,8 @@ importers:
   packages/platform:
     dependencies:
       '@convex-dev/platform':
-        specifier: ^0.1.11
+        specifier: 0.1.11
         version: 0.1.11
-      openapi-fetch:
-        specifier: ~0.17.0
-        version: 0.17.0
-      openapi-typescript-helpers:
-        specifier: ^0.1.0
-        version: 0.1.0
     devDependencies:
       '@effect/vitest':
         specifier: 4.1.0
@@ -528,6 +522,12 @@ importers:
       effect:
         specifier: 4.1.0
         version: 4.1.0
+      openapi-fetch:
+        specifier: 0.17.0
+        version: 0.17.0
+      openapi-typescript-helpers:
+        specifier: 0.1.0
+        version: 0.1.0
       tsdown:
         specifier: 0.23.7
         version: 0.23.7(tsrs@0.25.0-ts7.1.0-beta)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)
