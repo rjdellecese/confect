@@ -185,9 +185,9 @@ export const MiddlewareImpl = MiddlewareImpl_.forSchema<typeof schema>();
  * When the table directory is empty the `TableNames` union resolves to `never`,
  * which still lets the file typecheck against an empty workspace.
  */
-export const id = `import { GenericId } from "@confect/core";
+export const id = `import * as GenericId from "@confect/core/GenericId";
 import type { SystemTableNames } from "convex/server";
-import type tableNames from "./tableNames";
+import type tableNames from "./tableNames.js";
 
 export type TableNames = (typeof tableNames)[number];
 

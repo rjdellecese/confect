@@ -366,9 +366,13 @@ export { reads } from "./reads";
 });
 
 layer(NodeServices.layer)("id", (test) => {
-  test.effect.each([{ tableNames: [] }, { tableNames: ["notes", "users"] }])(
-    "exports matching ID types and schemas for $tableNames and system tables",
-    ({ tableNames }) =>
+  test.effect.each([
+    { tableNames: [], moduleResolution: "Bundler" },
+    { tableNames: ["notes", "users"], moduleResolution: "Bundler" },
+    { tableNames: ["notes", "users"], moduleResolution: "NodeNext" },
+  ])(
+    "exports matching ID types and schemas for $tableNames and system tables with $moduleResolution resolution",
+    ({ tableNames, moduleResolution }) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
@@ -377,6 +381,10 @@ layer(NodeServices.layer)("id", (test) => {
           directory: import.meta.dirname,
           prefix: "id-",
         });
+        yield* fs.writeFileString(
+          path.join(directory, "package.json"),
+          '{"type":"module"}',
+        );
         const contents = templates.id;
         yield* fs.writeFileString(
           path.join(directory, "tableNames.ts"),
@@ -391,8 +399,8 @@ layer(NodeServices.layer)("id", (test) => {
           `import { expectTypeOf } from "vitest";
 import type { GenericId } from "convex/values";
 import type { SystemTableNames } from "convex/server";
-import { Id } from "./id";
-import type { Id as IdType, TableNames } from "./id";
+import { Id } from "./id.js";
+import type { Id as IdType, TableNames } from "./id.js";
 
 expectTypeOf<TableNames>().toEqualTypeOf<${
             tableNames.length === 0
@@ -432,8 +440,8 @@ export const plainString: Id<"_storage"> = "not-an-id";
               "strict": true,
               "noEmit": true,
               "skipLibCheck": true,
-              "module": "ESNext",
-              "moduleResolution": "Bundler",
+              "module": "${moduleResolution === "NodeNext" ? "NodeNext" : "ESNext"}",
+              "moduleResolution": "${moduleResolution}",
               "target": "ESNext",
               "verbatimModuleSyntax": true
             },
