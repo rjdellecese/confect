@@ -1,13 +1,11 @@
-import { MiddlewareImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
-import databaseSchema from "../_generated/schema";
+import { MiddlewareImpl } from "../_generated/server";
 import { insertMarker } from "./insertMarker";
 import RecordFunctionLevel, {
   FunctionGateClosed,
 } from "./RecordFunctionLevel.spec";
 
 export default MiddlewareImpl.make(
-  databaseSchema,
   RecordFunctionLevel,
   (effect, { invocation: { args } }) =>
     typeof args === "object" &&

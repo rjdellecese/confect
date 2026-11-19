@@ -1,3 +1,3 @@
-import unnamed from "../../tables/httpVectors";
+import httpVectorsTable from "../../tables/httpVectors";
 
-export default unnamed("httpVectors");
+export default httpVectorsTable("httpVectors");

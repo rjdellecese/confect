@@ -1,17 +1,17 @@
-import { DatabaseSchema as $DatabaseSchema } from "@confect/server";
+import { DatabaseSchema as DatabaseSchema_ } from "@confect/server";
 
-import notes from "./tables/notes";
-import tags from "./tables/tags";
-import users from "./tables/users";
+import notesTable from "./tables/notes";
+import tagsTable from "./tables/tags";
+import usersTable from "./tables/users";
 
-const databaseSchema: $DatabaseSchema.DatabaseSchema<{
-  readonly notes: typeof notes;
-  readonly tags: typeof tags;
-  readonly users: typeof users;
-}> = $DatabaseSchema.make({
-  notes,
-  tags,
-  users,
+const databaseSchema: DatabaseSchema_.DatabaseSchema<{
+  readonly notes: typeof notesTable;
+  readonly tags: typeof tagsTable;
+  readonly users: typeof usersTable;
+}> = DatabaseSchema_.make({
+  notes: notesTable,
+  tags: tagsTable,
+  users: usersTable,
 });
 
 export default databaseSchema;

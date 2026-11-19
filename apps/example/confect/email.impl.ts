@@ -1,16 +1,14 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import * as Console from "effect/Console";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./_generated/schema";
-import email from "./email.spec";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
+import emailSpec from "./email.spec";
 
 const send = FunctionImpl.make(
-  databaseSchema,
-  email,
+  emailSpec,
   "send",
   Effect.fn(function* ({ to, subject, body }) {
     const spawner = yield* ChildProcessSpawner;
@@ -33,8 +31,7 @@ const send = FunctionImpl.make(
 );
 
 const getInbox = FunctionImpl.make(
-  databaseSchema,
-  email,
+  emailSpec,
   "getInbox",
   Effect.fn(function* () {
     yield* Console.log("Getting inbox…");
@@ -53,7 +50,7 @@ const getInbox = FunctionImpl.make(
   }),
 );
 
-export default GroupImpl.make(databaseSchema, email).pipe(
+export default GroupImpl.make(emailSpec).pipe(
   Layer.provide(send),
   Layer.provide(getInbox),
   GroupImpl.finalize,

@@ -1,7 +1,7 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
-import notes from "../_generated/tables/notes";
+import notesTable from "../_generated/tables/notes";
 
 export class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
   id: Schema.String,
@@ -37,7 +37,7 @@ export default GroupSpec.make()
     FunctionSpec.publicQuery({
       name: "getNoteOrFail",
       args: () => ({ noteId: Id("notes") }),
-      returns: () => notes.Doc,
+      returns: () => notesTable.Doc,
       error: () => NotFound,
     }),
   )
@@ -100,7 +100,7 @@ export default GroupSpec.make()
     FunctionSpec.internalQuery({
       name: "internalGetNoteOrFail",
       args: () => ({ noteId: Id("notes") }),
-      returns: () => notes.Doc,
+      returns: () => notesTable.Doc,
       error: () => NotFound,
     }),
   )

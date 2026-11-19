@@ -82,7 +82,7 @@ for how it affects optional properties and schema validation.
       information about what's permitted and what's not.
     </Note>
 
-    Define a table—one file per table under `confect/tables/`, where the **filename is the table name** (so filenames must be valid JS identifiers and may not start with `_`). Each file **must default-export** a `Table`; codegen reads `module.default` and applies the filename as the table name. From other modules (e.g. specs), default-import the codegen-emitted wrapper at `confect/_generated/tables/<name>` to reach the table's derived `Schema`s (`notes.Doc`, `notes.Fields`).
+    Define a table—one file per table under `confect/tables/`, where the **filename is the table name** (so filenames must be valid JS identifiers and may not start with `_`). Each file **must default-export** a `Table`; codegen reads `module.default` and applies the filename as the table name. From other modules (e.g. specs), default-import the codegen-emitted wrapper at `confect/_generated/tables/<name>` to reach the table's derived `Schema`s (`notesTable.Doc`, `notesTable.Fields`).
 
     ```ts confect/tables/notes.ts
     import { Table } from "@confect/core";
@@ -107,8 +107,8 @@ for how it affects optional properties and schema validation.
     pnpm exec confect codegen
     ```
 
-    This creates `confect/_generated/`, including `id.ts`, `tables/notes.ts`,
-    `schema.ts`, and `services.ts`.
+    This creates `confect/_generated/`, including the `tables/notes.ts` handle,
+    the `server.ts` builders, the `services.ts` service tags, and `id.ts`.
 
     This tutorial generates table bindings before you write the functions. If
     your table, spec, and implementation files are already complete, one codegen
@@ -124,13 +124,13 @@ for how it affects optional properties and schema validation.
     import * as Schema from "effect/Schema";
 
     import { Id } from "./_generated/id";
-    import notes from "./_generated/tables/notes";
+    import notesTable from "./_generated/tables/notes";
 
     export default GroupSpec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          returns: () => Schema.Array(notes.Doc),
+          returns: () => Schema.Array(notesTable.Doc),
         }),
       )
       .addFunction(
@@ -150,34 +150,34 @@ for how it affects optional properties and schema validation.
     missing implementation.
 
     ```ts confect/notes.impl.ts
-    import { FunctionImpl, GroupImpl } from "@confect/server";
     import * as Effect from "effect/Effect";
     import * as Layer from "effect/Layer";
 
-    import databaseSchema from "./_generated/schema";
+    import { FunctionImpl, GroupImpl } from "./_generated/server";
     import { DatabaseReader, DatabaseWriter } from "./_generated/services";
-    import notes from "./notes.spec";
+    import notesTable from "./_generated/tables/notes";
+    import notesSpec from "./notes.spec";
 
-    const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
+    const list = FunctionImpl.make(notesSpec, "list", () =>
       Effect.gen(function* () {
         const reader = yield* DatabaseReader;
 
         return yield* reader
-          .table("notes")
+          .table(notesTable)
           .index("by_creation_time", "desc")
           .collect();
       }).pipe(Effect.orDie),
     );
 
-    const create = FunctionImpl.make(databaseSchema, notes, "create", ({ text }) =>
+    const create = FunctionImpl.make(notesSpec, "create", ({ text }) =>
       Effect.gen(function* () {
         const writer = yield* DatabaseWriter;
 
-        return yield* writer.table("notes").insert({ text });
+        return yield* writer.table(notesTable).insert({ text });
       }).pipe(Effect.orDie),
     );
 
-    export default GroupImpl.make(databaseSchema, notes).pipe(
+    export default GroupImpl.make(notesSpec).pipe(
       Layer.provide(list),
       Layer.provide(create),
       GroupImpl.finalize,

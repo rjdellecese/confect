@@ -35,14 +35,13 @@ export default GroupSpec.make().addFunction(FunctionSpec.internalMutation({
   returns: () => Schema.Void,
 }));
 `,
-  "confect/tasks.impl.ts": `import { FunctionImpl, GroupImpl } from "@confect/server";
-import * as Effect from "effect/Effect";
+  "confect/tasks.impl.ts": `import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./_generated/schema";
-import tasks from "./tasks.spec";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
+import tasksSpec from "./tasks.spec";
 
-export default GroupImpl.make(databaseSchema, tasks).pipe(
-  Layer.provide(FunctionImpl.make(databaseSchema, tasks, "count", () => Effect.void)),
+export default GroupImpl.make(tasksSpec).pipe(
+  Layer.provide(FunctionImpl.make(tasksSpec, "count", () => Effect.void)),
   GroupImpl.finalize,
 );
 `,
@@ -82,20 +81,19 @@ export default Table.make(() => Schema.Struct({
   dimensions: 3,
 });
 `,
-  "confect/http.ts": `import * as ConfectHttpRouter from "@confect/server/HttpRouter";
+  "confect/http.ts": `import * as HttpRouter_ from "@confect/server/HttpRouter";
 import * as Effect from "effect/Effect";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
-import databaseSchema from "./_generated/schema";
+import type databaseSchema from "./_generated/schema";
 import type { Id } from "./_generated/id";
 import { VectorSearch } from "./_generated/services";
 
-export const health = ConfectHttpRouter.make(
-  databaseSchema,
+export const health = HttpRouter_.make<typeof databaseSchema>(
   HttpRouter.add("GET", "/health", HttpServerResponse.text("ok")),
 );
 
-const routes: ConfectHttpRouter.Routes<typeof databaseSchema> = HttpRouter.add(
+const routes: HttpRouter_.Routes<typeof databaseSchema> = HttpRouter.add(
   "GET", "/search", Effect.gen(function* () {
     const search = yield* VectorSearch;
     const matches: Array<{ _id: Id<"vectors">; _score: number }> = yield* search("vectors", "embedding", {
@@ -106,7 +104,7 @@ const routes: ConfectHttpRouter.Routes<typeof databaseSchema> = HttpRouter.add(
   }),
 );
 
-export default ConfectHttpRouter.make(databaseSchema, routes);
+export default HttpRouter_.make<typeof databaseSchema>(routes);
 `,
   "confect/notes.spec.ts": `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
@@ -124,12 +122,11 @@ export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({
   },
 }));
 `,
-  "confect/notes.impl.ts": `import { FunctionImpl, GroupImpl } from "@confect/server";
-import * as Effect from "effect/Effect";
+  "confect/notes.impl.ts": `import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./_generated/schema";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { Auth } from "./_generated/services";
-import notes from "./notes.spec";
+import notesSpec from "./notes.spec";
 
 export const count = Effect.fn("notes.count")(function* (args: { readonly count: number }) {
   const auth = yield* Auth;
@@ -137,8 +134,8 @@ export const count = Effect.fn("notes.count")(function* (args: { readonly count:
   return args.count + identity.subject.length;
 });
 
-const countImpl = FunctionImpl.make(databaseSchema, notes, "count", count);
-export default GroupImpl.make(databaseSchema, notes).pipe(
+const countImpl = FunctionImpl.make(notesSpec, "count", count);
+export default GroupImpl.make(notesSpec).pipe(
   Layer.provide(countImpl),
   GroupImpl.finalize,
 );
@@ -149,6 +146,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import refs from "./confect/_generated/refs";
 import type { NotesDoc } from "./confect/_generated/docs";
+import notesTable from "./confect/_generated/tables/notes";
 import { Id } from "./confect/_generated/id";
 import type databaseSchema from "./confect/_generated/schema";
 import { DatabaseReader, MutationAuth, Storage, TransactionMetadata } from "./confect/_generated/services";
@@ -159,7 +157,7 @@ export const noteId: Id<"notes"> = Schema.decodeUnknownSync(Id("notes"))("consum
 export const readNotes: () => Effect.Effect<ReadonlyArray<NotesDoc>, never, DatabaseReader> =
   Effect.fn("consumer.readNotes")(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table("notes").index("by_creation_time").collect().pipe(Effect.orDie);
+    return yield* reader.table(notesTable).index("by_creation_time").collect().pipe(Effect.orDie);
   });
 
 export const copyBlob: (id: Id<"_storage">) => Effect.Effect<Id<"_storage">, never, Handler.MutationServices<typeof databaseSchema>> =
@@ -180,14 +178,15 @@ export const encodedArgsAreNotDecodedArgs: Ref.Args<typeof refs.public.notes.cou
 `,
   "smoke.ts": `import assert from "node:assert/strict";
 import { Ref } from "@confect/core";
-import { CronWindow, FunctionRegistryItem, GroupImpl, Registry, type RegistryItems } from "@confect/server";
+import { CronWindow, FunctionRegistryItem, Registry, type RegistryItems } from "@confect/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as MutableRef from "effect/Ref";
 import refs from "./confect/_generated/refs";
+import { GroupImpl } from "./confect/_generated/server";
 import { Auth } from "./confect/_generated/services";
-import notes from "./confect/_generated/tables/notes";
+import notesTable from "./confect/_generated/tables/notes";
 import notesImpl, { count } from "./confect/notes.impl";
 import { schemaBuilds } from "./confect/probes";
 
@@ -225,7 +224,7 @@ assert.deepEqual(Ref.decodeArgsSync(refs.public.notes.count, { count: "41" }), {
 assert.equal(Ref.decodeReturnsSync(refs.public.notes.count, "42"), 42);
 assert.deepEqual(schemaBuilds, { table: 0, args: 1, returns: 1 });
 assert.throws(() => Ref.decodeReturnsSync(refs.public.notes.count, "not-a-number"));
-assert.equal(notes.Doc, notes.Doc);
+assert.equal(notesTable.Doc, notesTable.Doc);
 assert.equal(schemaBuilds.table, 1);
 assert.equal(await Effect.runPromise(Ref.runWithCodec(refs.public.notes.count, { count: 41 }, (_ref, args) => {
   assert.deepEqual(args, { count: "41" });

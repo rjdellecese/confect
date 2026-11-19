@@ -92,7 +92,7 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
 // System tables
 // -----------------------------------------------------------------------------
 
-export const scheduledFunctionsTable = Table_.make(() =>
+export const _scheduled_functions = Table_.make(() =>
   Schema.Struct({
     name: Schema.String,
     args: Schema.Array(Schema.Any),
@@ -111,7 +111,7 @@ export const scheduledFunctionsTable = Table_.make(() =>
   }),
 )("_scheduled_functions");
 
-export const storageTable = Table_.make(() =>
+export const _storage = Table_.make(() =>
   Schema.Struct({
     sha256: Schema.String,
     size: Schema.Finite,
@@ -120,8 +120,8 @@ export const storageTable = Table_.make(() =>
 )("_storage");
 
 export const systemTables = {
-  _scheduled_functions: scheduledFunctionsTable,
-  _storage: storageTable,
+  _scheduled_functions,
+  _storage,
 } as const;
 
-export type SystemTables = typeof scheduledFunctionsTable | typeof storageTable;
+export type SystemTables = typeof _scheduled_functions | typeof _storage;

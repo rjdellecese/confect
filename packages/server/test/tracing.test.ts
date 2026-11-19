@@ -18,7 +18,7 @@ import type {
   GenericActionCtx,
   GenericDatabaseWriter,
   GenericDataModel,
-  OrderedQuery as ConvexOrderedQuery,
+  OrderedQuery as OrderedQuery_,
 } from "convex/server";
 import { ConvexError, type GenericId } from "convex/values";
 import * as Cause from "effect/Cause";
@@ -341,11 +341,11 @@ describe("server operation tracing", () => {
         const get = vi
           .fn<GenericDatabaseWriter<ConvexDataModel>["get"]>()
           .mockResolvedValue({ _id: noteId, _creationTime: 1, value: "1" });
-        const writer = DatabaseWriter.make(databaseSchema, {
+        const writer = DatabaseWriter.make({
           insert,
           replace,
           get,
-        } as unknown as GenericDatabaseWriter<ConvexDataModel>).table("notes");
+        } as unknown as GenericDatabaseWriter<ConvexDataModel>).table(notes);
         const insertEffect = writer.insert({ value: 2 });
         const patchEffect = writer.patch(noteId, { value: 3 });
         const replaceEffect = writer.replace(noteId, { value: 4 });
@@ -386,10 +386,10 @@ describe("server operation tracing", () => {
       const get = vi
         .fn<GenericDatabaseWriter<ConvexDataModel>["get"]>()
         .mockResolvedValue({ _id: noteId, _creationTime: 1, value: "1" });
-      const writer = DatabaseWriter.make(databaseSchema, {
+      const writer = DatabaseWriter.make({
         replace,
         get,
-      } as unknown as GenericDatabaseWriter<ConvexDataModel>).table("notes");
+      } as unknown as GenericDatabaseWriter<ConvexDataModel>).table(notes);
       const error = yield* writer
         .patch(noteId, { value: "invalid" as never })
         .pipe(Effect.flip, Effect.withTracer(recorder.tracer));
@@ -410,14 +410,14 @@ describe("server operation tracing", () => {
       Effect.gen(function* () {
         const recorder = yield* makeRecorder;
         const paginate = vi
-          .fn<ConvexOrderedQuery<ConvexDataModel["notes"]>["paginate"]>()
+          .fn<OrderedQuery_<ConvexDataModel["notes"]>["paginate"]>()
           .mockResolvedValue({
             page: [{ _id: noteId, _creationTime: 1, value: "7" }],
             isDone: true,
             continueCursor: "done",
           });
         const filter = vi.fn();
-        const query = { paginate, filter } as unknown as ConvexOrderedQuery<
+        const query = { paginate, filter } as unknown as OrderedQuery_<
           ConvexDataModel["notes"]
         >;
         filter.mockReturnValue(query);

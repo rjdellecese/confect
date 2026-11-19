@@ -1,7 +1,8 @@
-import { GenericId } from "@confect/core";
+import * as GenericId from "@confect/core/GenericId";
 import type { SystemTableNames } from "convex/server";
+import type tableNames from "./tableNames.js";
 
-export type TableNames = "httpVectors" | "transactionNotes";
+export type TableNames = (typeof tableNames)[number];
 
 export type Id<TableName extends TableNames | SystemTableNames> = GenericId.GenericId<TableName>;
 

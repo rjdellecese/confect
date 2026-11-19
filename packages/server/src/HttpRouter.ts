@@ -1,6 +1,6 @@
 import {
   type GenericActionCtx,
-  type HttpRouter as ConvexHttpRouter,
+  type HttpRouter as HttpRouter_,
   httpActionGeneric,
   httpRouter,
   ROUTABLE_HTTP_METHODS,
@@ -35,11 +35,21 @@ import type { StorageReader } from "./StorageReader";
 import type { StorageWriter } from "./StorageWriter";
 import type * as VectorSearch from "./VectorSearch";
 
+type WithSchema<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Service,
+> = {
+  [Key in keyof DatabaseSchema_]: Service;
+}[DatabaseSchema.TypeId];
+
 /**
  * The Confect services available to HTTP route handlers and middleware,
- * supplied per request from the Convex action context.
+ * supplied per request from the Convex action context. Pass the application
+ * schema type to include its vector search service.
  */
-export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
+export type Services<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps = never,
+> =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
@@ -51,7 +61,10 @@ export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | StorageReader
   | StorageWriter
   | StorageActionWriter
-  | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>;
+  | WithSchema<
+      DatabaseSchema_,
+      VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>
+    >;
 
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
@@ -74,24 +87,25 @@ export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  * `Config` reads (e.g. in `Layer.unwrap`) resolve against Convex environment
  * variables.
  */
-export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
-  Layer.Layer<
-    never,
-    never,
-    | HttpRouter.HttpRouter
-    | Etag.Generator
-    | FileSystem.FileSystem
-    | HttpPlatform.HttpPlatform
-    | Path.Path
-    | HttpRouter.Request<"Requires", Services<DatabaseSchema_>>
-    | HttpRouter.Request<"GlobalRequires", Services<DatabaseSchema_>>
-    | HttpRouter.Request<"Error", any>
-    | HttpRouter.Request<"GlobalError", any>
-  >;
+export type Routes<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps = never,
+> = Layer.Layer<
+  never,
+  never,
+  | HttpRouter.HttpRouter
+  | Etag.Generator
+  | FileSystem.FileSystem
+  | HttpPlatform.HttpPlatform
+  | Path.Path
+  | HttpRouter.Request<"Requires", Services<DatabaseSchema_>>
+  | HttpRouter.Request<"GlobalRequires", Services<DatabaseSchema_>>
+  | HttpRouter.Request<"Error", any>
+  | HttpRouter.Request<"GlobalError", any>
+>;
 
 /**
- * Create a Convex HTTP router from a runtime database schema and routes, with
- * schema-typed vector search in handlers and middleware.
+ * Create a Convex HTTP router. Pass the application's database schema as a type
+ * argument for schema-typed vector search in handlers and middleware.
  *
  * A single catch-all `httpAction` is registered for every routable method under
  * the path prefix `"/"`, making the Effect router the single source of truth
@@ -103,9 +117,8 @@ export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  * precedence.
  */
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-  databaseSchema: DatabaseSchema_,
-  routes: Routes<NoInfer<DatabaseSchema_>>,
-): ConvexHttpRouter => {
+  routes: Routes<DatabaseSchema_>,
+): HttpRouter_ => {
   applyMonkeyPatches();
 
   // Provided (not just merged) so that route layers' own construction—e.g.
@@ -128,8 +141,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
-    const services = RegisteredFunction.actionLayer(
-      databaseSchema,
+    const services = RegisteredFunction.actionLayer<DatabaseSchema_>(
       ctx as unknown as GenericActionCtx<
         DataModel.ToConvexDataModel<
           DataModel.FromDatabaseSchema<DatabaseSchema_>

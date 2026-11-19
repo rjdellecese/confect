@@ -75,7 +75,7 @@ it.effect(
       const first = yield* render;
       const actual2 = yield* render;
       expect(actual2).toBe(first);
-      expect(first).toContain('["child"]: GroupSpec.make(),');
+      expect(first).toContain('["child"]: GroupSpec_.make(),');
     }),
 );
 

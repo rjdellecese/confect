@@ -15,6 +15,8 @@ const schema = DatabaseSchema.make({
   users: Table.make(() => Schema.Struct({ name: Schema.String }))("users"),
 });
 
+const tableNames = ["notes", "users"] as const;
+
 const makeNative = () => {
   const normalize = <Name extends string>(
     table: Name,
@@ -55,7 +57,9 @@ describe("DocumentIds", () => {
         notes: Table.make(fields)("notes"),
       });
       const native = makeNative();
-      const layer = DocumentIds.layer(databaseSchema, native);
+      const names = [DatabaseSchema.tables(databaseSchema).notes.tableName];
+      const scan = vi.spyOn(names, Symbol.iterator);
+      const layer = DocumentIds.layer(names, native);
       expect(fields).not.toHaveBeenCalled();
       expect(native.normalizeId).not.toHaveBeenCalled();
 
@@ -72,7 +76,9 @@ describe("DocumentIds", () => {
           const parsedResult2 = yield* parsed;
           expect(parsedResult2).toEqual(Option.some("notes:id"));
           expect(native.normalizeId).toHaveBeenCalledTimes(2);
+          expect(scan).not.toHaveBeenCalled();
           const identifiedResult = yield* identified;
+          expect(scan).toHaveBeenCalledOnce();
           expect(identifiedResult).toEqual(
             Option.some({ table: "_storage", id: "_storage:id" }),
           );
@@ -103,7 +109,7 @@ describe("DocumentIds", () => {
     "parses and identifies modern %s IDs without conversion",
     (table) =>
       Effect.gen(function* () {
-        const ids = DocumentIds.make(schema, makeNative());
+        const ids = DocumentIds.make(tableNames, makeNative());
         const input = `${table}:id`;
         const parseResult = yield* ids.parse(table, input);
         expect(parseResult).toEqual(Option.some(input));
@@ -116,7 +122,7 @@ describe("DocumentIds", () => {
     "returns None for unrecognized input %j",
     (input) =>
       Effect.gen(function* () {
-        const ids = DocumentIds.make(schema, makeNative());
+        const ids = DocumentIds.make(tableNames, makeNative());
         const parseResult2 = yield* ids.parse("notes", input);
         expect(parseResult2).toEqual(Option.none());
         const identifyResult2 = yield* ids.identify(input);
@@ -128,7 +134,7 @@ describe("DocumentIds", () => {
     "rejects another table's ID and legacy strings requiring conversion",
     () =>
       Effect.gen(function* () {
-        const ids = DocumentIds.make(schema, makeNative());
+        const ids = DocumentIds.make(tableNames, makeNative());
         const parseResult3 = yield* ids.parse("notes", "users:id");
         expect(parseResult3).toEqual(Option.none());
         const parseResult4 = yield* ids.parse("notes", "legacy");
@@ -143,7 +149,7 @@ describe("DocumentIds", () => {
     () =>
       Effect.gen(function* () {
         const native = makeNative();
-        const ids = DocumentIds.make(schema, native);
+        const ids = DocumentIds.make(tableNames, native);
         const identifyResult4 = yield* ids.identify("missing");
         expect(identifyResult4).toEqual(Option.none());
         expect(native.normalizeId).toHaveBeenCalledTimes(2);
@@ -176,7 +182,7 @@ describe("DocumentIds", () => {
   it.effect("supports public system IDs with an empty application schema", () =>
     Effect.gen(function* () {
       const native = makeNative();
-      const ids = DocumentIds.make(DatabaseSchema.make({}), native);
+      const ids = DocumentIds.make([], native);
       const identifyResult6 = yield* ids.identify("_storage:id");
       expect(identifyResult6).toEqual(
         Option.some({ table: "_storage", id: "_storage:id" }),
@@ -198,7 +204,7 @@ describe("DocumentIds", () => {
       vi.mocked(native.system.normalizeId).mockImplementation(() => {
         throw failure;
       });
-      const ids = DocumentIds.make(schema, native);
+      const ids = DocumentIds.make(tableNames, native);
       const pipeResult = yield* ids
         .parse("notes", "notes:id")
         .pipe(Effect.catchDefect(Effect.succeed));
@@ -219,7 +225,7 @@ describe("DocumentIds", () => {
     () =>
       Effect.gen(function* () {
         const services = yield* Layer.build(
-          DocumentIds.layer(schema, makeNative()),
+          DocumentIds.layer(tableNames, makeNative()),
         );
         return yield* Effect.gen(function* () {
           const ids = yield* DocumentIds.DocumentIds<typeof schema>();

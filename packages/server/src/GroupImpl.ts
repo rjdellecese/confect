@@ -9,7 +9,6 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Ref from "effect/Ref";
-import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as FunctionImpl from "./FunctionImpl";
 import type * as MiddlewareImpl from "./MiddlewareImpl";
 
@@ -76,17 +75,10 @@ export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({
   );
 
 /**
- * Begin a group's impl layer. `databaseSchema` and `group` are retained only as
- * type-level carriers (`group` drives the required `FunctionImpl` services via
- * `FromGroupSpec<Group>`; `databaseSchema` keeps the impl's dependency on
- * `_generated/schema` symmetric with `FunctionImpl.make`). Neither is read at
- * runtime.
+ * Begin a group's impl layer. Its spec determines the function and middleware
+ * implementations that must be provided before finalization.
  */
-export const make = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Group extends GroupSpec.AnyWithProps,
->(
-  _databaseSchema: DatabaseSchema_,
+export const make = <Group extends GroupSpec.AnyWithProps>(
   _group: Group &
     MiddlewareSpec.ValidateImplRequires<
       GroupSpec.Functions<Group>,

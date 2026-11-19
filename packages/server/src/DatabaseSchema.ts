@@ -1,4 +1,5 @@
 import * as Predicate from "effect/Predicate";
+import type { GenericDataModel, TableNamesInDataModel } from "convex/server";
 import type * as Table from "./Table";
 
 export const TypeId = "~@confect/server/DatabaseSchema";
@@ -27,6 +28,14 @@ export interface DatabaseSchema<
 export interface AnyWithProps extends DatabaseSchema<
   Readonly<Record<string, Table.AnyWithProps>>
 > {}
+
+export type FromConvexDataModel<Model extends GenericDataModel> =
+  DatabaseSchema<{
+    readonly [Name in TableNamesInDataModel<Model>]: Omit<
+      Table.AnyWithProps,
+      "tableName"
+    > & { readonly tableName: Name };
+  }>;
 
 export type Tables<DatabaseSchema_ extends AnyWithProps> =
   DatabaseSchema_[TypeId][keyof DatabaseSchema_[TypeId]];

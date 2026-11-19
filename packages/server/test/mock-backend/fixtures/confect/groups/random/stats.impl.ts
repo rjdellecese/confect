@@ -1,14 +1,11 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../../_generated/schema";
-import stats from "./stats.spec";
+import { FunctionImpl, GroupImpl } from "../../_generated/server";
+import statsSpec from "./stats.spec";
 
-const count = FunctionImpl.make(databaseSchema, stats, "count", () =>
-  Effect.succeed(0),
-);
+const count = FunctionImpl.make(statsSpec, "count", () => Effect.succeed(0));
 
-export default GroupImpl.make(databaseSchema, stats).pipe(
+export default GroupImpl.make(statsSpec).pipe(
   Layer.provide(count),
   GroupImpl.finalize,
 );

@@ -9,7 +9,7 @@ import * as SchemaCompiler from "effect/schema/SchemaCompiler";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Document from "@confect/server/Document";
 import type * as TableInfo from "@confect/server/TableInfo";
-import unnamedEvents from "./mock-backend/fixtures/confect/tables/events";
+import type eventsTable from "./mock-backend/fixtures/confect/_generated/tables/events";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,
@@ -235,8 +235,7 @@ describe("Document.Document", () => {
   });
 
   it("distributes system fields over union-schema tables", () => {
-    const events = unnamedEvents("events");
-    type Doc = TableInfo.TableInfo<typeof events>["document"];
+    type Doc = TableInfo.TableInfo<typeof eventsTable>["document"];
 
     expectTypeOf<Document.WithoutSystemFields<Doc>>().toEqualTypeOf<
       | { readonly kind: "a"; readonly a: string }

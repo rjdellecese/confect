@@ -12,7 +12,15 @@ import * as String from "effect/String";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 
-const entries = ["services.ts", "docs.ts", "refs.ts", "schema.ts", "spec.ts"];
+const entries = [
+  "server.ts",
+  "services.ts",
+  "docs.ts",
+  "refs.ts",
+  "schema.ts",
+  "spec.ts",
+  "tableNames.ts",
+];
 
 const TypeScriptConfig = Schema.fromJsonString(
   Schema.Struct({
@@ -139,6 +147,21 @@ const TestLayer = Layer.provideMerge(
 );
 
 layer(TestLayer, { timeout: "120 seconds" })("declaration emit", (it) => {
+  it.effect("emits the bound server builders and literal table names", () =>
+    Effect.gen(function* () {
+      const { declarations, diagnostics } = yield* DeclarationEmit;
+      expect(diagnostics).toBe("");
+      expect(declarations["server.ts"]).toContain(
+        "declare const FunctionImpl:",
+      );
+      expect(declarations["server.ts"]).toContain(
+        "declare const MiddlewareImpl:",
+      );
+      expect(declarations["tableNames.ts"]).toContain(
+        'readonly ["events", "notes", "tags", "users"]',
+      );
+    }),
+  );
   it.effect(
     "services.d.ts prints public types by name",
     () =>
