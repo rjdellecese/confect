@@ -143,6 +143,8 @@ The provider refuses project-team changes and deployment identity changes that c
 
 Environment management preserves unrelated variables. Existing variables that overlap a new declaration require explicit adoption. Adopted values are restored when their ownership is removed; variables introduced by the stack are removed. Pass secrets as `Redacted` values, not plain strings.
 
+If your deployment uses variables named both `Type` and `FQN`, put them in separate `Convex.EnvironmentVariables` resources. Alchemy interprets an object with both keys as a resource reference, so don't pass them together in one map, including a dynamically constructed `env`.
+
 Set `env: {}` to remove all managed variables before the next code push. Removing the `env` option removes the environment resource instead, so its cleanup follows Alchemy's resource-deletion ordering.
 
 If the deployed `convex.config.ts` declares a variable as required, remove it in two deploys. First remove the requirement from your backend code while keeping the value in `env`. Once that code is deployed, remove the value from `env`. Otherwise Convex rejects the unset before the new code can run.

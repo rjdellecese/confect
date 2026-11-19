@@ -33,6 +33,22 @@ const providers = Layer.succeed(Providers, {
 });
 
 describe("Backend", () => {
+  it.effect("rejects an env map Alchemy would mistake for a resource", () =>
+    Effect.gen(function* () {
+      const services = yield* Layer.build(Layer.mergeAll(stack(), providers));
+      const error = yield* Backend("Backend", {
+        ...props,
+        env: { Type: "service", FQN: "api" },
+      }).pipe(
+        Effect.provideContext(services),
+        Effect.catchDefect(Effect.succeed),
+      );
+      expect(error).toMatchObject({
+        _tag: "ConflictingEnvironmentNames",
+        names: ["Type", "FQN"],
+      });
+    }),
+  );
   it.effect(
     "namespaces Code and defaults to the locally installed Confect code generator",
     () =>
