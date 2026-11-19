@@ -150,7 +150,7 @@ export const layer = Layer.effect(
         cwd = process.cwd(),
       ) {
         const directory = path.resolve(cwd);
-        const env = yield* environment.pipe(
+        const env = yield* environment.parse(ConfigProvider.fromEnv()).pipe(
           Effect.mapError(() =>
             CommandError.make({
               operation: "prepare",
@@ -188,7 +188,7 @@ export const layer = Layer.effect(
           Config.String(name).pipe(Config.withDefault(undefined));
         const env = yield* Effect.all(
           {
-            environment,
+            environment: environment.parse(ConfigProvider.fromEnv()),
             markers: Config.all({
               VERCEL: optionalMarker("VERCEL"),
               VERCEL_ENV: optionalMarker("VERCEL_ENV"),

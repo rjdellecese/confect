@@ -5,6 +5,7 @@ import {
   provider as codeProvider,
   type CodeProps,
 } from "@confect/alchemy/Code";
+import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Deferred from "effect/Deferred";
@@ -298,10 +299,29 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
     () =>
       Effect.gen(function* () {
         const cwd = yield* project;
-        for (const environment of [
-          { PATH: "C:\\node", SYSTEMROOT: "C:\\Windows" },
-          { Path: "C:\\node", SystemRoot: "C:\\Windows" },
+        const host = ConfigProvider.fromEnv({ preserveEmptyStrings: true });
+        const pairs = [
+          ["PATH", "Path"],
+          ["SYSTEMROOT", "SystemRoot"],
+        ] as const;
+        for (const [upper, mixed] of pairs) {
+          const original = yield* Config.String(upper)
+            .pipe(
+              Config.orElse(() => Config.String(mixed)),
+              Config.withDefault(undefined),
+            )
+            .parse(host);
+          vi.stubEnv(upper, original);
+          vi.stubEnv(mixed, original);
+        }
+        for (const [path, root] of [
+          ["PATH", "SYSTEMROOT"],
+          ["Path", "SystemRoot"],
         ]) {
+          for (const [upper, mixed] of pairs)
+            vi.stubEnv(upper, undefined).stubEnv(mixed, undefined);
+          vi.stubEnv(path, "C:\\node");
+          vi.stubEnv(root, "C:\\Windows");
           const calls: string[] = [];
           const spawner = Layer.mock(ChildProcessSpawner.ChildProcessSpawner, {
             exitCode: (command) =>
@@ -317,17 +337,14 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
               }),
           });
           const runnerServices = yield* Layer.build(
-            Layer.mergeAll(
-              runnerLayer.pipe(Layer.provide(spawner)),
-              ConfigProvider.layer(ConfigProvider.fromUnknown(environment)),
-            ),
+            runnerLayer.pipe(Layer.provide(spawner)),
           );
           yield* deploy({ ...props, cwd }).pipe(
             Effect.provideContext(runnerServices),
           );
           expect(calls).toEqual(["codegen", "deploy"]);
         }
-      }),
+      }).pipe(Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs()))),
   );
 
   runtimeIt.effect(
@@ -402,6 +419,7 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
         };
         for (const [name, value] of Rec.toEntries(hostMarkers))
           vi.stubEnv(name, value);
+        vi.stubEnv("PATH", path.dirname(process.execPath));
         const spawner = Layer.mock(ChildProcessSpawner.ChildProcessSpawner, {
           exitCode: (command) =>
             Effect.gen(function* () {
@@ -411,6 +429,9 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
               calls.push(stringArgument(command.args[1]));
               expect(command.command).toBe(process.execPath);
               expect(command.options.cwd).toBe(cwd);
+              expect(command.options.env?.PATH).toBe(
+                path.dirname(process.execPath),
+              );
               expect(command.options.extendEnv).toBe(false);
               expect(command.options.stdin).toBe("ignore");
               expect(command.options.stdout).toBe("ignore");
@@ -462,7 +483,7 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
                 CONVEX_ACCESS_TOKEN: "ambient-management-secret",
                 CONVEX_DEPLOYMENT: "prod:wrong",
                 NODE_OPTIONS: "--inspect",
-                PATH: path.dirname(process.execPath),
+                PATH: "stack-path-override",
                 VERCEL_ENV: "production",
               }),
             ),
