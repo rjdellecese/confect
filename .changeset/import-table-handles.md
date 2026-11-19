@@ -8,9 +8,8 @@ Pass a bound table to `DatabaseReader.table` and `DatabaseWriter.table` so a fun
 
 ### Breaking Changes
 
-- In each handler, helper, or middleware, default-import the tables it uses from their individual `_generated/tables/<name>` modules. For a runtime choice between tables, import just the candidates rather than the full schema. For system reads, use `Table.storageTable` and `Table.scheduledFunctionsTable` from `@confect/server/Table`.
+- In each handler, helper, or middleware, default-import the tables it uses from their individual `_generated/tables/<name>` modules. For a runtime choice between tables, import just the candidates rather than the full schema. For system reads, use `Table._storage` and `Table._scheduled_functions` from `@confect/server/Table` (formerly `Table.storageTable` and `Table.scheduledFunctionsTable`).
 - Import `FunctionImpl` and `MiddlewareImpl` from `_generated/server`; keep importing `GroupImpl` from `@confect/server`. Remove the runtime schema import and the first argument from `FunctionImpl.make`, `GroupImpl.make`, `MiddlewareImpl.make`, `MiddlewareImpl.provides`, and `MiddlewareImpl.makeByFunctionType`.
-- When constructing services directly, pass only the native database to `DatabaseReader.make` and `DatabaseWriter.make`. For `DocumentIds.make` and `DocumentIds.layer`, pass the default export of `_generated/tableNames` instead of the schema.
 - Replace `TestConfect.layer(schema, convexSchema, modules)` with `TestConfect.layer<typeof schema>(convexSchema, modules)`, importing the Confect schema as a type.
 
 Before:

@@ -975,7 +975,7 @@ describe("action storage transaction isolation", () => {
   const files = Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     return yield* reader
-      .table(Table.storageTable)
+      .table(Table._storage)
       .index("by_creation_time")
       .collect();
   });
@@ -1016,9 +1016,8 @@ describe("action storage transaction isolation", () => {
                   Effect.gen(function* () {
                     const reader = yield* DatabaseReader;
                     expect(
-                      (yield* reader
-                        .table(Table.scheduledFunctionsTable)
-                        .get(job)).state.kind,
+                      (yield* reader.table(Table._scheduled_functions).get(job))
+                        .state.kind,
                     ).toBe("success");
                   }),
                 ),
@@ -1424,7 +1423,7 @@ describe("mutation Blob transactions", () => {
             const blob = yield* storage.get(id);
             expect(blob.size).toBe(2);
             expect(blob.type).toBe(type);
-            const metadata = yield* reader.table(Table.storageTable).get(id);
+            const metadata = yield* reader.table(Table._storage).get(id);
             expect(metadata.sha256).toBe(
               "v2DkNJys5rzg1VLo14NCjbZtDWSb2eQwo2J+LuFKyDk=",
             );
@@ -1455,7 +1454,7 @@ describe("mutation Blob transactions", () => {
         Effect.gen(function* () {
           const reader = yield* DatabaseReader;
           const files = yield* reader
-            .table(Table.storageTable)
+            .table(Table._storage)
             .index("by_creation_time")
             .collect();
           expect(files).toEqual([]);
@@ -1508,7 +1507,7 @@ describe("mutation Blob transactions", () => {
               expect((yield* Effect.flip(storage.getUrl(id))).id).toBe(id);
             }
             const files = yield* reader
-              .table(Table.storageTable)
+              .table(Table._storage)
               .index("by_creation_time")
               .collect();
             expect(Array.map(files, (file) => file._id)).toEqual([existingId]);
@@ -1572,7 +1571,7 @@ describe("mutation Blob transactions", () => {
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
             const files = yield* reader
-              .table(Table.storageTable)
+              .table(Table._storage)
               .index("by_creation_time")
               .collect();
             expect(files).toHaveLength(1);
@@ -1803,7 +1802,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
                   { text: "already due" },
                 );
             const scheduled = yield* reader
-              .table(Table.scheduledFunctionsTable)
+              .table(Table._scheduled_functions)
               .get(id);
             expect(time).toBe(now);
             const after = yield* Clock.currentTimeMillis;
@@ -1824,8 +1823,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
             expect(
-              (yield* reader.table(Table.scheduledFunctionsTable).get(job))
-                .state.kind,
+              (yield* reader.table(Table._scheduled_functions).get(job)).state
+                .kind,
             ).toBe("success");
           }),
         );
@@ -1850,7 +1849,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("Scheduler", (test) => {
           yield* scheduler.cancel(id);
 
           const scheduled = yield* reader
-            .table(Table.scheduledFunctionsTable)
+            .table(Table._scheduled_functions)
             .get(id);
           expect(scheduled.state.kind).toBe("canceled");
         }),

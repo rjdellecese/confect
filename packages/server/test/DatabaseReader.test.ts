@@ -40,7 +40,7 @@ it.effect("reads through the selected handle's codec and native receiver", () =>
     const app = yield* reader.table(notes).get(noteId);
     expectTypeOf(app.score).toEqualTypeOf<number>();
     expect(app.score).toBe(42);
-    const storage = yield* reader.table(Table.storageTable).get(storageId);
+    const storage = yield* reader.table(Table._storage).get(storageId);
     expect(storage).toEqual(stored);
     expect(native.get.mock.contexts).toEqual([native]);
     expect(native.system.get.mock.contexts).toEqual([native.system]);
@@ -69,7 +69,7 @@ it("infers named documents, indexes and IDs only for app and system handles", ()
       ReadonlyArray<NoteDoc>
     >();
     expectTypeOf(
-      reader.table(Table.scheduledFunctionsTable).index("by_creation_time"),
+      reader.table(Table._scheduled_functions).index("by_creation_time"),
     ).toBeObject();
     const foreign = Table.make(() => Schema.Struct({ field: Schema.String }))(
       "other",

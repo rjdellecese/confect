@@ -79,11 +79,11 @@ it("accepts only documents and IDs for the selected application handle", () => {
     expectTypeOf<"notes">().not.toExtend<Parameters<typeof writer.table>[0]>();
     const raw = DatabaseWriter.make(native);
     expectTypeOf(foreign).not.toExtend<Parameters<typeof raw.table>[0]>();
-    expectTypeOf(Table.storageTable).not.toExtend<
+    expectTypeOf(Table._storage).not.toExtend<
       Parameters<typeof writer.table>[0]
     >();
     // @ts-expect-error System tables are read-only even with an untyped native writer.
-    DatabaseWriter.make(untyped).table(Table.storageTable);
+    DatabaseWriter.make(untyped).table(Table._storage);
     // @ts-expect-error The writer accepts decoded values.
     expectTypeOf(writer.table(notes).insert({ score: "42" }));
     // @ts-expect-error The selected table may be users.

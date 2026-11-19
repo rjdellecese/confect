@@ -9,9 +9,9 @@ Use the built-in handles from `@confect/server/Table` with `DatabaseReader` to r
 ```ts
 import * as Table from "@confect/server/Table";
 
-reader.table(Table.storageTable).get(storageId);
+reader.table(Table._storage).get(storageId);
 reader
-  .table(Table.scheduledFunctionsTable)
+  .table(Table._scheduled_functions)
   .index("by_creation_time", "desc")
   .take(10);
 ```
