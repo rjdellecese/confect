@@ -14,7 +14,7 @@ import * as Schema from "effect/Schema";
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
 import { resourceName } from "./internal/ResourceIdentity";
-import { checkpointResource, shouldAdopt } from "./internal/Lifecycle";
+import { checkpointResource } from "./internal/Lifecycle";
 
 export interface DeploymentProps {
   readonly projectId: number;
@@ -137,7 +137,6 @@ export const provider = Effect.gen(function* () {
         return { action: "update" };
     }),
     read: Effect.fn("Deployment.read")(function* ({
-      fqn,
       instanceId,
       olds,
       output,
@@ -154,7 +153,7 @@ export const provider = Effect.gen(function* () {
       if (olds.projectId === undefined) return;
       const deployment = yield* find(
         olds.projectId,
-        olds.reference ?? (yield* resourceName("deployment", fqn, instanceId)),
+        olds.reference ?? resourceName("deployment", instanceId),
       );
       if (deployment === undefined) return;
       const current = yield* attributes(deployment);
@@ -177,27 +176,23 @@ export const provider = Effect.gen(function* () {
         news.reference ??
         output?.managedReference ??
         output?.reference ??
-        (yield* resourceName("deployment", fqn, instanceId));
+        resourceName("deployment", instanceId);
       if (deployment === undefined) {
         const existing = yield* find(news.projectId, reference);
         if (existing !== undefined) {
-          const adopted = yield* attributes(existing);
-          yield* validate(adopted, news);
-          if (!(yield* shouldAdopt(fqn)))
-            return yield* new OwnedBySomeoneElse({
-              message: "An existing deployment requires explicit adoption.",
-              resourceType: Deployment.Type,
-              physicalName: reference,
-            });
-          yield* checkpointResource(fqn, instanceId, news, adopted);
-          deployment = existing;
-        } else {
-          deployment = yield* client.createDeployment(news.projectId, {
-            type: news.type,
-            reference,
-            ...(news.region === undefined ? {} : { region: news.region }),
+          const candidate = yield* attributes(existing);
+          yield* validate(candidate, news);
+          return yield* new OwnedBySomeoneElse({
+            message: "An existing deployment requires explicit adoption.",
+            resourceType: Deployment.Type,
+            physicalName: reference,
           });
         }
+        deployment = yield* client.createDeployment(news.projectId, {
+          type: news.type,
+          reference,
+          ...(news.region === undefined ? {} : { region: news.region }),
+        });
       }
       const current = yield* attributes(deployment);
       yield* validate(current, news);

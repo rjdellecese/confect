@@ -22,6 +22,7 @@ import { ProfileStoreLive } from "alchemy/Auth/Profile";
 import { provideFreshArtifactStore } from "alchemy/Artifacts";
 import { layerNonInteractive } from "alchemy/Interaction";
 import * as Plan from "alchemy/Plan";
+import { renamedFrom } from "alchemy/Rename";
 import * as Provider from "alchemy/Provider";
 import * as Stack from "alchemy/Stack";
 import { Stage } from "alchemy/Stage";
@@ -152,6 +153,40 @@ describe("cloud deployment lifecycle", () => {
       expect(result.resources.Code.action).toBe("skipped");
     }),
   );
+  it.effect(
+    "does not adopt a renamed project's physical identity at its former logical ID",
+    () =>
+      Effect.gen(function* () {
+        const fixture = mockClient();
+        const deploy = makeHarness(
+          fixture.layer,
+          Layer.succeed(CommandRunner, {
+            prepare: () => Effect.void,
+            deploy: () => Effect.void,
+          }),
+          true,
+        );
+        const project = (id: string) =>
+          Convex.Project(id, { teamId: 10, name: "example" });
+        yield* deploy(project("Old").pipe(Effect.as({})));
+        const moved = project("New").pipe(renamedFrom("Old"));
+        const result = yield* deploy(
+          Effect.gen(function* () {
+            yield* moved;
+            yield* project("Old").pipe(RemovalPolicy.destroy());
+            return {};
+          }),
+        ).pipe(Effect.result);
+        yield* deploy(moved.pipe(Effect.as({})));
+        expect(fixture.client.deleteProject).not.toHaveBeenCalled();
+        expect(fixture.state.projects).toHaveLength(1);
+        expect(result).toMatchObject({
+          _tag: "Failure",
+          failure: { _tag: "OwnedBySomeoneElse" },
+        });
+      }),
+  );
+
   it.effect.each([false, true])(
     "cleans an interrupted create with retry=%s",
     (retry) =>

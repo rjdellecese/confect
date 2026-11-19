@@ -9,7 +9,7 @@ import * as Schema from "effect/Schema";
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
 import { resourceName } from "./internal/ResourceIdentity";
-import { checkpointResource, shouldAdopt } from "./internal/Lifecycle";
+import { checkpointResource } from "./internal/Lifecycle";
 
 export interface ProjectProps {
   readonly teamId: number;
@@ -111,12 +111,7 @@ export const provider = Effect.gen(function* () {
       )
         return { action: "update" };
     }),
-    read: Effect.fn("Project.read")(function* ({
-      fqn,
-      instanceId,
-      olds,
-      output,
-    }) {
+    read: Effect.fn("Project.read")(function* ({ instanceId, olds, output }) {
       if (output !== undefined) {
         const project = yield* get(output.projectId);
         return project !== undefined
@@ -126,7 +121,7 @@ export const provider = Effect.gen(function* () {
       if (olds.teamId === undefined) return;
       const project = yield* find(
         olds.teamId,
-        olds.name ?? (yield* resourceName("project", fqn, instanceId)),
+        olds.name ?? resourceName("project", instanceId),
       );
       return project !== undefined ? Unowned(attributes(project)) : undefined;
     }),
@@ -146,34 +141,24 @@ export const provider = Effect.gen(function* () {
         news.name ??
         output?.managedName ??
         output?.name ??
-        (yield* resourceName("project", fqn, instanceId));
+        resourceName("project", instanceId);
       if (project === undefined) {
         const existing = yield* find(news.teamId, name);
-        if (existing !== undefined && !(yield* shouldAdopt(fqn)))
+        if (existing !== undefined)
           return yield* new OwnedBySomeoneElse({
             message: "An existing project requires explicit adoption.",
             resourceType: Project.Type,
             physicalName: name,
           });
-        if (existing !== undefined) {
-          project = existing;
-          yield* checkpointResource(
-            fqn,
-            instanceId,
-            news,
-            attributes(existing),
-          );
-        } else {
-          const created = yield* client.createProject(news.teamId, {
-            projectName: name,
-          });
-          return attributes({
-            id: created.id,
-            teamId: news.teamId,
-            name,
-            slug: created.slug,
-          });
-        }
+        const created = yield* client.createProject(news.teamId, {
+          projectName: name,
+        });
+        return attributes({
+          id: created.id,
+          teamId: news.teamId,
+          name,
+          slug: created.slug,
+        });
       }
       yield* validateTeam(project.id, project.teamId, news.teamId);
       if (project.name !== name)

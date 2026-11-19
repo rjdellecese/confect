@@ -11,7 +11,7 @@ import * as Schema from "effect/Schema";
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
 import { validateTarget } from "./internal/DeploymentTarget";
-import { checkpointResource, shouldAdopt } from "./internal/Lifecycle";
+import { checkpointResource } from "./internal/Lifecycle";
 
 export interface EnvironmentVariablesProps {
   readonly deploymentName?: string;
@@ -143,12 +143,8 @@ export const provider = Effect.gen(function* () {
         ownedNames,
         (name) => !Arr.contains(previousNames, name),
       );
-      const existing = select(observed, added);
-      const [collision] = Rec.keys(existing);
-      if (
-        collision !== undefined &&
-        (output !== undefined || !(yield* shouldAdopt(fqn)))
-      ) {
+      for (const collision of added) {
+        if (!Rec.has(observed, collision)) continue;
         return yield* new OwnedBySomeoneElse({
           message:
             "An existing environment variable requires explicit adoption in a separate resource.",
@@ -187,7 +183,7 @@ export const provider = Effect.gen(function* () {
             changes.push({ name, value: original });
         } else if (current !== undefined) changes.push({ name });
       }
-      const originals = output?.originals ?? existing;
+      const originals = output?.originals ?? {};
       if (changes.length > 0) {
         if (added.length > 0) {
           const claimed = [...previousNames, ...added];

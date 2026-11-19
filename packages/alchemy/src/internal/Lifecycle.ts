@@ -1,5 +1,3 @@
-import { AdoptPolicy } from "alchemy/AdoptPolicy";
-import { AlchemyContext } from "alchemy/AlchemyContext";
 import { Stack } from "alchemy/Stack";
 import { State } from "alchemy/State/State";
 import * as Effect from "effect/Effect";
@@ -37,17 +35,3 @@ export const checkpointResource = Effect.fn("Lifecycle.checkpointResource")(
     });
   },
 );
-
-export const shouldAdopt = Effect.fn("Lifecycle.shouldAdopt")(function* (
-  fqn: string,
-) {
-  const stack = yield* Effect.serviceOption(Stack);
-  const resourcePolicy = Option.isSome(stack)
-    ? stack.value.resources[fqn]?.Adopt
-    : undefined;
-  if (resourcePolicy !== undefined) return resourcePolicy;
-  const policy = yield* Effect.serviceOption(AdoptPolicy);
-  if (Option.isSome(policy)) return policy.value;
-  const context = yield* Effect.serviceOption(AlchemyContext);
-  return Option.isSome(context) && context.value.adopt;
-});

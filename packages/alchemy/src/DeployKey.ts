@@ -109,18 +109,10 @@ export const provider = Effect.gen(function* () {
           field: "allowedActions",
         });
     }),
-    read: Effect.fn("DeployKey.read")(function* ({
-      fqn,
-      instanceId,
-      olds,
-      output,
-    }) {
+    read: Effect.fn("DeployKey.read")(function* ({ instanceId, olds, output }) {
       const deploymentName = output?.deploymentName ?? olds.deploymentName;
       if (deploymentName === undefined) return;
-      const name =
-        output?.name ??
-        olds.name ??
-        (yield* resourceName("key", fqn, instanceId));
+      const name = output?.name ?? olds.name ?? resourceName("key", instanceId);
       const keys = yield* client.listDeployKeys(deploymentName);
       if (output !== undefined) {
         const key = Option.getOrUndefined(
@@ -152,10 +144,7 @@ export const provider = Effect.gen(function* () {
     }) {
       if (output === undefined)
         yield* checkpointResource(fqn, instanceId, news);
-      const name =
-        news.name ??
-        output?.name ??
-        (yield* resourceName("key", fqn, instanceId));
+      const name = news.name ?? output?.name ?? resourceName("key", instanceId);
       if (output !== undefined) {
         for (const field of ["deploymentName", "name"] as const) {
           if (news[field] !== undefined && news[field] !== output[field])
