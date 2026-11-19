@@ -84,6 +84,7 @@
         "group": "Clients",
         "pages": [
           "clients/react",
+          "clients/platform",
           {
             "icon": "js",
             "group": "JS",
@@ -241,6 +242,10 @@
       "destination": "/clients/react"
     },
     {
+      "source": "/v9/clients/platform",
+      "destination": "/clients/platform"
+    },
+    {
       "source": "/v9/clients/js/http",
       "destination": "/clients/js/http"
     },
@@ -375,6 +380,10 @@
     {
       "source": "/v10/clients/react",
       "destination": "/clients/react"
+    },
+    {
+      "source": "/v10/clients/platform",
+      "destination": "/clients/platform"
     },
     {
       "source": "/v10/clients/js/http",
