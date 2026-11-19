@@ -1,6 +1,5 @@
 import * as Array from "effect/Array";
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
-import * as IdScope from "@confect/core/IdScope";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as Lazy from "@confect/core/Lazy";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
@@ -24,12 +23,12 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import type * as EffectScheduler from "effect/Scheduler";
+import type * as Scheduler_ from "effect/Scheduler";
 import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
 import * as Auth from "./Auth";
 import * as ConvexLogger from "./ConvexLogger";
-import type * as DatabaseSchema from "./DatabaseSchema";
+import * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as ExecutionMetadata from "./ExecutionMetadata";
 import * as RequestMetadata from "./RequestMetadata";
@@ -225,7 +224,7 @@ export const runHandlerPromise =
   (
     errorSchema: Schema.Codec<any, any> | undefined,
     runOptions?: {
-      readonly scheduler?: EffectScheduler.Scheduler | undefined;
+      readonly scheduler?: Scheduler_.Scheduler | undefined;
     },
   ) =>
   <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
@@ -287,7 +286,7 @@ export const actionFunctionBase = <
   handler,
   resolvedMiddlewares = [],
   createLayer,
-  databaseSchema,
+  scope = DatabaseSchema.appTarget.scope,
 }: {
   name: string;
   functionVisibility: FunctionVisibility;
@@ -296,21 +295,13 @@ export const actionFunctionBase = <
   error: Schema.Codec<Error, Value> | undefined;
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
   resolvedMiddlewares?: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
-  createLayer: (
-    ctx: GenericActionCtx<
-      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
-    >,
-  ) => Layer.Layer<R>;
-  databaseSchema?: DatabaseSchema_;
+  createLayer: (ctx: ActionContext<DatabaseSchema_>) => Layer.Layer<R>;
+  scope?: DatabaseSchema.Scope<DatabaseSchema_>;
 }) => ({
-  args: () =>
-    compileArgsSchema(args, databaseSchema?.target.scope ?? IdScope.app),
-  returns: () =>
-    compileReturnsSchema(returns, databaseSchema?.target.scope ?? IdScope.app),
+  args: () => compileArgsSchema(args, scope),
+  returns: () => compileReturnsSchema(returns, scope),
   handler: (
-    ctx: GenericActionCtx<
-      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
-    >,
+    ctx: ActionContext<DatabaseSchema_>,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     Effect.gen(function* () {
@@ -345,38 +336,44 @@ export type ActionServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = Handler.ActionServices<DatabaseSchema_>;
 
-export const actionLayer = <
+type ActionContext<S extends DatabaseSchema.AnyWithProps> = GenericActionCtx<
+  DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<S>>
+>;
+
+export function actionLayer(
+  ctx: ActionContext<DatabaseSchema.AnyApp>,
+  target?: DatabaseSchema.AppTarget,
+): Layer.Layer<Handler.ActionServices<DatabaseSchema.AnyApp>>;
+export function actionLayer<S extends DatabaseSchema.AnyWithProps>(
+  ctx: ActionContext<S>,
+  ...targetArgs: DatabaseSchema.TargetArgs<S["target"]>
+): Layer.Layer<Handler.ActionServices<S>>;
+export function actionLayer<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(
-  databaseSchema: DatabaseSchema_,
-  ctx: GenericActionCtx<
-    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
-  >,
-) =>
-  Layer.mergeAll(
+  ctx: ActionContext<DatabaseSchema_>,
+  layerTarget: DatabaseSchema_["target"] = DatabaseSchema.appTarget,
+): Layer.Layer<Handler.ActionServices<DatabaseSchema_>> {
+  const target = DatabaseSchema.checkedTarget(layerTarget);
+  return Layer.mergeAll(
     Scheduler.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
       ctx.scheduler,
-      databaseSchema.target.scope,
+      target.scope,
     ),
-    Auth.layerForTarget<DatabaseSchema_["target"]>(
-      databaseSchema.target,
-      ctx.auth,
-    ),
+    Auth.layerForTarget<DatabaseSchema_["target"]>(target, ctx.auth),
     ExecutionMetadata.layer(ctx.meta),
-    RequestMetadata.layer(
-      RequestMetadata.forScope(ctx.meta, databaseSchema.target.scope),
-    ),
+    RequestMetadata.layer(RequestMetadata.forScope(ctx.meta, target.scope)),
     Storage.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
       ctx.storage,
-      databaseSchema.target.scope,
+      target.scope,
     ),
     StorageWriter.StorageWriter.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
       ctx.storage,
-      databaseSchema.target.scope,
+      target.scope,
     ),
     StorageActionWriter.StorageActionWriter.layer<
       DatabaseSchema.Scope<DatabaseSchema_>
-    >(ctx.storage, databaseSchema.target.scope),
+    >(ctx.storage, target.scope),
     QueryRunner.layer(ctx.runQuery.bind(ctx)),
     MutationRunner.layer(ctx.runMutation.bind(ctx)),
     ActionRunner.layer(ctx.runAction.bind(ctx)),
@@ -385,8 +382,9 @@ export const actionLayer = <
         DataModel.FromDatabaseSchema<DatabaseSchema_>
       >,
       DatabaseSchema.Scope<DatabaseSchema_>
-    >(ctx, databaseSchema.target.scope),
+    >(ctx, target.scope),
     VectorSearch.layer<DataModel.FromDatabaseSchema<DatabaseSchema_>>(
       ctx.vectorSearch.bind(ctx),
     ),
   );
+}

@@ -1,12 +1,12 @@
-import { DatabaseSchema as $DatabaseSchema } from "@confect/server";
+import { DatabaseSchema as DatabaseSchema_ } from "@confect/server";
 
-import counters from "./tables/counters";
-
+import countersTable from "./tables/counters";
 import { target as $target } from "./id";
-const databaseSchema: $DatabaseSchema.DatabaseSchema<{
-  readonly counters: typeof counters;
-}, typeof $target> = $DatabaseSchema.make({
-  counters,
+
+const databaseSchema: DatabaseSchema_.DatabaseSchema<{
+  readonly counters: typeof countersTable;
+}, typeof $target> = DatabaseSchema_.make({
+  counters: countersTable,
 }, $target);
 
 export default databaseSchema;

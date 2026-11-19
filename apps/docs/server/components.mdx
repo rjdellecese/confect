@@ -230,16 +230,16 @@ Run the application's Confect codegen separately, then use this binding as in [U
 
 ### Handler capabilities
 
-Keep using `FunctionImpl.make(databaseSchema, group, name, handler)` with the generated schema. The schema determines the available services:
+Import `FunctionImpl`, `GroupImpl`, and `MiddlewareImpl` from the component's `_generated/server`. These builders use the component's schema type without importing the whole table registry at runtime. Import the individual table handles your handler reads or writes.
 
-- Database operations address the component's database, with scoped document IDs.
+- Database operations address the component's database, with scoped document IDs. For system tables, use `Table.systemTablesForScope(scope)._storage` or `._scheduled_functions` with the generated `scope`. The top-level `Table._storage` and `Table._scheduled_functions` handles belong to the application.
 - Storage and scheduling services return IDs in that same component scope.
 - The generated `QueryCtx`, `MutationCtx`, and `ActionCtx` services expose the underlying Convex handler argument—the `ctx` in `(ctx, args) => ...`. Their database, storage, and scheduler methods use component-scoped IDs, and they omit `ctx.auth`.
 - Application `Auth` and `MutationAuth` are unavailable, including JWT signing. In a component, Confect's `RequestMetadata` and context services return `null` for `authToken`. Pass the identity information your component needs explicitly in function arguments.
 
 Component codegen rejects `confect/auth.ts`. Configuration reads still use Convex's environment provider; declare component environment variables through the native component configuration API.
 
-For Effect HTTP routes, use `HttpRouter.forSchema(databaseSchema)(routes)` so route capabilities follow the component schema too. Mount the component's routes using Convex's component HTTP routing API. Applications use `HttpRouter.make(databaseSchema, routes)`; both APIs provide schema-typed vector search.
+For Effect HTTP routes, use `HttpRouter.forSchema<typeof schema>(target)(routes)`. Import `schema` as a type from `./_generated/schema` and `target` as a value from `./_generated/id`. The target identifies the component without loading any tables. Mount its routes using Convex's component HTTP routing API. Applications use `HttpRouter.make(routes)`, or `HttpRouter.make<typeof schema>(routes)` for schema-typed vector search.
 
 Plain Convex functions keep the `ctx` argument supplied by Convex and its runtime restrictions; Confect does not rewrite their handlers.
 
@@ -247,16 +247,21 @@ Plain Convex functions keep the `ctx` argument supplied by Convex and its runtim
 
 Convex [supports native database pagination inside components](https://docs.convex.dev/components/authoring#pagination). Declare the function with `FunctionSpec.publicPaginatedQuery`, using the component table's `Doc` schema for `item`, as described in [paginated functions](/server/functions). Its handler can use the generated `DatabaseReader`:
 
-```ts
+```ts src/confect/counter.impl.ts
+import * as Effect from "effect/Effect";
+import { FunctionImpl } from "./_generated/server";
+import { DatabaseReader } from "./_generated/services";
+import countersTable from "./_generated/tables/counters";
+import counterSpec from "./counter.spec";
+
 const paginate = FunctionImpl.make(
-  databaseSchema,
-  counter,
+  counterSpec,
   "paginate",
   ({ run, paginationOpts }) =>
     Effect.gen(function* () {
       const reader = yield* DatabaseReader;
       return yield* reader
-        .table("counters")
+        .table(countersTable)
         .index("by_run", (q) => q.eq("run", run))
         .paginate(paginationOpts);
     }).pipe(Effect.orDie),
@@ -286,7 +291,7 @@ The `parentScope` keeps child IDs associated with the enclosing instance when a 
 
 ### Publish the component
 
-Build the Convex and Confect trees to JavaScript and emit their TypeScript declarations. For an ES module package, bundle the entry points or rewrite relative imports to the emitted filenames (for example, `./spec.js` rather than `./spec`). Node won't resolve extensionless imports in the published contract. Make sure the declarations also resolve from a consumer using `NodeNext`. A package whose output mirrors `src/` under `dist/` can expose:
+Build the Convex and Confect trees to JavaScript and emit their TypeScript declarations. For an ES module package, bundle the entry points or rewrite relative imports to the emitted filenames (for example, `./spec.js` rather than `./spec`). Node won't resolve extensionless imports in the published contract. A package whose output mirrors `src/` under `dist/` can expose:
 
 ```json package.json
 {
@@ -308,6 +313,8 @@ Build the Convex and Confect trees to JavaScript and emit their TypeScript decla
 ```
 
 Include the runtime dependencies used by your component (`effect` and the relevant `@confect/*` packages), and declare compatible Convex requirements. The Confect contract's dependency graph must contain specs and codecs, not implementation modules. Include all transitive contract declarations as well as the deployable functions and schema in the package.
+
+For TypeScript consumers of the Confect contract, use `moduleResolution: "Bundler"`. Even if the component's own declarations use explicit `.js` paths, strict `NodeNext` resolution can fail at `Component.bind` because `@confect/core` declarations contain extensionless relative imports. This affects typechecking; it doesn't prevent Node from loading correctly built JavaScript.
 
 Vanilla Convex consumers install `@example/counter/convex.config.js` and call its generated component API without importing the Confect contract. They supply encoded arguments and receive encoded results; for example, `Schema.FiniteFromString` is a string on the wire. They observe declared failures as Convex errors rather than Effect failures. Confect consumers bind the additional `/confect` export to get decoding and typed errors.
 
@@ -337,6 +344,8 @@ const createCounter = Effect.gen(function* () {
 ```
 
 The registration path must match the installed component path. The module map follows `convex-test` conventions and includes the component's Convex `_generated` files. Register the same definition at two paths to test instance isolation. A published package can provide its own `/test` helper that supplies this schema and module map.
+
+When testing a component's handlers directly with `t.run`, construct the test layer with `TestConfect.layer<typeof schema>(tableNames, convexSchema, modules, target)`. Use the component's generated table names and target so the handler gets component-scoped services even when the test uses `withIdentity`. To test a call from the host across an installation boundary, use host registration as shown above.
 
 ## Wrap a vanilla Convex component
 

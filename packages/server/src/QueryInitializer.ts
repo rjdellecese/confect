@@ -35,6 +35,7 @@ import type * as QueryStreamKeyLabels from "./QueryStreamKeyLabels";
 import * as QueryStreamIndexRange from "./QueryStreamIndexRange";
 import type { QueryStreamOrderDirection as OrderDirection } from "./QueryStreamOrderDirection";
 import type * as Table from "./Table";
+import type { FullIndexScan } from "./internal/FullIndexScan";
 
 type ConvexTableInfoFor<
   DataModel_ extends DataModel.AnyWithProps,
@@ -83,15 +84,7 @@ export interface QueryInitializer<
       ) => IndexRange,
       order?: OrderDirection,
     ): OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
-    <
-      IndexName extends keyof Indexes<
-        ConvexTableInfoFor<DataModel_, TableName>
-      >,
-    >(
-      indexName: IndexName,
-      order?: OrderDirection,
-    ): OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
-  };
+  } & FullIndexScan<TableInfoFor<DataModel_, TableName>, Doc>["index"];
   readonly search: <
     IndexName extends keyof SearchIndexes<
       ConvexTableInfoFor<DataModel_, TableName>
@@ -173,41 +166,7 @@ export interface QueryInitializer<
       Document.DocumentDecodeError,
       never
     >;
-    <
-      IndexName extends keyof Indexes<
-        ConvexTableInfoFor<DataModel_, TableName>
-      > &
-        string,
-    >(
-      indexName: IndexName,
-    ): QueryStream.QueryStream<
-      Doc,
-      QueryStreamKeyLabels.QueryStreamKeyLabels<
-        NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
-      >,
-      "asc",
-      Document.DocumentDecodeError,
-      never
-    >;
-    <
-      IndexName extends keyof Indexes<
-        ConvexTableInfoFor<DataModel_, TableName>
-      > &
-        string,
-      Direction extends OrderDirection,
-    >(
-      indexName: IndexName,
-      order: Direction,
-    ): QueryStream.QueryStream<
-      Doc,
-      QueryStreamKeyLabels.QueryStreamKeyLabels<
-        NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
-      >,
-      Direction,
-      Document.DocumentDecodeError,
-      never
-    >;
-  };
+  } & FullIndexScan<TableInfoFor<DataModel_, TableName>, Doc>["stream"];
 }
 
 export const make = <

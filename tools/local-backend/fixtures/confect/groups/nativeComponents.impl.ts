@@ -1,14 +1,13 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Layer from "effect/Layer";
-import schema from "../_generated/schema";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import { paginate, paginateTwice, roundTrip } from "./nativeComponents";
 import spec from "./nativeComponents.spec";
 
-export default GroupImpl.make(schema, spec).pipe(
+export default GroupImpl.make(spec).pipe(
   Layer.provide([
-    FunctionImpl.make(schema, spec, "roundTrip", roundTrip),
-    FunctionImpl.make(schema, spec, "paginate", paginate),
-    FunctionImpl.make(schema, spec, "paginateTwice", paginateTwice),
+    FunctionImpl.make(spec, "roundTrip", roundTrip),
+    FunctionImpl.make(spec, "paginate", paginate),
+    FunctionImpl.make(spec, "paginateTwice", paginateTwice),
   ]),
   GroupImpl.finalize,
 );

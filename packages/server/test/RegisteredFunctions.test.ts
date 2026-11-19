@@ -10,7 +10,7 @@ import type { RegisteredQuery } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import databaseSchema from "./mock-backend/fixtures/confect/_generated/schema";
+import tableNames from "./mock-backend/fixtures/confect/_generated/tableNames";
 import registeredFunctions from "./mock-backend/fixtures/confect/_generated/registeredFunctions/groups/notes";
 // Imported as a value (not `import type`) because its type parameterizes
 // `buildForGroup` via `typeof notesSpec`, and `typeof` requires a value
@@ -37,10 +37,13 @@ describe("Registered functions", () => {
 });
 
 describe("buildForGroup", () => {
-  it("accepts only the schema and finalized group layer", () => {
+  it("accepts table names, the finalized group layer, and an optional target", () => {
     expectTypeOf<
       Parameters<typeof RegisteredFunctions.buildForGroup>["length"]
-    >().toEqualTypeOf<2>();
+    >().toEqualTypeOf<2 | 3>();
+    expectTypeOf<[typeof tableNames, typeof notes, string]>().not.toExtend<
+      Parameters<typeof RegisteredFunctions.buildForGroup>
+    >();
   });
   it("rejects an implementation registered for a different same-key spec", () => {
     class Policy extends MiddlewareSpec.MiddlewareSpec<Policy>()("Policy", {
@@ -69,23 +72,17 @@ describe("buildForGroup", () => {
     const group = GroupSpec.make().addFunction(query);
 
     for (const implementationSpec of [OtherPolicy, SameShapePolicy]) {
-      const layer = GroupImpl.make(databaseSchema, group).pipe(
+      const layer = GroupImpl.make(group).pipe(
         Layer.provide(
-          FunctionImpl.make(databaseSchema, group, "get", () =>
-            Effect.succeed("ok"),
-          ),
+          FunctionImpl.make(group, "get", () => Effect.succeed("ok")),
         ),
         Layer.provide(
-          MiddlewareImpl.make(
-            databaseSchema,
-            implementationSpec,
-            (effect) => effect,
-          ),
+          MiddlewareImpl.make(implementationSpec, (effect) => effect),
         ),
         GroupImpl.finalize,
       );
       expect(() =>
-        RegisteredFunctions.buildForGroup<typeof group>(databaseSchema, layer),
+        RegisteredFunctions.buildForGroup<typeof group>(tableNames, layer),
       ).toThrowError(/Middleware "Policy".*function "get".*different spec/);
     }
   });
@@ -106,25 +103,21 @@ describe("buildForGroup", () => {
     const group = GroupSpec.make()
       .middleware(GroupPolicy, { label: "same" })
       .addFunction(query);
-    const layer = GroupImpl.make(databaseSchema, group).pipe(
+    const layer = GroupImpl.make(group).pipe(
       Layer.provide(
-        FunctionImpl.make(databaseSchema, group, "get", () =>
-          Effect.succeed("ok"),
-        ),
+        FunctionImpl.make(group, "get", () => Effect.succeed("ok")),
       ),
-      Layer.provide(
-        MiddlewareImpl.make(databaseSchema, GroupPolicy, (effect) => effect),
-      ),
+      Layer.provide(MiddlewareImpl.make(GroupPolicy, (effect) => effect)),
       GroupImpl.finalize,
     );
     expect(() =>
-      RegisteredFunctions.buildForGroup<typeof group>(databaseSchema, layer),
+      RegisteredFunctions.buildForGroup<typeof group>(tableNames, layer),
     ).toThrowError(/GroupPolicy.*equivalent options.*function "get"/);
   });
 
   it("registers only the requested group", () => {
     const registered = RegisteredFunctions.buildForGroup<typeof notesSpec>(
-      databaseSchema,
+      tableNames,
       notes,
     );
 

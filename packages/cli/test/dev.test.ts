@@ -294,13 +294,12 @@ export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name, ret
           );
           yield* project.write(
             "confect/notes.impl.ts",
-            `import { FunctionImpl, GroupImpl } from "@confect/server";
+            `import { FunctionImpl, GroupImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./_generated/schema";
-import spec from "./notes.spec";
+import notesSpec from "./notes.spec";
 import { name } from "${importPath}";
-export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionImpl.make(databaseSchema, spec, name, () => Effect.succeed(null))), GroupImpl.finalize);
+export default GroupImpl.make(notesSpec).pipe(Layer.provide(FunctionImpl.make(notesSpec, name, () => Effect.succeed(null))), GroupImpl.finalize);
 `,
           );
           const ready = yield* Deferred.make<void>();
@@ -402,10 +401,7 @@ export default GroupImpl.make(databaseSchema, spec).pipe(Layer.provide(FunctionI
                   project.write(`confect/${name}.spec.ts`, Project.spec),
                   project.write(
                     `confect/${name}.impl.ts`,
-                    pipe(
-                      Project.impl,
-                      Str.replace('"./notes.spec"', `"./${name}.spec"`),
-                    ),
+                    Project.implFor(name),
                   ),
                 ],
                 { concurrency: 1 },

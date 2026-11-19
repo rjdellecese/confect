@@ -1,7 +1,12 @@
 import * as RecordEffect from "effect/Record";
 import { UnsupportedSchemaTypeError } from "@confect/core/SchemaToValidator";
 import { ConvexError, v } from "convex/values";
+import type * as Handler from "@confect/server/Handler";
 import * as RegisteredFunction from "@confect/server/RegisteredFunction";
+import * as DatabaseSchema from "@confect/server/DatabaseSchema";
+import type { Auth } from "@confect/server/Auth";
+import * as IdScope from "@confect/core/IdScope";
+import type { GenericActionCtx } from "convex/server";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Console from "effect/Console";
 import * as Context from "effect/Context";
@@ -17,11 +22,32 @@ import { vi } from "vitest";
 import type databaseSchema from "./mock-backend/fixtures/confect/_generated/schema";
 
 describe("actionLayer", () => {
+  it("provides application services when no target is specified", () => {
+    const app = (ctx: GenericActionCtx<{}>) =>
+      RegisteredFunction.actionLayer(ctx);
+    expectTypeOf<Auth>().toExtend<Layer.Success<ReturnType<typeof app>>>();
+  });
+
+  it("rejects the app scope for a component before providing services", () => {
+    const ctx = {} as GenericActionCtx<{}>;
+    const target = { kind: "component", scope: IdScope.app } as const;
+    expect(() => RegisteredFunction.actionLayer(ctx, target)).toThrow(
+      DatabaseSchema.InvalidDatabaseTargetError,
+    );
+    type Component = DatabaseSchema.DatabaseSchema<
+      {},
+      DatabaseSchema.ComponentTarget<IdScope.Component<"test">>
+    >;
+    expectTypeOf<[typeof ctx]>().not.toExtend<
+      Parameters<typeof RegisteredFunction.actionLayer<Component>>
+    >();
+  });
+
   it("provides the complete schema-typed action service set", () => {
     expectTypeOf<
       ReturnType<typeof RegisteredFunction.actionLayer<typeof databaseSchema>>
     >().toEqualTypeOf<
-      Layer.Layer<RegisteredFunction.ActionServices<typeof databaseSchema>>
+      Layer.Layer<Handler.ActionServices<typeof databaseSchema>>
     >();
   });
 });

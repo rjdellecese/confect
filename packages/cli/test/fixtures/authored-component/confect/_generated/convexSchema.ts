@@ -1,8 +1,8 @@
-import { defineSchema as $defineSchema } from "convex/server";
-import { Table as $Table } from "@confect/server";
+import { defineSchema as defineSchema_ } from "convex/server";
+import { Table as Table_ } from "@confect/server";
 
-import counters from "./tables/counters";
+import countersTable from "./tables/counters";
 
-export default $defineSchema({
-  counters: $Table.tableDefinition(counters),
+export default defineSchema_({
+  counters: Table_.tableDefinition(countersTable),
 });

@@ -1,37 +1,40 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import schema from "./_generated/schema";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { DatabaseReader, DatabaseWriter } from "./_generated/services";
+import countersTable from "./_generated/tables/counters";
 import counter from "./counter.spec";
 
-const create = FunctionImpl.make(schema, counter, "create", ({ count }) =>
+const create = FunctionImpl.make(counter, "create", ({ count }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
-    return yield* writer.table("counters").insert({ count });
+    return yield* writer.table(countersTable).insert({ count });
   }).pipe(Effect.orDie),
 );
-const list = FunctionImpl.make(schema, counter, "list", () =>
+const list = FunctionImpl.make(counter, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table("counters").index("by_creation_time").collect();
+    return yield* reader
+      .table(countersTable)
+      .index("by_creation_time")
+      .collect();
   }).pipe(Effect.orDie),
 );
-const reject = FunctionImpl.make(schema, counter, "reject", () =>
+const reject = FunctionImpl.make(counter, "reject", () =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
     const id = yield* writer
-      .table("counters")
+      .table(countersTable)
       .insert({ count: 999 })
       .pipe(Effect.orDie);
     return yield* Effect.fail({ _tag: "Rejected" as const, id });
   }),
 );
-const privateValue = FunctionImpl.make(schema, counter, "privateValue", () =>
+const privateValue = FunctionImpl.make(counter, "privateValue", () =>
   Effect.succeed("private"),
 );
 
-export default GroupImpl.make(schema, counter).pipe(
+export default GroupImpl.make(counter).pipe(
   Layer.provide([create, list, reject, privateValue]),
   GroupImpl.finalize,
 );

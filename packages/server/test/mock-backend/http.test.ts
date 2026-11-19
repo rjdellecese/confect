@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
-import { HttpRouter as ConfectHttpRouter } from "@confect/server";
+import { HttpRouter as HttpRouter_ } from "@confect/server";
 import * as Storage from "@confect/server/Storage";
 import { StorageReader } from "@confect/server/StorageReader";
 import { convexTest } from "convex-test";
@@ -16,11 +16,11 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import { vi } from "vitest";
+import notesTable from "./fixtures/confect/_generated/tables/notes";
 import {
   DatabaseWriter,
   VectorSearch,
 } from "./fixtures/confect/_generated/services";
-import databaseSchema from "./fixtures/confect/_generated/schema";
 import { Id } from "./fixtures/confect/_generated/id";
 import { NotesApi } from "./fixtures/confect/http";
 import * as TestConfect from "./TestConfect";
@@ -29,8 +29,7 @@ import convexSchema from "./fixtures/confect/_generated/convexSchema";
 it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
   test.effect("binds vector search to each request's native context", () =>
     Effect.gen(function* () {
-      const http = ConfectHttpRouter.make(
-        databaseSchema,
+      const http = HttpRouter_.make(
         HttpRouter.add(
           "GET",
           "/search",
@@ -119,8 +118,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
         const handlers = HttpApiBuilder.group(SearchApi, "search", (group) =>
           group.handle("notes", ({ query }) => search(query.tag)),
         );
-        const http = ConfectHttpRouter.make(
-          databaseSchema,
+        const http = HttpRouter_.make(
           Layer.mergeAll(
             HttpRouter.add(
               "GET",
@@ -213,8 +211,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
     "provides unified storage and both writer capabilities to HTTP handlers",
     () =>
       Effect.gen(function* () {
-        const http = ConfectHttpRouter.make(
-          databaseSchema,
+        const http = HttpRouter_.make(
           HttpRouter.add(
             "GET",
             "/storage",
@@ -288,7 +285,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
 
-            return yield* writer.table("notes").insert({ text });
+            return yield* writer.table(notesTable).insert({ text });
           }),
           Id("notes"),
         );
@@ -378,7 +375,7 @@ describe("HttpRouter.make type-level guarantees", () => {
     const _missingGroupLayerIsRejected = () =>
       // @ts-expect-error
       // @effect-diagnostics-next-line missingLayerContext:off
-      ConfectHttpRouter.make(databaseSchema, HttpApiBuilder.layer(NotesApi));
+      HttpRouter_.make(HttpApiBuilder.layer(NotesApi));
 
     expect(_missingGroupLayerIsRejected).toBeDefined();
   });

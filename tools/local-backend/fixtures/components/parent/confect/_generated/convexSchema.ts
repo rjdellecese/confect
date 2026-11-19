@@ -1,3 +1,3 @@
-import { defineSchema as $defineSchema } from "convex/server";
+import { defineSchema as defineSchema_ } from "convex/server";
 
-export default $defineSchema({});
+export default defineSchema_({});

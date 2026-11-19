@@ -150,27 +150,26 @@ describe("component capabilities", () => {
   });
 
   it("keeps the implementation builder while rejecting app authentication", () => {
+    const builder = FunctionImpl.forSchema<Database>();
     const auth = Effect.gen(function* () {
       yield* Auth.Auth;
       return null;
     });
     // @ts-expect-error Component handlers are not provided application Auth.
-    FunctionImpl.make(databaseSchema, group, "create", () => auth);
+    builder.make(group, "create", () => auth);
     const rawApp = Effect.gen(function* () {
       yield* MutationCtx.MutationCtx<Model>();
       return null;
     });
     // @ts-expect-error An unscoped raw app context cannot bypass component capabilities.
-    FunctionImpl.make(databaseSchema, group, "create", () => rawApp);
-    FunctionImpl.make(databaseSchema, group, "create", () =>
-      Effect.succeed(null),
-    );
+    builder.make(group, "create", () => rawApp);
+    builder.make(group, "create", () => Effect.succeed(null));
     const appScheduler = Effect.gen(function* () {
       yield* Scheduler.Scheduler;
       return null;
     });
     // @ts-expect-error A component cannot acquire root-scoped scheduled-function IDs.
-    FunctionImpl.make(databaseSchema, group, "create", () => appScheduler);
+    builder.make(group, "create", () => appScheduler);
   });
 
   it("scopes database and raw-context IDs", () => {
@@ -185,15 +184,15 @@ describe("component capabilities", () => {
     > = Effect.gen(function* () {
       const writer = yield* DatabaseWriter.DatabaseWriter<Database>();
       const reader = yield* DatabaseReader.DatabaseReader<Database>();
-      const id = yield* writer.table("users").insert({ name: "Ada" });
-      yield* reader.table("users").get(id);
+      const id = yield* writer.table(users).insert({ name: "Ada" });
+      yield* reader.table(users).get(id);
       const appId = yield* Schema.decodeUnknownEffect(
         GenericId.GenericId("users"),
       )("app-id");
       // @ts-expect-error The host's users table is a different table.
-      yield* reader.table("users").get(appId);
+      yield* reader.table(users).get(appId);
       // @ts-expect-error Writes must also reject a foreign ID.
-      yield* writer.table("users").delete(appId);
+      yield* writer.table(users).delete(appId);
       const raw = yield* MutationCtx.MutationCtx<Model, typeof scope>();
       // @ts-expect-error Component raw contexts don't expose auth.
       void raw.auth;
@@ -236,8 +235,8 @@ describe("component capabilities", () => {
       Auth.Auth.pipe(Effect.as(HttpServerResponse.text("OK"))),
     );
     // @ts-expect-error Component HTTP handlers also cannot require application Auth.
-    HttpRouter.forSchema(databaseSchema)(routes);
-    HttpRouter.forSchema(databaseSchema)(
+    HttpRouter.forSchema<Database>(databaseSchema.target)(routes);
+    HttpRouter.forSchema<Database>(databaseSchema.target)(
       Router.add("GET", "/", HttpServerResponse.text("OK")),
     );
   });
@@ -266,8 +265,15 @@ describe("component capabilities", () => {
         runMutation: () => Promise.resolve(null),
       } as unknown as GenericMutationCtx<Model>;
       return Effect.gen(function* () {
+        expectTypeOf<[["users"], typeof ctx]>().not.toExtend<
+          Parameters<typeof RegisteredConvexFunction.mutationLayer<Database>>
+        >();
         const context = yield* Layer.build(
-          RegisteredConvexFunction.mutationLayer(databaseSchema, ctx),
+          RegisteredConvexFunction.mutationLayer<Database>(
+            ["users"],
+            ctx,
+            databaseSchema.target,
+          ),
         );
         expect(Option.isNone(Context.getOption(context, Auth.Auth))).toBe(true);
         expect(

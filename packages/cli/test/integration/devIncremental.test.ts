@@ -106,7 +106,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           );
           yield* project.write(
             "confect/other.impl.ts",
-            `${pipe(Project.impl, Str.replace('"./notes.spec"', '"./other.spec"'))}\nconsole.log("IMPL:other");\n`,
+            `${Project.implFor("other")}\nconsole.log("IMPL:other");\n`,
           );
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
@@ -229,7 +229,7 @@ if (existsSync(block)) {
   unlinkSync(block);
 }
 `;
-          const otherImpl = `${pipe(Project.impl, Str.replace('"./notes.spec"', '"./other.spec"'))}\nprocess.stdout.write("SECOND:1\\n");\n`;
+          const otherImpl = `${Project.implFor("other")}\nprocess.stdout.write("SECOND:1\\n");\n`;
           yield* project.write("confect/notes.impl.ts", gatedImpl);
           yield* project.write("confect/other.spec.ts", Project.spec);
           yield* project.write("confect/other.impl.ts", otherImpl);
@@ -276,10 +276,7 @@ if (existsSync(block)) {
                   name === "unrelated"
                     ? "const version = 0;"
                     : 'import { version } from "../shared";',
-                  pipe(
-                    Project.impl,
-                    Str.replace('"./notes.spec"', `"./${name}.spec"`),
-                  ),
+                  Project.implFor(name),
                   `process.stdout.write("EVALUATED:${name}:" + version + "\\n");`,
                 ],
                 "\n",
@@ -333,7 +330,7 @@ if (existsSync(block)) {
                   project.write(`confect/${name}.spec.ts`, Project.spec),
                   project.write(
                     `confect/${name}.impl.ts`,
-                    `${pipe(Project.impl, Str.replace('"./notes.spec"', `"./${name}.spec"`))}\nprocess.stdout.write("${unrelatedMarker}\\n");\n`,
+                    `${Project.implFor(name)}\nprocess.stdout.write("${unrelatedMarker}\\n");\n`,
                   ),
                 ],
                 { concurrency: 1 },

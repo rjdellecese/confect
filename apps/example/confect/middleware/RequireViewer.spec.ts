@@ -1,11 +1,11 @@
 import { MiddlewareSpec } from "@confect/core";
 import * as Context from "effect/Context";
 import * as Schema from "effect/Schema";
-import type users from "../_generated/tables/users";
+import type usersTable from "../_generated/tables/users";
 
 export class Viewer extends Context.Service<
   Viewer,
-  { readonly user: typeof users.Doc.Type }
+  { readonly user: typeof usersTable.Doc.Type }
 >()("example/confect/middleware/RequireViewer.spec/Viewer") {}
 
 export class NotSignedIn extends Schema.TaggedError<

@@ -1,7 +1,7 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
-import notes from "../_generated/tables/notes";
+import notesTable from "../_generated/tables/notes";
 
 export default GroupSpec.make()
   .addFunction(
@@ -14,7 +14,7 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "list",
-      returns: () => Schema.Array(notes.Doc),
+      returns: () => Schema.Array(notesTable.Doc),
     }),
   )
   .addFunction(
@@ -27,12 +27,12 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getFirst",
-      returns: () => Schema.OptionFromNullOr(notes.Doc),
+      returns: () => Schema.OptionFromNullOr(notesTable.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetFirst",
-      returns: () => Schema.OptionFromNullOr(notes.Doc),
+      returns: () => Schema.OptionFromNullOr(notesTable.Doc),
     }),
   );

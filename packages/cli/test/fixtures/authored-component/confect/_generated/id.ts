@@ -1,9 +1,12 @@
-import { GenericId, IdScope } from "@confect/core";
+import * as GenericId from "@confect/core/GenericId";
+import * as IdScope from "@confect/core/IdScope";
 import type { SystemTableNames } from "convex/server";
+import type tableNames from "./tableNames.js";
 
 export const scope = IdScope.component("@confect-fixtures/counter:convex");
 export const target = { kind: "component", scope } as const;
-export type TableNames = "counters";
+
+export type TableNames = (typeof tableNames)[number];
 
 export type Id<TableName extends TableNames | SystemTableNames> = GenericId.GenericId<TableName, typeof scope>;
 

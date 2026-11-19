@@ -23,27 +23,30 @@ export default Table.make(() => Schema.Struct({ text: Schema.String, parent: Sch
 
 export const spec = `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
-import notes from "./_generated/tables/notes";
-export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "list", returns: () => Schema.Array(notes.Doc) }));
+import notesTable from "./_generated/tables/notes";
+export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "list", returns: () => Schema.Array(notesTable.Doc) }));
 `;
 
-export const impl = `import { FunctionImpl, GroupImpl } from "@confect/server";
+export const implFor = (
+  group: string,
+) => `import { FunctionImpl, GroupImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";
-import notes from "./notes.spec";
-const list = FunctionImpl.make(databaseSchema, notes, "list", () => Effect.gen(function* () {
+import notesTable from "./_generated/tables/notes";
+import ${group}Spec from "./${group}.spec";
+const list = FunctionImpl.make(${group}Spec, "list", () => Effect.gen(function* () {
   const reader = yield* DatabaseReader;
-  return yield* reader.table("notes").collect();
+  return yield* reader.table(notesTable).index("by_creation_time").collect();
 }).pipe(Effect.orDie));
-export default GroupImpl.make(databaseSchema, notes).pipe(Layer.provide(list), GroupImpl.finalize);
+export default GroupImpl.make(${group}Spec).pipe(Layer.provide(list), GroupImpl.finalize);
 `;
 
-export const emptyImpl = `import { GroupImpl } from "@confect/server";
-import databaseSchema from "./_generated/schema";
-import notes from "./notes.spec";
-export default GroupImpl.make(databaseSchema, notes).pipe(GroupImpl.finalize);
+export const impl = implFor("notes");
+
+export const emptyImpl = `import { GroupImpl } from "./_generated/server";
+import notesSpec from "./notes.spec";
+export default GroupImpl.make(notesSpec).pipe(GroupImpl.finalize);
 `;
 
 /**

@@ -5,10 +5,11 @@ import * as Predicate from "effect/Predicate";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
-import schema from "./_generated/schema";
+import { target } from "./_generated/id";
+import type schema from "./_generated/schema";
 import { ActionCtx } from "./_generated/services";
 
-export default ConfectHttpRouter.forSchema(schema)(
+export default ConfectHttpRouter.forSchema<typeof schema>(target)(
   Layer.mergeAll(
     HttpRouter.add(
       "GET",

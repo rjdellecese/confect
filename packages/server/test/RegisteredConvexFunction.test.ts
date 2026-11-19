@@ -5,6 +5,7 @@ import { GenericId } from "@confect/core/GenericId";
 import * as IdScope from "@confect/core/IdScope";
 import * as SchemaToValidator from "@confect/core/SchemaToValidator";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
+import type { MutationAuth } from "@confect/server/MutationAuth";
 import type * as DataModel from "@confect/server/DataModel";
 import * as DocumentIds from "@confect/server/DocumentIds";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
@@ -42,6 +43,37 @@ vi.mock("convex/server", (importOriginal) =>
 );
 
 describe("make", () => {
+  it("provides application services when no mutation target is specified", () => {
+    const app = (ctx: Convex.GenericMutationCtx<{}>) =>
+      RegisteredConvexFunction.mutationLayer([], ctx);
+    expectTypeOf<MutationAuth>().toExtend<
+      Layer.Success<ReturnType<typeof app>>
+    >();
+  });
+
+  it("rejects a component with the app scope before creating a registration or mutation layer", () => {
+    const target = { kind: "component", scope: IdScope.app } as const;
+    const item = FunctionRegistryItem.make({
+      functionSpec: FunctionSpec.publicQuery({
+        name: "get",
+        returns: () => Schema.Null,
+      }),
+      groupMiddlewareAttachments: [],
+      handler: () => Effect.succeed(null),
+    });
+    assert(item._tag === "Confect");
+    expect(() => RegisteredConvexFunction.make([], item, [], target)).toThrow(
+      DatabaseSchema.InvalidDatabaseTargetError,
+    );
+    expect(() =>
+      RegisteredConvexFunction.mutationLayer(
+        [],
+        {} as Convex.GenericMutationCtx<{}>,
+        target,
+      ),
+    ).toThrow(DatabaseSchema.InvalidDatabaseTargetError);
+  });
+
   it.effect(
     "provides component-scoped Blob storage to mutation handlers",
     () => {
@@ -62,7 +94,11 @@ describe("make", () => {
       >;
       return Effect.gen(function* () {
         const services = yield* Layer.build(
-          RegisteredConvexFunction.mutationLayer(schema, ctx),
+          RegisteredConvexFunction.mutationLayer<typeof schema>(
+            [],
+            ctx,
+            schema.target,
+          ),
         );
         const program = Effect.gen(function* () {
           const storage = yield* Storage.Storage.forScope<typeof scope>();
@@ -108,10 +144,10 @@ describe("make", () => {
     assert(item._tag === "Confect");
     const compileArgs = vi.spyOn(SchemaToValidator, "compileArgsSchema");
     const compileReturns = vi.spyOn(SchemaToValidator, "compileReturnsSchema");
-    const registered = RegisteredConvexFunction.make(
-      DatabaseSchema.make({}, { kind: "component", scope }),
-      item,
-    ) as unknown as { exportArgs: () => string; exportReturns: () => string };
+    const registered = RegisteredConvexFunction.make([], item, [], {
+      kind: "component",
+      scope,
+    }) as unknown as { exportArgs: () => string; exportReturns: () => string };
     expect(compileArgs).not.toHaveBeenCalled();
     expect(compileReturns).not.toHaveBeenCalled();
     expect(
@@ -176,7 +212,12 @@ describe("make", () => {
           }),
       });
       assert(item._tag === "Confect");
-      const definition = RegisteredConvexFunction.prepare(database, item);
+      const definition = RegisteredConvexFunction.prepare(
+        [],
+        item,
+        [],
+        database.target,
+      );
       assert(
         definition._tag === "PublicQuery" ||
           definition._tag === "PublicMutation",
@@ -213,7 +254,7 @@ describe("make", () => {
     >();
     expectTypeOf<
       Parameters<typeof RegisteredConvexFunction.make>["length"]
-    >().toEqualTypeOf<2 | 3>();
+    >().toEqualTypeOf<2 | 3 | 4>();
   });
   const options = {
     name: "get",
@@ -261,7 +302,6 @@ describe("make", () => {
         handler,
       });
       assert(item._tag === "Confect");
-      const database = DatabaseSchema.make({});
       const compileArgs = vi.spyOn(SchemaToValidator, "compileArgsSchema");
       const compileReturns = vi.spyOn(
         SchemaToValidator,
@@ -269,7 +309,7 @@ describe("make", () => {
       );
       const registration = vi.mocked(register);
       registration.mockClear();
-      const prepared = RegisteredConvexFunction.prepare(database, item);
+      const prepared = RegisteredConvexFunction.prepare([], item);
       expect(registration).not.toHaveBeenCalled();
       expect(Str.toLowerCase(prepared._tag)).toBe(
         `${spec.functionVisibility}${spec.runtimeAndFunctionType.functionType}`,
@@ -323,7 +363,7 @@ describe("make", () => {
         ).pipe(Result.getOrThrow),
       ).toEqual({ type: "string" });
       registration.mockClear();
-      RegisteredConvexFunction.make(database, item);
+      RegisteredConvexFunction.make([], item);
       expect(registration).toHaveBeenCalledOnce();
       const [call] = registration.mock.calls;
       assert(call);

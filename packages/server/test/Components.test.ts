@@ -1,14 +1,18 @@
 import type { Ref } from "@confect/core";
 import { Component } from "@confect/core";
 import {
+  Auth,
+  type DataModel,
   DatabaseSchema,
+  MutationAuth,
+  MutationCtx,
   MutationRunner,
   QueryRunner,
   RegisteredConvexFunction,
 } from "@confect/server";
 // Keep the server/test workspace dependency graph acyclic, as in mock-backend/TestConfect.ts.
 import { TestConfect } from "../../test/src";
-import { expect, it } from "@effect/vitest";
+import { expect, expectTypeOf, it } from "@effect/vitest";
 import { convexTest } from "convex-test";
 import {
   componentsGeneric,
@@ -16,9 +20,14 @@ import {
   type FunctionReference,
 } from "convex/server";
 import * as Effect from "effect/Effect";
+import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 import * as Array from "effect/Array";
 import * as Result from "effect/Result";
+import * as Option from "effect/Option";
+import type componentDatabase from "../../cli/test/fixtures/authored-component/confect/_generated/schema";
+import { target } from "../../cli/test/fixtures/authored-component/confect/_generated/id";
+import tableNames from "../../cli/test/fixtures/authored-component/confect/_generated/tableNames";
 import contract from "../../cli/test/fixtures/authored-component/confect/_generated/component";
 import componentSchema from "../../cli/test/fixtures/authored-component/convex/schema";
 
@@ -56,6 +65,30 @@ const componentModules = {
   "counter.ts": () =>
     import("../../cli/test/fixtures/authored-component/convex/counter"),
 };
+
+it.effect(
+  "provides application authentication without a schema type or target",
+  () =>
+    Effect.gen(function* () {
+      const layer = TestConfect.layer([], hostConvexSchema, hostModules);
+      const tag = TestConfect.TestConfect();
+      expectTypeOf<typeof tag.Identifier>().toEqualTypeOf<
+        TestConfect.TestConfect<DatabaseSchema.AnyApp>
+      >();
+      expectTypeOf<Layer.Success<typeof layer>>().toEqualTypeOf<
+        typeof tag.Identifier
+      >();
+      const services = yield* Layer.build(layer);
+      const t = Context.get(services, tag);
+      yield* t.withIdentity({ name: "Ada" }).run(
+        Effect.gen(function* () {
+          const auth = yield* Auth.Auth;
+          const identity = yield* auth.getUserIdentity;
+          expect(identity.name).toBe("Ada");
+        }),
+      );
+    }).pipe(Effect.scoped),
+);
 
 it.effect(
   "runs a generated component through vanilla Convex and scoped Confect runners",
@@ -100,7 +133,10 @@ it.effect(
               };
             }).pipe(
               Effect.provide(
-                RegisteredConvexFunction.mutationLayer(hostSchema, ctx),
+                RegisteredConvexFunction.mutationLayer<typeof hostSchema>(
+                  [],
+                  ctx,
+                ),
               ),
             ),
           ),
@@ -120,7 +156,7 @@ it.effect(
 it.effect("registers components with TestConfect", () =>
   Effect.gen(function* () {
     const services = yield* Layer.build(
-      TestConfect.layer(hostSchema, hostConvexSchema, hostModules),
+      TestConfect.layer<typeof hostSchema>([], hostConvexSchema, hostModules),
     );
     return yield* Effect.gen(function* () {
       const t = yield* TestConfect.TestConfect<typeof hostSchema>();
@@ -135,4 +171,42 @@ it.effect("registers components with TestConfect", () =>
       expect(Array.map(rows, (row) => row.count)).toEqual([11]);
     }).pipe(Effect.provide(services));
   }).pipe(Effect.scoped),
+);
+
+it.effect(
+  "preserves component capabilities when running with or without a test identity",
+  () =>
+    Effect.gen(function* () {
+      type Database = typeof componentDatabase;
+      type Model = DataModel.ToConvexDataModel<
+        DataModel.FromDatabaseSchema<Database>
+      >;
+      expectTypeOf<
+        [typeof tableNames, typeof componentSchema, typeof componentModules]
+      >().not.toExtend<Parameters<typeof TestConfect.layer<Database>>>();
+      const services = yield* Layer.build(
+        TestConfect.layer<Database>(
+          tableNames,
+          componentSchema,
+          componentModules,
+          target,
+        ),
+      );
+      const test = Context.get(services, TestConfect.TestConfect<Database>());
+      const check = Effect.gen(function* () {
+        const auth = yield* Effect.serviceOption(Auth.Auth);
+        const mutationAuth = yield* Effect.serviceOption(
+          MutationAuth.MutationAuth,
+        );
+        expect(Option.isNone(auth)).toBe(true);
+        expect(Option.isNone(mutationAuth)).toBe(true);
+        const ctx = yield* MutationCtx.MutationCtx<
+          Model,
+          typeof target.scope
+        >();
+        expect("auth" in ctx).toBe(false);
+      });
+      yield* test.run(check);
+      yield* test.withIdentity({ name: "Ada" }).run(check);
+    }).pipe(Effect.scoped),
 );

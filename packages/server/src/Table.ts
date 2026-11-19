@@ -1,5 +1,5 @@
 import * as Record from "effect/Record";
-import type * as IdScope from "@confect/core/IdScope";
+import * as IdScope from "@confect/core/IdScope";
 import {
   compileTableSchema,
   type EmittedTableValidator,
@@ -99,7 +99,7 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
 // System tables
 // -----------------------------------------------------------------------------
 
-export const scheduledFunctionsTable = Table_.make(() =>
+const scheduledFunctions = Table_.make(() =>
   Schema.Struct({
     name: Schema.String,
     args: Schema.Array(Schema.Any),
@@ -116,30 +116,31 @@ export const scheduledFunctionsTable = Table_.make(() =>
       Schema.Struct({ kind: Schema.Literal("canceled") }),
     ]),
   }),
-)("_scheduled_functions");
+);
 
-export const storageTable = Table_.make(() =>
+const storage = Table_.make(() =>
   Schema.Struct({
     sha256: Schema.String,
     size: Schema.Finite,
     contentType: Schema.optionalKey(Schema.String),
   }),
-)("_storage");
+);
 
-export const systemTables = {
-  _scheduled_functions: scheduledFunctionsTable,
-  _storage: storageTable,
-} as const;
-
+/**
+ * In a component, pass `systemTablesForScope(componentScope)._storage` or
+ * `._scheduled_functions` to the database reader. Applications can use the
+ * exported `_storage` and `_scheduled_functions` handles directly.
+ */
 export const systemTablesForScope = <const Scope_ extends IdScope.IdScope>(
   scope: Scope_,
-) => ({
-  _scheduled_functions: Table_.make(() => scheduledFunctionsTable.Fields)(
-    "_scheduled_functions",
-    scope,
-  ),
-  _storage: Table_.make(() => storageTable.Fields)("_storage", scope),
-});
+) =>
+  ({
+    _scheduled_functions: scheduledFunctions("_scheduled_functions", scope),
+    _storage: storage("_storage", scope),
+  }) as const;
+
+export const systemTables = systemTablesForScope(IdScope.app);
+export const { _scheduled_functions, _storage } = systemTables;
 
 export type SystemTables<Scope_ extends IdScope.IdScope = IdScope.App> =
   ReturnType<typeof systemTablesForScope<Scope_>>[keyof typeof systemTables];

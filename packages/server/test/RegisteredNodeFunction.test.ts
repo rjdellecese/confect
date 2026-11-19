@@ -30,10 +30,10 @@ it("preserves component scope in lazy Node validators", () => {
   assert(item._tag === "Confect");
   const compileArgs = vi.spyOn(SchemaToValidator, "compileArgsSchema");
   const compileReturns = vi.spyOn(SchemaToValidator, "compileReturnsSchema");
-  const registered = RegisteredNodeFunction.make(
-    DatabaseSchema.make({}, { kind: "component", scope }),
-    item,
-  ) as unknown as { exportArgs: () => string; exportReturns: () => string };
+  const registered = RegisteredNodeFunction.make(item, [], {
+    kind: "component",
+    scope,
+  }) as unknown as { exportArgs: () => string; exportReturns: () => string };
   expect(compileArgs).not.toHaveBeenCalled();
   expect(compileReturns).not.toHaveBeenCalled();
   expect(
@@ -72,24 +72,24 @@ it("registers a Node group without a factory parameter", () => {
       returns: () => Schema.String,
     }),
   );
-  const database = DatabaseSchema.make({});
-  const layer = GroupImpl.make(database, group).pipe(
-    Layer.provide(
-      FunctionImpl.make(database, group, "run", () => Effect.succeed("ok")),
-    ),
+  const layer = GroupImpl.make(group).pipe(
+    Layer.provide(FunctionImpl.make(group, "run", () => Effect.succeed("ok"))),
     GroupImpl.finalize,
   );
-  const registered = RegisteredNodeFunction.buildForGroup<typeof group>(
-    database,
-    layer,
-  );
+  const registered = RegisteredNodeFunction.buildForGroup<typeof group>(layer);
+  expect(() =>
+    RegisteredNodeFunction.buildForGroup<typeof group>(layer, {
+      kind: "component",
+      scope: IdScope.app,
+    }),
+  ).toThrow(DatabaseSchema.InvalidDatabaseTargetError);
   expect(registered.run).toBeDefined();
   expectTypeOf(registered.run).toExtend<
     RegisteredAction<"public", Record<string, unknown>, unknown>
   >();
   expectTypeOf<
     Parameters<typeof RegisteredNodeFunction.buildForGroup>["length"]
-  >().toEqualTypeOf<2>();
+  >().toEqualTypeOf<1 | 2>();
 });
 
 const options = {
@@ -110,7 +110,7 @@ it.each([
     handler: () => Effect.succeed(true),
   });
   assert(item._tag === "Confect");
-  const registered = RegisteredNodeFunction.make(DatabaseSchema.make({}), item);
+  const registered = RegisteredNodeFunction.make(item);
   expect(compileArgs).not.toHaveBeenCalled();
   expect(compileReturns).not.toHaveBeenCalled();
 

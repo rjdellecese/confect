@@ -1,4 +1,4 @@
-import unnamed from "../../tables/counters";
+import countersTable from "../../tables/counters";
 import { scope } from "../id";
 
-export default unnamed("counters", scope);
+export default countersTable("counters", scope);

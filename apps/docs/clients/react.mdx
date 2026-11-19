@@ -40,17 +40,17 @@ Given this spec:
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "list",
-    returns: () => Schema.Array(notes.Doc),
+    returns: () => Schema.Array(notesTable.Doc),
   }),
 );
 ```
 
-The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns a `QueryResult<readonly notes.Doc["Type"][]>`. Match it with `QueryResult.match`:
+The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns a `QueryResult<ReadonlyArray<typeof notesTable.Doc.Type>>`. Match it with `QueryResult.match`:
 
 ```tsx
 import { QueryResult, useQuery } from "@confect/react";

@@ -1,29 +1,24 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import schema from "../_generated/schema";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import { MutationRunner, QueryRunner } from "../_generated/services";
 import { first, second, left, right } from "../componentBindings";
 import spec from "./components.spec";
 
-const seedPagination = FunctionImpl.make(
-  schema,
-  spec,
-  "seedPagination",
-  ({ run }) =>
-    Effect.gen(function* () {
-      const { runMutation } = yield* MutationRunner;
-      const ids = yield* Effect.forEach(
-        [2, 3, 5],
-        (count) => runMutation(first.counter.create, { run, count }),
-        { concurrency: 1 },
-      );
-      yield* runMutation(second.counter.create, { run, count: 99 });
-      return { first: ids };
-    }).pipe(Effect.orDie),
+const seedPagination = FunctionImpl.make(spec, "seedPagination", ({ run }) =>
+  Effect.gen(function* () {
+    const { runMutation } = yield* MutationRunner;
+    const ids = yield* Effect.forEach(
+      [2, 3, 5],
+      (count) => runMutation(first.counter.create, { run, count }),
+      { concurrency: 1 },
+    );
+    yield* runMutation(second.counter.create, { run, count: 99 });
+    return { first: ids };
+  }).pipe(Effect.orDie),
 );
-const paginate = FunctionImpl.make(schema, spec, "paginate", (args) =>
+const paginate = FunctionImpl.make(spec, "paginate", (args) =>
   Effect.gen(function* () {
     const { runQuery } = yield* QueryRunner;
     const result = yield* runQuery(first.counter.paginate, args);
@@ -37,7 +32,7 @@ const paginate = FunctionImpl.make(schema, spec, "paginate", (args) =>
   }).pipe(Effect.orDie),
 );
 
-const exercise = FunctionImpl.make(schema, spec, "exercise", ({ run }) =>
+const exercise = FunctionImpl.make(spec, "exercise", ({ run }) =>
   Effect.gen(function* () {
     const { runMutation } = yield* MutationRunner;
     const { runQuery } = yield* QueryRunner;
@@ -67,13 +62,13 @@ const exercise = FunctionImpl.make(schema, spec, "exercise", ({ run }) =>
     };
   }).pipe(Effect.orDie),
 );
-const schedule = FunctionImpl.make(schema, spec, "schedule", ({ run }) =>
+const schedule = FunctionImpl.make(spec, "schedule", ({ run }) =>
   Effect.gen(function* () {
     const { runMutation } = yield* MutationRunner;
     return yield* runMutation(first.counter.schedule, { run, count: 17 });
   }).pipe(Effect.orDie),
 );
-const list = FunctionImpl.make(schema, spec, "list", (args) =>
+const list = FunctionImpl.make(spec, "list", (args) =>
   Effect.gen(function* () {
     const { runQuery } = yield* QueryRunner;
     return {
@@ -86,26 +81,26 @@ const list = FunctionImpl.make(schema, spec, "list", (args) =>
     };
   }).pipe(Effect.orDie),
 );
-const uploadUrl = FunctionImpl.make(schema, spec, "uploadUrl", () =>
+const uploadUrl = FunctionImpl.make(spec, "uploadUrl", () =>
   Effect.gen(function* () {
     const { runMutation } = yield* MutationRunner;
     return yield* runMutation(first.counter.uploadUrl, {});
   }).pipe(Effect.orDie),
 );
-const storageUrl = FunctionImpl.make(schema, spec, "storageUrl", (args) =>
+const storageUrl = FunctionImpl.make(spec, "storageUrl", (args) =>
   Effect.gen(function* () {
     const { runQuery } = yield* QueryRunner;
     return yield* runQuery(first.counter.storageUrl, args);
   }).pipe(Effect.orDie),
 );
-const hasAuth = FunctionImpl.make(schema, spec, "hasAuth", () =>
+const hasAuth = FunctionImpl.make(spec, "hasAuth", () =>
   Effect.gen(function* () {
     const { runQuery } = yield* QueryRunner;
     return yield* runQuery(first.counter.hasAuth, {});
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(schema, spec).pipe(
+export default GroupImpl.make(spec).pipe(
   Layer.provide([
     seedPagination,
     paginate,

@@ -1,9 +1,9 @@
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import * as Record from "effect/Record";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
-import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as GroupImpl from "./GroupImpl";
 import * as GroupRegistry from "./GroupRegistry";
 import * as FunctionRegistryItem from "./FunctionRegistryItem";
@@ -60,8 +60,9 @@ export const register = <Group extends GroupSpec.AnyWithProps>(
   ) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>;
 
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
-  databaseSchema: DatabaseSchema.AnyWithProps,
+  tableNames: ReadonlyArray<string>,
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
+  target?: DatabaseSchema.Target,
 ): ForGroup<Group> => {
   const { functionRegistryItems, middlewareRegistryItems } =
     GroupRegistry.make(groupLayer);
@@ -80,9 +81,10 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
         ),
         Match.tag("Confect", (confect) =>
           RegisteredConvexFunction.prepare(
-            databaseSchema,
+            tableNames,
             confect,
             ResolvedMiddleware.resolve(confect, middlewareRegistryItems),
+            target,
           ),
         ),
         Match.exhaustive,

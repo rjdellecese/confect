@@ -1,10 +1,10 @@
-import { GroupSpec, Spec } from "@confect/core";
-import counter from "../counter.spec";
+import { GroupSpec as GroupSpec_, Spec } from "@confect/core";
+import counterSpec from "../counter.spec";
 
 const spec: Spec.Spec<{
-  readonly counter: GroupSpec.NamedAt<typeof counter, "counter">;
+  readonly counter: GroupSpec_.NamedAt<typeof counterSpec, "counter">;
 }> = Spec.fromGroups({
-  ["counter"]: counter,
+  ["counter"]: counterSpec,
 }) as typeof spec;
 
 export default spec;

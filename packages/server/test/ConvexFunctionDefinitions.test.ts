@@ -3,7 +3,7 @@ import * as ConvexFunctionDefinitions from "@confect/server/ConvexFunctionDefini
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
 import type * as DataModel from "@confect/server/DataModel";
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
+import { type DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
 import { assert, expect, expectTypeOf, it } from "@effect/vitest";
 import {
   queryGeneric,
@@ -22,16 +22,13 @@ it("prepares only its own functions and preserves native registrations", () => {
       FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }),
     )
     .addFunction(FunctionSpec.convexPublicQuery<typeof native>()("native"));
-  const database = DatabaseSchema.make({});
-  const layer = GroupImpl.make(database, group).pipe(
-    Layer.provide(
-      FunctionImpl.make(database, group, "get", () => Effect.succeed("ok")),
-    ),
-    Layer.provide(FunctionImpl.make(database, group, "native", native)),
+  const layer = GroupImpl.make(group).pipe(
+    Layer.provide(FunctionImpl.make(group, "get", () => Effect.succeed("ok"))),
+    Layer.provide(FunctionImpl.make(group, "native", native)),
     GroupImpl.finalize,
   );
   const definitions = ConvexFunctionDefinitions.buildForGroup<typeof group>(
-    database,
+    [],
     layer,
   );
   expectTypeOf(definitions.get._tag).toEqualTypeOf<"PublicQuery">();
@@ -51,7 +48,10 @@ it("prepares only its own functions and preserves native registrations", () => {
   );
   expectTypeOf<
     Parameters<typeof ConvexFunctionDefinitions.buildForGroup>["length"]
-  >().toEqualTypeOf<2>();
+  >().toEqualTypeOf<2 | 3>();
+  expectTypeOf<[[], typeof layer, typeof native]>().not.toExtend<
+    Parameters<typeof ConvexFunctionDefinitions.buildForGroup>
+  >();
 });
 
 it("derives exact definitions for every kind and nested group", () => {

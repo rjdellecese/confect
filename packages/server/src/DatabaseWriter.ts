@@ -1,17 +1,21 @@
 import type {
-  BetterOmit,
   DocumentByName,
-  Expand,
   GenericDatabaseWriter,
+  GenericDataModel,
+  TableNamesInDataModel,
+  WithOptionalSystemFields,
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
+import type { BaseDatabaseReader } from "@confect/core/Types";
+import type * as IdScope from "@confect/core/IdScope";
 import { pipe } from "effect/Function";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
-import * as DatabaseSchema from "./DatabaseSchema";
+import type * as Types from "effect/Types";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type { DocumentByName as DocumentByName_ } from "./DataModel";
 import * as Document from "./Document";
@@ -69,22 +73,22 @@ export interface DatabaseWriterService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > {
-  readonly table: <
-    const TableName extends DataModel.TableNames<
-      DataModel.FromDatabaseSchema<DatabaseSchema_>
-    >,
-  >(
-    tableName: TableName,
-  ) => DatabaseWriterTableAccessor<
-    DataModel.FromDatabaseSchema<DatabaseSchema_>,
-    TableName,
-    TableName extends keyof Docs
-      ? Docs[TableName]
-      : DocumentByName_<
-          DataModel.FromDatabaseSchema<DatabaseSchema_>,
-          TableName
-        >
-  >;
+  readonly table: <Table_ extends DatabaseSchema.Tables<DatabaseSchema_>>(
+    table: Table_ & {
+      readonly tableName: Exclude<
+        Table.Name<Table_>,
+        DatabaseSchema.SystemTableNames
+      >;
+    },
+  ) => Table_ extends unknown
+    ? DatabaseWriterTableAccessor<
+        DataModel.FromTables<Table_>,
+        Table.Name<Table_>,
+        Table.Name<Table_> extends keyof Docs
+          ? Docs[Table.Name<Table_>]
+          : DocumentByName_<DataModel.FromTables<Table_>, Table.Name<Table_>>
+      >
+    : never;
 }
 
 /**
@@ -96,55 +100,50 @@ export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > = Context.Service<
-  DatabaseWriterService<DatabaseSchema_>,
+  DatabaseWriter<DatabaseSchema_>,
   DatabaseWriterService<DatabaseSchema_, Docs>
 >;
 
-export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-  databaseSchema: DatabaseSchema_,
-  convexDatabaseWriter: GenericDatabaseWriter<
-    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
-  >,
-): DatabaseWriterService<DatabaseSchema_> => {
-  type DataModel_ = DataModel.FromDatabaseSchema<DatabaseSchema_>;
-
-  const table = <const TableName extends DataModel.TableNames<DataModel_>>(
-    tableName: TableName,
+export const make = <
+  Model extends GenericDataModel,
+  const Scope extends IdScope.IdScope = IdScope.App,
+>(
+  convexDatabaseWriter: GenericDatabaseWriter<Model>,
+  ..._scope: IdScope.Args<Scope>
+): DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model, Scope>> => {
+  const reader: BaseDatabaseReader<any> = convexDatabaseWriter;
+  const table = <TableName extends TableNamesInDataModel<Model>>(
+    tableDef: Table.AnyWithProps & { readonly tableName: TableName },
   ) => {
-    const tableDef = DatabaseSchema.tables(databaseSchema)[tableName];
+    const tableName = tableDef.tableName;
+    type Encoded = DocumentByName<Model, TableName>;
 
     const insert = Effect.fn("DatabaseWriter.insert")(function* (
-      document: Document.WithoutSystemFields<
-        DocumentByName_<DataModel_, TableName>
-      >,
+      document: Record<string, unknown>,
     ) {
       const encodedDocument = yield* Document.encode(document, tableDef);
 
       const id = yield* Effect.promise(() =>
         convexDatabaseWriter.insert(
           tableName,
-          encodedDocument as WithoutSystemFields<
-            DocumentByName<DataModel.ToConvexDataModel<DataModel_>, TableName>
-          >,
+          encodedDocument as WithoutSystemFields<Encoded>,
         ),
       );
 
-      // The database supplies the ID in this table's execution scope. Its
-      // scope brand is erased at the Convex syscall boundary.
-      return id as unknown as DataModel.Id<DataModel_, TableName>;
+      return id;
     });
 
     const patch = Effect.fn("DatabaseWriter.patch")(function* (
-      id: DataModel.Id<DataModel_, TableName>,
-      patchedValues: PatchValue<DocumentByName_<DataModel_, TableName>>,
+      id: GenericId<TableName>,
+      patchedValues: Record<string, unknown>,
     ) {
       const originalDecodedDoc = yield* QueryInitializer.getById<
         Table.AnyWithProps,
         TableName
       >(
-        convexDatabaseWriter as any,
+        reader,
         tableDef,
-      )(id as unknown as GenericId<TableName>);
+      )(id);
 
       const updatedEncodedDoc = yield* pipe(
         patchedValues,
@@ -158,48 +157,28 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
       yield* Effect.promise(() =>
         convexDatabaseWriter.replace(
-          id as unknown as GenericId<TableName>,
-          updatedEncodedDoc as Expand<
-            BetterOmit<
-              DocumentByName<
-                DataModel.ToConvexDataModel<DataModel_>,
-                TableName
-              >,
-              "_creationTime" | "_id"
-            >
-          >,
+          id,
+          updatedEncodedDoc as WithOptionalSystemFields<Encoded>,
         ),
       );
     });
 
     const replace = Effect.fn("DatabaseWriter.replace")(function* (
-      id: DataModel.Id<DataModel_, TableName>,
-      value: Document.WithoutSystemFields<
-        DocumentByName_<DataModel_, TableName>
-      >,
+      id: GenericId<TableName>,
+      value: Record<string, unknown>,
     ) {
       const updatedEncodedDoc = yield* Document.encode(value, tableDef);
 
       yield* Effect.promise(() =>
         convexDatabaseWriter.replace(
-          id as unknown as GenericId<TableName>,
-          updatedEncodedDoc as Expand<
-            BetterOmit<
-              DocumentByName<
-                DataModel.ToConvexDataModel<DataModel_>,
-                TableName
-              >,
-              "_creationTime" | "_id"
-            >
-          >,
+          id,
+          updatedEncodedDoc as WithOptionalSystemFields<Encoded>,
         ),
       );
     });
 
-    const delete_ = (id: DataModel.Id<DataModel_, TableName>) =>
-      Effect.promise(() =>
-        convexDatabaseWriter.delete(id as unknown as GenericId<TableName>),
-      );
+    const delete_ = (id: GenericId<TableName>) =>
+      Effect.promise(() => convexDatabaseWriter.delete(id));
 
     return {
       insert,
@@ -211,7 +190,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
   return {
     table,
-  } as DatabaseWriterService<DatabaseSchema_>;
+  } as DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model, Scope>>;
 };
 
 export const DatabaseWriter = <
@@ -219,21 +198,25 @@ export const DatabaseWriter = <
   Docs = {},
 >(): DatabaseWriterTag<DatabaseSchema_, Docs> =>
   Context.Service<
-    DatabaseWriterService<DatabaseSchema_>,
+    DatabaseWriter<DatabaseSchema_>,
     DatabaseWriterService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseWriter");
 
 export type DatabaseWriter<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-> = DatabaseWriterService<DatabaseSchema_>;
+> = [DatabaseSchema_["target"]] extends [DatabaseSchema.AppTarget]
+  ? DatabaseWriterService<DatabaseSchema_>
+  : {
+      readonly "~@confect/server/ScopedDatabaseWriter": Types.Invariant<DatabaseSchema_>;
+    };
 
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-  databaseSchema: DatabaseSchema_,
   convexDatabaseWriter: GenericDatabaseWriter<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
+  ...scope: IdScope.Args<DatabaseSchema.Scope<DatabaseSchema_>>
 ) =>
   Layer.succeed(
     DatabaseWriter<DatabaseSchema_>(),
-    make(databaseSchema, convexDatabaseWriter),
+    make(convexDatabaseWriter, ...scope),
   );

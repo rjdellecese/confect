@@ -8,6 +8,7 @@ import type { LeafModule } from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
 import { FunctionSpec, GroupSpec, Refs, Spec } from "@confect/core";
+import * as IdScope from "@confect/core/IdScope";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
@@ -61,12 +62,13 @@ it.effect.each([false, true])(
                 returns: () => Schema.String,
               }),
             ),
-        schemaImportPath: "../schema",
+        tableNamesImportPath: "../tableNames",
         specImportPath: "../../notes.spec",
         implImportPath: "../../notes.impl",
       });
       expect(code).toContain('import groupLayer from "../../notes.impl";');
       expect(code).toContain('typeof import("../../notes.spec")["default"]');
+      expect(code).not.toContain("target");
       if (useNode) {
         expect(code).toContain("RegisteredNodeFunction.buildForGroup");
         expect(code).not.toContain(
@@ -87,6 +89,32 @@ it.effect.each([false, true])(
         expect(code).not.toContain("const register =");
         expect(code).not.toContain("RegisteredNodeFunction");
       }
+    }),
+);
+
+it.effect.each([
+  { spec: GroupSpec.makeNode(), args: "groupLayer, target" },
+  { spec: GroupSpec.make(), args: "[], groupLayer, target" },
+  {
+    spec: GroupSpec.make().addFunction(
+      FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }),
+    ),
+    args: "tableNames, groupLayer, target",
+  },
+])(
+  "passes the component target to the group builder: $args",
+  ({ spec, args }) =>
+    Effect.gen(function* () {
+      const code = yield* templates.registeredFunctionsForGroup({
+        spec,
+        tableNamesImportPath: "../../tableNames",
+        targetImportPath: "../../id",
+        specImportPath: "../../../groups/notes.spec",
+        implImportPath: "../../../groups/notes.impl",
+      });
+      expect(code).toContain('import { target } from "../../id";');
+      expect(code).toContain(`>(${args});`);
+      expect(code).not.toContain("schema");
     }),
 );
 
@@ -113,7 +141,7 @@ it.effect(
       });
       const code = yield* templates.registeredFunctionsForGroup({
         spec,
-        schemaImportPath: "../schema",
+        tableNamesImportPath: "../tableNames",
         specImportPath: "../../notes.spec",
         implImportPath: "../../notes.impl",
       });
@@ -141,7 +169,7 @@ it.effect.each([
     Effect.gen(function* () {
       const code = yield* templates.registeredFunctionsForGroup({
         spec,
-        schemaImportPath: "../schema",
+        tableNamesImportPath: "../tableNames",
         specImportPath: "../../notes.spec",
         implImportPath: "../../notes.impl",
       });
@@ -191,9 +219,8 @@ export default GroupSpec.makeNode();`,
           prefix: "registry-alias-",
         });
         yield* fs.writeFileString(
-          path.join(directory, "schema.ts"),
-          `import { DatabaseSchema } from "@confect/server";
-export default DatabaseSchema.make({});`,
+          path.join(directory, "tableNames.ts"),
+          templates.tableNames([]),
         );
         yield* Effect.forEach(
           [
@@ -205,6 +232,7 @@ export default DatabaseSchema.make({});`,
             "RegisteredFunctions",
             "RegisteredNodeFunction",
             "databaseSchema",
+            "tableNames",
             "groupLayer",
           ],
           (name) =>
@@ -222,7 +250,7 @@ export default implementation;`,
               );
               const contents = yield* templates.registeredFunctionsForGroup({
                 spec,
-                schemaImportPath: "./schema",
+                tableNamesImportPath: "./tableNames",
                 specImportPath: `./${name}.spec`,
                 implImportPath: `./${name}.impl`,
               });
@@ -325,8 +353,8 @@ export default Table.make(() => {
           path.join(directory, "runtime.ts"),
           `export { default } from "./schema";
 export { reads } from "./reads";
-import notes from "./tables/notes";
-export const fields = () => notes.Fields;
+import notesTable from "./tables/notes";
+export const fields = () => notesTable.Fields;
 `,
         );
         yield* fs.writeFileString(
@@ -349,7 +377,7 @@ export { reads } from "./reads";
 
         const deploy = yield* Bundler.bundle(path.join(directory, "deploy.ts"));
         expect(deploySource).toContain(
-          'import { Table as $Table } from "@confect/server";',
+          'import { Table as Table_ } from "@confect/server";',
         );
         expect(deploy.module.reads).toEqual({ fields: 1 });
         expect(Record.keys(deploy.metafile.inputs)).toContain(
@@ -366,9 +394,26 @@ export { reads } from "./reads";
 });
 
 layer(NodeServices.layer)("id", (test) => {
-  test.effect.each([{ tableNames: [] }, { tableNames: ["notes", "users"] }])(
-    "exports matching ID types and schemas for $tableNames and system tables",
-    ({ tableNames }) =>
+  test.effect.each([
+    { tableNames: [], moduleResolution: "Bundler", component: false },
+    {
+      tableNames: ["notes", "users"],
+      moduleResolution: "Bundler",
+      component: false,
+    },
+    {
+      tableNames: ["notes", "users"],
+      moduleResolution: "NodeNext",
+      component: false,
+    },
+    {
+      tableNames: ["notes", "users"],
+      moduleResolution: "NodeNext",
+      component: true,
+    },
+  ])(
+    "exports matching ID types and schemas for $tableNames and system tables with $moduleResolution resolution (component=$component)",
+    ({ tableNames, moduleResolution, component }) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
@@ -377,7 +422,17 @@ layer(NodeServices.layer)("id", (test) => {
           directory: import.meta.dirname,
           prefix: "id-",
         });
-        const contents = yield* templates.id({ tableNames });
+        yield* fs.writeFileString(
+          path.join(directory, "package.json"),
+          '{"type":"module"}',
+        );
+        const contents = yield* templates.id(
+          component ? IdScope.component("fixture") : undefined,
+        );
+        yield* fs.writeFileString(
+          path.join(directory, "tableNames.ts"),
+          templates.tableNames(tableNames),
+        );
         expect(contents).toContain(
           'import type { SystemTableNames } from "convex/server";',
         );
@@ -385,10 +440,10 @@ layer(NodeServices.layer)("id", (test) => {
         yield* fs.writeFileString(
           path.join(directory, "consumer.ts"),
           `import { expectTypeOf } from "vitest";
-import type { GenericId } from "convex/values";
+${component ? 'import type * as CoreId from "@confect/core/GenericId";\nimport type { scope } from "./id.js";\ntype GenericId<T extends string> = CoreId.GenericId<T, typeof scope>;' : 'import type { GenericId } from "convex/values";'}
 import type { SystemTableNames } from "convex/server";
-import { Id } from "./id";
-import type { Id as IdType, TableNames } from "./id";
+import { Id } from "./id.js";
+import type { Id as IdType, TableNames } from "./id.js";
 
 expectTypeOf<TableNames>().toEqualTypeOf<${
             tableNames.length === 0
@@ -428,8 +483,8 @@ export const plainString: Id<"_storage"> = "not-an-id";
               "strict": true,
               "noEmit": true,
               "skipLibCheck": true,
-              "module": "ESNext",
-              "moduleResolution": "Bundler",
+              "module": "${moduleResolution === "NodeNext" ? "NodeNext" : "ESNext"}",
+              "moduleResolution": "${moduleResolution}",
               "target": "ESNext",
               "verbatimModuleSyntax": true
             },
@@ -526,7 +581,7 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
             (index) =>
               `${prefix}${pipe(String(index + 1), Str.padStart(3, "0"))}`,
           );
-        const rootNames = names("g", 600);
+        const rootNames = ["Group", ...names("g", 600)];
         const childNames = names("c", 300);
         const deepNames = names("d", 100);
         const lastRoot = rootNames[rootNames.length - 1]!;
@@ -680,10 +735,10 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
         );
         expect(declaration).toContain("declare const spec:");
         expect(declaration).toContain(
-          `GroupSpec.NamedAt<typeof ${lastRoot}, "${lastRoot}">`,
+          `GroupSpec_.NamedAt<typeof ${lastRoot}Spec, "${lastRoot}">`,
         );
         expect(declaration).toContain(
-          `typeof nested_${lastChild}_level3_level4_${lastDeep}`,
+          `typeof nested_${lastChild}_level3_level4_${lastDeep}Spec`,
         );
         expect(
           Option.getOrNull(pipe(declaration, Str.match(/typeof /g))),

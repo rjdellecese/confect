@@ -59,6 +59,13 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(services).toContain(
             "Storage_.Storage.forScope<typeof scope>()",
           );
+          const registry = yield* fs.readFileString(
+            path.join(
+              project.root,
+              "confect/_generated/registeredFunctions/notes.ts",
+            ),
+          );
+          expect(registry).toContain(">(tableNames, groupLayer, target);");
           yield* fs.remove(path.join(project.root, "convex/convex.config.ts"));
           yield* project.write("confect/tables/other.ts", Project.table);
           yield* watching.waitFor("component definition is required");
@@ -99,7 +106,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             pipe(
               Project.impl,
               Str.replace(
-                'import { FunctionImpl, GroupImpl } from "@confect/server";',
+                'import { FunctionImpl, GroupImpl } from "./_generated/server";',
                 'import * as FunctionImpl from "@confect/server/FunctionImpl"; import * as GroupImpl from "@confect/server/GroupImpl";',
               ),
             ),

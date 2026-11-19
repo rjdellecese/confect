@@ -1,3 +1,3 @@
-import unnamed from "../../tables/events";
+import eventsTable from "../../tables/events";
 
-export default unnamed("events");
+export default eventsTable("events");

@@ -262,10 +262,7 @@ export default defineApp({ httpPrefix: "/" + notes.tableName });`,
           yield* project.write("confect/other.spec.ts", Project.spec);
           yield* project.write(
             "confect/other.impl.ts",
-            pipe(
-              Project.impl,
-              String.replace('"./notes.spec"', '"./other.spec"'),
-            ),
+            Project.implFor("other"),
           );
           const { snapshot } = yield* project.provide(generateWithSnapshot);
           yield* project.write(
@@ -344,9 +341,8 @@ export default defineApp({ httpPrefix: "/" + notes.tableName });`,
           yield* project.write(
             "confect/notes/archived.impl.ts",
             pipe(
-              Project.impl,
+              Project.implFor("archived"),
               String.replaceAll('"./_generated/', '"../_generated/'),
-              String.replace('"./notes.spec"', '"./archived.spec"'),
             ),
           );
           const { snapshot } = yield* project.provide(generateWithSnapshot);
@@ -459,12 +455,11 @@ export default defineApp({ httpPrefix: "/" + notes.tableName });`,
           );
           yield* project.write(
             "confect/notes.impl.ts",
-            `import { FunctionImpl, GroupImpl } from "@confect/server";
+            `import { FunctionImpl, GroupImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import schema from "./_generated/schema";
-import spec from "./notes.spec";
-export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make(schema, spec, "list", () => Effect.succeed([]))), GroupImpl.finalize);
+import notesSpec from "./notes.spec";
+export default GroupImpl.make(notesSpec).pipe(Layer.provide(FunctionImpl.make(notesSpec, "list", () => Effect.succeed([]))), GroupImpl.finalize);
 `,
           );
           snapshot = yield* project.provide(
@@ -593,10 +588,7 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
             yield* project.write(`confect/${name}.spec.ts`, Project.spec);
             yield* project.write(
               `confect/${name}.impl.ts`,
-              pipe(
-                Project.impl,
-                String.replace('"./notes.spec"', `"./${name}.spec"`),
-              ),
+              Project.implFor(name),
             );
           }
           const run = codegenHandler.pipe(
@@ -659,10 +651,9 @@ export default GroupImpl.make(schema, spec).pipe(Layer.provide(FunctionImpl.make
             );
             yield* project.write(
               `confect/group${index}.impl.ts`,
-              `import { GroupImpl } from "@confect/server";
-import databaseSchema from "./_generated/schema";
-import spec from "./group${index}.spec";
-export default GroupImpl.make(databaseSchema, spec).pipe(GroupImpl.finalize);`,
+              `import { GroupImpl } from "./_generated/server";
+import group${index}Spec from "./group${index}.spec";
+export default GroupImpl.make(group${index}Spec).pipe(GroupImpl.finalize);`,
             );
           }
           const active = { spec: 0, impl: 0 };

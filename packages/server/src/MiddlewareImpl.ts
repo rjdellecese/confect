@@ -158,102 +158,113 @@ const layerFromImpls = <
     }),
   );
 
-/**
- * Provide a middleware's implementation with a single strategy shared by every
- * function type the middleware declares. The implementation's environment is
- * bounded by {@link CommonServices}—the intersection of the declared
- * functionTypes' ctx services—plus the middleware's declared `requires`, which
- * middleware running earlier in the chain provide. Reach for
- * {@link makeByFunctionType} when one strategy can't fit all declared
- * functionTypes (the usual case for database-touching middleware attached to
- * actions).
- *
- * Like `FunctionImpl.make`, `databaseSchema` is a type-level carrier only.
- */
-export const make = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
->(
-  _databaseSchema: DatabaseSchema_,
-  middlewareSpec: MiddlewareSpec_,
-  impl: MiddlewareSpec.MiddlewareImpl<
-    MiddlewareSpec.Provides<MiddlewareSpec_>,
-    MiddlewareSpec.Error<MiddlewareSpec_>,
-    | CommonServices<
-        DatabaseSchema_,
-        MiddlewareSpec.FunctionTypes<MiddlewareSpec_>
-      >
-    | MiddlewareSpec.Requires<MiddlewareSpec_>,
-    MiddlewareSpec.Options<MiddlewareSpec_>
-  >,
-): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
-  layerFromImpls(
-    middlewareSpec,
-    Record.fromEntries(
-      Array.map(
-        Array.filter(
-          MiddlewareSpec.allFunctionTypes,
-          (functionType) => middlewareSpec.functionTypes[functionType],
-        ),
-        (functionType) =>
-          [functionType, impl as MiddlewareSpec.AnyMiddlewareImpl] as const,
-      ),
-    ),
-  );
-
-/**
- * Provide a middleware's implementation with one strategy per declared function
- * type. Each entry may use that function type's full ctx-service union—the
- * recommended shape for database-touching middleware that also covers actions:
- * use `DatabaseReader`/`DatabaseWriter` in queries and mutations, and
- * `runQuery` of an internal query in actions.
- */
-export const makeByFunctionType = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
->(
-  _databaseSchema: DatabaseSchema_,
-  middlewareSpec: MiddlewareSpec_,
-  impls: {
-    readonly [
-      FunctionType_ in MiddlewareSpec.FunctionTypes<MiddlewareSpec_>
-    ]: MiddlewareSpec.MiddlewareImpl<
+export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
+  /**
+   * Provide a middleware's implementation with a single strategy shared by
+   * every function type the middleware declares. The implementation's
+   * environment is bounded by {@link CommonServices}—the intersection of the
+   * declared functionTypes' ctx services—plus the middleware's declared
+   * `requires`, which middleware running earlier in the chain provide. Reach
+   * for {@link makeByFunctionType} when one strategy can't fit all declared
+   * functionTypes (the usual case for database-touching middleware attached to
+   * actions).
+   */
+  readonly make: <MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
+    middlewareSpec: MiddlewareSpec_,
+    impl: MiddlewareSpec.MiddlewareImpl<
       MiddlewareSpec.Provides<MiddlewareSpec_>,
       MiddlewareSpec.Error<MiddlewareSpec_>,
-      | FunctionTypeServices<DatabaseSchema_, FunctionType_>
+      | CommonServices<
+          DatabaseSchema_,
+          MiddlewareSpec.FunctionTypes<MiddlewareSpec_>
+        >
       | MiddlewareSpec.Requires<MiddlewareSpec_>,
       MiddlewareSpec.Options<MiddlewareSpec_>
-    >;
-  },
-): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
-  layerFromImpls(
-    middlewareSpec,
-    impls as MiddlewareRegistryItem.MiddlewareRegistryItem["impls"],
-  );
+    >,
+  ) => Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>>;
+
+  /**
+   * Provide a middleware's implementation with one strategy per declared
+   * function type. Each entry may use that function type's full ctx-service
+   * union—the recommended shape for database-touching middleware that also
+   * covers actions: use `DatabaseReader`/`DatabaseWriter` in queries and
+   * mutations, and `runQuery` of an internal query in actions.
+   */
+  readonly makeByFunctionType: <
+    MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
+  >(
+    middlewareSpec: MiddlewareSpec_,
+    impls: {
+      readonly [
+        FunctionType_ in MiddlewareSpec.FunctionTypes<MiddlewareSpec_>
+      ]: MiddlewareSpec.MiddlewareImpl<
+        MiddlewareSpec.Provides<MiddlewareSpec_>,
+        MiddlewareSpec.Error<MiddlewareSpec_>,
+        | FunctionTypeServices<DatabaseSchema_, FunctionType_>
+        | MiddlewareSpec.Requires<MiddlewareSpec_>,
+        MiddlewareSpec.Options<MiddlewareSpec_>
+      >;
+    },
+  ) => Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>>;
+
+  /**
+   * Sugar over {@link make} for the flagship "run something, provide a service"
+   * shape: run `effect` before the rest of the chain and provide its result
+   * under `tag` (the runtime tag for the middleware's type-level `provides`
+   * service, passed explicitly since the spec class only knows it at the type
+   * level).
+   */
+  readonly provides: <
+    MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
+    Shape,
+  >(
+    middlewareSpec: MiddlewareSpec_,
+    tag: Context.Key<MiddlewareSpec.Provides<MiddlewareSpec_>, Shape>,
+    effect: Effect.Effect<
+      Shape,
+      MiddlewareSpec.Error<MiddlewareSpec_>,
+      | CommonServices<
+          DatabaseSchema_,
+          MiddlewareSpec.FunctionTypes<MiddlewareSpec_>
+        >
+      | MiddlewareSpec.Requires<MiddlewareSpec_>
+    >,
+  ) => Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>>;
+}
 
 /**
- * Sugar over {@link make} for the flagship "run something, provide a service"
- * shape: run `effect` before the rest of the chain and provide its result under
- * `tag` (the runtime tag for the middleware's type-level `provides` service,
- * passed explicitly since the spec class only knows it at the type level).
+ * Bind middleware strategies to the application's data model at the type level.
  */
-export const provides = <
+export const forSchema = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
-  Shape,
->(
-  databaseSchema: DatabaseSchema_,
-  middlewareSpec: MiddlewareSpec_,
-  tag: Context.Key<MiddlewareSpec.Provides<MiddlewareSpec_>, Shape>,
-  effect: Effect.Effect<
-    Shape,
-    MiddlewareSpec.Error<MiddlewareSpec_>,
-    | CommonServices<
-        DatabaseSchema_,
-        MiddlewareSpec.FunctionTypes<MiddlewareSpec_>
-      >
-    | MiddlewareSpec.Requires<MiddlewareSpec_>
-  >,
-): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
-  make(databaseSchema, middlewareSpec, ((handlerEffect: Effect.Effect<any>) =>
-    Effect.provideServiceEffect(handlerEffect, tag, effect)) as any);
+>(): Builders<DatabaseSchema_> => {
+  const make: Builders<DatabaseSchema_>["make"] = (middlewareSpec, impl) =>
+    layerFromImpls(
+      middlewareSpec,
+      Record.fromEntries(
+        Array.map(
+          Array.filter(
+            MiddlewareSpec.allFunctionTypes,
+            (functionType) => middlewareSpec.functionTypes[functionType],
+          ),
+          (functionType) =>
+            [functionType, impl as MiddlewareSpec.AnyMiddlewareImpl] as const,
+        ),
+      ),
+    );
+
+  return {
+    make,
+    makeByFunctionType: (middlewareSpec, impls) =>
+      layerFromImpls(
+        middlewareSpec,
+        impls as MiddlewareRegistryItem.MiddlewareRegistryItem["impls"],
+      ),
+    provides: (middlewareSpec, tag, effect) =>
+      make(middlewareSpec, ((handlerEffect: Effect.Effect<any>) =>
+        Effect.provideServiceEffect(handlerEffect, tag, effect)) as any),
+  };
+};
+
+export const { make, makeByFunctionType, provides } =
+  forSchema<DatabaseSchema.AnyWithProps>();

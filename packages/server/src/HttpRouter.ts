@@ -25,7 +25,7 @@ import * as HttpServer from "effect/http/HttpServer";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
-import type * as DatabaseSchema from "./DatabaseSchema";
+import * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type * as Handler from "./Handler";
 import type { ExecutionMetadata } from "./ExecutionMetadata";
@@ -46,7 +46,9 @@ import type * as VectorSearch from "./VectorSearch";
  * The Confect services available to HTTP route handlers and middleware,
  * supplied per request from the Convex action context.
  */
-export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
+export type Services<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps = never,
+> =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
@@ -58,7 +60,11 @@ export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | StorageWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | StorageActionWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
-  | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>;
+  | {
+      [Key in keyof DatabaseSchema_]: VectorSearch.VectorSearch<
+        DataModel.FromDatabaseSchema<DatabaseSchema_>
+      >;
+    }[DatabaseSchema.TypeId];
 
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
@@ -81,8 +87,9 @@ export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  * `Config` reads (e.g. in `Layer.unwrap`) resolve against Convex environment
  * variables.
  */
-export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
-  RoutesWithServices<Services<DatabaseSchema_>>;
+export type Routes<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps = never,
+> = RoutesWithServices<Services<DatabaseSchema_>>;
 
 type RoutesWithServices<Services_> = Layer.Layer<
   never,
@@ -99,8 +106,8 @@ type RoutesWithServices<Services_> = Layer.Layer<
 >;
 
 /**
- * Create a Convex HTTP router from a runtime database schema and routes, with
- * schema-typed vector search in handlers and middleware.
+ * Create an application HTTP router. Pass the database schema as a type
+ * argument for schema-typed vector search in handlers and middleware.
  *
  * A single catch-all `httpAction` is registered for every routable method under
  * the path prefix `"/"`, making the Effect router the single source of truth
@@ -111,18 +118,18 @@ type RoutesWithServices<Services_> = Layer.Layer<
  * exact paths first and longer path prefixes before the catch-all, so they take
  * precedence.
  */
-export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-  databaseSchema: DatabaseSchema_,
-  routes: Routes<NoInfer<DatabaseSchema_>>,
-): ConvexHttpRouter => forSchema(databaseSchema)(routes);
+export const make = <DatabaseSchema_ extends DatabaseSchema.AnyApp = never>(
+  routes: Routes<DatabaseSchema_>,
+): ConvexHttpRouter =>
+  forSchema<DatabaseSchema_>(DatabaseSchema.appTarget)(routes);
 
 /**
- * Derive HTTP capabilities and ID scopes from the generated database schema.
+ * Bind HTTP capabilities to a schema type and its lightweight runtime target.
  * Component routes are relative to their installation's HTTP mount prefix.
  */
 export const forSchema =
   <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-    schema: DatabaseSchema_,
+    target: DatabaseSchema_["target"],
   ) =>
   (
     routes: RoutesWithServices<Handler.ActionServices<DatabaseSchema_>>,
@@ -131,14 +138,14 @@ export const forSchema =
       Handler.ActionServices<DatabaseSchema_>,
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >(
-      Match.value(schema.target.kind).pipe(
+      Match.value(DatabaseSchema.checkedTarget(target).kind).pipe(
         Match.when("app", () => routes),
         Match.when("component", () =>
           routes.pipe(Layer.provide(componentMount)),
         ),
         Match.exhaustive,
       ),
-      (ctx) => RegisteredFunction.actionLayer(schema, ctx),
+      (ctx) => RegisteredFunction.actionLayer<DatabaseSchema_>(ctx, target),
     );
 
 // Convex uses a component-relative path to select its HTTP action but passes
@@ -191,8 +198,8 @@ const makeWithLayer = <Services_, DataModel_ extends GenericDataModel>(
   const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
-    // Convex's HTTP registration erases the data model. The supplied generated
-    // schema restores it; this does not change the runtime context or services.
+    // Convex's HTTP registration erases the data model. The generated schema type
+    // restores it; this does not change the runtime context or services.
     const services = layer(ctx as unknown as GenericActionCtx<DataModel_>).pipe(
       Layer.build,
       Effect.scoped,

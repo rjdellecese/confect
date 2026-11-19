@@ -31,7 +31,7 @@ Convex function's cold-start bundle scales with its own group, not the whole
 project. This is invisible to types, lint, and most tests—a stray import in a
 codegen template silently regresses every function's bundle. Flag as 🔴
 Important any change (chiefly in `packages/cli/src/templates.ts`, the generated
-`_generated/` layout, or `packages/server/src/`) that breaks either rule:
+`_generated/` layout, or `packages/server/src/`) that breaks any of these rules:
 
 1. **One group per bundle.** A generated `convex/{path}.ts` must import only its
    own `_generated/registeredFunctions/{path}` module, and each
@@ -40,9 +40,15 @@ Important any change (chiefly in `packages/cli/src/templates.ts`, the generated
    `_generated/registeredFunctions.ts`) or any cross-group import that pulls one
    group's `.impl` into another group's bundle.
 
-2. **Application deployment-schema construction stays out of function bundles.**
-   `_generated/schema.ts` (the runtime `DatabaseSchema`) must only assemble
-   table records without forcing their schemas. `_generated/convexSchema.ts`
+2. **Table imports follow the handler's dependencies.** Registration and
+   implementation builders must not import `_generated/schema.ts` as a value:
+   that explicit, whole-app registry imports every table. The generated model
+   types can refer to it with `import type`. Readers and writers accept a bound
+   table handle; ID identification uses a list of names, not definitions.
+
+3. **Application deployment-schema construction stays out of function bundles.**
+   `_generated/schema.ts` must only assemble table records without forcing
+   their schemas. `_generated/convexSchema.ts`
    (the deploy `SchemaDefinition`) calls `convex/server`'s `defineSchema` and
    may import `@confect/server`'s `Table.tableDefinition` to construct Convex
    validators and indexes. That conversion belongs at deployment time, not
