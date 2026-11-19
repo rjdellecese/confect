@@ -9,7 +9,7 @@ import * as Schema from "effect/Schema";
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
 import { resourceName } from "./internal/ResourceIdentity";
-import { checkpointCreate, shouldAdopt } from "./internal/Lifecycle";
+import { checkpointResource, shouldAdopt } from "./internal/Lifecycle";
 
 export interface ProjectProps {
   readonly teamId: number;
@@ -20,6 +20,7 @@ export interface ProjectAttributes {
   readonly projectId: number;
   readonly teamId: number;
   readonly name: string;
+  readonly managedName?: string;
   readonly slug: string;
 }
 
@@ -54,17 +55,35 @@ export class AmbiguousProject extends Schema.TaggedError<
 
 export const provider = Effect.gen(function* () {
   const client = yield* ConvexClient;
-  const attributes = (project: {
-    id: number;
-    teamId: number;
-    name: string;
-    slug: string;
-  }): ProjectAttributes => ({
+  const attributes = (
+    project: {
+      id: number;
+      teamId: number;
+      name: string;
+      slug: string;
+    },
+    managedName = project.name,
+  ): ProjectAttributes => ({
     projectId: project.id,
     teamId: project.teamId,
     name: project.name,
+    ...(managedName === project.name ? {} : { managedName }),
     slug: project.slug,
   });
+  const get = (projectId: number) =>
+    client
+      .getProject(projectId)
+      .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
+  const validateTeam = (
+    projectId: number,
+    teamId: number,
+    requestedTeamId: number,
+  ) =>
+    teamId === requestedTeamId
+      ? Effect.void
+      : Effect.fail(
+          ProjectTeamChange.make({ projectId, teamId, requestedTeamId }),
+        );
   const find = Effect.fn("Project.find")(function* (
     teamId: number,
     name: string,
@@ -82,23 +101,14 @@ export const provider = Effect.gen(function* () {
   return {
     diff: Effect.fn("Project.diff")(function* ({ news, output }) {
       if (!isResolved(news) || output === undefined) return;
-      if (output.teamId !== news.teamId)
-        return yield* ProjectTeamChange.make({
-          projectId: output.projectId,
-          teamId: output.teamId,
-          requestedTeamId: news.teamId,
-        });
-      const project = yield* client
-        .getProject(output.projectId)
-        .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
+      yield* validateTeam(output.projectId, output.teamId, news.teamId);
+      const project = yield* get(output.projectId);
       if (project === undefined) return { action: "update" };
-      if (project.teamId !== news.teamId)
-        return yield* ProjectTeamChange.make({
-          projectId: project.id,
-          teamId: project.teamId,
-          requestedTeamId: news.teamId,
-        });
-      if ((news.name ?? output.name) !== project.name)
+      yield* validateTeam(project.id, project.teamId, news.teamId);
+      if (
+        (news.name ?? output.managedName ?? output.name) !== project.name ||
+        output.slug !== project.slug
+      )
         return { action: "update" };
     }),
     read: Effect.fn("Project.read")(function* ({
@@ -108,10 +118,10 @@ export const provider = Effect.gen(function* () {
       output,
     }) {
       if (output !== undefined) {
-        const project = yield* client
-          .getProject(output.projectId)
-          .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
-        return project !== undefined ? attributes(project) : undefined;
+        const project = yield* get(output.projectId);
+        return project !== undefined
+          ? attributes(project, output.managedName ?? output.name)
+          : undefined;
       }
       if (olds.teamId === undefined) return;
       const project = yield* find(
@@ -126,21 +136,15 @@ export const provider = Effect.gen(function* () {
       news,
       output,
     }) {
-      if (output === undefined) yield* checkpointCreate(fqn, instanceId, news);
-      if (output !== undefined && output.teamId !== news.teamId)
-        return yield* ProjectTeamChange.make({
-          projectId: output.projectId,
-          teamId: output.teamId,
-          requestedTeamId: news.teamId,
-        });
+      if (output === undefined)
+        yield* checkpointResource(fqn, instanceId, news);
+      if (output !== undefined)
+        yield* validateTeam(output.projectId, output.teamId, news.teamId);
       let project =
-        output !== undefined
-          ? yield* client
-              .getProject(output.projectId)
-              .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void))
-          : undefined;
+        output !== undefined ? yield* get(output.projectId) : undefined;
       const name =
         news.name ??
+        output?.managedName ??
         output?.name ??
         (yield* resourceName("project", fqn, instanceId));
       if (project === undefined) {
@@ -153,27 +157,36 @@ export const provider = Effect.gen(function* () {
           });
         if (existing !== undefined) {
           project = existing;
-          yield* checkpointCreate(fqn, instanceId, news, attributes(existing));
+          yield* checkpointResource(
+            fqn,
+            instanceId,
+            news,
+            attributes(existing),
+          );
         } else {
           const created = yield* client.createProject(news.teamId, {
             projectName: name,
           });
-          project = yield* client.getProject(created.id);
+          return attributes({
+            id: created.id,
+            teamId: news.teamId,
+            name,
+            slug: created.slug,
+          });
         }
       }
-      if (project.teamId !== news.teamId)
-        return yield* ProjectTeamChange.make({
-          projectId: project.id,
-          teamId: project.teamId,
-          requestedTeamId: news.teamId,
-        });
+      yield* validateTeam(project.id, project.teamId, news.teamId);
       if (project.name !== name)
         project = yield* client.updateProject(project.id, {
           name,
         });
       return attributes(project);
     }),
-    delete: Effect.fn("Project.delete")(function* ({ output }) {
+    delete: Effect.fn("Project.delete")(function* ({ olds, output }) {
+      const project = yield* get(output.projectId);
+      if (project === undefined) return;
+      yield* validateTeam(output.projectId, output.teamId, olds.teamId);
+      yield* validateTeam(project.id, project.teamId, output.teamId);
       yield* client
         .deleteProject(output.projectId)
         .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));

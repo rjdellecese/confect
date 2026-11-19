@@ -74,6 +74,7 @@ describe("Backend", () => {
         expect(environment.LogicalId).toBe("Environment");
         expect(environment.Namespace?.Id).toBe("Backend");
         expect(environment.Props.variables).toBe(env);
+        expect(environment.Props.deploymentName).toBe(props.deployment.name);
         const url = backend.code.Props.deployment.url;
         expect(Record.keys(Output.resolveUpstream(url))).toEqual([
           environment.FQN,

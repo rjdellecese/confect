@@ -1,12 +1,17 @@
 import * as Config from "effect/Config";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as HttpClient from "effect/http/HttpClient";
+import type { CodeProps } from "../Code";
 
 export interface PrepareCommand {
   readonly command: string;
@@ -18,7 +23,7 @@ export class CommandError extends Schema.TaggedError<
   { readonly brand: unique symbol }
 >()("CommandError", {
   operation: Schema.Literals(["prepare", "deploy"]),
-  reason: Schema.Literals(["configuration", "spawn", "exit"]),
+  reason: Schema.Literals(["configuration", "target", "spawn", "exit"]),
   exitCode: Schema.optionalKey(Schema.Finite),
 }) {}
 
@@ -30,6 +35,7 @@ export class CommandRunner extends Context.Service<
       cwd?: string,
     ) => Effect.Effect<void, CommandError>;
     readonly deploy: (
+      deployment: CodeProps["deployment"],
       deployKey: Redacted.Redacted<string>,
       cwd?: string,
     ) => Effect.Effect<void, CommandError>;
@@ -89,6 +95,11 @@ export const layer = Layer.effect(
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const http = yield* HttpClient.HttpClient;
+    const readRequestInit = Effect.serviceOption(
+      FetchHttpClient.RequestInit,
+    ).pipe(Effect.map(Option.getOrUndefined));
+    const defaultRequestInit = yield* readRequestInit;
     const run = Effect.fn("CommandRunner.run")(function* (
       operation: "prepare" | "deploy",
       command: string,
@@ -132,7 +143,7 @@ export const layer = Layer.effect(
       ),
       TMPDIR: Config.String("TMPDIR").pipe(Config.withDefault("")),
       TEMP: Config.String("TEMP").pipe(Config.withDefault("")),
-    }).pipe(Effect.map((env) => ({ ...env, CI: "true", DO_NOT_TRACK: "1" })));
+    }).pipe(Config.map((env) => ({ ...env, CI: "true", DO_NOT_TRACK: "1" })));
     return CommandRunner.of({
       prepare: Effect.fn("CommandRunner.prepare")(function* (
         command,
@@ -167,19 +178,66 @@ export const layer = Layer.effect(
         }
       }),
       deploy: Effect.fn("CommandRunner.deploy")(function* (
+        deployment,
         deployKey,
         cwd = process.cwd(),
       ) {
         const directory = path.resolve(cwd);
         const bin = yield* packageBin(fs, path, directory, "convex", "convex");
-        const env = yield* environment.pipe(
-          Effect.mapError(() =>
-            CommandError.make({
-              operation: "deploy",
-              reason: "configuration",
+        const optionalMarker = (name: string) =>
+          Config.String(name).pipe(Config.withDefault(undefined));
+        const env = yield* Effect.all(
+          {
+            environment,
+            markers: Config.all({
+              VERCEL: optionalMarker("VERCEL"),
+              VERCEL_ENV: optionalMarker("VERCEL_ENV"),
+              NETLIFY: optionalMarker("NETLIFY"),
+              CONTEXT: optionalMarker("CONTEXT"),
+              CF_PAGES: optionalMarker("CF_PAGES"),
+              CF_PAGES_BRANCH: optionalMarker("CF_PAGES_BRANCH"),
+              WORKERS_CI: optionalMarker("WORKERS_CI"),
+              WORKERS_CI_BRANCH: optionalMarker("WORKERS_CI_BRANCH"),
+            }).parse(ConfigProvider.fromEnv({ preserveEmptyStrings: true })),
+          },
+          { concurrency: 1 },
+        ).pipe(
+          Effect.mapBoth({
+            onSuccess: ({ environment: base, markers }) => ({
+              ...base,
+              ...markers,
             }),
-          ),
+            onFailure: () =>
+              CommandError.make({
+                operation: "deploy",
+                reason: "configuration",
+              }),
+          }),
         );
+        const invalidTarget = () =>
+          CommandError.make({ operation: "deploy", reason: "target" });
+        const requestInit = yield* readRequestInit;
+        const response = yield* http
+          .get(`${deployment.url}/instance_name`)
+          .pipe(
+            Effect.provideService(FetchHttpClient.RequestInit, {
+              ...(requestInit ?? defaultRequestInit),
+              headers: {},
+              referrer: "",
+              referrerPolicy: "no-referrer",
+              cache: "no-store",
+              credentials: "omit",
+              redirect: "manual",
+            }),
+            Effect.mapError(invalidTarget),
+          );
+        if (
+          response.status !== 200 ||
+          (yield* response.text.pipe(Effect.mapError(invalidTarget))) !==
+            deployment.name
+        ) {
+          return yield* invalidTarget();
+        }
         yield* Effect.scoped(
           Effect.gen(function* () {
             const temp = yield* fs.makeTempDirectoryScoped({
@@ -218,4 +276,4 @@ export const layer = Layer.effect(
       }),
     });
   }),
-);
+).pipe(Layer.provide(FetchHttpClient.layer));

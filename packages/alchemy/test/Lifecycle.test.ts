@@ -4,7 +4,7 @@ import { InMemoryService } from "alchemy/State/InMemoryState";
 import type { ResourceState } from "alchemy/State/ResourceState";
 import { State, StateStoreError } from "alchemy/State/State";
 import * as Effect from "effect/Effect";
-import { checkpointCreate } from "../src/internal/Lifecycle";
+import { checkpointResource } from "../src/internal/Lifecycle";
 
 const stack = {
   name: "test",
@@ -37,7 +37,7 @@ it.effect(
       });
       const props = { deploymentName: "happy-otter-123" };
       const output = { name: "adopted" };
-      yield* checkpointCreate("Key", "instance", props, output).pipe(
+      yield* checkpointResource("Key", "instance", props, output).pipe(
         Effect.provideService(Stack, stack),
         Effect.provideService(State, Effect.succeed(store)),
       );
@@ -56,7 +56,7 @@ it.effect("refuses a checkpoint for another resource incarnation", () =>
   Effect.gen(function* () {
     const original = creating();
     const store = yield* InMemoryService({ test: { test: { Key: original } } });
-    const error = yield* checkpointCreate("Key", "other-instance", {}).pipe(
+    const error = yield* checkpointResource("Key", "other-instance", {}).pipe(
       Effect.provideService(Stack, stack),
       Effect.provideService(State, Effect.succeed(store)),
       Effect.flip,
@@ -79,7 +79,7 @@ it.effect(
         test: { test: { Key: creating() } },
       });
       let mutated = false;
-      const error = yield* checkpointCreate("Key", "instance", {}).pipe(
+      const error = yield* checkpointResource("Key", "instance", {}).pipe(
         Effect.andThen(
           Effect.sync(() => {
             mutated = true;

@@ -14,7 +14,7 @@ import * as Schema from "effect/Schema";
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
 import { resourceName } from "./internal/ResourceIdentity";
-import { checkpointCreate, shouldAdopt } from "./internal/Lifecycle";
+import { checkpointResource, shouldAdopt } from "./internal/Lifecycle";
 
 export interface DeploymentProps {
   readonly projectId: number;
@@ -27,6 +27,7 @@ export interface DeploymentAttributes {
   readonly projectId: number;
   readonly name: string;
   readonly reference: string;
+  readonly managedReference?: string;
   readonly type: CreateDeploymentType;
   readonly url: string;
   readonly region: RegionName;
@@ -70,6 +71,7 @@ export const provider = Effect.gen(function* () {
   const client = yield* ConvexClient;
   const attributes = Effect.fn("Deployment.attributes")(function* (
     deployment: PlatformDeploymentResponse,
+    managedReference?: string,
   ) {
     if (deployment.kind !== "cloud")
       return yield* UnsupportedLocalDeployment.make({
@@ -79,11 +81,19 @@ export const provider = Effect.gen(function* () {
       projectId: deployment.projectId,
       name: deployment.name,
       reference: deployment.reference,
+      ...(managedReference === undefined ||
+      managedReference === deployment.reference
+        ? {}
+        : { managedReference }),
       type: deployment.deploymentType,
       url: deployment.deploymentUrl,
       region: deployment.region,
     } satisfies DeploymentAttributes;
   });
+  const get = (name: string) =>
+    client
+      .getDeployment(name)
+      .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
   const find = Effect.fn("Deployment.find")(function* (
     projectId: number,
     reference: string,
@@ -116,13 +126,14 @@ export const provider = Effect.gen(function* () {
     diff: Effect.fn("Deployment.diff")(function* ({ news, output }) {
       if (!isResolved(news) || output === undefined) return;
       yield* validate(output, news);
-      const deployment = yield* client
-        .getDeployment(output.name)
-        .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
+      const deployment = yield* get(output.name);
       if (deployment === undefined) return { action: "update" };
       const current = yield* attributes(deployment);
       yield* validate(current, news);
-      if ((news.reference ?? output.reference) !== current.reference)
+      if (
+        (news.reference ?? output.managedReference ?? output.reference) !==
+        current.reference
+      )
         return { action: "update" };
     }),
     read: Effect.fn("Deployment.read")(function* ({
@@ -132,11 +143,12 @@ export const provider = Effect.gen(function* () {
       output,
     }) {
       if (output !== undefined) {
-        const deployment = yield* client
-          .getDeployment(output.name)
-          .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
+        const deployment = yield* get(output.name);
         return deployment !== undefined
-          ? yield* attributes(deployment)
+          ? yield* attributes(
+              deployment,
+              output.managedReference ?? output.reference,
+            )
           : undefined;
       }
       if (olds.projectId === undefined) return;
@@ -146,7 +158,9 @@ export const provider = Effect.gen(function* () {
       );
       if (deployment === undefined) return;
       const current = yield* attributes(deployment);
-      return Unowned(current);
+      return (yield* Effect.isSuccess(validate(current, olds)))
+        ? Unowned(current)
+        : undefined;
     }),
     reconcile: Effect.fn("Deployment.reconcile")(function* ({
       fqn,
@@ -154,30 +168,28 @@ export const provider = Effect.gen(function* () {
       news,
       output,
     }) {
-      if (output === undefined) yield* checkpointCreate(fqn, instanceId, news);
+      if (output === undefined)
+        yield* checkpointResource(fqn, instanceId, news);
       if (output !== undefined) yield* validate(output, news);
       let deployment =
-        output !== undefined
-          ? yield* client
-              .getDeployment(output.name)
-              .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void))
-          : undefined;
+        output !== undefined ? yield* get(output.name) : undefined;
       const reference =
         news.reference ??
+        output?.managedReference ??
         output?.reference ??
         (yield* resourceName("deployment", fqn, instanceId));
       if (deployment === undefined) {
         const existing = yield* find(news.projectId, reference);
-        if (existing !== undefined && !(yield* shouldAdopt(fqn)))
-          return yield* new OwnedBySomeoneElse({
-            message: "An existing deployment requires explicit adoption.",
-            resourceType: Deployment.Type,
-            physicalName: reference,
-          });
         if (existing !== undefined) {
           const adopted = yield* attributes(existing);
           yield* validate(adopted, news);
-          yield* checkpointCreate(fqn, instanceId, news, adopted);
+          if (!(yield* shouldAdopt(fqn)))
+            return yield* new OwnedBySomeoneElse({
+              message: "An existing deployment requires explicit adoption.",
+              resourceType: Deployment.Type,
+              physicalName: reference,
+            });
+          yield* checkpointResource(fqn, instanceId, news, adopted);
           deployment = existing;
         } else {
           deployment = yield* client.createDeployment(news.projectId, {
@@ -204,7 +216,12 @@ export const provider = Effect.gen(function* () {
       }
       return yield* attributes(deployment);
     }),
-    delete: Effect.fn("Deployment.delete")(function* ({ output }) {
+    delete: Effect.fn("Deployment.delete")(function* ({ olds, output }) {
+      const deployment = yield* get(output.name);
+      if (deployment === undefined) return;
+      yield* validate(output, olds);
+      const current = yield* attributes(deployment);
+      yield* validate(current, output);
       yield* client
         .deleteDeployment(output.name)
         .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));

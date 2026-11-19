@@ -377,6 +377,96 @@ describe("cloud deployment lifecycle", () => {
   );
 
   it.effect(
+    "never deletes an incompatible deployment after deferred adoption fails",
+    () =>
+      Effect.gen(function* () {
+        const fixture = mockClient();
+        fixture.state.deployments = [existingDeployment()];
+        const deploy = makeHarness(
+          fixture.layer,
+          Layer.succeed(CommandRunner, {
+            prepare: () => Effect.void,
+            deploy: () => Effect.void,
+          }),
+        );
+        const resources = Effect.gen(function* () {
+          const project = yield* Convex.Project("Project", {
+            teamId: 10,
+            name: "example",
+          });
+          yield* Convex.Deployment("Deployment", {
+            projectId: project.projectId,
+            reference: "example",
+            type: "dev",
+          }).pipe(adopt(true), RemovalPolicy.destroy());
+          return {};
+        });
+        const result = yield* deploy(resources).pipe(Effect.result);
+        expect(result).toMatchObject({
+          _tag: "Failure",
+          failure: { _tag: "DeploymentIdentityChange" },
+        });
+        yield* deploy(Effect.succeed({}));
+        expect(fixture.client.deleteDeployment).not.toHaveBeenCalled();
+        expect(fixture.state.deployments).toHaveLength(1);
+      }),
+  );
+
+  it.effect.each([
+    { updating: false, retry: false },
+    { updating: false, retry: true },
+    { updating: true, retry: false },
+    { updating: true, retry: true },
+  ])(
+    "recovers newly managed variables after a lost response (updating=$updating, retry=$retry)",
+    ({ updating, retry }) =>
+      Effect.gen(function* () {
+        const fixture = mockClient();
+        fixture.state.variables.UNRELATED = Redacted.make("preserved");
+        let loseResponse = false;
+        const deploy = makeHarness(
+          Layer.succeed(ConvexClient, {
+            ...fixture.client,
+            updateEnvironmentVariables: (url, key, changes) =>
+              fixture.client.updateEnvironmentVariables(url, key, changes).pipe(
+                Effect.andThen(
+                  Effect.suspend(() => {
+                    if (!loseResponse) return Effect.void;
+                    loseResponse = false;
+                    return Effect.fail(
+                      ConvexApiError.make({
+                        operation: "updateEnvironmentVariables",
+                        code: "TransportError",
+                      }),
+                    );
+                  }),
+                ),
+              ),
+          }),
+          Layer.succeed(CommandRunner, {
+            prepare: () => Effect.void,
+            deploy: () => Effect.void,
+          }),
+        );
+        const resource = (variables: Record<string, string>) =>
+          Convex.EnvironmentVariables("Environment", {
+            url: "https://happy-otter-123.convex.cloud",
+            deployKey: Redacted.make("test-key"),
+            variables,
+          }).pipe(Effect.as({}));
+        if (updating) yield* deploy(resource({ OLD: "old" }));
+        const desired = resource({ NEW: "new" });
+        loseResponse = true;
+        const failure = yield* deploy(desired).pipe(Effect.result);
+        expect(failure).toMatchObject({ _tag: "Failure" });
+        expect(Redacted.value(fixture.state.variables.NEW)).toBe("new");
+        if (retry) yield* deploy(desired);
+        yield* deploy(Effect.succeed({}));
+        expect(Record.keys(fixture.state.variables)).toEqual(["UNRELATED"]);
+      }),
+  );
+
+  it.effect(
     "orders environment, codegen, and push, then retains data on removal",
     () =>
       Effect.gen(function* () {
@@ -412,6 +502,11 @@ describe("cloud deployment lifecycle", () => {
           const key = yield* Convex.DeployKey("Key", {
             deploymentName: deployment.name,
             name: "example",
+            allowedActions: [
+              "deployment:deploy",
+              "deployment:env:view",
+              "deployment:env:write",
+            ],
           });
           const backend = yield* Confect.Backend("Backend", {
             deployment,
@@ -447,6 +542,34 @@ describe("cloud deployment lifecycle", () => {
           "preserve-me",
         );
         expect(operations).toHaveLength(6);
+      }),
+  );
+
+  it.effect(
+    "rejects a mismatched backend target before writing its environment",
+    () =>
+      Effect.gen(function* () {
+        const fixture = mockClient();
+        const deploy = makeHarness(
+          fixture.layer,
+          Layer.succeed(CommandRunner, {
+            prepare: () => Effect.void,
+            deploy: () => Effect.void,
+          }),
+        );
+        const resources = Confect.Backend("Backend", {
+          deployment: {
+            name: "other-target-123",
+            url: "https://happy-otter-123.convex.cloud",
+          },
+          deployKey: Redacted.make("prod:happy-otter-123|integration-test"),
+          env: { NEW: "new" },
+        }).pipe(Effect.as({}));
+        const result = yield* deploy(resources).pipe(Effect.result);
+        expect(result).toMatchObject({ _tag: "Failure" });
+        expect(
+          fixture.client.updateEnvironmentVariables,
+        ).not.toHaveBeenCalled();
       }),
   );
 });

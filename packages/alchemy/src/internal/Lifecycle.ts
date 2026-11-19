@@ -11,7 +11,7 @@ export class LifecycleStateError extends Schema.TaggedError<
   { readonly brand: unique symbol }
 >()("LifecycleStateError", { fqn: Schema.String }) {}
 
-export const checkpointCreate = Effect.fn("Lifecycle.checkpointCreate")(
+export const checkpointResource = Effect.fn("Lifecycle.checkpointResource")(
   function* (fqn: string, instanceId: string, props: object, output?: object) {
     const stack = yield* Effect.serviceOption(Stack);
     if (Option.isNone(stack)) return;
@@ -26,7 +26,7 @@ export const checkpointCreate = Effect.fn("Lifecycle.checkpointCreate")(
       row.instanceId !== instanceId
     )
       return yield* LifecycleStateError.make({ fqn });
-    if (row.status !== "creating") return;
+    if (row.status !== "creating" && row.status !== "updating") return;
     yield* store.set({
       ...key,
       value: {

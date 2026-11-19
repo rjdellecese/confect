@@ -26,6 +26,7 @@ export const Backend = (id: string, props: BackendProps) =>
         props.env === undefined
           ? undefined
           : yield* EnvironmentVariables("Environment", {
+              deploymentName: props.deployment.name,
               url: props.deployment.url,
               deployKey: props.deployKey,
               variables: props.env,

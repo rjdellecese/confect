@@ -7,6 +7,7 @@ import * as Str from "effect/String";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
@@ -182,6 +183,10 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
   readonly token?: Redacted.Redacted<string>;
 }) {
   const http = yield* HttpClient.HttpClient;
+  const readRequestInit = Effect.serviceOption(
+    FetchHttpClient.RequestInit,
+  ).pipe(Effect.map(Option.getOrUndefined));
+  const defaultRequestInit = yield* readRequestInit;
   const managementAuthorization = Effect.gen(function* () {
     const token =
       options?.token ??
@@ -218,34 +223,26 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
         ),
       );
     }
+    const statusError = (status: number) => {
+      const fields = { operation, status, code: "HttpError" } as const;
+      if (status === 404) return ConvexNotFound.make(fields);
+      if (status === 409) return ConvexConflict.make(fields);
+      return ConvexApiError.make(fields);
+    };
+    const requestInit = yield* readRequestInit;
     const response = yield* http.execute(request).pipe(
       Effect.provideService(FetchHttpClient.RequestInit, {
+        ...(requestInit ?? defaultRequestInit),
         redirect: "manual",
       }),
-      Effect.mapError(() =>
-        ConvexApiError.make({ operation, code: "TransportError" }),
+      Effect.mapError(({ reason }) =>
+        reason._tag === "StatusCodeError"
+          ? statusError(reason.response.status)
+          : ConvexApiError.make({ operation, code: "TransportError" }),
       ),
     );
-    if (response.status === 404) {
-      return yield* ConvexNotFound.make({
-        operation,
-        status: 404,
-        code: "HttpError",
-      });
-    }
-    if (response.status === 409) {
-      return yield* ConvexConflict.make({
-        operation,
-        status: 409,
-        code: "HttpError",
-      });
-    }
     if (response.status < 200 || response.status >= 300) {
-      return yield* ConvexApiError.make({
-        operation,
-        status: response.status,
-        code: "HttpError",
-      });
+      return yield* statusError(response.status);
     }
     return response;
   });

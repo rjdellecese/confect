@@ -1,4 +1,4 @@
-import { ConvexClient } from "@confect/alchemy/ConvexClient";
+import { ConvexApiError, ConvexClient } from "@confect/alchemy/ConvexClient";
 import * as Arr from "effect/Array";
 import { it, expect, assert } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -12,6 +12,40 @@ const props: DeployKey.DeployKeyProps = {
   deploymentName: "happy-otter-123",
   name: "example",
 };
+
+it.effect(
+  "revokes only the just-issued key when its metadata lookup fails",
+  () => {
+    const mock = mockClient();
+    mock.state.keys = [key({ id: 2, name: "unrelated" })];
+    const error = ConvexApiError.make({
+      operation: "listDeployKeys",
+      code: "TransportError",
+    });
+    let reads = 0;
+    return Effect.gen(function* () {
+      const provider = yield* DeployKey.provider;
+      const request = {
+        ...lifecycle,
+        news: props,
+        olds: undefined,
+        output: undefined,
+      };
+      const failure = yield* Effect.flip(provider.reconcile(request));
+      expect(failure).toBe(error);
+      expect(Arr.map(mock.state.keys, (k) => k.id)).toEqual([2]);
+      const output = yield* provider.reconcile(request);
+      expect(output.name).toBe(props.name);
+      expect(mock.client.deleteDeployKey).toHaveBeenCalledTimes(1);
+    }).pipe(
+      Effect.provideService(ConvexClient, {
+        ...mock.client,
+        listDeployKeys: () =>
+          ++reads === 2 ? Effect.fail(error) : mock.client.listDeployKeys(),
+      }),
+    );
+  },
+);
 
 it.effect(
   "tracks Convex's uniquified key name without changing the requested name",

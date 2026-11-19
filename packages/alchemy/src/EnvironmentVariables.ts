@@ -10,9 +10,11 @@ import * as Schema from "effect/Schema";
 
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
-import { checkpointCreate, shouldAdopt } from "./internal/Lifecycle";
+import { validateTarget } from "./internal/DeploymentTarget";
+import { checkpointResource, shouldAdopt } from "./internal/Lifecycle";
 
 export interface EnvironmentVariablesProps {
+  readonly deploymentName?: string;
   readonly url: string;
   readonly deployKey: Redacted.Redacted<string>;
   readonly variables: Readonly<
@@ -64,6 +66,10 @@ export const provider = Effect.gen(function* () {
   return {
     diff: Effect.fn("EnvironmentVariables.diff")(function* ({ news, output }) {
       if (!isResolved(news) || output === undefined) return;
+      if (news.deploymentName !== undefined)
+        yield* Effect.fromResult(
+          validateTarget(news.deploymentName, news.url, news.deployKey),
+        );
       if (news.url !== output.url)
         return yield* EnvironmentTargetChange.make({
           url: output.url,
@@ -90,6 +96,10 @@ export const provider = Effect.gen(function* () {
     read: Effect.fn("EnvironmentVariables.read")(function* ({ olds, output }) {
       const url = output?.url ?? olds.url;
       if (url === undefined || olds.deployKey === undefined) return;
+      if (olds.deploymentName !== undefined)
+        yield* Effect.fromResult(
+          validateTarget(olds.deploymentName, url, olds.deployKey),
+        );
       const observed = yield* client.listEnvironmentVariables(
         url,
         olds.deployKey,
@@ -113,7 +123,12 @@ export const provider = Effect.gen(function* () {
       news,
       output,
     }) {
-      if (output === undefined) yield* checkpointCreate(fqn, instanceId, news);
+      if (news.deploymentName !== undefined)
+        yield* Effect.fromResult(
+          validateTarget(news.deploymentName, news.url, news.deployKey),
+        );
+      if (output === undefined)
+        yield* checkpointResource(fqn, instanceId, news);
       if (output !== undefined && output.url !== news.url)
         return yield* EnvironmentTargetChange.make({
           url: output.url,
@@ -123,29 +138,23 @@ export const provider = Effect.gen(function* () {
         news.deployKey,
       );
       const ownedNames = Rec.keys(news.variables);
-      if (output === undefined && (yield* shouldAdopt(fqn))) {
-        const variables = select(observed, ownedNames);
-        output = {
-          url: news.url,
-          deployKey: news.deployKey,
-          ownedNames,
-          variables,
-          originals: variables,
-        };
-        yield* checkpointCreate(fqn, instanceId, news, output);
-      }
       const previousNames = output?.ownedNames ?? [];
-      for (const name of ownedNames) {
-        if (
-          !Arr.contains(previousNames, name) &&
-          valueAt(observed, name) !== undefined
-        )
-          return yield* new OwnedBySomeoneElse({
-            message:
-              "An existing environment variable requires explicit adoption in a separate resource.",
-            resourceType: EnvironmentVariables.Type,
-            physicalName: name,
-          });
+      const added = Arr.filter(
+        ownedNames,
+        (name) => !Arr.contains(previousNames, name),
+      );
+      const existing = select(observed, added);
+      const [collision] = Rec.keys(existing);
+      if (
+        collision !== undefined &&
+        (output !== undefined || !(yield* shouldAdopt(fqn)))
+      ) {
+        return yield* new OwnedBySomeoneElse({
+          message:
+            "An existing environment variable requires explicit adoption in a separate resource.",
+          resourceType: EnvironmentVariables.Type,
+          physicalName: collision,
+        });
       }
       const desired = Rec.fromEntries(
         Arr.map(
@@ -178,18 +187,30 @@ export const provider = Effect.gen(function* () {
             changes.push({ name, value: original });
         } else if (current !== undefined) changes.push({ name });
       }
-      if (changes.length > 0)
+      const originals = output?.originals ?? existing;
+      if (changes.length > 0) {
+        if (added.length > 0) {
+          const claimed = [...previousNames, ...added];
+          yield* checkpointResource(fqn, instanceId, news, {
+            url: news.url,
+            deployKey: news.deployKey,
+            ownedNames: claimed,
+            variables: select(observed, claimed),
+            originals,
+          } satisfies EnvironmentVariablesAttributes);
+        }
         yield* client.updateEnvironmentVariables(
           news.url,
           news.deployKey,
           changes,
         );
+      }
       return {
         url: news.url,
         deployKey: news.deployKey,
         ownedNames,
         variables: desired,
-        originals: select(output?.originals ?? {}, ownedNames),
+        originals: select(originals, ownedNames),
       };
     }),
     delete: Effect.fn("EnvironmentVariables.delete")(function* ({ output }) {

@@ -19,6 +19,13 @@ it.effect(
         olds: undefined,
         output: undefined,
       });
+      expect(first).toEqual({
+        projectId: 1,
+        teamId: 10,
+        name: "example",
+        slug: "example",
+      });
+      expect(mock.client.getProject).not.toHaveBeenCalled();
       const second = yield* provider.reconcile({
         ...lifecycle,
         news,
@@ -159,9 +166,95 @@ it.effect(
       expect(mock.client.deleteProject).not.toHaveBeenCalled();
       yield* provider.delete({ ...lifecycle, olds, output });
       yield* provider.delete({ ...lifecycle, olds, output });
+      expect(mock.client.deleteProject).toHaveBeenCalledTimes(1);
       expect(mock.state.projects).toEqual([]);
       const readResult = yield* provider.read({ ...lifecycle, olds, output });
       expect(readResult).toBeUndefined();
+    }).pipe(Effect.provideService(ConvexClient, mock.client));
+  },
+);
+
+it.effect("refuses to destroy a project transferred to another team", () => {
+  const mock = mockClient();
+  mock.state.projects = [project({ teamId: 20 })];
+  return Effect.gen(function* () {
+    const provider = yield* Project.provider;
+    const error = yield* Effect.flip(
+      provider.delete({
+        ...lifecycle,
+        olds: { teamId: 10 },
+        output: { projectId: 1, teamId: 10, name: "example", slug: "example" },
+      }),
+    );
+    expect(error).toMatchObject({
+      _tag: "ProjectTeamChange",
+      teamId: 20,
+      requestedTeamId: 10,
+    });
+    expect(mock.client.deleteProject).not.toHaveBeenCalled();
+  }).pipe(Effect.provideService(ConvexClient, mock.client));
+});
+
+it.effect.each([undefined, "initial"])(
+  "repairs the managed name after observation and an FQN move, initial name=%s",
+  (name) => {
+    const mock = mockClient();
+    return Effect.gen(function* () {
+      const provider = yield* Project.provider;
+      const news = { teamId: 10 };
+      const initial = name === undefined ? news : { ...news, name };
+      const first = yield* provider.reconcile({
+        ...lifecycle,
+        news: initial,
+        olds: undefined,
+        output: undefined,
+      });
+      const renamed = { ...lifecycle, fqn: "migrated" };
+      mock.state.projects = [project({ name: "external" })];
+      const observed = yield* provider.read({
+        ...renamed,
+        olds: initial,
+        output: first,
+      });
+      expect(observed?.name).toBe("external");
+      const restored = yield* provider.reconcile({
+        ...renamed,
+        news,
+        olds: initial,
+        output: observed,
+      });
+      expect(restored).toEqual(first);
+      expect(mock.client.updateProject).toHaveBeenCalledWith(first.projectId, {
+        name: first.name,
+      });
+    }).pipe(Effect.provideService(ConvexClient, mock.client));
+  },
+);
+
+it.effect(
+  "refreshes an externally changed slug without renaming the project",
+  () => {
+    const mock = mockClient();
+    return Effect.gen(function* () {
+      const provider = yield* Project.provider;
+      const news = { teamId: 10, name: "example" };
+      const output = yield* provider.reconcile({
+        ...lifecycle,
+        news,
+        olds: undefined,
+        output: undefined,
+      });
+      mock.state.projects = [project({ slug: "new-slug" })];
+      const input = { ...lifecycle, news, olds: news, output };
+      const diff = yield* provider.diff({
+        ...input,
+        oldBindings: [],
+        newBindings: [],
+      });
+      expect(diff).toEqual({ action: "update" });
+      const refreshed = yield* provider.reconcile(input);
+      expect(refreshed.slug).toBe("new-slug");
+      expect(mock.client.updateProject).not.toHaveBeenCalled();
     }).pipe(Effect.provideService(ConvexClient, mock.client));
   },
 );

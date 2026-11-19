@@ -4,6 +4,7 @@ import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
@@ -12,7 +13,7 @@ import * as Str from "effect/String";
 import { ConvexClient } from "./ConvexClient";
 import type { Providers } from "./Providers";
 import { resourceName } from "./internal/ResourceIdentity";
-import { checkpointCreate } from "./internal/Lifecycle";
+import { checkpointResource } from "./internal/Lifecycle";
 
 export interface DeployKeyProps {
   readonly deploymentName: string;
@@ -149,7 +150,8 @@ export const provider = Effect.gen(function* () {
       news,
       output,
     }) {
-      if (output === undefined) yield* checkpointCreate(fqn, instanceId, news);
+      if (output === undefined)
+        yield* checkpointResource(fqn, instanceId, news);
       const name =
         news.name ??
         output?.name ??
@@ -201,28 +203,43 @@ export const provider = Effect.gen(function* () {
           name,
           Arr.map(existing, (key) => key.id),
         );
-      const created = yield* client.createDeployKey(news.deploymentName, {
-        name,
-        ...(news.allowedActions === undefined
-          ? {}
-          : { allowedActions: [...news.allowedActions] }),
-      });
-      const createdKeys = yield* client.listDeployKeys(news.deploymentName);
-      const matches = Arr.filter(createdKeys, (key) => hasName(key.name, name));
-      const key = matches[0];
-      if (matches.length !== 1 || key === undefined)
-        return yield* recover(
-          news.deploymentName,
+      return yield* Effect.acquireUseRelease(
+        client.createDeployKey(news.deploymentName, {
           name,
-          Arr.map(matches, (candidate) => candidate.id),
-        );
-      return {
-        deploymentName: news.deploymentName,
-        keyId: key.id,
-        name,
-        deployKey: created.deployKey,
-        allowedActions: key.allowedActions,
-      };
+          ...(news.allowedActions === undefined
+            ? {}
+            : { allowedActions: [...news.allowedActions] }),
+        }),
+        ({ deployKey }) =>
+          Effect.gen(function* () {
+            const createdKeys = yield* client.listDeployKeys(
+              news.deploymentName,
+            );
+            const matches = Arr.filter(createdKeys, (key) =>
+              hasName(key.name, name),
+            );
+            const key = matches[0];
+            if (matches.length !== 1 || key === undefined)
+              return yield* recover(
+                news.deploymentName,
+                name,
+                Arr.map(matches, (candidate) => candidate.id),
+              );
+            return {
+              deploymentName: news.deploymentName,
+              keyId: key.id,
+              name,
+              deployKey,
+              allowedActions: key.allowedActions,
+            };
+          }),
+        ({ deployKey }, exit) =>
+          Exit.isFailure(exit)
+            ? client
+                .deleteDeployKey(news.deploymentName, deployKey)
+                .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void))
+            : Effect.void,
+      );
     }),
     delete: Effect.fn("DeployKey.delete")(function* ({ output }) {
       yield* client

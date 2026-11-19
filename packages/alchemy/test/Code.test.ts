@@ -6,6 +6,7 @@ import {
   type CodeProps,
 } from "@confect/alchemy/Code";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -13,14 +14,16 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Redacted from "effect/Redacted";
+import * as Rec from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { ChildProcessSpawner } from "effect/process";
+import { vi } from "vitest";
 import { deploy } from "../src/internal/CodeDeployment";
 import {
   CommandError,
   CommandRunner,
-  layer as runnerLayer,
+  layer as commandRunnerLayer,
 } from "../src/internal/CommandRunner";
 
 const Json = Schema.fromJsonString(Schema.Unknown);
@@ -166,6 +169,7 @@ describe("Code", () => {
           "https://other.convex.cloud",
           "https://happy-otter-123.convex.cloud.evil.test",
           "https://happy-otter-123.convex.cloud/path",
+          "https://happy-otter-123.zz-nowhere-1.convex.cloud",
         ]) {
           const result = yield* deploy({
             ...props,
@@ -223,7 +227,72 @@ const project = Effect.gen(function* () {
   return cwd;
 });
 
+const runnerLayer = commandRunnerLayer.pipe(
+  Layer.provide(
+    Layer.succeed(
+      FetchHttpClient.Fetch,
+      Object.assign(
+        (...[input, init]: Parameters<typeof globalThis.fetch>) => {
+          const url = input instanceof URL ? input.href : input;
+          expect(init?.method).toBe("GET");
+          expect(init?.keepalive).toBe(true);
+          expect(init?.credentials).toBe("omit");
+          expect(init?.cache).toBe("no-store");
+          expect(init?.redirect).toBe("manual");
+          expect(new Headers(init?.headers).has("Authorization")).toBe(false);
+          if (url === `${props.deployment.url}/instance_name`) {
+            return Promise.resolve(new Response(props.deployment.name));
+          }
+          expect(url).toBe(
+            "https://happy-otter-123.eu-west-1.convex.cloud/instance_name",
+          );
+          return Promise.resolve(new Response("another-instance"));
+        },
+        { preconnect: () => undefined },
+      ),
+    ),
+  ),
+  Layer.provide(
+    Layer.succeed(FetchHttpClient.RequestInit, {
+      headers: { Authorization: "must-not-be-sent" },
+      keepalive: true,
+    }),
+  ),
+);
+
 layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
+  runtimeIt.effect(
+    "does not push when the declared region does not serve the keyed instance",
+    () =>
+      Effect.gen(function* () {
+        const cwd = yield* project;
+        let pushed = false;
+        const services = yield* Layer.build(
+          runnerLayer.pipe(
+            Layer.provide(
+              Layer.mock(ChildProcessSpawner.ChildProcessSpawner, {
+                exitCode: () =>
+                  Effect.sync(() => {
+                    pushed = true;
+                    return ChildProcessSpawner.ExitCode(0);
+                  }),
+              }),
+            ),
+          ),
+        );
+        const error = yield* deploy({
+          deployment: {
+            ...props.deployment,
+            url: "https://happy-otter-123.eu-west-1.convex.cloud",
+          },
+          deployKey: props.deployKey,
+          cwd,
+        }).pipe(Effect.provideContext(services), Effect.flip);
+        expect(error).toMatchObject({ _tag: "CommandError", reason: "target" });
+        expect(pushed).toBe(false);
+      }),
+  );
+
   runtimeIt.effect(
     "preserves Windows process prerequisites across environment casing",
     () =>
@@ -321,6 +390,18 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
         const cwd = yield* project;
         let envFile = "";
         const calls: string[] = [];
+        const hostMarkers = {
+          VERCEL: "1",
+          VERCEL_ENV: "preview",
+          NETLIFY: "true",
+          CONTEXT: "deploy-preview",
+          CF_PAGES: "1",
+          CF_PAGES_BRANCH: undefined,
+          WORKERS_CI: "",
+          WORKERS_CI_BRANCH: "feature",
+        };
+        for (const [name, value] of Rec.toEntries(hostMarkers))
+          vi.stubEnv(name, value);
         const spawner = Layer.mock(ChildProcessSpawner.ChildProcessSpawner, {
           exitCode: (command) =>
             Effect.gen(function* () {
@@ -346,6 +427,7 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
               );
               expect(command.options.env).not.toHaveProperty("NODE_OPTIONS");
               if (command.args[1] === "deploy") {
+                expect(command.options.env).toMatchObject(hostMarkers);
                 expect(command.args[0]).toBe(
                   path.join(cwd, "node_modules", "convex", "cli.js"),
                 );
@@ -381,6 +463,7 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
                 CONVEX_DEPLOYMENT: "prod:wrong",
                 NODE_OPTIONS: "--inspect",
                 PATH: path.dirname(process.execPath),
+                VERCEL_ENV: "production",
               }),
             ),
           ),
@@ -391,7 +474,7 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
         expect(calls).toEqual(["codegen", "deploy"]);
         const existsResult = yield* fs.exists(envFile);
         expect(existsResult).toBe(false);
-      }),
+      }).pipe(Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs()))),
   );
 
   runtimeIt.effect(

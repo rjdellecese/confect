@@ -13,6 +13,7 @@ import {
   type Deployment,
   type DeployKey,
   type Project,
+  type CreateDeployKeyInput,
   type CreateDeploymentInput,
   type UpdateProjectInput,
 } from "../../src/ConvexClient";
@@ -156,9 +157,16 @@ export const mockClient = (options: { readonly deployKey?: string } = {}) => {
       }),
     ),
     listDeployKeys: vi.fn(() => Effect.sync(() => state.keys)),
-    createDeployKey: vi.fn((_name: string, input: { name: string }) =>
+    createDeployKey: vi.fn((_name: string, input: CreateDeployKeyInput) =>
       Effect.sync(() => {
-        state.keys.push(key({ name: input.name }));
+        state.keys.push(
+          key({
+            name: input.name,
+            ...(input.allowedActions === undefined
+              ? {}
+              : { allowedActions: input.allowedActions }),
+          }),
+        );
         const secret = options.deployKey ?? "test-secret";
         issuedKeys.set(secret, 1);
         return { deployKey: Redacted.make(secret) };
