@@ -66,20 +66,20 @@ export interface DatabaseWriterService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > {
-  readonly table: <T extends DatabaseSchema.Tables<DatabaseSchema_>>(
-    table: T & {
+  readonly table: <Table_ extends DatabaseSchema.Tables<DatabaseSchema_>>(
+    table: Table_ & {
       readonly tableName: Exclude<
-        Table.Name<T>,
+        Table.Name<Table_>,
         DatabaseSchema.SystemTableNames
       >;
     },
-  ) => T extends unknown
+  ) => Table_ extends unknown
     ? DatabaseWriterTableAccessor<
-        DataModel.FromTables<T>,
-        Table.Name<T>,
-        Table.Name<T> extends keyof Docs
-          ? Docs[Table.Name<T>]
-          : DocumentByName_<DataModel.FromTables<T>, Table.Name<T>>
+        DataModel.FromTables<Table_>,
+        Table.Name<Table_>,
+        Table.Name<Table_> extends keyof Docs
+          ? Docs[Table.Name<Table_>]
+          : DocumentByName_<DataModel.FromTables<Table_>, Table.Name<Table_>>
       >
     : never;
 }

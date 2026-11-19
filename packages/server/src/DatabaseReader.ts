@@ -12,13 +12,19 @@ type IncludedTables<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | DatabaseSchema.Tables<DatabaseSchema_>
   | Table.SystemTables;
 
-type TableReader<T extends Table.AnyWithProps, Docs> = T extends unknown
+type TableReader<
+  Table_ extends Table.AnyWithProps,
+  Docs,
+> = Table_ extends unknown
   ? QueryInitializer.QueryInitializer<
-      DataModel.FromTables<T>,
-      Table.Name<T>,
-      Table.Name<T> extends keyof Docs
-        ? Docs[Table.Name<T>]
-        : DataModel.DocumentWithName<DataModel.FromTables<T>, Table.Name<T>>
+      DataModel.FromTables<Table_>,
+      Table.Name<Table_>,
+      Table.Name<Table_> extends keyof Docs
+        ? Docs[Table.Name<Table_>]
+        : DataModel.DocumentWithName<
+            DataModel.FromTables<Table_>,
+            Table.Name<Table_>
+          >
     >
   : never;
 
@@ -26,9 +32,9 @@ export interface DatabaseReaderService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > {
-  readonly table: <T extends IncludedTables<DatabaseSchema_>>(
-    table: T,
-  ) => TableReader<T, Docs>;
+  readonly table: <Table_ extends IncludedTables<DatabaseSchema_>>(
+    table: Table_,
+  ) => TableReader<Table_, Docs>;
 }
 
 export const make = <Model extends GenericDataModel>(
