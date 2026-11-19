@@ -4,6 +4,7 @@ import type * as Schema from "effect/Schema";
 import { Convex } from "@confect/alchemy";
 import type { ConvexClient } from "@confect/alchemy/ConvexClient";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
+import * as NodePath from "@effect/platform-node/NodePath";
 import { apply } from "alchemy/Apply";
 import { provideFreshArtifactStore } from "alchemy/Artifacts";
 import * as Drift from "alchemy/Drift";
@@ -16,7 +17,7 @@ import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
-import * as Path from "effect/Path";
+import type { FileSystem } from "effect/FileSystem";
 import type { StandardCommand } from "effect/process/ChildProcess";
 import {
   ChildProcessSpawner,
@@ -41,6 +42,7 @@ export const stackFixture = (
     readonly config?: Readonly<Record<string, string>>;
     readonly client?: Layer.Layer<ConvexClient>;
     readonly state?: Layer.Layer<State, never, StackServices>;
+    readonly fileSystem?: Layer.Layer<FileSystem>;
   } = {},
 ) => {
   const rows: Record<
@@ -49,8 +51,8 @@ export const stackFixture = (
   > = {};
   const state = options.state ?? inMemoryState(rows);
   const runtime = Layer.mergeAll(
-    NodeFileSystem.layer,
-    Path.layer,
+    options.fileSystem ?? NodeFileSystem.layer,
+    NodePath.layer,
     SecureRandom.layerWebCrypto,
     Digest.layerWebCrypto,
     ConfigProvider.layer(ConfigProvider.fromUnknown(options.config ?? {})),

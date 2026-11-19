@@ -23,7 +23,16 @@ it.effect(
       const deployment = { name: "happy-rabbit-17", url };
       const cwd = import.meta.dirname;
       const paths: string[] = [];
+      const privateWrites: string[] = [];
       const fixture = stackFixture({
+        fileSystem: Layer.succeed(FileSystem, {
+          ...fs,
+          writeFileString: (path, data, options) => {
+            if (options?.mode === 0o600 && options.flag === "wx")
+              privateWrites.push(path);
+            return fs.writeFileString(path, data, options);
+          },
+        }),
         run: (cmd) =>
           Effect.gen(function* () {
             expect(cmd.options.cwd).toBe(cwd);
@@ -42,7 +51,9 @@ it.effect(
               return yield* Effect.die("Missing mock CLI env file");
             paths.push(path);
             const stat = yield* fs.stat(path);
-            expect(stat.mode & 0o777).toBe(0o600);
+            expect(privateWrites).toEqual([path]);
+            if (process.platform !== "win32")
+              expect(stat.mode & 0o777).toBe(0o600);
             const file = yield* fs.readFileString(path);
             expect(file).toBe(`CONVEX_DEPLOY_KEY=${deployKey}\n`);
             return 13;
