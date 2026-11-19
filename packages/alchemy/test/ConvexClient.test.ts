@@ -43,15 +43,18 @@ const deployment = {
 
 const mockHttp = (responses: readonly Response[], filterStatus = false) => {
   const requests: HttpClientRequest.HttpClientRequest[] = [];
-  const client = HttpClient.make((request) => {
+  const signals: AbortSignal[] = [];
+  const client = HttpClient.make((request, _url, signal) => {
     const response = responses[requests.length];
     requests.push(request);
+    signals.push(signal);
     return response === undefined
       ? Effect.die("Unexpected HTTP request")
       : Effect.succeed(HttpClientResponse.fromWeb(request, response));
   });
   return {
     requests,
+    signals,
     layer: Layer.succeed(
       HttpClient.HttpClient,
       filterStatus ? HttpClient.filterStatusOk(client) : client,
@@ -601,6 +604,9 @@ describe("ConvexClient", () => {
             yield* expectSecretSafe(error, Redacted.value(token));
           }
           expect(http.requests).toHaveLength(6);
+          expect(Arr.every(http.signals, (signal) => signal.aborted)).toBe(
+            true,
+          );
         }).pipe(Effect.provideContext(services));
       });
     },

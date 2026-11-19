@@ -182,7 +182,9 @@ const ProjectsPageSchema = Schema.Struct({
 const make = Effect.fn("ConvexClient.make")(function* (options?: {
   readonly token?: Redacted.Redacted<string>;
 }) {
-  const http = yield* HttpClient.HttpClient;
+  const http = yield* HttpClient.HttpClient.pipe(
+    Effect.map(HttpClient.withScope),
+  );
   const readRequestInit = Effect.serviceOption(
     FetchHttpClient.RequestInit,
   ).pipe(Effect.map(Option.getOrUndefined));
@@ -202,11 +204,14 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
   });
   const baseUrl = "https://api.convex.dev/v1";
 
-  const send = Effect.fn("ConvexClient.request")(function* (
+  const send = Effect.fn("ConvexClient.request")(function* <A>(
     operation: string,
     method: "GET" | "POST" | "PATCH",
     url: string,
     authorization: Redacted.Redacted<string>,
+    consume: (
+      response: HttpClientResponse.HttpClientResponse,
+    ) => Effect.Effect<A, ConvexApiError>,
     body?: unknown,
   ) {
     let request = HttpClientRequest.make(method)(url).pipe(
@@ -230,7 +235,7 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
       return ConvexApiError.make(fields);
     };
     const requestInit = yield* readRequestInit;
-    const response = yield* http.execute(request).pipe(
+    return yield* http.execute(request).pipe(
       Effect.provideService(FetchHttpClient.RequestInit, {
         ...(requestInit ?? defaultRequestInit),
         redirect: "manual",
@@ -240,11 +245,13 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
           ? statusError(reason.response.status)
           : ConvexApiError.make({ operation, code: "TransportError" }),
       ),
+      Effect.flatMap((response) =>
+        response.status < 200 || response.status >= 300
+          ? Effect.fail(statusError(response.status))
+          : consume(response),
+      ),
+      Effect.scoped,
     );
-    if (response.status < 200 || response.status >= 300) {
-      return yield* statusError(response.status);
-    }
-    return response;
   });
 
   const decode = Effect.fn("ConvexClient.decode")(function* <A>(
@@ -272,14 +279,14 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
     body?: unknown,
   ) {
     const authorization = yield* managementAuthorization;
-    const response = yield* send(
+    return yield* send(
       operation,
       method,
       `${baseUrl}${path}`,
       authorization,
+      (response) => decode(operation, response, schema),
       body,
     );
-    return yield* decode(operation, response, schema);
   });
 
   const managementVoid = Effect.fn("ConvexClient.managementVoid")(function* (
@@ -289,7 +296,14 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
     body?: unknown,
   ) {
     const authorization = yield* managementAuthorization;
-    yield* send(operation, method, `${baseUrl}${path}`, authorization, body);
+    yield* send(
+      operation,
+      method,
+      `${baseUrl}${path}`,
+      authorization,
+      () => Effect.void,
+      body,
+    );
   });
 
   const deploymentUrl = Effect.fn("ConvexClient.deploymentUrl")(function* (
@@ -466,18 +480,19 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
       key: Redacted.Redacted<string>,
     ): Effect.fn.Return<EnvironmentVariables, ConvexClientError> {
       const base = yield* deploymentUrl("listEnvironmentVariables", url);
-      const response = yield* send(
+      const result = yield* send(
         "listEnvironmentVariables",
         "GET",
         `${base}/list_environment_variables`,
         Redacted.make(`Convex ${Redacted.value(key)}`),
-      );
-      const result = yield* decode(
-        "listEnvironmentVariables",
-        response,
-        Schema.Struct({
-          environmentVariables: Schema.Record(Schema.String, Schema.String),
-        }),
+        (response) =>
+          decode(
+            "listEnvironmentVariables",
+            response,
+            Schema.Struct({
+              environmentVariables: Schema.Record(Schema.String, Schema.String),
+            }),
+          ),
       );
       return Rec.map(result.environmentVariables, (value) =>
         Redacted.make(value),
@@ -496,6 +511,7 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
         "POST",
         `${base}/update_environment_variables`,
         Redacted.make(`Convex ${Redacted.value(key)}`),
+        () => Effect.void,
         {
           changes: Arr.map(changes, ({ name, value }) => ({
             name,
