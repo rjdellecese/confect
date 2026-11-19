@@ -263,6 +263,57 @@ const runnerLayer = commandRunnerLayer.pipe(
 
 layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
   runtimeIt.effect(
+    "releases the target probe before returning or pushing",
+    () =>
+      Effect.gen(function* () {
+        const cwd = yield* project;
+        let status = 503;
+        let signal: AbortSignal | null | undefined;
+        let pushes = 0;
+        const services = yield* Layer.build(
+          commandRunnerLayer.pipe(
+            Layer.provide(
+              Layer.succeed(
+                FetchHttpClient.Fetch,
+                Object.assign(
+                  (...[, init]: Parameters<typeof globalThis.fetch>) => {
+                    signal = init?.signal;
+                    return Promise.resolve(
+                      new Response(props.deployment.name, { status }),
+                    );
+                  },
+                  { preconnect: () => undefined },
+                ),
+              ),
+            ),
+            Layer.provide(
+              Layer.mock(ChildProcessSpawner.ChildProcessSpawner, {
+                exitCode: () =>
+                  Effect.sync(() => {
+                    expect(signal?.aborted).toBe(true);
+                    pushes++;
+                    return ChildProcessSpawner.ExitCode(0);
+                  }),
+              }),
+            ),
+          ),
+        );
+        const push = deploy({
+          deployment: props.deployment,
+          deployKey: props.deployKey,
+          cwd,
+        }).pipe(Effect.provideContext(services));
+        const error = yield* push.pipe(Effect.flip);
+        expect(error).toMatchObject({ _tag: "CommandError", reason: "target" });
+        expect(signal?.aborted).toBe(true);
+        expect(pushes).toBe(0);
+        status = 200;
+        yield* push;
+        expect(pushes).toBe(1);
+      }),
+  );
+
+  runtimeIt.effect(
     "does not push when the declared region does not serve the keyed instance",
     () =>
       Effect.gen(function* () {
@@ -381,6 +432,19 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
             );
           const encoded3 = yield* Schema.encodeEffect(Json)(exited);
           expect(encoded3).not.toContain("test-secret");
+          const terminated = yield* runner
+            .prepare(
+              {
+                command: process.execPath,
+                args: ["-e", "process.kill(process.pid, 'SIGTERM')"],
+              },
+              cwd,
+            )
+            .pipe(Effect.flip);
+          expect(terminated).toMatchObject({
+            operation: "prepare",
+            reason: "exit",
+          });
           const failed = yield* runner
             .prepare({
               command: path.join(cwd, "confect-test-secret"),
@@ -489,9 +553,14 @@ layer(NodeServices.layer)("Code command boundary", (runtimeIt) => {
             ),
           ),
         );
-        yield* deploy({ ...props, cwd }).pipe(
-          Effect.provideContext(runnerServices),
-        );
+        yield* deploy({
+          ...props,
+          deployment: {
+            ...props.deployment,
+            url: new URL(props.deployment.url).href,
+          },
+          cwd,
+        }).pipe(Effect.provideContext(runnerServices));
         expect(calls).toEqual(["codegen", "deploy"]);
         const existsResult = yield* fs.exists(envFile);
         expect(existsResult).toBe(false);

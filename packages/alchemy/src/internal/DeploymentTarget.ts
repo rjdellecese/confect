@@ -1,6 +1,9 @@
 import * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as Str from "effect/String";
+
+export const normalizeDeploymentUrl = Str.replace(/\/$/, "");
 
 export class InvalidDeploymentTarget extends Schema.TaggedError<
   InvalidDeploymentTarget,
@@ -16,7 +19,7 @@ export const validateTarget = (
 ) => {
   const host =
     /^https:\/\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\.(?:eu-west-1|ap-southeast-2|ca-central-1))?\.convex\.cloud$/.exec(
-      url,
+      normalizeDeploymentUrl(url),
     );
   if (host === null || host[1] !== name)
     return Result.fail(InvalidDeploymentTarget.make({ reason: "deployment" }));

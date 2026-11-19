@@ -12,6 +12,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import type { CodeProps } from "../Code.js";
+import { normalizeDeploymentUrl } from "./DeploymentTarget.js";
 
 export interface PrepareCommand {
   readonly command: string;
@@ -95,7 +96,10 @@ export const layer = Layer.effect(
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const http = yield* HttpClient.HttpClient;
+    const http = (yield* HttpClient.HttpClient).pipe(
+      HttpClient.withScope,
+      HttpClient.filterStatus((status) => status === 200),
+    );
     const readRequestInit = Effect.serviceOption(
       FetchHttpClient.RequestInit,
     ).pipe(Effect.map(Option.getOrUndefined));
@@ -119,8 +123,11 @@ export const layer = Layer.effect(
           }),
         )
         .pipe(
-          Effect.mapError(() =>
-            CommandError.make({ operation, reason: "spawn" }),
+          Effect.mapError(({ reason }) =>
+            CommandError.make({
+              operation,
+              reason: reason.method === "exitCode" ? "exit" : "spawn",
+            }),
           ),
         );
       if (code !== 0)
@@ -217,8 +224,8 @@ export const layer = Layer.effect(
         const invalidTarget = () =>
           CommandError.make({ operation: "deploy", reason: "target" });
         const requestInit = yield* readRequestInit;
-        const response = yield* http
-          .get(`${deployment.url}/instance_name`)
+        const instanceName = yield* http
+          .get(`${normalizeDeploymentUrl(deployment.url)}/instance_name`)
           .pipe(
             Effect.provideService(FetchHttpClient.RequestInit, {
               ...(requestInit ?? defaultRequestInit),
@@ -229,15 +236,11 @@ export const layer = Layer.effect(
               credentials: "omit",
               redirect: "manual",
             }),
+            Effect.flatMap((response) => response.text),
             Effect.mapError(invalidTarget),
+            Effect.scoped,
           );
-        if (
-          response.status !== 200 ||
-          (yield* response.text.pipe(Effect.mapError(invalidTarget))) !==
-            deployment.name
-        ) {
-          return yield* invalidTarget();
-        }
+        if (instanceName !== deployment.name) return yield* invalidTarget();
         yield* Effect.scoped(
           Effect.gen(function* () {
             const temp = yield* fs.makeTempDirectoryScoped({
