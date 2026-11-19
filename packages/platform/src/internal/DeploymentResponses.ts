@@ -10,6 +10,10 @@ import type { Responses } from "./Client.js";
 
 const Integer = Schema.Finite.check(Schema.makeFilter(Number.isInteger));
 
+const SyncTimestamp = Schema.BigInt.check(
+  Schema.isBetweenBigInt({ minimum: -(2n ** 63n), maximum: 2n ** 63n - 1n }),
+);
+
 const withAdditionalProperties = (
   fields: Schema.Struct.Fields,
   additional: Schema.Decoder<unknown>,
@@ -349,11 +353,11 @@ const DataSyncSnapshotting = Schema.Struct({
 });
 const DataSyncStale = Schema.Struct({
   type: Schema.Literal("stale"),
-  snapshotTs: Integer,
+  snapshotTs: SyncTimestamp,
 });
 const DataSyncUpToDate = Schema.Struct({
   type: Schema.Literal("upToDate"),
-  snapshotTs: Integer,
+  snapshotTs: SyncTimestamp,
 });
 const DataSyncStatus = Schema.Union(
   [DataSyncSnapshotting, DataSyncStale, DataSyncUpToDate],
@@ -366,12 +370,12 @@ const DataSyncTruncate = Schema.Struct({
 const DataSyncValue = Schema.Struct({
   component: Schema.String,
   table: Schema.String,
-  ts: Integer,
+  ts: SyncTimestamp,
   deleted: Schema.Boolean,
   value: Schema.Record(Schema.String, Schema.Json),
 });
 const SyncId = Schema.String;
-const DataSyncResponse = Schema.Struct({
+export const DataSyncResponse = Schema.Struct({
   status: DataSyncStatus,
   truncates: Schema.Array(DataSyncTruncate),
   values: Schema.Array(DataSyncValue),
@@ -393,24 +397,24 @@ const ActiveDataSyncStale = Schema.Struct({
   type: Schema.Literal("stale"),
   totalTables: Integer.check(Schema.isGreaterThanOrEqualTo(0)),
   numDocumentsSynced: Integer.check(Schema.isGreaterThanOrEqualTo(0)),
-  syncedTs: Integer,
+  syncedTs: SyncTimestamp,
 });
 const ActiveDataSyncUpToDate = Schema.Struct({
   type: Schema.Literal("upToDate"),
   totalTables: Integer.check(Schema.isGreaterThanOrEqualTo(0)),
   numDocumentsSynced: Integer.check(Schema.isGreaterThanOrEqualTo(0)),
-  syncedTs: Integer,
+  syncedTs: SyncTimestamp,
 });
 const ActiveDataSyncStatus = Schema.Union(
   [ActiveDataSyncSnapshotting, ActiveDataSyncStale, ActiveDataSyncUpToDate],
   { mode: "oneOf" },
 );
-const ActiveDataSync = Schema.Struct({
+export const ActiveDataSync = Schema.Struct({
   syncId: SyncId,
   lastUpdated: Integer,
   status: ActiveDataSyncStatus,
 });
-const ListActiveSyncsResponse = Schema.Struct({
+export const ListActiveSyncsResponse = Schema.Struct({
   syncs: Schema.Array(ActiveDataSync),
   pagination: PaginationMetadata,
 });

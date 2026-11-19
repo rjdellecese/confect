@@ -1,15 +1,19 @@
 import assert from "node:assert/strict";
 import { $ } from "bun";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Obj from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 
 const sdkName = "@convex-dev/platform";
 const sdkVersion = "0.1.11";
 const sdk = `${sdkName}@${sdkVersion}`;
+const revision = "4a3f005d9bcfc402c9619d07c2c3d03bfa59ee8f";
 const documents = {
   management:
     "2ded7dd7ebcf5b68c324e11e685e32d02939cfa35889b122dcf360fa5461a320",
@@ -25,7 +29,6 @@ assert.equal(
   sdkVersion,
   "Review and regenerate platform response schemas when changing the SDK pin",
 );
-const directory = Str.trim(await $`pnpm opensrc path ${sdk}`.text());
 const json = Schema.fromJsonString(Schema.Json);
 
 function generate(api, document) {
@@ -40,9 +43,9 @@ function generate(api, document) {
   };
 
   function emit(node, name, operators = []) {
-    if (Arr.isArray(node.type)) {
-      const base = Arr.filter(node.type, (t) => t !== "null");
-      assert(Arr.contains(node.type, "null") && base.length === 1);
+    if (Array.isArray(node.type)) {
+      const base = Array.filter(node.type, (t) => t !== "null");
+      assert(Array.contains(node.type, "null") && base.length === 1);
       return emit({ ...node, type: base[0] }, name, [
         "Schema.NullOr",
         ...operators,
@@ -51,7 +54,7 @@ function generate(api, document) {
     const code = expression(node, name);
     return operators.length === 0
       ? code
-      : `${code}.pipe(${Arr.join(operators, ", ")})`;
+      : `${code}.pipe(${Array.join(operators, ", ")})`;
   }
 
   function expression(node, name) {
@@ -87,7 +90,7 @@ function generate(api, document) {
         const { mapping, propertyName } = discriminator;
         assert.deepEqual(
           new Set(Obj.values(mapping)),
-          new Set(Arr.map(oneOf, (part) => part.$ref)),
+          new Set(Array.map(oneOf, (part) => part.$ref)),
         );
         for (const [tag, ref] of Obj.toEntries(mapping)) {
           const branch = document.components.schemas[refName(ref)];
@@ -99,8 +102,8 @@ function generate(api, document) {
         }
       }
       if (oneOf.length === 1) return emit(oneOf[0]);
-      return `Schema.Union([${Arr.join(
-        Arr.map(oneOf, (part) => emit(part)),
+      return `Schema.Union([${Array.join(
+        Array.map(oneOf, (part) => emit(part)),
         ", ",
       )}], {mode: "oneOf"})`;
     }
@@ -156,8 +159,22 @@ function generate(api, document) {
         if (properties === undefined) {
           return `Schema.Record(Schema.String, ${additionalProperties !== undefined ? emit(additionalProperties) : "Schema.Json"})`;
         }
-        const fields = Arr.join(
-          Arr.map(Obj.toEntries(properties), ([key, value]) => {
+        const fields = Array.join(
+          Array.map(Obj.toEntries(properties), ([key, value]) => {
+            if (
+              api === "deployment" &&
+              ((name === "DataSyncValue" && key === "ts") ||
+                ((name === "DataSyncUpToDate" || name === "DataSyncStale") &&
+                  key === "snapshotTs") ||
+                ((name === "ActiveDataSyncUpToDate" ||
+                  name === "ActiveDataSyncStale") &&
+                  key === "syncedTs"))
+            ) {
+              assert.equal(value.type, "integer");
+              assert.equal(value.format, "int64");
+              assert(Array.contains(required, key));
+              return `${key}: SyncTimestamp`;
+            }
             let field = value;
             // Previously issued keys may report scopes newer than this client.
             // Keep the create-key input closed; only the metadata read is open.
@@ -173,10 +190,10 @@ function generate(api, document) {
               );
               assert.equal(value.type, "array");
               assert.equal(value.items.type, "string");
-              assert(Arr.contains(value.items.enum, "deployment:deploy"));
+              assert(Array.contains(value.items.enum, "deployment:deploy"));
               field = { type: "array", items: { type: "string" } };
             }
-            return `${Result.getOrThrow(Schema.encodeResult(json)(key))}: ${emit(field, undefined, Arr.contains(required, key) ? [] : ["Schema.optionalKey"])}`;
+            return `${Result.getOrThrow(Schema.encodeResult(json)(key))}: ${emit(field, undefined, Array.contains(required, key) ? [] : ["Schema.optionalKey"])}`;
           }),
           ", ",
         );
@@ -195,7 +212,7 @@ function generate(api, document) {
   const endpoints = [];
   for (const [path, methods] of Obj.toEntries(document.paths)) {
     for (const [method, operation] of Obj.toEntries(methods)) {
-      const success = Arr.filter(
+      const success = Array.filter(
         Obj.toEntries(operation.responses),
         ([status]) => /^2\d\d$/.test(status),
       );
@@ -221,7 +238,9 @@ const Integer = Schema.Finite.check(Schema.makeFilter(Number.isInteger));
 
 ${
   api === "deployment"
-    ? `const withAdditionalProperties = (fields: Schema.Struct.Fields, additional: Schema.Decoder<unknown>) => {
+    ? `const SyncTimestamp = Schema.BigInt.check(Schema.isBetweenBigInt({ minimum: -(2n ** 63n), maximum: 2n ** 63n - 1n }));
+
+const withAdditionalProperties = (fields: Schema.Struct.Fields, additional: Schema.Decoder<unknown>) => {
   const hasFields = Schema.is(Schema.Struct(fields));
   const isAdditional = Schema.is(additional);
   return Schema.Record(Schema.String, Schema.Unknown).check(Schema.makeFilter((record) =>
@@ -230,17 +249,17 @@ ${
 };\n`
     : ""
 }
-${Arr.join(
-  Arr.map([...components], ([name, value]) =>
+${Array.join(
+  Array.map([...components], ([name, value]) =>
     api === "deployment" && name === "Selection"
       ? `export const Selection: Schema.Decoder<unknown> = ${value};`
-      : `const ${name} = ${value};`,
+      : `${api === "deployment" && ["DataSyncResponse", "ActiveDataSync", "ListActiveSyncsResponse"].includes(name) ? "export " : ""}const ${name} = ${value};`,
   ),
   "\n",
 )}
 
 export const ${api}: Record<Responses<paths>, Schema.Decoder<unknown>> = {
-  ${Arr.join(endpoints, ",\n")}
+  ${Array.join(endpoints, ",\n")}
 };
 `;
 }
@@ -255,9 +274,10 @@ await Effect.runPromise(
     Obj.toEntries(documents),
     ([api, sha256]) =>
       Effect.gen(function* () {
-        const source = yield* Effect.promise(() =>
-          Bun.file(`${directory}/${api}-openapi.json`).bytes(),
-        );
+        const response = yield* HttpClient.get(
+          `https://raw.githubusercontent.com/get-convex/convex-backend/${revision}/npm-packages/@convex-dev/platform/${api}-openapi.json`,
+        ).pipe(Effect.flatMap(HttpClientResponse.filterStatusOk));
+        const source = yield* response.arrayBuffer;
         assert.equal(
           new Bun.CryptoHasher("sha256").update(source).digest("hex"),
           sha256,
@@ -284,5 +304,5 @@ await Effect.runPromise(
         } else yield* Effect.promise(() => Bun.write(file, formatted));
       }),
     { concurrency: "unbounded" },
-  ),
+  ).pipe(Effect.provide(FetchHttpClient.layer)),
 );

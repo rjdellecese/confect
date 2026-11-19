@@ -2,7 +2,7 @@ import type { DeploymentApi } from "@confect/platform";
 import * as DeploymentClient from "@confect/platform/DeploymentClient";
 import type { RequestFailure } from "@confect/platform/PlatformError";
 import { expect, expectTypeOf, it } from "@effect/vitest";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -16,6 +16,44 @@ import * as Stream from "effect/Stream";
 import { vi } from "vitest";
 
 const token = Redacted.make("test-deployment-key");
+
+it.effect.each([
+  { address: "http-otter-123", base: "https://http-otter-123.convex.cloud" },
+  {
+    address: "https://test-123.eu-west-1.convex.cloud/",
+    base: "https://test-123.eu-west-1.convex.cloud",
+  },
+  {
+    address: "http://localhost:3210/prefix/",
+    base: "http://localhost:3210/prefix",
+  },
+])("resolves the deployment base $address", ({ address, base }) =>
+  Effect.gen(function* () {
+    const fetch = vi.fn((_request: Request) =>
+      Promise.resolve(new Response(null)),
+    );
+    yield* DeploymentClient.make(address, token, { fetch }).pauseDeployment;
+    const [[request]] = fetch.mock.calls;
+    expect(request.url).toBe(`${base}/api/v1/pause_deployment`);
+  }),
+);
+
+it.effect(
+  "fails the request without sending a wiped deployment credential",
+  () =>
+    Effect.gen(function* () {
+      const credential = Redacted.make("test-forgotten-key");
+      const fetch = vi.fn(() => Promise.resolve(new Response(null)));
+      const client = DeploymentClient.make("test-123", credential, { fetch });
+      Redacted.wipeUnsafe(credential);
+      const error = yield* Effect.flip(client.pauseDeployment);
+      expect(error).toMatchObject({
+        _tag: "InvalidRequest",
+        operation: "pauseDeployment",
+      });
+      expect(fetch).not.toHaveBeenCalled();
+    }),
+);
 const Json = Schema.fromJsonString(Schema.Unknown);
 const selection = {
   _other: "included",
@@ -139,7 +177,7 @@ it("checks deployment request bodies and does not expose per-request transport c
     // @ts-expect-error Deployment audit queries must include their starting timestamp.
     expectTypeOf(client.listAuditLogEvents({ limit: 4 }));
     expectTypeOf(client.listActiveSyncs()).toEqualTypeOf<
-      Effect.Effect<DeploymentApi.ListActiveSyncsResponse, RequestFailure>
+      Effect.Effect<DeploymentClient.ActiveSyncsPage, RequestFailure>
     >();
   };
   expectTypeOf(check).toBeFunction();
@@ -263,7 +301,7 @@ it.effect(
         .fn((_request: Request) => Promise.resolve(new Response(null)))
         .mockResolvedValueOnce(
           Response.json(
-            Arr.map(streams, (config) =>
+            Array.map(streams, (config) =>
               config.logStreamType === "sentry"
                 ? { ...config, dsn: "secret-undeclared" }
                 : config,
@@ -376,12 +414,12 @@ it.effect(
       });
       expect(fetch).not.toHaveBeenCalled();
       const one = yield* stream.pipe(Stream.take(1), Stream.runCollect);
-      expect(Arr.map(one, (entry) => entry.createTime)).toEqual([14]);
+      expect(Array.map(one, (entry) => entry.createTime)).toEqual([14]);
       expect(fetch).toHaveBeenCalledTimes(1);
       const all = yield* Stream.runCollect(stream);
-      expect(Arr.map(all, (entry) => entry.createTime)).toEqual([14, 16]);
+      expect(Array.map(all, (entry) => entry.createTime)).toEqual([14, 16]);
       expect(
-        Arr.map(fetch.mock.calls, ([request]) =>
+        Array.map(fetch.mock.calls, ([request]) =>
           Record.fromEntries(new URL(request.url).searchParams),
         ),
       ).toEqual([
@@ -435,14 +473,20 @@ it.effect(
         .mockResolvedValueOnce(Response.json(response));
       const client = DeploymentClient.make("test-123", token, { fetch });
       const syncs = yield* Stream.runCollect(client.streamActiveSyncs());
-      expect(syncs).toEqual([sync]);
+      expect(syncs).toEqual([
+        { ...sync, status: { ...sync.status, syncedTs: 20n } },
+      ]);
       const step = yield* client.syncData({
         cursor: "persistent-cursor",
         selection,
       });
       expectTypeOf(step.values[0].value.message).toEqualTypeOf<Schema.Json>();
       expect(step.values[0].value.message).toBe("hello");
-      expect(step).toEqual(response);
+      expect(step).toEqual({
+        ...response,
+        status: { ...response.status, snapshotTs: 20n },
+        values: [{ ...response.values[0], ts: 20n }],
+      });
       expect(fetch).toHaveBeenCalledTimes(3);
       expect(new URL(fetch.mock.calls[0][0].url).search).toBe("");
       expect(new URL(fetch.mock.calls[1][0].url).search).toBe("?cursor=page-2");
@@ -451,6 +495,79 @@ it.effect(
       );
       expect(syncBody).toEqual({ cursor: "persistent-cursor", selection });
     }),
+);
+
+const rawSyncPage = (ts: string) => `{
+  "syncId":"abc","pagination":{"hasMore":false},"truncates":[],
+  "status":{"type":"stale","snapshotTs":1700000000000000002},
+  "values":[
+    {"component":"","table":"posts","ts":1700000000000000000,"deleted":false,"value":{}},
+    {"component":"","table":"posts","ts":${ts},"deleted":false,"value":{
+      "ts":0.5,"status":{"snapshotTs":13},"syncs":[{"status":{"syncedTs":14}}]
+    }}
+  ]
+}`;
+
+const rawActiveSync = `{"syncId":"abc","lastUpdated":1700000000000,
+  "status":{"type":"upToDate","totalTables":1,"numDocumentsSynced":2,"syncedTs":1700000000000000001}}`;
+
+it.effect("preserves exact wire ticks only at sync metadata paths", () =>
+  Effect.gen(function* () {
+    const fetch = vi
+      .fn<NonNullable<DeploymentClient.Options["fetch"]>>()
+      .mockResolvedValueOnce(new Response(rawSyncPage("1700000000000000001")))
+      .mockResolvedValueOnce(new Response(rawActiveSync))
+      .mockResolvedValueOnce(
+        new Response(
+          `{"syncs":[${rawActiveSync}],"pagination":{"hasMore":false}}`,
+        ),
+      );
+    const client = DeploymentClient.make("test-123", token, { fetch });
+    const page = yield* client.syncData({});
+    expectTypeOf(page.values[0].ts).toEqualTypeOf<bigint>();
+    expect(Array.map(page.values, ({ ts }) => ts)).toEqual([
+      1700000000000000000n,
+      1700000000000000001n,
+    ]);
+    expect(page.status).toEqual({
+      type: "stale",
+      snapshotTs: 1700000000000000002n,
+    });
+    expect(page.values[1].value).toEqual({
+      ts: 0.5,
+      status: { snapshotTs: 13 },
+      syncs: [{ status: { syncedTs: 14 } }],
+    });
+    const active = yield* client.getActiveSync(page.syncId);
+    expectTypeOf(active.lastUpdated).toEqualTypeOf<number>();
+    expect(active.lastUpdated).toBe(1700000000000);
+    if (active.status.type !== "upToDate") return expect.unreachable();
+    expectTypeOf(active.status.syncedTs).toEqualTypeOf<bigint>();
+    expect(active.status.syncedTs).toBe(1700000000000000001n);
+    const listed = yield* client.listActiveSyncs();
+    expect(listed.syncs).toEqual([active]);
+  }),
+);
+
+it.effect.each([
+  '"1700000000000000001"',
+  "1700000000000000000.1",
+  "9223372036854775808",
+  "null",
+  "{",
+])("rejects malformed sync timestamps without exposing the body: %s", (ts) =>
+  Effect.gen(function* () {
+    const client = DeploymentClient.make("test-123", token, {
+      fetch: () => Promise.resolve(new Response(rawSyncPage(ts))),
+    });
+    const error = yield* client.syncData({}).pipe(Effect.flip);
+    expect(error).toMatchObject({
+      _tag: "InvalidResponse",
+      operation: "syncData",
+      status: 200,
+    });
+    expect(String(error)).not.toContain("1700000000000000000");
+  }),
 );
 
 it.effect(

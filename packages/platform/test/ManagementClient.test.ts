@@ -63,6 +63,36 @@ it.effect("sends a typed team audit query with management credentials", () =>
 
 const privateDetail = "synthetic-private-detail";
 
+it.effect.each(["", "not-a-url", "https://example.test/v1?token=private"])(
+  "never falls back to another host for an invalid explicit base URL: %s",
+  (baseUrl) =>
+    Effect.gen(function* () {
+      const fetch = vi.fn(() => Promise.resolve(new Response(null)));
+      const client = ManagementClient.make(token, { baseUrl, fetch });
+      const error = yield* Effect.flip(client.getTokenDetails);
+      expect(error).toMatchObject({
+        _tag: "InvalidRequest",
+        operation: "getTokenDetails",
+      });
+      expect(fetch).not.toHaveBeenCalled();
+    }),
+);
+
+it.effect("keeps a wiped access token in the request error channel", () =>
+  Effect.gen(function* () {
+    const credential = Redacted.make("test-forgotten-token");
+    Redacted.wipeUnsafe(credential);
+    const fetch = vi.fn(() => Promise.resolve(new Response(null)));
+    const client = ManagementClient.make(credential, { fetch });
+    const error = yield* Effect.flip(client.getTokenDetails);
+    expect(error).toMatchObject({
+      _tag: "InvalidRequest",
+      operation: "getTokenDetails",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  }),
+);
+
 it.effect.each([
   {
     name: "empty 404",

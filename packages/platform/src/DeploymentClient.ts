@@ -1,6 +1,6 @@
 import { createDeploymentClient } from "@convex-dev/platform";
 import type * as Api from "@convex-dev/platform/deploymentApi";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -11,10 +11,14 @@ import type * as Stream from "effect/Stream";
 import * as Struct from "effect/Struct";
 import * as Client from "./internal/Client.js";
 import {
+  ActiveDataSync as ActiveDataSyncSchema,
+  DataSyncResponse,
   deployment,
+  ListActiveSyncsResponse,
   Selection as SelectionSchema,
 } from "./internal/DeploymentResponses.js";
 import * as Pagination from "./internal/Pagination.js";
+import * as SyncResponse from "./internal/SyncResponse.js";
 import {
   InvalidRequest,
   type InvalidPagination,
@@ -41,11 +45,31 @@ type WithSelection<T> = {
     : T[K];
 };
 
-export type DataSyncPage = Omit<Api.DataSyncResponse, "values"> & {
-  readonly values: ReadonlyArray<
-    Omit<Api.DataSyncValue, "value"> & { readonly value: Schema.JsonObject }
-  >;
+type WithSyncTimestamps<T> = {
+  [K in keyof T]: K extends "ts" | "snapshotTs" | "syncedTs" ? bigint : T[K];
 };
+export type DataSyncPage = Omit<
+  Api.DataSyncResponse,
+  "status" | "values" | "truncates"
+> & {
+  readonly status: WithSyncTimestamps<Api.DataSyncStatus>;
+  readonly values: ReadonlyArray<
+    Omit<WithSyncTimestamps<Api.DataSyncValue>, "value"> & {
+      readonly value: Schema.JsonObject;
+    }
+  >;
+  readonly truncates: ReadonlyArray<Api.DataSyncTruncate>;
+};
+export type ActiveDataSync = Omit<Api.ActiveDataSync, "status"> & {
+  readonly status: WithSyncTimestamps<Api.ActiveDataSyncStatus>;
+};
+export type ActiveSyncsPage = Omit<Api.ListActiveSyncsResponse, "syncs"> & {
+  readonly syncs: ReadonlyArray<ActiveDataSync>;
+};
+
+const decodeDataSync = SyncResponse.decode("page", DataSyncResponse);
+const decodeActiveSync = SyncResponse.decode("active", ActiveDataSyncSchema);
+const decodeActiveSyncs = SyncResponse.decode("list", ListActiveSyncsResponse);
 type BodyOverrides = {
   "/data/sync": WithSelection<Api.DataSyncArgs>;
   "/create_log_stream": WithSelection<Api.CreateLogStreamArgs>;
@@ -199,11 +223,11 @@ export interface Service {
   ) => Operation<DataSyncPage>;
   readonly listActiveSyncs: (
     query?: ActiveSyncsQuery,
-  ) => Operation<Api.ListActiveSyncsResponse>;
+  ) => Operation<ActiveSyncsPage>;
   readonly streamActiveSyncs: (
     query?: ActiveSyncsQuery,
-  ) => ItemStream<Api.ActiveDataSync>;
-  readonly getActiveSync: (syncId: Api.SyncId) => Operation<Api.ActiveDataSync>;
+  ) => ItemStream<ActiveDataSync>;
+  readonly getActiveSync: (syncId: Api.SyncId) => Operation<ActiveDataSync>;
 }
 
 export const make = (
@@ -211,8 +235,13 @@ export const make = (
   token: Redacted.Redacted<string>,
   options?: Options,
 ): Service => {
+  const address = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(nameOrUrl)
+    ? `https://${nameOrUrl}.convex.cloud`
+    : Client.normalizeBaseUrl(nameOrUrl);
   const { request } = Client.make<WirePaths>(
-    createDeploymentClient(nameOrUrl, Redacted.value(token)),
+    address === undefined
+      ? undefined
+      : () => createDeploymentClient(address, Redacted.value(token)),
     deployment,
     options?.fetch,
   );
@@ -223,6 +252,7 @@ export const make = (
   const listActiveSyncs = (query: ActiveSyncsQuery = {}) =>
     request("listActiveSyncs", "get", "/data/list_active_syncs", {
       params: { query },
+      decodeText: decodeActiveSyncs,
     });
   return {
     listEnvironmentVariables: request(
@@ -244,7 +274,7 @@ export const make = (
         {
           get body() {
             return {
-              changes: Arr.map(input.changes, (change) =>
+              changes: Array.map(input.changes, (change) =>
                 Struct.map(change, reveal),
               ),
             };
@@ -280,7 +310,7 @@ export const make = (
       request("updateCanonicalUrl", "post", "/update_canonical_url", { body }),
     getCanonicalUrls: request("getCanonicalUrls", "get", "/get_canonical_urls"),
     listLogStreams: request("listLogStreams", "get", "/list_log_streams").pipe(
-      Effect.map(Arr.map(redactLogStream)),
+      Effect.map(Array.map(redactLogStream)),
     ),
     getLogStream: (id) =>
       request("getLogStream", "get", "/get_log_stream/{id}", {
@@ -326,9 +356,10 @@ export const make = (
       "/unpause_deployment",
     ),
     syncData: (body) =>
-      request("syncData", "post", "/data/sync", { body }).pipe(
-        withValidSelection("syncData", body),
-      ),
+      request("syncData", "post", "/data/sync", {
+        body,
+        decodeText: decodeDataSync,
+      }).pipe(withValidSelection("syncData", body)),
     listActiveSyncs,
     streamActiveSyncs: (query = {}) =>
       Pagination.stream(
@@ -341,6 +372,7 @@ export const make = (
     getActiveSync: (syncId) =>
       request("getActiveSync", "get", "/data/sync/{sync_id}", {
         params: { path: { sync_id: syncId } },
+        decodeText: decodeActiveSync,
       }),
   };
 };
