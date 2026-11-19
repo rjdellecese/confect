@@ -6,6 +6,8 @@
 
 Pass a bound table to `DatabaseReader.table` and `DatabaseWriter.table` so a function can read and write documents without loading unrelated table definitions. No data migration is needed: table definitions, document IDs, indexes, and function paths stay the same.
 
+Upgrade the Confect packages and CLI together, then run `confect codegen` before typechecking or deploying. This generates the bindings used below and replaces the old `_generated/services` types, which are incompatible with the new `@confect/server` even if your handlers don't access tables.
+
 ### Breaking Changes
 
 - In each handler, helper, or middleware, default-import the tables it uses from their individual `_generated/tables/<name>` modules. For a runtime choice between tables, import just the candidates rather than the full schema. For system reads, use `Table._storage` and `Table._scheduled_functions` from `@confect/server/Table` (formerly `Table.storageTable` and `Table.scheduledFunctionsTable`).
@@ -47,5 +49,3 @@ const list = FunctionImpl.make(notesSpec, "list", () =>
 ```
 
 Keep using table names for `Id("notes")`, `documentIds.parse("notes", input)`, `vectorSearch("notes", index, query)`, and native Convex calls such as `ctx.db.query("notes")`. When `documentIds.identify(input)` finds a match, its `table` field is still a name, not a handle.
-
-Upgrade the Confect packages and CLI together. Regenerate bindings with `confect codegen` rather than editing them by hand, then typecheck your application.
