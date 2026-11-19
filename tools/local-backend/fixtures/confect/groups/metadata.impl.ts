@@ -1,8 +1,7 @@
-import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import refs from "../_generated/refs";
-import { FunctionImpl, MiddlewareImpl } from "../_generated/server";
+import { FunctionImpl, GroupImpl, MiddlewareImpl } from "../_generated/server";
 import {
   DatabaseWriter,
   ExecutionMetadata,

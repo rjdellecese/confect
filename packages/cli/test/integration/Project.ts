@@ -27,8 +27,7 @@ import notes from "./_generated/tables/notes";
 export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "list", returns: () => Schema.Array(notes.Doc) }));
 `;
 
-export const impl = `import { GroupImpl } from "@confect/server";
-import { FunctionImpl } from "./_generated/server";
+export const impl = `import { FunctionImpl, GroupImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { DatabaseReader } from "./_generated/services";
@@ -41,7 +40,7 @@ const list = FunctionImpl.make(notesSpec, "list", () => Effect.gen(function* () 
 export default GroupImpl.make(notesSpec).pipe(Layer.provide(list), GroupImpl.finalize);
 `;
 
-export const emptyImpl = `import { GroupImpl } from "@confect/server";
+export const emptyImpl = `import { GroupImpl } from "./_generated/server";
 import notes from "./notes.spec";
 export default GroupImpl.make(notes).pipe(GroupImpl.finalize);
 `;

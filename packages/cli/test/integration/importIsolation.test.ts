@@ -91,9 +91,8 @@ export default GroupSpec.make().addFunction(
           );
           yield* project.write(
             "confect/plain.impl.ts",
-            `import { GroupImpl } from "@confect/server";
-import * as Layer from "effect/Layer";
-import { FunctionImpl } from "./_generated/server";
+            `import * as Layer from "effect/Layer";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { ping } from "./ping";
 import plain from "./plain.spec";
 export default GroupImpl.make(plain).pipe(
@@ -112,10 +111,9 @@ export default GroupSpec.make()
           );
           yield* project.write(
             "confect/mixed.impl.ts",
-            `import { GroupImpl } from "@confect/server";
-import * as Effect from "effect/Effect";
+            `import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { FunctionImpl } from "./_generated/server";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { ping } from "./ping";
 import mixed from "./mixed.spec";
 export default GroupImpl.make(mixed).pipe(
@@ -155,10 +153,9 @@ export default notes.middleware(Audit);`,
           );
           yield* project.write(
             "confect/audited.impl.ts",
-            `import { GroupImpl } from "@confect/server";
-import * as Effect from "effect/Effect";
+            `import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { FunctionImpl } from "./_generated/server";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
 import notes from "./_generated/tables/notes";
 import Audit from "./middleware/audit.impl";

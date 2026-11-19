@@ -1,6 +1,5 @@
-import { GroupImpl } from "@confect/server";
 import * as Layer from "effect/Layer";
-import { FunctionImpl } from "./_generated/server";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { echoAction, echoMutation, echoQuery, read, write } from "./clients";
 import spec from "./clients.spec";
 

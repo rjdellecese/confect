@@ -35,10 +35,9 @@ export default GroupSpec.make().addFunction(FunctionSpec.internalMutation({
   returns: () => Schema.Void,
 }));
 `,
-  "confect/tasks.impl.ts": `import { GroupImpl } from "@confect/server";
-import * as Effect from "effect/Effect";
+  "confect/tasks.impl.ts": `import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { FunctionImpl } from "./_generated/server";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import tasks from "./tasks.spec";
 
 export default GroupImpl.make(tasks).pipe(
@@ -123,10 +122,9 @@ export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({
   },
 }));
 `,
-  "confect/notes.impl.ts": `import { GroupImpl } from "@confect/server";
-import * as Effect from "effect/Effect";
+  "confect/notes.impl.ts": `import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { FunctionImpl } from "./_generated/server";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { Auth } from "./_generated/services";
 import notes from "./notes.spec";
 
@@ -180,12 +178,13 @@ export const encodedArgsAreNotDecodedArgs: Ref.Args<typeof refs.public.notes.cou
 `,
   "smoke.ts": `import assert from "node:assert/strict";
 import { Ref } from "@confect/core";
-import { CronWindow, FunctionRegistryItem, GroupImpl, Registry, type RegistryItems } from "@confect/server";
+import { CronWindow, FunctionRegistryItem, Registry, type RegistryItems } from "@confect/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as MutableRef from "effect/Ref";
 import refs from "./confect/_generated/refs";
+import { GroupImpl } from "./confect/_generated/server";
 import { Auth } from "./confect/_generated/services";
 import notes from "./confect/_generated/tables/notes";
 import notesImpl, { count } from "./confect/notes.impl";

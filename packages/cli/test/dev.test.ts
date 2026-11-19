@@ -285,8 +285,7 @@ export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name, ret
           );
           yield* project.write(
             "confect/notes.impl.ts",
-            `import { GroupImpl } from "@confect/server";
-import { FunctionImpl } from "./_generated/server";
+            `import { FunctionImpl, GroupImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import spec from "./notes.spec";

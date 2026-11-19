@@ -91,7 +91,7 @@ Contains a registry of all your application table handles. Use a type-only impor
 
 #### `server.ts`
 
-Exports the `FunctionImpl` and `MiddlewareImpl` builders bound to your application's database **type**. Import these from server implementations, not from specs. They do not import the full registry as a value.
+Import `FunctionImpl`, `GroupImpl`, and `MiddlewareImpl` from this module in your server implementations. None takes a database schema argument: function and middleware handlers are checked against your application's database type, and groups are checked against their spec. Importing the builders does not load your table definitions.
 
 #### `tableNames.ts`
 

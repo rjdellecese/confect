@@ -823,8 +823,7 @@ export default GroupImpl.make(
         const result = yield* Effect.result(
           withTempLeaf(
             "_unfinalized",
-            `import { GroupImpl } from "@confect/server";
-import { FunctionImpl } from "../_generated/server";
+            `import { FunctionImpl, GroupImpl } from "../_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import notes from "../_generated/tables/notes";
@@ -894,8 +893,7 @@ export default GroupImpl.make(notesSpec).pipe(
         const result = yield* Effect.result(
           withTempLeaf(
             "_incomplete",
-            `import { GroupImpl } from "@confect/server";
-import { FunctionImpl } from "../_generated/server";
+            `import { FunctionImpl, GroupImpl } from "../_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import notes from "../_generated/tables/notes";

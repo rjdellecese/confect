@@ -1,6 +1,5 @@
-import { GroupImpl } from "@confect/server";
 import * as Layer from "effect/Layer";
-import { FunctionImpl } from "./_generated/server";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { backgroundWork, enqueue, onComplete, status } from "./workpool";
 import workpool from "./workpool.spec";
 

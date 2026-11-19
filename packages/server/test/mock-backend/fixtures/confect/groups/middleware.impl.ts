@@ -1,9 +1,8 @@
 import * as Str from "effect/String";
-import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import { FunctionImpl } from "../_generated/server";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import notes from "../_generated/tables/notes";
 import { DatabaseReader } from "../_generated/services";
 import ProvideViewer from "../middleware/ProvideViewer.impl";

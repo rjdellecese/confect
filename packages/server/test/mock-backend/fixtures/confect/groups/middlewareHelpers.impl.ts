@@ -1,8 +1,7 @@
-import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import { FunctionImpl } from "../_generated/server";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import users from "../_generated/tables/users";
 import { DatabaseReader } from "../_generated/services";
 import middlewareHelpers from "./middlewareHelpers.spec";

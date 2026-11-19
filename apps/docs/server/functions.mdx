@@ -146,11 +146,10 @@ Each function impl contains a handler that implements the function's logic. Func
 Import `FunctionImpl` from `_generated/server` so the handler is checked against your application's database type without loading its tables. The handler receives the decoded arguments as its first parameter and returns an `Effect`. Use the generated [services](/concepts/services) inside your handler to interact with Convex.
 
 ```ts confect/notes.impl.ts
-import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { FunctionImpl } from "./_generated/server";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
 import notes from "./_generated/tables/notes";
 import notesSpec from "./notes.spec";

@@ -7,12 +7,11 @@
  * under test.
  */
 
-import { GroupImpl } from "@confect/server";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Random from "effect/Random";
-import { FunctionImpl } from "../_generated/server";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import { TransactionMetadata } from "../_generated/services";
 import cacheStubbed from "./cacheStubbed.spec";
 

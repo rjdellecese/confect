@@ -1,7 +1,6 @@
-import { GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { FunctionImpl } from "../_generated/server";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import refs from "../_generated/refs";
 import {
   ActionRunner,

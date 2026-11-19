@@ -439,8 +439,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           );
           yield* project.write(
             "confect/notes.impl.ts",
-            `import { GroupImpl } from "@confect/server";
-import { FunctionImpl } from "./_generated/server";
+            `import { FunctionImpl, GroupImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import spec from "./notes.spec";
@@ -639,7 +638,7 @@ export default GroupImpl.make(spec).pipe(Layer.provide(FunctionImpl.make(spec, "
             );
             yield* project.write(
               `confect/group${index}.impl.ts`,
-              `import { GroupImpl } from "@confect/server";
+              `import { GroupImpl } from "./_generated/server";
 import spec from "./group${index}.spec";
 export default GroupImpl.make(spec).pipe(GroupImpl.finalize);`,
             );

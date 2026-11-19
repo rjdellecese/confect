@@ -32,14 +32,13 @@ export default GroupSpec.makeNode().addFunction(
 A Node impl uses the same generated `FunctionImpl` builder as a non-Node impl. Its sibling spec selects the runtime with `GroupSpec.makeNode()`. Each handler runs in the Node.js runtime, so it has access to `NodeServices` from the `@effect/platform-node` package (filesystem, path, child processes, and more).
 
 ```ts confect/email.impl.ts
-import { GroupImpl } from "@confect/server";
 import * as Console from "effect/Console";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
-import { FunctionImpl } from "./_generated/server";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import email from "./email.spec";
 
 const send = FunctionImpl.make(

@@ -5,14 +5,13 @@
  * in the isolate.
  */
 
-import { GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import refs from "../_generated/refs";
-import { FunctionImpl } from "../_generated/server";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import {
   MutationRunner,
   QueryRunner,

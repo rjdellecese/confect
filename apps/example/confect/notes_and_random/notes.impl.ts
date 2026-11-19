@@ -1,7 +1,7 @@
-import { GroupImpl, QueryStream } from "@confect/server";
+import { QueryStream } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { FunctionImpl } from "../_generated/server";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import notes from "../_generated/tables/notes";
 import notesSpec, { NoteNotFound } from "./notes.spec";

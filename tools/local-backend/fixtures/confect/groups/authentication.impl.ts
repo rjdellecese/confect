@@ -1,8 +1,7 @@
-import { GroupImpl } from "@confect/server";
 import type { SignJwtOptions } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { FunctionImpl, MiddlewareImpl } from "../_generated/server";
+import { FunctionImpl, GroupImpl, MiddlewareImpl } from "../_generated/server";
 import { MutationAuth } from "../_generated/services";
 import authentication, {
   SignedToken,

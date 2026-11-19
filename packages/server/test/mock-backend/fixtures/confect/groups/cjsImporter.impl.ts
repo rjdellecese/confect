@@ -1,8 +1,7 @@
-import { GroupImpl } from "@confect/server";
 import { DateTime } from "luxon";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { FunctionImpl } from "../_generated/server";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import cjsImporter from "./cjsImporter.spec";
 
 const now = FunctionImpl.make(cjsImporter, "now", () =>
