@@ -7,7 +7,10 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { ConvexClient, type ConvexClientError } from "./ConvexClient.js";
 import type { Providers } from "./Providers.js";
-import { validateTarget } from "./internal/DeploymentTarget.js";
+import {
+  normalizeDeploymentUrl,
+  validateTarget,
+} from "./internal/DeploymentTarget.js";
 import { checkpointResource } from "./internal/Lifecycle.js";
 
 export interface AuthoritativeEnvironmentVariableProps {
@@ -50,13 +53,16 @@ const validateIdentity = (
 ) =>
   Result.gen(function* () {
     yield* validateTarget(deployment.name, deployment.url, deployKey);
-    const target = { name, url: deployment.url };
+    const target = { name, url: normalizeDeploymentUrl(deployment.url) };
     if (output === undefined) return target;
-    for (const field of ["name", "url"] as const)
-      if (target[field] !== output[field])
-        return yield* Result.fail(
-          AuthoritativeEnvironmentVariableIdentityChange.make({ field }),
-        );
+    if (target.name !== output.name)
+      return yield* Result.fail(
+        AuthoritativeEnvironmentVariableIdentityChange.make({ field: "name" }),
+      );
+    if (target.url !== normalizeDeploymentUrl(output.url))
+      return yield* Result.fail(
+        AuthoritativeEnvironmentVariableIdentityChange.make({ field: "url" }),
+      );
     return target;
   });
 
@@ -78,8 +84,14 @@ export const provider = Effect.gen(function* () {
       return { action: "update" };
     }),
     reconcile: Effect.fn("AuthoritativeEnvironmentVariable.reconcile")(
-      function* ({ fqn, instanceId, news, output }) {
-        const target = yield* Effect.fromResult(validateIdentity(news, output));
+      function* ({ fqn, instanceId, olds, news, output }) {
+        const restoreOldProps =
+          olds === undefined
+            ? Effect.void
+            : checkpointResource(fqn, instanceId, olds);
+        const target = yield* Effect.fromResult(
+          validateIdentity(news, output),
+        ).pipe(Effect.tapError(() => restoreOldProps));
         if (output === undefined)
           yield* checkpointResource(fqn, instanceId, news, target);
         yield* client
@@ -87,11 +99,12 @@ export const provider = Effect.gen(function* () {
             { name: target.name, value: news.value },
           ])
           .pipe(
-            Effect.tapError((error) =>
-              output === undefined && isDefiniteRejection(error)
+            Effect.tapError((error) => {
+              if (!isDefiniteRejection(error)) return Effect.void;
+              return output === undefined
                 ? checkpointResource(fqn, instanceId, news, null)
-                : Effect.void,
-            ),
+                : restoreOldProps;
+            }),
           );
         return target;
       },

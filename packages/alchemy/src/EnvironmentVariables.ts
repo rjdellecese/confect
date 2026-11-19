@@ -1,9 +1,13 @@
 import { OwnedBySomeoneElse, Unowned } from "alchemy/AdoptPolicy";
 import { isResolved } from "alchemy/Diff";
+import type { PropsInput } from "alchemy/Input";
+import * as Output from "alchemy/Output";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
 import * as Arr from "effect/Array";
+import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
+import * as Effectable from "effect/Effectable";
 import * as Rec from "effect/Record";
 import * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
@@ -14,7 +18,11 @@ import {
   type EnvironmentVariableChange,
 } from "./ConvexClient.js";
 import type { Providers } from "./Providers.js";
-import { validateTarget } from "./internal/DeploymentTarget.js";
+import {
+  normalizeDeploymentUrl,
+  validateTarget,
+} from "./internal/DeploymentTarget.js";
+import { isUnadmittedCreate } from "./internal/Lifecycle.js";
 
 export interface EnvironmentVariablesProps {
   readonly deploymentName?: string;
@@ -40,8 +48,92 @@ export type EnvironmentVariables = Resource<
   never,
   Providers
 >;
-export const EnvironmentVariables = Resource<EnvironmentVariables>(
-  "Convex.EnvironmentVariables",
+const resource = Resource<EnvironmentVariables>("Convex.EnvironmentVariables");
+
+export class ConflictingEnvironmentNames extends Schema.TaggedError<
+  ConflictingEnvironmentNames,
+  { readonly brand: unique symbol }
+>()("ConflictingEnvironmentNames", {
+  names: Schema.Tuple([Schema.Literal("Type"), Schema.Literal("FQN")]),
+}) {}
+
+export class ReservedEnvironmentVariableName extends Schema.TaggedError<
+  ReservedEnvironmentVariableName,
+  { readonly brand: unique symbol }
+>()("ReservedEnvironmentVariableName", { variableName: Schema.String }) {}
+
+export class UnresolvedEnvironmentVariableNames extends Schema.TaggedError<
+  UnresolvedEnvironmentVariableNames,
+  { readonly brand: unique symbol }
+>()("UnresolvedEnvironmentVariableNames", {}) {}
+
+const validateNames = (
+  names: ReadonlyArray<string>,
+): Result.Result<
+  void,
+  ReservedEnvironmentVariableName | ConflictingEnvironmentNames
+> => {
+  for (const variableName of names)
+    if (
+      ["__proto__", "__redacted__", "__date__", "__bytes__"].includes(
+        variableName,
+      )
+    )
+      return Result.fail(
+        ReservedEnvironmentVariableName.make({ variableName }),
+      );
+  if (names.includes("Type") && names.includes("FQN"))
+    return Result.fail(
+      ConflictingEnvironmentNames.make({ names: ["Type", "FQN"] }),
+    );
+  return Result.succeed(undefined);
+};
+
+type Props = PropsInput<EnvironmentVariablesProps>;
+const checkedVariables = <T extends object>(variables: T) =>
+  Effect.fromResult(validateNames(Rec.keys(variables))).pipe(
+    Effect.orDie,
+    Effect.as(variables),
+  );
+const checkedProps = (props: Props) => {
+  const { variables } = props;
+  if (Output.isOutput(variables))
+    return Effect.succeed({
+      ...props,
+      variables: Output.mapEffect(
+        checkedVariables<EnvironmentVariablesProps["variables"]>,
+      )(variables),
+    });
+  if (Config.isConfig(variables))
+    return Effect.succeed({
+      ...props,
+      variables: Config.mapEffect(
+        variables,
+        checkedVariables<EnvironmentVariablesProps["variables"]>,
+      ),
+    });
+  if (Effect.isEffect(variables))
+    return Effect.die(UnresolvedEnvironmentVariableNames.make({}));
+  return checkedVariables(variables).pipe(Effect.as(props));
+};
+
+const declare = <R>(
+  ...args: [object] | [string, Props | Effect.Effect<Props, never, R>]
+) => {
+  if (args.length === 1) return Object.assign(EnvironmentVariables, args[0]);
+  const [id, source] = args;
+  return Effect.isEffect(source)
+    ? resource(id, Effect.flatMap(source, checkedProps))
+    : Effect.flatMap(checkedProps(source), (props) => resource(id, props));
+};
+
+export const EnvironmentVariables: typeof resource = Object.assign(
+  declare,
+  resource,
+  Effectable.Prototype<typeof resource>({
+    label: "Resource<Convex.EnvironmentVariables>",
+    evaluate: () => Effect.succeed(EnvironmentVariables),
+  }),
 );
 
 export class EnvironmentTargetChange extends Schema.TaggedError<
@@ -63,11 +155,16 @@ const planChanges = (
   output?: EnvironmentVariablesAttributes,
 ): Result.Result<
   ReadonlyArray<EnvironmentVariableChange>,
-  OwnedBySomeoneElse | UnreadableEnvironmentVariable
+  | OwnedBySomeoneElse
+  | UnreadableEnvironmentVariable
+  | ReservedEnvironmentVariableName
+  | ConflictingEnvironmentNames
 > => {
   const owned = new Set(output?.ownedNames);
   const originals = output?.originals ?? {};
   const requested = Rec.keys(desired);
+  const names = validateNames([...requested, ...owned]);
+  if (Result.isFailure(names)) return Result.fail(names.failure);
   for (const variableName of [...requested, ...owned]) {
     if (!Rec.has(observed, variableName))
       return Result.fail(UnreadableEnvironmentVariable.make({ variableName }));
@@ -106,7 +203,9 @@ export const provider = Effect.gen(function* () {
         yield* Effect.fromResult(
           validateTarget(news.deploymentName, news.url, news.deployKey),
         );
-      if (news.url !== output.url)
+      if (
+        normalizeDeploymentUrl(news.url) !== normalizeDeploymentUrl(output.url)
+      )
         return yield* EnvironmentTargetChange.make({
           url: output.url,
         });
@@ -123,18 +222,47 @@ export const provider = Effect.gen(function* () {
       )
         return { action: "update" };
     }),
-    read: Effect.fn("EnvironmentVariables.read")(function* ({ olds, output }) {
+    read: Effect.fn("EnvironmentVariables.read")(function* ({
+      fqn,
+      instanceId,
+      olds,
+      output,
+    }) {
       const url = output?.url ?? olds.url;
       if (url === undefined || olds.deployKey === undefined) return;
-      if (olds.deploymentName !== undefined)
-        yield* Effect.fromResult(
-          validateTarget(olds.deploymentName, url, olds.deployKey),
-        );
-      const observed = yield* client.listEnvironmentVariables(
-        url,
-        olds.deployKey,
-      );
+      const unadmitted =
+        output === undefined
+          ? isUnadmittedCreate(fqn, instanceId)
+          : Effect.succeed(false);
+      if (olds.deploymentName !== undefined) {
+        const target = validateTarget(olds.deploymentName, url, olds.deployKey);
+        if (Result.isFailure(target)) {
+          if (yield* unadmitted) return;
+          return yield* target.failure;
+        }
+      }
       const ownedNames = output?.ownedNames ?? Rec.keys(olds.variables);
+      yield* Effect.fromResult(validateNames(ownedNames));
+      const observed = yield* client
+        .listEnvironmentVariables(url, olds.deployKey)
+        .pipe(
+          Effect.catchTags({
+            ConvexNotFound: () => Effect.void,
+            ConvexApiError: (error) =>
+              Effect.gen(function* () {
+                if (
+                  (error.code === "InvalidRequest" ||
+                    error.status === 400 ||
+                    error.status === 401 ||
+                    error.status === 403) &&
+                  (yield* unadmitted)
+                )
+                  return;
+                return yield* error;
+              }),
+          }),
+        );
+      if (observed === undefined) return;
       const variables = Rec.filter(observed, (_, name) =>
         Arr.contains(ownedNames, name),
       );
@@ -158,7 +286,10 @@ export const provider = Effect.gen(function* () {
         yield* Effect.fromResult(
           validateTarget(news.deploymentName, news.url, news.deployKey),
         );
-      if (output !== undefined && output.url !== news.url)
+      if (
+        output !== undefined &&
+        normalizeDeploymentUrl(output.url) !== normalizeDeploymentUrl(news.url)
+      )
         return yield* EnvironmentTargetChange.make({
           url: output.url,
         });

@@ -116,6 +116,8 @@ Effect.gen(function* () {
 
 Using `token.url` makes the code push wait for the variable write. Pass `backend.url` to your frontend resource's build environment, such as `VITE_CONVEX_URL`, to make the frontend wait for the backend. Never pass the deploy key to the frontend.
 
+Pass resource outputs such as `deployment.name` directly to other resources. If a field comes from an ordinary Effect, `yield*` it in the stack first; Alchemy does not run a bare Effect nested inside a props object. For a lookup that must run at plan time and cannot fail, use `Output.fromEffect` from `alchemy/Output`.
+
 One stack should own each project and deployment. For a project shared by several stages, pass its project ID to each stage's deployment rather than declaring the same project in every stage. Deployment references must be unique within the project.
 
 ## Choose who owns an environment value
@@ -170,7 +172,7 @@ Projects and deployments **retain their cloud objects by default** when removed 
 
 The provider refuses project-team changes and deployment identity changes that could move or replace data. Create a separate resource and plan a migration instead. Existing resources found by name or reference require explicit Alchemy adoption; ambiguous matches fail rather than selecting an arbitrary object.
 
-If your deployment uses variables named both `Type` and `FQN`, put them in separate `Convex.EnvironmentVariables` resources. Alchemy interprets an object with both keys as a resource reference, so don't pass them together in one map, including a dynamically constructed `env`.
+If your deployment uses variables named both `Type` and `FQN`, put them in separate `Convex.EnvironmentVariables` resources. Alchemy interprets a map with both keys as a resource reference. The map also rejects `__proto__`, `__redacted__`, `__date__`, and `__bytes__` because Alchemy cannot reliably preserve those keys in state. For one of those names, manage it directly in Convex or use `Convex.AuthoritativeEnvironmentVariable` if you intend to overwrite it without restoring the old value.
 
 Set `env: {}` to release all adopted variables and restore their original values before the next code push. Removing the `env` option removes the environment resource instead, so its cleanup follows Alchemy's resource-deletion ordering.
 

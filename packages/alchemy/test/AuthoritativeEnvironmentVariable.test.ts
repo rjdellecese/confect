@@ -9,6 +9,8 @@ import { Providers } from "@confect/alchemy/Providers";
 import { expect, it } from "@effect/vitest";
 import * as RemovalPolicy from "alchemy/RemovalPolicy";
 import { Stack } from "alchemy/Stack";
+import { InMemoryService } from "alchemy/State/InMemoryState";
+import { State } from "alchemy/State/State";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
@@ -152,8 +154,44 @@ it.effect.each([
       };
       const planned = yield* Effect.flip(p.diff({ ...input, ...bindings }));
       expect(planned).toMatchObject(expected);
-      const applied = yield* Effect.flip(p.reconcile(input));
+      const store = yield* InMemoryService({
+        test: {
+          test: {
+            test: {
+              status: "updating",
+              fqn: lifecycle.fqn,
+              logicalId: lifecycle.id,
+              instanceId: lifecycle.instanceId,
+              namespace: undefined,
+              providerVersion: 0,
+              resourceType: Convex.AuthoritativeEnvironmentVariable.Type,
+              downstream: [],
+              bindings: [],
+              old: { props, attr: output, bindings: [] },
+              props: news,
+              attr: output,
+            },
+          },
+        },
+      });
+      const applied = yield* p.reconcile(input).pipe(
+        Effect.provideService(State, Effect.succeed(store)),
+        Effect.provideService(Stack, {
+          name: "test",
+          stage: "test",
+          resources: {},
+          actions: {},
+          bindings: {},
+        }),
+        Effect.flip,
+      );
       expect(applied).toMatchObject(expected);
+      const saved = yield* store.get({
+        stack: "test",
+        stage: "test",
+        fqn: lifecycle.fqn,
+      });
+      expect(saved).toMatchObject({ props, attr: output });
       const deleted = yield* Effect.flip(p.delete({ ...input, olds: news }));
       expect(deleted).toMatchObject(expected);
       expect(mock.client.updateEnvironmentVariables).not.toHaveBeenCalled();

@@ -9,6 +9,31 @@ export class LifecycleStateError extends Schema.TaggedError<
   { readonly brand: unique symbol }
 >()("LifecycleStateError", { fqn: Schema.String }) {}
 
+const getCheckpoint = Effect.fn("Lifecycle.getCheckpoint")(function* (
+  fqn: string,
+) {
+  const stack = yield* Effect.serviceOption(Stack);
+  if (Option.isNone(stack)) return;
+  const state = yield* Effect.serviceOption(State);
+  if (Option.isNone(state)) return yield* LifecycleStateError.make({ fqn });
+  const store = yield* state.value;
+  const key = { stack: stack.value.name, stage: stack.value.stage, fqn };
+  const row = yield* store.get(key);
+  return { store, key, row };
+});
+
+export const isUnadmittedCreate = Effect.fn("Lifecycle.isUnadmittedCreate")(
+  function* (fqn: string, instanceId: string) {
+    const row = (yield* getCheckpoint(fqn))?.row;
+    return (
+      row?.kind !== "action" &&
+      row?.status === "creating" &&
+      row.instanceId === instanceId &&
+      row.attr === undefined
+    );
+  },
+);
+
 export const checkpointResource = Effect.fn("Lifecycle.checkpointResource")(
   function* (
     fqn: string,
@@ -16,13 +41,9 @@ export const checkpointResource = Effect.fn("Lifecycle.checkpointResource")(
     props: object,
     output?: object | null,
   ) {
-    const stack = yield* Effect.serviceOption(Stack);
-    if (Option.isNone(stack)) return;
-    const state = yield* Effect.serviceOption(State);
-    if (Option.isNone(state)) return yield* LifecycleStateError.make({ fqn });
-    const store = yield* state.value;
-    const key = { stack: stack.value.name, stage: stack.value.stage, fqn };
-    const row = yield* store.get(key);
+    const checkpoint = yield* getCheckpoint(fqn);
+    if (checkpoint === undefined) return;
+    const { store, key, row } = checkpoint;
     if (
       row === undefined ||
       row.kind === "action" ||

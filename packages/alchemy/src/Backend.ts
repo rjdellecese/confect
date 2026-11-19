@@ -1,11 +1,12 @@
-import type { Input } from "alchemy/Input";
 import * as Namespace from "alchemy/Namespace";
 import * as Output from "alchemy/Output";
+import type * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
-import * as Schema from "effect/Schema";
 import { Code } from "./Code.js";
 import { EnvironmentVariables } from "./EnvironmentVariables.js";
+
+type Input<T> = T | Config.Config<T> | Output.Output<T, unknown>;
 
 export interface BackendProps {
   readonly deployment: {
@@ -19,23 +20,12 @@ export interface BackendProps {
   >;
 }
 
-export class ConflictingEnvironmentNames extends Schema.TaggedError<
-  ConflictingEnvironmentNames,
-  { readonly brand: unique symbol }
->()("ConflictingEnvironmentNames", {
-  names: Schema.Tuple([Schema.Literal("Type"), Schema.Literal("FQN")]),
-}) {}
+export { ConflictingEnvironmentNames } from "./EnvironmentVariables.js";
 
 export const Backend = (id: string, props: BackendProps) =>
   Namespace.push(
     id,
     Effect.gen(function* () {
-      if (props.env !== undefined && "Type" in props.env && "FQN" in props.env)
-        return yield* Effect.die(
-          ConflictingEnvironmentNames.make({
-            names: ["Type", "FQN"],
-          }),
-        );
       const environment =
         props.env === undefined
           ? undefined

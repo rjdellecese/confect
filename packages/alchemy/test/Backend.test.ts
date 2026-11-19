@@ -1,10 +1,11 @@
 import * as Record from "effect/Record";
-import { describe, expect, it } from "@effect/vitest";
-import { Backend } from "@confect/alchemy/Backend";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { Backend, type BackendProps } from "@confect/alchemy/Backend";
 import { Providers } from "@confect/alchemy/Providers";
 import * as Output from "alchemy/Output";
 import { Stack } from "alchemy/Stack";
 import { inMemoryState } from "alchemy/State/InMemoryState";
+import type * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -33,6 +34,15 @@ const providers = Layer.succeed(Providers, {
 });
 
 describe("Backend", () => {
+  it("accepts only inputs Alchemy can resolve as nested values", () => {
+    type EnvValue = NonNullable<BackendProps["env"]>[string];
+    expectTypeOf<Effect.Effect<string>>().not.toExtend<EnvValue>();
+    expectTypeOf<Output.Output<string, Providers>>().toExtend<EnvValue>();
+    expectTypeOf<Config.Config<string>>().toExtend<EnvValue>();
+    expectTypeOf<Config.Config<Redacted.Redacted<string>>>().toExtend<
+      BackendProps["deployKey"]
+    >();
+  });
   it.effect("rejects an env map Alchemy would mistake for a resource", () =>
     Effect.gen(function* () {
       const services = yield* Layer.build(Layer.mergeAll(stack(), providers));

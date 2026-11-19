@@ -1,11 +1,17 @@
 import * as Record from "effect/Record";
 import { it, expect, assert } from "@effect/vitest";
 import { AdoptPolicy, Unowned } from "alchemy/AdoptPolicy";
+import * as Output from "alchemy/Output";
+import { Stack } from "alchemy/Stack";
+import { InMemoryService } from "alchemy/State/InMemoryState";
+import { State } from "alchemy/State/State";
+import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
 import * as EnvironmentVariables from "@confect/alchemy/EnvironmentVariables";
+import { Providers } from "@confect/alchemy/Providers";
 import { ConvexClient, ConvexNotFound } from "@confect/alchemy/ConvexClient";
 import { lifecycle, mockClient } from "./fixtures/ConvexClient";
 
@@ -19,6 +25,12 @@ it.effect("deletes idempotently when the deployment is already gone", () => {
   const mock = mockClient();
   return Effect.gen(function* () {
     const provider = yield* EnvironmentVariables.provider;
+    const missing = yield* provider.read({
+      ...lifecycle,
+      olds: props,
+      output: undefined,
+    });
+    expect(missing).toBeUndefined();
     yield* provider.delete({
       ...lifecycle,
       olds: props,
@@ -45,6 +57,36 @@ it.effect("deletes idempotently when the deployment is already gone", () => {
     }),
   );
 });
+
+it.effect(
+  "rejects an invalid target during cold discovery and reconcile",
+  () => {
+    const mock = mockClient();
+    const news = { ...props, deploymentName: "other-deployment" };
+    return Effect.gen(function* () {
+      const provider = yield* EnvironmentVariables.provider;
+      const rejected = yield* Effect.flip(
+        provider.read({
+          ...lifecycle,
+          olds: news,
+          output: undefined,
+        }),
+      );
+      expect(rejected._tag).toBe("InvalidDeploymentTarget");
+      const failed = yield* Effect.flip(
+        provider.reconcile({
+          ...lifecycle,
+          news,
+          olds: undefined,
+          output: undefined,
+        }),
+      );
+      expect(failed).toMatchObject({ _tag: "InvalidDeploymentTarget" });
+      expect(mock.client.listEnvironmentVariables).not.toHaveBeenCalled();
+      expect(mock.client.updateEnvironmentVariables).not.toHaveBeenCalled();
+    }).pipe(Effect.provideService(ConvexClient, mock.client));
+  },
+);
 
 it.effect(
   "updates only differences, repairs drift, and preserves unrelated variables",
@@ -278,7 +320,6 @@ it.effect(
         variables: {
           constructor: "constructor-value",
           toString: "string-value",
-          ["__proto__"]: "proto-value",
         },
       };
       const readResult = yield* provider.read({
@@ -290,7 +331,6 @@ it.effect(
       mock.state.variables = {
         constructor: Redacted.make("old-constructor"),
         toString: Redacted.make("old-string"),
-        ["__proto__"]: Redacted.make("old-proto"),
       };
       const candidate = yield* provider.read({
         ...lifecycle,
@@ -317,10 +357,118 @@ it.effect(
       expect(Record.map(mock.state.variables, Redacted.value)).toEqual({
         constructor: "old-constructor",
         toString: "old-string",
-        ["__proto__"]: "old-proto",
       });
     }).pipe(Effect.provideService(ConvexClient, mock.client));
   },
+);
+
+it.effect.each(["__proto__", "__redacted__", "__date__", "__bytes__"])(
+  "rejects the state codec's reserved key %s before any cloud mutation",
+  (name) => {
+    const fixture = mockClient();
+    const variables = { READABLE: "next", [name]: "value" };
+    return Effect.gen(function* () {
+      const Env = EnvironmentVariables.EnvironmentVariables;
+      const ctor = yield* Env;
+      const news = { ...props, variables };
+      const expected = {
+        _tag: "ReservedEnvironmentVariableName",
+        variableName: name,
+      };
+      const direct = yield* Env("Direct", {
+        ...news,
+        deployKey: Output.literal(props.deployKey),
+      }).pipe(Effect.catchDefect(Effect.succeed));
+      expect(direct).toMatchObject(expected);
+      const yielded = yield* ctor("ViaEffect", Effect.succeed(news)).pipe(
+        Effect.catchDefect(Effect.succeed),
+      );
+      expect(yielded).toMatchObject(expected);
+      const provider = yield* EnvironmentVariables.provider;
+      const readable = Record.map(variables, (value) => Redacted.make(value));
+      fixture.state.variables = readable;
+      const output = {
+        url: props.url,
+        deployKey: props.deployKey,
+        ownedNames: Record.keys(variables),
+        variables: readable,
+        originals: {},
+      };
+      const read = yield* Effect.flip(
+        provider.read({ ...lifecycle, olds: news, output: undefined }),
+      );
+      expect(read).toMatchObject(expected);
+      const write = yield* Effect.flip(
+        provider.reconcile({ ...lifecycle, olds: props, news, output }),
+      );
+      expect(write).toMatchObject(expected);
+      const remove = yield* Effect.flip(
+        provider.delete({ ...lifecycle, olds: news, output }),
+      );
+      expect(remove).toMatchObject(expected);
+      expect(fixture.client.updateEnvironmentVariables).not.toHaveBeenCalled();
+    }).pipe(
+      Effect.provideService(ConvexClient, fixture.client),
+      Effect.provideService(Stack, {
+        name: "test",
+        stage: "test",
+        resources: {},
+        bindings: {},
+        actions: {},
+      }),
+      Effect.provideService(Providers, {
+        kind: "ProviderCollection",
+        providers: {},
+        get: () => undefined,
+      }),
+    );
+  },
+);
+
+it.effect("validates whole-map inputs when Alchemy resolves them", () =>
+  Effect.gen(function* () {
+    const Env = EnvironmentVariables.EnvironmentVariables;
+    const ref = yield* Env.ref("External", { stage: "other" });
+    expect(Output.isRefExpr(ref)).toBe(true);
+    const source = yield* Env("Source", props);
+    const deferred = yield* Env("Deferred", {
+      ...props,
+      variables: source.variables,
+    });
+    const resolved = yield* Output.evaluate(deferred.Props, {
+      [source.FQN]: { variables: props.variables },
+    });
+    expect(resolved.variables).toEqual(props.variables);
+    const unsafe = { ["__bytes__"]: "example" };
+    const rejected = yield* Output.evaluate(deferred.Props, {
+      [source.FQN]: { variables: unsafe },
+    }).pipe(Effect.catchDefect(Effect.succeed));
+    expect(rejected).toMatchObject({ _tag: "ReservedEnvironmentVariableName" });
+    const config = yield* Env("Config", {
+      ...props,
+      variables: Config.succeed(unsafe),
+    });
+    const invalidConfig = yield* Output.evaluate(config.Props, {}).pipe(
+      Effect.catchDefect(Effect.succeed),
+    );
+    expect(invalidConfig).toMatchObject({
+      _tag: "ReservedEnvironmentVariableName",
+    });
+  }).pipe(
+    Effect.provideService(Providers, {
+      kind: "ProviderCollection",
+      providers: {},
+      get: () => undefined,
+    }),
+    Effect.provideService(Stack, {
+      name: "test",
+      stage: "test",
+      resources: {},
+      bindings: {},
+      actions: {},
+    }),
+    Effect.provideService(State, InMemoryService()),
+  ),
 );
 
 it.effect(
