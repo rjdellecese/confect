@@ -13,10 +13,10 @@ This integration supports Alchemy `2.0.0-beta.85` and Effect v4.1 or later. It d
 Install the integration and Alchemy in the workspace that contains your stack:
 
 ```sh
-pnpm add -D @confect/alchemy alchemy@2.0.0-beta.85
+pnpm add -D @confect/alchemy alchemy@2.0.0-beta.85 effect@^4.1.0 @effect/platform-node@^4.1.0
 ```
 
-The backend workspace must also have `convex` and, for `Confect.Backend`, `@confect/cli` installed. Deployment uses these installed binaries; it does not download a CLI. Use Node.js 24 or later.
+The Node.js CLI loads `@effect/platform-node` from the stack workspace. Use Node.js 24.11.1 or later on 24.x, or Node.js 25.1.0 or later. The backend workspace must also have `convex` and, for `Confect.Backend`, `@confect/cli` installed. Deployment uses these installed binaries; it does not download a CLI.
 
 ## Deploy to an existing backend
 
@@ -144,6 +144,8 @@ The provider refuses project-team changes and deployment identity changes that c
 Environment management preserves unrelated variables. Existing variables that overlap a new declaration require explicit adoption. Adopted values are restored when their ownership is removed; variables introduced by the stack are removed. Pass secrets as `Redacted` values, not plain strings.
 
 Set `env: {}` to remove all managed variables before the next code push. Removing the `env` option removes the environment resource instead, so its cleanup follows Alchemy's resource-deletion ordering.
+
+If the deployed `convex.config.ts` declares a variable as required, remove it in two deploys. First remove the requirement from your backend code while keeping the value in `env`. Once that code is deployed, remove the value from `env`. Otherwise Convex rejects the unset before the new code can run.
 
 Deploy-key secrets are only available when created. If the key's saved secret is lost, or the managed key no longer exists, deployment fails rather than silently rotating credentials. Restore the protected state or explicitly provision a replacement key. Deploy keys are revoked when their resource is destroyed.
 
