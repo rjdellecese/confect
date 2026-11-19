@@ -72,6 +72,7 @@ describe("HttpRouter", () => {
       }),
     );
     expectTypeOf<typeof routes>().toExtend<HttpRouter_.Routes<typeof schema>>();
+    expectTypeOf<typeof routes>().not.toExtend<HttpRouter_.Routes>();
     expectTypeOf<[typeof routes]>().toExtend<
       Parameters<typeof HttpRouter_.make<typeof schema>>
     >();
@@ -88,7 +89,7 @@ describe("HttpRouter", () => {
   });
 
   it("accepts routes without a schema value or type argument", () => {
-    const routes = HttpRouter.add(
+    const routes: HttpRouter_.Routes = HttpRouter.add(
       "GET",
       "/health",
       HttpServerResponse.text("ok"),
@@ -105,6 +106,9 @@ describe("HttpRouter", () => {
 
   it("keeps non-HTTP capabilities unavailable", () => {
     type Services = HttpRouter_.Services<typeof schema>;
+    expectTypeOf<HttpRouter_.Services>().toEqualTypeOf<
+      Exclude<Services, VectorSearch.VectorSearch<Model>>
+    >();
     expectTypeOf<VectorSearch.VectorSearch<Model>>().toExtend<Services>();
     expectTypeOf<VectorSearch.VectorSearch<Model>>().not.toExtend<
       HttpRouter_.Services<typeof otherSchema>
@@ -117,6 +121,20 @@ describe("HttpRouter", () => {
     expectTypeOf<
       ActionCtx.ActionCtx<DataModel.ToConvexDataModel<Model>>
     >().not.toExtend<Services>();
+  });
+
+  it("allows a generic schema's vector search in its HTTP handlers", () => {
+    const mount = <S extends DatabaseSchema.AnyWithProps>(
+      search: VectorSearch.VectorSearchTag<DataModel.FromDatabaseSchema<S>>,
+    ) =>
+      HttpRouter_.make<S>(
+        HttpRouter.add(
+          "GET",
+          "/health",
+          Effect.as(search, HttpServerResponse.text("ok")),
+        ),
+      );
+    mount<typeof schema>(Search);
   });
 
   it("does not evaluate or alter table schemas when constructing a router", () => {

@@ -35,11 +35,21 @@ import type { StorageReader } from "./StorageReader";
 import type { StorageWriter } from "./StorageWriter";
 import type * as VectorSearch from "./VectorSearch";
 
+type WithSchema<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Service,
+> = {
+  [Key in keyof DatabaseSchema_]: Service;
+}[DatabaseSchema.TypeId];
+
 /**
  * The Confect services available to HTTP route handlers and middleware,
- * supplied per request from the Convex action context.
+ * supplied per request from the Convex action context. Pass the application
+ * schema type to include its vector search service.
  */
-export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
+export type Services<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps = never,
+> =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
@@ -51,7 +61,10 @@ export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | StorageReader
   | StorageWriter
   | StorageActionWriter
-  | VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>;
+  | WithSchema<
+      DatabaseSchema_,
+      VectorSearch.VectorSearch<DataModel.FromDatabaseSchema<DatabaseSchema_>>
+    >;
 
 /**
  * A layer that registers routes on the HTTP router—the input to {@link make}.
@@ -74,20 +87,21 @@ export type Services<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  * `Config` reads (e.g. in `Layer.unwrap`) resolve against Convex environment
  * variables.
  */
-export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
-  Layer.Layer<
-    never,
-    never,
-    | HttpRouter.HttpRouter
-    | Etag.Generator
-    | FileSystem.FileSystem
-    | HttpPlatform.HttpPlatform
-    | Path.Path
-    | HttpRouter.Request<"Requires", Services<DatabaseSchema_>>
-    | HttpRouter.Request<"GlobalRequires", Services<DatabaseSchema_>>
-    | HttpRouter.Request<"Error", any>
-    | HttpRouter.Request<"GlobalError", any>
-  >;
+export type Routes<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps = never,
+> = Layer.Layer<
+  never,
+  never,
+  | HttpRouter.HttpRouter
+  | Etag.Generator
+  | FileSystem.FileSystem
+  | HttpPlatform.HttpPlatform
+  | Path.Path
+  | HttpRouter.Request<"Requires", Services<DatabaseSchema_>>
+  | HttpRouter.Request<"GlobalRequires", Services<DatabaseSchema_>>
+  | HttpRouter.Request<"Error", any>
+  | HttpRouter.Request<"GlobalError", any>
+>;
 
 /**
  * Create a Convex HTTP router. Pass the application's database schema as a type
