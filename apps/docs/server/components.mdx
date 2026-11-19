@@ -180,12 +180,19 @@ import { defineComponent } from "convex/server";
 export default defineComponent("counter");
 ```
 
-From the component package directory, run Confect codegen before Convex's component codegen:
+From the component package directory, generate the Confect files first:
 
 ```sh
 confect codegen --component-dir src/convex
-convex codegen --component-dir src/convex
 ```
+
+Convex's codegen needs a configured development deployment. For a local component, run it from the enclosing Convex application, with the path relative to that application:
+
+```sh
+convex codegen --component-dir components/counter/src/convex
+```
+
+For a separately published component, use a configured development application the same way. If the component package itself is configured as a Convex project, run `convex codegen --component-dir src/convex` there instead.
 
 For watch mode, use `confect dev --component-dir src/convex` alongside your Convex development workflow. These commands target one component; run application codegen separately.
 
@@ -228,7 +235,7 @@ Keep using `FunctionImpl.make(databaseSchema, group, name, handler)` with the ge
 - Database operations address the component's database, with scoped document IDs.
 - Storage and scheduling services return IDs in that same component scope.
 - The generated `QueryCtx`, `MutationCtx`, and `ActionCtx` services expose the underlying Convex handler argument—the `ctx` in `(ctx, args) => ...`. Their database, storage, and scheduler methods use component-scoped IDs, and they omit `ctx.auth`.
-- Application `Auth` and `MutationAuth` are unavailable, including JWT signing. Pass the identity information your component needs explicitly in function arguments.
+- Application `Auth` and `MutationAuth` are unavailable, including JWT signing. In a component, Confect's `RequestMetadata` and context services return `null` for `authToken`. Pass the identity information your component needs explicitly in function arguments.
 
 Component codegen rejects `confect/auth.ts`. Configuration reads still use Convex's environment provider; declare component environment variables through the native component configuration API.
 
@@ -279,7 +286,7 @@ The `parentScope` keeps child IDs associated with the enclosing instance when a 
 
 ### Publish the component
 
-Build the Convex and Confect trees to JavaScript and emit their TypeScript declarations. Preserve relative imports and the generated files they reference, or bundle the corresponding entry points. A package whose output mirrors `src/` under `dist/` can expose:
+Build the Convex and Confect trees to JavaScript and emit their TypeScript declarations. For an ES module package, bundle the entry points or rewrite relative imports to the emitted filenames (for example, `./spec.js` rather than `./spec`). Node won't resolve extensionless imports in the published contract. Make sure the declarations also resolve from a consumer using `NodeNext`. A package whose output mirrors `src/` under `dist/` can expose:
 
 ```json package.json
 {
@@ -304,16 +311,29 @@ Include the runtime dependencies used by your component (`effect` and the releva
 
 Vanilla Convex consumers install `@example/counter/convex.config.js` and call its generated component API without importing the Confect contract. They supply encoded arguments and receive encoded results; for example, `Schema.FiniteFromString` is a string on the wire. They observe declared failures as Convex errors rather than Effect failures. Confect consumers bind the additional `/confect` export to get decoding and typed errors.
 
-Confect does not run Convex's component codegen, build your npm package, or publish it for you. Before publishing, inspect `npm pack --dry-run` and test the packed artifact from a separate consumer project using both interfaces.
+Confect does not run Convex's component codegen, build your npm package, or publish it for you. Before publishing, install the tarball from `npm pack` in a separate consumer project. Check the runtime import with `node --input-type=module -e 'import "@example/counter/confect"'` and test a call through each interface.
 
 ### Test the component
 
-Register the component's generated Convex schema and module loaders with `TestConfect` before calling bound references:
+Register the component's generated Convex schema and module loaders with `TestConfect` before calling bound references. In a test without a generated host registry, bind the reference returned by registration:
 
 ```ts
-const t = yield * TestConfect.TestConfect<typeof applicationSchema>();
-yield * t.registerComponent("counter", componentConvexSchema, componentModules);
-yield * t.mutation(counter.counter.create, { count: 3 });
+import { Component } from "@confect/core";
+import { TestConfect } from "@confect/test";
+import type { ComponentApi } from "@example/counter/_generated/component.js";
+import contract from "@example/counter/confect";
+import * as Effect from "effect/Effect";
+
+const createCounter = Effect.gen(function* () {
+  const t = yield* TestConfect.TestConfect<typeof applicationSchema>();
+  const installed = yield* t.registerComponent<ComponentApi<"counter">>(
+    "counter",
+    componentConvexSchema,
+    componentModules,
+  );
+  const counter = Component.bind(contract, installed);
+  return yield* t.mutation(counter.counter.create, { count: 3 });
+});
 ```
 
 The registration path must match the installed component path. The module map follows `convex-test` conventions and includes the component's Convex `_generated` files. Register the same definition at two paths to test instance isolation. A published package can provide its own `/test` helper that supplies this schema and module map.

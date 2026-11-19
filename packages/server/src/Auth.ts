@@ -29,7 +29,7 @@ export class Auth extends Context.Service<Auth, ReturnType<typeof make>>()(
 export const layer = (auth: ConvexAuth) => Layer.succeed(Auth, make(auth));
 
 export type ForTarget<Target extends DatabaseSchema.Target> =
-  Target["kind"] extends "component" ? never : Auth;
+  Target["kind"] extends "app" ? Auth : never;
 
 export const layerForTarget = <Target extends DatabaseSchema.Target>(
   target: Target,

@@ -1,5 +1,6 @@
 import type { GenericId } from "@confect/core/GenericId";
 import type * as IdScope from "@confect/core/IdScope";
+import type * as Types from "effect/Types";
 import type { StorageReader as ConvexStorageReader } from "convex/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -35,9 +36,11 @@ const make = <Scope extends IdScope.IdScope = IdScope.App>() =>
 export type Service<Scope extends IdScope.IdScope = IdScope.App> =
   Effect.Success<ReturnType<typeof make<Scope>>>;
 
-export type ForScope<Scope extends IdScope.IdScope> = Scope extends IdScope.App
+export type ForScope<Scope extends IdScope.IdScope> = [Scope] extends [
+  IdScope.App,
+]
   ? Storage
-  : { readonly "~ScopedStorage": Scope };
+  : { readonly "~ScopedStorage": Types.Invariant<Scope> };
 
 export class Storage extends Context.Service<Storage, Service>()(
   "@confect/server/Storage",

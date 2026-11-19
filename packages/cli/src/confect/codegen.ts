@@ -116,6 +116,10 @@ export const codegen = Command.make("codegen", DirectoryOptions.flags, () =>
 const runCodegen = Effect.gen(function* () {
   yield* validateComponentConfiguration;
   yield* generateConfectGeneratedDirectory;
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const generated = path.join(confectDirectory, GENERATED_DIRNAME);
   // Reject a legacy `confect/schema.ts` up front so the user-facing
   // migration message surfaces before any bundler error from impl
   // validation (each impl imports `_generated/schema.ts`).
@@ -126,8 +130,20 @@ const runCodegen = Effect.gen(function* () {
   // cross-table id refs, so it must exist on disk first.
   const tableModules = yield* TableModule.discover;
   yield* warnIfNoTables(tableModules);
+  const component = (yield* ConvexDirectory.target).kind === "component";
+  const switchingTarget =
+    (yield* fs.exists(path.join(generated, "id.ts"))) &&
+    (yield* fs.exists(path.join(generated, "component.ts"))) !== component;
+  if (switchingTarget) {
+    yield* generateComponents;
+  } else {
+    const registry = path.join(generated, "components.ts");
+    if (!(yield* fs.exists(registry))) {
+      const contents = yield* templates.components({ components: [] });
+      yield* writeFileStringAndLog(registry, contents);
+    }
+  }
   yield* generateIdConstructor(tableModules);
-  yield* generateComponents;
   // Now that `_generated/id.ts` is on disk, bundle each table module and
   // check its default export is an `UnnamedTable`. Surface diagnostics
   // here (rather than later) so they appear before impl-validation noise.
@@ -158,6 +174,7 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
+  if (!switchingTarget) yield* generateComponents;
   yield* validateAllImpls(leaves);
   yield* generateGroupRegisteredFunctions(leaves);
   yield* removeObsoleteRegisteredFunctions(leaves);
@@ -171,9 +188,6 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
   const optionalFiles = yield* Effect.filter(
     ["http.ts", "crons.ts", "auth.ts"],
     (file) => fs.exists(path.join(confectDirectory, file)),
@@ -221,7 +235,7 @@ const generateComponentContract = Effect.fnUntraced(function* (
   tables: ReadonlyArray<TableModule.TableModule>,
 ) {
   return yield* Match.value((yield* ConvexDirectory.target).kind).pipe(
-    Match.when("app", () => Effect.void),
+    Match.when("app", () => removeObsoleteGeneratedFile("component.ts")),
     Match.when("component", () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
@@ -846,10 +860,10 @@ const generateRefs = Effect.gen(function* () {
 /**
  * Generate `confect/_generated/components.ts`—the typed registry of Convex
  * components installed in `convex/convex.config.ts` (see
- * {@link templates.components}). The file is emitted even when there is no
- * `convex.config.ts` (as an empty registry) so the import surface stays stable.
- * It must exist before loading tables and specs because they may import bound
- * component IDs and schemas.
+ * {@link templates.components}). An application without `convex.config.ts` gets
+ * an empty registry; an authored component must have a definition. Tables and
+ * specs only need the registry's runtime proxy while they load; its
+ * installation types may depend on config imports of their generated modules.
  *
  * @internal
  */
@@ -872,11 +886,19 @@ export const generateComponents = Effect.gen(function* () {
     ConvexConfig.CONVEX_CONFIG_FILENAME,
   );
 
-  const installedComponents = (yield* fs.exists(convexConfigPath))
+  const kind = (yield* ConvexDirectory.target).kind;
+  const hasConfig = yield* fs.exists(convexConfigPath);
+  if (!hasConfig && kind === "component") {
+    return yield* CodegenError.InvalidConvexConfigError.make({
+      configPath: path.relative(projectRoot, convexConfigPath),
+      reason: "a component definition is required for --component-dir.",
+    });
+  }
+  const installedComponents = hasConfig
     ? yield* ConvexConfig.discoverInstalledComponents(
         convexConfigPath,
         path.relative(projectRoot, convexConfigPath),
-        (yield* ConvexDirectory.target).kind,
+        kind,
       )
     : [];
 
@@ -906,6 +928,7 @@ const logGenerated = (effect: typeof generateHttp) =>
           Match.value(change).pipe(
             Match.when("Added", () => logFileAdded(convexFilePath)),
             Match.when("Modified", () => logFileModified(convexFilePath)),
+            Match.when("Removed", () => logFileRemoved(convexFilePath)),
             Match.when("Unchanged", () => Effect.void),
             Match.exhaustive,
           ),

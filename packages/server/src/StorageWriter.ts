@@ -1,4 +1,5 @@
 import type * as IdScope from "@confect/core/IdScope";
+import type * as Types from "effect/Types";
 import type { StorageWriter as ConvexStorageWriter } from "convex/server";
 import type { GenericId } from "convex/values";
 import * as Context from "effect/Context";
@@ -15,9 +16,11 @@ export type Service<Scope extends IdScope.IdScope = IdScope.App> = {
     id: ScopedId.GenericId<"_storage", Scope>,
   ) => ReturnType<ReturnType<typeof make>["delete"]>;
 };
-export type ForScope<Scope extends IdScope.IdScope> = Scope extends IdScope.App
+export type ForScope<Scope extends IdScope.IdScope> = [Scope] extends [
+  IdScope.App,
+]
   ? StorageWriter
-  : { readonly "~ScopedStorageWriter": Scope };
+  : { readonly "~ScopedStorageWriter": Types.Invariant<Scope> };
 
 const make = (storageWriter: ConvexStorageWriter) => ({
   generateUploadUrl: Effect.promise(() =>

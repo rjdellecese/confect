@@ -44,6 +44,13 @@ describe("DatabaseSchema", () => {
   it("represents an empty schema with no table members", () => {
     const schema = DatabaseSchema.make({});
     expect(DatabaseSchema.tables(schema)).toEqual({});
+    expectTypeOf(schema.target).toEqualTypeOf<DatabaseSchema.AppTarget>();
+    // @ts-expect-error An omitted target constructs an application schema.
+    const misidentified: DatabaseSchema.DatabaseSchema<
+      {},
+      DatabaseSchema.ComponentTarget
+    > = DatabaseSchema.make({});
+    void misidentified;
     expectTypeOf<DatabaseSchema.Tables<typeof schema>>().toBeNever();
     expectTypeOf<DatabaseSchema.TableNames<typeof schema>>().toBeNever();
     expectTypeOf<DatabaseSchema.AllTableNames<typeof schema>>().toEqualTypeOf<

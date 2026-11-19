@@ -1,5 +1,6 @@
 import type { DefaultFunctionArgs, FunctionReference } from "convex/server";
 import { getFunctionAddress } from "convex/server";
+import type { GenericId as ConvexId } from "convex/values";
 import * as Array from "effect/Array";
 import { memoize, pipe } from "effect/Function";
 import * as Match from "effect/Match";
@@ -19,22 +20,37 @@ import * as Spec from "./Spec";
 
 const TypeId = "~@confect/core/Component";
 const BoundTypeId = "~@confect/core/BoundComponent";
+declare const MountNameId: unique symbol;
+
+export type Mounted<Api_, Name extends string> = Api_ & {
+  readonly [MountNameId]: Name;
+};
 
 /**
  * Convex's generated ComponentApi erases database ID brands at the boundary.
  */
-type Wire<A> = A extends { readonly __tableName: string }
-  ? string
-  : A extends
-        | string
-        | number
-        | bigint
-        | boolean
-        | null
-        | undefined
-        | ArrayBuffer
-    ? A
-    : { [K in keyof A]: Wire<A[K]> };
+type Wire<A, ValidatorShape extends boolean = false> =
+  A extends ConvexId<string>
+    ? string
+    : A extends
+          | string
+          | number
+          | bigint
+          | boolean
+          | null
+          | undefined
+          | ArrayBuffer
+      ? A
+      : A extends ReadonlyArray<infer Item>
+        ? ValidatorShape extends true
+          ? Array<Wire<Item, true>>
+          : { [K in keyof A]: Wire<A[K]> }
+        : {
+            [K in keyof A as K extends ConvexId<string> ? string : K]: Wire<
+              A[K],
+              ValidatorShape
+            >;
+          };
 
 type OmitEmpty<A> = {
   [K in keyof A as keyof A[K] extends never ? never : K]: A[K];
@@ -61,8 +77,11 @@ type ApiGroup<
       FunctionSpec_["runtimeAndFunctionType"]
     >,
     "internal",
-    Extract<Wire<FunctionSpec.EncodedArgs<FunctionSpec_>>, DefaultFunctionArgs>,
-    Wire<FunctionSpec.EncodedReturns<FunctionSpec_>>,
+    Extract<
+      Wire<FunctionSpec.EncodedArgs<FunctionSpec_>, true>,
+      DefaultFunctionArgs
+    >,
+    Wire<FunctionSpec.EncodedReturns<FunctionSpec_>, true>,
     Name
   >;
 };
@@ -71,6 +90,53 @@ export type Api<
   Spec_ extends Spec.AnyWithProps,
   Name extends string | undefined = string | undefined,
 > = ApiGroups<Spec.Groups<Spec_>, Name>;
+
+type AcceptedArgs<Sent, Native> = unknown extends Native
+  ? Sent
+  : Native extends unknown
+    ? Sent extends Native
+      ? Native extends ArrayBuffer
+        ? Sent
+        : Native extends ReadonlyArray<infer Element>
+          ? Sent extends ReadonlyArray<infer Item>
+            ? ReadonlyArray<AcceptedArgs<Item, Element>>
+            : never
+          : Native extends object
+            ? Sent extends object
+              ? [keyof Sent] extends [keyof Native]
+                ? {
+                    [K in keyof Sent]: K extends keyof Native
+                      ? AcceptedArgs<Sent[K], Native[K]>
+                      : never;
+                  }
+                : never
+              : never
+            : Sent
+      : never
+    : never;
+
+type CompatibleApi<Expected, Native> =
+  Expected extends FunctionReference<
+    infer Kind,
+    infer Visibility,
+    infer Args,
+    infer Returns
+  >
+    ? Native extends FunctionReference<
+        Kind,
+        Visibility,
+        infer NativeArgs,
+        Returns
+      >
+      ? [Args] extends [AcceptedArgs<Args, NativeArgs>]
+        ? Native
+        : never
+      : never
+    : {
+        [K in keyof Expected]: K extends keyof Native
+          ? CompatibleApi<Expected[K], Native[K]>
+          : never;
+      };
 
 interface Tree {
   readonly [key: string]: Tree | Ref.Any;
@@ -97,8 +163,11 @@ export type MountScope<
   Name extends string | undefined,
 > = IdScope.Mount<Parent, Name>;
 
-type MountName<ComponentApi> =
-  ComponentApi extends FunctionReference<any, any, any, any, infer Name>
+type MountName<ComponentApi> = ComponentApi extends {
+  readonly [MountNameId]: infer Name extends string;
+}
+  ? Name
+  : ComponentApi extends FunctionReference<any, any, any, any, infer Name>
     ? Name
     : ComponentApi extends object
       ? {
@@ -203,11 +272,11 @@ export const bind = <
   Spec_ extends Spec.AnyWithProps,
   From extends IdScope.IdScope,
   Tables extends string,
-  Native extends Api<NoInfer<Spec_>>,
+  Native extends object,
   const Parent extends IdScope.IdScope = IdScope.App,
 >(
   component: Component<Spec_, From, Tables>,
-  native: Native,
+  native: Native & CompatibleApi<Api<NoInfer<Spec_>>, NoInfer<Native>>,
   options?: { readonly parentScope: Parent },
 ): Bound<
   Spec_,

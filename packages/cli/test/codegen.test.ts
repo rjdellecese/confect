@@ -48,6 +48,26 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "codegenHandler",
   (it) => {
     it.effect(
+      "bootstraps configurations that import generated table wrappers",
+      () =>
+        Effect.gen(function* () {
+          const project = yield* Project.make;
+          const fs = yield* FileSystem.FileSystem;
+          yield* project.write(
+            "convex/convex.config.ts",
+            `import { defineApp } from "convex/server";
+import notes from "../confect/_generated/tables/notes";
+export default defineApp({ httpPrefix: "/" + notes.tableName });`,
+          );
+          yield* project.provide(codegenHandler);
+          const registry = yield* fs.readFileString(
+            `${project.root}/confect/_generated/components.ts`,
+          );
+          expect(registry).toContain("export type Components = {};");
+        }).pipe(Effect.scoped),
+    );
+
+    it.effect(
       "matches fresh output with workspace-linked dependencies",
       () =>
         Effect.gen(function* () {

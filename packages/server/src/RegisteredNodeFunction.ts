@@ -106,7 +106,7 @@ const nodeActionFunction = <
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
-    scope: databaseSchema.target.scope,
+    databaseSchema,
     name,
     functionVisibility,
     args,

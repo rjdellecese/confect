@@ -59,6 +59,14 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(services).toContain(
             "Storage_.Storage.forScope<typeof scope>()",
           );
+          yield* fs.remove(path.join(project.root, "convex/convex.config.ts"));
+          yield* project.write("confect/tables/other.ts", Project.table);
+          yield* watching.waitFor("component definition is required");
+          yield* project.write(
+            "convex/convex.config.ts",
+            'import { defineComponent } from "convex/server"; export default defineComponent("counter");',
+          );
+          yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
       { timeout: 30000 },
     );

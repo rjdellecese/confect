@@ -309,7 +309,9 @@ export const mutationLayer = <
       schema.target.scope,
     ),
     ExecutionMetadata.layer(ctx.meta),
-    RequestMetadata.layer(ctx.meta),
+    RequestMetadata.layer(
+      RequestMetadata.forScope(ctx.meta, schema.target.scope),
+    ),
     TransactionMetadata.layer(ctx.meta),
     QueryTransactionContext.layer(ctx),
     MutationTransactionContext.layer(ctx),
@@ -431,7 +433,7 @@ const convexActionFunction = <
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
-    scope: schema.target.scope,
+    databaseSchema: schema,
     name,
     functionVisibility,
     args,

@@ -287,7 +287,7 @@ export const actionFunctionBase = <
   handler,
   resolvedMiddlewares = [],
   createLayer,
-  scope = IdScope.app,
+  databaseSchema,
 }: {
   name: string;
   functionVisibility: FunctionVisibility;
@@ -301,10 +301,12 @@ export const actionFunctionBase = <
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
   ) => Layer.Layer<R>;
-  scope?: IdScope.IdScope;
+  databaseSchema?: DatabaseSchema_;
 }) => ({
-  args: () => compileArgsSchema(args, scope),
-  returns: () => compileReturnsSchema(returns, scope),
+  args: () =>
+    compileArgsSchema(args, databaseSchema?.target.scope ?? IdScope.app),
+  returns: () =>
+    compileReturnsSchema(returns, databaseSchema?.target.scope ?? IdScope.app),
   handler: (
     ctx: GenericActionCtx<
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
@@ -361,7 +363,9 @@ export const actionLayer = <
       ctx.auth,
     ),
     ExecutionMetadata.layer(ctx.meta),
-    RequestMetadata.layer(ctx.meta),
+    RequestMetadata.layer(
+      RequestMetadata.forScope(ctx.meta, databaseSchema.target.scope),
+    ),
     Storage.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
       ctx.storage,
       databaseSchema.target.scope,

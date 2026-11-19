@@ -374,6 +374,9 @@ const componentsEffect = Effect.fnUntraced(function* ({
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
+  if (installedComponents.length > 0) {
+    yield* cbw.writeLine(`import type { Component } from "@confect/core";`);
+  }
   yield* cbw.writeLine(`import { componentsGeneric } from "convex/server";`);
   yield* cbw.blankLine();
 
@@ -386,7 +389,7 @@ const componentsEffect = Effect.fnUntraced(function* ({
         installedComponents,
         ({ name, typeImportPath }) =>
           cbw.writeLine(
-            `"${name}": import("${typeImportPath}/_generated/component.js").ComponentApi<"${name}">;`,
+            `"${name}": Component.Mounted<import("${typeImportPath}/_generated/component.js").ComponentApi<"${name}">, "${name}">;`,
           ),
         { concurrency: 1, discard: true },
       ),

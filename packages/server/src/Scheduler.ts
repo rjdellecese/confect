@@ -1,4 +1,5 @@
 import type * as IdScope from "@confect/core/IdScope";
+import type * as Types from "effect/Types";
 import { Ref } from "@confect/core";
 import type { GenericId } from "@confect/core/GenericId";
 import type { Scheduler as ConvexScheduler } from "convex/server";
@@ -65,9 +66,11 @@ export interface Service<Scope extends IdScope.IdScope = IdScope.App> {
   ): Effect.Effect<GenericId<"_scheduled_functions", Scope>>;
 }
 
-export type ForScope<Scope extends IdScope.IdScope> = Scope extends IdScope.App
+export type ForScope<Scope extends IdScope.IdScope> = [Scope] extends [
+  IdScope.App,
+]
   ? Scheduler
-  : { readonly "~ScopedScheduler": Scope };
+  : { readonly "~ScopedScheduler": Types.Invariant<Scope> };
 
 export const forScope = <
   Scope extends IdScope.IdScope = IdScope.App,

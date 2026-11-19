@@ -25,7 +25,7 @@ export const layer = (auth: Pick<ConvexMutationAuth, "signJwt">) =>
   Layer.succeed(MutationAuth, make(auth));
 
 export type ForTarget<Target extends DatabaseSchema.Target> =
-  Target["kind"] extends "component" ? never : MutationAuth;
+  Target["kind"] extends "app" ? MutationAuth : never;
 
 export const layerForTarget = <Target extends DatabaseSchema.Target>(
   target: Target,

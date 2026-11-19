@@ -17,10 +17,12 @@ import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import type * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as Str from "effect/String";
 import type * as Etag from "effect/http/Etag";
 import type * as HttpPlatform from "effect/http/HttpPlatform";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServer from "effect/http/HttpServer";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
 import type * as DatabaseSchema from "./DatabaseSchema";
@@ -132,7 +134,7 @@ export const forSchema =
       Match.value(schema.target.kind).pipe(
         Match.when("app", () => routes),
         Match.when("component", () =>
-          routes.pipe(Layer.provide(componentRouter)),
+          routes.pipe(Layer.provide(componentMount)),
         ),
         Match.exhaustive,
       ),
@@ -141,18 +143,26 @@ export const forSchema =
 
 // Convex uses a component-relative path to select its HTTP action but passes
 // the original request URL to that action. Its CONVEX_SITE_URL includes the
-// installation's full mount prefix (including parent mounts). Prefixing the
-// Effect router preserves relative routes without rewriting the Request body.
-const componentRouter = Layer.effect(
-  HttpRouter.HttpRouter,
-  Effect.gen(function* () {
-    const router = yield* HttpRouter.HttpRouter;
-    const siteUrl = yield* Config.schema(
-      Schema.URLFromString,
-      "CONVEX_SITE_URL",
-    );
-    return router.prefixed(siteUrl.pathname);
-  }).pipe(Effect.orDie),
+// installation's full, literal mount path (including parent mounts).
+const componentMount = HttpRouter.middleware(
+  Config.schema(Schema.URLFromString, "CONVEX_SITE_URL").pipe(
+    Effect.orDie,
+    Effect.map((siteUrl) => {
+      const prefix = Str.replace(/\/$/, "")(siteUrl.pathname);
+      return (handler) =>
+        Effect.updateService(
+          handler,
+          HttpServerRequest.HttpServerRequest,
+          (request) => {
+            const relative = Str.slice(prefix.length)(request.url);
+            return request.modify({
+              url: Str.startsWith("/")(relative) ? relative : "/" + relative,
+            });
+          },
+        );
+    }),
+  ),
+  { global: true },
 );
 
 const makeWithLayer = <Services_, DataModel_ extends GenericDataModel>(

@@ -80,7 +80,7 @@ export type QueryServices<
 > =
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | DocumentIds.DocumentIds<DatabaseSchema_>
-  | (DatabaseSchema_["target"]["kind"] extends "component" ? never : Auth.Auth)
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | ExecutionMetadata
   | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
@@ -101,7 +101,7 @@ export type MutationServices<
   | DatabaseWriter.DatabaseWriter<DatabaseSchema_>
   | MutationAuth.ForTarget<DatabaseSchema_["target"]>
   | DocumentIds.DocumentIds<DatabaseSchema_>
-  | (DatabaseSchema_["target"]["kind"] extends "component" ? never : Auth.Auth)
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | Scheduler.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | ExecutionMetadata
   | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
@@ -128,7 +128,7 @@ export type ActionServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
   | Scheduler.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
-  | (DatabaseSchema_["target"]["kind"] extends "component" ? never : Auth.Auth)
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | ExecutionMetadata
   | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>

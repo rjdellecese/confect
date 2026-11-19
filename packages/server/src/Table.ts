@@ -1,6 +1,9 @@
 import * as Record from "effect/Record";
 import type * as IdScope from "@confect/core/IdScope";
-import { compileTableSchema } from "@confect/core/SchemaToValidator";
+import {
+  compileTableSchema,
+  type EmittedTableValidator,
+} from "@confect/core/SchemaToValidator";
 import * as Table_ from "@confect/core/Table";
 import * as Schema from "effect/Schema";
 import { defineTable, type TableDefinition } from "convex/server";
@@ -43,22 +46,30 @@ const tableDefinitionCache = new WeakMap<
   TableDefinition<any, any, any, any>
 >();
 
+type CompiledTable<Table extends Table_.AnyWithProps> =
+  Table extends Table_.Table<
+    string,
+    infer Fields,
+    any,
+    infer Indexes,
+    infer SearchIndexes,
+    infer VectorIndexes,
+    infer Scope
+  >
+    ? TableDefinition<
+        EmittedTableValidator<Fields, Scope>,
+        Indexes,
+        SearchIndexes,
+        VectorIndexes
+      >
+    : never;
+
 export const tableDefinition = <Table extends Table_.AnyWithProps>(
   table: Table,
-): TableDefinition<
-  Table_.TableValidator<Table>,
-  Table_.Indexes<Table>,
-  Table_.SearchIndexes<Table>,
-  Table_.VectorIndexes<Table>
-> => {
+): CompiledTable<Table> => {
   const cached = tableDefinitionCache.get(table);
   if (cached !== undefined) {
-    return cached as TableDefinition<
-      Table_.TableValidator<Table>,
-      Table_.Indexes<Table>,
-      Table_.SearchIndexes<Table>,
-      Table_.VectorIndexes<Table>
-    >;
+    return cached as CompiledTable<Table>;
   }
 
   let definition: TableDefinition<any, any, any, any> = defineTable(
@@ -81,12 +92,7 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
   }
 
   tableDefinitionCache.set(table, definition);
-  return definition as TableDefinition<
-    Table_.TableValidator<Table>,
-    Table_.Indexes<Table>,
-    Table_.SearchIndexes<Table>,
-    Table_.VectorIndexes<Table>
-  >;
+  return definition as CompiledTable<Table>;
 };
 
 // -----------------------------------------------------------------------------

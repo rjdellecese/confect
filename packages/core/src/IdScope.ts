@@ -19,6 +19,10 @@ const make = <const Identity extends string>(
 export type App = IdScope<"">;
 export const app: App = make("");
 
+export type Args<Scope extends IdScope> =
+  | [scope: Scope]
+  | (App extends Scope ? [scope?: Scope | undefined] : never);
+
 export type Component<Name extends string> = IdScope<`component:${Name}`>;
 
 interface InstanceIdentity<Parent extends IdScope, Name extends string> {

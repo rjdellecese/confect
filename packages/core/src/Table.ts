@@ -111,7 +111,7 @@ export interface UnnamedTable<
     const Scope_ extends IdScope.IdScope = IdScope.App,
   >(
     tableName: Name_,
-    scope?: Scope_,
+    ...scope: IdScope.Args<Scope_>
   ): Table<
     Name_,
     TableSchema_,

@@ -13,7 +13,11 @@ import {
   Spec,
 } from "@confect/core";
 import { componentsGeneric, getFunctionAddress } from "convex/server";
-import type { FunctionReference, RegisteredQuery } from "convex/server";
+import type {
+  FunctionReference,
+  PaginationOptions,
+  RegisteredQuery,
+} from "convex/server";
 import { v } from "convex/values";
 import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
@@ -67,6 +71,82 @@ const first = Component.bind(contract, native.first);
 const second = Component.bind(contract, native.second);
 
 describe("published component contracts", () => {
+  it("distinguishes installations without exported function references", () => {
+    const internal = GroupSpec.withName(
+      "items",
+      GroupSpec.make().addFunction(
+        FunctionSpec.internalQuery({ name: "get", returns: () => ItemId }),
+      ),
+    );
+    const internalSpec = { [Spec.TypeId]: { items: internal } };
+    const empty = Component.make({ [Spec.TypeId]: {} }, scope, ["items"]);
+    const privateOnly = Component.make(internalSpec, scope, ["items"]);
+    const registry = componentsGeneric() as unknown as {
+      left: Component.Mounted<{}, "left">;
+      right: Component.Mounted<
+        Component.Api<typeof internalSpec, "right">,
+        "right"
+      >;
+    };
+    const left = Component.bind(empty, registry.left);
+    const right = Component.bind(privateOnly, registry.right);
+    const leftId = Component.id(left, "items");
+    const rightId = Component.id(right, "items");
+    const rebound = Component.schema(right, ItemId);
+    expectTypeOf<typeof rebound.Type>().toEqualTypeOf<typeof rightId.Type>();
+    expectTypeOf<typeof leftId.Type>().not.toExtend<typeof rebound.Type>();
+    expect(GenericId.scope(leftId.ast)).not.toBe(GenericId.scope(rebound.ast));
+    expect(GenericId.scope(rightId.ast)).toBe(GenericId.scope(rebound.ast));
+  });
+
+  it("binds paginated tuple items to their native array validator shape", () => {
+    const paginated = {
+      [Spec.TypeId]: {
+        items: GroupSpec.withName(
+          "items",
+          GroupSpec.make().addFunction(
+            FunctionSpec.publicPaginatedQuery({
+              name: "list",
+              item: () => Schema.Tuple([ItemId, Schema.FiniteFromString]),
+            }),
+          ),
+        ),
+      },
+    };
+    const registry = componentsGeneric() as unknown as {
+      first: {
+        items: {
+          list: FunctionReference<
+            "query",
+            "internal",
+            { paginationOpts: PaginationOptions & { id?: number } },
+            { page: string[][]; continueCursor: string; isDone: boolean },
+            "first"
+          >;
+        };
+      };
+    };
+    const bound = Component.bind(
+      Component.make(paginated, scope, ["items"]),
+      registry.first,
+    );
+    const result = Ref.decodeReturnsSync(bound.items.list, {
+      page: [["item", "3"]],
+      continueCursor: "",
+      isDone: true,
+    });
+    expect(result.page).toEqual([["item", 3]]);
+    expectTypeOf<(typeof result.page)[number]>().toEqualTypeOf<
+      readonly [
+        GenericId.GenericId<
+          "items",
+          Component.MountScope<IdScope.App, "first">
+        >,
+        number,
+      ]
+    >();
+  });
+
   it.effect(
     "adds a hand-written codec contract to an existing native component",
     () => {
@@ -129,6 +209,66 @@ describe("published component contracts", () => {
       });
     },
   );
+
+  it("checks what a hand-written contract can send to the native function", () => {
+    const group = GroupSpec.withName(
+      "items",
+      GroupSpec.make().addFunction(
+        FunctionSpec.publicQuery({
+          name: "lookup",
+          args: () => ({
+            name: Schema.Literal("item"),
+            criteria: Schema.Struct({ enabled: Schema.Boolean }),
+          }),
+          returns: () => Schema.String,
+        }),
+      ),
+    );
+    const wrapper = Component.make(
+      { [Spec.TypeId]: { items: group } },
+      scope,
+      [],
+    );
+    type Lookup<Args extends Record<string, unknown>, Returns = string> = {
+      items: {
+        lookup: FunctionReference<"query", "internal", Args, Returns, "first">;
+      };
+    };
+    type Criteria = { criteria: { enabled: boolean } };
+    const registry = componentsGeneric() as unknown as {
+      wider: Lookup<Criteria & { name: string; limit?: number }, "found"> & {
+        other: {};
+      };
+      narrower: Lookup<{ name: "item"; criteria: { enabled: true } }>;
+      required: Lookup<Criteria & { name: "item"; limit: number }>;
+      nested: Lookup<{
+        name: "item";
+        criteria: { enabled: boolean; limit: number };
+      }>;
+      nestedExtra: Lookup<{ name: "item"; criteria: {} }>;
+      extra: Lookup<{}>;
+      wrongReturn: Lookup<Criteria & { name: "item" }, number>;
+      open: Lookup<Record<string, unknown>>;
+      untyped: Lookup<any, any>;
+    };
+    const bound = Component.bind(wrapper, registry.wider);
+    const args = { name: "item", criteria: { enabled: true } } as const;
+    expect(Ref.encodeArgsSync(bound.items.lookup, args)).toEqual(args);
+    Component.bind(wrapper, registry.open);
+    Component.bind(wrapper, registry.untyped);
+    // @ts-expect-error The wrapper can send false, but the native function requires true.
+    Component.bind(wrapper, registry.narrower);
+    // @ts-expect-error The wrapper does not send the required limit.
+    Component.bind(wrapper, registry.required);
+    // @ts-expect-error Nested required native arguments must be supplied too.
+    Component.bind(wrapper, registry.nested);
+    // @ts-expect-error A nested native object validator also rejects undeclared keys.
+    Component.bind(wrapper, registry.nestedExtra);
+    // @ts-expect-error A validator with no fields rejects the extra name key.
+    Component.bind(wrapper, registry.extra);
+    // @ts-expect-error The wrapper cannot decode the native return type.
+    Component.bind(wrapper, registry.wrongReturn);
+  });
 
   it("keeps bound function schemas lazy and memoized across installations", () => {
     const args = vi.fn(() => ({ id: GenericId.GenericId("items", scope) }));
@@ -309,15 +449,28 @@ describe("published component contracts", () => {
       [Spec.TypeId]: {
         native: GroupSpec.withName(
           "native",
-          GroupSpec.make().addFunction(
-            FunctionSpec.convexPublicQuery<
-              RegisteredQuery<
-                "public",
-                {},
-                Promise<GenericId.GenericId<"items">>
-              >
-            >()("id"),
-          ),
+          GroupSpec.make()
+            .addFunction(
+              FunctionSpec.convexPublicQuery<
+                RegisteredQuery<
+                  "public",
+                  {},
+                  Promise<GenericId.GenericId<"items">>
+                >
+              >()("id"),
+            )
+            .addFunction(
+              FunctionSpec.convexPublicQuery<
+                RegisteredQuery<
+                  "public",
+                  {},
+                  {
+                    __tableName: string;
+                    counts: Record<GenericId.GenericId<"items">, number>;
+                  }
+                >
+              >()("counts"),
+            ),
         ),
       },
     };
@@ -333,6 +486,15 @@ describe("published component contracts", () => {
     // @ts-expect-error Native component IDs must not acquire a host-table brand.
     const root: GenericId.GenericId<"items"> = value;
     void [wire, root];
+    const counts = Ref.decodeReturnsSync(bound.native.counts, {
+      __tableName: "items",
+      counts: { one: 3 },
+    });
+    expectTypeOf<typeof counts>().toEqualTypeOf<{
+      __tableName: string;
+      counts: Record<string, number>;
+    }>();
+    expect(counts.counts.one).toBe(3);
   });
   it("wraps a native component ref without inventing a local function name", () => {
     const wrapped = Ref.fromFunctionReference(native.first.items.create);

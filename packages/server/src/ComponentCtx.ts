@@ -1,4 +1,5 @@
 import type * as IdScope from "@confect/core/IdScope";
+import type * as Types from "effect/Types";
 import type { GenericId, Rebase } from "@confect/core/GenericId";
 import type {
   DocumentByName,
@@ -12,7 +13,7 @@ import type {
   SystemDataModel,
   WithoutSystemFields,
   WithOptionalSystemFields,
-  SchedulableFunctionReference,
+  Scheduler as ConvexScheduler,
   OptionalRestArgs,
   VectorIndexNames,
   VectorSearchQuery,
@@ -30,7 +31,7 @@ export interface Identifier<
   readonly "~@confect/server/ComponentCtx": {
     readonly kind: Kind;
     readonly dataModel: DataModel;
-    readonly scope: Scope;
+    readonly scope: Types.Invariant<Scope>;
   };
 }
 
@@ -71,6 +72,7 @@ export interface DatabaseWriter<
   DataModel extends GenericDataModel,
   Scope extends IdScope.IdScope,
 > extends DatabaseReader<DataModel, Scope> {
+  readonly vars: GenericMutationCtx<DataModel>["db"]["vars"];
   insert<TableName extends TableNamesInDataModel<DataModel>>(
     table: TableName,
     value: WithoutSystemFields<DocumentByName<DataModel, TableName>>,
@@ -137,6 +139,8 @@ export interface StorageActionWriter<
     options?: { sha256?: string },
   ): Promise<GenericId<"_storage", Scope>>;
 }
+
+type SchedulableFunctionReference = Parameters<ConvexScheduler["runAfter"]>[1];
 
 export interface Scheduler<Scope extends IdScope.IdScope> {
   runAfter<FunctionReference extends SchedulableFunctionReference>(

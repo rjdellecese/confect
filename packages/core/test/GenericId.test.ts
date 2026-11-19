@@ -1,4 +1,5 @@
 import * as Result from "effect/Result";
+import type * as Brand from "effect/Brand";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -123,6 +124,41 @@ describe("tableName", () => {
 });
 
 describe("rebase", () => {
+  it("keeps application brands on rebased IDs", () => {
+    const definition = IdScope.component("counter");
+    const installation = IdScope.instance(IdScope.app, "first");
+    const input = GenericId.GenericId("items", definition).pipe(
+      Schema.brand("Reviewed"),
+    );
+    const bound = GenericId.rebase(input, definition, installation);
+    type InstalledId = GenericId.GenericId<"items", typeof installation>;
+    expectTypeOf<typeof bound.Type>().toEqualTypeOf<
+      InstalledId & Brand.Brand<"Reviewed">
+    >();
+    expectTypeOf<InstalledId>().not.toExtend<typeof bound.Type>();
+    expectTypeOf<typeof bound.Encoded>().toEqualTypeOf<InstalledId>();
+  });
+
+  it("rebinds ID-keyed records in both directions", () => {
+    const definition = IdScope.component("counter");
+    const installation = IdScope.instance(IdScope.app, "first");
+    const counts = Schema.Record(
+      GenericId.GenericId("items", definition),
+      Schema.FiniteFromString,
+    );
+    const bound = GenericId.rebase(counts, definition, installation);
+    const id = GenericId.GenericId("items", installation).make("item");
+    const decoded = Result.getOrThrow(
+      Schema.decodeUnknownResult(bound)({ item: "2" }),
+    );
+    expectTypeOf<keyof typeof decoded>().toEqualTypeOf<typeof id>();
+    expectTypeOf<keyof typeof bound.Encoded>().toEqualTypeOf<typeof id>();
+    expect(decoded[id]).toBe(2);
+    expect(Result.getOrThrow(Schema.encodeResult(bound)(decoded))).toEqual({
+      item: "2",
+    });
+  });
+
   it("rebinds checked IDs without changing their source scope or checks", () => {
     const definition = IdScope.component("counter");
     const installation = IdScope.instance(IdScope.app, "first");

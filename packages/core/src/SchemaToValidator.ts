@@ -83,10 +83,74 @@ export type TableSchemaToTableValidator<
     ? Vd
     : never;
 
-export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
+declare const IdValidatorTypeId: unique symbol;
+type LocalId<Name extends string> = VId<ConvexGenericId<Name>>;
+type DeployedId<Original, Name extends string, Owner, Scope> = Original & {
+  readonly [IdValidatorTypeId]: IdScope.IdScope extends Scope
+    ? LocalId<Name> | VString
+    : [Owner, Scope] extends [Scope, Owner]
+      ? LocalId<Name>
+      : Owner extends Scope
+        ? LocalId<Name> | VString
+        : Scope extends Owner
+          ? LocalId<Name> | VString
+          : VString;
+};
+
+type WireValue<Value, Scope> =
+  IsAny<Value> extends true
+    ? any
+    : Value extends ConvexGenericId<infer Name>
+      ? Value extends {
+          readonly "~@confect/core/ScopedId": {
+            readonly table: infer Table extends string;
+            readonly scope: infer Owner;
+          };
+        }
+        ? DeployedId<Value, Table, Owner, Scope>
+        : DeployedId<Value, Name, IdScope.App, Scope>
+      : Value extends
+            | string
+            | number
+            | boolean
+            | bigint
+            | undefined
+            | null
+            | ArrayBuffer
+        ? Value
+        : [Extract<keyof Value, ConvexGenericId<string>>] extends [never]
+          ? { [K in keyof Value]: WireValue<Value[K], Scope> }
+          : {
+              [
+                K in keyof Value as K extends ConvexGenericId<string>
+                  ? WireValue<K, Scope>
+                  : K
+              ]: WireValue<Value[K], Scope>;
+            };
+
+type EmittedValidator<Value, Scope> =
+  IsRecursive<Value> extends true
+    ? VAny
+    : ValueToValidator<WireValue<Value, Scope>>;
+
+export type EmittedTableValidator<
+  TableSchema extends Schema.Codec<any, any>,
+  Scope extends IdScope.IdScope,
+> =
+  EmittedValidator<TableSchema["Encoded"], Scope> extends infer Vd extends
+    | VObject<any, any, any, any>
+    | VUnion<any, any, any, any>
+    | VAny
+    ? Vd
+    : never;
+
+export const compileTableSchema = <
+  TableSchema extends Schema.Codec<any, any>,
+  const Scope extends IdScope.IdScope = IdScope.App,
+>(
   schema: TableSchema,
-  scope: IdScope.IdScope = IdScope.app,
-): TableSchemaToTableValidator<TableSchema> => {
+  ...[scope]: IdScope.Args<Scope>
+): EmittedTableValidator<TableSchema, Scope> => {
   const ast = Schema.toEncoded(schema).ast;
 
   return pipe(
@@ -122,12 +186,22 @@ export type ReadonlyRecordValue = {
   readonly [key: string]: ReadonlyValue | undefined;
 };
 
+type DeployedIdType<T> = T extends {
+  readonly [IdValidatorTypeId]: { readonly type: infer Value extends string };
+}
+  ? Value
+  : T;
+
 type MutableValue<T> =
-  T extends ReadonlyArray<infer El>
-    ? MutableValue<El>[]
-    : T extends ReadonlyRecordValue
-      ? { -readonly [K in keyof T]: MutableValue<Exclude<T[K], undefined>> }
-      : T;
+  T extends ConvexGenericId<string>
+    ? DeployedIdType<T>
+    : T extends ReadonlyArray<infer El>
+      ? MutableValue<El>[]
+      : T extends ReadonlyRecordValue
+        ? [Extract<keyof T, { [IdValidatorTypeId]: unknown }>] extends [never]
+          ? { -readonly [K in keyof T]: MutableValue<Exclude<T[K], undefined>> }
+          : Record<DeployedIdType<keyof T>, MutableValue<T[keyof T]>>
+        : T;
 
 export type ValueToValidator<Vl> = [Vl] extends [never]
   ? never
@@ -184,37 +258,54 @@ type ConvertValueToValidator<
                         ? ObjectValueToValidator<Vl, Optionality>
                         : never;
 
-type StringValueToValidator<Vl, Optionality extends "required" | "optional"> =
-  Vl extends ConvexGenericId<string>
+type StringValueToValidator<
+  Vl,
+  Optionality extends "required" | "optional",
+> = Vl extends {
+  readonly [IdValidatorTypeId]: infer V extends VId<any> | VString;
+}
+  ? Optionality extends "optional"
+    ? ReturnType<typeof v.optional<V>>
+    : V
+  : Vl extends ConvexGenericId<string>
     ? VId<OptionalValue<Vl, Optionality>, Optionality>
     : [string] extends [Vl]
       ? VString<OptionalValue<string, Optionality>, Optionality>
       : VLiteral<OptionalValue<Vl, Optionality>, Optionality>;
 
-type ObjectValueToValidator<Vl, Optionality extends "required" | "optional"> =
-  IsRecord<MutableValue<Vl>> extends true
-    ? ValueToValidator<Vl[keyof Vl]> extends infer VdValue extends Validator<
-        any,
-        "required",
+type ObjectValueToValidator<Vl, Optionality extends "required" | "optional"> = (
+  IsRecord<Vl> extends true
+    ? true
+    : [keyof Vl] extends [never]
+      ? false
+      : keyof Vl extends ConvexGenericId<string>
+        ? true
+        : IsRecord<MutableValue<Vl>>
+) extends true
+  ? ValueToValidator<Vl[keyof Vl]> extends infer VdValue extends Validator<
+      any,
+      "required",
+      any
+    >
+    ? VRecord<
+        OptionalValue<MutableValue<Vl>, Optionality>,
+        keyof Vl extends ConvexGenericId<string>
+          ? StringValueToValidator<keyof Vl, "required">
+          : VString,
+        VdValue,
+        Optionality
+      >
+    : never
+  : ObjectFieldsToValidators<Vl> extends infer VdFields extends Record<
+        string,
         any
       >
-      ? VRecord<
-          OptionalValue<MutableValue<Vl>, Optionality>,
-          VString,
-          VdValue,
-          Optionality
-        >
-      : never
-    : ObjectFieldsToValidators<Vl> extends infer VdFields extends Record<
-          string,
-          any
-        >
-      ? VObject<
-          OptionalValue<MutableValue<Vl>, Optionality>,
-          VdFields,
-          Optionality
-        >
-      : never;
+    ? VObject<
+        OptionalValue<MutableValue<Vl>, Optionality>,
+        VdFields,
+        Optionality
+      >
+    : never;
 
 type ObjectFieldsToValidators<Vl> = {
   -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
@@ -261,10 +352,15 @@ type OptionalValueToValidator<Vl> = [Vl] extends [
   ? ConvertValueToValidator<Val, "optional">
   : never;
 
-export const compileSchema = <T, E>(
+export const compileSchema = <
+  T,
+  E,
+  const Scope extends IdScope.IdScope = IdScope.App,
+>(
   schema: Schema.Codec<T, E>,
-): ValueToValidator<(typeof schema)["Encoded"]> =>
-  Effect.runSync(compileAst(schema.ast)) as any;
+  ...[scope]: IdScope.Args<Scope>
+): EmittedValidator<E, Scope> =>
+  Effect.runSync(compileAst(Schema.toEncoded(schema).ast, false, scope)) as any;
 
 export const isRecursive = (ast: SchemaAST.AST): boolean =>
   pipe(

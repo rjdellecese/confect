@@ -33,11 +33,11 @@ export const GenericId = <
   const Scope extends IdScope.IdScope = IdScope.App,
 >(
   tableName: TableName,
-  scope?: Scope,
+  ...scope: IdScope.Args<Scope>
 ): Schema.toType<Schema.refine<GenericId<TableName, Scope>, Schema.String>> =>
   Schema.String.annotate({
     [ConvexId]: tableName,
-    [ConvexIdScope]: scope ?? IdScope.app,
+    [ConvexIdScope]: scope[0] ?? IdScope.app,
   }).pipe(
     Schema.refine((_value): _value is GenericId<TableName, Scope> => true),
     Schema.toType,
@@ -47,6 +47,16 @@ export const scope = (ast: SchemaAST.AST): IdScope.IdScope =>
   (ast.annotations?.[ConvexIdScope] as IdScope.IdScope | undefined) ??
   SchemaAST.resolveAt<IdScope.IdScope>(ConvexIdScope)(ast) ??
   IdScope.app;
+
+type WithOriginalIdBrands<Id, Original> =
+  Exclude<
+    keyof Original,
+    keyof ConvexGenericId<string> | "~@confect/core/ScopedId"
+  > extends infer Keys extends keyof Original
+    ? [Keys] extends [never]
+      ? Id
+      : Id & Pick<Original, Keys>
+    : never;
 
 /**
  * Rebind only IDs owned by `From`; IDs belonging to other scopes survive.
@@ -61,10 +71,10 @@ export type Rebase<
     readonly scope: infer Scope extends IdScope.IdScope;
   };
 }
-  ? GenericId<Table, IdScope.Rebase<Scope, From, To>>
+  ? WithOriginalIdBrands<GenericId<Table, IdScope.Rebase<Scope, From, To>>, A>
   : A extends ConvexGenericId<infer Table>
     ? From extends IdScope.App
-      ? GenericId<Table, To>
+      ? WithOriginalIdBrands<GenericId<Table, To>, A>
       : A
     : A extends
           | string
@@ -88,9 +98,17 @@ export type Rebase<
             ? Set<Rebase<Value, From, To>>
             : A extends ReadonlySet<infer Value>
               ? ReadonlySet<Rebase<Value, From, To>>
-              : A extends object
+              : A extends ReadonlyArray<unknown>
                 ? { [K in keyof A]: Rebase<A[K], From, To> }
-                : A;
+                : A extends object
+                  ? {
+                      [
+                        K in keyof A as K extends ConvexGenericId<string>
+                          ? Rebase<K, From, To>
+                          : K
+                      ]: Rebase<A[K], From, To>;
+                    }
+                  : A;
 
 /**
  * Scope annotations belong to both sides of a codec. Keep its transformations,

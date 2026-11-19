@@ -159,6 +159,9 @@ const generateOptionalFile = Effect.fnUntraced(function* (
   confectFile: string,
   convexFile: string,
   generateContents: (importPath: string) => Effect.Effect<string>,
+  removeOnly: Effect.Effect<boolean, never, ConvexDirectory> = Effect.succeed(
+    false,
+  ),
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -166,19 +169,26 @@ const generateOptionalFile = Effect.fnUntraced(function* (
   const convexDirectory = yield* ConvexDirectory.get;
 
   const confectFilePath = path.join(confectDirectory, confectFile);
-
-  if (!(yield* fs.exists(confectFilePath))) {
+  const convexFilePath = path.join(convexDirectory, convexFile);
+  const removing = yield* removeOnly;
+  if (!(yield* fs.exists(removing ? convexFilePath : confectFilePath))) {
     return Option.none();
   }
 
-  const convexFilePath = path.join(convexDirectory, convexFile);
   const relativeImportPath = path.relative(
     path.dirname(convexFilePath),
     confectFilePath,
   );
   const moduleImportPath = yield* toModuleImportPath(relativeImportPath);
   const contents = yield* generateContents(moduleImportPath);
-  const change = yield* writeFileString(convexFilePath, contents);
+  if (removing && (yield* fs.readFileString(convexFilePath)) !== contents) {
+    return Option.none();
+  }
+  const change = removing
+    ? yield* removePathIfExists(convexFilePath).pipe(
+        Effect.as("Removed" as const),
+      )
+    : yield* writeFileString(convexFilePath, contents);
   return Option.some({ change, convexFilePath });
 });
 
@@ -207,4 +217,5 @@ export const generateAuthConfig = generateOptionalFile(
   "auth.ts",
   "auth.config.ts",
   (importPath) => templates.authConfig({ authImportPath: importPath }),
+  Effect.map(ConvexDirectory.target, (target) => target.kind === "component"),
 );

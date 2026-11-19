@@ -11,6 +11,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { codegenHandler } from "@confect/cli/confect/codegen";
 import * as DirectoryOptions from "@confect/cli/DirectoryOptions";
+import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 
 const fixture = `${import.meta.dirname}/fixtures/authored-component`;
 
@@ -95,6 +96,73 @@ layer(NodeServices.layer)("component codegen", (it) => {
   );
 
   it.effect(
+    "preserves scoped IDs on a rejected target and cleans obsolete outputs on target switches",
+    () =>
+      Effect.gen(function* () {
+        const directory = yield* freshFixture;
+        const fs = yield* FileSystem.FileSystem;
+        const dirs = yield* Layer.build(
+          DirectoryOptions.layer({
+            componentDir: Option.some(`${directory}/convex`),
+          }),
+        );
+        const component = codegenHandler.pipe(Effect.provideContext(dirs));
+        const app = codegenHandler.pipe(
+          Effect.provideService(ConvexDirectory, {
+            get: Effect.succeed(`${directory}/convex`),
+          }),
+          Effect.provideContext(dirs),
+        );
+        const config = `${directory}/convex/convex.config.ts`;
+        const original = yield* fs.readFileString(config);
+        const id = `${directory}/confect/_generated/id.ts`;
+        const contract = `${directory}/confect/_generated/component.ts`;
+        const auth = `${directory}/confect/auth.ts`;
+        const authConfig = `${directory}/convex/auth.config.ts`;
+        const targetFiles = Effect.all(
+          { contract: fs.exists(contract), authConfig: fs.exists(authConfig) },
+          { concurrency: 1 },
+        );
+        yield* component;
+        const scopedId = yield* fs.readFileString(id);
+        const rejected = yield* Effect.result(app);
+        expect(rejected).toMatchObject({
+          _tag: "Failure",
+          failure: { _tag: "InvalidConvexConfigError" },
+        });
+        const idAfterRejection = yield* fs.readFileString(id);
+        expect(idAfterRejection).toBe(scopedId);
+        yield* fs.writeFileString(config, `import "./missing";\n${original}`);
+        const broken = yield* Effect.result(app);
+        expect(broken).toMatchObject({
+          _tag: "Failure",
+          failure: { _tag: "BundleFailedError" },
+        });
+        const idAfterBuildFailure = yield* fs.readFileString(id);
+        expect(idAfterBuildFailure).toBe(scopedId);
+        yield* fs.writeFileString(
+          config,
+          'import { defineApp } from "convex/server"; export default defineApp();',
+        );
+        yield* fs.writeFileString(auth, "export default { providers: [] };");
+        yield* app;
+        const appFiles = yield* targetFiles;
+        expect(appFiles).toEqual({ contract: false, authConfig: true });
+        yield* fs.remove(auth);
+        yield* fs.writeFileString(config, original);
+        yield* component;
+        const componentFiles = yield* targetFiles;
+        expect(componentFiles).toEqual({ contract: true, authConfig: false });
+        const customAuth = "export default { providers: [] };";
+        yield* fs.writeFileString(authConfig, customAuth);
+        yield* component;
+        const preserved = yield* fs.readFileString(authConfig);
+        expect(preserved).toBe(customAuth);
+      }).pipe(Effect.scoped),
+    { timeout: 30000 },
+  );
+
+  it.effect(
     "keeps a table named target distinct from the component execution target",
     () =>
       Effect.gen(function* () {
@@ -169,7 +237,8 @@ export default Table.make(() => Schema.Struct({ id: Component.id(child, "counter
         const components = yield* fs.readFileString(
           `${directory}/confect/_generated/components.ts`,
         );
-        expect(components).toContain('ComponentApi<"child">');
+        expect(components).toContain("Component.Mounted<import(");
+        expect(components).toContain('ComponentApi<"child">, "child">');
         const before = yield* generatedModificationTimes(directory);
         yield* codegenHandler.pipe(Effect.provideContext(dirs));
         const after = yield* generatedModificationTimes(directory);

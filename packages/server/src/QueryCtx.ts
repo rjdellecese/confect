@@ -9,7 +9,7 @@ export type QueryCtxTag<
   Scope extends IdScope.IdScope = IdScope.App,
 > = Context.Service<
   QueryCtx<DataModel, Scope>,
-  Scope extends IdScope.App
+  [Scope] extends [IdScope.App]
     ? GenericQueryCtx<DataModel>
     : ComponentCtx.Query<DataModel, Scope>
 >;
@@ -23,7 +23,7 @@ export const QueryCtx = <
 export type QueryCtx<
   DataModel extends GenericDataModel,
   Scope extends IdScope.IdScope = IdScope.App,
-> = Scope extends IdScope.App
+> = [Scope] extends [IdScope.App]
   ? GenericQueryCtx<DataModel>
   : ComponentCtx.Identifier<"query", DataModel, Scope>;
 

@@ -14,6 +14,7 @@ import {
   FunctionImpl,
   HttpRouter,
   MutationCtx,
+  RequestMetadata,
   RegisteredConvexFunction,
   StorageReader,
   Scheduler,
@@ -25,9 +26,14 @@ import type {
   QueryInitializer,
   BlobNotFoundError,
   StorageActionWriter,
+  ActionCtx,
+  QueryCtx,
 } from "@confect/server";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import type { GenericMutationCtx } from "convex/server";
+import type {
+  FunctionReference_future,
+  GenericMutationCtx,
+} from "convex/server";
 import { makeFunctionReference } from "convex/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -60,6 +66,63 @@ const group = GroupSpec.make().addFunction(
 );
 
 describe("component capabilities", () => {
+  it("requires a known app target for application capabilities", () => {
+    const app = DatabaseSchema.make({});
+    type Mixed = Database | typeof app;
+    type MutationServices = Handler.MutationServices<Mixed>;
+    expectTypeOf<Auth.Auth>().not.toExtend<
+      Handler.QueryServices<DatabaseSchema.AnyWithProps>
+    >();
+    expectTypeOf<MutationAuth.MutationAuth>().not.toExtend<
+      Handler.MutationServices<DatabaseSchema.AnyWithProps>
+    >();
+    expectTypeOf<
+      MutationCtx.MutationCtx<Model>
+    >().not.toExtend<MutationServices>();
+    expectTypeOf<QueryCtx.QueryCtx<Model>>().not.toExtend<
+      Handler.QueryServices<Mixed>
+    >();
+    expectTypeOf<ActionCtx.ActionCtx<Model>>().not.toExtend<
+      Handler.ActionServices<Mixed>
+    >();
+    expectTypeOf<Scheduler.Scheduler>().not.toExtend<MutationServices>();
+    expectTypeOf<
+      Scheduler.ForScope<typeof scope>
+    >().not.toExtend<MutationServices>();
+    expectTypeOf<
+      MutationCtx.MutationCtx<Model, typeof scope>
+    >().not.toExtend<MutationServices>();
+    expectTypeOf<StorageReader.StorageReader>().not.toExtend<MutationServices>();
+  });
+
+  it("preserves native database variables and schedulable references", () => {
+    type Raw = Context.Service.Shape<
+      MutationCtx.MutationCtxTag<Model, typeof scope>
+    >;
+    expectTypeOf<Raw["db"]["vars"]>().toEqualTypeOf<
+      GenericMutationCtx<Model>["db"]["vars"]
+    >();
+    const schedule = (
+      { scheduler }: Raw,
+      ref: FunctionReference_future<
+        "mutation",
+        "internal",
+        { count: number },
+        null
+      >,
+    ) => {
+      const delayed = scheduler.runAfter(0, ref, { count: 1 });
+      const timed = scheduler.runAt(0, ref, { count: 1 });
+      expectTypeOf(delayed).toEqualTypeOf<
+        Promise<GenericId.GenericId<"_scheduled_functions", typeof scope>>
+      >();
+      expectTypeOf(timed).toEqualTypeOf<typeof delayed>();
+      // @ts-expect-error Scheduling a future reference still checks its arguments.
+      void scheduler.runAfter(0, ref, { count: "1" });
+    };
+    void schedule;
+  });
+
   it("excludes JWT signing from component mutation handlers", () => {
     expectTypeOf<MutationAuth.MutationAuth>().not.toExtend<
       Handler.MutationServices<Database>
@@ -185,6 +248,17 @@ describe("component capabilities", () => {
       // Only ctx construction is faked here; no database or storage method is called.
       const ctx = {
         auth: {},
+        meta: {
+          getSnapshotTs: () => 1n,
+          getRequestMetadata: () =>
+            Promise.resolve({
+              ip: null,
+              userAgent: null,
+              requestId: "request",
+              scheduledFunctionId: null,
+              authToken: "fixture",
+            }),
+        },
         db: {},
         scheduler: {},
         storage: {},
@@ -204,6 +278,22 @@ describe("component capabilities", () => {
           MutationCtx.MutationCtx<Model, typeof scope>(),
         );
         expect(Predicate.hasProperty(raw, "auth")).toBe(false);
+        expect(raw.meta.getSnapshotTs()).toBe(1n);
+        expect(RequestMetadata.forScope(ctx.meta, IdScope.app)).toBe(ctx.meta);
+        const requestMetadata = Context.get(
+          context,
+          RequestMetadata.RequestMetadata,
+        );
+        const native = yield* Effect.promise(() =>
+          ctx.meta.getRequestMetadata(),
+        );
+        const wrapped = yield* requestMetadata.get();
+        const rawMetadata = yield* Effect.promise(() =>
+          raw.meta.getRequestMetadata(),
+        );
+        expect(wrapped).toEqual({ ...native, authToken: null });
+        expect(rawMetadata).toEqual(wrapped);
+        expect(native.authToken).toBe("fixture");
       }).pipe(Effect.scoped);
     },
   );

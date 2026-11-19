@@ -82,13 +82,22 @@ export type TableWithName<
  * must match their tables' names. Table schemas remain lazy; construction only
  * stores the record. The empty case is `make({})`.
  */
-export const make = <
+export function make<
   const TablesRecord extends Readonly<Record<string, Table.AnyWithProps>>,
-  const Target_ extends Target = AppTarget,
+>(tableRecord: TablesRecord, target?: AppTarget): DatabaseSchema<TablesRecord>;
+export function make<
+  const TablesRecord extends Readonly<Record<string, Table.AnyWithProps>>,
+  const Target_ extends Target,
 >(
   tableRecord: TablesRecord,
-  target?: Target_,
-): DatabaseSchema<TablesRecord, Target_> => {
+  target: Target_,
+): DatabaseSchema<TablesRecord, Target_>;
+export function make<
+  const TablesRecord extends Readonly<Record<string, Table.AnyWithProps>>,
+>(
+  tableRecord: TablesRecord,
+  target?: Target,
+): DatabaseSchema<TablesRecord, Target> {
   const resolvedTarget = target ?? { kind: "app", scope: IdScope.app };
   Match.value(resolvedTarget.kind).pipe(
     Match.when("app", () => {}),
@@ -111,5 +120,5 @@ export const make = <
   return {
     [TypeId]: tableRecord,
     target: resolvedTarget,
-  } as DatabaseSchema<TablesRecord, Target_>;
-};
+  };
+}

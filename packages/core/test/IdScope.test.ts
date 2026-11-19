@@ -68,6 +68,18 @@ describe("ID scopes", () => {
     expectTypeOf<typeof restored.Type>().toEqualTypeOf<ConvexId<"users">>();
   });
 
+  it("cannot infer an omitted runtime scope from an assignment target", () => {
+    const componentId = GenericId.GenericId("users", definition);
+    // @ts-expect-error An omitted scope constructs an application ID codec.
+    const wrongId: typeof componentId = GenericId.GenericId("users");
+    const users = Table.make(() => Schema.Struct({}));
+    const scoped = users("users", definition);
+    // @ts-expect-error An omitted scope binds an application table.
+    const wrongTable: Pick<typeof scoped, "scope"> = users("users");
+    expect(GenericId.scope(wrongId.ast)).toBe(IdScope.app);
+    expect(wrongTable.scope).toBe(IdScope.app);
+  });
+
   it("preserves ID identity in validator types", () => {
     type ScopedId = GenericId.GenericId<"users", typeof first>;
     expectTypeOf<

@@ -22,10 +22,10 @@ export const SystemFields = <
   const Scope extends IdScope.IdScope = IdScope.App,
 >(
   tableName: TableName,
-  scope?: Scope,
+  ...scope: IdScope.Args<Scope>
 ) =>
   Schema.Struct({
-    _id: GenericId.GenericId(tableName, scope),
+    _id: GenericId.GenericId<TableName, Scope>(tableName, ...scope),
     _creationTime: Schema.Finite,
   });
 
@@ -182,9 +182,9 @@ export const extendWithSystemFields = <
 >(
   tableName: TableName,
   schema: TableSchema,
-  scope?: Scope,
+  ...scope: IdScope.Args<Scope>
 ): ExtendWithSystemFields<TableName, TableSchema, Scope> => {
-  const system = SystemFields(tableName, scope).fields;
+  const system = SystemFields<TableName, Scope>(tableName, ...scope).fields;
 
   const extendAst = makeExtendAst(
     pipe(

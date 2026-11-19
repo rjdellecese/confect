@@ -1,5 +1,6 @@
 import {
   compileSchema,
+  compileTableSchema,
   compileAst,
   UnsupportedPropertySignatureKeyTypeError,
   type UndefinedOrValueToValidator,
@@ -7,7 +8,7 @@ import {
 } from "@confect/core/SchemaToValidator";
 import * as GenericId from "@confect/core/GenericId";
 import type { TypeError } from "@confect/core/Types";
-import type * as IdScope from "@confect/core/IdScope";
+import * as IdScope from "@confect/core/IdScope";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import {
   v,
@@ -348,6 +349,51 @@ describe("UndefinedOrValueToValidator", () => {
 });
 
 describe("ID schemas", () => {
+  it("reports the physical table name and string validators emitted in each scope", () => {
+    const scope = IdScope.component("counter");
+    const local = GenericId.GenericId("items", scope);
+    const foreign = GenericId.GenericId("items", IdScope.component("other"));
+    const appId = GenericId.GenericId("items");
+    const string = v.string();
+    const id = v.id("items");
+    const inHost = compileSchema(local);
+    expectTypeOf(inHost).toEqualTypeOf(string);
+    expect(inHost).toEqual(string);
+    const inComponent = compileSchema(local, scope);
+    expectTypeOf(inComponent).toEqualTypeOf(id);
+    expect(inComponent.tableName).toBe("items");
+    const schema = Schema.Struct({
+      references: Schema.Array(
+        Schema.Struct({ local, foreign: Schema.optionalKey(foreign) }),
+      ),
+      owned: Schema.Record(local, appId),
+      external: Schema.Record(foreign, local),
+      either: Schema.Union([appId, foreign]),
+    });
+    const expected = v.object({
+      references: v.array(v.object({ local: id, foreign: v.optional(string) })),
+      owned: v.record(id, string),
+      external: v.record(string, id),
+      either: v.union(string, string),
+    });
+    const actual = compileTableSchema(schema, scope);
+    expect(actual).toEqual(expected);
+    expectTypeOf(actual.fields.owned).toEqualTypeOf(expected.fields.owned);
+    expectTypeOf(actual.fields.external).toEqualTypeOf(
+      expected.fields.external,
+    );
+    expectTypeOf(actual.fields.references).toEqualTypeOf(
+      expected.fields.references,
+    );
+    expectTypeOf(actual.fields.either).toEqualTypeOf(expected.fields.either);
+    expectTypeOf(actual.type).toEqualTypeOf(expected.type);
+    const inUnknownScope = (target: IdScope.IdScope) =>
+      compileSchema(local, target);
+    expectTypeOf<ReturnType<typeof inUnknownScope>>().toEqualTypeOf<
+      typeof id | typeof string
+    >();
+  });
+
   it("compiles an ID to a table-specific validator", () => {
     const expected = v.id("users");
     const compiled = compileSchema(GenericId.GenericId("users"));

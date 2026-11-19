@@ -318,7 +318,7 @@ const syncLoop = Effect.fnUntraced(function* (
         ...(HashSet.has(optional, "Crons")
           ? [syncOptionalFile(generateCrons, "crons.ts")]
           : []),
-        ...(HashSet.has(optional, "Auth")
+        ...(target.kind === "app" && HashSet.has(optional, "Auth")
           ? [syncOptionalFile(generateAuthConfig, "auth.config.ts")]
           : []),
       ];
@@ -347,8 +347,8 @@ const syncOptionalFile = (generate: typeof generateHttp, convexFile: string) =>
         onSome: ({ change, convexFilePath }) =>
           Match.value(change).pipe(
             Match.when("Unchanged", () => Effect.void),
-            Match.whenOr("Added", "Modified", (addedOrModified) =>
-              logFileChangeIndented(addedOrModified, convexFilePath),
+            Match.whenOr("Added", "Modified", "Removed", (fileChange) =>
+              logFileChangeIndented(fileChange, convexFilePath),
             ),
             Match.exhaustive,
           ),

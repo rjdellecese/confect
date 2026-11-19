@@ -1,4 +1,5 @@
 import type * as IdScope from "@confect/core/IdScope";
+import type * as Types from "effect/Types";
 import type { StorageActionWriter as ConvexStorageActionWriter } from "convex/server";
 import type { GenericId } from "convex/values";
 import * as Context from "effect/Context";
@@ -18,9 +19,11 @@ export type Service<Scope extends IdScope.IdScope = IdScope.App> = {
     options?: { sha256?: string },
   ) => Effect.Effect<ScopedId.GenericId<"_storage", Scope>>;
 };
-export type ForScope<Scope extends IdScope.IdScope> = Scope extends IdScope.App
+export type ForScope<Scope extends IdScope.IdScope> = [Scope] extends [
+  IdScope.App,
+]
   ? StorageActionWriter
-  : { readonly "~ScopedStorageActionWriter": Scope };
+  : { readonly "~ScopedStorageActionWriter": Types.Invariant<Scope> };
 
 const make = (storageActionWriter: ConvexStorageActionWriter) => ({
   get: (storageId: GenericId<"_storage">) =>

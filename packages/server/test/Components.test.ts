@@ -124,9 +124,14 @@ it.effect("registers components with TestConfect", () =>
     );
     return yield* Effect.gen(function* () {
       const t = yield* TestConfect.TestConfect<typeof hostSchema>();
-      yield* t.registerComponent("first", componentSchema, componentModules);
+      const registered = yield* t.registerComponent<CounterApi<"first">>(
+        "first",
+        componentSchema,
+        componentModules,
+      );
+      const bound = Component.bind(contract, registered);
       yield* t.mutation(first.counter.create, { count: 11 });
-      const rows = yield* t.query(first.counter.list);
+      const rows = yield* t.query(bound.counter.list);
       expect(Array.map(rows, (row) => row.count)).toEqual([11]);
     }).pipe(Effect.provide(services));
   }).pipe(Effect.scoped),

@@ -14,6 +14,7 @@ import type * as MutationAuth from "@confect/server/MutationAuth";
 import type * as TransactionMetadata from "@confect/server/TransactionMetadata";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { GenericId } from "convex/values";
+import type { GenericActionCtx, GenericDataModel } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as HttpRouter from "effect/http/HttpRouter";
@@ -45,6 +46,53 @@ describe("HttpRouter", () => {
   });
   type Model = DataModel.FromDatabaseSchema<typeof schema>;
   const Search = VectorSearch.VectorSearch<Model>();
+
+  it.effect(
+    "matches literal installation paths before interpreting route patterns",
+    () =>
+      Effect.gen(function* () {
+        vi.stubEnv(
+          "CONVEX_SITE_URL",
+          "https://example.test/team%20docs/v1::blue/",
+        );
+        try {
+          const scope = IdScope.component("routes");
+          const http = ConfectHttpRouter.forSchema(
+            DatabaseSchema.make({}, { kind: "component", scope }),
+          )(
+            HttpRouter.add(
+              "GET",
+              "/items/:id",
+              HttpRouter.params.pipe(Effect.flatMap(HttpServerResponse.json)),
+            ),
+          );
+          const action = http.lookup("/items/42", "GET")![0] as unknown as {
+            _handler: (
+              ctx: GenericActionCtx<GenericDataModel>,
+              request: Request,
+            ) => Promise<Response>;
+          };
+          const empty = () => Promise.resolve(null);
+          const ctx = {
+            runQuery: empty,
+            runMutation: empty,
+            runAction: empty,
+            vectorSearch: empty,
+          } as unknown as GenericActionCtx<GenericDataModel>;
+          const response = yield* Effect.promise(() =>
+            action._handler(
+              ctx,
+              new Request("https://example.test/team%20docs/v1::blue/items/42"),
+            ),
+          );
+          expect(response.status).toBe(200);
+          const params = yield* Effect.promise(() => response.json());
+          expect(params).toEqual({ id: "42" });
+        } finally {
+          vi.unstubAllEnvs();
+        }
+      }),
+  );
 
   it("requires a matching schema for vector-search route requirements", () => {
     const routes = HttpRouter.add(
