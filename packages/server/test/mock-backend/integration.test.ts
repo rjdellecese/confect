@@ -280,6 +280,7 @@ describe("mock search compatibility", () => {
   ).searchIndex("text", { searchField: "text" })("entries");
   const schema = DatabaseSchema.make({ entries: table });
   const layer = TestConfect_.layer<typeof schema>(
+    [table.tableName],
     defineSchema({ entries: Table.tableDefinition(table) }),
     import.meta.glob("./fixtures/convex/_generated/*.js"),
   );
@@ -466,14 +467,18 @@ describe("mock transaction clocks", () => {
   });
   assert(read._tag === "Confect");
   assert(insert._tag === "Confect");
-  const layer = TestConfect_.layer<typeof confectSchema>(convexSchema, {
-    ...import.meta.glob("./fixtures/convex/_generated/*.js"),
-    "./fixtures/convex/clocks.ts": () =>
-      Promise.resolve({
-        read: RegisteredConvexFunction.make(tableNames, read),
-        insert: RegisteredConvexFunction.make(tableNames, insert),
-      }),
-  });
+  const layer = TestConfect_.layer<typeof confectSchema>(
+    tableNames,
+    convexSchema,
+    {
+      ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+      "./fixtures/convex/clocks.ts": () =>
+        Promise.resolve({
+          read: RegisteredConvexFunction.make(tableNames, read),
+          insert: RegisteredConvexFunction.make(tableNames, insert),
+        }),
+    },
+  );
 
   it.layer(layer, { buildPerTest: true })("Confect runners", (test) => {
     test.effect.each([1000, -1000])(
@@ -629,7 +634,7 @@ describe("DocumentIds", () => {
     "TestConfect.run",
     (test) => {
       test.effect.each([false, true])(
-        "identifies application IDs from the deployment schema with identity=%s",
+        "identifies application IDs from the model's table names with identity=%s",
         (authenticated) =>
           Effect.gen(function* () {
             const c = yield* TestConfect.TestConfect;
@@ -652,6 +657,35 @@ describe("DocumentIds", () => {
       );
     },
   );
+
+  type UsersOnly = DatabaseSchema.DatabaseSchema<{ users: typeof usersTable }>;
+  const usersOnly = TestConfect_.layer<UsersOnly>(
+    [usersTable.tableName],
+    convexSchema,
+    import.meta.glob([
+      "./fixtures/convex/_generated/*.js",
+      "./fixtures/convex/groups/notes.ts",
+    ]),
+  );
+  it.layer(usersOnly)("wider Convex deployment", (test) => {
+    test.effect(
+      "ignores IDs from deployment-only tables in TestConfect.run",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect_.TestConfect<UsersOnly>();
+          const noteId = yield* c.mutation(refs.public.groups.notes.insert, {
+            text: "native only",
+          });
+          yield* c.run(
+            Effect.gen(function* () {
+              const ids = yield* DocumentIds.DocumentIds<UsersOnly>();
+              const identified = yield* ids.identify(noteId);
+              expect(identified).toEqual(Option.none());
+            }),
+          );
+        }),
+    );
+  });
 
   const cases = [
     {
@@ -931,7 +965,11 @@ describe("action storage transaction isolation", () => {
     return Effect.runSync(
       TestConfect.TestConfect.pipe(
         Effect.provide(
-          TestConfect_.layer<typeof confectSchema>(convexSchema, modules),
+          TestConfect_.layer<typeof confectSchema>(
+            tableNames,
+            convexSchema,
+            modules,
+          ),
         ),
       ),
     );
@@ -1870,6 +1908,7 @@ describe("DatabaseReader table isolation", () => {
     otherNotes,
   });
   const layer = TestConfect_.layer<typeof schema>(
+    [...tableNames, otherNotes.tableName],
     defineSchema({
       ...convexSchema.tables,
       otherNotes: Table.tableDefinition(otherNotes),

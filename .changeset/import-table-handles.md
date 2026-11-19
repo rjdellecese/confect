@@ -10,7 +10,7 @@ Pass a bound table to `DatabaseReader.table` and `DatabaseWriter.table` so a fun
 
 - In each handler, helper, or middleware, default-import the tables it uses from their individual `_generated/tables/<name>` modules. For a runtime choice between tables, import just the candidates rather than the full schema. For system reads, use `Table._storage` and `Table._scheduled_functions` from `@confect/server/Table` (formerly `Table.storageTable` and `Table.scheduledFunctionsTable`).
 - Import your implementation builders (`FunctionImpl`, `GroupImpl`, and `MiddlewareImpl`) from `_generated/server`. Remove the runtime schema import and the database schema argument from builder calls.
-- Replace `TestConfect.layer(schema, convexSchema, modules)` with `TestConfect.layer<typeof schema>(convexSchema, modules)`, importing the Confect schema as a type.
+- Replace `TestConfect.layer(schema, convexSchema, modules)` with `TestConfect.layer<typeof schema>(tableNames, convexSchema, modules)`. Default-import `tableNames` from `_generated/tableNames` and import the Confect schema as a type.
 
 By convention, default-import application tables as `<name>Table` and group specs as `<name>Spec`. These are local names, not changes to the table or function paths.
 

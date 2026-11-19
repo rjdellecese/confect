@@ -30,7 +30,7 @@ bun add -D @confect/test convex-test @effect/vitest
 
 ## Setup
 
-Pass your generated Convex deployment schema and Convex modules to `TestConfect.layer`. The Confect schema is a **type-only** import: it types the test services but isn't needed at runtime.
+Pass your generated table names, Convex deployment schema, and Convex modules to `TestConfect.layer`. In `TestConfect.run`, `DocumentIds.identify` checks those application tables and the system tables, even if your test deployment has extra tables. Import the Confect schema as a type only.
 
 ```ts test/TestConfect.ts
 /// <reference types="vite/client" />
@@ -39,10 +39,12 @@ import { TestConfect as TestConfect_ } from "@confect/test";
 
 import type confectSchema from "../confect/_generated/schema";
 import convexSchema from "../confect/_generated/convexSchema";
+import tableNames from "../confect/_generated/tableNames";
 
 export const TestConfect = TestConfect_.TestConfect<typeof confectSchema>();
 
 export const layer = TestConfect_.layer<typeof confectSchema>(
+  tableNames,
   convexSchema,
   import.meta.glob("../convex/**/!(*.*.*)*.*s"),
 );
@@ -146,9 +148,9 @@ describe("notes", () => {
 Use `run` to execute arbitrary code with mutation-context services (like `DatabaseWriter`) for test setup. When the handler returns a value, pass a `Schema` as the second argument for decoding.
 
 ```ts
-import { Id } from "./confect/_generated/id";
-import { DatabaseWriter } from "./confect/_generated/services";
-import notesTable from "./confect/_generated/tables/notes";
+import { Id } from "../confect/_generated/id";
+import { DatabaseWriter } from "../confect/_generated/services";
+import notesTable from "../confect/_generated/tables/notes";
 
 Effect.gen(function* () {
   const c = yield* TestConfect.TestConfect;

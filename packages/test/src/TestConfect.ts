@@ -17,7 +17,6 @@ import type { Value } from "convex/values";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 
 export type { DeploymentJwk, DeploymentJwks } from "convex-test";
@@ -262,6 +261,7 @@ class TestConfectImpl<
 }
 
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+  tableNames: ReadonlyArray<DatabaseSchema.TableNames<DatabaseSchema_>>,
   convexSchemaDefinition: SchemaDefinition<
     Record<DatabaseSchema.TableNames<DatabaseSchema_>, GenericSchema[string]>,
     true
@@ -272,7 +272,7 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     TestConfect<DatabaseSchema_>(),
     () =>
       new TestConfectImpl<DatabaseSchema_>(
-        Record.keys(convexSchemaDefinition.tables),
+        tableNames,
         convexTest(convexSchemaDefinition, modules) as any,
       ),
   );

@@ -444,11 +444,15 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
           );
           const c = yield* Effect.gen(function* () {
             const services = yield* Layer.build(
-              TestConfect_.layer<typeof databaseSchema>(convexSchema, {
-                ...import.meta.glob("./fixtures/convex/_generated/*.js"),
-                "./fixtures/convex/options.ts": () =>
-                  Promise.resolve(registered),
-              }),
+              TestConfect_.layer<typeof databaseSchema>(
+                tableNames,
+                convexSchema,
+                {
+                  ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+                  "./fixtures/convex/options.ts": () =>
+                    Promise.resolve(registered),
+                },
+              ),
             );
             return yield* Effect.service(TestConfect.TestConfect).pipe(
               Effect.provideContext(services),
@@ -507,11 +511,15 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
           );
           const c = yield* Effect.gen(function* () {
             const services = yield* Layer.build(
-              TestConfect_.layer<typeof databaseSchema>(convexSchema, {
-                ...import.meta.glob("./fixtures/convex/_generated/*.js"),
-                "./fixtures/convex/options.ts": () =>
-                  Promise.resolve(registered),
-              }),
+              TestConfect_.layer<typeof databaseSchema>(
+                tableNames,
+                convexSchema,
+                {
+                  ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+                  "./fixtures/convex/options.ts": () =>
+                    Promise.resolve(registered),
+                },
+              ),
             );
             return yield* Effect.service(TestConfect.TestConfect).pipe(
               Effect.provideContext(services),
