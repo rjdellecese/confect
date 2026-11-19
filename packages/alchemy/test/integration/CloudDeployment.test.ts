@@ -494,13 +494,15 @@ describe("cloud deployment lifecycle", () => {
   );
 
   it.effect.each([
-    { updating: false, retry: false },
-    { updating: false, retry: true },
-    { updating: true, retry: false },
-    { updating: true, retry: true },
+    { updating: false, retry: false, status: undefined },
+    { updating: false, retry: true, status: undefined },
+    { updating: true, retry: false, status: undefined },
+    { updating: true, retry: true, status: undefined },
+    { updating: false, retry: true, status: 503 },
+    { updating: true, retry: false, status: 503 },
   ])(
-    "recovers newly managed variables after a lost response (updating=$updating, retry=$retry)",
-    ({ updating, retry }) =>
+    "recovers newly managed variables after a lost response (updating=$updating, retry=$retry, status=$status)",
+    ({ updating, retry, status }) =>
       Effect.gen(function* () {
         const fixture = mockClient();
         fixture.state.variables.UNRELATED = Redacted.make("preserved");
@@ -517,7 +519,9 @@ describe("cloud deployment lifecycle", () => {
                     return Effect.fail(
                       ConvexApiError.make({
                         operation: "updateEnvironmentVariables",
-                        code: "TransportError",
+                        ...(status === undefined
+                          ? { code: "TransportError" }
+                          : { code: "HttpError", status }),
                       }),
                     );
                   }),
@@ -544,6 +548,74 @@ describe("cloud deployment lifecycle", () => {
         if (retry) yield* deploy(desired);
         yield* deploy(Effect.succeed({}));
         expect(Record.keys(fixture.state.variables)).toEqual(["UNRELATED"]);
+      }),
+  );
+
+  it.effect.each([
+    { start: "create", retry: false },
+    { start: "create", retry: true },
+    { start: "update", retry: false },
+    { start: "update", retry: true },
+    { start: "adopt", retry: false },
+    { start: "adopt", retry: true },
+  ])(
+    "does not claim a new variable after a rejected write (start=$start, retry=$retry)",
+    ({ start, retry }) =>
+      Effect.gen(function* () {
+        const fixture = mockClient();
+        fixture.state.variables.UNRELATED = Redacted.make("preserved");
+        let reject = false;
+        const deploy = makeHarness(
+          Layer.succeed(ConvexClient, {
+            ...fixture.client,
+            updateEnvironmentVariables: (url, key, changes) =>
+              reject
+                ? Effect.fail(
+                    ConvexApiError.make({
+                      operation: "updateEnvironmentVariables",
+                      code: "HttpError",
+                      status: 400,
+                    }),
+                  )
+                : fixture.client.updateEnvironmentVariables(url, key, changes),
+          }),
+          Layer.succeed(CommandRunner, {
+            prepare: () => Effect.void,
+            deploy: () => Effect.void,
+          }),
+          true,
+        );
+        const resource = (variables: Record<string, string>) =>
+          Convex.EnvironmentVariables("Environment", {
+            url: "https://happy-otter-123.convex.cloud",
+            deployKey: Redacted.make("test-key"),
+            variables,
+          }).pipe(Effect.as({}));
+        if (start === "update") yield* deploy(resource({ OLD: "owned" }));
+        if (start === "adopt")
+          fixture.state.variables.OLD = Redacted.make("original");
+        const desired = resource({ OLD: "changed", NEW: "new" });
+        reject = true;
+        const failure = yield* deploy(desired).pipe(Effect.result);
+        expect(failure).toMatchObject({
+          _tag: "Failure",
+          failure: { _tag: "ConvexApiError", status: 400 },
+        });
+        reject = false;
+        fixture.state.variables.NEW = Redacted.make("external");
+        if (retry) {
+          const collision = yield* deploy(desired).pipe(Effect.result);
+          expect(collision).toMatchObject({
+            _tag: "Failure",
+            failure: { _tag: "OwnedBySomeoneElse" },
+          });
+        }
+        yield* deploy(Effect.succeed({}));
+        expect(Record.map(fixture.state.variables, Redacted.value)).toEqual({
+          UNRELATED: "preserved",
+          NEW: "external",
+          ...(start === "adopt" ? { OLD: "original" } : {}),
+        });
       }),
   );
 

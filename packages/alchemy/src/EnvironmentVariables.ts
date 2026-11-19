@@ -8,7 +8,7 @@ import * as Rec from "effect/Record";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-import { ConvexClient } from "./ConvexClient";
+import { ConvexClient, type ConvexClientError } from "./ConvexClient";
 import type { Providers } from "./Providers";
 import { validateTarget } from "./internal/DeploymentTarget";
 import { checkpointResource } from "./internal/Lifecycle";
@@ -45,6 +45,12 @@ export class EnvironmentTargetChange extends Schema.TaggedError<
   EnvironmentTargetChange,
   { readonly brand: unique symbol }
 >()("EnvironmentTargetChange", { url: Schema.String }) {}
+
+const isDefiniteRejection = (error: ConvexClientError) =>
+  error.code === "InvalidRequest" ||
+  (error.code === "HttpError" &&
+    error.status !== undefined &&
+    [400, 401, 403, 404, 405, 409, 413, 415, 422, 429].includes(error.status));
 
 export const provider = Effect.gen(function* () {
   const client = yield* ConvexClient;
@@ -112,7 +118,7 @@ export const provider = Effect.gen(function* () {
       return Unowned({
         url,
         deployKey: olds.deployKey,
-        ownedNames,
+        ownedNames: Rec.keys(variables),
         variables,
         originals: variables,
       });
@@ -195,11 +201,27 @@ export const provider = Effect.gen(function* () {
             originals,
           } satisfies EnvironmentVariablesAttributes);
         }
-        yield* client.updateEnvironmentVariables(
-          news.url,
-          news.deployKey,
-          changes,
-        );
+        yield* client
+          .updateEnvironmentVariables(news.url, news.deployKey, changes)
+          .pipe(
+            Effect.tapError((error) =>
+              added.length > 0 && isDefiniteRejection(error)
+                ? checkpointResource(
+                    fqn,
+                    instanceId,
+                    news,
+                    output ??
+                      ({
+                        url: news.url,
+                        deployKey: news.deployKey,
+                        ownedNames: [],
+                        variables: {},
+                        originals: {},
+                      } satisfies EnvironmentVariablesAttributes),
+                  )
+                : Effect.void,
+            ),
+          );
       }
       return {
         url: news.url,
@@ -210,6 +232,7 @@ export const provider = Effect.gen(function* () {
       };
     }),
     delete: Effect.fn("EnvironmentVariables.delete")(function* ({ output }) {
+      if (output.ownedNames.length === 0) return;
       const observed = yield* client
         .listEnvironmentVariables(output.url, output.deployKey)
         .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
