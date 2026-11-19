@@ -1,0 +1,77 @@
+---
+title: "Platform clients"
+description: "Call the Convex management and deployment APIs with typed Effect clients."
+---
+
+Use `@confect/platform` for administrative operations such as listing a team's projects or inspecting a deployment. To run application queries, mutations, and actions, use the [JavaScript HTTP client](/clients/js/http) instead.
+
+```sh
+pnpm add @confect/platform effect
+```
+
+## Call the management API
+
+Read an access token from your server or CI secret store. Pass the method and path template from the [Convex Management API](https://docs.convex.dev/management-api/overview); TypeScript checks the path parameters, query parameters, request body, and result for that route.
+
+```ts
+import { ManagementClient } from "@confect/platform";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
+
+const firstPage = Effect.gen(function* () {
+  const token = yield* Config.Redacted("CONVEX_ACCESS_TOKEN");
+  const teamId = yield* Config.Number("CONVEX_TEAM_ID");
+  const client = ManagementClient.make(token);
+  return yield* client.request("get", "/teams/{team_id}/projects", {
+    params: { path: { team_id: teamId }, query: { limit: 20 } },
+  });
+});
+```
+
+Each request returns one API response. To list more projects, pass the response's `pagination.nextCursor` as `params.query.cursor` while `pagination.hasMore` is true.
+
+By default the upstream SDK uses `https://api.convex.dev/v1`, or the host configured by `CONVEX_PROVISION_HOST`. To select the destination explicitly, pass `{ baseUrl: "https://api.convex.dev/v1" }` to `ManagementClient.make`. Only use trusted URLs and fetch implementations: they receive the access token.
+
+## Call a deployment API
+
+Use the full URL returned by Convex for a regional deployment. A bare deployment name selects the US East cloud URL. Supply a deployment credential with permission for the operation; don't put administrative credentials in browser code.
+
+```ts
+import { DeploymentClient } from "@confect/platform";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
+
+const deploymentInfo = Effect.gen(function* () {
+  const url = yield* Config.String("CONVEX_URL");
+  const key = yield* Config.Redacted("CONVEX_DEPLOY_KEY");
+  const client = DeploymentClient.make(url, key);
+  return yield* client.request("get", "/deployment_info");
+});
+```
+
+## Provide a client to other Effects
+
+Yield the client's service tag instead of constructing a client in each operation. Provide its layer once at the boundary of your program:
+
+```ts
+import { ManagementClient } from "@confect/platform";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
+
+const projectById = (projectId: number) =>
+  Effect.gen(function* () {
+    const client = yield* ManagementClient.ManagementClient;
+    return yield* client.request("get", "/projects/{project_id}", {
+      params: { path: { project_id: projectId } },
+    });
+  });
+
+const program = Effect.gen(function* () {
+  const token = yield* Config.Redacted("CONVEX_ACCESS_TOKEN");
+  return yield* projectById(42).pipe(
+    Effect.provide(ManagementClient.layer(token)),
+  );
+});
+```
+
+Requests fail with a tagged `PlatformError`. An HTTP rejection includes its status without copying credentials or the server's response body into the error. Successful JSON is typed from the upstream API, not validated against a runtime schema; it can contain secrets such as a newly issued deploy key. The clients don't retry mutations for you.

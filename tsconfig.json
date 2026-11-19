@@ -21,6 +21,8 @@
       "@confect/server/*": ["./packages/server/src/*"],
       "@confect/js": ["./packages/js/src/index.ts"],
       "@confect/js/*": ["./packages/js/src/*"],
+      "@confect/platform": ["./packages/platform/src/index.ts"],
+      "@confect/platform/*": ["./packages/platform/src/*"],
       "@confect/foldkit": ["./packages/foldkit/src/index.ts"],
       "@confect/foldkit/*": ["./packages/foldkit/src/*"],
       "@confect/react": ["./packages/react/src/index.ts"],

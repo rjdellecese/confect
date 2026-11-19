@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "isolatedDeclarations": false,
+    "skipLibCheck": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "paths": {
+      "@confect/platform": ["./src/index.ts"],
+      "@confect/platform/*": ["./src/*"]
+    }
+  },
+  "exclude": ["coverage", "dist", "node_modules"]
+}
