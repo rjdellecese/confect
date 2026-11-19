@@ -141,7 +141,16 @@ Projects and deployments **retain their cloud objects by default** when removed 
 
 The provider refuses project-team changes and deployment identity changes that could move or replace data. Create a separate resource and plan a migration instead. Existing resources found by name or reference require explicit Alchemy adoption; ambiguous matches fail rather than selecting an arbitrary object.
 
-Environment management preserves unrelated variables. Existing variables that overlap a new declaration require explicit adoption. Adopted values are restored when their ownership is removed; variables introduced by the stack are removed. Pass secrets as `Redacted` values, not plain strings.
+Environment management preserves unrelated variables. Existing **readable** variables that overlap a new declaration require explicit adoption. Adopted values are restored when their ownership is removed; readable variables introduced by the stack are removed. Pass sensitive values as `Redacted` rather than plain strings.
+
+<Warning>
+  Do not manage a name that might already be a write-only Convex secret. The
+  [Convex list
+  API](https://docs.convex.dev/deployment-api/list-environment-variables) omits
+  those variables, so this provider can mistake one for a new name, overwrite
+  it, and cannot restore its original value. Leave such names out of `env` and
+  manage them directly in Convex.
+</Warning>
 
 If your deployment uses variables named both `Type` and `FQN`, put them in separate `Convex.EnvironmentVariables` resources. Alchemy interprets an object with both keys as a resource reference, so don't pass them together in one map, including a dynamically constructed `env`.
 
