@@ -1,14 +1,14 @@
 import * as Provider from "alchemy/Provider";
 import * as Layer from "effect/Layer";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as AuthoritativeEnvironmentVariable from "./AuthoritativeEnvironmentVariable";
-import * as Code from "./Code";
-import * as ConvexClient from "./ConvexClient";
-import * as Deployment from "./Deployment";
-import * as DeployKey from "./DeployKey";
-import * as EnvironmentVariables from "./EnvironmentVariables";
-import * as Project from "./Project";
-import * as CommandRunner from "./internal/CommandRunner";
+import * as AuthoritativeEnvironmentVariable from "./AuthoritativeEnvironmentVariable.js";
+import * as Code from "./Code.js";
+import * as ConvexClient from "./ConvexClient.js";
+import * as Deployment from "./Deployment.js";
+import * as DeployKey from "./DeployKey.js";
+import * as EnvironmentVariables from "./EnvironmentVariables.js";
+import * as Project from "./Project.js";
+import * as CommandRunner from "./internal/CommandRunner.js";
 
 export class Providers extends Provider.ProviderCollection<Providers>()(
   "@confect/alchemy/Providers",

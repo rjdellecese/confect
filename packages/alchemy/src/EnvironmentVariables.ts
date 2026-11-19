@@ -9,9 +9,12 @@ import * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-import { ConvexClient, type EnvironmentVariableChange } from "./ConvexClient";
-import type { Providers } from "./Providers";
-import { validateTarget } from "./internal/DeploymentTarget";
+import {
+  ConvexClient,
+  type EnvironmentVariableChange,
+} from "./ConvexClient.js";
+import type { Providers } from "./Providers.js";
+import { validateTarget } from "./internal/DeploymentTarget.js";
 
 export interface EnvironmentVariablesProps {
   readonly deploymentName?: string;

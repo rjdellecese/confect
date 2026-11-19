@@ -1,1 +1,1 @@
-export { Backend, type BackendProps } from "./Backend";
+export { Backend, type BackendProps } from "./Backend.js";

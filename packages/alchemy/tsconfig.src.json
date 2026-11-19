@@ -14,8 +14,7 @@
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "types": ["node"],
-    "moduleResolution": "Bundler",
-    "module": "ESNext"
+    "module": "NodeNext"
   },
   "include": ["src"]
 }

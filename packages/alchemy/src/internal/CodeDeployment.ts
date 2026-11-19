@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
-import type { CodeProps } from "../Code";
-import { CommandRunner } from "./CommandRunner";
-import { validateTarget } from "./DeploymentTarget";
+import type { CodeProps } from "../Code.js";
+import { CommandRunner } from "./CommandRunner.js";
+import { validateTarget } from "./DeploymentTarget.js";
 
 export const deploy = Effect.fn("Code.deploy")(function* (props: CodeProps) {
   yield* Effect.fromResult(

@@ -11,7 +11,7 @@ import * as Schema from "effect/Schema";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
-import type { CodeProps } from "../Code";
+import type { CodeProps } from "../Code.js";
 
 export interface PrepareCommand {
   readonly command: string;

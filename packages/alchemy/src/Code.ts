@@ -2,9 +2,12 @@ import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
 import * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
-import type { Providers } from "./Providers";
-import { deploy } from "./internal/CodeDeployment";
-import { CommandRunner, type PrepareCommand } from "./internal/CommandRunner";
+import type { Providers } from "./Providers.js";
+import { deploy } from "./internal/CodeDeployment.js";
+import {
+  CommandRunner,
+  type PrepareCommand,
+} from "./internal/CommandRunner.js";
 
 export interface CodeProps {
   readonly deployment: { readonly name: string; readonly url: string };

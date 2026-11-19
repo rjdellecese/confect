@@ -11,10 +11,10 @@ import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { ConvexClient } from "./ConvexClient";
-import type { Providers } from "./Providers";
-import { resourceName } from "./internal/ResourceIdentity";
-import { checkpointResource } from "./internal/Lifecycle";
+import { ConvexClient } from "./ConvexClient.js";
+import type { Providers } from "./Providers.js";
+import { resourceName } from "./internal/ResourceIdentity.js";
+import { checkpointResource } from "./internal/Lifecycle.js";
 
 export interface DeploymentProps {
   readonly projectId: number;

@@ -5,10 +5,10 @@ import * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
-import { ConvexClient, type ConvexClientError } from "./ConvexClient";
-import type { Providers } from "./Providers";
-import { validateTarget } from "./internal/DeploymentTarget";
-import { checkpointResource } from "./internal/Lifecycle";
+import { ConvexClient, type ConvexClientError } from "./ConvexClient.js";
+import type { Providers } from "./Providers.js";
+import { validateTarget } from "./internal/DeploymentTarget.js";
+import { checkpointResource } from "./internal/Lifecycle.js";
 
 export interface AuthoritativeEnvironmentVariableProps {
   readonly deployment: { readonly name: string; readonly url: string };

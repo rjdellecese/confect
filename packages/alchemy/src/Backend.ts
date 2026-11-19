@@ -4,8 +4,8 @@ import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import { Code } from "./Code";
-import { EnvironmentVariables } from "./EnvironmentVariables";
+import { Code } from "./Code.js";
+import { EnvironmentVariables } from "./EnvironmentVariables.js";
 
 export interface BackendProps {
   readonly deployment: {

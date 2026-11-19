@@ -10,10 +10,10 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
 
-import { ConvexClient } from "./ConvexClient";
-import type { Providers } from "./Providers";
-import { resourceName } from "./internal/ResourceIdentity";
-import { checkpointResource } from "./internal/Lifecycle";
+import { ConvexClient } from "./ConvexClient.js";
+import type { Providers } from "./Providers.js";
+import { resourceName } from "./internal/ResourceIdentity.js";
+import { checkpointResource } from "./internal/Lifecycle.js";
 
 export interface DeployKeyProps {
   readonly deploymentName: string;
