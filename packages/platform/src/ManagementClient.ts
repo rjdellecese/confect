@@ -1,6 +1,6 @@
-import { createManagementClient } from "@convex-dev/platform";
+import { createManagementClient, provisionHost } from "@convex-dev/platform";
 import type * as Api from "@convex-dev/platform/managementApi";
-import * as Arr from "effect/Array";
+import * as Array from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -290,12 +290,16 @@ export const make = (
   token: Redacted.Redacted<string>,
   options?: Options,
 ): Service => {
-  const sdk = token.pipe(Redacted.value, createManagementClient);
+  const baseUrl = Client.normalizeBaseUrl(options?.baseUrl ?? provisionHost);
   const { request } = Client.make<Api.paths>(
-    sdk,
+    baseUrl === undefined
+      ? undefined
+      : () => token.pipe(Redacted.value, createManagementClient),
     management,
     options?.fetch,
-    options?.baseUrl,
+    options?.baseUrl === undefined && baseUrl !== undefined
+      ? `${baseUrl}/v1`
+      : baseUrl,
   );
 
   const listProjects: Service["listProjects"] = (teamId, query = {}) =>
@@ -635,7 +639,7 @@ export const make = (
         { params: { path: { project_id: projectId }, query } },
       ).pipe(
         Effect.map(({ items, pagination }) => ({
-          items: Arr.map(items, ({ name, value, deploymentTypes }) => ({
+          items: Array.map(items, ({ name, value, deploymentTypes }) => ({
             name,
             value: Redacted.make(value),
             deploymentTypes,
@@ -652,7 +656,7 @@ export const make = (
           params: { path: { project_id: projectId } },
           get body() {
             return {
-              changes: Arr.map(body.changes, ({ value, ...change }) =>
+              changes: Array.map(body.changes, ({ value, ...change }) =>
                 value === undefined
                   ? change
                   : {

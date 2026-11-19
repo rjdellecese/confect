@@ -53,7 +53,7 @@ const entry = {
   component: "",
   table: "messages",
   deleted: false,
-  ts: 1_700_000_000_000_000_000,
+  ts: 1_700_000_000_000_000_001n,
   value: { _id: "a", tags: ["a", null], payload: { updated: true } },
 };
 const page = {
@@ -64,7 +64,7 @@ const page = {
   values: [entry],
 };
 
-test("keeps open document fields and accepts integer timestamps beyond JavaScript’s safe integer range", () => {
+test("keeps open document fields and exact int64 timestamps", () => {
   const decoded = Schema.decodeResult(sync)(page);
   expect(decoded).toEqual(Result.succeed(page));
 });
@@ -75,7 +75,7 @@ test.each([
   { values: [{ ...entry, ts: 1.5 }] },
   { values: [{ ...entry, value: [1, 2] }] },
   { pagination: { hasMore: "yes" } },
-])("rejects malformed data sync pages: %j", (overrides) => {
+])("rejects malformed data sync pages: %#", (overrides) => {
   const result = Schema.decodeResult(sync)({ ...page, ...overrides });
   expect(result._tag).toBe("Failure");
 });

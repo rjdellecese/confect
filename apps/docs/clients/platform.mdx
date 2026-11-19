@@ -65,6 +65,8 @@ const deploymentInfo = Effect.gen(function* () {
 
 Operations with no inputs, such as `getDeploymentInfo` and `listEnvironmentVariables`, are lazy Effect values. Yielding the same value again sends a fresh request. `syncData` returns one export page rather than a stream that polls forever: use the returned status and cursor to decide when to request the next page.
 
+Data-sync revision timestamps (`values[].ts`, `status.snapshotTs`, and active-sync `status.syncedTs`) are `bigint` values, so you can compare consecutive revisions without losing precision. Use `.toString()` if you need to store one in JSON. These operations require a runtime with JSON parse source access, such as Node.js 24 or later. Wall-clock milliseconds such as `lastUpdated` and numbers inside exported documents remain JavaScript numbers.
+
 Use `createLogStream` to configure a log destination. The separate `ConvexEventLog` type describes delivered events by `topic`; it isn't a subscription or a runtime webhook validator.
 
 ## Provide a client to other Effects
@@ -92,7 +94,7 @@ const program = Effect.gen(function* () {
 
 ## Handle a failed operation
 
-Each method exposes the errors it can return. This example returns a new team's slug, or `null` for an invalid name or region. Permission and transport errors stay in the error channel:
+Each method exposes the errors it can return. Convex reserves `createTeam` for integrations it has approved to create teams on behalf of users; an ordinary management token doesn't grant that permission. For an approved integration, this example returns the new team's slug, or `null` for an invalid name or region. Permission and transport errors stay in the error channel:
 
 ```ts
 import { ManagementClient } from "@confect/platform";
