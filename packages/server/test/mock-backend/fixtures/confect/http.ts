@@ -1,4 +1,4 @@
-import { HttpRouter as ConfectHttpRouter } from "@confect/server";
+import { HttpRouter as HttpRouter_ } from "@confect/server";
 import { httpActionGeneric } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -12,14 +12,13 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as HttpApiScalar from "effect/http-api/HttpApiScalar";
+import notesTable from "./_generated/tables/notes";
 import refs from "./_generated/refs";
-import databaseSchema from "./_generated/schema";
 import { QueryRunner } from "./_generated/services";
-import notes from "./_generated/tables/notes";
 
 class NotesGroup extends HttpApiGroup.make("notes").add(
   HttpApiEndpoint.get("listNotes", "/notes", {
-    success: Schema.Array(notes.Doc),
+    success: Schema.Array(notesTable.Doc),
   }),
 ) {}
 
@@ -55,8 +54,7 @@ const withTestHeader: HttpMiddleware.HttpMiddleware = (httpApp) =>
     HttpServerResponse.setHeader(response, "x-confect-middleware", "applied"),
   );
 
-const http = ConfectHttpRouter.make(
-  databaseSchema,
+const http = HttpRouter_.make(
   Layer.mergeAll(
     HttpApiBuilder.layer(NotesApi).pipe(Layer.provide(NotesApiLive)),
     HttpApiBuilder.layer(MetaApi).pipe(Layer.provide(MetaApiLive)),

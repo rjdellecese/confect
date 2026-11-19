@@ -40,23 +40,8 @@ interface TableModuleBinding {
 }
 
 /**
- * Emit `confect/_generated/schema.ts`—the runtime `DatabaseSchema` used by
- * impls and the per-group registries (and downstream by per-function bundles
- * for codec lookup). Every table wrapper at
- * `confect/_generated/tables/<name>.ts` is imported statically and registered
- * as a value entry on the `DatabaseSchema.make({...})` call. Per-table laziness
- * lives inside each `Table`: its `Fields` and `Doc` are lazy memoised getters
- * that only evaluate the user-supplied field-schema callback on first access,
- * so unused tables in a function bundle never pay schema-construction cost
- * despite the static import.
- *
- * The `DatabaseSchema` import is aliased to `$DatabaseSchema` because each
- * table is imported under its own (filename-derived) name; a table named
- * `DatabaseSchema` would otherwise collide with the library import and emit a
- * duplicate-binding file. The leading `$` makes the alias collision-proof:
- * `validateConfectTableIdentifier` requires names to match
- * `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid table import can
- * ever shadow it.
+ * Emit the opt-in registry of all application tables. Generated services and
+ * document aliases use its type; function modules import individual handles.
  */
 export const runtimeSchema = ({
   tableModules,
@@ -71,7 +56,7 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
   yield* cbw.writeLine(
-    `import { DatabaseSchema as $DatabaseSchema } from "@confect/server";`,
+    `import { DatabaseSchema as DatabaseSchema_ } from "@confect/server";`,
   );
 
   if (tableModules.length > 0) {
@@ -79,7 +64,7 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
     yield* Effect.forEach(
       tableModules,
       ({ tableName, importPath }) =>
-        cbw.writeLine(`import ${tableName} from "${importPath}";`),
+        cbw.writeLine(`import ${tableName}Table from "${importPath}";`),
       { concurrency: 1 },
     );
   }
@@ -88,25 +73,25 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
 
   if (tableModules.length === 0) {
     yield* cbw.writeLine(
-      `const databaseSchema: $DatabaseSchema.DatabaseSchema = $DatabaseSchema.make({});`,
+      `const databaseSchema: DatabaseSchema_.DatabaseSchema = DatabaseSchema_.make({});`,
     );
   } else {
     yield* cbw.writeLine(
-      `const databaseSchema: $DatabaseSchema.DatabaseSchema<{`,
+      `const databaseSchema: DatabaseSchema_.DatabaseSchema<{`,
     );
     yield* cbw.indent(
       Effect.forEach(
         tableModules,
         ({ tableName }) =>
-          cbw.writeLine(`readonly ${tableName}: typeof ${tableName};`),
+          cbw.writeLine(`readonly ${tableName}: typeof ${tableName}Table;`),
         { concurrency: 1, discard: true },
       ),
     );
-    yield* cbw.writeLine(`}> = $DatabaseSchema.make({`);
+    yield* cbw.writeLine(`}> = DatabaseSchema_.make({`);
     yield* cbw.indent(
       Effect.gen(function* () {
         for (const { tableName } of tableModules) {
-          yield* cbw.writeLine(`${tableName},`);
+          yield* cbw.writeLine(`${tableName}: ${tableName}Table,`);
         }
       }),
     );
@@ -126,13 +111,6 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
  * `Table.tableDefinition` lives in `@confect/server` because it is the
  * `defineTable` binding; the generated table wrappers themselves stay
  * client-safe (`Fields`/`Doc` from `@confect/core`).
- *
- * The `defineSchema` and `Table` imports are aliased with a leading `$` because
- * each table is imported under its own (filename-derived) name; a table named
- * `defineSchema` or `Table` would otherwise collide with the library import and
- * emit a duplicate-binding file. `validateConfectTableIdentifier` requires
- * names to match `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid
- * table import can ever shadow them.
  */
 export const convexSchema = ({
   tableModules,
@@ -147,16 +125,16 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
   yield* cbw.writeLine(
-    `import { defineSchema as $defineSchema } from "convex/server";`,
+    `import { defineSchema as defineSchema_ } from "convex/server";`,
   );
 
   if (tableModules.length > 0) {
-    yield* cbw.writeLine(`import { Table as $Table } from "@confect/server";`);
+    yield* cbw.writeLine(`import { Table as Table_ } from "@confect/server";`);
     yield* cbw.blankLine();
     yield* Effect.forEach(
       tableModules,
       ({ tableName, importPath }) =>
-        cbw.writeLine(`import ${tableName} from "${importPath}";`),
+        cbw.writeLine(`import ${tableName}Table from "${importPath}";`),
       { concurrency: 1 },
     );
   }
@@ -164,14 +142,14 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   if (tableModules.length === 0) {
-    yield* cbw.writeLine(`export default $defineSchema({});`);
+    yield* cbw.writeLine(`export default defineSchema_({});`);
   } else {
-    yield* cbw.writeLine(`export default $defineSchema({`);
+    yield* cbw.writeLine(`export default defineSchema_({`);
     yield* cbw.indent(
       Effect.gen(function* () {
         for (const { tableName } of tableModules) {
           yield* cbw.writeLine(
-            `${tableName}: $Table.tableDefinition(${tableName}),`,
+            `${tableName}: Table_.tableDefinition(${tableName}Table),`,
           );
         }
       }),
@@ -181,6 +159,21 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
 
   return yield* cbw.toString();
 });
+
+export const tableNames = (names: ReadonlyArray<string>) =>
+  `export default [${Array.join(
+    Array.map(names, (name) => `"${name}"`),
+    ", ",
+  )}] as const;\n`;
+
+export const serverBuilders = `import * as FunctionImpl_ from "@confect/server/FunctionImpl";
+import * as MiddlewareImpl_ from "@confect/server/MiddlewareImpl";
+import type schema from "./schema";
+
+export * as GroupImpl from "@confect/server/GroupImpl";
+export const FunctionImpl = FunctionImpl_.forSchema<typeof schema>();
+export const MiddlewareImpl = MiddlewareImpl_.forSchema<typeof schema>();
+`;
 
 /**
  * Emit `confect/_generated/id.ts`—a type-constrained `Id` constructor and a
@@ -192,45 +185,18 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
  * When the table directory is empty the `TableNames` union resolves to `never`,
  * which still lets the file typecheck against an empty workspace.
  */
-export const id = ({ tableNames }: Parameters<typeof idEffect>[0]) =>
-  idEffect({ tableNames });
+export const id = `import * as GenericId from "@confect/core/GenericId";
+import type { SystemTableNames } from "convex/server";
+import type tableNames from "./tableNames.js";
 
-const idEffect = Effect.fnUntraced(function* ({
-  tableNames,
-}: {
-  tableNames: ReadonlyArray<string>;
-}) {
-  const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+export type TableNames = (typeof tableNames)[number];
 
-  yield* cbw.writeLine(`import { GenericId } from "@confect/core";`);
-  yield* cbw.writeLine(
-    `import type { SystemTableNames } from "convex/server";`,
-  );
-  yield* cbw.blankLine();
+export type Id<TableName extends TableNames | SystemTableNames> = GenericId.GenericId<TableName>;
 
-  const union =
-    tableNames.length === 0
-      ? "never"
-      : Array.join(
-          Array.map(tableNames, (n) => `"${n}"`),
-          " | ",
-        );
-  yield* cbw.writeLine(`export type TableNames = ${union};`);
-  yield* cbw.blankLine();
-
-  yield* cbw.writeLine(
-    `export type Id<TableName extends TableNames | SystemTableNames> = GenericId.GenericId<TableName>;`,
-  );
-  yield* cbw.blankLine();
-
-  yield* cbw.writeLine(
-    `export const Id = <const TableName extends TableNames | SystemTableNames>(`,
-  );
-  yield* cbw.indent(cbw.writeLine(`tableName: TableName,`));
-  yield* cbw.writeLine(`) => GenericId.GenericId(tableName);`);
-
-  return yield* cbw.toString();
-});
+export const Id = <const TableName extends TableNames | SystemTableNames>(
+  tableName: TableName,
+) => GenericId.GenericId(tableName);
+`;
 
 /**
  * Emit `confect/_generated/tables/<tableName>.ts`—a two-line wrapper that
@@ -253,9 +219,9 @@ const tableWrapperEffect = Effect.fnUntraced(function* ({
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-  yield* cbw.writeLine(`import unnamed from "${unnamedImportPath}";`);
+  yield* cbw.writeLine(`import ${tableName}Table from "${unnamedImportPath}";`);
   yield* cbw.blankLine();
-  yield* cbw.writeLine(`export default unnamed("${tableName}");`);
+  yield* cbw.writeLine(`export default ${tableName}Table("${tableName}");`);
 
   return yield* cbw.toString();
 });
@@ -452,37 +418,47 @@ const docsEffect = Effect.fnUntraced(function* ({
 
 export const registeredFunctionsForGroup = ({
   spec,
-  schemaImportPath,
+  tableNamesImportPath,
   specImportPath,
   implImportPath,
 }: Parameters<typeof registeredFunctionsForGroupEffect>[0]) =>
   registeredFunctionsForGroupEffect({
     spec,
-    schemaImportPath,
+    tableNamesImportPath,
     specImportPath,
     implImportPath,
   });
 
 const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   spec,
-  schemaImportPath,
+  tableNamesImportPath,
   specImportPath,
   implImportPath,
 }: {
   spec: GroupSpec.AnyWithProps;
-  schemaImportPath: string;
+  tableNamesImportPath: string;
   specImportPath: string;
   implImportPath: string;
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
   const useNode = spec.runtime === "Node";
 
-  const hasConfectFunctions = (group: GroupSpec.AnyWithProps): boolean =>
+  const hasConfectFunctions = (
+    group: GroupSpec.AnyWithProps,
+    databaseOnly: boolean,
+  ): boolean =>
     Array.some(
       Record.values(group.functions),
-      (functionSpec) => functionSpec.functionProvenance._tag === "Confect",
-    ) || Array.some(Record.values(group.groups), hasConfectFunctions);
-  const forwarding = !useNode && hasConfectFunctions(spec);
+      (fn) =>
+        fn.functionProvenance._tag === "Confect" &&
+        (!databaseOnly || fn.runtimeAndFunctionType.functionType !== "action"),
+    ) ||
+    Array.some(Record.values(group.groups), (child) =>
+      hasConfectFunctions(child, databaseOnly),
+    );
+  const usesTableNames = !useNode && hasConfectFunctions(spec, true);
+  const forwarding =
+    usesTableNames || (!useNode && hasConfectFunctions(spec, false));
 
   if (useNode) {
     yield* cbw.writeLine(
@@ -498,22 +474,23 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
     );
   }
 
-  yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
+  if (usesTableNames) {
+    yield* cbw.writeLine(`import tableNames from "${tableNamesImportPath}";`);
+  }
   yield* cbw.writeLine(`import groupLayer from "${implImportPath}";`);
   yield* cbw.blankLine();
   // The group's own leaf spec is referenced type-only (`typeof import(...)`),
   // so the spec module is erased at transpile time and never enters the
-  // per-function bundle; only `databaseSchema` and the impl are runtime
-  // imports. Typing from the leaf spec (not the project-wide assembled spec)
+  // per-function bundle. Typing from the leaf spec (not the project-wide assembled spec)
   // keeps the registry's type dependent solely on its own group.
   const specType = `typeof import("${specImportPath}")["default"]`;
   if (useNode) {
     yield* cbw.writeLine(
-      `export default RegisteredNodeFunction.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
+      `export default RegisteredNodeFunction.buildForGroup<${specType}>(groupLayer);`,
     );
   } else if (!forwarding) {
     yield* cbw.writeLine(
-      `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, groupLayer);`,
+      `export default RegisteredFunctions.buildForGroup<${specType}>([], groupLayer);`,
     );
   } else {
     const JsonString = Schema.fromJsonString(Schema.String);
@@ -559,7 +536,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
     const registered = yield* bindings(spec, "definitions");
     yield* cbw.writeLine(`const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<Returns>) => (ctx: Ctx, args: Args) => handler(ctx, args);
 
-const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(databaseSchema, groupLayer);
+const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(${usesTableNames ? "tableNames" : "[]"}, groupLayer);
 
 export default ${registered} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
   }

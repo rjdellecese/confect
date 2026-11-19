@@ -16,11 +16,11 @@ import * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as GroupRegistry from "./GroupRegistry";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as GroupImpl from "./GroupImpl";
+import type * as Handler from "./Handler";
 import type * as RegisteredFunctions from "./RegisteredFunctions";
 import { mapLeaves } from "./internal/utils";
 
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
-  databaseSchema: DatabaseSchema.AnyWithProps,
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
 ): RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group> => {
   const { functionRegistryItems, middlewareRegistryItems } =
@@ -35,7 +35,6 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
         Match.tag("Convex", ({ handler }) => handler),
         Match.tag("Confect", (confect) =>
           make(
-            databaseSchema,
             confect,
             ResolvedMiddleware.resolve(confect, middlewareRegistryItems),
           ),
@@ -46,7 +45,6 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
 };
 
 export const make = (
-  databaseSchema: DatabaseSchema.AnyWithProps,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
 ): RegisteredFunction.Any => {
@@ -58,7 +56,7 @@ export const make = (
 
   return genericFunction(
     RegisteredFunction.toConvexDefinition(
-      nodeActionFunction(databaseSchema, {
+      nodeActionFunction({
         name: item.name,
         functionVisibility: item.functionVisibility,
         args: item.args,
@@ -72,39 +70,35 @@ export const make = (
 };
 
 const nodeActionFunction = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
   ConvexArgs extends DefaultFunctionArgs,
   Returns,
   ConvexReturns,
   E,
->(
-  databaseSchema: DatabaseSchema_,
-  {
-    name,
-    functionVisibility,
-    args,
-    returns,
-    error,
-    handler,
-    resolvedMiddlewares,
-  }: {
-    name: string;
-    functionVisibility: FunctionVisibility;
-    args: Schema.Codec<Args, ConvexArgs>;
-    returns: Schema.Codec<Returns, ConvexReturns>;
-    error: Schema.Codec<any, any> | undefined;
-    handler: (
-      a: Args,
-    ) => Effect.Effect<
-      Returns,
-      E,
-      | RegisteredFunction.ActionServices<DatabaseSchema_>
-      | NodeServices.NodeServices
-    >;
-    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
-  },
-) =>
+>({
+  name,
+  functionVisibility,
+  args,
+  returns,
+  error,
+  handler,
+  resolvedMiddlewares,
+}: {
+  name: string;
+  functionVisibility: FunctionVisibility;
+  args: Schema.Codec<Args, ConvexArgs>;
+  returns: Schema.Codec<Returns, ConvexReturns>;
+  error: Schema.Codec<any, any> | undefined;
+  handler: (
+    a: Args,
+  ) => Effect.Effect<
+    Returns,
+    E,
+    | Handler.ActionServices<DatabaseSchema.AnyWithProps>
+    | NodeServices.NodeServices
+  >;
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
+}) =>
   RegisteredFunction.actionFunctionBase({
     name,
     functionVisibility,
@@ -114,8 +108,5 @@ const nodeActionFunction = <
     handler,
     resolvedMiddlewares,
     createLayer: (ctx) =>
-      Layer.mergeAll(
-        RegisteredFunction.actionLayer(databaseSchema, ctx),
-        NodeServices.layer,
-      ),
+      Layer.mergeAll(RegisteredFunction.actionLayer(ctx), NodeServices.layer),
   });

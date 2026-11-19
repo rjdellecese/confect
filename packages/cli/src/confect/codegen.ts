@@ -114,8 +114,7 @@ export const codegen = Command.make("codegen", {}, () =>
 const runCodegen = Effect.gen(function* () {
   yield* generateConfectGeneratedDirectory;
   // Reject a legacy `confect/schema.ts` up front so the user-facing
-  // migration message surfaces before any bundler error from impl
-  // validation (each impl imports `_generated/schema.ts`).
+  // migration message surfaces before bundling user code.
   yield* rejectLegacySchemaFile;
   // List `confect/tables/*.ts` (filename-only—no bundling yet) so the
   // `_generated/id.ts` constructor can be emitted *before* we bundle any
@@ -123,7 +122,7 @@ const runCodegen = Effect.gen(function* () {
   // cross-table id refs, so it must exist on disk first.
   const tableModules = yield* TableModule.discover;
   yield* warnIfNoTables(tableModules);
-  yield* generateIdConstructor(tableModules);
+  yield* generateTableNamesAndIds(tableModules);
   // Now that `_generated/id.ts` is on disk, bundle each table module and
   // check its default export is an `UnnamedTable`. Surface diagnostics
   // here (rather than later) so they appear before impl-validation noise.
@@ -138,10 +137,6 @@ const runCodegen = Effect.gen(function* () {
     GenerationSnapshot.fromLoadedLeaves(leaves),
   );
   yield* generateAssembledSpecs(leaves);
-  // `_generated/api.ts`/`nodeApi.ts` are no longer imported by generated or
-  // impl code (impls take the database schema from `_generated/schema`
-  // directly), so remove any copies left over from earlier versions before
-  // impl validation runs.
   yield* Effect.all(
     [
       removeGeneratedApi,
@@ -149,6 +144,7 @@ const runCodegen = Effect.gen(function* () {
       removeGeneratedNodeApi,
       generateDocs(tableModules),
       generateServices,
+      generateServerBuilders,
       generateConvexSchema(tableModules),
       // Must land before impl validation: impls may import the generated
       // components registry, so it has to exist when their bundles are built.
@@ -313,10 +309,10 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
       }
 
       const implRelativePath = yield* implPathForSpec(leaf.relativePath);
-      const schemaImportPath = yield* toModuleImportPath(
+      const tableNamesImportPath = yield* toModuleImportPath(
         path.relative(
           path.dirname(registryPath),
-          path.join(confectDirectory, "_generated", "schema.ts"),
+          path.join(confectDirectory, "_generated", "tableNames.ts"),
         ),
       );
       // The group's own leaf spec (sibling of its impl), referenced
@@ -336,7 +332,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
 
       const contents = yield* templates.registeredFunctionsForGroup({
         spec: leaf.spec,
-        schemaImportPath,
+        tableNamesImportPath,
         specImportPath,
         implImportPath,
       });
@@ -453,9 +449,6 @@ const removeObsoleteGeneratedFile = Effect.fnUntraced(function* (
   }
 });
 
-// `_generated/api.ts` is no longer imported by generated or impl code: impls
-// take the database schema (`_generated/schema`) directly, and per-group
-// registries reference the spec type-only. Remove any stale copy.
 const removeGeneratedApi = removeObsoleteGeneratedFile("api.ts");
 
 // `_generated/nodeApi.ts` is obsolete for the same reason.
@@ -527,7 +520,7 @@ const tableModuleBindings = Effect.fnUntraced(function* (
   );
 });
 
-const generateIdConstructor = Effect.fnUntraced(function* (
+const generateTableNamesAndIds = Effect.fnUntraced(function* (
   tableModules: ReadonlyArray<TableModule.TableModule>,
 ) {
   const path = yield* Path.Path;
@@ -539,9 +532,11 @@ const generateIdConstructor = Effect.fnUntraced(function* (
     tableModules,
     (tableModule) => tableModule.tableName,
   );
-  const contents = yield* templates.id({ tableNames });
-
-  yield* writeFileStringAndLog(idPath, contents);
+  yield* writeFileStringAndLog(
+    path.join(confectDirectory, GENERATED_DIRNAME, "tableNames.ts"),
+    templates.tableNames(tableNames),
+  );
+  yield* writeFileStringAndLog(idPath, templates.id);
 });
 
 const generateTableWrappers = Effect.fnUntraced(function* (
@@ -699,6 +694,15 @@ const generateServices = Effect.gen(function* () {
   });
 
   yield* writeFileStringAndLog(servicesPath, servicesContentsString);
+});
+
+const generateServerBuilders = Effect.gen(function* () {
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  yield* writeFileStringAndLog(
+    path.join(confectDirectory, GENERATED_DIRNAME, "server.ts"),
+    templates.serverBuilders,
+  );
 });
 
 /**

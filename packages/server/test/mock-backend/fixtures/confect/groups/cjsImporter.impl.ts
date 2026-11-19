@@ -1,15 +1,14 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import { DateTime } from "luxon";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../_generated/schema";
-import cjsImporter from "./cjsImporter.spec";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
+import cjsImporterSpec from "./cjsImporter.spec";
 
-const now = FunctionImpl.make(databaseSchema, cjsImporter, "now", () =>
+const now = FunctionImpl.make(cjsImporterSpec, "now", () =>
   Effect.sync(() => DateTime.now().toISO() ?? ""),
 );
 
-export default GroupImpl.make(databaseSchema, cjsImporter).pipe(
+export default GroupImpl.make(cjsImporterSpec).pipe(
   Layer.provide(now),
   GroupImpl.finalize,
 );

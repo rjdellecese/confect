@@ -1,41 +1,36 @@
 import * as Array from "effect/Array";
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../_generated/schema";
 import refs from "../_generated/refs";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import {
   DatabaseReader,
   DatabaseWriter,
   MutationRunner,
   QueryRunner,
 } from "../_generated/services";
-import transactions, { RejectedWrite } from "./transactions.spec";
+import transactionNotesTable from "../_generated/tables/transactionNotes";
+import transactionsSpec, { RejectedWrite } from "./transactions.spec";
 
-const read = FunctionImpl.make(
-  databaseSchema,
-  transactions,
-  "read",
-  ({ caseId }) =>
-    Effect.gen(function* () {
-      const reader = yield* DatabaseReader;
-      const notes = yield* reader
-        .table("transactionNotes")
-        .index("by_caseId", (q) => q.eq("caseId", caseId))
-        .collect();
-      return Array.map(notes, (note) => note.value);
-    }).pipe(Effect.orDie),
+const read = FunctionImpl.make(transactionsSpec, "read", ({ caseId }) =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    const notes = yield* reader
+      .table(transactionNotesTable)
+      .index("by_caseId", (q) => q.eq("caseId", caseId))
+      .collect();
+    return Array.map(notes, (note) => note.value);
+  }).pipe(Effect.orDie),
 );
 
 const write = FunctionImpl.make(
-  databaseSchema,
-  transactions,
+  transactionsSpec,
   "write",
   ({ caseId, value, fail }) =>
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
       yield* writer
-        .table("transactionNotes")
+        .table(transactionNotesTable)
         .insert({ caseId, value })
         .pipe(Effect.orDie);
       if (fail) return yield* RejectedWrite.make({ value });
@@ -43,32 +38,27 @@ const write = FunctionImpl.make(
     }),
 );
 
-const seed = FunctionImpl.make(
-  databaseSchema,
-  transactions,
-  "seed",
-  ({ caseId, count }) =>
-    Effect.gen(function* () {
-      const writer = yield* DatabaseWriter;
-      const reader = yield* DatabaseReader;
-      const notes = yield* reader
-        .table("transactionNotes")
-        .index("by_caseId", (q) => q.eq("caseId", caseId))
-        .collect();
-      for (const note of notes)
-        yield* writer.table("transactionNotes").delete(note._id);
-      for (let i = 0; i < count; i++) {
-        yield* writer
-          .table("transactionNotes")
-          .insert({ caseId, value: `seed-${i}` });
-      }
-      return null;
-    }).pipe(Effect.orDie),
+const seed = FunctionImpl.make(transactionsSpec, "seed", ({ caseId, count }) =>
+  Effect.gen(function* () {
+    const writer = yield* DatabaseWriter;
+    const reader = yield* DatabaseReader;
+    const notes = yield* reader
+      .table(transactionNotesTable)
+      .index("by_caseId", (q) => q.eq("caseId", caseId))
+      .collect();
+    for (const note of notes)
+      yield* writer.table(transactionNotesTable).delete(note._id);
+    for (let i = 0; i < count; i++) {
+      yield* writer
+        .table(transactionNotesTable)
+        .insert({ caseId, value: `seed-${i}` });
+    }
+    return null;
+  }).pipe(Effect.orDie),
 );
 
 const limitedRead = FunctionImpl.make(
-  databaseSchema,
-  transactions,
+  transactionsSpec,
   "limitedRead",
   ({ caseId, limit }) =>
     Effect.gen(function* () {
@@ -84,8 +74,7 @@ const limitedRead = FunctionImpl.make(
 );
 
 const limitedReadFromMutation = FunctionImpl.make(
-  databaseSchema,
-  transactions,
+  transactionsSpec,
   "limitedReadFromMutation",
   ({ caseId, limit }) =>
     Effect.gen(function* () {
@@ -101,8 +90,7 @@ const limitedReadFromMutation = FunctionImpl.make(
 );
 
 const limitedWrite = FunctionImpl.make(
-  databaseSchema,
-  transactions,
+  transactionsSpec,
   "limitedWrite",
   ({ caseId, limit }) =>
     Effect.gen(function* () {
@@ -117,41 +105,36 @@ const limitedWrite = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-const rollback = FunctionImpl.make(
-  databaseSchema,
-  transactions,
-  "rollback",
-  ({ caseId }) =>
-    Effect.gen(function* () {
-      const writer = yield* DatabaseWriter;
-      yield* writer
-        .table("transactionNotes")
-        .insert({ caseId, value: "parent" });
-      const mutations = yield* MutationRunner;
-      return yield* mutations
-        .runMutation(
-          refs.internal.groups.transactions.write,
-          { caseId, value: "child", fail: true },
-          {
-            transactionLimits: { documentsWritten: 10 },
-          },
-        )
-        .pipe(
-          Effect.as(false),
-          Effect.catchTag("RejectedWrite", () => Effect.succeed(true)),
-        );
-    }).pipe(Effect.orDie),
+const rollback = FunctionImpl.make(transactionsSpec, "rollback", ({ caseId }) =>
+  Effect.gen(function* () {
+    const writer = yield* DatabaseWriter;
+    yield* writer
+      .table(transactionNotesTable)
+      .insert({ caseId, value: "parent" });
+    const mutations = yield* MutationRunner;
+    return yield* mutations
+      .runMutation(
+        refs.internal.groups.transactions.write,
+        { caseId, value: "child", fail: true },
+        {
+          transactionLimits: { documentsWritten: 10 },
+        },
+      )
+      .pipe(
+        Effect.as(false),
+        Effect.catchTag("RejectedWrite", () => Effect.succeed(true)),
+      );
+  }).pipe(Effect.orDie),
 );
 
 const staleRead = FunctionImpl.make(
-  databaseSchema,
-  transactions,
+  transactionsSpec,
   "staleRead",
   ({ caseId, stale }) =>
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
       yield* writer
-        .table("transactionNotes")
+        .table(transactionNotesTable)
         .insert({ caseId, value: "uncommitted" });
       const queries = yield* QueryRunner;
       return yield* queries.runQuery(
@@ -165,7 +148,7 @@ const staleRead = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(databaseSchema, transactions).pipe(
+export default GroupImpl.make(transactionsSpec).pipe(
   Layer.provide(read),
   Layer.provide(write),
   Layer.provide(seed),

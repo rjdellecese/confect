@@ -1,10 +1,10 @@
-import { defineSchema as $defineSchema } from "convex/server";
-import { Table as $Table } from "@confect/server";
+import { defineSchema as defineSchema_ } from "convex/server";
+import { Table as Table_ } from "@confect/server";
 
-import httpVectors from "./tables/httpVectors";
-import transactionNotes from "./tables/transactionNotes";
+import httpVectorsTable from "./tables/httpVectors";
+import transactionNotesTable from "./tables/transactionNotes";
 
-export default $defineSchema({
-  httpVectors: $Table.tableDefinition(httpVectors),
-  transactionNotes: $Table.tableDefinition(transactionNotes),
+export default defineSchema_({
+  httpVectors: Table_.tableDefinition(httpVectorsTable),
+  transactionNotes: Table_.tableDefinition(transactionNotesTable),
 });

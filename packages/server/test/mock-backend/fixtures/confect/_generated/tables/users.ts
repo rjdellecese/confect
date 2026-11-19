@@ -1,3 +1,3 @@
-import unnamed from "../../tables/users";
+import usersTable from "../../tables/users";
 
-export default unnamed("users");
+export default usersTable("users");

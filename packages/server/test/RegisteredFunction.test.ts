@@ -1,6 +1,7 @@
 import * as RecordEffect from "effect/Record";
 import { UnsupportedSchemaTypeError } from "@confect/core/SchemaToValidator";
 import { ConvexError, v } from "convex/values";
+import type * as Handler from "@confect/server/Handler";
 import * as RegisteredFunction from "@confect/server/RegisteredFunction";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Console from "effect/Console";
@@ -21,7 +22,7 @@ describe("actionLayer", () => {
     expectTypeOf<
       ReturnType<typeof RegisteredFunction.actionLayer<typeof databaseSchema>>
     >().toEqualTypeOf<
-      Layer.Layer<RegisteredFunction.ActionServices<typeof databaseSchema>>
+      Layer.Layer<Handler.ActionServices<typeof databaseSchema>>
     >();
   });
 });
