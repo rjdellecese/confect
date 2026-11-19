@@ -22,8 +22,10 @@ import type {
 } from "openapi-typescript-helpers";
 import * as PlatformError from "../PlatformError.js";
 
+type ReadonlyInput<T> = { readonly [K in keyof T]: ReadonlyInput<T[K]> };
+
 type Options<Operation> = ParamsOption<Operation> &
-  RequestBodyOption<Operation>;
+  ReadonlyInput<RequestBodyOption<Operation>>;
 
 export type Responses<Paths extends object> = {
   [

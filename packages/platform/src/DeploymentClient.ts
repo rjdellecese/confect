@@ -6,7 +6,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
 import * as Redacted from "effect/Redacted";
-import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
+import type * as Schema from "effect/Schema";
 import type * as Stream from "effect/Stream";
 import * as Struct from "effect/Struct";
 import * as Client from "./internal/Client.js";
@@ -15,9 +16,9 @@ import {
   DataSyncResponse,
   deployment,
   ListActiveSyncsResponse,
-  Selection as SelectionSchema,
 } from "./internal/DeploymentResponses.js";
 import * as Pagination from "./internal/Pagination.js";
+import * as Selections from "./internal/Selection.js";
 import * as SyncResponse from "./internal/SyncResponse.js";
 import {
   InvalidRequest,
@@ -34,11 +35,7 @@ type WithSecretFields<T, Keys extends string> = {
   [K in keyof T]: K extends Keys ? T[K] | Secret : T[K];
 };
 
-interface SelectionRecord<A> {
-  readonly _other: Api.InclusionDefault;
-  readonly [name: string]: A | Api.InclusionDefault;
-}
-export type Selection = SelectionRecord<SelectionRecord<Api.TableSelection>>;
+export type Selection = Selections.Selection;
 type WithSelection<T> = {
   [K in keyof T]: K extends "selection"
     ? Exclude<T[K], Api.Selection> | Selection
@@ -70,20 +67,6 @@ export type ActiveSyncsPage = Omit<Api.ListActiveSyncsResponse, "syncs"> & {
 const decodeDataSync = SyncResponse.decode("page", DataSyncResponse);
 const decodeActiveSync = SyncResponse.decode("active", ActiveDataSyncSchema);
 const decodeActiveSyncs = SyncResponse.decode("list", ListActiveSyncsResponse);
-type BodyOverrides = {
-  "/data/sync": WithSelection<Api.DataSyncArgs>;
-  "/create_log_stream": WithSelection<Api.CreateLogStreamArgs>;
-  "/update_log_stream/{id}": WithSelection<Api.UpdateLogStreamArgs>;
-};
-type WirePaths = {
-  [P in keyof Api.paths]: P extends keyof BodyOverrides
-    ? Omit<Api.paths[P], "post"> & {
-        post: Omit<Api.paths[P]["post"], "requestBody"> & {
-          requestBody: { content: { "application/json": BodyOverrides[P] } };
-        };
-      }
-    : Api.paths[P];
-};
 
 export interface UpdateEnvironmentVariablesInput {
   readonly changes: ReadonlyArray<
@@ -137,7 +120,11 @@ const redactLogStream = (stream: Api.LogStreamConfig): LogStream => {
         hmacSecret: Redacted.make(stream.hmacSecret),
       };
     case "s3Export":
-      return { ...stream, accessKeyId: Redacted.make(stream.accessKeyId) };
+      return {
+        ...stream,
+        accessKeyId: Redacted.make(stream.accessKeyId),
+        selection: Selections.decode(stream.selection),
+      };
     case "axiom":
       return Struct.evolve(stream, { ingestUrl: redactUrl });
     case "postHogLogs":
@@ -158,22 +145,35 @@ type ActiveSyncsQuery = NonNullable<
 type Operation<A> = Effect.Effect<A, RequestFailure>;
 type ItemStream<A> = Stream.Stream<A, RequestFailure | InvalidPagination>;
 
-const withValidSelection =
-  (
-    operation: string,
-    input:
-      | WithSelection<Api.DataSyncArgs>
-      | CreateLogStreamInput
-      | UpdateLogStreamInput,
-  ) =>
-  <A>(effect: Operation<A>): Operation<A> =>
-    Effect.suspend(() =>
-      "selection" in input &&
-      input.selection != null &&
-      !Schema.is(SelectionSchema)(input.selection)
-        ? Effect.fail(InvalidRequest.make({ operation }))
-        : effect,
-    );
+const encodeSelection = (selection: Selection) =>
+  Result.getOrThrow(Selections.encode(selection));
+
+function logStreamBody(
+  input: CreateLogStreamInput,
+  operation: "createLogStream",
+): Api.CreateLogStreamArgs;
+function logStreamBody(
+  input: UpdateLogStreamInput,
+  operation: "updateLogStream",
+): Api.UpdateLogStreamArgs;
+function logStreamBody(
+  input: CreateLogStreamInput | UpdateLogStreamInput,
+  operation: string,
+) {
+  if (input.logStreamType !== "s3Export") {
+    if ("selection" in input && input.selection != null)
+      throw InvalidRequest.make({ operation });
+    return Struct.map(input, reveal);
+  }
+  const { selection, ...rest } = input;
+  const body = Struct.map(rest, reveal);
+  return selection === undefined
+    ? body
+    : {
+        ...body,
+        selection: selection === null ? null : encodeSelection(selection),
+      };
+}
 
 export interface Service {
   readonly listEnvironmentVariables: Operation<{
@@ -238,7 +238,7 @@ export const make = (
   const address = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(nameOrUrl)
     ? `https://${nameOrUrl}.convex.cloud`
     : Client.normalizeBaseUrl(nameOrUrl);
-  const { request } = Client.make<WirePaths>(
+  const { request } = Client.make<Api.paths>(
     address === undefined
       ? undefined
       : () => createDeploymentClient(address, Redacted.value(token)),
@@ -319,10 +319,9 @@ export const make = (
     createLogStream: (input) =>
       request("createLogStream", "post", "/create_log_stream", {
         get body() {
-          return Struct.map(input, reveal);
+          return logStreamBody(input, "createLogStream");
         },
       }).pipe(
-        withValidSelection("createLogStream", input),
         Effect.map((stream) =>
           stream.logStreamType === "webhook"
             ? { ...stream, hmacSecret: Redacted.make(stream.hmacSecret) }
@@ -333,9 +332,9 @@ export const make = (
       request("updateLogStream", "post", "/update_log_stream/{id}", {
         params: { path: { id } },
         get body() {
-          return Struct.map(input, reveal);
+          return logStreamBody(input, "updateLogStream");
         },
-      }).pipe(withValidSelection("updateLogStream", input)),
+      }),
     deleteLogStream: (id) =>
       request("deleteLogStream", "post", "/delete_log_stream/{id}", {
         params: { path: { id } },
@@ -357,9 +356,14 @@ export const make = (
     ),
     syncData: (body) =>
       request("syncData", "post", "/data/sync", {
-        body,
+        get body() {
+          const { selection, ...rest } = body;
+          return selection === undefined
+            ? rest
+            : { ...rest, selection: encodeSelection(selection) };
+        },
         decodeText: decodeDataSync,
-      }).pipe(withValidSelection("syncData", body)),
+      }),
     listActiveSyncs,
     streamActiveSyncs: (query = {}) =>
       Pagination.stream(

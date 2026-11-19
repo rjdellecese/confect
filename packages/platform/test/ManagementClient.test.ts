@@ -541,6 +541,75 @@ it.effect.each([400, 403, 500])(
     }),
 );
 
+it.effect(
+  "sends built-in and custom role assignments in their distinct wire forms",
+  () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn((_request: Request) =>
+        Promise.resolve(new Response(null)),
+      );
+      const client = ManagementClient.make(token, { fetch });
+      const customRoles = [41, 42] as const;
+      const email = "member@example.test";
+      yield* client.inviteTeamMember(1, { email, role: "custom", customRoles });
+      yield* client.inviteTeamMember(1, { email, role: "developer" });
+      yield* client.updateTeamMemberRole(1, { memberId: 7, customRoles });
+      yield* client.updateTeamMemberRole(1, { memberId: 7, role: "admin" });
+      const bodies = yield* Effect.forEach(
+        fetch.mock.calls,
+        ([request]) => Effect.promise((): Promise<unknown> => request.json()),
+        { concurrency: 1 },
+      );
+      expect(bodies).toEqual([
+        { email, role: "custom", customRoles: [41, 42] },
+        { email, role: "developer" },
+        { memberId: 7, customRoles: [41, 42] },
+        { memberId: 7, role: "admin" },
+      ]);
+    }),
+);
+
+it("rules out conflicting roles and non-defaultable deployment types", () => {
+  type Invite = Parameters<ManagementClient.Service["inviteTeamMember"]>[1];
+  type Update = Parameters<ManagementClient.Service["updateTeamMemberRole"]>[1];
+  type Create = Parameters<ManagementClient.Service["createDeployment"]>[1];
+  const email = "member@example.test";
+  const memberId = 7;
+  expectTypeOf({ email, role: "custom" } as const).not.toExtend<Invite>();
+  expectTypeOf({
+    email,
+    role: "custom",
+    customRoles: [],
+  } as const).not.toExtend<Invite>();
+  expectTypeOf({
+    email,
+    role: "admin",
+    customRoles: [1],
+  } as const).not.toExtend<Invite>();
+  expectTypeOf({
+    memberId,
+    role: "developer",
+    customRoles: [1],
+  } as const).not.toExtend<Update>();
+  expectTypeOf({ memberId, role: "custom" } as const).not.toExtend<Update>();
+  expectTypeOf({ memberId, customRoles: [] } as const).not.toExtend<Update>();
+  expectTypeOf({ memberId }).not.toExtend<Update>();
+  expectTypeOf({
+    type: "preview",
+    isDefault: false,
+  } as const).not.toExtend<Create>();
+  expectTypeOf({
+    type: "custom",
+    isDefault: true,
+  } as const).not.toExtend<Create>();
+  expectTypeOf({ type: "dev", isDefault: true } as const).toExtend<Create>();
+  expectTypeOf({ type: "prod", isDefault: false } as const).toExtend<Create>();
+  expectTypeOf<{
+    type: ManagementApi.CreateDeploymentType;
+    reference: string;
+  }>().toExtend<Create>();
+});
+
 it("requires each named operation's inputs and exposes only its own error types", () => {
   type CreateTeamResponses =
     ManagementApi.operations["create team"]["responses"];

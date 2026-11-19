@@ -35,6 +35,39 @@ type SecretInput<A, Field extends keyof A> = {
   [K in keyof A]: K extends Field ? A[K] | Redacted.Redacted<string> : A[K];
 };
 
+type BuiltInRoleAssignment = {
+  readonly role: Exclude<Api.Role, "custom">;
+  readonly customRoles?: never;
+};
+type CustomRoleIds = Array.NonEmptyReadonlyArray<Api.CustomRoleId>;
+
+export type InviteTeamMemberInput = Omit<
+  Api.CreateInvitationArgs,
+  "role" | "customRoles"
+> &
+  (
+    | BuiltInRoleAssignment
+    | { readonly role: "custom"; readonly customRoles: CustomRoleIds }
+  );
+
+export type UpdateTeamMemberRoleInput = Omit<
+  Api.UpdateTeamMemberRoleArgs,
+  "role" | "customRoles"
+> &
+  (
+    | BuiltInRoleAssignment
+    | { readonly role?: never; readonly customRoles: CustomRoleIds }
+  );
+
+export type CreateDeploymentInput = Omit<
+  Api.PlatformCreateDeploymentArgs,
+  "isDefault"
+> &
+  (
+    | { readonly isDefault?: never }
+    | { readonly type: "dev" | "prod"; readonly isDefault?: boolean | null }
+  );
+
 export interface UpdateDefaultEnvironmentVariablesInput {
   readonly changes: ReadonlyArray<
     SecretInput<Api.DefaultEnvironmentVariableChangeArgs, "value">
@@ -86,7 +119,7 @@ export interface Service {
   ) => ResponseEffect<Api.ProjectResponse>;
   readonly createDeployment: (
     projectId: number,
-    body: Api.PlatformCreateDeploymentArgs,
+    body: CreateDeploymentInput,
   ) => ResponseEffect<Api.PlatformDeploymentResponse>;
   readonly deleteDeployment: (name: string) => ResponseEffect<void>;
   readonly getDeployment: (
@@ -214,7 +247,7 @@ export interface Service {
   ) => ItemStream<Api.AuditLogEventResponse>;
   readonly inviteTeamMember: (
     teamId: number,
-    body: Api.CreateInvitationArgs,
+    body: InviteTeamMemberInput,
   ) => ResponseEffect<void>;
   readonly listPendingTeamInvites: (
     teamId: number,
@@ -257,7 +290,7 @@ export interface Service {
   ) => ResponseEffect<void>;
   readonly updateTeamMemberRole: (
     teamId: number,
-    body: Api.UpdateTeamMemberRoleArgs,
+    body: UpdateTeamMemberRoleInput,
   ) => ResponseEffect<void>;
 }
 

@@ -56,13 +56,48 @@ it.effect(
 );
 const Json = Schema.fromJsonString(Schema.Unknown);
 const selection = {
+  default: "included",
+  components: {
+    "": {
+      default: "excluded",
+      tables: {
+        posts: { default: "excluded" },
+        users: {
+          default: "included",
+          columns: {
+            _id: "included",
+            ssn: "excluded",
+            ["__proto__"]: "excluded",
+          },
+        },
+        constructor: "excluded",
+      },
+    },
+    ["__proto__"]: "excluded",
+  },
+} as const;
+const wireSelection = {
   _other: "included",
   "": {
     _other: "excluded",
-    posts: { _other: "included" },
-    users: { _other: "included", ssn: "excluded" },
+    posts: { _other: "excluded" },
+    users: {
+      _other: "included",
+      _id: "included",
+      ssn: "excluded",
+      ["__proto__"]: "excluded",
+    },
+    constructor: "excluded",
   },
-} satisfies DeploymentClient.Selection;
+  ["__proto__"]: "excluded",
+} as const;
+const withTables = <T>(tables: T) =>
+  ({
+    default: "included",
+    components: { "": { default: "included", tables } },
+  }) as const;
+const withColumns = <T>(columns: T) =>
+  withTables({ users: { default: "excluded", columns } } as const);
 const limit = {
   metric: "functionCalls",
   window: "day",
@@ -163,6 +198,21 @@ it.effect("aborts an in-flight HTTP request when the owning scope closes", () =>
 
 it("checks deployment request bodies and does not expose per-request transport controls", () => {
   const check = (client: ReturnType<typeof DeploymentClient.make>) => {
+    expectTypeOf(selection).toExtend<DeploymentClient.Selection>();
+    const reserved = { _other: "excluded" } as const;
+    expectTypeOf({
+      default: "included",
+      components: reserved,
+    } as const).not.toExtend<DeploymentClient.Selection>();
+    expectTypeOf(
+      withTables(reserved),
+    ).not.toExtend<DeploymentClient.Selection>();
+    expectTypeOf(
+      withColumns(reserved),
+    ).not.toExtend<DeploymentClient.Selection>();
+    expectTypeOf(
+      withColumns({ _id: "excluded" } as const),
+    ).not.toExtend<DeploymentClient.Selection>();
     // @ts-expect-error Updating a usage limit requires the replacement body.
     expectTypeOf(client.updateUsageLimit("first"));
     const invalid = { ...limit, enabled: "yes" };
@@ -236,6 +286,106 @@ it.effect(
         operation: "updateEnvironmentVariables",
       });
       expect(fetch).toHaveBeenCalledTimes(2);
+    }),
+);
+
+it.effect(
+  "reuses an S3 selection without dropping prototype-named entries and rejects an excluded document ID on read",
+  () =>
+    Effect.gen(function* () {
+      const config = {
+        logStreamType: "s3Export",
+        id: "s3",
+        status: { type: "active" },
+        bucket: "bucket",
+        region: "region",
+        accessKeyId: "test-access-id",
+        period: "daily",
+        selection: wireSelection,
+      };
+      const fetch = vi
+        .fn<NonNullable<DeploymentClient.Options["fetch"]>>()
+        .mockResolvedValueOnce(Response.json(config))
+        .mockResolvedValueOnce(new Response(null))
+        .mockResolvedValueOnce(
+          Response.json(
+            [
+              {
+                ...config,
+                selection: {
+                  _other: "included",
+                  "": {
+                    _other: "included",
+                    users: { _other: "excluded", _id: "excluded" },
+                  },
+                },
+              },
+            ],
+            { status: 206 },
+          ),
+        );
+      const client = DeploymentClient.make("test-123", token, { fetch });
+      const stream = yield* client.getLogStream("s3");
+      if (stream.logStreamType !== "s3Export") return expect.unreachable();
+      expect(stream.selection).toStrictEqual(selection);
+      yield* client.updateLogStream("s3", {
+        logStreamType: "s3Export",
+        selection: stream.selection,
+      });
+      const body: unknown = yield* Effect.promise(() =>
+        fetch.mock.calls[1][0].json(),
+      );
+      expect(body).toStrictEqual({
+        logStreamType: "s3Export",
+        selection: wireSelection,
+      });
+      const error = yield* Effect.flip(client.listLogStreams);
+      expect(error).toMatchObject({
+        _tag: "InvalidResponse",
+        operation: "listLogStreams",
+        status: 206,
+      });
+    }),
+);
+
+it.effect(
+  "rejects reserved dynamic names and malformed selections without broadening a data export",
+  () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn(() => Promise.resolve(new Response(null)));
+      const client = DeploymentClient.make("test-123", token, { fetch });
+      const key: string = "_other";
+      const collision = { [key]: "excluded" } as const;
+      for (const value of [
+        { default: "included", components: collision } as const,
+        withTables(collision),
+        withColumns(collision),
+        withColumns({ ["_id" as string]: "excluded" } as const),
+      ]) {
+        const error = yield* Effect.flip(client.syncData({ selection: value }));
+        expect(error).toMatchObject({
+          _tag: "InvalidRequest",
+          operation: "syncData",
+        });
+      }
+      for (const value of [
+        wireSelection,
+        { default: "included", secretComponent: "excluded" },
+        {
+          default: "included",
+          components: { "": { default: "included", users: "excluded" } },
+        },
+        withTables({ users: { default: "included", ssn: "excluded" } }),
+        { default: "included", components: new Map([["secret", "excluded"]]) },
+      ]) {
+        // @ts-expect-error JavaScript callers can pass legacy shapes and non-record maps.
+        const error = yield* Effect.flip(client.syncData({ selection: value }));
+        expect(error).toMatchObject({
+          _tag: "InvalidRequest",
+          operation: "syncData",
+        });
+      }
+      expect(fetch).not.toHaveBeenCalled();
     }),
 );
 
@@ -329,6 +479,7 @@ it.effect(
       const s3 = listed[1];
       if (s3.logStreamType !== "s3Export") return expect.unreachable();
       expectTypeOf(s3.selection).toEqualTypeOf<DeploymentClient.Selection>();
+      expect(s3.selection).toEqual({ default: "excluded" });
       expect(Redacted.value(s3.accessKeyId)).toBe("secret-access-id");
       expect(listed[4]).toMatchObject({ host: null });
       expect(listed[5]).toEqual(streams[5]);
@@ -378,7 +529,7 @@ it.effect(
         logStreamType: "s3Export",
         secretAccessKey: "secret-key",
         accessKeyId: null,
-        selection,
+        selection: wireSelection,
       });
     }),
 );
@@ -493,7 +644,10 @@ it.effect(
       const syncBody: unknown = yield* Effect.promise(() =>
         fetch.mock.calls[2][0].json(),
       );
-      expect(syncBody).toEqual({ cursor: "persistent-cursor", selection });
+      expect(syncBody).toStrictEqual({
+        cursor: "persistent-cursor",
+        selection: wireSelection,
+      });
     }),
 );
 
@@ -591,21 +745,27 @@ it.effect(
       const body: unknown = yield* Effect.promise(() =>
         fetch.mock.calls[0][0].json(),
       );
-      expect(body).toMatchObject({ selection, secretAccessKey: "test-key" });
-      const invalid = { _other: "included", root: "included" } as const;
+      expect(body).toMatchObject({
+        selection: wireSelection,
+        secretAccessKey: "test-key",
+      });
+      const invalid = {
+        default: "included",
+        components: { root: "included" },
+      } as const;
       const badSync = yield* Effect.flip(
+        // @ts-expect-error A named component cannot be included without an object.
         client.syncData({ selection: invalid }),
       );
       const badCreate = yield* Effect.flip(
+        // @ts-expect-error S3 selections use the same component rules as syncData.
         client.createLogStream({ ...s3, selection: invalid }),
       );
       const badUpdate = yield* Effect.flip(
         client.updateLogStream("s3", {
           logStreamType: "s3Export",
-          selection: {
-            _other: "included",
-            root: { _other: "included", todos: "included" },
-          },
+          // @ts-expect-error A named table cannot be included without an object.
+          selection: withTables({ todos: "included" } as const),
         }),
       );
       expect(badSync).toMatchObject({
@@ -620,6 +780,26 @@ it.effect(
         _tag: "InvalidRequest",
         operation: "updateLogStream",
       });
+      const wrongVariant = yield* Effect.flip(
+        client.updateLogStream("hook", {
+          logStreamType: "webhook",
+          // @ts-expect-error A webhook update has no data-selection field.
+          selection: invalid,
+        }),
+      );
+      expect(wrongVariant).toMatchObject({
+        _tag: "InvalidRequest",
+        operation: "updateLogStream",
+      });
       expect(fetch).toHaveBeenCalledTimes(1);
+      for (const input of [
+        { logStreamType: "s3Export" },
+        { logStreamType: "s3Export", selection: null },
+      ] as const) {
+        yield* client.updateLogStream("s3", input);
+        const [request] = fetch.mock.calls[fetch.mock.calls.length - 1];
+        const sent: unknown = yield* Effect.promise(() => request.json());
+        expect(sent).toStrictEqual(input);
+      }
     }),
 );
