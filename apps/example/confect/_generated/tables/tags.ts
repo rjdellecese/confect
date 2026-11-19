@@ -1,3 +1,3 @@
-import unnamed from "../../tables/tags";
+import tagsTable from "../../tables/tags";
 
-export default unnamed("tags");
+export default tagsTable("tags");

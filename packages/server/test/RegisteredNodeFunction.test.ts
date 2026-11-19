@@ -1,6 +1,6 @@
 import * as Result from "effect/Result";
 import { RegisteredNodeFunction } from "@confect/server/node";
-import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl } from "@confect/server";
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as SchemaToValidator from "@confect/core/SchemaToValidator";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
@@ -20,24 +20,18 @@ it("registers a Node group without a factory parameter", () => {
       returns: () => Schema.String,
     }),
   );
-  const database = DatabaseSchema.make({});
-  const layer = GroupImpl.make(database, group).pipe(
-    Layer.provide(
-      FunctionImpl.make(database, group, "run", () => Effect.succeed("ok")),
-    ),
+  const layer = GroupImpl.make(group).pipe(
+    Layer.provide(FunctionImpl.make(group, "run", () => Effect.succeed("ok"))),
     GroupImpl.finalize,
   );
-  const registered = RegisteredNodeFunction.buildForGroup<typeof group>(
-    database,
-    layer,
-  );
+  const registered = RegisteredNodeFunction.buildForGroup<typeof group>(layer);
   expect(registered.run).toBeDefined();
   expectTypeOf(registered.run).toExtend<
     RegisteredAction<"public", Record<string, unknown>, unknown>
   >();
   expectTypeOf<
     Parameters<typeof RegisteredNodeFunction.buildForGroup>["length"]
-  >().toEqualTypeOf<2>();
+  >().toEqualTypeOf<1>();
 });
 
 const options = {
@@ -58,7 +52,7 @@ it.each([
     handler: () => Effect.succeed(true),
   });
   assert(item._tag === "Confect");
-  const registered = RegisteredNodeFunction.make(DatabaseSchema.make({}), item);
+  const registered = RegisteredNodeFunction.make(item);
   expect(compileArgs).not.toHaveBeenCalled();
   expect(compileReturns).not.toHaveBeenCalled();
 

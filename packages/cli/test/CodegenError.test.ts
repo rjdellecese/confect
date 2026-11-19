@@ -3,12 +3,23 @@ import {
   catchAndLog,
   isCodegenError,
   renderCodegenError,
+  ImplMissingSpecImportError,
   InvalidContextReuseError,
 } from "@confect/cli/CodegenError";
 import { SnapshotError } from "@confect/cli/SnapshotError";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
+
+it("suggests a sibling spec import named after the group", () => {
+  const error = ImplMissingSpecImportError.make({
+    implPath: "nested/notes.impl.ts",
+    expectedSpecPath: "nested/notes.spec.ts",
+  });
+  expect(renderCodegenError(error)).toContain(
+    'import notesSpec from "./notes.spec"',
+  );
+});
 
 it.each([
   ["InvalidOption", "must be a boolean"],

@@ -32,26 +32,32 @@ describe("SpecAssemblyNode", () => {
       ]);
       const contents = yield* render(nodes);
 
-      expect(contents).toContain('import env from "../env.spec";');
+      expect(contents).toContain('import envSpec from "../env.spec";');
       expect(contents).toContain(
-        'import notesAndRandom_notes from "../notesAndRandom/notes.spec";',
+        'import notesAndRandom_notesSpec from "../notesAndRandom/notes.spec";',
       );
       expect(contents).toContain(
-        'import notesAndRandom_random from "../notesAndRandom/random.spec";',
+        'import notesAndRandom_randomSpec from "../notesAndRandom/random.spec";',
       );
       expect(contents).toContain(
-        `["notesAndRandom"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
-    ["notes"]: notesAndRandom_notes,
-    ["random"]: notesAndRandom_random,
+        `["notesAndRandom"]: GroupSpec_.addGroupsAt(GroupSpec_.make(), {
+    ["notes"]: notesAndRandom_notesSpec,
+    ["random"]: notesAndRandom_randomSpec,
   })`,
       );
-      expect(contents).toContain('["env"]: env,');
+      expect(contents).toContain('["env"]: envSpec,');
       expect(contents).toContain("}> = Spec.fromGroups({");
       expect(contents).not.toContain("as any");
       expect(contents).toContain("const spec: Spec.Spec<");
-      expect(Option.getOrNull(pipe(contents, Str.match(/\bas\b/g)))).toEqual([
-        "as",
-      ]);
+      expect(
+        Option.getOrNull(
+          pipe(
+            contents,
+            Str.replace("GroupSpec as GroupSpec_", "GroupSpec_"),
+            Str.match(/\bas\b/g),
+          ),
+        ),
+      ).toEqual(["as"]);
       expect(contents).toContain("}) as typeof spec;");
       // Group paths are resolved impl-side, so the assembled spec no longer
       // emits a `.addPath(...)` registration chain.
@@ -69,16 +75,16 @@ describe("SpecAssemblyNode", () => {
         ]);
         const contents = yield* render(nodes);
 
-        expect(contents).toContain('import notes from "../notes.spec";');
+        expect(contents).toContain('import notesSpec from "../notes.spec";');
         expect(contents).toContain(
-          'import notes_archived from "../notes/archived.spec";',
+          'import notes_archivedSpec from "../notes/archived.spec";',
         );
         expect(contents).toContain(
-          `["notes"]: GroupSpec.addGroupsAt(notes, {
-    ["archived"]: notes_archived,
+          `["notes"]: GroupSpec_.addGroupsAt(notesSpec, {
+    ["archived"]: notes_archivedSpec,
   })`,
         );
-        expect(contents).not.toContain("GroupSpec.make()");
+        expect(contents).not.toContain("GroupSpec_.make()");
       }),
   );
 
@@ -93,11 +99,11 @@ describe("SpecAssemblyNode", () => {
         const contents = yield* render(nodes);
 
         expect(contents).toContain(
-          'import { GroupSpec, Spec } from "@confect/core";',
+          'import { GroupSpec as GroupSpec_, Spec } from "@confect/core";',
         );
-        expect(contents).toContain("GroupSpec.addGroupsAt(notes, {");
+        expect(contents).toContain("GroupSpec_.addGroupsAt(notesSpec, {");
         expect(contents).toContain(
-          'GroupSpec.AddGroups<typeof notes, GroupSpec.NamedAt<typeof notes_archived, "archived">>',
+          'GroupSpec_.AddGroups<typeof notesSpec, GroupSpec_.NamedAt<typeof notes_archivedSpec, "archived">>',
         );
         expect(contents).toContain("const spec: Spec.Spec<");
       }),
@@ -111,7 +117,7 @@ describe("SpecAssemblyNode", () => {
 
         expect(contents).toContain('import { Spec } from "@confect/core";');
         expect(contents).not.toContain(
-          'import { GroupSpec, Spec } from "@confect/core";',
+          'import { GroupSpec as GroupSpec_, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
           "const spec: Spec.Spec = Spec.fromGroups({\n}) as typeof spec;",
@@ -135,12 +141,12 @@ describe("SpecAssemblyNode", () => {
         const contents = yield* render(nodes);
 
         expect(contents).toContain(
-          'import { GroupSpec, Spec } from "@confect/core";',
+          'import { GroupSpec as GroupSpec_, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
-          `["notes"]: GroupSpec.addGroupsAt(notes, {
-    ["archived"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
-      ["legacy"]: notes_archived_legacy,
+          `["notes"]: GroupSpec_.addGroupsAt(notesSpec, {
+    ["archived"]: GroupSpec_.addGroupsAt(GroupSpec_.make(), {
+      ["legacy"]: notes_archived_legacySpec,
     }),
   })`,
         );
@@ -187,19 +193,19 @@ describe("SpecAssemblyNode", () => {
         const contents = yield* render(nodes);
 
         expect(contents).toContain(
-          'import scripts_operational_inviteUser_mutations from "../scripts/operational/inviteUser/mutations.spec";',
+          'import scripts_operational_inviteUser_mutationsSpec from "../scripts/operational/inviteUser/mutations.spec";',
         );
         expect(contents).toContain(
-          'import scripts_operational_inviteUser_queries from "../scripts/operational/inviteUser/queries.spec";',
+          'import scripts_operational_inviteUser_queriesSpec from "../scripts/operational/inviteUser/queries.spec";',
         );
         expect(contents).toContain(
-          'import scripts_operational_seed_mutations from "../scripts/operational/seed/mutations.spec";',
+          'import scripts_operational_seed_mutationsSpec from "../scripts/operational/seed/mutations.spec";',
         );
         expect(contents).toContain(
-          'import scripts_operational_seedTestUser_mutations from "../scripts/operational/seedTestUser/mutations.spec";',
+          'import scripts_operational_seedTestUser_mutationsSpec from "../scripts/operational/seedTestUser/mutations.spec";',
         );
         expect(contents).toContain(
-          'import scripts_operational_seedTestUser_queries from "../scripts/operational/seedTestUser/queries.spec";',
+          'import scripts_operational_seedTestUser_queriesSpec from "../scripts/operational/seedTestUser/queries.spec";',
         );
 
         const importLines = Array.filter(
@@ -211,19 +217,19 @@ describe("SpecAssemblyNode", () => {
         expect(importLines).toHaveLength(leaves.length);
 
         expect(contents).toContain(
-          '["mutations"]: scripts_operational_inviteUser_mutations,',
+          '["mutations"]: scripts_operational_inviteUser_mutationsSpec,',
         );
         expect(contents).toContain(
-          '["queries"]: scripts_operational_inviteUser_queries,',
+          '["queries"]: scripts_operational_inviteUser_queriesSpec,',
         );
         expect(contents).toContain(
-          '["mutations"]: scripts_operational_seed_mutations,',
+          '["mutations"]: scripts_operational_seed_mutationsSpec,',
         );
         expect(contents).toContain(
-          '["mutations"]: scripts_operational_seedTestUser_mutations,',
+          '["mutations"]: scripts_operational_seedTestUser_mutationsSpec,',
         );
         expect(contents).toContain(
-          '["queries"]: scripts_operational_seedTestUser_queries,',
+          '["queries"]: scripts_operational_seedTestUser_queriesSpec,',
         );
       }),
   );
@@ -267,7 +273,7 @@ describe("SpecAssemblyNode", () => {
         const contents = yield* render(nodes);
 
         expect(contents).toContain(
-          "GroupSpec.addGroupsAt(remix_routes__app_catalog, {",
+          "GroupSpec_.addGroupsAt(remix_routes__app_catalogSpec, {",
         );
         expect(contents).not.toContain(".addPath(");
       }),
@@ -310,12 +316,12 @@ for (const { name, pathLayer, sep } of [
         const contents = yield* render(nodes);
 
         expect(contents).toContain(
-          'import notesAndRandom_notes from "../notesAndRandom/notes.spec";',
+          'import notesAndRandom_notesSpec from "../notesAndRandom/notes.spec";',
         );
         expect(contents).toContain(
-          'import scripts_operational_seed_mutations from "../scripts/operational/seed/mutations.spec";',
+          'import scripts_operational_seed_mutationsSpec from "../scripts/operational/seed/mutations.spec";',
         );
-        expect(contents).toContain('import env from "../env.spec";');
+        expect(contents).toContain('import envSpec from "../env.spec";');
         expect(contents).not.toContain("\\");
       }),
     );

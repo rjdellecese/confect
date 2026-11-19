@@ -7,25 +7,22 @@
  * under test.
  */
 
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Random from "effect/Random";
-import databaseSchema from "../_generated/schema";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import { TransactionMetadata } from "../_generated/services";
-import cacheStubbed from "./cacheStubbed.spec";
+import cacheStubbedSpec from "./cacheStubbed.spec";
 
 const confectNoTime = FunctionImpl.make(
-  databaseSchema,
-  cacheStubbed,
+  cacheStubbedSpec,
   "confectNoTime",
   () => Random.next,
 );
 
 const confectWithSnapshot = FunctionImpl.make(
-  databaseSchema,
-  cacheStubbed,
+  cacheStubbedSpec,
   "confectWithSnapshot",
   () =>
     Effect.flatMap(TransactionMetadata, (transaction) =>
@@ -34,15 +31,13 @@ const confectWithSnapshot = FunctionImpl.make(
 );
 
 const confectWithClock = FunctionImpl.make(
-  databaseSchema,
-  cacheStubbed,
+  cacheStubbedSpec,
   "confectWithClock",
   () => Clock.currentTimeMillis,
 );
 
 const confectWithRawDateNow = FunctionImpl.make(
-  databaseSchema,
-  cacheStubbed,
+  cacheStubbedSpec,
   "confectWithRawDateNow",
   () =>
     // oxlint-disable-next-line effecttsgo/global-date-in-effect -- This fixture verifies that raw time access evicts Convex's query cache.
@@ -50,15 +45,13 @@ const confectWithRawDateNow = FunctionImpl.make(
 );
 
 const confectWithSpan = FunctionImpl.make(
-  databaseSchema,
-  cacheStubbed,
+  cacheStubbedSpec,
   "confectWithSpan",
   () => Random.next.pipe(Effect.withSpan("cacheStubbed.confectWithSpan")),
 );
 
 const confectWithLog = FunctionImpl.make(
-  databaseSchema,
-  cacheStubbed,
+  cacheStubbedSpec,
   "confectWithLog",
   () =>
     Effect.gen(function* () {
@@ -67,7 +60,7 @@ const confectWithLog = FunctionImpl.make(
     }),
 );
 
-export default GroupImpl.make(databaseSchema, cacheStubbed).pipe(
+export default GroupImpl.make(cacheStubbedSpec).pipe(
   Layer.provide(confectWithSnapshot),
   Layer.provide(confectNoTime),
   Layer.provide(confectWithClock),

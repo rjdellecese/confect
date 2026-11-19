@@ -29,11 +29,11 @@ Each function spec defines the function's name, argument fields, and returns sch
 import { GroupSpec, FunctionSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
-  returns: () => Schema.Array(notes.Doc),
+  returns: () => Schema.Array(notesTable.Doc),
 });
 
 export default GroupSpec.make().addFunction(list);
@@ -86,7 +86,7 @@ import { FunctionSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
 import { Id } from "./_generated/id";
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 
 class NoteNotFound extends Schema.TaggedError<NoteNotFound>()("NoteNotFound", {
   noteId: Id("notes"),
@@ -95,7 +95,7 @@ class NoteNotFound extends Schema.TaggedError<NoteNotFound>()("NoteNotFound", {
 FunctionSpec.publicQuery({
   name: "getOrFail",
   args: () => ({ noteId: Id("notes") }),
-  returns: () => notes.Doc,
+  returns: () => notesTable.Doc,
   error: () => NoteNotFound,
 });
 ```
@@ -108,12 +108,12 @@ Define a paginated query with `FunctionSpec.publicPaginatedQuery` (or `internalP
 import { FunctionSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 
 FunctionSpec.publicPaginatedQuery({
   name: "listByAuthor",
   args: () => ({ author: Schema.String }), // optional; omit for no extra args
-  item: () => notes.Doc,
+  item: () => notesTable.Doc,
 });
 ```
 
@@ -122,19 +122,18 @@ Do not declare `paginationOpts` in `args`—it is added automatically, and decla
 The handler receives the decoded args including `paginationOpts`, which it typically forwards directly to [`paginate`](/server/database/reading#paginate):
 
 ```ts confect/notes.impl.ts
-FunctionImpl.make(
-  databaseSchema,
-  notes,
-  "listByAuthor",
-  ({ author, paginationOpts }) =>
-    Effect.gen(function* () {
-      const reader = yield* DatabaseReader;
+import notesTable from "./_generated/tables/notes";
+import notesSpec from "./notes.spec";
 
-      return yield* reader
-        .table("notes")
-        .index("by_creation_time", "desc")
-        .paginate(paginationOpts, (q) => q.eq(q.field("author"), author));
-    }).pipe(Effect.orDie),
+FunctionImpl.make(notesSpec, "listByAuthor", ({ author, paginationOpts }) =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+
+    return yield* reader
+      .table(notesTable)
+      .index("by_creation_time", "desc")
+      .paginate(paginationOpts, (q) => q.eq(q.field("author"), author));
+  }).pipe(Effect.orDie),
 );
 ```
 
@@ -144,29 +143,29 @@ Paginated queries support the optional `error` schema like any other function. O
 
 Each function impl contains a handler that implements the function's logic. Function impls are composed into group impls using Effect layers.
 
-The handler receives the decoded arguments as its first parameter and returns an `Effect`. Use the generated [services](/concepts/services) (like `DatabaseReader`, `DatabaseWriter`, `Auth`, etc.) inside your handler to interact with Convex.
+Import `FunctionImpl` from `_generated/server` so the handler is checked against your application's database type without loading its tables. The handler receives the decoded arguments as its first parameter and returns an `Effect`. Use the generated [services](/concepts/services) inside your handler to interact with Convex.
 
 ```ts confect/notes.impl.ts
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import databaseSchema from "./_generated/schema";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
-import notes from "./notes.spec";
+import notesTable from "./_generated/tables/notes";
+import notesSpec from "./notes.spec";
 
-const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
+const list = FunctionImpl.make(notesSpec, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
     return yield* reader
-      .table("notes")
+      .table(notesTable)
       .index("by_creation_time", "desc")
       .collect();
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(databaseSchema, notes).pipe(
+export default GroupImpl.make(notesSpec).pipe(
   Layer.provide(list),
   GroupImpl.finalize,
 );
@@ -175,14 +174,12 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
 `GroupImpl.finalize` is the per-group completeness check: it only typechecks once every function declared by the spec has been provided to the group layer.
 
 <Note>
-  Convex bundles a deployment into a single artifact, but a function's cold
-  start only evaluates the module graph reachable from its entry point. Confect
-  emits one Convex module per group, so cold-starting a function only evaluates
-  its own group's spec, impl, and the tables it touches. To keep that cold start
-  fast, import Effect from its submodule paths (`import * as Schema from
-  "effect/Schema"`) rather than the `effect` barrel in your `confect/` files—a
-  barrel import pulls the whole `Schema` namespace into the module graph your
-  function evaluates at cold start, even when you use only a small part of it.
+  A cold function evaluates the modules reachable from its group's Convex entry.
+  Registration does not import every table. The group's own spec, handlers,
+  middleware, and helpers can still bring in tables or other dependencies
+  through their imports. Import handles from the individual
+  `_generated/tables/<name>` modules, and prefer Effect submodules such as
+  `effect/Schema` over the `effect` barrel.
 </Note>
 
 ## Logging

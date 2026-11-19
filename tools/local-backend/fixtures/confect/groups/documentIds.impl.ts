@@ -1,10 +1,10 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import databaseSchema from "../_generated/schema";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import { DatabaseWriter, DocumentIds, QueryCtx } from "../_generated/services";
-import documentIds from "./documentIds.spec";
+import transactionNotesTable from "../_generated/tables/transactionNotes";
+import documentIdsSpec from "./documentIds.spec";
 
 const inspect = ({
   table,
@@ -24,13 +24,12 @@ const inspect = ({
   });
 
 const createAndDelete = FunctionImpl.make(
-  databaseSchema,
-  documentIds,
+  documentIdsSpec,
   "createAndDelete",
   () =>
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
-      const table = writer.table("transactionNotes");
+      const table = writer.table(transactionNotesTable);
       const id = yield* table.insert({
         caseId: "document-id-inspection",
         value: "deleted",
@@ -40,31 +39,20 @@ const createAndDelete = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(databaseSchema, documentIds).pipe(
+export default GroupImpl.make(documentIdsSpec).pipe(
   Layer.provide(
-    FunctionImpl.make(
-      databaseSchema,
-      documentIds,
-      "nativeSampleId",
-      ({ table, input }) =>
-        Effect.gen(function* () {
-          const { db } = yield* QueryCtx;
-          return table === "transactionNotes"
-            ? db.normalizeId(table, input)
-            : db.system.normalizeId(table, input);
-        }),
+    FunctionImpl.make(documentIdsSpec, "nativeSampleId", ({ table, input }) =>
+      Effect.gen(function* () {
+        const { db } = yield* QueryCtx;
+        return table === "transactionNotes"
+          ? db.normalizeId(table, input)
+          : db.system.normalizeId(table, input);
+      }),
     ),
   ),
+  Layer.provide(FunctionImpl.make(documentIdsSpec, "inspect", inspect)),
   Layer.provide(
-    FunctionImpl.make(databaseSchema, documentIds, "inspect", inspect),
-  ),
-  Layer.provide(
-    FunctionImpl.make(
-      databaseSchema,
-      documentIds,
-      "inspectFromMutation",
-      inspect,
-    ),
+    FunctionImpl.make(documentIdsSpec, "inspectFromMutation", inspect),
   ),
   Layer.provide(createAndDelete),
   GroupImpl.finalize,

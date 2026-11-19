@@ -42,7 +42,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             pipe(
               Project.impl,
               Str.replace(
-                'import { FunctionImpl, GroupImpl } from "@confect/server";',
+                'import { FunctionImpl, GroupImpl } from "./_generated/server";',
                 'import * as FunctionImpl from "@confect/server/FunctionImpl"; import * as GroupImpl from "@confect/server/GroupImpl";',
               ),
             ),

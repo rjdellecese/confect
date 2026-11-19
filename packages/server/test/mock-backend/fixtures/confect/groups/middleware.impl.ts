@@ -1,14 +1,14 @@
 import * as Str from "effect/String";
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import databaseSchema from "../_generated/schema";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
+import notesTable from "../_generated/tables/notes";
 import { DatabaseReader } from "../_generated/services";
 import ProvideViewer from "../middleware/ProvideViewer.impl";
 import { Viewer } from "../middleware/ProvideViewer.spec";
 import RequireLongName from "../middleware/RequireLongName.impl";
-import middleware, { NoNotes } from "./middleware.spec";
+import middlewareSpec, { NoNotes } from "./middleware.spec";
 
 const viewerUsername = Effect.gen(function* () {
   const viewer = yield* Viewer;
@@ -17,29 +17,25 @@ const viewerUsername = Effect.gen(function* () {
 });
 
 const viewerName = FunctionImpl.make(
-  databaseSchema,
-  middleware,
+  middlewareSpec,
   "viewerName",
   () => viewerUsername,
 );
 
 const viewerNameMutation = FunctionImpl.make(
-  databaseSchema,
-  middleware,
+  middlewareSpec,
   "viewerNameMutation",
   () => viewerUsername,
 );
 
 const viewerNameAction = FunctionImpl.make(
-  databaseSchema,
-  middleware,
+  middlewareSpec,
   "viewerNameAction",
   () => viewerUsername,
 );
 
 const firstNoteForViewer = FunctionImpl.make(
-  databaseSchema,
-  middleware,
+  middlewareSpec,
   "firstNoteForViewer",
   () =>
     Effect.gen(function* () {
@@ -47,7 +43,7 @@ const firstNoteForViewer = FunctionImpl.make(
       const reader = yield* DatabaseReader;
 
       const note = yield* reader
-        .table("notes")
+        .table(notesTable)
         .index("by_creation_time")
         .first()
         .pipe(Effect.orDie);
@@ -60,19 +56,15 @@ const firstNoteForViewer = FunctionImpl.make(
     }),
 );
 
-const shoutName = FunctionImpl.make(
-  databaseSchema,
-  middleware,
-  "shoutName",
-  () =>
-    Effect.gen(function* () {
-      const { username } = yield* Viewer;
+const shoutName = FunctionImpl.make(middlewareSpec, "shoutName", () =>
+  Effect.gen(function* () {
+    const { username } = yield* Viewer;
 
-      return Str.toUpperCase(username);
-    }),
+    return Str.toUpperCase(username);
+  }),
 );
 
-export default GroupImpl.make(databaseSchema, middleware).pipe(
+export default GroupImpl.make(middlewareSpec).pipe(
   Layer.provide(viewerName),
   Layer.provide(viewerNameMutation),
   Layer.provide(viewerNameAction),

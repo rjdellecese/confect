@@ -1,18 +1,16 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./_generated/schema";
-import typedErrorsNode from "./typedErrorsNode.spec";
+import { FunctionImpl, GroupImpl } from "./_generated/server";
+import typedErrorsNodeSpec from "./typedErrorsNode.spec";
 import { NodeNotFound } from "./typedErrorsNode.spec";
 
 const failingNodeAction = FunctionImpl.make(
-  databaseSchema,
-  typedErrorsNode,
+  typedErrorsNodeSpec,
   "failingNodeAction",
   ({ id }) => Effect.fail(NodeNotFound.make({ id })),
 );
 
-export default GroupImpl.make(databaseSchema, typedErrorsNode).pipe(
+export default GroupImpl.make(typedErrorsNodeSpec).pipe(
   Layer.provide(failingNodeAction),
   GroupImpl.finalize,
 );

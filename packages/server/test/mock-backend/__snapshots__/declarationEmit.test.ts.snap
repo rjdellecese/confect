@@ -9,16 +9,16 @@ export default refs;
 `;
 
 exports[`declaration emit > schema.ts emits a declaration without TS7056 1`] = `
-"import { DatabaseSchema as $DatabaseSchema } from "@confect/server";
-import events from "./tables/events";
-import notes from "./tables/notes";
-import tags from "./tables/tags";
-import users from "./tables/users";
-declare const databaseSchema: $DatabaseSchema.DatabaseSchema<{
-    readonly events: typeof events;
-    readonly notes: typeof notes;
-    readonly tags: typeof tags;
-    readonly users: typeof users;
+"import { DatabaseSchema as DatabaseSchema_ } from "@confect/server";
+import eventsTable from "./tables/events";
+import notesTable from "./tables/notes";
+import tagsTable from "./tables/tags";
+import usersTable from "./tables/users";
+declare const databaseSchema: DatabaseSchema_.DatabaseSchema<{
+    readonly events: typeof eventsTable;
+    readonly notes: typeof notesTable;
+    readonly tags: typeof tagsTable;
+    readonly users: typeof usersTable;
 }>;
 export default databaseSchema;
 "
@@ -120,25 +120,25 @@ export type ActionCtx = typeof ActionCtx.Identifier;
 `;
 
 exports[`declaration emit > spec.ts emits a declaration without TS7056 1`] = `
-"import { GroupSpec, Spec } from "@confect/core";
-import databaseReader from "../databaseReader.spec";
-import groups_aliasImporter from "../groups/aliasImporter.spec";
-import groups_cjsImporter from "../groups/cjsImporter.spec";
-import groups_middleware from "../groups/middleware.spec";
-import groups_middlewareHelpers from "../groups/middlewareHelpers.spec";
-import groups_middlewareOptions from "../groups/middlewareOptions.spec";
-import groups_middlewareOrder from "../groups/middlewareOrder.spec";
-import groups_notes from "../groups/notes.spec";
-import groups_random from "../groups/random.spec";
-import groups_random_stats from "../groups/random/stats.spec";
-import groups_runners from "../groups/runners.spec";
-import groups_scheduling from "../groups/scheduling.spec";
-import groups_typedErrors from "../groups/typedErrors.spec";
-import typedErrorsNode from "../typedErrorsNode.spec";
+"import { GroupSpec as GroupSpec_, Spec } from "@confect/core";
+import databaseReaderSpec from "../databaseReader.spec";
+import groups_aliasImporterSpec from "../groups/aliasImporter.spec";
+import groups_cjsImporterSpec from "../groups/cjsImporter.spec";
+import groups_middlewareHelpersSpec from "../groups/middlewareHelpers.spec";
+import groups_middlewareOptionsSpec from "../groups/middlewareOptions.spec";
+import groups_middlewareOrderSpec from "../groups/middlewareOrder.spec";
+import groups_middlewareSpec from "../groups/middleware.spec";
+import groups_notesSpec from "../groups/notes.spec";
+import groups_randomSpec from "../groups/random.spec";
+import groups_random_statsSpec from "../groups/random/stats.spec";
+import groups_runnersSpec from "../groups/runners.spec";
+import groups_schedulingSpec from "../groups/scheduling.spec";
+import groups_typedErrorsSpec from "../groups/typedErrors.spec";
+import typedErrorsNodeSpec from "../typedErrorsNode.spec";
 declare const spec: Spec.Spec<{
-    readonly databaseReader: GroupSpec.NamedAt<typeof databaseReader, "databaseReader">;
-    readonly groups: GroupSpec.NamedAt<GroupSpec.GroupSpec<"Convex", "groups", never, GroupSpec.NamedAt<typeof groups_aliasImporter, "aliasImporter"> | GroupSpec.NamedAt<typeof groups_cjsImporter, "cjsImporter"> | GroupSpec.NamedAt<typeof groups_middleware, "middleware"> | GroupSpec.NamedAt<typeof groups_middlewareHelpers, "middlewareHelpers"> | GroupSpec.NamedAt<typeof groups_middlewareOptions, "middlewareOptions"> | GroupSpec.NamedAt<typeof groups_middlewareOrder, "middlewareOrder"> | GroupSpec.NamedAt<typeof groups_notes, "notes"> | GroupSpec.NamedAt<GroupSpec.AddGroups<typeof groups_random, GroupSpec.NamedAt<typeof groups_random_stats, "stats">>, "random"> | GroupSpec.NamedAt<typeof groups_runners, "runners"> | GroupSpec.NamedAt<typeof groups_scheduling, "scheduling"> | GroupSpec.NamedAt<typeof groups_typedErrors, "typedErrors">>, "groups">;
-    readonly typedErrorsNode: GroupSpec.NamedAt<typeof typedErrorsNode, "typedErrorsNode">;
+    readonly databaseReader: GroupSpec_.NamedAt<typeof databaseReaderSpec, "databaseReader">;
+    readonly groups: GroupSpec_.NamedAt<GroupSpec_.GroupSpec<"Convex", "groups", never, GroupSpec_.NamedAt<typeof groups_aliasImporterSpec, "aliasImporter"> | GroupSpec_.NamedAt<typeof groups_cjsImporterSpec, "cjsImporter"> | GroupSpec_.NamedAt<typeof groups_middlewareSpec, "middleware"> | GroupSpec_.NamedAt<typeof groups_middlewareHelpersSpec, "middlewareHelpers"> | GroupSpec_.NamedAt<typeof groups_middlewareOptionsSpec, "middlewareOptions"> | GroupSpec_.NamedAt<typeof groups_middlewareOrderSpec, "middlewareOrder"> | GroupSpec_.NamedAt<typeof groups_notesSpec, "notes"> | GroupSpec_.NamedAt<GroupSpec_.AddGroups<typeof groups_randomSpec, GroupSpec_.NamedAt<typeof groups_random_statsSpec, "stats">>, "random"> | GroupSpec_.NamedAt<typeof groups_runnersSpec, "runners"> | GroupSpec_.NamedAt<typeof groups_schedulingSpec, "scheduling"> | GroupSpec_.NamedAt<typeof groups_typedErrorsSpec, "typedErrors">>, "groups">;
+    readonly typedErrorsNode: GroupSpec_.NamedAt<typeof typedErrorsNodeSpec, "typedErrorsNode">;
 }>;
 export default spec;
 "

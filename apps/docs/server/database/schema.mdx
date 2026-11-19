@@ -51,7 +51,39 @@ export default Table.make(() =>
 );
 ```
 
-Each `confect/tables/*.ts` file **must default-export a `Table`**—codegen reads `module.default` and applies the filename as the table name. Consumers (specs, impls, HTTP handlers, etc.) reach a table's derived `Schema`s through the generated wrapper at `confect/_generated/tables/<name>`, e.g. `import notes from "../_generated/tables/notes"` and then `notes.Doc`.
+Default-import the generated handle as `<name>Table`: for example, `import notesTable from "../_generated/tables/notes"`. Use the same handle for schemas (`notesTable.Doc`) and database access (`reader.table(notesTable)`). The `Table` suffix is a local [naming convention](/concepts/file-naming-conventions#spec-and-impl-files); the table name is still `"notes"`.
+
+## Selecting a table
+
+Pass the generated handle to `reader.table` or `writer.table`. A function that reads only notes needs only the notes handle. Shared helpers and middleware import their own handles; you don't need to list those tables in the group spec.
+
+If a handler chooses between a few tables at runtime, import just those handles. Branch before calling a table-specific index or using fields that differ between documents:
+
+```ts
+import * as Effect from "effect/Effect";
+import { DatabaseReader } from "./_generated/services";
+import notesTable from "./_generated/tables/notes";
+import usersTable from "./_generated/tables/users";
+
+const latestLabel = (name: "notes" | "users") =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    if (name === "notes") {
+      const [note] = yield* reader
+        .table(notesTable)
+        .index("by_creation_time", "desc")
+        .take(1);
+      return note?.text;
+    }
+    const [user] = yield* reader
+      .table(usersTable)
+      .index("by_creation_time", "desc")
+      .take(1);
+    return user?.username;
+  });
+```
+
+An admin tool that needs **every** table can opt in to the full registry with `DatabaseSchema.tables(schema)`, where `schema` is the default export of `_generated/schema` and `DatabaseSchema` comes from `@confect/server`. This brings every table module into that tool's runtime dependencies. For a list of application table **names** without codecs, use the default import instead: `import tableNames from "./_generated/tableNames"`.
 
 ## Document IDs
 
@@ -89,7 +121,7 @@ A `Table`'s `Doc` property contains an Effect `Schema` for the table's document,
 
 ## Document types
 
-`Fields` and `Doc` are runtime `Schema`s—_values_. Reach for them whenever you need a value: a spec's `returns`, an HTTP endpoint's `addSuccess`, or decoding. Their TypeScript types are available as `typeof notes.Doc.Type` and `typeof notes.Fields.Type`.
+`Fields` and `Doc` are runtime `Schema`s—_values_. Reach for them whenever you need a value: a spec's `returns`, an HTTP endpoint's `addSuccess`, or decoding. Their TypeScript types are available as `typeof notesTable.Doc.Type` and `typeof notesTable.Fields.Type`.
 
 When you only need to annotate something with a table's document _type_, codegen also emits named document types in `confect/_generated/docs.ts`—one per table (`NotesDoc`, `UsersDoc`, …) plus a `Docs` registry:
 
@@ -106,7 +138,7 @@ export interface Docs {
 }
 ```
 
-`NotesDoc` is the decoded document—the table's fields plus its system fields—exactly the same type as `typeof notes.Doc.Type`, but as a _named_ type. Because it's named, it keeps editor hovers and emitted `.d.ts` files readable (`NotesDoc` rather than the fully-expanded row), and it's what lets the `DatabaseReader`/`DatabaseWriter` services hand documents back under their table's name.
+`NotesDoc` is the decoded document—the table's fields plus its system fields—exactly the same type as `typeof notesTable.Doc.Type`, but as a _named_ type. Because it's named, it keeps editor hovers and emitted `.d.ts` files readable (`NotesDoc` rather than the fully-expanded row), and it's what lets the `DatabaseReader`/`DatabaseWriter` services hand documents back under their table's name.
 
 ```ts
 import type { NotesDoc } from "./confect/_generated/docs";
@@ -116,7 +148,7 @@ const renderNote = (note: NotesDoc) => note.text;
 
 You can also write the type inline with the same helper the generated types alias, `Document.Document<typeof schemaDefinition, "notes">`, and drop the system fields with `Document.WithoutSystemFields<NotesDoc>`.
 
-As a rule of thumb: reach for `notes.Doc` when you need a **value** (a `Schema`), and `NotesDoc` when you need a **type**.
+As a rule of thumb: reach for `notesTable.Doc` when you need a **value** (a `Schema`), and `NotesDoc` when you need a **type**.
 
 <Note>
   Each type's name is the table name folded to PascalCase, so `user_profiles`

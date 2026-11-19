@@ -1,3 +1,3 @@
-import unnamed from "../../tables/transactionNotes";
+import transactionNotesTable from "../../tables/transactionNotes";
 
-export default unnamed("transactionNotes");
+export default transactionNotesTable("transactionNotes");

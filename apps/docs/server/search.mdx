@@ -6,7 +6,7 @@ description: "Query vector indexes for semantic similarity search."
 
 ## Vector search
 
-The `VectorSearch` service queries vector indexes defined in your [schema](/server/database/schema). It is only available in actions.
+The `VectorSearch` service queries vector indexes defined in your [schema](/server/database/schema). Use it in actions and HTTP handlers. Pass the table **name**: vector search returns IDs and scores, so it does not need a document codec.
 
 ```ts
 import * as Effect from "effect/Effect";

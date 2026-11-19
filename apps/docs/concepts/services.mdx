@@ -32,13 +32,13 @@ import {
 
 <ContextBadges query mutation />
 
-Read documents from the database.
+Read documents with `reader.table(handle)`. The handle is the default export of `_generated/tables/<name>`. See [Reading](/server/database/reading).
 
 ### `DatabaseWriter`
 
 <ContextBadges mutation />
 
-Insert, edit, and delete documents from the database.
+Insert, edit, and delete documents with `writer.table(handle)`. It takes the same application table handles as the reader, but not system table handles. See [Writing](/server/database/writing).
 
 ### `DocumentIds`
 
@@ -205,9 +205,9 @@ Read transaction usage and remaining limits. See [Metadata](/server/metadata) fo
 
 ### `VectorSearch`
 
-<ContextBadges action />
+<ContextBadges action http />
 
-Query vector indexes for semantic similarity search.
+Query vector indexes by table and index **name**; results contain IDs and scores rather than decoded documents. See [Search](/server/search).
 
 ## Convex context
 

@@ -11,12 +11,13 @@
 import { TestConfect as TestConfect_ } from "../../../test/src";
 
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
-import confectSchema from "./fixtures/confect/_generated/schema";
+import type confectSchema from "./fixtures/confect/_generated/schema";
+import tableNames from "./fixtures/confect/_generated/tableNames";
 
 export const TestConfect = TestConfect_.TestConfect<typeof confectSchema>();
 
-export const layer = TestConfect_.layer(
-  confectSchema,
+export const layer = TestConfect_.layer<typeof confectSchema>(
+  tableNames,
   convexSchema,
   import.meta.glob([
     "./fixtures/convex/**/*.ts",

@@ -1,5 +1,5 @@
 import { Ref } from "@confect/core";
-import type { DatabaseSchema, DataModel } from "@confect/server";
+import type { DatabaseSchema, DataModel, Handler } from "@confect/server";
 import { RegisteredConvexFunction } from "@confect/server";
 import type {
   DeploymentJwks,
@@ -51,15 +51,11 @@ export type TestConfectWithoutIdentity<
       handler: Effect.Effect<
         void,
         E,
-        RegisteredConvexFunction.MutationServices<DatabaseSchema_>
+        Handler.MutationServices<DatabaseSchema_>
       >,
     ): Effect.Effect<void>;
     <A, B extends Value, E>(
-      handler: Effect.Effect<
-        A,
-        E,
-        RegisteredConvexFunction.MutationServices<DatabaseSchema_>
-      >,
+      handler: Effect.Effect<A, E, Handler.MutationServices<DatabaseSchema_>>,
       returns: Schema.Codec<A, B>,
     ): Effect.Effect<A, Schema.SchemaError>;
   };
@@ -88,7 +84,9 @@ class TestConfectImplWithoutIdentity<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > implements TestConfectWithoutIdentity<DatabaseSchema_> {
   constructor(
-    private confectSchema: DatabaseSchema_,
+    private readonly tableNames: ReadonlyArray<
+      DatabaseSchema.TableNames<DatabaseSchema_>
+    >,
     private testConvex: TestConvexForDataModel<
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
@@ -145,11 +143,7 @@ class TestConfectImplWithoutIdentity<
     B extends Value,
     E,
   >(
-    handler: Effect.Effect<
-      A,
-      E,
-      RegisteredConvexFunction.MutationServices<DatabaseSchema_>
-    >,
+    handler: Effect.Effect<A, E, Handler.MutationServices<DatabaseSchema_>>,
     returns?: Schema.Codec<A, B>,
   ): Effect.Effect<void> | Effect.Effect<A, Schema.SchemaError> => {
     const makeMutationLayer = (
@@ -158,15 +152,11 @@ class TestConfectImplWithoutIdentity<
           DataModel.FromDatabaseSchema<DatabaseSchema_>
         >
       >,
-    ): Layer.Layer<
-      RegisteredConvexFunction.MutationServices<DatabaseSchema_>
-    > =>
-      RegisteredConvexFunction.mutationLayer(
-        this.confectSchema,
+    ) =>
+      RegisteredConvexFunction.mutationLayer<DatabaseSchema_>(
+        this.tableNames,
         mutationCtx,
-      ) as Layer.Layer<
-        RegisteredConvexFunction.MutationServices<DatabaseSchema_>
-      >;
+      );
 
     return returns === undefined
       ? Effect.promise(() =>
@@ -211,20 +201,22 @@ class TestConfectImpl<
   private readonly testConfectImplWithoutIdentity: TestConfectImplWithoutIdentity<DatabaseSchema_>;
 
   constructor(
-    private confectSchema: DatabaseSchema_,
+    private readonly tableNames: ReadonlyArray<
+      DatabaseSchema.TableNames<DatabaseSchema_>
+    >,
     private testConvex: TestConvexForDataModelAndIdentity<
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
   ) {
     this.testConfectImplWithoutIdentity = new TestConfectImplWithoutIdentity(
-      confectSchema,
+      tableNames,
       testConvex,
     );
   }
 
   readonly withIdentity = (userIdentity: Partial<UserIdentity>) =>
     new TestConfectImplWithoutIdentity(
-      this.confectSchema,
+      this.tableNames,
       this.testConvex.withIdentity(userIdentity),
     );
 
@@ -269,15 +261,18 @@ class TestConfectImpl<
 }
 
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
-  databaseSchema: DatabaseSchema_,
-  convexSchemaDefinition: SchemaDefinition<GenericSchema, true>,
+  tableNames: ReadonlyArray<DatabaseSchema.TableNames<DatabaseSchema_>>,
+  convexSchemaDefinition: SchemaDefinition<
+    Record<DatabaseSchema.TableNames<DatabaseSchema_>, GenericSchema[string]>,
+    true
+  >,
   modules: Record<string, () => Promise<any>>,
 ): Layer.Layer<TestConfect<DatabaseSchema_>> =>
   Layer.sync(
     TestConfect<DatabaseSchema_>(),
     () =>
-      new TestConfectImpl(
-        databaseSchema,
+      new TestConfectImpl<DatabaseSchema_>(
+        tableNames,
         convexTest(convexSchemaDefinition, modules) as any,
       ),
   );

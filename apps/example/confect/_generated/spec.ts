@@ -1,29 +1,29 @@
-import { GroupSpec, Spec } from "@confect/core";
-import email from "../email.spec";
-import env from "../env.spec";
-import notes_and_random_notes from "../notes_and_random/notes.spec";
-import notes_and_random_random from "../notes_and_random/random.spec";
-import users from "../users.spec";
-import viewer from "../viewer.spec";
-import workpool from "../workpool.spec";
+import { GroupSpec as GroupSpec_, Spec } from "@confect/core";
+import emailSpec from "../email.spec";
+import envSpec from "../env.spec";
+import notes_and_random_notesSpec from "../notes_and_random/notes.spec";
+import notes_and_random_randomSpec from "../notes_and_random/random.spec";
+import usersSpec from "../users.spec";
+import viewerSpec from "../viewer.spec";
+import workpoolSpec from "../workpool.spec";
 
 const spec: Spec.Spec<{
-  readonly email: GroupSpec.NamedAt<typeof email, "email">;
-  readonly env: GroupSpec.NamedAt<typeof env, "env">;
-  readonly notes_and_random: GroupSpec.NamedAt<GroupSpec.GroupSpec<"Convex", "notes_and_random", never, GroupSpec.NamedAt<typeof notes_and_random_notes, "notes"> | GroupSpec.NamedAt<typeof notes_and_random_random, "random">>, "notes_and_random">;
-  readonly users: GroupSpec.NamedAt<typeof users, "users">;
-  readonly viewer: GroupSpec.NamedAt<typeof viewer, "viewer">;
-  readonly workpool: GroupSpec.NamedAt<typeof workpool, "workpool">;
+  readonly email: GroupSpec_.NamedAt<typeof emailSpec, "email">;
+  readonly env: GroupSpec_.NamedAt<typeof envSpec, "env">;
+  readonly notes_and_random: GroupSpec_.NamedAt<GroupSpec_.GroupSpec<"Convex", "notes_and_random", never, GroupSpec_.NamedAt<typeof notes_and_random_notesSpec, "notes"> | GroupSpec_.NamedAt<typeof notes_and_random_randomSpec, "random">>, "notes_and_random">;
+  readonly users: GroupSpec_.NamedAt<typeof usersSpec, "users">;
+  readonly viewer: GroupSpec_.NamedAt<typeof viewerSpec, "viewer">;
+  readonly workpool: GroupSpec_.NamedAt<typeof workpoolSpec, "workpool">;
 }> = Spec.fromGroups({
-  ["email"]: email,
-  ["env"]: env,
-  ["notes_and_random"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
-    ["notes"]: notes_and_random_notes,
-    ["random"]: notes_and_random_random,
+  ["email"]: emailSpec,
+  ["env"]: envSpec,
+  ["notes_and_random"]: GroupSpec_.addGroupsAt(GroupSpec_.make(), {
+    ["notes"]: notes_and_random_notesSpec,
+    ["random"]: notes_and_random_randomSpec,
   }),
-  ["users"]: users,
-  ["viewer"]: viewer,
-  ["workpool"]: workpool,
+  ["users"]: usersSpec,
+  ["viewer"]: viewerSpec,
+  ["workpool"]: workpoolSpec,
 }) as typeof spec;
 
 export default spec;

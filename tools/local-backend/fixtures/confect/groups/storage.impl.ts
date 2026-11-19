@@ -5,21 +5,20 @@
  * in the isolate.
  */
 
-import { FunctionImpl, GroupImpl } from "@confect/server";
 import type { GenericId } from "convex/values";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../_generated/schema";
 import refs from "../_generated/refs";
+import { FunctionImpl, GroupImpl } from "../_generated/server";
 import {
   MutationRunner,
   QueryRunner,
   Storage,
   TransactionMetadata,
 } from "../_generated/services";
-import storage, { StorageRollback } from "./storage.spec";
+import storageSpec, { StorageRollback } from "./storage.spec";
 
 const readBlob = Effect.fn("storage.readBlob")(function* (
   storageId: GenericId<"_storage">,
@@ -46,8 +45,7 @@ const readFileMetrics = Effect.gen(function* () {
 });
 
 const storeMutation = FunctionImpl.make(
-  databaseSchema,
-  storage,
+  storageSpec,
   "storeMutation",
   ({ text, type, sha256 }) =>
     Effect.gen(function* () {
@@ -61,15 +59,13 @@ const storeMutation = FunctionImpl.make(
 );
 
 const getMutation = FunctionImpl.make(
-  databaseSchema,
-  storage,
+  storageSpec,
   "getMutation",
   ({ storageId }) => readBlob(storageId).pipe(Effect.orDie),
 );
 
 const deleteAndGet = FunctionImpl.make(
-  databaseSchema,
-  storage,
+  storageSpec,
   "deleteAndGet",
   ({ storageId }) =>
     Effect.gen(function* () {
@@ -81,8 +77,7 @@ const deleteAndGet = FunctionImpl.make(
 );
 
 const replaceThenFail = FunctionImpl.make(
-  databaseSchema,
-  storage,
+  storageSpec,
   "replaceThenFail",
   ({ parentId, readId }) =>
     Effect.gen(function* () {
@@ -94,34 +89,29 @@ const replaceThenFail = FunctionImpl.make(
     }),
 );
 
-const rollback = FunctionImpl.make(
-  databaseSchema,
-  storage,
-  "rollback",
-  ({ readId }) =>
-    Effect.gen(function* () {
-      const storageService = yield* Storage;
-      const mutations = yield* MutationRunner;
-      const parentId = yield* storageService.store(new Blob(["parent"]));
-      const rolledBackId = yield* mutations
-        .runMutation(refs.internal.groups.storage.replaceThenFail, {
-          parentId,
-          readId,
-        })
-        .pipe(
-          Effect.catchTag("StorageRollback", (error) =>
-            Effect.succeed(error.storageId),
-          ),
-        );
-      yield* storageService.get(readId);
-      yield* storageService.get(parentId);
-      return { parentId, rolledBackId, metrics: yield* readFileMetrics };
-    }).pipe(Effect.orDie),
+const rollback = FunctionImpl.make(storageSpec, "rollback", ({ readId }) =>
+  Effect.gen(function* () {
+    const storageService = yield* Storage;
+    const mutations = yield* MutationRunner;
+    const parentId = yield* storageService.store(new Blob(["parent"]));
+    const rolledBackId = yield* mutations
+      .runMutation(refs.internal.groups.storage.replaceThenFail, {
+        parentId,
+        readId,
+      })
+      .pipe(
+        Effect.catchTag("StorageRollback", (error) =>
+          Effect.succeed(error.storageId),
+        ),
+      );
+    yield* storageService.get(readId);
+    yield* storageService.get(parentId);
+    return { parentId, rolledBackId, metrics: yield* readFileMetrics };
+  }).pipe(Effect.orDie),
 );
 
 const pendingUrl = FunctionImpl.make(
-  databaseSchema,
-  storage,
+  storageSpec,
   "pendingUrl",
   ({ storageId }) =>
     Effect.gen(function* () {
@@ -133,28 +123,23 @@ const pendingUrl = FunctionImpl.make(
     }),
 );
 
-const staleRead = FunctionImpl.make(
-  databaseSchema,
-  storage,
-  "staleRead",
-  ({ stale }) =>
-    Effect.gen(function* () {
-      const storageService = yield* Storage;
-      const queries = yield* QueryRunner;
-      const storageId = yield* storageService.store(new Blob(["pending"]));
-      const url = yield* queries.runQuery(
-        refs.internal.groups.storage.pendingUrl,
-        { storageId },
-        { useStaleSnapshot: stale },
-      );
-      const blob = yield* readBlob(storageId);
-      return { storageId, url, text: blob.text };
-    }).pipe(Effect.orDie),
+const staleRead = FunctionImpl.make(storageSpec, "staleRead", ({ stale }) =>
+  Effect.gen(function* () {
+    const storageService = yield* Storage;
+    const queries = yield* QueryRunner;
+    const storageId = yield* storageService.store(new Blob(["pending"]));
+    const url = yield* queries.runQuery(
+      refs.internal.groups.storage.pendingUrl,
+      { storageId },
+      { useStaleSnapshot: stale },
+    );
+    const blob = yield* readBlob(storageId);
+    return { storageId, url, text: blob.text };
+  }).pipe(Effect.orDie),
 );
 
 const exerciseFiles = FunctionImpl.make(
-  databaseSchema,
-  storage,
+  storageSpec,
   "exerciseFiles",
   ({ sizes, storageIds }) =>
     Effect.gen(function* () {
@@ -184,8 +169,7 @@ const exerciseFiles = FunctionImpl.make(
 );
 
 const limitedFiles = FunctionImpl.make(
-  databaseSchema,
-  storage,
+  storageSpec,
   "limitedFiles",
   ({ limits, ...args }) =>
     Effect.gen(function* () {
@@ -199,8 +183,7 @@ const limitedFiles = FunctionImpl.make(
 );
 
 const generateUploadUrl = FunctionImpl.make(
-  databaseSchema,
-  storage,
+  storageSpec,
   "generateUploadUrl",
   () =>
     Effect.gen(function* () {
@@ -212,21 +195,17 @@ const generateUploadUrl = FunctionImpl.make(
     }),
 );
 
-const getUrl = FunctionImpl.make(
-  databaseSchema,
-  storage,
-  "getUrl",
-  ({ storageId }) =>
-    Effect.gen(function* () {
-      const storageService = yield* Storage;
+const getUrl = FunctionImpl.make(storageSpec, "getUrl", ({ storageId }) =>
+  Effect.gen(function* () {
+    const storageService = yield* Storage;
 
-      const url = yield* storageService.getUrl(storageId);
+    const url = yield* storageService.getUrl(storageId);
 
-      return url.toString();
-    }).pipe(Effect.orDie),
+    return url.toString();
+  }).pipe(Effect.orDie),
 );
 
-const store = FunctionImpl.make(databaseSchema, storage, "store", ({ text }) =>
+const store = FunctionImpl.make(storageSpec, "store", ({ text }) =>
   Effect.gen(function* () {
     const storageService = yield* Storage;
 
@@ -236,7 +215,7 @@ const store = FunctionImpl.make(databaseSchema, storage, "store", ({ text }) =>
   }),
 );
 
-const get = FunctionImpl.make(databaseSchema, storage, "get", ({ storageId }) =>
+const get = FunctionImpl.make(storageSpec, "get", ({ storageId }) =>
   Effect.gen(function* () {
     const storageService = yield* Storage;
     const blob = yield* storageService.get(storageId);
@@ -246,8 +225,7 @@ const get = FunctionImpl.make(databaseSchema, storage, "get", ({ storageId }) =>
 );
 
 const deleteBlob = FunctionImpl.make(
-  databaseSchema,
-  storage,
+  storageSpec,
   "deleteBlob",
   ({ storageId }) =>
     Effect.gen(function* () {
@@ -258,7 +236,7 @@ const deleteBlob = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(databaseSchema, storage).pipe(
+export default GroupImpl.make(storageSpec).pipe(
   Layer.provide(storeMutation),
   Layer.provide(getMutation),
   Layer.provide(deleteAndGet),

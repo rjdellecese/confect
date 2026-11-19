@@ -8,12 +8,12 @@ import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as OpenApi from "effect/http-api/OpenApi";
 import refs from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
-import notes from "../_generated/tables/notes";
+import notesTable from "../_generated/tables/notes";
 
 class ApiGroup extends HttpApiGroup.make("notes")
   .add(
     HttpApiEndpoint.get("getFirst", "/get-first", {
-      success: Schema.OptionFromNullOr(notes.Doc),
+      success: Schema.OptionFromNullOr(notesTable.Doc),
     }).annotate(OpenApi.Description, "Get the first note, if there is one."),
   )
   .annotate(OpenApi.Title, "Notes")

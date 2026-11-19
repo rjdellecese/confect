@@ -1,7 +1,7 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
-import notes from "../_generated/tables/notes";
+import notesTable from "../_generated/tables/notes";
 
 export class NoteNotFound extends Schema.TaggedError<
   NoteNotFound,
@@ -19,7 +19,7 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "list",
-      returns: () => Schema.Array(notes.Doc),
+      returns: () => Schema.Array(notesTable.Doc),
     }),
   )
   .addFunction(
@@ -32,7 +32,7 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicPaginatedQuery({
       name: "listPaginated",
-      item: () => notes.Doc,
+      item: () => notesTable.Doc,
     }),
   )
   .addFunction(
@@ -49,27 +49,27 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicPaginatedQuery({
       name: "feed",
-      item: () => notes.Doc,
+      item: () => notesTable.Doc,
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getOrFail",
       args: () => ({ noteId: Id("notes") }),
-      returns: () => notes.Doc,
+      returns: () => notesTable.Doc,
       error: () => NoteNotFound,
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getFirst",
-      returns: () => Schema.OptionFromNullOr(notes.Doc),
+      returns: () => Schema.OptionFromNullOr(notesTable.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetFirst",
-      returns: () => Schema.OptionFromNullOr(notes.Doc),
+      returns: () => Schema.OptionFromNullOr(notesTable.Doc),
     }),
   )
   .addFunction(

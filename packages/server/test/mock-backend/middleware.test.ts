@@ -1,4 +1,4 @@
-import * as RecordEffect from "effect/Record";
+import * as Record from "effect/Record";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { FunctionSpec, GroupSpec, MiddlewareSpec, Ref } from "@confect/core";
 import {
@@ -10,7 +10,10 @@ import {
 import { TestConfect as TestConfect_ } from "../../../test/src";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
-import databaseSchema from "./fixtures/confect/_generated/schema";
+import notesTable from "./fixtures/confect/_generated/tables/notes";
+import usersTable from "./fixtures/confect/_generated/tables/users";
+import tableNames from "./fixtures/confect/_generated/tableNames";
+import type databaseSchema from "./fixtures/confect/_generated/schema";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
 import { NameRejected } from "./fixtures/confect/middleware/RequireName.spec";
 import * as Array from "effect/Array";
@@ -40,7 +43,7 @@ const insertUser = Effect.fnUntraced(function* (username: string) {
   yield* c.run(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
-      yield* writer.table("users").insert({ username });
+      yield* writer.table(usersTable).insert({ username });
     }),
   );
 }, Effect.orDie);
@@ -50,11 +53,11 @@ const listNoteTexts = Effect.gen(function* () {
   return yield* c.run(
     Effect.gen(function* () {
       const reader = yield* DatabaseReader;
-      const notes = yield* reader
-        .table("notes")
+      const documents = yield* reader
+        .table(notesTable)
         .index("by_creation_time", "asc")
         .collect();
-      return Array.map(notes, (note) => note.text);
+      return Array.map(documents, (note) => note.text);
     }),
     Schema.String.pipe(Schema.Array, Schema.mutable),
   );
@@ -351,9 +354,9 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
             .middleware(GroupPolicy, { label: "group" })
             .addFunction(query);
 
-          const groupLayer = GroupImpl.make(databaseSchema, group).pipe(
+          const groupLayer = GroupImpl.make(group).pipe(
             Layer.provide(
-              FunctionImpl.make(databaseSchema, group, "get", () =>
+              FunctionImpl.make(group, "get", () =>
                 Effect.sync(() => {
                   events.push("handler");
                   return "ok";
@@ -361,58 +364,64 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
               ),
             ),
             Layer.provide(
-              MiddlewareImpl.make(
-                databaseSchema,
-                GroupPolicy,
-                (effect, context) =>
+              MiddlewareImpl.make(GroupPolicy, (effect, context) =>
+                Effect.gen(function* () {
+                  expect(context).toEqual({
+                    options: { label: context.options.label },
+                    invocation: {
+                      name: "get",
+                      functionType: "query",
+                      functionVisibility: "public",
+                      args: { id: "decoded" },
+                    },
+                  });
+                  events.push(context.options.label);
+                  const result = yield* effect;
+                  events.push(`${context.options.label}:after`);
+                  return result;
+                }),
+              ),
+            ),
+            Layer.provide(
+              MiddlewareImpl.makeByFunctionType(FunctionPolicy, {
+                query: (effect, { options, invocation }) =>
                   Effect.gen(function* () {
-                    expect(context).toEqual({
-                      options: { label: context.options.label },
-                      invocation: {
-                        name: "get",
-                        functionType: "query",
-                        functionVisibility: "public",
-                        args: { id: "decoded" },
-                      },
+                    expect(options.tolerateMissing).toBe(true);
+                    expect(invocation).toEqual({
+                      name: "get",
+                      functionType: "query",
+                      functionVisibility: "public",
+                      args: { id: "decoded" },
                     });
-                    events.push(context.options.label);
-                    const result = yield* effect;
-                    events.push(`${context.options.label}:after`);
-                    return result;
+                    events.push("function");
+                    return yield* effect;
                   }),
-              ),
+                mutation: (effect) => effect,
+                action: (effect) => effect,
+              }),
             ),
             Layer.provide(
-              MiddlewareImpl.makeByFunctionType(
-                databaseSchema,
-                FunctionPolicy,
-                {
-                  query: (effect, { options, invocation }) =>
-                    Effect.gen(function* () {
-                      expect(options.tolerateMissing).toBe(true);
-                      expect(invocation).toEqual({
-                        name: "get",
-                        functionType: "query",
-                        functionVisibility: "public",
-                        args: { id: "decoded" },
-                      });
-                      events.push("function");
-                      return yield* effect;
-                    }),
-                  mutation: (effect) => effect,
-                  action: (effect) => effect,
-                },
-              ),
+              MiddlewareImpl.make(Observe, (effect, context) => {
+                expect(Record.has<string, unknown>(context, "options")).toBe(
+                  false,
+                );
+                expect(context).toStrictEqual({
+                  invocation: {
+                    name: "get",
+                    functionType: "query",
+                    functionVisibility: "public",
+                    args: { id: "decoded" },
+                  },
+                });
+                return effect;
+              }),
             ),
             Layer.provide(
-              MiddlewareImpl.make(
-                databaseSchema,
-                Observe,
-                (effect, context) => {
-                  expect(
-                    RecordEffect.has<string, unknown>(context, "options"),
-                  ).toBe(false);
+              MiddlewareImpl.makeByFunctionType(UndefinedPolicy, {
+                query: (effect, context) => {
+                  expect(Record.has(context, "options")).toBe(true);
                   expect(context).toStrictEqual({
+                    options: undefined,
                     invocation: {
                       name: "get",
                       functionType: "query",
@@ -422,45 +431,28 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
                   });
                   return effect;
                 },
-              ),
-            ),
-            Layer.provide(
-              MiddlewareImpl.makeByFunctionType(
-                databaseSchema,
-                UndefinedPolicy,
-                {
-                  query: (effect, context) => {
-                    expect(RecordEffect.has(context, "options")).toBe(true);
-                    expect(context).toStrictEqual({
-                      options: undefined,
-                      invocation: {
-                        name: "get",
-                        functionType: "query",
-                        functionVisibility: "public",
-                        args: { id: "decoded" },
-                      },
-                    });
-                    return effect;
-                  },
-                  mutation: (effect) => effect,
-                  action: (effect) => effect,
-                },
-              ),
+                mutation: (effect) => effect,
+                action: (effect) => effect,
+              }),
             ),
             GroupImpl.finalize,
           );
 
           const registered = RegisteredFunctions.buildForGroup<typeof group>(
-            databaseSchema,
+            tableNames,
             groupLayer,
           );
           const c = yield* Effect.gen(function* () {
             const services = yield* Layer.build(
-              TestConfect_.layer(databaseSchema, convexSchema, {
-                ...import.meta.glob("./fixtures/convex/_generated/*.js"),
-                "./fixtures/convex/options.ts": () =>
-                  Promise.resolve(registered),
-              }),
+              TestConfect_.layer<typeof databaseSchema>(
+                tableNames,
+                convexSchema,
+                {
+                  ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+                  "./fixtures/convex/options.ts": () =>
+                    Promise.resolve(registered),
+                },
+              ),
             );
             return yield* Effect.service(TestConfect.TestConfect).pipe(
               Effect.provideContext(services),
@@ -502,33 +494,32 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
           const group = GroupSpec.make()
             .middleware(ProvideValue, { value: "outer" })
             .addFunction(query);
-          const groupLayer = GroupImpl.make(databaseSchema, group).pipe(
+          const groupLayer = GroupImpl.make(group).pipe(
             Layer.provide(
-              FunctionImpl.make(databaseSchema, group, "get", () =>
-                Effect.service(Value),
-              ),
+              FunctionImpl.make(group, "get", () => Effect.service(Value)),
             ),
             Layer.provide(
-              MiddlewareImpl.make(
-                databaseSchema,
-                ProvideValue,
-                (effect, { options }) =>
-                  Effect.provideService(effect, Value, options.value),
+              MiddlewareImpl.make(ProvideValue, (effect, { options }) =>
+                Effect.provideService(effect, Value, options.value),
               ),
             ),
             GroupImpl.finalize,
           );
           const registered = RegisteredFunctions.buildForGroup<typeof group>(
-            databaseSchema,
+            tableNames,
             groupLayer,
           );
           const c = yield* Effect.gen(function* () {
             const services = yield* Layer.build(
-              TestConfect_.layer(databaseSchema, convexSchema, {
-                ...import.meta.glob("./fixtures/convex/_generated/*.js"),
-                "./fixtures/convex/options.ts": () =>
-                  Promise.resolve(registered),
-              }),
+              TestConfect_.layer<typeof databaseSchema>(
+                tableNames,
+                convexSchema,
+                {
+                  ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+                  "./fixtures/convex/options.ts": () =>
+                    Promise.resolve(registered),
+                },
+              ),
             );
             return yield* Effect.service(TestConfect.TestConfect).pipe(
               Effect.provideContext(services),
@@ -551,7 +542,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
           yield* c.run(
             Effect.gen(function* () {
               const writer = yield* DatabaseWriter;
-              yield* writer.table("users").insert({ username: "ada" });
+              yield* writer.table(usersTable).insert({ username: "ada" });
             }),
           );
           const group = refs.public.groups.middlewareOptions;
