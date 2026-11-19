@@ -23,14 +23,14 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import type * as EffectScheduler from "effect/Scheduler";
+import type * as Scheduler_ from "effect/Scheduler";
 import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
 import * as Auth from "./Auth";
 import * as ConvexLogger from "./ConvexLogger";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
-import type { ActionServices } from "./Handler";
+import type * as Handler from "./Handler";
 import * as ExecutionMetadata from "./ExecutionMetadata";
 import * as RequestMetadata from "./RequestMetadata";
 import * as MutationRunner from "./MutationRunner";
@@ -132,16 +132,16 @@ export type RegisteredFunction<
 export const toConvexDefinition = <
   Args extends PropertyValidators,
   Returns extends Validator<any, any, any>,
-  Handler,
+  Handler_,
 >(prepared: {
   readonly args: () => Args;
   readonly returns: () => Returns;
-  readonly handler: Handler;
-}): { args: Args; returns: Returns; handler: Handler } => {
+  readonly handler: Handler_;
+}): { args: Args; returns: Returns; handler: Handler_ } => {
   const definition = { handler: prepared.handler };
   Lazy.defineProperty(definition, "args", prepared.args);
   Lazy.defineProperty(definition, "returns", prepared.returns);
-  return definition as { args: Args; returns: Returns; handler: Handler };
+  return definition as { args: Args; returns: Returns; handler: Handler_ };
 };
 
 /**
@@ -224,7 +224,7 @@ export const runHandlerPromise =
   (
     errorSchema: Schema.Codec<any, any> | undefined,
     runOptions?: {
-      readonly scheduler?: EffectScheduler.Scheduler | undefined;
+      readonly scheduler?: Scheduler_.Scheduler | undefined;
     },
   ) =>
   <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
@@ -336,15 +336,13 @@ export const actionFunctionBase = <
     }).pipe(runHandlerPromise(combineErrorSchemas(error, resolvedMiddlewares))),
 });
 
-export type { ActionServices } from "./Handler";
-
 export const actionLayer = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(
   ctx: GenericActionCtx<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
-): Layer.Layer<ActionServices<DatabaseSchema_>> =>
+): Layer.Layer<Handler.ActionServices<DatabaseSchema_>> =>
   Layer.mergeAll(
     Scheduler.layer(ctx.scheduler),
     Auth.layer(ctx.auth),

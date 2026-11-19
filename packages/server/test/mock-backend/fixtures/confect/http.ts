@@ -1,4 +1,4 @@
-import { HttpRouter as ConfectHttpRouter } from "@confect/server";
+import { HttpRouter as HttpRouter_ } from "@confect/server";
 import { httpActionGeneric } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -54,7 +54,7 @@ const withTestHeader: HttpMiddleware.HttpMiddleware = (httpApp) =>
     HttpServerResponse.setHeader(response, "x-confect-middleware", "applied"),
   );
 
-const http = ConfectHttpRouter.make(
+const http = HttpRouter_.make(
   Layer.mergeAll(
     HttpApiBuilder.layer(NotesApi).pipe(Layer.provide(NotesApiLive)),
     HttpApiBuilder.layer(MetaApi).pipe(Layer.provide(MetaApiLive)),

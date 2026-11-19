@@ -1,5 +1,5 @@
 import { Ref } from "@confect/core";
-import type { DatabaseSchema, DataModel } from "@confect/server";
+import type { DatabaseSchema, DataModel, Handler } from "@confect/server";
 import { RegisteredConvexFunction } from "@confect/server";
 import type {
   DeploymentJwks,
@@ -52,15 +52,11 @@ export type TestConfectWithoutIdentity<
       handler: Effect.Effect<
         void,
         E,
-        RegisteredConvexFunction.MutationServices<DatabaseSchema_>
+        Handler.MutationServices<DatabaseSchema_>
       >,
     ): Effect.Effect<void>;
     <A, B extends Value, E>(
-      handler: Effect.Effect<
-        A,
-        E,
-        RegisteredConvexFunction.MutationServices<DatabaseSchema_>
-      >,
+      handler: Effect.Effect<A, E, Handler.MutationServices<DatabaseSchema_>>,
       returns: Schema.Codec<A, B>,
     ): Effect.Effect<A, Schema.SchemaError>;
   };
@@ -148,11 +144,7 @@ class TestConfectImplWithoutIdentity<
     B extends Value,
     E,
   >(
-    handler: Effect.Effect<
-      A,
-      E,
-      RegisteredConvexFunction.MutationServices<DatabaseSchema_>
-    >,
+    handler: Effect.Effect<A, E, Handler.MutationServices<DatabaseSchema_>>,
     returns?: Schema.Codec<A, B>,
   ): Effect.Effect<void> | Effect.Effect<A, Schema.SchemaError> => {
     const makeMutationLayer = (

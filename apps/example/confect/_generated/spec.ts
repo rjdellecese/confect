@@ -1,4 +1,4 @@
-import { GroupSpec as Group, Spec } from "@confect/core";
+import { GroupSpec as GroupSpec_, Spec } from "@confect/core";
 import emailSpec from "../email.spec";
 import envSpec from "../env.spec";
 import notes_and_random_notesSpec from "../notes_and_random/notes.spec";
@@ -8,16 +8,16 @@ import viewerSpec from "../viewer.spec";
 import workpoolSpec from "../workpool.spec";
 
 const spec: Spec.Spec<{
-  readonly email: Group.NamedAt<typeof emailSpec, "email">;
-  readonly env: Group.NamedAt<typeof envSpec, "env">;
-  readonly notes_and_random: Group.NamedAt<Group.GroupSpec<"Convex", "notes_and_random", never, Group.NamedAt<typeof notes_and_random_notesSpec, "notes"> | Group.NamedAt<typeof notes_and_random_randomSpec, "random">>, "notes_and_random">;
-  readonly users: Group.NamedAt<typeof usersSpec, "users">;
-  readonly viewer: Group.NamedAt<typeof viewerSpec, "viewer">;
-  readonly workpool: Group.NamedAt<typeof workpoolSpec, "workpool">;
+  readonly email: GroupSpec_.NamedAt<typeof emailSpec, "email">;
+  readonly env: GroupSpec_.NamedAt<typeof envSpec, "env">;
+  readonly notes_and_random: GroupSpec_.NamedAt<GroupSpec_.GroupSpec<"Convex", "notes_and_random", never, GroupSpec_.NamedAt<typeof notes_and_random_notesSpec, "notes"> | GroupSpec_.NamedAt<typeof notes_and_random_randomSpec, "random">>, "notes_and_random">;
+  readonly users: GroupSpec_.NamedAt<typeof usersSpec, "users">;
+  readonly viewer: GroupSpec_.NamedAt<typeof viewerSpec, "viewer">;
+  readonly workpool: GroupSpec_.NamedAt<typeof workpoolSpec, "workpool">;
 }> = Spec.fromGroups({
   ["email"]: emailSpec,
   ["env"]: envSpec,
-  ["notes_and_random"]: Group.addGroupsAt(Group.make(), {
+  ["notes_and_random"]: GroupSpec_.addGroupsAt(GroupSpec_.make(), {
     ["notes"]: notes_and_random_notesSpec,
     ["random"]: notes_and_random_randomSpec,
   }),

@@ -92,14 +92,14 @@ const writeGroupAssembly: (
   node: SpecAssemblyNode,
 ) => Effect.Effect<void> = Effect.fnUntraced(function* (cbw, node) {
   const group = Option.match(node.importBinding, {
-    onNone: () => "Group.make()",
+    onNone: () => "GroupSpec_.make()",
     onSome: (binding) => binding.localName,
   });
   yield* Array.match(node.children, {
     onEmpty: () => cbw.write(group),
     onNonEmpty: (children) =>
       Effect.gen(function* () {
-        yield* cbw.write(`Group.addGroupsAt(${group}, {\n`);
+        yield* cbw.write(`GroupSpec_.addGroupsAt(${group}, {\n`);
         yield* cbw.indent(
           Effect.forEach(children, (child) => writeGroupEntry(cbw, child), {
             concurrency: 1,
@@ -115,7 +115,7 @@ const groupTypeExpr = (node: SpecAssemblyNode): string =>
     onEmpty: () =>
       Option.match(node.importBinding, {
         onNone: () =>
-          `Group.GroupSpec<"Convex", "${node.segment}", never, never>`,
+          `GroupSpec_.GroupSpec<"Convex", "${node.segment}", never, never>`,
         onSome: (binding) => `typeof ${binding.localName}`,
       }),
     onNonEmpty: (children) => {
@@ -126,15 +126,15 @@ const groupTypeExpr = (node: SpecAssemblyNode): string =>
       );
       return Option.match(node.importBinding, {
         onNone: () =>
-          `Group.GroupSpec<"Convex", "${node.segment}", never, ${childUnion}>`,
+          `GroupSpec_.GroupSpec<"Convex", "${node.segment}", never, ${childUnion}>`,
         onSome: (binding) =>
-          `Group.AddGroups<typeof ${binding.localName}, ${childUnion}>`,
+          `GroupSpec_.AddGroups<typeof ${binding.localName}, ${childUnion}>`,
       });
     },
   });
 
 const rootGroupTypeMember = (node: SpecAssemblyNode): string =>
-  `Group.NamedAt<${groupTypeExpr(node)}, "${node.segment}">`;
+  `GroupSpec_.NamedAt<${groupTypeExpr(node)}, "${node.segment}">`;
 
 export const render = Effect.fnUntraced(function* (
   nodes: ReadonlyArray<SpecAssemblyNode>,
@@ -145,7 +145,7 @@ export const render = Effect.fnUntraced(function* (
     Array.match(nodes, {
       onEmpty: () => `import { Spec } from "@confect/core";`,
       onNonEmpty: () =>
-        `import { GroupSpec as Group, Spec } from "@confect/core";`,
+        `import { GroupSpec as GroupSpec_, Spec } from "@confect/core";`,
     }),
   );
 

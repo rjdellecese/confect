@@ -1,4 +1,4 @@
-import { GroupSpec as Group, Spec } from "@confect/core";
+import { GroupSpec as GroupSpec_, Spec } from "@confect/core";
 import clientsSpec from "../clients.spec";
 import groups_authenticationSpec from "../groups/authentication.spec";
 import groups_cacheControlSpec from "../groups/cacheControl.spec";
@@ -13,12 +13,12 @@ import groups_transactionsSpec from "../groups/transactions.spec";
 import metadataNodeSpec from "../metadataNode.spec";
 
 const spec: Spec.Spec<{
-  readonly clients: Group.NamedAt<typeof clientsSpec, "clients">;
-  readonly groups: Group.NamedAt<Group.GroupSpec<"Convex", "groups", never, Group.NamedAt<typeof groups_authenticationSpec, "authentication"> | Group.NamedAt<typeof groups_cacheControlSpec, "cacheControl"> | Group.NamedAt<typeof groups_cacheStubbedSpec, "cacheStubbed"> | Group.NamedAt<typeof groups_contextReuseSpec, "contextReuse"> | Group.NamedAt<typeof groups_documentIdsSpec, "documentIds"> | Group.NamedAt<typeof groups_httpVectorsSpec, "httpVectors"> | Group.NamedAt<typeof groups_metadataSpec, "metadata"> | Group.NamedAt<typeof groups_schedulingSpec, "scheduling"> | Group.NamedAt<typeof groups_storageSpec, "storage"> | Group.NamedAt<typeof groups_transactionsSpec, "transactions">>, "groups">;
-  readonly metadataNode: Group.NamedAt<typeof metadataNodeSpec, "metadataNode">;
+  readonly clients: GroupSpec_.NamedAt<typeof clientsSpec, "clients">;
+  readonly groups: GroupSpec_.NamedAt<GroupSpec_.GroupSpec<"Convex", "groups", never, GroupSpec_.NamedAt<typeof groups_authenticationSpec, "authentication"> | GroupSpec_.NamedAt<typeof groups_cacheControlSpec, "cacheControl"> | GroupSpec_.NamedAt<typeof groups_cacheStubbedSpec, "cacheStubbed"> | GroupSpec_.NamedAt<typeof groups_contextReuseSpec, "contextReuse"> | GroupSpec_.NamedAt<typeof groups_documentIdsSpec, "documentIds"> | GroupSpec_.NamedAt<typeof groups_httpVectorsSpec, "httpVectors"> | GroupSpec_.NamedAt<typeof groups_metadataSpec, "metadata"> | GroupSpec_.NamedAt<typeof groups_schedulingSpec, "scheduling"> | GroupSpec_.NamedAt<typeof groups_storageSpec, "storage"> | GroupSpec_.NamedAt<typeof groups_transactionsSpec, "transactions">>, "groups">;
+  readonly metadataNode: GroupSpec_.NamedAt<typeof metadataNodeSpec, "metadataNode">;
 }> = Spec.fromGroups({
   ["clients"]: clientsSpec,
-  ["groups"]: Group.addGroupsAt(Group.make(), {
+  ["groups"]: GroupSpec_.addGroupsAt(GroupSpec_.make(), {
     ["authentication"]: groups_authenticationSpec,
     ["cacheControl"]: groups_cacheControlSpec,
     ["cacheStubbed"]: groups_cacheStubbedSpec,

@@ -18,7 +18,7 @@ import type {
   GenericActionCtx,
   GenericDatabaseWriter,
   GenericDataModel,
-  OrderedQuery as ConvexOrderedQuery,
+  OrderedQuery as OrderedQuery_,
 } from "convex/server";
 import { ConvexError, type GenericId } from "convex/values";
 import * as Cause from "effect/Cause";
@@ -410,14 +410,14 @@ describe("server operation tracing", () => {
       Effect.gen(function* () {
         const recorder = yield* makeRecorder;
         const paginate = vi
-          .fn<ConvexOrderedQuery<ConvexDataModel["notes"]>["paginate"]>()
+          .fn<OrderedQuery_<ConvexDataModel["notes"]>["paginate"]>()
           .mockResolvedValue({
             page: [{ _id: noteId, _creationTime: 1, value: "7" }],
             isDone: true,
             continueCursor: "done",
           });
         const filter = vi.fn();
-        const query = { paginate, filter } as unknown as ConvexOrderedQuery<
+        const query = { paginate, filter } as unknown as OrderedQuery_<
           ConvexDataModel["notes"]
         >;
         filter.mockReturnValue(query);

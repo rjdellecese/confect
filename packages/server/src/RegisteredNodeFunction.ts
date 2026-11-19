@@ -16,6 +16,7 @@ import * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as GroupRegistry from "./GroupRegistry";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as GroupImpl from "./GroupImpl";
+import type * as Handler from "./Handler";
 import type * as RegisteredFunctions from "./RegisteredFunctions";
 import { mapLeaves } from "./internal/utils";
 
@@ -93,7 +94,7 @@ const nodeActionFunction = <
   ) => Effect.Effect<
     Returns,
     E,
-    | RegisteredFunction.ActionServices<DatabaseSchema.AnyWithProps>
+    | Handler.ActionServices<DatabaseSchema.AnyWithProps>
     | NodeServices.NodeServices
   >;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;

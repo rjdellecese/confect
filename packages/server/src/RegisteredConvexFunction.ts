@@ -23,7 +23,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import * as Schema from "effect/Schema";
-import * as EffectScheduler from "effect/Scheduler";
+import * as Scheduler_ from "effect/Scheduler";
 import * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as DatabaseReader from "./DatabaseReader";
@@ -43,7 +43,7 @@ import * as QueryRunner from "./QueryRunner";
 import * as QueryTransactionContext from "./QueryTransactionContext";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as FunctionRegistryItem from "./FunctionRegistryItem";
-import type { MutationServices, QueryServices } from "./Handler";
+import type * as Handler from "./Handler";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
 import * as Storage from "./Storage";
@@ -209,7 +209,7 @@ const queryFunction = <
   error: Schema.Codec<Error, Value> | undefined;
   handler: (
     a: Args,
-  ) => Effect.Effect<Returns, E, QueryServices<DatabaseSchema_>>;
+  ) => Effect.Effect<Returns, E, Handler.QueryServices<DatabaseSchema_>>;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
   args: () => compileArgsSchema(args),
@@ -266,7 +266,7 @@ const queryFunction = <
       Effect.provideService(Clock.Clock, queryClock),
       RegisteredFunction.runHandlerPromise(
         RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
-        { scheduler: new EffectScheduler.MixedScheduler("sync") },
+        { scheduler: new Scheduler_.MixedScheduler("sync") },
       ),
     ),
 });
@@ -278,7 +278,7 @@ export const mutationLayer = <
   ctx: GenericMutationCtx<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
-): Layer.Layer<MutationServices<DatabaseSchema_>> =>
+): Layer.Layer<Handler.MutationServices<DatabaseSchema_>> =>
   Layer.mergeAll(
     DatabaseReader.layer<DatabaseSchema_>(ctx.db),
     DocumentIds.layer(tableNames, ctx.db),
@@ -307,8 +307,6 @@ export const mutationLayer = <
     ConvexConfigProvider.layer,
   );
 
-export type { MutationServices } from "./Handler";
-
 const mutationFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
@@ -334,7 +332,7 @@ const mutationFunction = <
   error: Schema.Codec<Error, Value> | undefined;
   handler: (
     a: Args,
-  ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
+  ) => Effect.Effect<Returns, E, Handler.MutationServices<DatabaseSchema_>>;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
   args: () => compileArgsSchema(args),
@@ -373,7 +371,7 @@ const mutationFunction = <
     }).pipe(
       RegisteredFunction.runHandlerPromise(
         RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
-        { scheduler: new EffectScheduler.MixedScheduler("sync") },
+        { scheduler: new Scheduler_.MixedScheduler("sync") },
       ),
     ),
 });
@@ -403,7 +401,7 @@ const convexActionFunction = <
   ) => Effect.Effect<
     Returns,
     E,
-    RegisteredFunction.ActionServices<DatabaseSchema.AnyWithProps>
+    Handler.ActionServices<DatabaseSchema.AnyWithProps>
   >;
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) =>

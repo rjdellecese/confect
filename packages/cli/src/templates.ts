@@ -56,7 +56,7 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
   yield* cbw.writeLine(
-    `import { DatabaseSchema as $DatabaseSchema } from "@confect/server";`,
+    `import { DatabaseSchema as DatabaseSchema_ } from "@confect/server";`,
   );
 
   if (tableModules.length > 0) {
@@ -73,11 +73,11 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
 
   if (tableModules.length === 0) {
     yield* cbw.writeLine(
-      `const databaseSchema: $DatabaseSchema.DatabaseSchema = $DatabaseSchema.make({});`,
+      `const databaseSchema: DatabaseSchema_.DatabaseSchema = DatabaseSchema_.make({});`,
     );
   } else {
     yield* cbw.writeLine(
-      `const databaseSchema: $DatabaseSchema.DatabaseSchema<{`,
+      `const databaseSchema: DatabaseSchema_.DatabaseSchema<{`,
     );
     yield* cbw.indent(
       Effect.forEach(
@@ -87,7 +87,7 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
         { concurrency: 1, discard: true },
       ),
     );
-    yield* cbw.writeLine(`}> = $DatabaseSchema.make({`);
+    yield* cbw.writeLine(`}> = DatabaseSchema_.make({`);
     yield* cbw.indent(
       Effect.gen(function* () {
         for (const { tableName } of tableModules) {
@@ -125,11 +125,11 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
   yield* cbw.writeLine(
-    `import { defineSchema as $defineSchema } from "convex/server";`,
+    `import { defineSchema as defineSchema_ } from "convex/server";`,
   );
 
   if (tableModules.length > 0) {
-    yield* cbw.writeLine(`import { Table as $Table } from "@confect/server";`);
+    yield* cbw.writeLine(`import { Table as Table_ } from "@confect/server";`);
     yield* cbw.blankLine();
     yield* Effect.forEach(
       tableModules,
@@ -142,14 +142,14 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   if (tableModules.length === 0) {
-    yield* cbw.writeLine(`export default $defineSchema({});`);
+    yield* cbw.writeLine(`export default defineSchema_({});`);
   } else {
-    yield* cbw.writeLine(`export default $defineSchema({`);
+    yield* cbw.writeLine(`export default defineSchema_({`);
     yield* cbw.indent(
       Effect.gen(function* () {
         for (const { tableName } of tableModules) {
           yield* cbw.writeLine(
-            `${tableName}: $Table.tableDefinition(${tableName}Table),`,
+            `${tableName}: Table_.tableDefinition(${tableName}Table),`,
           );
         }
       }),

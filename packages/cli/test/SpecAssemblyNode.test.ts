@@ -40,7 +40,7 @@ describe("SpecAssemblyNode", () => {
         'import notesAndRandom_randomSpec from "../notesAndRandom/random.spec";',
       );
       expect(contents).toContain(
-        `["notesAndRandom"]: Group.addGroupsAt(Group.make(), {
+        `["notesAndRandom"]: GroupSpec_.addGroupsAt(GroupSpec_.make(), {
     ["notes"]: notesAndRandom_notesSpec,
     ["random"]: notesAndRandom_randomSpec,
   })`,
@@ -53,7 +53,7 @@ describe("SpecAssemblyNode", () => {
         Option.getOrNull(
           pipe(
             contents,
-            Str.replace("GroupSpec as Group", "Group"),
+            Str.replace("GroupSpec as GroupSpec_", "GroupSpec_"),
             Str.match(/\bas\b/g),
           ),
         ),
@@ -80,11 +80,11 @@ describe("SpecAssemblyNode", () => {
           'import notes_archivedSpec from "../notes/archived.spec";',
         );
         expect(contents).toContain(
-          `["notes"]: Group.addGroupsAt(notesSpec, {
+          `["notes"]: GroupSpec_.addGroupsAt(notesSpec, {
     ["archived"]: notes_archivedSpec,
   })`,
         );
-        expect(contents).not.toContain("Group.make()");
+        expect(contents).not.toContain("GroupSpec_.make()");
       }),
   );
 
@@ -99,11 +99,11 @@ describe("SpecAssemblyNode", () => {
         const contents = yield* render(nodes);
 
         expect(contents).toContain(
-          'import { GroupSpec as Group, Spec } from "@confect/core";',
+          'import { GroupSpec as GroupSpec_, Spec } from "@confect/core";',
         );
-        expect(contents).toContain("Group.addGroupsAt(notesSpec, {");
+        expect(contents).toContain("GroupSpec_.addGroupsAt(notesSpec, {");
         expect(contents).toContain(
-          'Group.AddGroups<typeof notesSpec, Group.NamedAt<typeof notes_archivedSpec, "archived">>',
+          'GroupSpec_.AddGroups<typeof notesSpec, GroupSpec_.NamedAt<typeof notes_archivedSpec, "archived">>',
         );
         expect(contents).toContain("const spec: Spec.Spec<");
       }),
@@ -117,7 +117,7 @@ describe("SpecAssemblyNode", () => {
 
         expect(contents).toContain('import { Spec } from "@confect/core";');
         expect(contents).not.toContain(
-          'import { GroupSpec as Group, Spec } from "@confect/core";',
+          'import { GroupSpec as GroupSpec_, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
           "const spec: Spec.Spec = Spec.fromGroups({\n}) as typeof spec;",
@@ -141,11 +141,11 @@ describe("SpecAssemblyNode", () => {
         const contents = yield* render(nodes);
 
         expect(contents).toContain(
-          'import { GroupSpec as Group, Spec } from "@confect/core";',
+          'import { GroupSpec as GroupSpec_, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
-          `["notes"]: Group.addGroupsAt(notesSpec, {
-    ["archived"]: Group.addGroupsAt(Group.make(), {
+          `["notes"]: GroupSpec_.addGroupsAt(notesSpec, {
+    ["archived"]: GroupSpec_.addGroupsAt(GroupSpec_.make(), {
       ["legacy"]: notes_archived_legacySpec,
     }),
   })`,
@@ -273,7 +273,7 @@ describe("SpecAssemblyNode", () => {
         const contents = yield* render(nodes);
 
         expect(contents).toContain(
-          "Group.addGroupsAt(remix_routes__app_catalogSpec, {",
+          "GroupSpec_.addGroupsAt(remix_routes__app_catalogSpec, {",
         );
         expect(contents).not.toContain(".addPath(");
       }),

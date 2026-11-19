@@ -1,7 +1,7 @@
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import type * as DataModel from "@confect/server/DataModel";
 import type * as ActionCtx from "@confect/server/ActionCtx";
-import * as ConfectHttpRouter from "@confect/server/HttpRouter";
+import * as HttpRouter_ from "@confect/server/HttpRouter";
 import * as Table from "@confect/server/Table";
 import * as VectorSearch from "@confect/server/VectorSearch";
 import type * as DatabaseWriter from "@confect/server/DatabaseWriter";
@@ -71,22 +71,20 @@ describe("HttpRouter", () => {
         return yield* HttpServerResponse.json(results);
       }),
     );
-    expectTypeOf<typeof routes>().toExtend<
-      ConfectHttpRouter.Routes<typeof schema>
-    >();
+    expectTypeOf<typeof routes>().toExtend<HttpRouter_.Routes<typeof schema>>();
     expectTypeOf<[typeof routes]>().toExtend<
-      Parameters<typeof ConfectHttpRouter.make<typeof schema>>
+      Parameters<typeof HttpRouter_.make<typeof schema>>
     >();
     expectTypeOf<typeof routes>().not.toExtend<
-      ConfectHttpRouter.Routes<typeof otherSchema>
+      HttpRouter_.Routes<typeof otherSchema>
     >();
     expectTypeOf<[typeof routes]>().not.toExtend<
-      Parameters<typeof ConfectHttpRouter.make<typeof otherSchema>>
+      Parameters<typeof HttpRouter_.make<typeof otherSchema>>
     >();
     expectTypeOf<typeof routes>().not.toExtend<
-      ConfectHttpRouter.Routes<typeof wrongIndexSchema>
+      HttpRouter_.Routes<typeof wrongIndexSchema>
     >();
-    ConfectHttpRouter.make<typeof schema>(routes);
+    HttpRouter_.make<typeof schema>(routes);
   });
 
   it("accepts routes without a schema value or type argument", () => {
@@ -96,22 +94,20 @@ describe("HttpRouter", () => {
       HttpServerResponse.text("ok"),
     );
     expectTypeOf<[typeof routes]>().toExtend<
-      Parameters<typeof ConfectHttpRouter.make>
+      Parameters<typeof HttpRouter_.make>
     >();
     expectTypeOf<
-      Parameters<typeof ConfectHttpRouter.make>["length"]
+      Parameters<typeof HttpRouter_.make>["length"]
     >().toEqualTypeOf<1>();
-    expectTypeOf<typeof routes>().toExtend<
-      ConfectHttpRouter.Routes<typeof schema>
-    >();
-    ConfectHttpRouter.make(routes);
+    expectTypeOf<typeof routes>().toExtend<HttpRouter_.Routes<typeof schema>>();
+    HttpRouter_.make(routes);
   });
 
   it("keeps non-HTTP capabilities unavailable", () => {
-    type Services = ConfectHttpRouter.Services<typeof schema>;
+    type Services = HttpRouter_.Services<typeof schema>;
     expectTypeOf<VectorSearch.VectorSearch<Model>>().toExtend<Services>();
     expectTypeOf<VectorSearch.VectorSearch<Model>>().not.toExtend<
-      ConfectHttpRouter.Services<typeof otherSchema>
+      HttpRouter_.Services<typeof otherSchema>
     >();
     expectTypeOf<
       DatabaseWriter.DatabaseWriter<typeof schema>
@@ -148,7 +144,7 @@ describe("HttpRouter", () => {
         return yield* HttpServerResponse.json(matches);
       }),
     );
-    ConfectHttpRouter.make<typeof lazySchema>(routes);
+    HttpRouter_.make<typeof lazySchema>(routes);
     expect(fields).not.toHaveBeenCalled();
     expect(DatabaseSchema.tables(lazySchema)).toBe(tables);
     expect(DatabaseSchema.tables(lazySchema).lazy).toBe(table);

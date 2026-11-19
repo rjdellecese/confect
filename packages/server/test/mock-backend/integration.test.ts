@@ -5,8 +5,8 @@ import { assertEquals } from "@effect/vitest/utils";
 import { FunctionSpec, GenericId, Ref } from "@confect/core";
 import * as SchemaToValidator from "@confect/core/SchemaToValidator";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
+import type * as Handler from "@confect/server/Handler";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
-import type * as RegisteredFunction from "@confect/server/RegisteredFunction";
 import { RegisteredNodeFunction } from "@confect/server/node";
 import { convexTest, type TestConvex } from "convex-test";
 import {
@@ -900,7 +900,7 @@ describe("action storage transaction isolation", () => {
     action: Effect.Effect<
       Id<"_storage">,
       E,
-      RegisteredFunction.ActionServices<typeof confectSchema>
+      Handler.ActionServices<typeof confectSchema>
     >,
   ) => {
     const run = FunctionRegistryItem.make({
@@ -1376,11 +1376,7 @@ describe("mutation Blob transactions", () => {
   const modules = import.meta.glob("./fixtures/convex/_generated/*.js");
   const run = <A, E>(
     t: TestConvex<typeof convexSchema>,
-    effect: Effect.Effect<
-      A,
-      E,
-      RegisteredConvexFunction.MutationServices<typeof confectSchema>
-    >,
+    effect: Effect.Effect<A, E, Handler.MutationServices<typeof confectSchema>>,
   ) =>
     Effect.promise(() =>
       t.mutation((ctx) =>

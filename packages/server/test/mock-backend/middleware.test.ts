@@ -1,4 +1,4 @@
-import * as RecordEffect from "effect/Record";
+import * as Record from "effect/Record";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { FunctionSpec, GroupSpec, MiddlewareSpec, Ref } from "@confect/core";
 import {
@@ -402,9 +402,9 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
             ),
             Layer.provide(
               MiddlewareImpl.make(Observe, (effect, context) => {
-                expect(
-                  RecordEffect.has<string, unknown>(context, "options"),
-                ).toBe(false);
+                expect(Record.has<string, unknown>(context, "options")).toBe(
+                  false,
+                );
                 expect(context).toStrictEqual({
                   invocation: {
                     name: "get",
@@ -419,7 +419,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
             Layer.provide(
               MiddlewareImpl.makeByFunctionType(UndefinedPolicy, {
                 query: (effect, context) => {
-                  expect(RecordEffect.has(context, "options")).toBe(true);
+                  expect(Record.has(context, "options")).toBe(true);
                   expect(context).toStrictEqual({
                     options: undefined,
                     invocation: {

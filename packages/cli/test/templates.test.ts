@@ -349,7 +349,7 @@ export { reads } from "./reads";
 
         const deploy = yield* Bundler.bundle(path.join(directory, "deploy.ts"));
         expect(deploySource).toContain(
-          'import { Table as $Table } from "@confect/server";',
+          'import { Table as Table_ } from "@confect/server";',
         );
         expect(deploy.module.reads).toEqual({ fields: 1 });
         expect(Record.keys(deploy.metafile.inputs)).toContain(
@@ -684,7 +684,7 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
         );
         expect(declaration).toContain("declare const spec:");
         expect(declaration).toContain(
-          `Group.NamedAt<typeof ${lastRoot}Spec, "${lastRoot}">`,
+          `GroupSpec_.NamedAt<typeof ${lastRoot}Spec, "${lastRoot}">`,
         );
         expect(declaration).toContain(
           `typeof nested_${lastChild}_level3_level4_${lastDeep}Spec`,

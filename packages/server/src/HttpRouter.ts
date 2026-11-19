@@ -1,6 +1,6 @@
 import {
   type GenericActionCtx,
-  type HttpRouter as ConvexHttpRouter,
+  type HttpRouter as HttpRouter_,
   httpActionGeneric,
   httpRouter,
   ROUTABLE_HTTP_METHODS,
@@ -104,7 +104,7 @@ export type Routes<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
  */
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   routes: Routes<DatabaseSchema_>,
-): ConvexHttpRouter => {
+): HttpRouter_ => {
   applyMonkeyPatches();
 
   // Provided (not just merged) so that route layers' own construction—e.g.

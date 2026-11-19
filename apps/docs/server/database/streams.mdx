@@ -645,7 +645,7 @@ interface Entry {
 }
 
 // Notes and comments together, alphabetically by their text.
-const noteEntries = reader
+const notes = reader
   .table(notesTable)
   .stream("by_text") // visible ordering labels: ["text", "_creationTime"]
   .pipe(QueryStream.map((note): Entry => ({ kind: "note", text: note.text })));
@@ -661,7 +661,7 @@ const relabeled = reader
     QueryStream.renameKey(["text", "_creationTime"]),
   );
 
-const entries = QueryStream.merge([noteEntries, relabeled]);
+const entries = QueryStream.merge([notes, relabeled]);
 ```
 
 Relabeling changes the visible labels; key values and implicit-ID positions stay the same:
@@ -685,12 +685,12 @@ With matching key labels and implicit-ID positions, the two streams merge by the
 {/* stream-diagram: rename-key-merge */}
 
 ```text
-noteEntries
+notes
 ╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────────────────────────────────────────┤
 relabeled
 ╰───────────────────────────────────────────────────────────────────────── c1 ──────── c2 ──────── c3 ───────┤
 
-╞═ merge([noteEntries, relabeled]) ═╡
+╞═ merge([notes, relabeled]) ═╡
 
 merged
 ╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ──────── c1 ──────── c2 ──────── c3 ───────┤

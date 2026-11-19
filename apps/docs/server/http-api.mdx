@@ -99,7 +99,7 @@ Create the Convex HTTP router in `confect/http.ts` with `HttpRouter.make(routes)
 Confect's `HttpRouter` module collides with Effect's, so alias it on import:
 
 ```ts confect/http.ts
-import { HttpRouter as ConfectHttpRouter } from "@confect/server";
+import { HttpRouter as HttpRouter_ } from "@confect/server";
 import { flow } from "effect/Function";
 import * as Layer from "effect/Layer";
 import * as HttpMiddleware from "effect/http/HttpMiddleware";
@@ -108,7 +108,7 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as NotesApi from "./http/NotesApi";
 import * as ScalarDocs from "./http/ScalarDocs";
 
-const http = ConfectHttpRouter.make(
+const http = HttpRouter_.make(
   Layer.mergeAll(
     NotesApi.layer,
     ScalarDocs.layer,
@@ -122,7 +122,7 @@ const http = ConfectHttpRouter.make(
 export default http;
 ```
 
-If your routes require the generated, schema-typed `VectorSearch` service, supply the database model as a **type**: `import type schema from "./_generated/schema"` and call `ConfectHttpRouter.make<typeof schema>(routes)`. The handler still passes a table name to vector search; neither the router nor the search needs a runtime table registry.
+If your routes require the generated, schema-typed `VectorSearch` service, supply the database model as a **type**: `import type schema from "./_generated/schema"` and call `HttpRouter_.make<typeof schema>(routes)`. The handler still passes a table name to vector search; neither the router nor the search needs a runtime table registry.
 
 ## Routing semantics
 

@@ -1,4 +1,4 @@
-import { HttpRouter as ConfectHttpRouter } from "@confect/server";
+import { HttpRouter as HttpRouter_ } from "@confect/server";
 import { flow } from "effect/Function";
 import * as Layer from "effect/Layer";
 import * as HttpMiddleware from "effect/http/HttpMiddleware";
@@ -7,7 +7,7 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as NotesApi from "./http/NotesApi";
 import * as ScalarDocs from "./http/ScalarDocs";
 
-export default ConfectHttpRouter.make(
+export default HttpRouter_.make(
   Layer.mergeAll(
     NotesApi.layer,
     ScalarDocs.layer,

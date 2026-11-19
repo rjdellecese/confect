@@ -81,7 +81,7 @@ export default Table.make(() => Schema.Struct({
   dimensions: 3,
 });
 `,
-  "confect/http.ts": `import * as ConfectHttpRouter from "@confect/server/HttpRouter";
+  "confect/http.ts": `import * as HttpRouter_ from "@confect/server/HttpRouter";
 import * as Effect from "effect/Effect";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
@@ -89,11 +89,11 @@ import type databaseSchema from "./_generated/schema";
 import type { Id } from "./_generated/id";
 import { VectorSearch } from "./_generated/services";
 
-export const health = ConfectHttpRouter.make<typeof databaseSchema>(
+export const health = HttpRouter_.make<typeof databaseSchema>(
   HttpRouter.add("GET", "/health", HttpServerResponse.text("ok")),
 );
 
-const routes: ConfectHttpRouter.Routes<typeof databaseSchema> = HttpRouter.add(
+const routes: HttpRouter_.Routes<typeof databaseSchema> = HttpRouter.add(
   "GET", "/search", Effect.gen(function* () {
     const search = yield* VectorSearch;
     const matches: Array<{ _id: Id<"vectors">; _score: number }> = yield* search("vectors", "embedding", {
@@ -104,7 +104,7 @@ const routes: ConfectHttpRouter.Routes<typeof databaseSchema> = HttpRouter.add(
   }),
 );
 
-export default ConfectHttpRouter.make<typeof databaseSchema>(routes);
+export default HttpRouter_.make<typeof databaseSchema>(routes);
 `,
   "confect/notes.spec.ts": `import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
