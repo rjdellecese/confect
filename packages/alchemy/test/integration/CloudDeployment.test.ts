@@ -15,6 +15,7 @@ import * as Result from "effect/Result";
 import { Providers } from "@confect/alchemy/Providers";
 import { AlchemyContext } from "alchemy/AlchemyContext";
 import { apply } from "alchemy/Apply";
+import * as Drift from "alchemy/Drift";
 import { AuthProviders } from "alchemy/Auth/AuthProvider";
 import { CredentialsStoreLive } from "alchemy/Auth/Credentials";
 import { ProfileStoreLive } from "alchemy/Auth/Profile";
@@ -106,6 +107,51 @@ const makeHarness = (
 };
 
 describe("cloud deployment lifecycle", () => {
+  it.effect("does not report deployed code as verified by a drift check", () =>
+    Effect.gen(function* () {
+      const stack = { name: "integration", stage: "test" };
+      const services = yield* Layer.build(
+        Layer.mergeAll(
+          Code.layer.pipe(
+            Layer.provide(
+              Layer.succeed(CommandRunner, {
+                prepare: () => Effect.void,
+                deploy: () => Effect.void,
+              }),
+            ),
+          ),
+          inMemoryState({
+            integration: {
+              test: {
+                Code: {
+                  status: "created",
+                  resourceType: Convex.Code.Type,
+                  fqn: "Code",
+                  logicalId: "Code",
+                  instanceId: "instance",
+                  namespace: undefined,
+                  downstream: [],
+                  bindings: [],
+                  providerVersion: 0,
+                  props: {},
+                  attr: {
+                    name: "example",
+                    url: "https://example.convex.cloud",
+                  },
+                },
+              },
+            },
+          }),
+        ),
+      );
+      const result = yield* Effect.succeed(stack).pipe(
+        Effect.flatMap(Drift.detect),
+        Effect.orDie,
+        Effect.provideContext(services),
+      );
+      expect(result.resources.Code.action).toBe("skipped");
+    }),
+  );
   it.effect.each([false, true])(
     "cleans an interrupted create with retry=%s",
     (retry) =>

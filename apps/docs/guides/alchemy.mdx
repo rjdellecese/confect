@@ -135,6 +135,8 @@ You can also declare `Convex.EnvironmentVariables` separately. A standalone code
 
 Code is pushed on every Alchemy deployment, including when resource props have not changed. This deliberately catches source-only edits, workspace dependency changes, and out-of-band code pushes without relying on an incomplete file hash. Convex still performs its normal validation and deployment checks. Removing `Code` or `Backend` does not erase deployed functions or data.
 
+`alchemy drift` skips code resources because the provider cannot compare the deployed code with your source. Run `alchemy deploy` to push the current source.
+
 Projects and deployments **retain their cloud objects by default** when removed or destroyed. Alchemy drops the state entry, so managing a retained object again requires explicit adoption. To authorize deletion, use Alchemy's `RemovalPolicy.destroy()` on the resource. Deleting a project also deletes its deployments and data, even if an individual deployment was retained. Back up data before opting into deletion.
 
 The provider refuses project-team changes and deployment identity changes that could move or replace data. Create a separate resource and plan a migration instead. Existing resources found by name or reference require explicit Alchemy adoption; ambiguous matches fail rather than selecting an arbitrary object.

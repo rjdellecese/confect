@@ -30,7 +30,6 @@ export const Code = Resource<Code>("Convex.Code");
 export const provider = Effect.gen(function* () {
   const runner = yield* CommandRunner;
   return {
-    read: ({ output }) => Effect.succeed(output),
     diff: () => Effect.succeed({ action: "update" }),
     reconcile: ({ news }) =>
       deploy(news).pipe(Effect.provideService(CommandRunner, runner)),
