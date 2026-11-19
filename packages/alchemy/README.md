@@ -12,7 +12,9 @@ See the [deployment guide](https://confect.dev/guides/alchemy) for complete exam
 
 Use `Confect.Backend`'s `env` option to adopt existing readable environment variables and restore them on removal. To create or overwrite a name, including a hidden secret, declare a `Convex.AuthoritativeEnvironmentVariable`. It retains the value by default and cannot restore the previous one.
 
-Projects and deployments are retained by default. Treat your Alchemy state as a secret store: it contains deployment credentials and managed environment values. Code deployment runs on every apply and never deletes data when removed from a stack. All resources are cloud-backed, including in `alchemy dev`.
+Alchemy state can contain deploy keys and environment values. Keep local `.alchemy/` state out of Git. For shared deployments, use an access-controlled, encrypted [state backend](https://alchemy.run/state-store/) and protect its backups.
+
+Projects and deployments are retained by default. Code deployment runs on every apply and never deletes data when removed from a stack. All resources are cloud-backed, including in `alchemy dev`.
 
 ## Tests
 

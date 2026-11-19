@@ -62,11 +62,15 @@ pnpm alchemy deploy
 `Confect.Backend` runs `confect codegen`, then `convex deploy`. A codegen failure prevents the push. The deploy key selects the target explicitly, independently of the backend directory's environment files.
 
 <Warning>
-  Treat Alchemy state as a secret store. Deploy keys and managed environment
-  values are persisted in state; `Redacted` hides ordinary rendering, not
-  storage. Protect the state backend and its backups, and never commit
-  `.alchemy/` or return credentials as stack outputs. The example uses local
-  state; choose an appropriately secured shared state backend for CI.
+  You can load deploy keys and environment values from a CI secret store or an
+  [Alchemy secret provider](https://alchemy.run/environments/secret-providers/).
+  When you pass them to a resource, Alchemy can persist their values in state.
+  `Redacted` hides values in logs; it does not encrypt local state.
+
+Keep `.alchemy/` out of Git and never return credentials as stack outputs.
+For shared deployments, use an access-controlled, encrypted
+[state backend](https://alchemy.run/state-store/) and protect its backups.
+
 </Warning>
 
 ## Provision a project and deployment
