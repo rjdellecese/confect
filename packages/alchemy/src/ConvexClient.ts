@@ -12,9 +12,22 @@ import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
-import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { cloudOrigin } from "./internal/Target.js";
+import {
+  PlatformClients,
+  ConvexApiError,
+  type ConvexClientError,
+  apiFailure,
+  streamProjects,
+  environment,
+} from "./internal/PlatformClients.js";
+export {
+  ConvexApiError,
+  ConvexNotFound,
+  ConvexConflict,
+  type ConvexClientError,
+} from "./internal/PlatformClients.js";
 
 export type Project = ManagementApi.ProjectResponse;
 export type CreatedProject = ManagementApi.PlatformCreateProjectResponse;
@@ -49,46 +62,6 @@ interface Options {
   readonly token?: Redacted.Redacted<string>;
 }
 
-const failure = {
-  operation: Schema.String,
-  status: Schema.optionalKey(Schema.Int),
-  code: Schema.Literals([
-    "HttpError",
-    "TransportError",
-    "InvalidResponse",
-    "InvalidRequest",
-    "InvalidPagination",
-    "InvalidConfiguration",
-  ]),
-};
-export class ConvexApiError extends Schema.TaggedError<
-  ConvexApiError,
-  { readonly brand: unique symbol }
->()("ConvexApiError", failure) {
-  override get message() {
-    return `${this.operation} failed: ${this.code}${this.status === undefined ? "" : ` (${this.status})`}`;
-  }
-}
-export class ConvexNotFound extends Schema.TaggedError<
-  ConvexNotFound,
-  { readonly brand: unique symbol }
->()("ConvexNotFound", failure) {
-  override get message() {
-    return `${this.operation} failed: ${this.code}${this.status === undefined ? "" : ` (${this.status})`}`;
-  }
-}
-export class ConvexConflict extends Schema.TaggedError<
-  ConvexConflict,
-  { readonly brand: unique symbol }
->()("ConvexConflict", failure) {
-  override get message() {
-    return `${this.operation} failed: ${this.code}${this.status === undefined ? "" : ` (${this.status})`}`;
-  }
-}
-export type ConvexClientError =
-  | ConvexApiError
-  | ConvexNotFound
-  | ConvexConflict;
 type Operation<A> = Effect.Effect<A, ConvexClientError>;
 
 interface Service {
@@ -141,22 +114,6 @@ export class ConvexClient extends Context.Service<ConvexClient, Service>()(
   "@confect/alchemy/ConvexClient",
 ) {}
 
-const apiFailure = (
-  operation: keyof Service,
-  error: PlatformError.RequestFailure | PlatformError.InvalidPagination,
-): ConvexClientError => {
-  const fields = {
-    operation,
-    code: error._tag,
-    ...("status" in error ? { status: error.status } : {}),
-  };
-  if (error._tag === "HttpError" && error.status === 404)
-    return ConvexNotFound.make(fields);
-  if (error._tag === "HttpError" && error.status === 409)
-    return ConvexConflict.make(fields);
-  return ConvexApiError.make(fields);
-};
-
 const credential = (
   value: Redacted.Redacted<string>,
   operation: keyof Service,
@@ -172,9 +129,8 @@ const credential = (
     ),
   );
 
-export const layer = (options?: Options) =>
-  Layer.effect(
-    ConvexClient,
+export const layer = (options?: Options): Layer.Layer<ConvexClient> =>
+  Layer.effectContext(
     Effect.gen(function* () {
       const fallbackFetch = yield* FetchHttpClient.Fetch;
       const fallbackConfig = yield* ConfigProvider.ConfigProvider;
@@ -215,15 +171,7 @@ export const layer = (options?: Options) =>
           });
         });
       });
-      const management = <A>(
-        operation: keyof Service,
-        perform: (
-          c: ManagementClient.Service,
-        ) => Effect.Effect<
-          A,
-          PlatformError.RequestFailure | PlatformError.InvalidPagination
-        >,
-      ) =>
+      const managementClient = (operation: keyof Service) =>
         Effect.gen(function* () {
           const callContext = yield* Effect.context<never>();
           const token =
@@ -245,20 +193,15 @@ export const layer = (options?: Options) =>
               ));
           yield* Effect.fromResult(credential(token, operation));
           const fetch = yield* fetchForCall;
-          return yield* perform(
-            ManagementClient.make(token, {
-              fetch,
-              baseUrl: "https://api.convex.dev/v1",
-            }),
-          ).pipe(Effect.mapError((error) => apiFailure(operation, error)));
+          return ManagementClient.make(token, {
+            fetch,
+            baseUrl: "https://api.convex.dev/v1",
+          });
         });
-      const deployment = <A>(
+      const deploymentClient = (
         operation: keyof Service,
         url: string,
         key: Redacted.Redacted<string>,
-        perform: (
-          c: DeploymentClient.Service,
-        ) => Effect.Effect<A, PlatformError.RequestFailure>,
       ) =>
         Effect.gen(function* () {
           const origin = yield* Effect.fromResult(cloudOrigin(url)).pipe(
@@ -268,14 +211,25 @@ export const layer = (options?: Options) =>
           );
           yield* Effect.fromResult(credential(key, operation));
           const fetch = yield* fetchForCall;
-          return yield* perform(
-            DeploymentClient.make(origin, key, { fetch }),
-          ).pipe(Effect.mapError((error) => apiFailure(operation, error)));
+          return DeploymentClient.make(origin, key, { fetch });
         });
-      return ConvexClient.of({
-        listProjects: (id) =>
-          management("listProjects", (c) =>
-            Stream.runCollect(c.streamProjects(id)),
+      const management = <A>(
+        operation: keyof Service,
+        perform: (
+          c: ManagementClient.Service,
+        ) => Effect.Effect<A, PlatformError.RequestFailure>,
+      ) =>
+        managementClient(operation).pipe(
+          Effect.flatMap((client) =>
+            perform(client).pipe(
+              Effect.mapError((error) => apiFailure(operation, error)),
+            ),
+          ),
+        );
+      const client = ConvexClient.of({
+        listProjects: (teamId) =>
+          Stream.runCollect(
+            streamProjects(managementClient("listProjects"), teamId),
           ),
         getProject: (id) => management("getProject", (c) => c.getProject(id)),
         deleteProject: (id) =>
@@ -303,15 +257,20 @@ export const layer = (options?: Options) =>
         deleteDeployKey: (name, id) =>
           management("deleteDeployKey", (c) => c.deleteDeployKey(name, { id })),
         listEnvironmentVariables: (url, key) =>
-          deployment("listEnvironmentVariables", url, key, (c) =>
-            c.listEnvironmentVariables.pipe(
-              Effect.map((r) => r.environmentVariables),
-            ),
+          deploymentClient("listEnvironmentVariables", url, key).pipe(
+            Effect.flatMap((native) => environment(native).list),
           ),
         updateEnvironmentVariables: (url, key, changes) =>
-          deployment("updateEnvironmentVariables", url, key, (c) =>
-            c.updateEnvironmentVariables({ changes }),
+          deploymentClient("updateEnvironmentVariables", url, key).pipe(
+            Effect.flatMap((native) => environment(native).update(changes)),
           ),
       });
+      return Context.make(ConvexClient, client).pipe(
+        Context.add(PlatformClients, {
+          facade: client,
+          management: managementClient,
+          deployment: deploymentClient,
+        }),
+      );
     }),
   );

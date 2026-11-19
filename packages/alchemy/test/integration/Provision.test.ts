@@ -194,6 +194,37 @@ it.effect(
 );
 
 it.effect(
+  "does not fetch another project page after the registered provider finds a duplicate",
+  () =>
+    Effect.gen(function* () {
+      const cursors: (string | null)[] = [];
+      const fixture = stackFixture({
+        token: Redacted.make(token),
+        fetch: (request) =>
+          Effect.sync(() => {
+            const cursor = new URL(request.url).searchParams.get("cursor");
+            cursors.push(cursor);
+            if (cursor !== null) return new Response(null, { status: 500 });
+            return Response.json({
+              items: [project, { ...project, id: 13 }],
+              pagination: { hasMore: true, nextCursor: "unused" },
+            });
+          }),
+      });
+      const message = yield* failureOf(
+        fixture.plan(
+          Convex.Project("Project", {
+            teamId: project.teamId,
+            name: project.name,
+          }).pipe(Effect.asVoid),
+        ),
+      );
+      expect(message).toContain("More than one project");
+      expect(cursors).toEqual([null]);
+    }),
+);
+
+it.effect(
   "refuses ambiguous discovery and identity changes without modifying existing infrastructure",
   () =>
     Effect.gen(function* () {

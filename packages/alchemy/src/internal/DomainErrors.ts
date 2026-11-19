@@ -67,9 +67,30 @@ export class DeployKeyRecoveryRequired extends Schema.TaggedError<
   deploymentName: Schema.String,
   keyName: Schema.String,
   keyIds: Schema.Array(Schema.Int),
+  reason: Schema.Literals([
+    "missing saved secret",
+    "key not found",
+    "key name already exists",
+    "issuance uncertain",
+    "unverifiable issuance metadata",
+    "issued permissions differ",
+  ]),
 }) {
-  override get message() {
-    return `Cannot recover the deploy key: key not found or missing saved secret. Restore its state or provision a replacement.`;
+  override get message(): string {
+    switch (this.reason) {
+      case "missing saved secret":
+        return "Cannot recover the deploy key: missing saved secret. Restore its protected state or provision a replacement.";
+      case "key not found":
+        return "Tracked deploy key not found in Convex. Verify the deployment and key ID before provisioning a replacement.";
+      case "key name already exists":
+        return "A matching deploy-key name already exists. Restore its protected state to manage it, or choose a different name for a new key.";
+      case "issuance uncertain":
+        return "Convex may have issued a deploy key before its secret was saved. Check the deployment's keys and restore the state or revoke the untracked key before provisioning a replacement.";
+      case "unverifiable issuance metadata":
+        return "The key list did not identify the newly issued deploy key unambiguously. Check for matching key names before retrying.";
+      case "issued permissions differ":
+        return "The newly issued deploy key did not have the requested permissions. Verify the requested actions and the issuing token's permissions before retrying.";
+    }
   }
 }
 

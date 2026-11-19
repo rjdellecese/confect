@@ -160,6 +160,17 @@ Effect.gen(function* () {
 });
 ```
 
+To run a command before the push, pass `prepare` to `Convex.Code`. Give a reusable command the type `Convex.PrepareCommand` (also exported from `@confect/alchemy/Code`):
+
+```ts
+import type { Convex } from "@confect/alchemy";
+
+const prepare = {
+  command: "node",
+  args: ["scripts/generate.mjs"],
+} satisfies Convex.PrepareCommand;
+```
+
 You can also declare `Convex.EnvironmentVariables` separately. A standalone code resource must depend on its outputs if those variables need to be applied first; declaring resources in source order alone does not establish a dependency. `Confect.Backend` handles this ordering for its `env` option.
 
 ## Understand updates and deletion
@@ -170,7 +181,7 @@ Code is pushed on every Alchemy deployment, including when resource props have n
 
 Projects and deployments **retain their cloud objects by default** when removed or destroyed. Alchemy drops the state entry, so managing a retained object again requires explicit adoption. To authorize deletion, use Alchemy's `RemovalPolicy.destroy()` on the resource. Deleting a project also deletes its deployments and data, even if an individual deployment was retained. Back up data before opting into deletion.
 
-The provider refuses project-team changes and deployment identity changes that could move or replace data. Create a separate resource and plan a migration instead. Existing resources found by name or reference require explicit Alchemy adoption; ambiguous matches fail rather than selecting an arbitrary object.
+The provider refuses project-team changes and deployment identity changes that could move or replace data. Create a separate resource and plan a migration instead. Existing resources found by name or reference require explicit Alchemy adoption; ambiguous matches fail. Project discovery stops at the second project with the same team and name: `AmbiguousProject.projectIds` identifies those two matches, not every project with that name.
 
 If your deployment uses variables named both `Type` and `FQN`, put them in separate `Convex.EnvironmentVariables` resources. Alchemy interprets a map with both keys as a resource reference. The map also rejects `__proto__`, `__redacted__`, `__date__`, and `__bytes__` because Alchemy cannot reliably preserve those keys in state. For one of those names, manage it directly in Convex or use `Convex.AuthoritativeEnvironmentVariable` if you intend to overwrite it without restoring the old value.
 
@@ -178,7 +189,7 @@ Set `env: {}` to release all adopted variables and restore their original values
 
 If the deployed `convex.config.ts` declares a variable as required, drop the requirement in a code deployment before unsetting that variable. Otherwise Convex rejects the unset.
 
-Deploy-key secrets are only available when created. If the key's saved secret is lost, or the managed key no longer exists, deployment fails rather than silently rotating credentials. Restore the protected state or explicitly provision a replacement key. Deploy keys are revoked when their resource is destroyed.
+Deploy-key secrets are only available when created. If deployment stops with `DeployKeyRecoveryRequired`, use its `reason` and matching `keyIds` to decide what to do. For `"missing saved secret"`, restore protected state; for `"key not found"`, verify the deployment and key ID before provisioning a replacement. If `reason` is `"issuance uncertain"`, inspect the deployment's keys before creating another: Convex may have issued one even though its response was lost. The resource never silently rotates the credential. Deploy keys are revoked when their resource is destroyed.
 
 ## Troubleshoot a failed push
 

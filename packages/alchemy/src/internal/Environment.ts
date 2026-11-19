@@ -32,6 +32,7 @@ import {
 } from "./Recovery.js";
 import type { ConvexClientError } from "../ConvexClient.js";
 import { authorize } from "./Target.js";
+import * as Platform from "./PlatformClients.js";
 
 type Secret = Redacted.Redacted<string>;
 type Values = Readonly<Record<string, Secret>>;
@@ -160,6 +161,7 @@ const listed = (
     : Effect.succeed<Values>({});
 export const environment = Effect.gen(function* () {
   const client = yield* ConvexClient;
+  const platform = yield* Platform.forFacade(client);
   return {
     list: () => Effect.succeed([]),
     read: Effect.fn("Convex.EnvironmentVariables.read")(function* ({
@@ -218,10 +220,24 @@ export const environment = Effect.gen(function* () {
         return yield* EnvironmentTargetChange.make({ url: output.url });
       const names = Rec.keys(news.variables);
       yield* Effect.fromResult(checkNames(names));
-      const live = yield* listed(client, target.url, news.deployKey, [
-        ...names,
-        ...(output?.ownedNames ?? []),
-      ]);
+      const needsRead =
+        names.length > 0 || (output?.ownedNames.length ?? 0) > 0;
+      const deployment =
+        platform !== undefined && needsRead
+          ? yield* platform
+              .deployment(
+                "listEnvironmentVariables",
+                target.url,
+                news.deployKey,
+              )
+              .pipe(Effect.map(Platform.environment))
+          : undefined;
+      const live = needsRead
+        ? yield* (
+            deployment?.list ??
+              client.listEnvironmentVariables(target.url, news.deployKey)
+          )
+        : {};
       let basis = output;
       if (
         names.length > 0 &&
@@ -276,12 +292,17 @@ export const environment = Effect.gen(function* () {
                 : news.deployKey,
           },
         };
-        yield* attempt(owner, before, uncertain, () =>
-          client.updateEnvironmentVariables(
-            target.url,
-            news.deployKey,
-            changes,
-          ),
+        yield* attempt(
+          owner,
+          before,
+          uncertain,
+          () =>
+            deployment?.update(changes) ??
+            client.updateEnvironmentVariables(
+              target.url,
+              news.deployKey,
+              changes,
+            ),
         );
       }
       return attributes;

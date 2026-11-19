@@ -14,6 +14,8 @@ import { isResolved } from "alchemy/Diff";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as Platform from "./PlatformClients.js";
 
 import { ConvexClient, type ConvexClientError } from "../ConvexClient.js";
 import {
@@ -83,16 +85,22 @@ const projectTeam = (
   );
 };
 const findProject = Effect.fn("Convex.findProject")(function* (
-  client: typeof ConvexClient.Service,
+  stream: (
+    teamId: number,
+  ) => Stream.Stream<ManagementApi.ProjectResponse, ConvexClientError>,
   teamId: number,
   name: string,
 ) {
-  const projects = yield* ifPresent(client.listProjects(teamId));
-  if (projects === undefined) return undefined;
-  const matches = Array.filter(
-    projects,
-    (p) => p.teamId === teamId && p.name === name,
+  const matches = yield* ifPresent(
+    stream(teamId).pipe(
+      Stream.filter(
+        (project) => project.teamId === teamId && project.name === name,
+      ),
+      Stream.take(2),
+      Stream.runCollect,
+    ),
   );
+  if (matches === undefined) return undefined;
   if (matches.length > 1)
     return yield* AmbiguousProject.make({
       teamId,
@@ -115,6 +123,13 @@ const projectState = (
 
 export const projects = Effect.gen(function* () {
   const client = yield* ConvexClient;
+  const platform = yield* Platform.forFacade(client);
+  const stream =
+    platform !== undefined
+      ? (teamId: number) =>
+          Platform.streamProjects(platform.management("listProjects"), teamId)
+      : (teamId: number) =>
+          Stream.fromIterableEffect(client.listProjects(teamId));
   return {
     list: () => Effect.succeed([]),
     read: Effect.fn("Convex.Project.read")(function* ({
@@ -130,7 +145,7 @@ export const projects = Effect.gen(function* () {
       const project =
         output !== undefined
           ? yield* ifPresent(client.getProject(output.projectId))
-          : yield* findProject(client, olds.teamId, managedName);
+          : yield* findProject(stream, olds.teamId, managedName);
       if (project === undefined) return undefined;
       yield* Effect.fromResult(
         projectTeam(project.id, project.teamId, olds.teamId),
@@ -199,7 +214,7 @@ export const projects = Effect.gen(function* () {
         const updated = yield* client.updateProject(actual.id, { name });
         return projectState(updated, name);
       }
-      const found = yield* findProject(client, news.teamId, name);
+      const found = yield* findProject(stream, news.teamId, name);
       if (found !== undefined) {
         if (!(yield* allowDiscovery(owner)))
           return yield* IdentityConflict.make({
@@ -445,14 +460,18 @@ export const deployments = Effect.gen(function* () {
 const sameActions = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) =>
   Equal.equals(Array.sort(a, Order.String), Array.sort(b, Order.String));
 const recovery = (
+  reason: DeployKeyRecoveryRequired["reason"],
   deploymentName: string,
   keyName: string,
   keyIds: ReadonlyArray<number>,
-) => DeployKeyRecoveryRequired.make({ deploymentName, keyName, keyIds });
+) =>
+  DeployKeyRecoveryRequired.make({ reason, deploymentName, keyName, keyIds });
 const savedKey = (output: DeployKeyAttributes) =>
   usableKey(output.deployKey).pipe(
     Result.mapError(() =>
-      recovery(output.deploymentName, output.name, [output.keyId]),
+      recovery("missing saved secret", output.deploymentName, output.name, [
+        output.keyId,
+      ]),
     ),
   );
 const unchangedKey = (
@@ -506,6 +525,7 @@ const lookupKey = (
       if (related.length > 0)
         return yield* Result.fail(
           recovery(
+            "key name already exists",
             props.deploymentName,
             name,
             Array.map(related, (k) => k.id),
@@ -520,7 +540,9 @@ const lookupKey = (
     );
     if (Option.isNone(key))
       return yield* Result.fail(
-        recovery(output.deploymentName, output.name, [output.keyId]),
+        recovery("key not found", output.deploymentName, output.name, [
+          output.keyId,
+        ]),
       );
     if (
       props.allowedActions !== undefined &&
@@ -561,6 +583,7 @@ export const deployKeys = Effect.gen(function* () {
         olds._confectKeyIssue === true
       )
         return yield* recovery(
+          "issuance uncertain",
           olds.deploymentName,
           name,
           Array.map(
@@ -595,9 +618,12 @@ export const deployKeys = Effect.gen(function* () {
           client.listDeployKeys(output.deploymentName),
         );
         if (keys === undefined)
-          return yield* recovery(output.deploymentName, output.name, [
-            output.keyId,
-          ]);
+          return yield* recovery(
+            "key not found",
+            output.deploymentName,
+            output.name,
+            [output.keyId],
+          );
         const actual = yield* Effect.fromResult(
           lookupKey(keys, output.name, olds, output),
         );
@@ -631,7 +657,12 @@ export const deployKeys = Effect.gen(function* () {
         journal.row.props?._confectKeyIssue === true &&
         journal.row.attr === undefined
       )
-        return yield* recovery(news.deploymentName, name, []);
+        return yield* recovery(
+          "issuance uncertain",
+          news.deploymentName,
+          name,
+          [],
+        );
       const fresh = { props: { ...news }, attr: undefined };
       const { deployKey } = yield* attempt(
         owner,
@@ -655,16 +686,22 @@ export const deployKeys = Effect.gen(function* () {
             keyLabel(name, k.name),
         );
         const [created] = added;
-        if (
-          created === undefined ||
-          added.length !== 1 ||
-          (news.allowedActions !== undefined &&
-            !sameActions(created.allowedActions, news.allowedActions))
-        )
+        if (created === undefined || added.length !== 1)
           return yield* recovery(
+            "unverifiable issuance metadata",
             news.deploymentName,
             name,
             Array.map(added, (k) => k.id),
+          );
+        if (
+          news.allowedActions !== undefined &&
+          !sameActions(created.allowedActions, news.allowedActions)
+        )
+          return yield* recovery(
+            "issued permissions differ",
+            news.deploymentName,
+            name,
+            [created.id],
           );
         const attributes = {
           deploymentName: news.deploymentName,
