@@ -227,7 +227,13 @@ const ColumnSelection = Schema.Literals(["excluded", "included"]);
 const ExcludedTag = Schema.Literal("excluded");
 const TableSelection = Schema.Union(
   [
-    withAdditionalProperties({ _other: InclusionDefault }, ColumnSelection),
+    withAdditionalProperties(
+      {
+        _other: InclusionDefault,
+        _id: Schema.Literal("included").pipe(Schema.optionalKey),
+      },
+      ColumnSelection,
+    ),
     ExcludedTag,
   ],
   { mode: "oneOf" },
@@ -239,7 +245,7 @@ const ComponentSelection = Schema.Union(
   ],
   { mode: "oneOf" },
 );
-export const Selection: Schema.Decoder<unknown> = withAdditionalProperties(
+const Selection = withAdditionalProperties(
   { _other: InclusionDefault },
   ComponentSelection,
 );

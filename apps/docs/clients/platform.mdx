@@ -46,6 +46,10 @@ const firstTenNames = (teamId: number) =>
 
 By default the upstream SDK uses `https://api.convex.dev/v1`, or the host configured by `CONVEX_PROVISION_HOST`. To select the destination explicitly, pass `{ baseUrl: "https://api.convex.dev/v1" }` to `ManagementClient.make`. Only use trusted URLs and fetch implementations: they receive the access token.
 
+When inviting a member, pass a built-in `role` (`"admin"` or `"developer"`) without `customRoles`, or pass `role: "custom"` with a non-empty `customRoles` list. For an existing member, pass `{ memberId, role: "developer" }` to assign a built-in role, or `{ memberId, customRoles: [roleId] }` to assign custom roles.
+
+When creating a deployment, only `"dev"` and `"prod"` accept an `isDefault` flag. Omit it for `"preview"` and `"custom"`, even if you would otherwise set it to `false`.
+
 ## Call a deployment API
 
 Use the full URL returned by Convex for a regional deployment. A bare deployment name selects the US East cloud URL. Supply a deployment credential with permission for the operation; don't put administrative credentials in browser code.
@@ -68,6 +72,28 @@ Operations with no inputs, such as `getDeploymentInfo` and `listEnvironmentVaria
 Data-sync revision timestamps (`values[].ts`, `status.snapshotTs`, and active-sync `status.syncedTs`) are `bigint` values, so you can compare consecutive revisions without losing precision. Use `.toString()` if you need to store one in JSON. These operations require a runtime with JSON parse source access, such as Node.js 24 or later. Wall-clock milliseconds such as `lastUpdated` and numbers inside exported documents remain JavaScript numbers.
 
 Use `createLogStream` to configure a log destination. The separate `ConvexEventLog` type describes delivered events by `topic`; it isn't a subscription or a runtime webhook validator.
+
+### Select data for sync or S3 export
+
+Use `default` for unlisted names and put overrides in `components`, `tables`, or `columns`. The empty component name selects the root component. The following selection exports the root `posts` table except for its `draftNotes` column; everything else is excluded.
+
+```ts
+import type { DeploymentClient } from "@confect/platform";
+
+const posts = {
+  default: "excluded",
+  components: {
+    "": {
+      default: "excluded",
+      tables: {
+        posts: { default: "included", columns: { draftNotes: "excluded" } },
+      },
+    },
+  },
+} satisfies DeploymentClient.Selection;
+```
+
+Pass `{ selection: posts }` to `syncData`, or use the same `selection` when creating or updating an S3 log stream. Use `"excluded"` to omit a named table or component entirely; to include it, supply a nested selection. Convex always includes the `_id` column of an exported document. The client handles Convex's `_other` wire key.
 
 ## Provide a client to other Effects
 

@@ -103,7 +103,31 @@ function generate(api, document) {
       }
       if (oneOf.length === 1) return emit(oneOf[0]);
       return `Schema.Union([${Array.join(
-        Array.map(oneOf, (part) => emit(part)),
+        Array.map(oneOf, (part) => {
+          if (
+            api === "deployment" &&
+            name === "TableSelection" &&
+            part.type === "object"
+          ) {
+            assert.equal(
+              part.additionalProperties.$ref,
+              "#/components/schemas/ColumnSelection",
+            );
+            assert.match(
+              part.additionalProperties.description,
+              /`_id`\s+cannot be excluded\./,
+            );
+            assert(!Obj.has(part.properties, "_id"));
+            return emit({
+              ...part,
+              properties: {
+                ...part.properties,
+                _id: { type: "string", enum: ["included"] },
+              },
+            });
+          }
+          return emit(part);
+        }),
         ", ",
       )}], {mode: "oneOf"})`;
     }
@@ -250,10 +274,10 @@ const withAdditionalProperties = (fields: Schema.Struct.Fields, additional: Sche
     : ""
 }
 ${Array.join(
-  Array.map([...components], ([name, value]) =>
-    api === "deployment" && name === "Selection"
-      ? `export const Selection: Schema.Decoder<unknown> = ${value};`
-      : `${api === "deployment" && ["DataSyncResponse", "ActiveDataSync", "ListActiveSyncsResponse"].includes(name) ? "export " : ""}const ${name} = ${value};`,
+  Array.map(
+    [...components],
+    ([name, value]) =>
+      `${api === "deployment" && ["DataSyncResponse", "ActiveDataSync", "ListActiveSyncsResponse"].includes(name) ? "export " : ""}const ${name} = ${value};`,
   ),
   "\n",
 )}
