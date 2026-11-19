@@ -1,4 +1,4 @@
-import { ConvexClient } from "@confect/alchemy/ConvexClient";
+import { ConvexClient, ConvexNotFound } from "@confect/alchemy/ConvexClient";
 import { it, expect } from "@effect/vitest";
 import { AdoptPolicy, Unowned } from "alchemy/AdoptPolicy";
 import * as Effect from "effect/Effect";
@@ -19,6 +19,31 @@ const attrs: Deployment.DeploymentAttributes = {
   region: "aws-us-east-1",
   url: "https://happy-otter-123.convex.cloud",
 };
+
+it.effect("recovers an interrupted create after the project is gone", () => {
+  const mock = mockClient();
+  return Effect.gen(function* () {
+    const provider = yield* Deployment.provider;
+    const observed = yield* provider.read({
+      ...lifecycle,
+      olds: props,
+      output: undefined,
+    });
+    expect(observed).toBeUndefined();
+  }).pipe(
+    Effect.provideService(ConvexClient, {
+      ...mock.client,
+      listDeployments: () =>
+        Effect.fail(
+          ConvexNotFound.make({
+            operation: "listDeployments",
+            code: "HttpError",
+            status: 404,
+          }),
+        ),
+    }),
+  );
+});
 
 it.effect(
   "reconciles repeatedly and repairs reference drift without replacement",

@@ -154,7 +154,7 @@ export const provider = Effect.gen(function* () {
       const deployment = yield* find(
         olds.projectId,
         olds.reference ?? resourceName("deployment", instanceId),
-      );
+      ).pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
       if (deployment === undefined) return;
       const current = yield* attributes(deployment);
       return (yield* Effect.isSuccess(validate(current, olds)))

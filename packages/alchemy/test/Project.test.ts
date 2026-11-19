@@ -1,10 +1,35 @@
-import { ConvexClient } from "@confect/alchemy/ConvexClient";
+import { ConvexClient, ConvexNotFound } from "@confect/alchemy/ConvexClient";
 import { it, expect } from "@effect/vitest";
 import { Unowned } from "alchemy/AdoptPolicy";
 import * as Effect from "effect/Effect";
 
 import * as Project from "@confect/alchemy/Project";
 import { lifecycle, mockClient, project } from "./fixtures/ConvexClient";
+
+it.effect("recovers an interrupted create after the team is gone", () => {
+  const mock = mockClient();
+  return Effect.gen(function* () {
+    const provider = yield* Project.provider;
+    const observed = yield* provider.read({
+      ...lifecycle,
+      olds: { teamId: 10 },
+      output: undefined,
+    });
+    expect(observed).toBeUndefined();
+  }).pipe(
+    Effect.provideService(ConvexClient, {
+      ...mock.client,
+      listProjects: () =>
+        Effect.fail(
+          ConvexNotFound.make({
+            operation: "listProjects",
+            code: "HttpError",
+            status: 404,
+          }),
+        ),
+    }),
+  );
+});
 
 it.effect(
   "creates once, observes drift, and updates only changed names",

@@ -122,7 +122,7 @@ export const provider = Effect.gen(function* () {
       const project = yield* find(
         olds.teamId,
         olds.name ?? resourceName("project", instanceId),
-      );
+      ).pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));
       return project !== undefined ? Unowned(attributes(project)) : undefined;
     }),
     reconcile: Effect.fn("Project.reconcile")(function* ({

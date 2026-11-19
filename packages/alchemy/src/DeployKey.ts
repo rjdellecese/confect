@@ -60,6 +60,10 @@ export class DeployKeyChangeRequiresNewResource extends Schema.TaggedError<
 
 export const provider = Effect.gen(function* () {
   const client = yield* ConvexClient;
+  const readKeys = (deploymentName: string) =>
+    client
+      .listDeployKeys(deploymentName)
+      .pipe(Effect.catchTag("ConvexNotFound", () => Effect.succeed([])));
   const hasName = (keyName: string, name: string) =>
     keyName === name ||
     (Str.startsWith(`${name} (`)(keyName) &&
@@ -81,7 +85,7 @@ export const provider = Effect.gen(function* () {
             field,
           });
       }
-      const keys = yield* client.listDeployKeys(output.deploymentName);
+      const keys = yield* readKeys(output.deploymentName);
       const key = Option.getOrUndefined(
         Arr.findFirst(keys, (candidate) => candidate.id === output.keyId),
       );
@@ -113,7 +117,7 @@ export const provider = Effect.gen(function* () {
       const deploymentName = output?.deploymentName ?? olds.deploymentName;
       if (deploymentName === undefined) return;
       const name = output?.name ?? olds.name ?? resourceName("key", instanceId);
-      const keys = yield* client.listDeployKeys(deploymentName);
+      const keys = yield* readKeys(deploymentName);
       if (output !== undefined) {
         const key = Option.getOrUndefined(
           Arr.findFirst(keys, (candidate) => candidate.id === output.keyId),
@@ -154,7 +158,7 @@ export const provider = Effect.gen(function* () {
               field,
             });
         }
-        const keys = yield* client.listDeployKeys(output.deploymentName);
+        const keys = yield* readKeys(output.deploymentName);
         const key = Option.getOrUndefined(
           Arr.findFirst(keys, (candidate) => candidate.id === output.keyId),
         );
@@ -231,6 +235,14 @@ export const provider = Effect.gen(function* () {
       );
     }),
     delete: Effect.fn("DeployKey.delete")(function* ({ output }) {
+      if (!Redacted.isRedacted(output.deployKey)) {
+        const keys = yield* readKeys(output.deploymentName);
+        if (Arr.some(keys, (key) => key.id === output.keyId))
+          return yield* recover(output.deploymentName, output.name, [
+            output.keyId,
+          ]);
+        return;
+      }
       yield* client
         .deleteDeployKey(output.deploymentName, output.deployKey)
         .pipe(Effect.catchTag("ConvexNotFound", () => Effect.void));

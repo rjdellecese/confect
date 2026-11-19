@@ -1,4 +1,8 @@
-import { ConvexApiError, ConvexClient } from "@confect/alchemy/ConvexClient";
+import {
+  ConvexApiError,
+  ConvexClient,
+  ConvexNotFound,
+} from "@confect/alchemy/ConvexClient";
 import * as Arr from "effect/Array";
 import { it, expect, assert } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -12,6 +16,31 @@ const props: DeployKey.DeployKeyProps = {
   deploymentName: "happy-otter-123",
   name: "example",
 };
+
+it.effect("recovers an interrupted create after the deployment is gone", () => {
+  const mock = mockClient();
+  return Effect.gen(function* () {
+    const provider = yield* DeployKey.provider;
+    const observed = yield* provider.read({
+      ...lifecycle,
+      olds: props,
+      output: undefined,
+    });
+    expect(observed).toBeUndefined();
+  }).pipe(
+    Effect.provideService(ConvexClient, {
+      ...mock.client,
+      listDeployKeys: () =>
+        Effect.fail(
+          ConvexNotFound.make({
+            operation: "listDeployKeys",
+            code: "HttpError",
+            status: 404,
+          }),
+        ),
+    }),
+  );
+});
 
 it.effect(
   "revokes only the just-issued key when its metadata lookup fails",
@@ -259,6 +288,33 @@ it.effect(
     }).pipe(Effect.provideService(ConvexClient, mock.client));
   },
 );
+
+it.effect("never sends a lost secret as a key name during destroy", () => {
+  const mock = mockClient();
+  return Effect.gen(function* () {
+    const provider = yield* DeployKey.provider;
+    const output = yield* provider.reconcile({
+      ...lifecycle,
+      news: props,
+      olds: undefined,
+      output: undefined,
+    });
+    const placeholder = "<redacted>";
+    const lost = { ...output };
+    Reflect.set(lost, "deployKey", placeholder);
+    mock.state.keys.push(key({ id: 2, name: placeholder }));
+    const request = { ...lifecycle, olds: props, output: lost };
+    const result = yield* Effect.result(provider.delete(request));
+    expect(result).toMatchObject({
+      _tag: "Failure",
+      failure: { _tag: "DeployKeyRecoveryRequired", keyIds: [output.keyId] },
+    });
+    expect(mock.client.deleteDeployKey).not.toHaveBeenCalled();
+    mock.state.keys = [key({ id: 2, name: placeholder })];
+    yield* provider.delete(request);
+    expect(mock.state.keys).toHaveLength(1);
+  }).pipe(Effect.provideService(ConvexClient, mock.client));
+});
 
 it.effect(
   "observes key revocation and permission drift during planning",
